@@ -216,7 +216,13 @@ branches that evidenced no done-when line stop the chain and the person is asked
 branch dispatched (`scripts/validate-session.mjs`). After every transition the orchestrator prints to
 the root chat exactly the two lines `resources/interaction.json#transitionLog` declares — the branch
 goal, then its outcome with the count of evidenced done-when lines, the artifact paths and the next
-cell — and records `logged: true` on the transition; full outputs stay in the session folder.
+cell. For an accepted v2.2 done result it also runs `scripts/render-outcome.mjs <branch>` and emits the
+returned **The best outcome** Markdown/media visibly in the root chat: the selected UI render as an
+embedded image, or the operator's readable code/diff, diagram, table, document or measured result.
+The bound `response.json.outcome` and `resources/outcomes.json` define what to show. Only after both
+the transition pair and required outcome block are shown does it record `logged: true`; full evidence
+stays in the session folder. A failed or incomplete attempt shows its truthful state and repair step,
+never a successful best-outcome claim.
 
 A rule a person states in their own words is restated to them before anything is designed on it:
 `business.decide` and `architecture.decide` write a `restatement` of at most five lines in the

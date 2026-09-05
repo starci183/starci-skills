@@ -1,10 +1,6 @@
 # data.plan — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
-
-## Job
-
-Name every seed the mission needs once — one unit per flow the UAT plan names and per data family the goal names — each with its goal, its own namespace, its target stores, its representative volume and its rollback, so that the blind seeders that follow each place one unit and no two of them ever share a row.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback. Context is limited to what request.json names.
 
 ## Done when
 
@@ -14,7 +10,7 @@ Primary output: `seed-plan`
 
 ## Inputs
 
-`uat-plan` (optional), `surface-map` (optional)
+`uat-plan`?, `surface-map`?
 
 ## Outputs
 

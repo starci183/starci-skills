@@ -117,6 +117,17 @@ danh tính là `declared` cho `env`, và một hash đã đổi giữa lúc vi�
 `approval` không có mặc định: một danh tính mà các luồng khác dùng chung không bao giờ bị đổi trên sự
 im lặng.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| alias có đúng provider account, role, membership và login product thật | tái dùng không mutation | ghi stable account ref và browser login proof mới | publish action `reuse` |
+| alias thiếu | tạo với sealed credential chỉ resolve trong request body/form | xác minh provider, role, membership và login thật tại endpoint đã bind | publish action `create` |
+| account sai hoặc login fail | chỉ sửa field thuộc provider bị sai | lặp login thật và check membership đổi | publish action `repair` hoặc exact `IDENTITY_UNPROVEN` delta |
+| provider effect không chắc | không tạo account trùng | đọc lại bằng stable account ref và username | chỉ resume khi biết reuse hay bounded repair |
+
 ## Ranh giới ghi
 
 Context chỉ đọc, trừ phần delta đã duyệt. Operator tạo tài khoản tại provider mà entry sổ đăng ký khai,
@@ -163,9 +174,9 @@ check bắt buộc vắng mặt hay hỏng.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào và resume theo generation đã đóng băng | `resume` | `request/request.json`, @worktrees/sessions/central-runtime tại generation đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng thẩm quyền — một id phê duyệt, hoặc bản khai báo của môi trường được đọc lại và băm lại — và chạy preflight danh tính `scripts/identity-custody.mjs` qua @tools/shell, chứng minh custody theo tên chứ không bao giờ theo giá trị | `approval`, `env` | @workspaces/device-state cho tên và custody của thông tin xác thực niêm phong, bản khai báo của môi trường khi `approval` tham chiếu tới nó, @tools/secrets | — | `AUTHORITY_DRIFT`, `PROVISIONING_UNAVAILABLE` |
-| 3 | Đọc khai báo danh tính của entry và thư mục luồng, và phác tài liệu luồng từ khuôn khi nó còn thiếu | `routeKey`, `flow` | @worktrees/sessions/central-runtime cho provider và realm mà entry khai, @worktrees/uat/&lt;flow> cho hồ sơ và tài liệu hiện có, @worktrees/_templates cho khuôn luồng | @worktrees/uat/&lt;flow>, @tools/sourcewrite | `INVALID_INPUT` |
-| 4 | Tạo tài khoản của từng alias tại provider với thông tin xác thực niêm phong được phân giải theo tên vào body của request, hoặc xoay custody quản trị dưới principal đã ràng và stage ciphertext của nó | `desiredState`, `identityRotation` | @worktrees/uat/&lt;flow> cho các alias mà tài liệu luồng nêu, @workspaces/device-state cho thông tin xác thực theo tên, @tools/secrets, @tools/http | `response/data/delta.json` | `PROVISIONING_UNAVAILABLE` |
-| 5 | Chứng minh bộ proof danh tính: provider tới được, thông tin xác thực giải được, từng tài khoản tồn tại và đăng nhập được qua @tools/browsercontrol hay endpoint token, và không thông tin xác thực nào được ghi ở bất cứ chỗ nào đã viết | — | @worktrees/sessions/central-runtime cho provider, @tools/http, @tools/browsercontrol | `response/data/checks.json` | `IDENTITY_UNPROVEN` |
+| 3 | Kiểm provider đã khai và từng flow alias, phân loại stable provider account, role, membership và prior login evidence là reusable, missing hoặc invalid | `routeKey`, `flow` | @worktrees/sessions/central-runtime cho provider và realm mà entry khai, @worktrees/uat/&lt;flow> cho hồ sơ và tài liệu hiện có, @worktrees/_templates cho khuôn luồng | @worktrees/uat/&lt;flow>, @tools/sourcewrite | `INVALID_INPUT` |
+| 4 | Tái dùng account hợp lệ, tạo account thiếu, và chỉ sửa role, membership hoặc credential state thuộc provider bị sai; không tạo trùng account chưa chắc | `desiredState`, `identityRotation` | @worktrees/uat/&lt;flow> cho các alias mà tài liệu luồng nêu, @workspaces/device-state cho thông tin xác thực theo tên, @tools/secrets, @tools/http | `response/data/delta.json` | `PROVISIONING_UNAVAILABLE` |
+| 5 | Chứng minh provider reachability, credential custody, role và membership, rồi login thật qua product endpoint đã bind trong browser context mới; token-only proof không đủ | — | @worktrees/sessions/central-runtime cho provider, @tools/http, @tools/browsercontrol | `response/data/checks.json` | `IDENTITY_UNPROVEN` |
 | 6 | Ghi hồ sơ tài khoản chỉ gồm tên vào thư mục luồng và công bố nó | `flow`, `env` | `response/data/delta.json` cho các tài khoản đã tạo | @worktrees/uat/&lt;flow>, `response/data/account.json` | — |
 | 7 | Viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 
@@ -181,6 +192,10 @@ Một lần resume bắt đầu lại từ cổng vào, chỉ dùng lại quan s
 | `delta` | `response/data/delta.json` | data | có |
 | `checks` | `response/data/checks.json` | data | có |
 | `uat-account` | `response/data/account.json` | data | không |
+
+## Kết quả tốt nhất
+
+Với provisioning, in **Kết quả tốt nhất** là bảng reuse, create hoặc repair theo alias từ `response/data/delta.json` cùng kết quả đăng nhập an toàn trong `response/data/checks.json`; `response/data/account.json` có thể nêu tài khoản bằng tên làm evidence phụ. Với admin rotation, hiện credential cũ bị từ chối và credential thay thế được chấp nhận mà không phát account record; không bao giờ in, link hay sao chép giá trị credential, sealed file hoặc lệnh chứa secret, và login chưa chứng minh phải được hiện là chưa chứng minh.
 
 ## Dừng
 

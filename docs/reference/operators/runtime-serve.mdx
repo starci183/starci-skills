@@ -257,6 +257,17 @@ environment's standing answer counts as the approval, not that the question stop
 `portClaims` defaults to the empty list, because most rungs need no port at all and a claim nobody
 made cannot collide with anybody.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| entry serves a head containing requested commit with matching config and health | reuse process and lease; do not restart | read generation, ancestry, endpoint, process and probes | emit existing runtime receipt |
+| process or entry missing | create generation and start source-owned command on projected port | prove served head ancestry and health | emit created generation and lease |
+| head/config/health invalid | under exclusive lease update integration head or declared process | reread generation, process, ancestry and health | new repair attempt; foreign owner handoff |
+| start ownership uncertain | do not kill or overwrite | record pid, port and registry mismatch | block until ownership is proved |
+
 ## Boundary
 
 Context is read-only apart from the approved delta. The operator applies only the approved effect
@@ -313,10 +324,10 @@ release approval, or UAT proof.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and the resume against the frozen generation | `resume` | `request/request.json`, @worktrees/sessions/central-runtime at the frozen generation | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the authority — an approval id, or the environment's declaration re-read and re-hashed — and the registry-write capability by name | `approval`, `env` | @workspaces/device-state for the capability handle with its custody evidence, the environment's declaration when `approval` references it, @tools/secrets | — | `AUTHORITY_DRIFT`, `CAPABILITY_MISSING` |
-| 3 | Recheck the route's entry once before anything changes, and refuse a fingerprint that moved | `routeKey` | @worktrees/sessions/central-runtime for the entry re-observed, @tools/git for the served head | — | `INVENTORY_DRIFT` |
+| 3 | Recheck the route entry and classify its process, generation, served head, configuration and health as reusable, missing, invalid or uncertain before any effect | `routeKey` | @worktrees/sessions/central-runtime for the entry re-observed, @tools/git for the served head | — | `INVENTORY_DRIFT` |
 | 4 | Resolve the port claims against the projection and record who holds each | `portClaims` | @workspaces/ports/&lt;project> for the projected ports, @worktrees/sessions/central-runtime for their observed holders, @tools/shell for the socket table | — | `PORT_CONFLICT` |
-| 5 | Write the delta between the observed entry and the desired state | `desiredState` | @worktrees/sessions/central-runtime for the observed entry, `request/request.json` for the desired state | `response/data/delta.json` | `EFFECT_UNAUTHORIZED` |
-| 6 | Climb the named rung under the lease — bring the infra up, locate the checkouts, start the role, merge `commit` into the integration branch and serve, restart, reset or stop the one detached server through `scripts/serve-runtime.mjs` — or queue behind the session that holds the lease | `operation`, `commit` | @workspaces/projects/&lt;project>/&lt;role> for the dev command and the integration branch, input `changes` for the session's write set, @worktrees/sessions/central-runtime for the lease and queue, @tools/git, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json`, `changes` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
+| 5 | Write the desired delta: reuse a matching healthy generation, create a missing generation, or update only invalid declared fields; an uncertain or foreign holder is never mutated | `desiredState` | @worktrees/sessions/central-runtime for the observed entry, `request/request.json` for the desired state | `response/data/delta.json` | `EFFECT_UNAUTHORIZED` |
+| 6 | Under the lease perform only the classified create or update, queue on conflict, and preserve the previous effect transcript so a resume never blindly repeats it | `operation`, `commit` | @workspaces/projects/&lt;project>/&lt;role> for the dev command and the integration branch, input `changes` for the session's write set, @worktrees/sessions/central-runtime for the lease and queue, @tools/git, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json`, `changes` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
 | 7 | Attest the entry: probe every declared endpoint, record the served head, what it contains and the server record, and set the status from what answered | — | @worktrees/sessions/central-runtime for the entry's endpoints, @tools/http | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE` |
 | 8 | Prove the rung's whole check set against the attested entry | — | @worktrees/sessions/central-runtime re-read against the rung's proof set, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 9 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
@@ -341,6 +352,10 @@ Raw gate evidence stays bound to this merged head.
 | `delta` | `response/data/delta.json` | data | yes |
 | `checks` | `response/data/checks.json` | data | yes |
 | `changes` | `response/changes.md` | md | no |
+
+## The best outcome
+
+For `stack-up`, `locate`, `start-role`, `serve`, `restart` or `reset`, print **The best outcome** as the resulting URL, generation and attested head in `response/response.md`, with `response/data/checks.json` and `response/data/delta.json` as secondary evidence; a proved reuse is labeled a no-op. For `stop`, show the stopped generation and released lease or port instead of a URL; a held port, stale head or failed probe leads with the conflicting holder or observation and never offers the route as ready.
 
 ## Stops
 

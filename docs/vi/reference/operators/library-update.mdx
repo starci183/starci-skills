@@ -28,8 +28,8 @@ Cập nhật một package của owner đã được uỷ quyền rõ ràng từ
 package, sửa nó, tăng version patch, build và gate package, rồi tiêu thụ đúng bản phát hành ấy trong
 metadata dependency của consumer cùng proof regression consumer không đổi, trong hai commit phiên chịu
 trách nhiệm cho từng byte của cả hai; `mode` nói nhánh này chạy nửa nào, nên một package owner và một
-consumer nằm ở hai repository là hai route, hai phiên và hai nhánh của cùng operator này chứ không
-phải một việc không ai khai nổi.
+consumer nằm ở hai repository dùng hai worktree và hai nhánh cô lập trong chính một phiên user host,
+cả hai do operator này sở hữu chứ không tách thành hai việc không liên quan.
 
 ## Xong khi
 
@@ -45,7 +45,8 @@ trên đó, và `changes` nêu các đường dẫn của cả hai commit; hoặ
 dừng tại `library-release` ấy cạnh `library-archive` của nó, đã phát hành lên registry mà manifest
 package gọi tên dưới đúng integrity của archive trừ khi yêu cầu xin không phát hành, mà không chạm
 metadata consumer nào; hoặc,
-dưới mode `consume`, riêng nửa consumer chạy trên `library-release` mà một phiên anh em đã sinh, ghi
+dưới mode `consume`, riêng nửa consumer chạy trên `library-release` mà nhánh owner trước đó trong cùng
+phiên user host đã sinh, hoặc một bản phát hành lịch sử tương thích được import từ phiên anh em, ghi
 đúng một commit metadata và không ghi một dòng source package nào.
 
 ## Một package, một consumer, một việc
@@ -76,8 +77,8 @@ gate bên dưới chỉ đọc đúng nửa mà chế độ ấy cần:
   chính câu trả lời của registry làm lý do — không bao giờ là một receipt lặng lẽ ghi pending. Chỉ một
   trường hợp pending là hợp lệ: yêu cầu đặt sẵn `publish: false` vì người sẽ tự phát hành archive ấy.
 - `consume` — riêng route consumer. `consumer` được cấp còn `plan` thì không; đầu vào là
-  `library-release` của một nhánh trước — của phiên anh em đã import vào phiên này, hoặc của một nhánh
-  sớm hơn trong chính phiên này — và việc đúng bằng nửa consumer: delta manifest chính xác, danh tính
+  `library-release` của nhánh owner trước đó trong phiên user host này, hoặc một bản phát hành lịch sử
+  tương thích từ phiên anh em được import vào, và việc đúng bằng nửa consumer: delta manifest chính xác, danh tính
   lock, bao đóng dependency và các proof consumer trên bản phát hành ấy. Không ghi source package,
   receipt không được mang tiết mục package nào, và danh tính package cùng version tiêu thụ được đọc từ
   bản ghi phát hành chứ không từ một plan. Bản ghi ấy có thể `published` hoặc `pending`; pending giờ là
@@ -85,16 +86,20 @@ gate bên dưới chỉ đọc đúng nửa mà chế độ ấy cần:
   metadata trỏ về chỗ không checkout nào khác có là `DEPENDENCY_BOUNDARY_REJECTED`.
 
 Vậy một package owner ở repository này và consumer của nó ở repository khác là một nhánh `publish`
-trên route owner và một nhánh `consume` trên route consumer, nhánh sau bind `library-release` của
-nhánh trước qua `producer-import`; một route `chain` gọi tên operator này là đang xin cái thứ nhất.
+trong worktree owner cô lập và một nhánh `consume` trong worktree consumer cô lập thuộc cùng phiên
+user host. Nhánh sau bind `library-release` của nhánh trước qua `producer-import`; import chéo phiên
+lịch sử vẫn tương thích. Một route `chain` gọi tên operator này là đang xin nhánh đầu tiên.
 
 ## Ranh giới nửa package
 
 Manifest package tại base đóng băng chứng minh danh tính package; tên thư mục do caller đưa không đủ.
 Mọi file đã khai nằm trong package và write roots của route. Từ chối symlink, package lồng, file
-consumer, dependency mới, sửa script, asset, cấu trúc markup, class và inline style. File behavior là một
-script, hoặc chính style sheet mà package giao các recipe của nó trong đó — họ nào giữ luật bằng CSS thì sửa
-sheet ấy như behavior, với cùng regression cặp đôi đọc recipe. Chỉ sửa file
+consumer, dependency mới, sửa script, asset chưa khai và delta công khai chưa khai. Plan behavior có
+thể khai rõ delta prop, anatomy, semantic-attribute, token, claim hoặc class kèm bằng chứng owner cụ
+thể và tác động consumer chính xác; markup và attribute ngữ nghĩa hiện thực contract package đã khai
+khi ấy thuộc lần sửa của owner. File behavior là một script, hoặc chính style sheet mà package giao
+các recipe của nó trong đó — họ nào giữ luật bằng CSS thì sửa sheet ấy như behavior, với cùng
+regression cặp đôi đọc recipe. Chỉ sửa file
 hành vi hiện có, regression test đi cặp, version patch kế tiếp trong manifest hiện có, changelog
 package và metadata version của package trong lockfile. Lockfile workspace chỉ được phép khi cả plan và
 route đều gọi tên; JSON chỉ được thay version của entry package đã bind. Presentation đi qua pipeline
@@ -135,7 +140,10 @@ package đó; một entry link workspace giữ nguyên. Version mà workspace kh
 
 Chạy `validate.mjs <branch> --preflight` trước khi ghi. Gate đọc các plan có kiểu mà chế độ gọi tên,
 route đã bind và Git, từ chối cây bẩn và chứng minh ranh giới của những nửa sắp chạy; đường dẫn package
-chỉ được giải nơi có nửa package chạy. Dưới `full` và `publish`, viết test đi cặp trước rồi chạy
+chỉ được giải nơi có nửa package chạy. Trước mọi mutation, nó còn đóng băng manifest Grammar chính
+xác và brief hiểu family tách ngữ nghĩa Common, phong cách family và dữ kiện sản phẩm, rồi ghi thứ tự
+tìm kiếm: dùng lại, ghép, mở rộng owner hiện có, và chỉ đưa owner mới vào cho gap có bằng chứng. Dưới
+`full` và `publish`, viết test đi cặp trước rồi chạy
 `run-proof.mjs <branch> before`; helper buộc hành vi và manifest còn đúng base và ghi assertion
 regression thất bại. Sửa hành vi cùng version patch kế tiếp rồi chạy helper cho `after` và mọi gate
 package đã khai. Mỗi script test, typecheck, build hiện có của package phải chạy đầy đủ không filter.
@@ -159,6 +167,7 @@ những byte khác.
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
 | `@workspaces/fe` | checkout được route: package owner, consumer của nó, hoặc cả hai, tại base đóng băng; chỉ ghi nhánh phiên | có |
+| `@knowledge/grammars/<family>` | INDEX, snapshot DNA package, định nghĩa family, idiom, playbook và bảng gap chuẩn của family cụ thể theo route | có |
 
 ## Đầu vào
 
@@ -166,13 +175,14 @@ những byte khác.
 | --- | --- | --- |
 | `route` | `workspace.bind`; checkout, policy session và write roots đã kiểm chứng | có |
 | `library-release` | một nhánh `library.update` dưới mode `publish`, import vào phiên này qua `producer-import` hoặc do một nhánh sớm hơn của phiên sinh ra; bắt buộc dưới mode `consume` và bị từ chối dưới hai mode kia | không |
+| `knowledge-repair-receipt` | `knowledge.repair`, khi đây là lần thử lại với manifest đã bind lại | không |
 
 ## Yêu cầu
 
 | Field | Kiểu | Mặc định | Hỏi |
 | --- | --- | --- | --- |
 | `mode` | choice | full | `full` chạy cả hai nửa trong checkout được route; `publish` chạy riêng nửa owner và dừng ở bản phát hành đã ghi; `consume` chạy riêng nửa consumer trên `library-release` đã bind |
-| `plan` | object | null | Schema library-behavior-plan đóng: danh tính package, tập file, regression đi cặp, script hiện có và patch kế tiếp; cấp dưới `full` và `publish`, vắng dưới `consume` |
+| `plan` | object | null | Schema library-behavior-plan đóng: danh tính package, tập file, regression đi cặp, script hiện có, patch kế tiếp, delta công khai đã khai và tác động consumer chính xác; cấp dưới `full` và `publish`, vắng dưới `consume` |
 | `consumer` | object | null | Schema dependency-plan đóng: các manifest và lockfile consumer pin package, thẩm quyền trước-và-sau — một regression consumer không đổi, hoặc hai audit của một bản phát hành trình bày — và các gate bàn giao đầy đủ; cấp dưới `full` và `consume`, vắng dưới `publish` |
 | `publish` | choice | true | `true` phát hành bản đã đóng gói lên registry khi proof package đã xanh; `false` để nguyên bản đóng gói cho người; đọc dưới mode `publish`, nơi không gì khác đưa được bản phát hành lên registry |
 | `resume` | token | null | Token nhánh bị chặn khi vào lại với plan hoặc proof thay đổi |
@@ -181,7 +191,7 @@ những byte khác.
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm request, chạy preflight của request, và preflight những nửa mà chế độ gọi tên, tất cả trước lần ghi đầu ra ngoài thư mục phiên | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, đầu vào `route`, đầu vào `library-release` dưới `consume`, @workspaces/fe tại base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LI<br />ARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
+| 1 | Kiểm request, đóng băng manifest family chính xác cùng brief hiểu family, chạy preflight của request, và preflight những nửa mà chế độ gọi tên, tất cả trước lần ghi đầu ra ngoài thư mục phiên | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, đầu vào `route`, đầu vào `library-release` dưới `consume`, @knowledge/grammars/&lt;family>, @workspaces/fe tại base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LI<br />ARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
 | 2 | Chỉ viết regression test đi cặp trong package owner và chứng minh thất bại | `plan` | @workspaces/fe tại base, @tools/shell | @workspaces/fe/branch/session trong trần test, @tools/sourcewrite, `library-proof` | `LI<br />ARY_PROOF_FAILED` |
 | 3 | Sửa hành vi đã khai và tăng version patch kế tiếp | `plan` | @workspaces/fe trong trần package | @workspaces/fe/branch/session trong tập file đã khai, @tools/sourcewrite | `LI<br />ARY_BOUNDARY_REJECTED` |
 | 4 | Chạy regression cùng toàn bộ script test, typecheck và build của package | `plan` | @workspaces/fe, @tools/shell | `library-proof` | `LI<br />ARY_PROOF_FAILED` |
@@ -192,7 +202,7 @@ những byte khác.
 | 9 | Cài bản phát hành đã bind trong ranh giới metadata consumer chính xác | `consumer` | @workspaces/fe và bản phát hành đã bind, @tools/shell | @workspaces/fe/branch/session trong trần metadata, @tools/sourcewrite | `DEPENDENCY_BOUNDARY_REJECTED` |
 | 10 | Kiểm byte đã cài và chạy regression consumer cùng gate đầy đủ, hoặc ràng audit sau của một bản phát hành trình bày | `consumer` | @workspaces/fe, nhánh `interface.audit` mà phiên này đã đo tại commit vừa tăng, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
 | 11 | Commit metadata consumer một lần rồi kiểm delta và hash proof của nó | `consumer` | @workspaces/fe tại commit consumer, @tools/git | @workspaces/fe/branch/session, `dependency-update` | `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
-| 12 | Phát | — | mọi thứ ở trên | `changes`, `response/response.json` | — |
+| 12 | Phát | — | mọi thứ ở trên | `changes`, `knowledge-coverage`, `family-understanding`, `response/response.json` | — |
 
 Bước 2 tới 6 là nửa package, chạy dưới `full` và `publish`; bước 7 là phát hành, chỉ chạy dưới
 `publish` và chỉ khi yêu cầu không đặt sẵn `publish: false`; bước 8 tới 11 là nửa consumer, chạy dưới
@@ -214,11 +224,20 @@ package mà không ghi đè.
 | `dependency-proof` | `response/data/proofs/consumer-<phase>.json` | data | không |
 | `dependency-log` | `response/artifacts/proofs/consumer-<phase>.log` | artifact | không |
 | `changes` | `response/changes.md` | md | có |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | không |
+| `family-understanding` | `response/data/family-understanding.json` | data | không |
 
 Mọi đầu ra trừ receipt đều thuộc về một nửa, nên nhánh done phải mang những cái nào là câu trả lời của
 chế độ chứ không phải của một cột: `validate.mjs` đòi tập package dưới `full` và `publish`, tập
 consumer dưới `full` và `consume`, và từ chối tập của nửa kia như một tiết mục nhánh ấy không có thẩm
 quyền viết.
+
+## Kết quả tốt nhất
+
+Với lượt chạy thành công, `outcome.primary` chọn link, code, document hay table đã khai chứng minh
+trực tiếp nhất nửa được giao: thay đổi package/release proof cho `publish`, dependency và phép kiểm
+consumer cho `consume`, và proof quyết định cho `full`. Before/after cùng proof của nửa còn lại có thể
+làm mục phụ. Không nâng archive hay log package thành kết quả chỉ vì nó tồn tại.
 
 ## Dừng
 

@@ -60,6 +60,10 @@ grants. [Resources](resources/INDEX.md) lists the actual assignments. UI procedu
 applicable knowledge, analyze the Grammar family before changes and judge the rendered aesthetic.
 `knowledge.repair` and `library.update` own the corresponding repairs.
 
+Each accepted operator presents **The best outcome** directly in the chat. UI generation embeds the
+selected rendered image; other operators show readable source/diff, diagrams, tables, documents or
+measured results, with full evidence linked. A failed attempt keeps its real status and repair step.
+
 ## Develop
 
 This repository is the package. `npm test` runs every validator, the operator self-tests, the script

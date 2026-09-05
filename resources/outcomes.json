@@ -2,128 +2,251 @@
   "schemaVersion": 1,
   "kinds": {
     "image": {
-      "responseTypes": ["artifact"]
+      "responseTypes": [
+        "artifact"
+      ]
     },
     "table": {
-      "responseTypes": ["md", "data"]
+      "responseTypes": [
+        "md",
+        "data"
+      ]
     },
     "code": {
-      "responseTypes": ["artifact", "md"]
+      "responseTypes": [
+        "artifact",
+        "md"
+      ]
     },
     "diagram": {
-      "responseTypes": ["artifact", "md"]
+      "responseTypes": [
+        "artifact",
+        "md"
+      ]
     },
     "document": {
-      "responseTypes": ["md", "artifact"]
+      "responseTypes": [
+        "md",
+        "artifact"
+      ]
     },
     "link": {
-      "responseTypes": ["md", "artifact", "data"]
+      "responseTypes": [
+        "md",
+        "artifact",
+        "data"
+      ]
     }
   },
   "operators": {
     "api.verify": {
-      "primaryKinds": ["table", "document"],
-      "guidance": "Show the case and lane verdicts first, with the raw runner output as secondary evidence."
+      "primaryKinds": [
+        "table",
+        "document"
+      ],
+      "guidance": "Show actual case and contract/data/lifecycle verdicts with expected versus observed behavior. Link runner output, command, revision, readback and cleanup; browser screenshots are not an API requirement."
     },
     "architecture.decide": {
-      "primaryKinds": ["diagram", "document", "table"],
-      "guidance": "Show the accepted boundary and stack model; use the alternatives artifact when it makes the trade-off easier to review."
+      "primaryKinds": [
+        "diagram",
+        "document",
+        "table"
+      ],
+      "guidance": "Show the chosen boundaries, data ownership and trade-offs as a diagram, decision document or table appropriate to complexity; link observed current state, alternatives and critique resolution."
     },
     "backend.generate": {
-      "primaryKinds": ["code", "document", "table"],
-      "guidance": "Show the source change or reviewable diff first, followed by conformance and proof records."
+      "primaryKinds": [
+        "code"
+      ],
+      "primaryOutputs": [
+        "changes"
+      ],
+      "guidance": "Show the reviewable changes diff, affected files and behavior, with conformance and actual proof. Apply names its commit; dry-run clearly labels proposed changes and claims no executed test or mutation."
     },
     "backend.plan": {
-      "primaryKinds": ["diagram", "table", "document"],
-      "guidance": "Show the module plan and executable unit table before implementation begins."
+      "primaryKinds": [
+        "diagram",
+        "table",
+        "document"
+      ],
+      "guidance": "Show operation-to-module/store ownership, dependency order and required proof with contract coverage. Planning is not implemented behavior."
     },
     "business.decide": {
-      "primaryKinds": ["table", "diagram", "document"],
-      "guidance": "Show the decided promise and coverage matrix, with the model as supporting evidence."
+      "primaryKinds": [
+        "table",
+        "diagram",
+        "document"
+      ],
+      "guidance": "Show actor-to-promise rules and observable outcomes, scope coverage and decided exceptions; link claims and the model."
     },
     "business.reconcile": {
-      "primaryKinds": ["table", "document"],
-      "guidance": "Show the promise-to-delivery reconciliation and unresolved claim rows."
+      "primaryKinds": [
+        "table",
+        "document"
+      ],
+      "guidance": "Show each promise mapped to delivered behavior and evidence, with any remaining discrepancy. Missing proof cannot support a complete-scope claim."
     },
     "content.generate": {
-      "primaryKinds": ["document", "image", "link"],
-      "guidance": "Render the finished article first; display a generated image when present and link any audio track as secondary output."
+      "primaryKinds": [
+        "document"
+      ],
+      "guidance": "Render the reviewed article in the display language as the primary result; display relevant generated images with the content and link full articles, review, lab proof and tracks. A thumbnail alone never represents the completed lesson.",
+      "primaryOutputs": [
+        "article"
+      ]
     },
     "data.plan": {
-      "primaryKinds": ["table", "document"],
-      "guidance": "Show the seed units with namespace, order, expected state and rollback."
+      "primaryKinds": [
+        "table",
+        "document"
+      ],
+      "guidance": "Show fixture preconditions, target attribution, namespace, volume, order and rollback. Choose JSON or SQL only as the actual backend requires; never claim rows are already seeded."
     },
     "data.seed": {
-      "primaryKinds": ["table", "document"],
-      "guidance": "Show the applied, reused or removed records and the namespace-scoped before/after proof."
+      "primaryKinds": [
+        "table",
+        "document"
+      ],
+      "guidance": "Show reused, created, changed or removed records and expected versus readback within the owned namespace. Rollback reports only its exact removed subset; never dump unrelated data."
     },
     "environment.preflight": {
-      "primaryKinds": ["table", "document"],
-      "guidance": "Show the complete readiness table, including every wall and skipped check."
+      "primaryKinds": [
+        "table",
+        "document"
+      ],
+      "guidance": "Show every required readiness check with observed state, walls, skipped checks and repair owner. A missing check is not readiness."
     },
     "git.publish": {
-      "primaryKinds": ["link", "document"],
-      "guidance": "Show the published branch and commit reference, with the publication receipt as evidence."
+      "primaryKinds": [
+        "link",
+        "document"
+      ],
+      "guidance": "Show the non-force published remote/ref/commit, review link when available, hooks and its relation to the tested head. Publishing does not delete the user worktree or branch; session closure retains proof separately."
     },
     "identity.provision": {
-      "primaryKinds": ["table", "document"],
-      "guidance": "Show per-alias reuse, create or repair status and safe sign-in checks; never show credential values."
+      "primaryKinds": [
+        "table",
+        "document"
+      ],
+      "guidance": "Show safe account aliases, roles, reuse/create/repair and sign-in checks. Rotation shows new credentials work and old ones fail, without exposing either credential."
     },
     "interface.audit": {
-      "primaryKinds": ["image", "table", "document"],
-      "guidance": "Display the audited screenshot first, then the verdict and finding tables."
+      "primaryKinds": [
+        "image"
+      ],
+      "primaryOutputs": [
+        "screenshot"
+      ],
+      "guidance": "Display the actual screenshot that best exposes the significant finding, with region, rule and verdict, plus matrix coverage. A completed audit may validly find failures; never choose the prettiest capture to hide them."
     },
     "interface.fix": {
-      "primaryKinds": ["code", "document"],
-      "guidance": "Show the focused source diff and the finding it resolves."
+      "primaryKinds": [
+        "code",
+        "document"
+      ],
+      "primaryOutputs": [
+        "changes"
+      ],
+      "guidance": "Show the bounded changes diff and the exact finding it addresses, with targeted verification. Label dry-run as proposed changes, and do not claim the later visual audit has passed."
     },
     "interface.generate": {
-      "primaryKinds": ["image"],
-      "guidance": "Display a rendered image of the generated surface as the primary outcome; source and decision artifacts are secondary."
+      "primaryKinds": [
+        "image"
+      ],
+      "primaryOutputs": [
+        "selected-candidate-capture"
+      ],
+      "guidance": "Embed the actual selected rendered candidate with its focal point and selection reason; link preview, viewport/source binding, score and changes. Dry-run remains a preview, not an applied change; decorative assets cannot replace the rendered surface."
     },
     "interface.plan": {
-      "primaryKinds": ["table", "diagram", "document"],
-      "guidance": "Show the surface map and unit sequence in a reviewable table or diagram."
+      "primaryKinds": [
+        "table",
+        "diagram",
+        "document"
+      ],
+      "guidance": "Show all scoped pages, modals, shared shells and states with routes and implementation units. Expose deferred scope; a surface plan is not a rendered UI."
     },
     "knowledge.repair": {
-      "primaryKinds": ["table"],
-      "guidance": "Show the repaired rule, changed source references and checks as a reviewable table from the repair receipt."
+      "primaryKinds": [
+        "table"
+      ],
+      "guidance": "Show the challenged rule or case before and after, counterexample, exact canonical/mirror owner files, scope and revalidation from the typed receipt. The originating operator retry still owns whether the repair resolves the observed failure."
     },
     "library.update": {
-      "primaryKinds": ["link", "code", "document", "table"],
-      "guidance": "Show the mode-specific release or dependency result, with the source change and proof records as secondary evidence."
+      "primaryKinds": [
+        "link",
+        "code",
+        "document",
+        "table"
+      ],
+      "guidance": "Show mode-specific source changes, package release or consumed dependency movement, with matching proofs. Package publication alone never claims consumer repair; consume names its exact dependency and verification."
     },
     "migration.release": {
-      "primaryKinds": ["table", "document"],
-      "guidance": "Show each migration disposition and its release proof, linking logs only as secondary evidence."
+      "primaryKinds": [
+        "table",
+        "document"
+      ],
+      "guidance": "Show each pending/applied/already-applied disposition and journal verification, including the second no-op check. A command exit alone is not migration evidence."
     },
     "quality.verify": {
-      "primaryKinds": ["table", "document"],
-      "guidance": "Show the gate result table first, including failures and skipped gates."
+      "primaryKinds": [
+        "table",
+        "document"
+      ],
+      "guidance": "Show measured gates, pass/fail/unrun states, thresholds, blocking findings and owners. A done verifier can validly report failing code; retain source head, commands and scope."
     },
     "release.deploy": {
-      "primaryKinds": ["link", "table", "document"],
-      "guidance": "Show the deployed release address or identifier and the probe results that verify it."
+      "primaryKinds": [
+        "link",
+        "table",
+        "document"
+      ],
+      "guidance": "Show the active target release/digest and observed probe health. Distinguish delivering a new release from rollback restoring the prior one; cover all declared targets."
     },
     "runtime.serve": {
-      "primaryKinds": ["link", "table", "document"],
-      "guidance": "Show the served URL and head first, followed by runtime checks and the operation receipt."
+      "primaryKinds": [
+        "link",
+        "table",
+        "document"
+      ],
+      "guidance": "Show the served URL, observed revision, health and reused/updated disposition, with checks and lease. Starting a process alone does not prove the correct application is served."
     },
     "service.operate": {
-      "primaryKinds": ["table", "document", "link"],
-      "guidance": "Show the service's requested and observed states with its probe result."
+      "primaryKinds": [
+        "table",
+        "document",
+        "link"
+      ],
+      "guidance": "Show requested versus observed service state and its probe. A requested down state succeeds when the correct service is stopped and the port is free, not when a URL responds."
     },
     "uat.plan": {
-      "primaryKinds": ["table", "document"],
-      "guidance": "Show the flow and case sheet with actors, entry points, accounts, fixtures and isolated namespaces."
+      "primaryKinds": [
+        "table",
+        "document"
+      ],
+      "guidance": "Show journey/case actors, entry points, preconditions, expected behavior, account/fixture needs, isolated namespace and reuse/update disposition. Actual results do not exist before the run."
     },
     "uat.verify": {
-      "primaryKinds": ["image", "table", "document"],
-      "guidance": "Display the run sheet image first, followed by per-case screenshots and verdict evidence."
+      "primaryKinds": [
+        "table",
+        "image",
+        "document"
+      ],
+      "primaryOutputs": [
+        "uat-flow-verification",
+        "uat-verdicts",
+        "sheet",
+        "screenshot"
+      ],
+      "guidance": "Show the whole run case summary and the most diagnostic actual evidence. Choose a readable result table, sheet or case screenshot according to the finding, with per-case proof as secondary. Include failed and unrun cases; never use one passing capture to imply the whole journey passed."
     },
     "workspace.bind": {
-      "primaryKinds": ["table", "document", "link"],
-      "guidance": "Show the resolved route, checkout, revision and runtime binding."
+      "primaryKinds": [
+        "table",
+        "document",
+        "link"
+      ],
+      "guidance": "Show the resolved role, route, checkout, branch, revision and mutation readiness. A source binding does not prove the runtime is serving that revision."
     }
   }
 }

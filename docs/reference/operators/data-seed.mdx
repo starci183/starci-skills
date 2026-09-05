@@ -62,14 +62,12 @@ template) says what is placed, how placing it again changes nothing, and how the
 taken; a seed that only works on an empty store is a seed that works once, so a second application
 over the same namespace is `SEED_ALREADY_APPLIED` and a no-op, not a failure.
 
-## A missing seed is drafted, not reported
+## A missing seed is created from the plan
 
-A flow whose folder has no seed directory is a flow nobody has seeded yet. The seed is drafted from
-the shipped template and the flow document's steps, marked `Drafted` in the receipt, and applied in
-the same branch. The account the rows are owned by is the one `identity.provision` created; a flow
-with no account record yet is `IDENTITY_MISSING`, a hand-off to that operator and not a verdict. The
-only other honest stop on this path is a store that cannot be reached at all, which is
-`PROVISIONING_UNAVAILABLE`.
+`data.plan` decides the fixture and classifies it as valid, missing or invalid. This operator reuses
+valid rows, creates missing rows, or updates invalid rows from that frozen execution sheet; it never
+drafts or changes the plan. A missing account is handed to `identity.provision`. An unreachable store
+is `PROVISIONING_UNAVAILABLE`.
 
 ## The seed carries no credential
 
@@ -78,12 +76,22 @@ credential; the shared password is resolved by name at the moment a request is m
 request body and nothing else. Nothing under the seed directory, the receipt or a fixture carries a
 secret, and the receipt is swept for one.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| planned rows already match exact namespace | reuse; make no mutation | read every row and bind seed-plan fingerprint | emit `SEED_ALREADY_APPLIED` with zero new mutations |
+| rows missing | create from JSON, or optional SQL through declared runner | read ids, values, ownership and volume | record created rows and exact rollback set |
+| namespaced rows differ | idempotent upsert only owned rows | read full expected state and recompute rollback | repair attempt; transient retry has new transcript |
+| prior apply partial or uncertain | do not reapply or broaden cleanup | identify journaled rows and unknown effects | block until exact remaining set is safe |
+
 ## Boundary
 
-Context is read-only apart from the seed. The operator writes the flow's seed directory under
-`@worktrees/uat/<flow>` — the drafted records, the expectation and the fingerprint the snapshot
-freezes — places or removes rows in the environment's store through its declared connection or the
-product's own API, and writes only `response/` of its own branch: `response.md` and
+Context is read-only apart from the planned store rows. The operator reads the fixture bytes and
+expected state named by `seed-plan`, places or removes rows in the environment's store through its
+declared connection or the product's own API, and writes only `response/` of its own branch: `response.md` and
 `response.json`. It does not create an account, serve a runtime, change a schema, touch a row
 outside the flow's namespace, seed the outcome under test, or write a credential value anywhere; and
 it does not claim a placed seed while any check is absent or failed.
@@ -92,15 +100,15 @@ it does not claim a placed seed while any check is absent or failed.
 
 | Alias | Bind | Required |
 | --- | --- | --- |
-| `@worktrees/uat/<flow>` | the flow folder: the flow document the seed is drafted from, the account record the rows are owned by, and the seed directory this operator writes | yes |
+| `@worktrees/uat/<flow>` | the planned flow folder and immutable fixture bytes referenced by `seed-plan`; read only | yes |
 | `@worktrees/sessions/central-runtime` | the entry of the bound route: the store and the endpoints the seed is applied through, read by fingerprint and generation | yes |
 | `@workspaces/device-state` | the store's credential by name and its custody; values never appear | yes |
-| `@worktrees/_templates` | the seed template a missing seed directory is drafted from, consumed and never modified | no |
 
 ## Inputs
 
 | Kind | From | Required |
 | --- | --- | --- |
+| `seed-plan` | `data.plan`; the validated JSON fixture, optional SQL input, namespace, expected read-back and rollback set | yes |
 | `uat-account` | `identity.provision`; the account record the rows are owned by, when this chain provisioned it; otherwise read from the flow folder | no |
 | `units` | `data.plan`; the seed list whose one unit this branch places, named by `request.unit` | no |
 
@@ -119,11 +127,11 @@ it does not claim a placed seed while any check is absent or failed.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and the resume against the frozen flow folder | `resume` | `request/request.json`, @worktrees/uat/&lt;flow> at the frozen fingerprint | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the shared attempt gate and resume against the frozen `seed-plan`, account and exact namespace | `resume` | `request/request.json`, @worktrees/uat/&lt;flow> at the frozen fingerprint | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the authority for the seed class, the flow's account record and the route entry's store, resolving the store credential by name | `approval`, `env`, `routeKey`, `flow` | @worktrees/uat/&lt;flow> for the account record, input `uat-account` when the chain carries it, @worktrees/sessions/central-runtime for the store and endpoints, @workspaces/device-state for the credential by name, the environment's declaration when `approval` references it, @tools/secrets | — | `AUTHORITY_DRIFT`, `IDENTITY_MISSING` |
-| 3 | Draft the seed directory from the template and the flow document's steps when it is absent, and record it as a draft | — | @worktrees/uat/&lt;flow> for the flow document, @worktrees/_templates for the seed template | @worktrees/uat/&lt;flow>, @tools/sourcewrite | — |
-| 4 | Observe the store under the flow's namespace before changing it, and refuse a record that would land on a row outside it | `operation` | @worktrees/sessions/central-runtime for the store, @tools/database, @tools/http | — | `SEED_SHARED_ROW`, `PROVISIONING_UNAVAILABLE` |
-| 5 | Apply the records one at a time under the flow's account or prefix, or remove the rollback set, and write the seed fingerprint | — | @worktrees/uat/&lt;flow> for the records and the rollback set, @tools/database, @tools/http | @worktrees/uat/&lt;flow> | `PROVISIONING_UNAVAILABLE` |
+| 3 | Inspect the `seed-plan` JSON fixture, optional SQL input, expected read-back and cleanup set; refuse a missing or invalid plan and never draft one here | — | input `seed-plan`, @worktrees/uat/&lt;flow> for referenced fixture bytes | — | `INVALID_INPUT` |
+| 4 | Observe every planned id in the exact namespace and classify rows reusable, missing, invalid or uncertain before changing anything | `operation` | @worktrees/sessions/central-runtime for the store, @tools/database, @tools/http | — | `SEED_SHARED_ROW`, `PROVISIONING_UNAVAILABLE` |
+| 5 | Reuse matching rows, create missing rows, idempotently update invalid owned rows, or remove only the plan's rollback set; never reapply an uncertain effect | — | @worktrees/uat/&lt;flow> for the records and the rollback set, @tools/database, @tools/http | @worktrees/uat/&lt;flow> | `PROVISIONING_UNAVAILABLE` |
 | 6 | Prove the expected state against the seed's expectation and the rollback set against the rows placed | — | @worktrees/uat/&lt;flow> for the expectation, @tools/database, @tools/http | — | `SEED_UNPROVEN` |
 | 7 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
@@ -136,6 +144,10 @@ what the store does not yet hold; a resume that adds no authority, account, seed
 | Kind | File | Type | Required |
 | --- | --- | --- | --- |
 | `seed-receipt` | `response/response.md` | md | yes |
+
+## The best outcome
+
+On `done`, print **The best outcome** as the applied, reused or removed record table and namespace-scoped before/after proof in `response/response.md`. A partial apply, failed rollback or uncertain store result leads with the exact incomplete rows and stop; it never reports the namespace as ready.
 
 ## Stops
 

@@ -59,6 +59,10 @@ và quyền riêng cho từng vai trò. [Tài nguyên](resources/INDEX.vi.md) li
 Quy trình UI ràng buộc toàn bộ knowledge đã áp dụng, phân tích family Grammar trước khi sửa và
 đánh giá cả thẩm mỹ trên bản render. `knowledge.repair` và `library.update` sở hữu hai loại sửa tương ứng.
 
+Mỗi operator đã được nghiệm thu hiện **The best outcome** ngay trong chat. UI generation nhúng ảnh
+render của phương án được chọn; operator khác hiện source/diff, sơ đồ, bảng, tài liệu hoặc kết quả đo
+dễ xem, kèm link bằng chứng đầy đủ. Attempt lỗi giữ đúng trạng thái và bước sửa tiếp.
+
 ## Phát triển
 
 Repository này chính là gói. `npm test` chạy mọi validator, self-test của operator, spec của script và

@@ -1,10 +1,6 @@
 # release.deploy — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
-
-## Job
-
-Deploy one immutable release to one declared target under its declared authorization and prove the steady state it reached, taking the recovery or rollback branch inside the same pass rather than assuming the rollout succeeded.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.
 
 ## Done when
 
@@ -14,7 +10,7 @@ Primary output: `release-deployment`
 
 ## Inputs
 
-`quality-verification`, `migration-release` (optional)
+`quality-verification`, `migration-release`?
 
 ## Outputs
 

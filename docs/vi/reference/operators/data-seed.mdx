@@ -61,13 +61,12 @@ không đổi gì ra sao, và trạng thái đã scope được lấy thế nào
 seed chỉ chạy được một lần, nên áp lần thứ hai trên cùng namespace là `SEED_ALREADY_APPLIED` và là
 một no-op, không phải lỗi.
 
-## Seed thiếu thì phác ra, không phải báo lỗi
+## Seed thiếu được tạo từ plan
 
-Một luồng mà thư mục chưa có thư mục seed là một luồng chưa ai seed. Seed được phác từ khuôn đi kèm
-và các bước của tài liệu luồng, đánh dấu `Drafted` trong biên bản, và được áp ngay trong nhánh này.
-Tài khoản sở hữu các hàng là tài khoản mà `identity.provision` đã tạo; một luồng chưa có hồ sơ tài
-khoản là `IDENTITY_MISSING`, một lần bàn giao cho operator ấy chứ không phải phán quyết. Mã dừng thật
-duy nhất còn lại trên lối này là một kho hoàn toàn không tới được, tức `PROVISIONING_UNAVAILABLE`.
+`data.plan` quyết định fixture và phân loại nó là valid, missing hay invalid. Operator này reuse row
+hợp lệ, create row thiếu, hoặc update row sai từ execution sheet đã freeze; nó không draft hay đổi
+plan. Account thiếu được handoff cho `identity.provision`; store không tới được là
+`PROVISIONING_UNAVAILABLE`.
 
 ## Seed không mang credential
 
@@ -75,10 +74,21 @@ Một bản ghi cần danh tính đã xác thực thì nêu alias trong hồ sơ
 khẩu dùng chung được giải theo tên đúng lúc gửi request và chỉ đi vào body của request. Không gì
 dưới thư mục seed, biên bản hay fixture mang bí mật, và biên bản được quét để tìm.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| planned row đã khớp exact namespace | tái dùng; không mutation | đọc mọi row và bind seed-plan fingerprint | phát `SEED_ALREADY_APPLIED` không mutation mới |
+| row thiếu | tạo từ JSON hoặc SQL tùy chọn qua runner đã khai | đọc id, value, ownership, volume | ghi row tạo và exact rollback set |
+| row có namespace khác expected | idempotent upsert chỉ row sở hữu | đọc full expected state và tính rollback | repair attempt; retry tạm thời có transcript mới |
+| apply trước partial hoặc không chắc | không reapply hay mở cleanup | xác định journaled row và effect chưa rõ | block tới khi exact remaining set an toàn |
+
 ## Ranh giới ghi
 
-Context chỉ đọc, trừ seed. Operator ghi thư mục seed của luồng dưới `@worktrees/uat/<flow>` — bản
-ghi đã phác, kỳ vọng và fingerprint mà snapshot đóng băng — đặt hay gỡ hàng trong kho của môi trường
+Context chỉ đọc, trừ planned store row. Operator đọc fixture bytes và expected state mà `seed-plan`
+gọi tên, rồi đặt hay gỡ hàng trong kho của môi trường
 qua kết nối đã khai hoặc API của chính sản phẩm, và chỉ ghi `response/` của nhánh mình: `response.md`
 và `response.json`. Nó không tạo tài khoản, không phục vụ runtime, không đổi schema, không đụng hàng
 ngoài namespace của luồng, không seed kết quả đang được kiểm, không ghi giá trị credential ở bất kỳ
@@ -88,15 +98,15 @@ ngoài namespace của luồng, không seed kết quả đang được kiểm, k
 
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
-| `@worktrees/uat/<flow>` | thư mục luồng: tài liệu luồng mà seed được phác từ, hồ sơ tài khoản sở hữu các hàng, và thư mục seed mà operator này ghi | có |
+| `@worktrees/uat/<flow>` | flow folder đã plan và immutable fixture bytes mà `seed-plan` tham chiếu; chỉ đọc | có |
 | `@worktrees/sessions/central-runtime` | entry của route đã bind: kho và các endpoint mà seed được áp qua, đọc theo fingerprint và generation | có |
 | `@workspaces/device-state` | credential của kho theo tên và custody của nó; giá trị không bao giờ xuất hiện | có |
-| `@worktrees/_templates` | khuôn seed dùng để phác một thư mục seed còn thiếu, chỉ tiêu thụ chứ không sửa | không |
 
 ## Đầu vào
 
 | Kind | Từ đâu | Bắt buộc |
 | --- | --- | --- |
+| `seed-plan` | `data.plan`; JSON fixture đã validate, SQL input tùy chọn, namespace, expected read-back và rollback set | có |
 | `uat-account` | `identity.provision`; hồ sơ tài khoản sở hữu các hàng, khi chuỗi này đã cấp nó; nếu không thì đọc từ thư mục luồng | không |
 | `units` | `data.plan`; danh sách seed mà nhánh này đặt đúng một đơn vị, gọi tên bằng `request.unit` | không |
 
@@ -115,11 +125,11 @@ ngoài namespace của luồng, không seed kết quả đang được kiểm, k
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm cổng vào và resume theo thư mục luồng đã đóng băng | `resume` | `request/request.json`, @worktrees/uat/&lt;flow> tại fingerprint đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate shared attempt gate và resume theo frozen `seed-plan`, account và exact namespace | `resume` | `request/request.json`, @worktrees/uat/&lt;flow> tại fingerprint đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng thẩm quyền cho lớp seed, hồ sơ tài khoản của luồng và kho của entry route, giải credential của kho theo tên | `approval`, `env`, `routeKey`, `flow` | @worktrees/uat/&lt;flow> cho hồ sơ tài khoản, đầu vào `uat-account` khi chuỗi mang nó, @worktrees/sessions/central-runtime cho kho và endpoint, @workspaces/device-state cho credential theo tên, bản khai báo của môi trường khi `approval` tham chiếu tới nó, @tools/secrets | — | `AUTHORITY_DRIFT`, `IDENTITY_MISSING` |
-| 3 | Phác thư mục seed từ khuôn và các bước của tài liệu luồng khi nó còn thiếu, và ghi nhận là bản nháp | — | @worktrees/uat/&lt;flow> cho tài liệu luồng, @worktrees/_templates cho khuôn seed | @worktrees/uat/&lt;flow>, @tools/sourcewrite | — |
-| 4 | Quan sát kho dưới namespace của luồng trước khi đổi, và từ chối bản ghi sẽ rơi vào hàng ngoài namespace ấy | `operation` | @worktrees/sessions/central-runtime cho kho, @tools/database, @tools/http | — | `SEED_SHARED_ROW`, `PROVISIONING_UNAVAILABLE` |
-| 5 | Áp từng bản ghi một dưới tài khoản hay tiền tố của luồng, hoặc gỡ tập rollback, và ghi fingerprint của seed | — | @worktrees/uat/&lt;flow> cho các bản ghi và tập rollback, @tools/database, @tools/http | @worktrees/uat/&lt;flow> | `PROVISIONING_UNAVAILABLE` |
+| 3 | Kiểm JSON fixture, SQL input tùy chọn, expected read-back và cleanup set trong `seed-plan`; từ chối plan thiếu/sai và không draft ở đây | — | đầu vào `seed-plan`, @worktrees/uat/&lt;flow> cho bytes fixture được tham chiếu | — | `INVALID_INPUT` |
+| 4 | Quan sát từng planned id trong exact namespace và phân loại row reusable, missing, invalid hoặc uncertain trước khi thay đổi | `operation` | @worktrees/sessions/central-runtime cho kho, @tools/database, @tools/http | — | `SEED_SHARED_ROW`, `PROVISIONING_UNAVAILABLE` |
+| 5 | Tái dùng row khớp, tạo row thiếu, idempotent update row sai được sở hữu, hoặc chỉ xóa rollback set của plan; không reapply effect chưa chắc | — | @worktrees/uat/&lt;flow> cho các bản ghi và tập rollback, @tools/database, @tools/http | @worktrees/uat/&lt;flow> | `PROVISIONING_UNAVAILABLE` |
 | 6 | Chứng minh trạng thái mong đợi theo kỳ vọng của seed và tập rollback theo các hàng đã đặt | — | @worktrees/uat/&lt;flow> cho kỳ vọng, @tools/database, @tools/http | — | `SEED_UNPROVEN` |
 | 7 | Viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 
@@ -131,6 +141,10 @@ chưa giữ; một lần resume không thêm thẩm quyền, tài khoản, seed 
 | Kind | File | Kiểu | Bắt buộc |
 | --- | --- | --- | --- |
 | `seed-receipt` | `response/response.md` | md | có |
+
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** là bảng record đã apply, reuse hoặc remove cùng proof before/after theo namespace trong `response/response.md`. Apply dở, rollback fail hoặc kết quả store chưa chắc phải đưa đúng các dòng incomplete và điểm dừng lên trước; không được báo namespace đã sẵn sàng.
 
 ## Dừng
 

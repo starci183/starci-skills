@@ -24,15 +24,26 @@ Khi prompt mở đầu đã nêu và cấp quyền đúng scope đó, tham chi�
 hoặc chưa trả lời giữ lifecycle `draft`, nên không thể dispatch. Follow-up và replan trong goal đã
 xác nhận dùng lại cùng host binding và không hỏi lại.
 
-Sau mỗi chuyển bước của một nhiệm vụ, orchestrator in vào chat gốc đúng hai dòng mà
+Sau mỗi chuyển bước của một nhiệm vụ, orchestrator in vào chat gốc bản ghi hai dòng mà
 `interaction.json#transitionLog` khai — mục tiêu của nhánh, rồi kết quả kèm số dòng "xong khi" đã có
 bằng chứng, đường dẫn artifact và ô kế tiếp — và ghi `logged: true` lên chuyển bước, điều mà
 `scripts/validate-session.mjs` bắt buộc trên mọi chuyển bước của phiên có mission.
 `scripts/validate-interaction.mjs#transitionLogErrors` đối chiếu một cặp dòng đã in với dạng đã khai,
-biên dịch từ chính sách chứ không chép lại. Output đầy đủ ở lại trong thư mục phiên; ai cần thì đọc
-sổ.
+biên dịch từ chính sách chứ không chép lại.
+
+Với kết quả v2.2 done đã được nghiệm thu, chạy thêm `scripts/render-outcome.mjs <branch>` và hiển thị
+Markdown cùng media trả về ngay trong chat gốc dưới **The best outcome**, rồi mới đánh dấu đã log.
+`response.json.outcome` chỉ rõ kết quả được chọn để người dùng xem cùng bằng chứng; gate chung và
+[bảng định dạng theo operator](outcomes.json) kiểm nó trước acceptance. UI generation phải hiện hình
+render thật của phương án được chọn. Code, plan và kiểm thử hiện source/diff, sơ đồ/bảng/tài liệu hoặc
+kết quả đo phù hợp với operator, kèm link tới bằng chứng đầy đủ. Không thay phần hiển thị bằng một tên
+file, JSON thô hoặc câu “đã tạo file”. Attempt lỗi, waiting hay mismatch giữ đúng trạng thái và bước
+sửa tiếp; không trình bày thành best outcome đã thành công. Output đầy đủ và lần chạy trước vẫn ở
+trong thư mục session.
 
 Gate độc lập `scripts/validate-interaction.mjs <branch>` và gate response chung kiểm câu hỏi dự kiến.
 Các gate này chỉ kiểm giao tiếp; qua gate không cấp quyền thực hiện thao tác nào.
+
+Các ví dụ là định hướng, không ép một định dạng cho mọi việc. Đọc contract và mode của operator: hiện expected so với actual, coverage và bước tiếp cạnh kết quả được chọn. “Best” là phần hữu ích nhất để đánh giá kết quả, kể cả lỗi quan trọng. Operator kiểm xong vẫn có thể kết luận đối tượng bị kiểm không đạt. Dry-run là đề xuất; reuse/no-op là trạng thái không đổi đã quan sát; rollback là khôi phục. Tổng quan kết quả phải hiện đủ dù chỉ nhúng một artifact đại diện.
 
 Sources: [Bằng chứng tương tác](../tests/evidence/20260904-interaction.md).

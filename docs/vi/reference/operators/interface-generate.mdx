@@ -35,9 +35,10 @@ commit trên nhánh phiên mà `writes` mang mọi đường dẫn đã khai v�
 `inventory` đóng băng cạnh `frontend-presentation-resolution` và `resolved-tree` công bố, với lượt
 quét sạch và cây đã commit bằng cây đã resolve, cây ấy hiện thực hướng mà `frontend-direction-decision`
 đã chọn trên các `candidates` phục vụ qua `host`, được in, bị phản chứng và được chấm điểm, với lớp
-bề mặt trong `ui-coverage`; hoặc, dưới mode dry, y như vậy với commit null và checkout không bị đụng
-tới; hoặc, khi hướng đã khai delta trình bày là none, owner map rỗng, không chọn luật nào và một
-inventory rỗng.
+bề mặt trong `ui-coverage`, còn PNG của render đã chọn được ghi làm `selected-candidate-capture` và
+`outcome.primary`; hoặc, dưới mode dry, y như vậy với commit null và checkout không bị đụng tới;
+hoặc, khi hướng đã khai delta trình bày là none, vẫn có bằng chứng render đã chọn ấy bên cạnh owner
+map rỗng, không chọn luật nào và một inventory rỗng.
 
 ## Một agent, một trang
 
@@ -144,12 +145,13 @@ Quyết định trên nhiều phương án đã render vẫn phải có đủ đ
 
 ## Hình là thứ operator tự xét, không chờ yêu cầu
 
-Một tấm hình là quyết định composition như mọi quyết định khác: khi một ứng viên để lại vùng đọc lên
-thấy trống (hero không có chủ thể, empty state chỉ có một câu, hàng card mà chữ không gánh nổi chiều
-rộng), operator thêm hình làm theo đúng một claim của hướng (`@tools/imagegen`) và ghi lý do vào
-bảng `## Images`. Nó không chờ người nói, và cũng không trang trí: vùng mà chữ và Grammar object đã
-gánh được thì không thêm hình, và hình không bao giờ mã hoá claim mà lời hứa nghiệp vụ không hề nêu.
-Asset và prompt nằm dưới `response/artifacts/images/`, và bước 11 ghi chúng cùng write set đã khai.
+Một tấm hình là quyết định composition như mọi quyết định khác. Hình có thể làm nổi bật ý chính, giải
+thích nội dung, hoặc tạo điểm nhấn phù hợp và hệ phân cấp thị giác có chủ đích, kể cả một accent giàu
+cảm xúc có chủ thể nâng đỡ ý nghĩa của bề mặt. Operator xét chủ thể, độ liên quan, sức hút chú ý và hệ
+phân cấp so với claim đã nêu cùng CTA cạnh tranh, rồi ghi mục đích ấy vào bảng `## Images`. Chỉ có
+khoảng trống thì không đủ làm bằng chứng để thêm hình; hình không được làm đồ lấp chỗ, cân mật độ hay
+tự bịa claim nghiệp vụ. Asset và prompt nằm dưới `response/artifacts/images/`, và bước 11 ghi chúng
+cùng write set đã khai.
 
 ## Cấu trúc quyết trước, giá trị quyết sau
 
@@ -316,8 +318,8 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | `@knowledge/ui/composition` | các khẳng định mà biên nhận quyết định phải thoả, `COVERAGE-1` là khẳng định về toàn bộ biên nhận | có |
 | `@knowledge/ui/presentation` | kho luật đóng, đọc ở fingerprint của nó; nguồn duy nhất của identifier hợp lệ | có |
 | `@workspaces/fe` | checkout frontend được route, đọc ở head đóng băng; hiện trạng là bằng chứng, không bao giờ là hướng được yêu cầu, và là cây mà lần ghi đáp xuống, trên nhánh phiên của nó và không đâu khác | có |
-| `@knowledge/grammars/<family>` | họ mà route đã bind gọi tên (`context.grammarId`) được kỳ vọng hiện thực hoá Common ra sao; luật về Grammar, không phải chính Grammar | không |
-| `@knowledge/ui/proof` | các tiêu chí mà mọi phương án đã render được chấm theo trước khi chọn một; cùng thang điểm mà audit sau này đo, chỉ đọc khi có nhiều hơn một phương án được render | không |
+| `@knowledge/grammars/<family>` | cách family cụ thể theo route hiện thực Common; mọi file authored của family được đóng băng và đọc trước composition | có |
+| `@knowledge/ui/proof` | mọi file, luật, Case và calibration proof dùng để chấm mọi phương án đã render, kể cả một phương án hay refine | có |
 | `@worktrees/uat/<flow>/<case>` | quan sát hành vi, UX và UI của lần trước kèm ảnh chụp; bằng chứng và phản chứng, một lần pass cũ không phải thẩm quyền hiện tại | không |
 
 ## Đầu vào
@@ -332,6 +334,7 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | `library-source-application` | `library.update`, lần sửa owner mà một route `chain` sinh ra cho lỗ hổng grammar bề mặt này đụng phải; chỉ có mặt khi vào lại sau nhiệm vụ anh em đó | không |
 | `units` | `interface.plan`; bản đồ bề mặt mà nhánh này sinh đúng một đơn vị, gọi tên bằng `request.unit` | không |
 | `findings` | sổ cái findings, như `scripts/record-findings.mjs` đã vật chất hoá các dòng đang mở của nó cạnh biên nhận `interface.audit` hay `uat.verify` gần nhất của bề mặt này; mọi dòng cho target hay đơn vị này được trả lời dưới `## Findings answered` của quyết định, nếu không nhánh bị từ chối | không |
+| `knowledge-repair-receipt` | `knowledge.repair`, khi đây là lần thử lại với manifest đã bind lại | không |
 
 ## Yêu cầu
 
@@ -342,7 +345,7 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | `changeLevel` | choice | — | new, reconstruct hay refine; một lượt audit phải kết thúc bằng bề mặt pass là reconstruct |
 | `ownerCeiling` | choice | surface-and-nested-layouts | surface-only, surface-and-nested-layouts hay ancestor-layouts-authorized |
 | `candidates` | number 1–3 | 1 | Hình thành bao nhiêu hướng; nhiều hơn một chỉ khi muốn so sánh |
-| `preview` | choice | no | yes thì render phương án duy nhất thành một trang xem được |
+| `preview` | choice | no | yes yêu cầu thêm preview tương tác; mọi phương án vẫn được render, phục vụ và in ra bất kể giá trị này |
 | `references` | list | [] | Tham chiếu của người: mỗi cái là một URL, một đường dẫn ảnh chụp hay một mô tả; nghiên cứu có giới hạn chỉ chạy khi ô này rỗng |
 | `selectionPolicy` | choice | automatic | `automatic` cho so sánh nội bộ trong hướng đã chọn; `approval-required` cho các tier/hướng khác nhau về bản chất theo chính sách tương tác |
 | `approval` | id | null | Id phương án người dùng thực sự chọn; bắt buộc dưới `approval-required`, dùng lại khi tiếp tục |
@@ -360,8 +363,8 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | 3 | Quan sát context đang có và tham chiếu của người, rồi biên UI contract, coverage của nó và lớp bề mặt | `references` | @workspaces/fe (artifact trực tiếp của target, hoặc host được uỷ quyền và họ sản phẩm khi target chưa tồn tại), @worktrees/uat/&lt;flow>/&lt;case> nếu có, @knowledge/ui/composition (`COVERAGE-1` Case 7 publish bộ từ vựng lớp), đầu vào `business-promise-authority` nếu có | `ui-coverage` | `EVIDENCE_MISSING`, `SCOPE_UNFROZEN` |
 | 4 | Chốt các chuẩn tham chiếu theo lớp, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 5 | Hình thành các phương án và áp bộ lọc Grammar | `candidates`, `ownerCeiling` | UI contract vừa biên, @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/&lt;family> | — | `NO_VIABLE_DIRECTION`, `GRAMMAR_REQUIRED` |
-| 6 | Render mọi phương án còn sống kèm hình đã tự xét, phục vụ các trang cho một người xem rồi in ra | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/&lt;family>, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | `candidates`, `direction-image`, `host` | — |
-| 7 | Phản chứng, chấm các phương án đã render rồi viết quyết định | `selectionPolicy`, `approval` | các phương án, đầu vào `business-promise-authority` và `backend-source-application`, `ui-coverage`, @knowledge/ui/proof (các tiêu chí một bản render tĩnh trả lời được, theo từng viewport đã in) | `frontend-direction-decision` | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED` |
+| 6 | Render mọi phương án còn sống kèm hình đã tự xét, phục vụ các trang cho một người xem rồi in ra | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/&lt;family>, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | `candidates`, `selected-candidate-capture`, `direction-image`, `host` | — |
+| 7 | Phản chứng và chấm mọi phương án đã render theo conform cùng chất lượng thật cho tác vụ, rồi viết quyết định | `selectionPolicy`, `approval` | các phương án, tham chiếu, đầu vào `business-promise-authority` và `backend-source-application`, `ui-coverage`, @knowledge/ui/proof | `frontend-direction-decision`, `knowledge-coverage`, `family-understanding`, hoặc `knowledge-question` khi mâu thuẫn | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED`, `KNOWLEDGE_QUESTION` |
 | 8 | Bind thẩm quyền trình bày và đi hết cây đã quyết một lượt dưới trần owner | — | @knowledge/ui/presentation (mọi topic kèm fingerprint và kho luật), @grammar/core (các quan hệ đã sở hữu của gói đã publish), @workspaces/fe (cây đóng băng, theo thứ tự tài liệu), `frontend-direction-decision`, @tools/registry | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED`, `OWNER_CONFLICT` |
 | 9 | Chọn một luật đã publish cho mỗi thuộc tính ứng dụng sở hữu, bỏ những gì cây không được mang, ghi các khoảng trống và phát lời khai | `contractEmission` | @knowledge/ui/presentation (các case topic được bind publish), @grammar/core (các quan hệ đã sở hữu, giải phẫu Grammar và thang đóng), @workspaces/fe (thuộc tính mỗi node đang mang) | `inventory`, `resolved-tree`, `frontend-presentation-resolution` | `RULE_MISSING`, `UNKNOWN_RULE` |
 | 10 | Chiếu cây đã resolve lên write set đã khai, đối chiếu mọi giá trị với kho rồi quét bản chiếu | `mode` | `inventory` cạnh `resolved-tree`, @workspaces/fe (các path đã khai và gốc owner của chúng), @tools/shell | `writes` | `RESOLUTION_STALE`, `OWNER_CONFLICT`, `WRITE_REJECTED` |
@@ -378,10 +381,11 @@ không thừa kế ngầm mà nêu lại.
 Bước 4 để lại trong biên nhận các chuẩn mà bề mặt này nhắm tới, mỗi chuẩn gọi tên theo lớp, kèm thứ
 được mượn và thứ nó không giải quyết. Dưới `new` và `reconstruct` bảng ấy có ít nhất một dòng và bước
 4 dừng bằng `REFERENCE_MISSING` khi không sinh nổi một dòng nào; dưới `refine` nó để trống. Bước 6
-render trước khi bước 7 ghi quyết định, vì một cấu trúc chưa ai nhìn thấy thì không thể duyệt, và một
-phương án chỉ được tả bằng văn xuôi thì không ai phán được. Dưới `new` và `reconstruct`, mọi phương án
-mà lượt chạy hình thành đều được render thành trang riêng, bất kể `preview` nói gì và bất kể có bao
-nhiêu phương án: đó là `@tools/visualize`, không cần cấp quyền, và mọi runtime đều làm được.
+render trước khi bước 7 ghi quyết định, vì một phương án chưa ai nhìn thấy thì không thể được chấm và
+phương án chỉ được tả bằng văn xuôi không tạo ra bằng chứng thị giác. Ở mọi mức thay đổi, kể cả
+`refine`, mọi phương án mà lượt chạy hình thành đều được render thành trang riêng, bất kể `preview`
+nói gì và bất kể có bao nhiêu phương án: đó là `@tools/visualize`, không cần cấp quyền, và mọi runtime
+đều làm được.
 
 Trang phương án không phải file để người ta tự đi tìm. Bước 6 phục vụ thư mục artifacts qua
 `@tools/host` (tool có sẵn trong sổ đăng ký, không viết server mới cho từng lần) trên loopback, ở cổng
@@ -406,10 +410,10 @@ này, và audit sau đó ghi nó là person-accepted, gọi tên nhánh này, th
 của mình. Reason của mã dừng vận hành mô tả giới hạn tại owner, không mang câu hỏi tier; thẩm quyền
 hiện hành và chính sách tương tác vẫn áp dụng.
 
-Dưới `refine` trang vẫn là tuỳ chọn — cấu trúc đã được duyệt từ trước lượt chạy này — và chỉ render
-khi có nhiều hơn một phương án được hình thành hoặc `preview` là yes; một phương án refine duy nhất
-dưới mặc định không sinh trang nào và dựa vào phản chứng. Dưới `automatic`, chọn phương án trội hoặc
-ghi fallback khi hoà; `approval-required` dừng với `DIRECTION_CHOICE_REQUIRED` cho tới khi người quay
+Mọi phương án `refine` đều được render và chấm, kể cả khi chỉ có một phương án và `preview` là `no`;
+việc cấu trúc từng được duyệt không chứng minh thay đổi thị giác hiện tại. Dưới `automatic`, chọn
+phương án trội hoặc ghi fallback khi hoà; `approval-required` dừng với
+`DIRECTION_CHOICE_REQUIRED` cho tới khi người quay
 lại với `approval`, và lần chạy tiếp tục ở bước 8 với phương án đã duyệt. Biên nhận quyết định uỷ
 quyền cho lượt resolve làm việc bên trong trần owner đã đóng băng và không chứng minh gì về việc kết
 quả render ra sao.
@@ -439,14 +443,27 @@ minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bả
 | `frontend-direction-decision` | `response/direction.md` | md | có |
 | `ui-coverage` | `response/data/coverage.json` | data | có |
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | không |
+| `selected-candidate-capture` | `response/artifacts/<candidateId>.<viewport>.png` | artifact | có |
 | `direction-image` | `response/artifacts/images/<slot>.png` | artifact | không |
 | `host` | `response/artifacts/host.json` | artifact | không |
+| `knowledge-question` | `response/data/knowledge-question.json` | data | không |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | không |
+| `family-understanding` | `response/data/family-understanding.json` | data | không |
 | `frontend-presentation-resolution` | `response/resolution.md` | md | có |
 | `inventory` | `response/data/inventory.json` | data | có |
 | `resolved-tree` | `response/artifacts/<target>.resolved.tsx` | artifact | có |
 | `frontend-source-application` | `response/response.md` | md | có |
 | `changes` | `response/changes.md` | md | có |
 | `writes` | `response/data/writes.json` | data | có |
+
+## Kết quả tốt nhất
+
+Ở mọi lượt chạy thành công — `apply` hoặc `dry`, tại mọi change level gồm `new`, `reconstruct` và
+`refine` — `outcome.primary` là `image` có ref trỏ tới `selected-candidate-capture` bắt buộc.
+`## Selected capture` bind PNG đó
+với phương án đã chọn, URL HTML được phục vụ và viewport; `## Printed` chứng minh chính ảnh ấy đã
+được đưa ra xem. Asset direction-image, đường dẫn HTML hoặc ảnh chụp phương án không được chọn không
+thể thay cho kết quả. Biên nhận quyết định và source có thể là mục phụ.
 
 ## Dừng
 
@@ -476,11 +493,13 @@ minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bả
 | `RESOLUTION_STALE` | terminate |
 | `WRITE_REJECTED` | terminate |
 | `NO_PROGRESS` | terminate |
+| `KNOWLEDGE_QUESTION` | terminate |
 
 ## Kế tiếp
 
 | Khi | Operator |
 | --- | --- |
+| knowledge đã bind mâu thuẫn với bằng chứng phương án hay tham chiếu đã kiểm, nên owner chuẩn sửa nó trước khi sinh lại chính bề mặt này | `knowledge.repair` |
 | source đã commit và một bề mặt đang được phục vụ phải được bind ở head mới trước khi quan sát được | `workspace.bind` |
 | source đã commit và head của phiên phải được phục vụ trước khi quan sát được | `runtime.serve` |
 | source đã commit và bề mặt render ra phải được đo | `interface.audit` |

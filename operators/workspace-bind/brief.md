@@ -1,10 +1,6 @@
 # workspace.bind — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
-
-## Job
-
-Resolve one project and role into a verified checkout identity and its exact source head, and return that as one typed route receipt; the runtime a caller consumes is the runtime owner's to serve and bind.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.
 
 ## Done when
 

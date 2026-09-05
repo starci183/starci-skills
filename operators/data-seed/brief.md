@@ -1,10 +1,6 @@
 # data.seed — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
-
-## Job
-
-Place one flow's seed in the environment's store from the flow document, every row attributable to the flow by account ownership or prefix, at the representative volume the flow declares, and list exactly what undoes it; or remove that rollback set and nothing else.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.
 
 ## Done when
 
@@ -14,7 +10,7 @@ Primary output: `seed-receipt`
 
 ## Inputs
 
-`uat-account` (optional), `units` (optional)
+`seed-plan`, `uat-account`?, `units`?
 
 ## Outputs
 

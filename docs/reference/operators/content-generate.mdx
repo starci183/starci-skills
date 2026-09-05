@@ -91,6 +91,18 @@ because a unit that has been rewritten to a reviewer's satisfaction after unboun
 rewritten by the reviewer. A unit that passes its own author's review has not been reviewed, which is
 why shared executions, inherited turns, and producer rationale are three separate refusals.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| artifact matches frozen brief | reuse its fingerprint | structure, source, image or executable checks pass | receipt marks reused |
+| artifact missing | create declared edition, image or track | run artifact-specific check | continue only on match |
+| artifact invalid | update owning prose/image/track/harness stage | rerun failed and dependent checks | new repair attempt preserves prior review |
+| review exceeds brief | change no goal silently | record scope-changing finding | emit replan evidence |
+| valid alternatives tie | choose by brief fit, learner clarity, support, lower cost, stable id | record scores and differentiator | continue |
+
 ## Boundary
 
 Context is read-only. The operator writes only `response/` of its own branch: the brief, the receipt,
@@ -135,11 +147,11 @@ the checks it actually ran.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume | `resume` | `request/request.json`, input `content-generation-receipt` when present, @remote/minio/&lt;contentId>/&lt;locale> at the frozen unit binding | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind the served unit and the runtime | `unit` | @remote/minio/&lt;contentId>/&lt;locale> for curriculum and style as served, @worktrees/sessions/central-runtime for the runtime configuration, @tools/objectstorage | — | — |
+| 2 | Inspect every edition, image and track, classifying each reusable, missing or invalid against the bound curriculum, source and runtime | `unit` | @remote/minio/&lt;contentId>/&lt;locale> for curriculum and style as served, @worktrees/sessions/central-runtime for the runtime configuration, @tools/objectstorage | — | — |
 | 3 | Write and freeze the brief | `naturalLanguages`, `implementationLanguages` | @remote/minio/&lt;contentId>/&lt;locale> for curriculum and source evidence, @tools/websearch | `response/brief.md` | `<br />IEF_UNBOUND` |
-| 4 | Write every declared edition | `naturalLanguages` | `response/brief.md` as the frozen brief | `response/artifacts/article.<language>.md` | `OUTCOME_UNCOVERED` |
-| 5 | Generate the image to its claims, only when `stageModes` turns it on | `stageModes` | `response/brief.md` for the claims and the stated image intent | `response/artifacts/image.<name>`, `response/artifacts/prompt.<name>.txt`, @tools/imagegen | `IMAGE_UNAVAILABLE` |
-| 6 | Implement every declared track | `implementationLanguages`, `commands` | `response/brief.md`, @worktrees/sessions/central-runtime where each build command runs | `response/artifacts/track.<language>.<extension>`, @tools/shell | `CODE_BUILD_FAILED` |
+| 4 | Reuse valid editions, create missing editions and update only invalid editions from the frozen brief | `naturalLanguages` | `response/brief.md` as the frozen brief | `response/artifacts/article.<language>.md` | `OUTCOME_UNCOVERED` |
+| 5 | Reuse a valid image, or generate and inspect a missing or invalid image and prompt; mismatch opens a new image repair attempt | `stageModes` | `response/brief.md` for the claims and the stated image intent | `response/artifacts/image.<name>`, `response/artifacts/prompt.<name>.txt`, @tools/imagegen | `IMAGE_UNAVAILABLE` |
+| 6 | Reuse valid tracks, create missing tracks and repair invalid tracks, then build each declared track without changing the brief | `implementationLanguages`, `commands` | `response/brief.md`, @worktrees/sessions/central-runtime where each build command runs | `response/artifacts/track.<language>.<extension>`, @tools/shell | `CODE_BUILD_FAILED` |
 | 7 | Run the executable check, at most `maxE2eIterations` iterations | `maxE2eIterations` | @worktrees/sessions/central-runtime where each declared command runs | `response/data/e2e.json`, @tools/shell | `E2E_FAILED`, `CONTRACT_WEAKENED` |
 | 8 | Await the review: pause, a fresh agent reads the artifacts without the producer's rationale, revise and reopen while rounds remain | `maxReviewRounds` | `review/response/review.md` once the exchange is done | `response/response.json` (waiting, awaiting review) | `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
 | 9 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
@@ -162,6 +174,10 @@ publication, no learner outcome in production, and no acceptance beyond the chec
 | `image` | `response/artifacts/image.<name>` | artifact | no |
 | `image-prompt` | `response/artifacts/prompt.<name>.txt` | artifact | no |
 | `track` | `response/artifacts/track.<language>.<extension>` | artifact | no |
+
+## The best outcome
+
+On `done`, print **The best outcome** by rendering `response/artifacts/article.<language>.md`; display each declared `response/artifacts/image.<name>` beside the relevant passage and link any `response/artifacts/track.<language>.<extension>` as secondary output. A failed review presents `review/response/review.md` and the unresolved issue, never the draft as finished content.
 
 ## Stops
 

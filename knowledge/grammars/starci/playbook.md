@@ -42,7 +42,11 @@ request, Common semantics come from `knowledge/ui`, and family anatomy and reusa
 this Grammar. A tied score never causes this stop; `interface.generate` applies its deterministic
 fallback and continues.
 
-Owner ruling 2026-09-03 on images: an image is added only when it has a concrete content or task role
-and supports one named claim of the promise. Blank space alone is not evidence for an image; filler,
-decoration and density balancing are not roles. A direction records the role and the claim in its
-`## Images` table, or records that no image is warranted.
+Owner clarification 2026-09-05 on images: imagery can highlight the key idea, explain content,
+strengthen recognition or create a relevant, evocative focal point. Deliberate visual emphasis is a
+concrete role; an image need not be a functional diagram to earn its place. Name the subject, the
+idea or claim it highlights, and the intended order of attention in the direction's `## Images`
+table. Judge its scale, contrast and crop on the rendered surface: it should support that hierarchy
+without obscuring the content or competing with the primary action. Blank space alone is never a
+reason to add an image; filling space or balancing density without a content or emphasis role does
+not qualify. Record no image when imagery would not improve the composition.

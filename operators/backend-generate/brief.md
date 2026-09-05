@@ -1,10 +1,6 @@
 # backend.generate — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
-
-## Job
-
-Generate one backend outcome inside a frozen mutation contract, following the observed sibling family, in full or as a fix inside the orchestrator's fix size, and return the measured conformance and proof receipt that shows the boundary was not widened.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback. Context is limited to what request.json names.
 
 ## Done when
 
@@ -14,15 +10,15 @@ Primary output: `backend-source-application`
 
 ## Inputs
 
-`business-reconciliation` (optional), `architecture-decision`, `model` (optional), `backend-source-application` (optional), `units` (optional)
+`business-reconciliation`?, `architecture-decision`, `model`?, `backend-source-application`?, `units`?
 
 ## Outputs
 
 `backend-source-application` `response/response.md`
 `changes` `response/changes.md`
 `mutations` `response/data/mutations.json`
-`conformance` `response/data/conformance/<operationId>.<facet>.json` (optional)
-`proof` `response/data/proofs/<operationId>.<proofKind>.json` (optional)
+`conformance` `response/data/conformance/<operationId>.<facet>.json`?
+`proof` `response/data/proofs/<operationId>.<proofKind>.json`?
 
 ## Stops
 

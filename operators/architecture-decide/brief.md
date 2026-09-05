@@ -1,10 +1,6 @@
 # architecture.decide — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
-
-## Job
-
-Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it against the observed current state, the rejected alternatives, verified compatibility, and an independent critique.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback. Context is limited to what request.json names.
 
 ## Done when
 
@@ -14,15 +10,15 @@ Primary output: `architecture-decision`
 
 ## Inputs
 
-`architecture-decision` (optional), `model` (optional)
+`architecture-decision`?, `model`?
 
 ## Outputs
 
 `architecture-decision` `response/response.md`
-`restatement` `response/restatement.md` (optional)
+`restatement` `response/restatement.md`?
 `current-state` `response/data/current-state.json`
 `stack-model` `response/data/stack-model.json`
-`alternatives` `response/artifacts/<decisionId>-alternatives.html` (optional)
+`alternatives` `response/artifacts/<decisionId>-alternatives.html`?
 `independent-critique` `critique/response/critique.md`
 
 ## Stops

@@ -1,10 +1,6 @@
 # environment.preflight — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
-
-## Job
-
-Run, once and before any chain, every readiness check a mission would otherwise meet one wall at a time — declarations, checkouts, identity custody, the runtime, the host and the environment's approvals — and return them all at once as one typed readiness report, repairing nothing.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.
 
 ## Done when
 

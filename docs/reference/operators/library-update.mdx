@@ -28,8 +28,8 @@ Update one explicitly authorized owner package end to end: reproduce the regress
 repair it, bump the patch version, build and gate the package, then consume that exact release in the
 consumer's dependency metadata with the unchanged consumer regression proof, in two session commits
 that account for every byte of both; `mode` says which of those halves this branch runs, so an owner
-package and a consumer that live in two repositories are two routes, two sessions and two branches of
-this one operator rather than a job nobody can express.
+package and a consumer that live in two repositories use two isolated worktrees, one branch in each, inside
+the same user host session, both owned by this one operator rather than split into unrelated jobs.
 
 ## Done when
 
@@ -46,7 +46,8 @@ the paths of both commits; or, under mode `publish`, the package half alone ends
 `library-release` beside its `library-archive`, published to the registry the package manifest names
 under the archive's own integrity unless the request asked for no publication, with no consumer
 metadata touched; or, under mode
-`consume`, the consumer half alone runs against the `library-release` a sibling session produced,
+`consume`, the consumer half alone runs against the `library-release` the earlier owner branch in the
+same user host session produced, or a compatible historical release imported from a sibling session,
 writing the one metadata commit and no package source at all.
 
 ## One package, one consumer, one job
@@ -79,8 +80,8 @@ gate below reads only the half its mode needs:
   publication is lawful in one case only: a request that preset `publish: false` because a person will
   publish that archive themselves.
 - `consume` — the consumer route alone. `consumer` is supplied and `plan` is not; the input is the
-  `library-release` of an earlier branch — a sibling session's, imported into this session, or an
-  earlier branch of this one — and the job is exactly the consumer half: the exact manifest delta,
+  `library-release` of the earlier owner branch in this user host session, or a compatible historical
+  sibling-session release imported into it, and the job is exactly the consumer half: the exact manifest delta,
   the lock identity, the dependency closure and the consumer proofs against that release. No package
   source is written, no package section may appear in the receipt, and the package identity and the
   version consumed are read from the release record rather than from a plan. That record may be
@@ -88,18 +89,23 @@ gate below reads only the half its mode needs:
   only inside the producing session, and a consumer whose metadata resolves to a place no other
   checkout has is `DEPENDENCY_BOUNDARY_REJECTED`.
 
-So an owner package in one repository and its consumer in another are a `publish` branch on the owner
-route and a `consume` branch on the consumer route, the second binding the first's `library-release`
-through `producer-import`; a `chain` route that names this operator is asking for the first of those.
+So an owner package in one repository and its consumer in another are a `publish` branch in an
+isolated owner worktree and a `consume` branch in an isolated consumer worktree within the same user
+host session. The second binds the first's `library-release` through `producer-import`; historical
+cross-session imports remain compatible. A `chain` route that names this operator is asking for the
+first of those branches.
 
 ## Boundary of the package half
 
 The package manifest at the frozen base proves the package's identity; a caller-supplied directory
 name does not. Every declared file is inside that package and the route's write roots. Symlinks,
-nested package boundaries, consumer files, new dependencies, script changes, assets, markup
-structure, classes and inline style changes are refused. A behavior file is a script, or the style
-sheet a package ships its recipes in — a family whose law lives in CSS repairs that sheet as behavior,
-with the same paired regression reading the recipe. Only existing behavior files, their paired
+nested package boundaries, consumer files, new dependencies, script changes, undeclared assets and
+undeclared public deltas are refused. A behavior plan may explicitly declare a prop, anatomy,
+semantic-attribute, token, claim or class delta with concrete owner evidence and exact consumer
+impact; semantic markup and attributes that implement that declared package contract are then part
+of the owner repair. A behavior file is a script, or the style sheet a package ships its recipes in —
+a family whose law lives in CSS repairs that sheet as behavior, with the same paired regression
+reading the recipe. Only existing behavior files, their paired
 regression tests, the existing manifest's next patch version, the package changelog and package
 version metadata in a lockfile may change. A workspace lockfile is allowed only when the plan and
 route both name it; its parsed content may change only the bound package entry's version. Presentation
@@ -141,7 +147,10 @@ script, option, UI, test, source or presentation value is edited.
 
 Run `validate.mjs <branch> --preflight` before writing. It reads the typed plans the mode names, the
 bound route and the Git state, refuses a dirty tree, and proves the boundaries of the halves that
-will run; a package path is resolved only where a package half runs. Under `full` and `publish`, write
+will run; a package path is resolved only where a package half runs. Before any mutation it also
+freezes the exact Grammar manifest and a family-understanding brief that separates Common semantics,
+family style and product facts, then records the search order: reuse, compose, extend the existing
+owner, and introduce a new owner only for an evidenced gap. Under `full` and `publish`, write
 the paired tests first. Run `run-proof.mjs <branch> before`; it requires behavior and manifests to
 remain at the base, and records the declared regression's failing assertion. Apply the behavior repair
 and the next patch version, then run the helper for `after` and every declared package gate. Each
@@ -167,6 +176,7 @@ a proof from different bytes is rejected.
 | Alias | Bind | Required |
 | --- | --- | --- |
 | `@workspaces/fe` | the routed checkout: the owner package, its consumer, or both, at the frozen base; mutation is confined to its session branch | yes |
+| `@knowledge/grammars/<family>` | the concrete route family's INDEX, package DNA snapshot, family definition, idioms, playbook and canonical gaps | yes |
 
 ## Inputs
 
@@ -174,13 +184,14 @@ a proof from different bytes is rejected.
 | --- | --- | --- |
 | `route` | `workspace.bind`; the verified checkout, session policy and write roots | yes |
 | `library-release` | a `library.update` branch under mode `publish`, imported into this session through `producer-import` or produced by an earlier branch of it; required under mode `consume` and refused under the other two | no |
+| `knowledge-repair-receipt` | `knowledge.repair`, when this is a retry with a rebound manifest | no |
 
 ## Requirements
 
 | Field | Type | Default | Ask |
 | --- | --- | --- | --- |
 | `mode` | choice | full | `full` runs both halves in the routed checkout; `publish` runs the owner half alone and ends at the recorded release; `consume` runs the consumer half alone against a bound `library-release` |
-| `plan` | object | null | The closed library-behavior-plan schema: owner package identity, exact file set, paired regression, existing scripts and next patch; supplied under `full` and `publish`, absent under `consume` |
+| `plan` | object | null | The closed library-behavior-plan schema: owner package identity, exact file set, paired regression, existing scripts, next patch, declared public delta and exact consumer impact; supplied under `full` and `publish`, absent under `consume` |
 | `consumer` | object | null | The closed dependency-plan schema: the consumer manifests and lockfile that pin the package, the before-and-after authority — an unchanged consumer regression, or the two audits of a presentation release — and the complete delivery gates; supplied under `full` and `consume`, absent under `publish` |
 | `publish` | choice | true | `true` publishes the packed release to the registry when the package proofs are green; `false` leaves it packed for a person; read under mode `publish`, where nothing else makes a release reach a registry |
 | `resume` | token | null | The blocked branch token when re-entering with a changed plan or proof |
@@ -189,7 +200,7 @@ a proof from different bytes is rejected.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the request, run the request preflight, and preflight the halves the mode names, all before the first write outside the session folder | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, input `route`, input `library-release` under `consume`, @workspaces/fe at the base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LI<br />ARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
+| 1 | Validate the request, freeze the exact family manifest and understanding brief, run the request preflight, and preflight the halves the mode names, all before the first write outside the session folder | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, input `route`, input `library-release` under `consume`, @knowledge/grammars/&lt;family>, @workspaces/fe at the base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LI<br />ARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
 | 2 | Write only the paired regression tests in the owner package and prove the failure | `plan` | @workspaces/fe at the base, @tools/shell | @workspaces/fe/branch/session within the test ceiling, @tools/sourcewrite, `library-proof` | `LI<br />ARY_PROOF_FAILED` |
 | 3 | Repair the declared behavior and bump the next patch version | `plan` | @workspaces/fe inside the package ceiling | @workspaces/fe/branch/session within the declared file set, @tools/sourcewrite | `LI<br />ARY_BOUNDARY_REJECTED` |
 | 4 | Run the regression and the complete package test, typecheck and build scripts | `plan` | @workspaces/fe, @tools/shell | `library-proof` | `LI<br />ARY_PROOF_FAILED` |
@@ -200,7 +211,7 @@ a proof from different bytes is rejected.
 | 9 | Install the bound release within the exact consumer metadata boundary | `consumer` | @workspaces/fe and the bound release, @tools/shell | @workspaces/fe/branch/session within the metadata ceiling, @tools/sourcewrite | `DEPENDENCY_BOUNDARY_REJECTED` |
 | 10 | Verify the installed bytes and run the consumer regression and complete gates, or bind the after audit of a presentation release | `consumer` | @workspaces/fe, the `interface.audit` branch this session measured the bumped commit on, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
 | 11 | Commit the consumer metadata once and verify its delta and proof hashes | `consumer` | @workspaces/fe at the consumer commit, @tools/git | @workspaces/fe/branch/session, `dependency-update` | `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
-| 12 | Emit | — | everything above | `changes`, `response/response.json` | — |
+| 12 | Emit | — | everything above | `changes`, `knowledge-coverage`, `family-understanding`, `response/response.json` | — |
 
 Steps 2 to 6 are the package half and run under `full` and `publish`; step 7 is the publication and
 runs under `publish` alone, and only where the request did not preset `publish: false`; steps 8 to 11
@@ -222,11 +233,20 @@ alone, whose base is the frozen route head. The consumer proofs are the phases `
 | `dependency-proof` | `response/data/proofs/consumer-<phase>.json` | data | no |
 | `dependency-log` | `response/artifacts/proofs/consumer-<phase>.log` | artifact | no |
 | `changes` | `response/changes.md` | md | yes |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | no |
+| `family-understanding` | `response/data/family-understanding.json` | data | no |
 
 Every output but the receipt belongs to one half, so which of them a done branch must carry is the
 mode's answer and not a column's: `validate.mjs` requires the package set under `full` and `publish`,
 the consumer set under `full` and `consume`, and refuses the other half's set as a section that
 branch had no authority to write.
+
+## The best outcome
+
+For a successful run, `outcome.primary` chooses the declared link, code, document or table that most
+directly proves the requested half: package change/release proof for `publish`, consumer dependency
+and verification for `consume`, and the decisive proof for `full`. Before/after and the other half's
+proof may be secondary. A package archive or log is not promoted merely because it exists.
 
 ## Stops
 

@@ -257,7 +257,7 @@
           "generate-banks"
         ],
         "helperWritable": true,
-        "purpose": "The run record of the support layer: one folder per helper, one append-only run inside it, so every draft a helper left names the run that drafted it. No session, no chain, no receipt — a helper runs outside any workflow and this is the whole trace it leaves."
+        "purpose": "The append-only support run record: every draft names the helper run that produced it. A v2.2 helper belongs to the existing user host session and uses helper-request plus acquire-helper to share its worker limit and resource leases; it opens no separate user session and produces a helper-run rather than an operator receipt. Standalone legacy run records remain readable."
       },
       "banked": {
         "params": [

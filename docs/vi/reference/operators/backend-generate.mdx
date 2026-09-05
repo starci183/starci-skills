@@ -159,6 +159,17 @@ không bao giờ trở thành khẳng định rằng hành vi vẫn ổn, và m�
 được phân loại lại. Mỗi file bị chạm mang một bản ghi thay đổi kèm loại và hash trước/sau, vì một file
 sửa mà hai hash bằng nhau ghi lại một mutation không hề xảy ra.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| artifact conform tồn tại | tái dùng và ghi hash không đổi | contract facet và proof pass | ghi no-change observation |
+| artifact thiếu | chỉ tạo operation và integration point đã đóng băng | snapshot, conformance, proof bao phủ | commit một lần sau match |
+| artifact sai | update tập owner-owned nhỏ nhất | chạy lại facet, proof, snapshot bị ảnh hưởng | repair attempt mới; contract rộng handoff `architecture.decide` |
+| cùng failure fingerprint | không reapply mù | giữ cả hai attempt | `NO_PROGRESS` hoặc typed owner handoff |
+
 ## Ranh giới
 
 Operator chỉ ghi source sản phẩm bên trong ranh giới chủ sở hữu hoặc bên ngoài nó dưới dạng một lần
@@ -215,11 +226,11 @@ publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền. 
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate, chạy lại, xác nhận phiên, và chạy preflight của request trước lần ghi đầu ra ngoài thư mục phiên | `resume`, `mode` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, đầu vào `backend-source-application` nếu có, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng thẩm quyền, contract và pattern | `featureId`, `contractFingerprint` | đầu vào `model` khi có, nếu không thì @worktrees/businesses/&lt;featureId> ở head đã publish, đầu vào `architecture-decision` làm contract đóng băng và làm nguồn `operations` của nó, @knowledge/patterns/be mỗi khía cạnh một pattern | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
-| 3 | Điền từng operation của contract, trên nhánh phiên, đầy đủ hoặc như một fix | `mutableFileRefs`, `protectedRefs`, `scope` | @knowledge/patterns/be cho từng khía cạnh, @workspaces/be trong ranh giới chủ sở hữu | @workspaces/be/branch/session trong ranh giới chủ sở hữu, hoặc ngoài nó dưới dạng một lần nới có ghi nhận và không bao giờ trong một ref được bảo vệ, dưới một lease độc quyền, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_WIDENED`, `OWNER_CONFLICT` |
+| 3 | Kiểm artifact của từng operation, tái dùng phần conform, tạo phần thiếu và update tập owner-owned sai nhỏ nhất trên session branch | `mutableFileRefs`, `protectedRefs`, `scope` | @knowledge/patterns/be cho từng khía cạnh, @workspaces/be trong ranh giới chủ sở hữu | @workspaces/be/branch/session trong ranh giới chủ sở hữu, hoặc ngoài nó dưới dạng một lần nới có ghi nhận và không bao giờ trong một ref được bảo vệ, dưới một lease độc quyền, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Đối chiếu mọi mutation với contract đóng băng và ghi nó kèm hash trước và sau | `mode` | @workspaces/be, các file bị chạm và contract đóng băng | `response/data/mutations.json` | — |
 | 5 | Kiểm lại snapshot đã lưu khi đọc | — | @workspaces/be, snapshot đã lưu, @knowledge/patterns/be cho các luật trôi sau nó | — | — |
 | 6 | Chứng minh từng facet đã khai | — | @workspaces/be, phép đo đứng sau mỗi facet | `response/data/conformance/<operationId>.<facet>.json` | — |
-| 7 | Chạy từng proof đã khai | — | @workspaces/be, câu lệnh đã pin của mỗi kiểu proof đã khai | `response/data/proofs/<operationId>.<proofKind>.json`, @tools/shell | `PROOF_UNAVAILABLE` |
+| 7 | Chạy từng proof, so actual output với frozen criterion, và giữ transcript mismatch cho repair hoặc transient retry attempt mới thay vì hạ contract | — | @workspaces/be, câu lệnh đã pin của mỗi kiểu proof đã khai | `response/data/proofs/<operationId>.<proofKind>.json`, @tools/shell | `PROOF_UNAVAILABLE` |
 | 8 | Commit tập ghi đúng một lần, viết biên nhận và phát | `outcome` | mọi thứ ở trên | @workspaces/be/branch/session thành một commit, `response/changes.md`, `response/response.md`, `response/response.json`, @tools/git | — |
 
 Dưới `mode = dry`, bước 3 chiếu phần điền lên các path đã khai mà không ghi lấy một path nào, bước 4
@@ -246,6 +257,10 @@ không thể cho một câu trả lời khác.
 | `mutations` | `response/data/mutations.json` | data | có |
 | `conformance` | `response/data/conformance/<operationId>.<facet>.json` | data | không |
 | `proof` | `response/data/proofs/<operationId>.<proofKind>.json` | data | không |
+
+## Kết quả tốt nhất
+
+Với `mode: apply`, in **Kết quả tốt nhất** là thay đổi source có thể review mà `response/changes.md` gọi tên, kèm `response/data/mutations.json` và các file conformance hoặc proof đã khai làm evidence phụ. Với `mode: dry`, hiện các mutation và write set được đề xuất là chưa áp dụng, không có commit hay claim test; implementation bị blocked hoặc mismatch phải đưa contract, proof hay dòng ownership đang fail lên trước và không mô tả backend như đã bàn giao.
 
 ## Dừng
 

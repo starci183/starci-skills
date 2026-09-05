@@ -1,10 +1,6 @@
 # business.reconcile — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
-
-## Job
-
-Compare one published business promise, dimension by dimension of its frozen coverage matrix, against the source that was actually delivered, and republish the head with the reconciliation it now carries or stop on the first discrepancy that stands.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback. Context is limited to what request.json names.
 
 ## Done when
 
@@ -14,7 +10,7 @@ Primary output: `business-reconciliation`
 
 ## Inputs
 
-`backend-source-application`, `quality-verification` (optional), `uat-flow-verification` (optional), `api-verification` (optional)
+`backend-source-application`, `quality-verification`?, `uat-flow-verification`?, `api-verification`?
 
 ## Outputs
 

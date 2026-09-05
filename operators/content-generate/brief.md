@@ -1,10 +1,6 @@
 # content.generate — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
-
-## Job
-
-Generate or refactor one educational content unit in one linear pass: a teacher brief that constrains everything after it, one written edition per declared language, images made to a stated claim, code and executable checks that actually run, and an independent review that receives the artifacts without the producer's rationale.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback. Context is limited to what request.json names.
 
 ## Done when
 
@@ -14,18 +10,18 @@ Primary output: `content-generation-receipt`
 
 ## Inputs
 
-`content-generation-receipt` (optional)
+`content-generation-receipt`?
 
 ## Outputs
 
 `content-generation-receipt` `response/response.md`
 `content-brief` `response/brief.md`
-`e2e` `response/data/e2e.json` (optional)
+`e2e` `response/data/e2e.json`?
 `content-review` `review/response/review.md`
 `article` `response/artifacts/article.<language>.md`
-`image` `response/artifacts/image.<name>` (optional)
-`image-prompt` `response/artifacts/prompt.<name>.txt` (optional)
-`track` `response/artifacts/track.<language>.<extension>` (optional)
+`image` `response/artifacts/image.<name>`?
+`image-prompt` `response/artifacts/prompt.<name>.txt`?
+`track` `response/artifacts/track.<language>.<extension>`?
 
 ## Stops
 

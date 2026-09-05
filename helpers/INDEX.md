@@ -8,7 +8,7 @@ A helper is reached from the person and never from a wall: `/helper <id> <args>`
 
 | Helper | Profile | Mode | Single job |
 | --- | --- | --- | --- |
-| `generate-banks` | `astra` | `isolated` | Read what a product has already left behind — its routes, the coverage nobody took, the findings nobody answered, the walks and the API runs that failed, the feature models and the person's own notes — and draft a bank of missions the harness can take one after another, each with the goal block a session needs and at least one observation it came from. |
+| `generate-banks` | `sol-reviewer` | `isolated` | Read what a product has already left behind — its routes, the coverage nobody took, the findings nobody answered, the walks and the API runs that failed, the feature models and the person's own notes — and draft a bank of missions the harness can take one after another, each with the goal block a session needs and at least one observation it came from. |
 
 ## generate-banks
 
@@ -28,6 +28,7 @@ A helper is reached from the person and never from a wall: `/helper <id> <args>`
 | `@worktrees/uat/<flow>` | the walks this product has run and what they failed on | no |
 | `@worktrees/e2e/<flow>` | the API runs this product has run and which cases they failed | no |
 | `@worktrees/businesses` | the feature models and the promises they publish, so a drafted mission is about a promise and not about a file | no |
+| `@worktrees/banked/<product>` | the existing queue, missions, approval bytes and statuses used for reuse, update and duplicate checks | no |
 
 ### Writes
 
@@ -40,16 +41,16 @@ A helper is reached from the person and never from a wall: `/helper <id> <args>`
 
 | # | Step | Writes | Stops with |
 | --- | --- | --- | --- |
-| 1 | Validate the invocation and its arguments | — | `INVALID_INPUT` |
-| 2 | Read the product's route declarations, its port projection and the head of each routed checkout | — | `PRODUCT_UNROUTED` |
-| 3 | Read the open entries of the product's unchecked ledger, each with its lane, its unit and its reason | — | — |
-| 4 | Read the open findings of every family this product composes | — | — |
-| 5 | Read the last walk of every flow and the last API run of every e2e flow, and what each one failed on | — | — |
-| 6 | Read the feature models this product publishes and the person's notes the invocation named | — | — |
-| 7 | Draft one mission per open thread: its goal block, its routes, its environment, its evidence refs and its tier hint | `banked-mission` | `BANK_EMPTY` |
-| 8 | Refuse every draft that names no evidence ref, naming the thread it came from | — | `BANK_UNGROUNDED` |
-| 9 | Order the queue by what each mission waits for, then by priority | `bank-queue` | — |
-| 10 | Record the run: every input with the head it was read at, every output written, the profile and the two instants | `helper-run` | — |
+| 1 | Validate the invocation and bind this helper run to the existing Codex or Claude host session; never create a StarCi user session | — | `INVALID_INPUT` |
+| 2 | Read routes, ports and checkout heads, then inspect the existing queue, missions, approval bytes and statuses before deciding reuse, update or create | — | `PRODUCT_UNROUTED` |
+| 3 | Read and classify every unchecked-ledger source as valid, missing, invalid or stale, preserving evidence for the classification | — | — |
+| 4 | Read and classify the open findings of every family this product composes | — | — |
+| 5 | Read and classify the last UAT walk and API run of each e2e flow, including incomplete and failed attempts | — | — |
+| 6 | Read and classify the published feature models and the referenced person notes; optional absent sources make the run incomplete rather than silently empty | — | — |
+| 7 | Resolve duplicate open threads against the existing bank; reuse an unchanged mission, update only changed draft fields, or create one mission for a new thread | `banked-mission` | `BANK_EMPTY` |
+| 8 | Refuse drafts without evidence and record every merge as kept mission, merged mission ids and supporting refs | — | `BANK_UNGROUNDED` |
+| 9 | Order the queue while preserving approval bytes and every running or done status; never reopen a terminal mission during refresh | `bank-queue` | — |
+| 10 | Record every run, including empty and incomplete outcomes, source coverage, before/after hashes and entries, deduplications, outputs, profile, host binding and instants | `helper-run` | — |
 
 ### Outputs
 

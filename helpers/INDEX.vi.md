@@ -8,7 +8,7 @@ Helper được gọi từ người dùng chứ không bao giờ từ một bứ
 
 | Helper | Profile | Chế độ | Việc duy nhất |
 | --- | --- | --- | --- |
-| `generate-banks` | `astra` | `isolated` | Read what a product has already left behind — its routes, the coverage nobody took, the findings nobody answered, the walks and the API runs that failed, the feature models and the person's own notes — and draft a bank of missions the harness can take one after another, each with the goal block a session needs and at least one observation it came from. |
+| `generate-banks` | `sol-reviewer` | `isolated` | Read what a product has already left behind — its routes, the coverage nobody took, the findings nobody answered, the walks and the API runs that failed, the feature models and the person's own notes — and draft a bank of missions the harness can take one after another, each with the goal block a session needs and at least one observation it came from. |
 
 ## generate-banks
 
@@ -28,6 +28,7 @@ Helper được gọi từ người dùng chứ không bao giờ từ một bứ
 | `@worktrees/uat/<flow>` | những lượt đi thử sản phẩm này đã chạy và chúng hỏng ở đâu | không |
 | `@worktrees/e2e/<flow>` | những lượt chạy API sản phẩm này đã chạy và chúng hỏng ở case nào | không |
 | `@worktrees/businesses` | model tính năng và những lời hứa chúng công bố, để nhiệm vụ được phác nói về một lời hứa chứ không phải về một tệp | không |
+| `@worktrees/banked/<product>` | queue, mission, approval bytes và status hiện có dùng cho reuse, update và duplicate check | không |
 
 ### Ghi
 
@@ -40,16 +41,16 @@ Helper được gọi từ người dùng chứ không bao giờ từ một bứ
 
 | # | Bước | Ghi | Dừng với |
 | --- | --- | --- | --- |
-| 1 | Kiểm lần gọi và các tham số của nó | — | `INVALID_INPUT` |
-| 2 | Đọc khai báo route, phép chiếu port và head của từng checkout đã route của sản phẩm | — | `PRODUCT_UNROUTED` |
-| 3 | Đọc các mục đang mở của sổ chưa kiểm của sản phẩm, mỗi mục kèm lane, unit và lý do | — | — |
-| 4 | Đọc các finding đang mở của mọi họ mà sản phẩm này soạn theo | — | — |
-| 5 | Đọc lượt đi thử gần nhất của mỗi flow và lượt chạy API gần nhất của mỗi flow e2e, và mỗi lượt hỏng ở đâu | — | — |
-| 6 | Đọc các model tính năng sản phẩm này công bố và ghi chú của người dùng mà lần gọi nêu tên | — | — |
-| 7 | Phác một nhiệm vụ cho mỗi mạch đang mở: khối goal, route, môi trường, evidence ref và gợi ý tier của nó | `banked-mission` | `BANK_EMPTY` |
-| 8 | Từ chối mọi bản phác không gọi tên được evidence ref nào, nêu rõ mạch nó sinh ra từ đó | — | `BANK_UNGROUNDED` |
-| 9 | Xếp hàng đợi theo thứ mỗi nhiệm vụ chờ, rồi theo mức ưu tiên | `bank-queue` | — |
-| 10 | Ghi lại lần chạy: mọi đầu vào kèm head đã đọc, mọi đầu ra đã ghi, profile và hai mốc thời gian | `helper-run` | — |
+| 1 | Validate invocation và bind helper run vào host session Codex hoặc Claude hiện có; không tạo StarCi user session | — | `INVALID_INPUT` |
+| 2 | Đọc route, port, checkout head rồi inspect queue, mission, approval bytes và status hiện có trước khi chọn reuse, update hay create | — | `PRODUCT_UNROUTED` |
+| 3 | Đọc và phân loại từng unchecked-ledger source là valid, missing, invalid hay stale, giữ evidence của phân loại | — | — |
+| 4 | Đọc và phân loại open finding của mọi family mà product dùng | — | — |
+| 5 | Đọc và phân loại UAT walk cùng API run cuối của từng e2e flow, kể cả attempt incomplete và failed | — | — |
+| 6 | Đọc và phân loại feature model cùng person note được tham chiếu; optional source vắng làm run incomplete thay vì âm thầm empty | — | — |
+| 7 | Resolve duplicate open thread với bank hiện có; reuse mission không đổi, update đúng draft field đổi, hoặc create một mission cho thread mới | `banked-mission` | `BANK_EMPTY` |
+| 8 | Từ chối draft không có evidence và ghi từng merge bằng kept mission, merged mission ids và supporting refs | — | `BANK_UNGROUNDED` |
+| 9 | Xếp queue nhưng giữ nguyên approval bytes và mọi status running hoặc done; không mở lại terminal mission khi refresh | `bank-queue` | — |
+| 10 | Record mọi run, kể cả empty và incomplete, gồm source coverage, before/after hash và entries, deduplication, output, profile, host binding và thời điểm | `helper-run` | — |
 
 ### Đầu ra
 

@@ -25,6 +25,13 @@ chung và gate operator, phân giải bằng chứng actual rồi đối chiếu
 `evidenceManifest`. Mismatch được giữ lại và dẫn tới repair, retry hoặc blocked; retry trỏ về attempt trước
 và không được hạ expected bắt buộc trong cùng goal version.
 
+Khi cấp slot, operator ghi profile thực tế bằng `acquire <branch> <workerId> <ranProfile>`; request
+input nội bộ phải trỏ đúng kind do attempt đã match xuất ra và vẫn khớp evidence manifest đã niêm
+phong. Import từ session khác tiếp tục được kiểm bằng import manifest. Helper thuộc mission ghi
+request theo `templates/step/helper-request.schema.json` trong thư mục run, rồi dùng
+`acquire-helper <session> <helper-request.json> <workerId>` để kiểm host binding và lease các đường
+ghi cụ thể trong `.worktrees`. Helper dùng cùng hạn mức ba worker và cùng lệnh release.
+
 ## Chuỗi được suy ra thế nào
 
 Planner xuất phát từ nhiệm vụ đã xác nhận (`state.json.mission`): mỗi dòng "xong khi" gọi tên

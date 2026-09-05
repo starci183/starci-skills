@@ -40,7 +40,10 @@ quyền ở trên: dữ kiện sản phẩm và thứ tự vùng đã duyệt đ
 `knowledge/ui`, còn giải phẫu family và phong cách dùng lại đến từ Grammar này. Điểm số hoà không gây
 lần dừng này; `interface.generate` áp fallback xác định và tiếp tục.
 
-Chốt của owner ngày 2026-09-03 về hình: chỉ thêm hình khi nó có vai trò nội dung hoặc nhiệm vụ cụ thể
-và hỗ trợ một claim được gọi tên trong lời hứa. Khoảng trống tự nó không phải bằng chứng cần hình;
-ảnh lấp chỗ, trang trí và cân mật độ không phải vai trò. Một định hướng ghi vai trò và claim trong
-bảng `## Images`, hoặc ghi rõ không có hình nào đáng dùng.
+Thầy làm rõ ngày 2026-09-05 về hình: hình có thể làm nổi bật ý chính, giải thích nội dung, tăng nhận
+diện hoặc tạo điểm nhấn gợi cảm xúc phù hợp. Nhấn mạnh thị giác có chủ đích là một vai trò cụ thể;
+hình không bắt buộc phải là sơ đồ chức năng mới đáng dùng. Ghi chủ thể, ý hoặc claim được highlight
+và thứ tự chú ý mong muốn vào bảng `## Images` của định hướng. Chấm kích thước, tương phản và crop
+trên bề mặt đã render: hình phải hỗ trợ thứ bậc ấy, không che nội dung hoặc tranh trọng tâm với hành
+động chính. Khoảng trống tự nó không bao giờ là lý do thêm hình; lấp chỗ hoặc cân mật độ mà không có
+vai trò nội dung hay điểm nhấn thì không đạt. Ghi không dùng hình khi hình không cải thiện bố cục.

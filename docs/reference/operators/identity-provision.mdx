@@ -118,6 +118,17 @@ identity provisioning `declared` for `env`, and a hash that moved between the re
 `AUTHORITY_DRIFT`. Rotation belongs to no declared class and always takes an approval id. `approval`
 has no default: an identity other flows share is never changed on silence.
 
+## Concrete attempt flow
+
+This operator's rows are gated by the shared expected/actual attempt contract in `scripts/attempt-gate.mjs`.
+
+| Observed state | Action | Actual check | Next branch |
+| --- | --- | --- | --- |
+| alias has correct provider account, role, memberships and real product login | reuse without mutation | record stable account ref and fresh browser login proof | publish action `reuse` |
+| alias missing | create with sealed credential resolved only in request body/form | verify provider, role, memberships and real login at bound endpoint | publish action `create` |
+| account wrong or login fails | repair only wrong provider-owned fields | repeat real login and changed membership checks | publish action `repair` or exact `IDENTITY_UNPROVEN` delta |
+| provider effect uncertain | do not create a duplicate | reread by stable account ref and username | resume only when reuse or bounded repair is known |
+
 ## Boundary
 
 Context is read-only apart from the approved delta. The operator creates accounts at the provider the
@@ -164,9 +175,9 @@ approval; and does not claim a provisioned outcome while any required check is a
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and the resume against the frozen generation | `resume` | `request/request.json`, @worktrees/sessions/central-runtime at the frozen generation | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the authority — an approval id, or the environment's declaration re-read and re-hashed — and run the identity preflight `scripts/identity-custody.mjs` through @tools/shell, proving the custody by name and never by value | `approval`, `env` | @workspaces/device-state for the sealed credential's name and custody, the environment's declaration when `approval` references it, @tools/secrets | — | `AUTHORITY_DRIFT`, `PROVISIONING_UNAVAILABLE` |
-| 3 | Read the entry's identity declaration and the flow folder, and draft the flow document from the template when it is absent | `routeKey`, `flow` | @worktrees/sessions/central-runtime for the provider and realm the entry declares, @worktrees/uat/&lt;flow> for the existing record and document, @worktrees/_templates for the flow template | @worktrees/uat/&lt;flow>, @tools/sourcewrite | `INVALID_INPUT` |
-| 4 | Create each alias's account at the provider with the sealed credential resolved by name into the request body, or rotate the administrator custody under the bound principal and stage its ciphertext | `desiredState`, `identityRotation` | @worktrees/uat/&lt;flow> for the aliases the flow document names, @workspaces/device-state for the credential by name, @tools/secrets, @tools/http | `response/data/delta.json` | `PROVISIONING_UNAVAILABLE` |
-| 5 | Prove the identity proof set: the provider reachable, the credential resolvable, each account existing and signing in through @tools/browsercontrol or the token endpoint, and no credential recorded anywhere written | — | @worktrees/sessions/central-runtime for the provider, @tools/http, @tools/browsercontrol | `response/data/checks.json` | `IDENTITY_UNPROVEN` |
+| 3 | Inspect the declared provider and every flow alias, classifying its stable provider account, role, memberships and prior login evidence as reusable, missing or invalid | `routeKey`, `flow` | @worktrees/sessions/central-runtime for the provider and realm the entry declares, @worktrees/uat/&lt;flow> for the existing record and document, @worktrees/_templates for the flow template | @worktrees/uat/&lt;flow>, @tools/sourcewrite | `INVALID_INPUT` |
+| 4 | Reuse valid accounts, create missing accounts, and repair only invalid provider-owned role, membership or credential state; never duplicate an uncertain account | `desiredState`, `identityRotation` | @worktrees/uat/&lt;flow> for the aliases the flow document names, @workspaces/device-state for the credential by name, @tools/secrets, @tools/http | `response/data/delta.json` | `PROVISIONING_UNAVAILABLE` |
+| 5 | Prove provider reachability, credential custody, role and memberships, then perform a real login through the bound product endpoint in a fresh browser context; token-only proof is insufficient | — | @worktrees/sessions/central-runtime for the provider, @tools/http, @tools/browsercontrol | `response/data/checks.json` | `IDENTITY_UNPROVEN` |
 | 6 | Write the account record of names into the flow folder and publish it | `flow`, `env` | `response/data/delta.json` for the accounts created | @worktrees/uat/&lt;flow>, `response/data/account.json` | — |
 | 7 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
@@ -181,6 +192,10 @@ the exact delta; a resume that adds no authority, provider or desired-state chan
 | `delta` | `response/data/delta.json` | data | yes |
 | `checks` | `response/data/checks.json` | data | yes |
 | `uat-account` | `response/data/account.json` | data | no |
+
+## The best outcome
+
+For provisioning, print **The best outcome** as the per-alias reuse, create or repair table from `response/data/delta.json` and the safe sign-in results in `response/data/checks.json`; `response/data/account.json` may identify the account by name as secondary evidence. For admin rotation, show the old credential rejected and the replacement accepted without emitting an account record; never print, link or copy a credential value, sealed file or secret-bearing command, and show an unproved login as unproved.
 
 ## Stops
 

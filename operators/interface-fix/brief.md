@@ -1,10 +1,6 @@
 # interface.fix — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
-
-## Job
-
-Repair one finding — one audit verdict row, or one UAT verdict — on a generated surface with one small commit on the session branch: inside the orchestrator's fix size, with no layout change, and with every value taken from the resolution inventory the surface was generated from.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.
 
 ## Done when
 
@@ -14,14 +10,17 @@ Primary output: `frontend-source-application`
 
 ## Inputs
 
-`frontend-presentation-resolution`, `frontend-source-application`, `frontend-surface-audit` (optional), `uat-flow-verification` (optional)
+`frontend-presentation-resolution`, `frontend-source-application`, `frontend-surface-audit`?, `uat-flow-verification`?, `knowledge-repair-receipt`?
 
 ## Outputs
 
 `frontend-source-application` `response/response.md`
 `changes` `response/changes.md`
 `writes` `response/data/writes.json`
+`knowledge-question` `response/data/knowledge-question.json`?
+`knowledge-coverage` `response/data/knowledge-coverage.json`?
+`family-understanding` `response/data/family-understanding.json`?
 
 ## Stops
 
-`INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `RESOLUTION_STALE`, `OWNER_CONFLICT`, `FIX_TOO_LARGE`, `WRITE_REJECTED`, `NO_PROGRESS`
+`INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `RESOLUTION_STALE`, `OWNER_CONFLICT`, `FIX_TOO_LARGE`, `WRITE_REJECTED`, `NO_PROGRESS`, `KNOWLEDGE_QUESTION`

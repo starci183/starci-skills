@@ -128,6 +128,17 @@ mặc định lấy bộ mà manifest đã kiểm khai ra, nên người không 
 thật. `approval` thì hoàn toàn không có mặc định: đổi thứ mà production đang phục vụ luôn là việc có
 người nói đồng ý.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| exact digest active và probe pass full window | tái dùng; không rollout | so digest, manifest, domain, schema, probe | phát idempotent receipt |
+| target trống | tạo host/artifact/domain đã khai bằng compare-and-set | đọc mọi revision và steady probe | phát sau required match |
+| valid release khác | update frozen digest giữ rollback identity | xác minh compatibility, domain, digest, probe | bounded recovery cùng release rồi exact rollback |
+| state/effect không chắc hoặc concurrent drift | không lặp/đoán phá hủy | ghi before/after revision và foreign drift | typed replan/block; identity mới cần reconfirm expected |
+
 ## Ranh giới ghi
 
 Context chỉ đọc, trừ các mutation đã khai. Operator chỉ áp các mutation host, migration, domain và
@@ -175,13 +186,13 @@ quan sát probe duy nhất hay từ một rollout được giả định.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào, thẩm quyền mà Đầu vào mang, và resume | `resume` | `request/request.json`, Đầu vào `quality-verification` là thẩm quyền lượt chạy này đứng lên | — | `INVALID_INPUT`, `AUTHORIZATION_MISSING`, `NO_PROGRESS` |
-| 2 | Ràng release và biên dịch kế hoạch, rồi đọc sổ chưa kiểm của tính năng trước khi production bị đổi | `release`, `target`, `approval`, `feature` | @remote/ghcr/&lt;image> tại digest đã đóng băng, @remote/github-actions/&lt;runId> cho trạng thái quan sát được, đầu vào `migration-release` cho schema mà image phụ thuộc khi đã release một cái, @worktrees/unchecked/&lt;product> cho phần chưa kiểm còn mở của tính năng, @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED`, `UNCHECKED_OPEN` |
+| 2 | Bind immutable release và inspect artifact, host, active digest, schema, domain, target revision, phân loại reusable, missing, invalid hoặc foreign trước effect | `release`, `target`, `approval`, `feature` | @remote/ghcr/&lt;image> tại digest đã đóng băng, @remote/github-actions/&lt;runId> cho trạng thái quan sát được, đầu vào `migration-release` cho schema mà image phụ thuộc khi đã release một cái, @worktrees/unchecked/&lt;product> cho phần chưa kiểm còn mở của tính năng, @tools/git, @tools/ci | — | `MANIFEST_INVALID`, `APPROVAL_REQUIRED`, `UNCHECKED_OPEN` |
 | 3 | Khởi tạo execution root và phân giải credential theo tên | — | @workspaces/device-state cho các handle đã khai và custody của chúng, @tools/secrets | — | `CREDENTIAL_UNAVAILABLE` |
-| 4 | Chuẩn bị host, publish artifact theo digest, migrate và đối chiếu domain | — | @remote/ghcr/&lt;image> cho artifact theo digest, @remote/github-actions/&lt;runId> cho revision trước và sau của từng boundary | @tools/shell | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
+| 4 | Tái dùng host, artifact, domain state khớp; tạo declared state thiếu hoặc chỉ update declared state sai bằng compare-and-set revision | — | @remote/ghcr/&lt;image> cho artifact theo digest, @remote/github-actions/&lt;runId> cho revision trước và sau của từng boundary | @tools/shell | `HOST_UNAVAILABLE`, `ARTIFACT_MISSING`, `MIGRATION_BLOCKED`, `DOMAIN_UNRECONCILED` |
 | 5 | Roll out | — | @remote/ghcr/&lt;image> cho revision của target trước và sau | @tools/container | `ROLLOUT_FAILED` |
 | 6 | Theo dõi trong deadline, có backoff | `steadyDeadline`, `probes` | @remote/github-actions/&lt;runId> cho các quan sát probe suốt cửa sổ, @tools/http | `response/data/probes.json` | — |
 | 7 | Phát hiện drift đồng thời trước khi hành động | — | `response/data/probes.json`, @remote/ghcr/&lt;image> cho release đang active theo digest | — | `CONCURRENT_DRIFT` |
-| 8 | Đi nhánh phục hồi khi lỗi còn dai dẳng | — | `response/data/probes.json`, @remote/ghcr/&lt;image> tại cùng danh tính release | @tools/container | `RECOVERY_EXHAUSTED` |
+| 8 | Chỉ làm recovery thuận nghịch có giới hạn cho cùng release identity, ghi từng observation và effect; không lặp mutation chưa chắc | — | `response/data/probes.json`, @remote/ghcr/&lt;image> tại cùng danh tính release | @tools/container | `RECOVERY_EXHAUSTED` |
 | 9 | Đi nhánh rollback khi phục hồi không giữ được | `rollbackIdentity` | @remote/ghcr/&lt;image> tại đúng digest an toàn | @tools/container | `ROLLBACK_IDENTITY_MISSING` |
 | 10 | Chứng minh trạng thái ổn định, viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | `STEADY_STATE_UNPROVEN` |
 
@@ -197,6 +208,10 @@ một lần resume không thêm thẩm quyền, manifest, credential hay quan s�
 | --- | --- | --- | --- |
 | `release-deployment` | `response/response.md` | md | có |
 | `probes` | `response/data/probes.json` | data | có |
+
+## Kết quả tốt nhất
+
+In **Kết quả tốt nhất** từ steady state trong `response/response.md` cùng các dòng health và readiness ở `response/data/probes.json`: rollout thành công hiện địa chỉ, định danh và digest release mới, còn fallback rollback hiện đúng release trước đã khôi phục và không gọi đó là một bản giao mới. Probe fail phải hiện trung thực deployed state và observation đang fail, không quảng bá release là khỏe.
 
 ## Dừng
 

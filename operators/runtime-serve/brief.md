@@ -1,10 +1,6 @@
 # runtime.serve — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
-
-## Job
-
-Serve one product route's integration branch on its one fixed port: climb the named rung of the runtime ladder for the bound route — bring the environment's infrastructure up, locate the routed checkouts, start a role, merge this session's commit into the integration branch and serve it, restart, reset or stop the one detached server — attest the entry from what answered, and hold the lease that orders sessions.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.
 
 ## Done when
 
@@ -14,14 +10,14 @@ Primary output: `platform-operation-receipt`
 
 ## Inputs
 
-`changes` (optional)
+`changes`?
 
 ## Outputs
 
 `platform-operation-receipt` `response/response.md`
 `delta` `response/data/delta.json`
 `checks` `response/data/checks.json`
-`changes` `response/changes.md` (optional)
+`changes` `response/changes.md`?
 
 ## Stops
 

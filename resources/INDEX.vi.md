@@ -34,7 +34,7 @@ orchestrator.json; mode không tạo thêm user session hoặc hạn mức paral
 | `business.reconcile` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
 | `content.generate` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `websearch:bounded`, `imagegen:required`, `objectstorage:read` | isolated | Thực thi trong phạm vi ghi và tác động được giao |
 | `data.plan` | sol-reviewer | no | `fileread:context-aliases`, `git:read` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
-| `data.seed` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `secrets:resolve-by-name`, `http:probe`, `database:namespaced-write` | inline | Thực thi trong phạm vi ghi và tác động được giao |
+| `data.seed` | sol-fresh | no | `fileread:context-aliases`, `secrets:resolve-by-name`, `http:probe`, `database:namespaced-write` | inline | Thực thi trong phạm vi ghi và tác động được giao |
 | `environment.preflight` | sol-reviewer | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `container:read` | inline | Suy luận và kiểm bằng chứng trong ranh giới operator |
 | `git.publish` | sol-fresh | no | `fileread:context-aliases`, `git:merge-and-push`, `shell:declared-commands`, `ci:read` | inline | Thực thi trong phạm vi ghi và tác động được giao |
 | `identity.provision` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `sourcewrite:declared-write-set`, `browsercontrol:required` | inline | Thực thi trong phạm vi ghi và tác động được giao |
@@ -42,7 +42,7 @@ orchestrator.json; mode không tạo thêm user session hoặc hạn mức paral
 | `interface.fix` | sol-fresh | yes | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `shell:declared-commands`, `git:commit-session-branch` | inline | Thực thi trong phạm vi ghi và tác động được giao |
 | `interface.generate` | sol-fresh | yes | `fileread:context-aliases`, `git:commit-session-branch`, `websearch:bounded`, `imagegen:judged`, `visualize:html`, `host:loopback`, `print:decision-points`, `registry:read`, `sourcewrite:declared-write-set`, `shell:declared-commands` | isolated | Thực thi trong phạm vi ghi và tác động được giao |
 | `interface.plan` | sol-reviewer | yes | `fileread:context-aliases`, `git:read` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
-| `knowledge.repair` | sol-fresh | no | `fileread:context-aliases`, `git:read-write`, `sourcewrite:declared-paths` | isolated | Thực thi trong phạm vi ghi và tác động được giao |
+| `knowledge.repair` | sol-fresh | no | `fileread:context-aliases`, `git:commit-session-branch`, `sourcewrite:declared-write-set` | isolated | Thực thi trong phạm vi ghi và tác động được giao |
 | `library.update` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands`, `registry:publish`, `secrets:resolve-by-name` | isolated | Thực thi trong phạm vi ghi và tác động được giao |
 | `migration.release` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
 | `quality.verify` | sol-reviewer | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe` | inline | Suy luận và kiểm bằng chứng trong ranh giới operator |
@@ -50,7 +50,7 @@ orchestrator.json; mode không tạo thêm user session hoặc hạn mức paral
 | `runtime.serve` | sol-fresh | no | `fileread:context-aliases`, `git:merge-into-integration-branch`, `shell:declared-commands`, `http:probe`, `container:operate`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
 | `service.operate` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `container:operate`, `http:probe`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
 | `uat.plan` | sol-reviewer | no | `fileread:context-aliases` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
-| `uat.verify` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `database:namespaced-write`, `print:decision-points` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `uat.verify` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `print:decision-points` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
 | `workspace.bind` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
 
 ## Thay đổi

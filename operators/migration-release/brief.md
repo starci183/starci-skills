@@ -1,10 +1,6 @@
 # migration.release — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
-
-## Job
-
-Apply one frozen source migration plan once to one declared non-production target through the source-owned runner, and prove by a second invocation that nothing remains pending and the journal did not move.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.
 
 ## Done when
 
@@ -20,7 +16,7 @@ Primary output: `migration-release`
 
 `migration-release` `response/migration-release.md`
 `migration-release-proof` `response/data/migration-release.json`
-`migration-log` `response/artifacts/migration-<n>.log` (optional)
+`migration-log` `response/artifacts/migration-<n>.log`?
 
 ## Stops
 

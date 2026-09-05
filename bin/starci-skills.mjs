@@ -207,8 +207,9 @@ const HELP = `${pkg.name} ${pkg.version}
   npx ${pkg.name} doctor [--dir <repo>] [--quick]
   npx ${pkg.name} version
 
-init    copies the runtime into <repo>/.claude, writes CLAUDE.md and AGENTS.md when absent, and
-        adds .worktrees/sessions/ to .gitignore. Refuses a .claude it did not install unless --force.
+init    copies the runtime into <repo>/.claude, adds the StarCi entry once to CLAUDE.md and AGENTS.md
+        while preserving custom instructions, and adds .worktrees/sessions/ to .gitignore.
+        Refuses a .claude it did not install unless --force; --no-bootstrap keeps host files unchanged.
 update  replaces the runtime paths with this version; a file changed locally is kept and listed
         (resources/settings.json is the person's own and is never part of the package)
         unless --force. Files outside the runtime paths are never touched.

@@ -90,6 +90,18 @@ cho vừa lòng người phản biện qua vô số vòng là một đơn vị d
 giả của nó duyệt thì chưa được phản biện, và đó là lý do lượt chạy chung, lượt thừa hưởng và lý lẽ của
 người sản xuất là ba điều bị từ chối riêng biệt.
 
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| artifact khớp frozen brief | tái dùng fingerprint | check structure, source, image hoặc executable pass | receipt ghi reused |
+| artifact thiếu | tạo edition, image hoặc track đã khai | chạy check riêng artifact | chỉ tiếp tục khi match |
+| artifact sai | update stage prose/image/track/harness sở hữu | chạy lại check fail và phụ thuộc | repair attempt mới giữ review cũ |
+| review vượt brief | không tự đổi goal | ghi scope-changing finding | phát replan evidence |
+| alternative hợp lệ tied | chọn theo fit brief, rõ cho learner, support, chi phí thấp, id ổn định | ghi score và yếu tố phân định | tiếp tục |
+
 ## Ranh giới
 
 Context chỉ đọc. Operator chỉ ghi `response/` của nhánh mình: brief, biên nhận, bản ghi máy của phần
@@ -134,11 +146,11 @@ vượt quá các phép kiểm nó thực sự đã chạy.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate và chạy lại | `resume` | `request/request.json`, đầu vào `content-generation-receipt` nếu có, @remote/minio/&lt;contentId>/&lt;locale> ở ràng buộc đơn vị đã đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Ràng đơn vị đang phục vụ và runtime | `unit` | @remote/minio/&lt;contentId>/&lt;locale> cho chương trình học và văn phong như đang phục vụ, @worktrees/sessions/central-runtime cho cấu hình runtime, @tools/objectstorage | — | — |
+| 2 | Kiểm mọi edition, image và track, phân loại reusable, missing hoặc invalid theo curriculum, source và runtime đã bind | `unit` | @remote/minio/&lt;contentId>/&lt;locale> cho chương trình học và văn phong như đang phục vụ, @worktrees/sessions/central-runtime cho cấu hình runtime, @tools/objectstorage | — | — |
 | 3 | Viết và đóng băng brief | `naturalLanguages`, `implementationLanguages` | @remote/minio/&lt;contentId>/&lt;locale> cho chương trình học và bằng chứng nguồn, @tools/websearch | `response/brief.md` | `<br />IEF_UNBOUND` |
-| 4 | Viết mọi bản đã khai | `naturalLanguages` | `response/brief.md` như brief đã đóng băng | `response/artifacts/article.<language>.md` | `OUTCOME_UNCOVERED` |
-| 5 | Sinh hình theo các tuyên bố của nó, chỉ khi `stageModes` bật | `stageModes` | `response/brief.md` cho các tuyên bố và ý định hình ảnh đã nêu | `response/artifacts/image.<name>`, `response/artifacts/prompt.<name>.txt`, @tools/imagegen | `IMAGE_UNAVAILABLE` |
-| 6 | Cài đặt mọi track đã khai | `implementationLanguages`, `commands` | `response/brief.md`, @worktrees/sessions/central-runtime nơi mỗi câu lệnh build chạy | `response/artifacts/track.<language>.<extension>`, @tools/shell | `CODE_BUILD_FAILED` |
+| 4 | Tái dùng edition hợp lệ, tạo edition thiếu và chỉ update edition sai từ frozen brief | `naturalLanguages` | `response/brief.md` như brief đã đóng băng | `response/artifacts/article.<language>.md` | `OUTCOME_UNCOVERED` |
+| 5 | Tái dùng image hợp lệ, hoặc generate và inspect image/prompt thiếu hay sai; mismatch mở image repair attempt mới | `stageModes` | `response/brief.md` cho các tuyên bố và ý định hình ảnh đã nêu | `response/artifacts/image.<name>`, `response/artifacts/prompt.<name>.txt`, @tools/imagegen | `IMAGE_UNAVAILABLE` |
+| 6 | Tái dùng track hợp lệ, tạo track thiếu và sửa track sai, rồi build từng declared track mà không đổi brief | `implementationLanguages`, `commands` | `response/brief.md`, @worktrees/sessions/central-runtime nơi mỗi câu lệnh build chạy | `response/artifacts/track.<language>.<extension>`, @tools/shell | `CODE_BUILD_FAILED` |
 | 7 | Chạy phép kiểm chạy được, tối đa `maxE2eIterations` vòng | `maxE2eIterations` | @worktrees/sessions/central-runtime nơi mỗi câu lệnh đã khai chạy | `response/data/e2e.json`, @tools/shell | `E2E_FAILED`, `CONTRACT_WEAKENED` |
 | 8 | Chờ phản biện: tạm ngưng, một agent mới đọc các artifact mà không có lý lẽ của người sản xuất, sửa và mở lại khi còn vòng | `maxReviewRounds` | `review/response/review.md` khi cuộc trao đổi done | `response/response.json` (waiting, awaiting review) | `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
 | 9 | Viết biên nhận và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
@@ -162,6 +174,10 @@ quá các phép kiểm đã thực sự chạy.
 | `image` | `response/artifacts/image.<name>` | artifact | không |
 | `image-prompt` | `response/artifacts/prompt.<name>.txt` | artifact | không |
 | `track` | `response/artifacts/track.<language>.<extension>` | artifact | không |
+
+## Kết quả tốt nhất
+
+Khi `done`, in **Kết quả tốt nhất** bằng cách render `response/artifacts/article.<language>.md`; hiển thị từng `response/artifacts/image.<name>` đã khai cạnh đoạn liên quan và link mọi `response/artifacts/track.<language>.<extension>` làm đầu ra phụ. Review fail phải trình bày `review/response/review.md` cùng vấn đề chưa khép, không bao giờ coi draft là content hoàn tất.
 
 ## Dừng
 

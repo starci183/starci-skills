@@ -291,7 +291,7 @@ xong mà sổ cái không giữ các lần hỏng của nó.
 
 ## Kết quả tốt nhất
 
-Khi `done`, hiển thị `response/artifacts/sheet.png` làm **Kết quả tốt nhất**, rồi hiển thị hoặc link các capture bắt buộc `response/artifacts/<case>.png` cùng dòng verdict trong `response/data/verdicts.json`. Attempt fail và incomplete phải hiện actual state đã capture cùng assertion còn thiếu và không bao giờ dùng lại ảnh pass cũ làm kết quả hiện tại.
+Khi `done`, hiện tổng quan đầy đủ kết quả các case làm **Kết quả tốt nhất**, chọn bảng dễ đọc, `response/artifacts/sheet.png` hoặc screenshot của case giúp giải thích finding quan trọng nhất. Kèm dòng verdict và link tới bằng chứng mọi case; ảnh được chọn phải hiện trực tiếp. Một lượt kiểm hoàn tất vẫn có thể có verdict fail, phải hiện rõ thay vì che bằng capture pass. Attempt fail và incomplete phải hiện actual state đã capture cùng assertion còn thiếu và không bao giờ dùng lại ảnh pass cũ làm kết quả hiện tại.
 
 ## Dừng
 

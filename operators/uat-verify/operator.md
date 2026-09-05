@@ -294,7 +294,7 @@ whose failures the ledger does not hold.
 
 ## The best outcome
 
-On `done`, display `response/artifacts/sheet.png` as **The best outcome**, then display or link the required `response/artifacts/<case>.png` captures and the verdict rows in `response/data/verdicts.json`. Failed and incomplete attempts show their actual captured state and missing assertions and never reuse a prior pass image as the current result.
+On `done`, show the complete case result summary as **The best outcome**, choosing a readable result table, `response/artifacts/sheet.png`, or the case screenshot that best explains the significant finding. Include the verdict rows and links to all case evidence; display selected images visibly. A completed verification may contain failing verdicts, which must be prominent rather than hidden behind a passing capture. Failed and incomplete attempts show their actual captured state and missing assertions and never reuse a prior pass image as the current result.
 
 ## Stops
 

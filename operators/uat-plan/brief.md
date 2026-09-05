@@ -1,10 +1,6 @@
 # uat.plan — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
-
-## Job
-
-Enumerate the user journeys the mission goal names, one flow per journey with its entry route, its step budget, its own account alias and its own seed namespace, so that the blind walkers that follow each walk one flow and no two of them ever share a row.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback. Context is limited to what request.json names.
 
 ## Done when
 
@@ -14,11 +10,12 @@ Primary output: `uat-plan`
 
 ## Inputs
 
-`surface-map` (optional)
+`surface-map`?
 
 ## Outputs
 
 `uat-plan` `response/response.md`
+`uat-case-sheet` `response/data/cases.json`
 `units` `response/data/units.json`
 
 ## Stops

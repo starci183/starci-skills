@@ -36,7 +36,7 @@ law live in orchestrator.json; a mode does not create a second user session or a
 | `business.reconcile` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read` | isolated | Reasoning and evidence review within the operator boundary |
 | `content.generate` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `websearch:bounded`, `imagegen:required`, `objectstorage:read` | isolated | Execution within the assigned write and effect boundary |
 | `data.plan` | sol-reviewer | no | `fileread:context-aliases`, `git:read` | isolated | Reasoning and evidence review within the operator boundary |
-| `data.seed` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `secrets:resolve-by-name`, `http:probe`, `database:namespaced-write` | inline | Execution within the assigned write and effect boundary |
+| `data.seed` | sol-fresh | no | `fileread:context-aliases`, `secrets:resolve-by-name`, `http:probe`, `database:namespaced-write` | inline | Execution within the assigned write and effect boundary |
 | `environment.preflight` | sol-reviewer | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `container:read` | inline | Reasoning and evidence review within the operator boundary |
 | `git.publish` | sol-fresh | no | `fileread:context-aliases`, `git:merge-and-push`, `shell:declared-commands`, `ci:read` | inline | Execution within the assigned write and effect boundary |
 | `identity.provision` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `http:probe`, `secrets:resolve-by-name`, `sourcewrite:declared-write-set`, `browsercontrol:required` | inline | Execution within the assigned write and effect boundary |
@@ -44,7 +44,7 @@ law live in orchestrator.json; a mode does not create a second user session or a
 | `interface.fix` | sol-fresh | yes | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `shell:declared-commands`, `git:commit-session-branch` | inline | Execution within the assigned write and effect boundary |
 | `interface.generate` | sol-fresh | yes | `fileread:context-aliases`, `git:commit-session-branch`, `websearch:bounded`, `imagegen:judged`, `visualize:html`, `host:loopback`, `print:decision-points`, `registry:read`, `sourcewrite:declared-write-set`, `shell:declared-commands` | isolated | Execution within the assigned write and effect boundary |
 | `interface.plan` | sol-reviewer | yes | `fileread:context-aliases`, `git:read` | isolated | Reasoning and evidence review within the operator boundary |
-| `knowledge.repair` | sol-fresh | no | `fileread:context-aliases`, `git:read-write`, `sourcewrite:declared-paths` | isolated | Execution within the assigned write and effect boundary |
+| `knowledge.repair` | sol-fresh | no | `fileread:context-aliases`, `git:commit-session-branch`, `sourcewrite:declared-write-set` | isolated | Execution within the assigned write and effect boundary |
 | `library.update` | sol-fresh | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:commit-session-branch`, `shell:declared-commands`, `registry:publish`, `secrets:resolve-by-name` | isolated | Execution within the assigned write and effect boundary |
 | `migration.release` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Execution within the assigned write and effect boundary |
 | `quality.verify` | sol-reviewer | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `http:probe` | inline | Reasoning and evidence review within the operator boundary |
@@ -52,7 +52,7 @@ law live in orchestrator.json; a mode does not create a second user session or a
 | `runtime.serve` | sol-fresh | no | `fileread:context-aliases`, `git:merge-into-integration-branch`, `shell:declared-commands`, `http:probe`, `container:operate`, `secrets:resolve-by-name` | inline | Execution within the assigned write and effect boundary |
 | `service.operate` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `container:operate`, `http:probe`, `secrets:resolve-by-name` | inline | Execution within the assigned write and effect boundary |
 | `uat.plan` | sol-reviewer | no | `fileread:context-aliases` | isolated | Reasoning and evidence review within the operator boundary |
-| `uat.verify` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `database:namespaced-write`, `print:decision-points` | isolated | Reasoning and evidence review within the operator boundary |
+| `uat.verify` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `print:decision-points` | isolated | Reasoning and evidence review within the operator boundary |
 | `workspace.bind` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Execution within the assigned write and effect boundary |
 
 ## Changes

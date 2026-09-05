@@ -1,10 +1,6 @@
 # identity.provision — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
-
-## Job
-
-Provision the identity one flow signs in as: create each alias's account at the identity provider the bound route's registry entry declares, set its password from the sealed credential resolved by name, prove the account signs in, and publish the record of names the flow folder keeps; or rotate the administrator custody the same provider stands on.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.
 
 ## Done when
 
@@ -14,14 +10,14 @@ Primary output: `uat-account`
 
 ## Inputs
 
-`environment-readiness` (optional)
+`environment-readiness`?
 
 ## Outputs
 
 `platform-operation-receipt` `response/response.md`
 `delta` `response/data/delta.json`
 `checks` `response/data/checks.json`
-`uat-account` `response/data/account.json` (optional)
+`uat-account` `response/data/account.json`?
 
 ## Stops
 

@@ -1,10 +1,6 @@
 # business.decide — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
-
-## Job
-
-Decide and publish one evidence-backed business promise as durable backend-owned authority, frozen behind a complete promise-to-enforcement coverage matrix.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback. Context is limited to what request.json names.
 
 ## Done when
 
@@ -14,12 +10,12 @@ Primary output: `business-promise-authority`
 
 ## Inputs
 
-`architecture-decision` (optional)
+`architecture-decision`?
 
 ## Outputs
 
 `business-promise-authority` `response/response.md`
-`restatement` `response/restatement.md` (optional)
+`restatement` `response/restatement.md`?
 `claims` `response/data/claims.json`
 `coverage-matrix` `response/data/coverage-matrix.json`
 `model` `response/data/model.json`

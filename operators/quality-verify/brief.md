@@ -1,10 +1,6 @@
 # quality.verify — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
-
-## Job
-
-Verify one bounded delivery by running its declared gates against an unchanged predecessor receipt at one frozen head, and return the exact measured verdict, repairing nothing.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.
 
 ## Done when
 
@@ -14,14 +10,14 @@ Primary output: `quality-verification`
 
 ## Inputs
 
-`backend-source-application` (optional), `frontend-source-application` (optional), `changes` (optional), `frontend-surface-audit` (optional), `uat-flow-verification` (optional), `service-receipt` (optional)
+`backend-source-application`?, `frontend-source-application`?, `changes`?, `frontend-surface-audit`?, `uat-flow-verification`?, `service-receipt`?
 
 ## Outputs
 
 `quality-verification` `response/response.md`
 `gate-result` `response/data/gates/<gate>.json`
-`coverage` `response/data/coverage.json` (optional)
-`audit-scope` `response/data/audit-scope.json` (optional)
+`coverage` `response/data/coverage.json`?
+`audit-scope` `response/data/audit-scope.json`?
 
 ## Stops
 

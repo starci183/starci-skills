@@ -11,6 +11,7 @@
   },
   "wait": "completion: a dispatched or isolated agent is awaited on its completion event and a chain route on its same-session prerequisite branch's accepted completion; a timed poll is not a step of any chain, and a wait that returns nothing is not evidence of anything",
   "receiptSkeleton": true,
+  "outcomePolicy": "resources/interaction.json#outcomePresentation",
   "briefBytes": 3072,
   "budget": {
     "maxSteps": 24,
@@ -86,7 +87,7 @@
   },
   "concurrency": {
     "rule": "scripts/worker-slots.mjs is the executable session-wide gate: at most maxConcurrentAgents active workers across top-level branches, nested exchanges, helpers, repairs and retries. A wait releases its slot. A branch queues when its inputs are not accepted or its normalized exclusive resource overlaps a live lease, including parent/child paths, Windows case variants and junction/symlink aliases resolved through the nearest existing ancestor.",
-    "gate": "node scripts/worker-slots.mjs acquire|resume <branch> <workerId>; node scripts/worker-slots.mjs release <session> <token>",
+    "gate": "node scripts/worker-slots.mjs acquire|resume <branch> <workerId> <ranProfile>; node scripts/worker-slots.mjs acquire-helper <session> <helper-request.json> <workerId>; node scripts/worker-slots.mjs release <session> <token>",
     "state": "state.json.workerSlots and state.json.leases, mutated with scripts/session-lock.mjs",
     "maxDispatch": 1,
     "maxParallel": 3,
@@ -123,7 +124,7 @@
     },
     "lifecycle": [
       "open: node scripts/session-open.mjs open <sessionsRoot> <draft.json> creates or reuses the host user session before asking. The draft mission stores Goal, Target, In scope, Out of scope, Outputs, Done when, Verification reach and Example. The same authorized user prompt may be recorded as the versioned as-stated answer; corrected or rejected never activates it.",
-      "branch: write request.json with contractVersion, attempt, expected, environment and frozenInputs; node scripts/attempt-gate.mjs open <branch> freezes it and writes the running skeleton; node scripts/worker-slots.mjs acquire <branch> <workerId> must return acquired before execution.",
+      "branch: write request.json with contractVersion, attempt, expected, environment and frozenInputs; node scripts/attempt-gate.mjs open <branch> freezes it and writes the running skeleton; node scripts/worker-slots.mjs acquire <branch> <workerId> <ranProfile> must return acquired before execution.",
       "advance: node scripts/attempt-gate.mjs accept <branch> reruns validate-request, validate-response and the operator validator, then seals evidenceManifest over every request/response file while holding the session lock. status done advances only with a matched comparison for every required expected criterion and resolvable evidence. status mismatch preserves the receipt and chooses repair, retry or blocked; the next attempt points at it and cannot weaken required expected under the same goal version.",
       "abandon: an agent exited with the running skeleton in place; one followup_task to the same agent naming the skeleton; a second exit writes status blocked with stop RECEIPT_MISSING, event abandoned, and the chain routes it as caller",
       "wait: status waiting releases the worker slot. The nested exchange opens its own attempt under the same session and cap; worker-slots resume reacquires a slot before the parent continues.",

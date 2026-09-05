@@ -1,10 +1,6 @@
 # api.verify — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
-
-## Job
-
-Run the repository's own end-to-end suite as a client against the served runtime, on the namespace the seed placed, and publish one append-only run record whose cases are the runner's and whose three lanes are judged apart, or stop at the exact unavailability instead of manufacturing a verdict.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback. Context is limited to what request.json names.
 
 ## Done when
 
@@ -14,7 +10,7 @@ Primary output: `api-verification`
 
 ## Inputs
 
-`platform-operation-receipt`, `uat-account` (optional), `seed-receipt` (optional), `quality-verification` (optional), `units` (optional)
+`platform-operation-receipt`, `uat-account`?, `seed-receipt`?, `quality-verification`?, `units`?
 
 ## Outputs
 

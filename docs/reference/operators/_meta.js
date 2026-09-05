@@ -16,6 +16,7 @@ export default {
   "interface-fix": "interface.fix",
   "interface-generate": "interface.generate",
   "interface-plan": "interface.plan",
+  "knowledge-repair": "knowledge.repair",
   "library-update": "library.update",
   "migration-release": "migration.release",
   "quality-verify": "quality.verify",

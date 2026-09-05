@@ -1,10 +1,6 @@
 # backend.plan — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
-
-## Job
-
-Group the operations of one frozen contract into modules once — a module being the operations that share a writer and a store boundary — and give every module its goal, its stores, its proof kinds, its migration refs and its place in the order, so that the blind generators that follow each fill one module and no operation is filled twice.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback. Context is limited to what request.json names.
 
 ## Done when
 
@@ -14,7 +10,7 @@ Primary output: `backend-plan`
 
 ## Inputs
 
-`architecture-decision`, `business-promise-authority` (optional)
+`architecture-decision`, `business-promise-authority`?
 
 ## Outputs
 

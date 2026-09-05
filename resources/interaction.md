@@ -24,15 +24,26 @@ reused as `as-stated`; no routine second question is sent. A correction creates 
 Rejection or no answer leaves lifecycle `draft`, which cannot dispatch. Follow-ups and replans under
 the confirmed goal reuse the same host binding and ask nothing.
 
-After every transition of a mission the orchestrator prints to the root chat exactly the two lines
+After every transition of a mission the orchestrator prints the two-line transition record to the root chat that
 `interaction.json#transitionLog` declares — the branch's goal, then its outcome with the count of
 evidenced done-when lines, the artifact paths and the next cell — and records `logged: true` on the
 transition, which `scripts/validate-session.mjs` requires on every transition of a session that
 carries a mission. `scripts/validate-interaction.mjs#transitionLogErrors` checks a printed pair
-against the declared shape, compiled from the policy rather than copied. Full outputs stay in the
-session folder; the person who wants them reads the ledger.
+against the declared shape, compiled from the policy rather than copied.
+
+For an accepted v2.2 done result, also run `scripts/render-outcome.mjs <branch>` and emit the returned
+Markdown and media directly in the root chat under **The best outcome** before marking the transition
+logged. `response.json.outcome` identifies the selected reviewable result and its evidence; the shared
+gate and [operator presentation map](outcomes.json) check it before acceptance. UI generation shows the
+actual selected render as an embedded image. Code, plans and checks show the readable source/diff,
+diagram/table/document or measured result appropriate to that operator, with links to full proof.
+Do not replace visible output with a filename, a raw JSON dump or the sentence “the file is ready”.
+Failed, waiting and mismatched attempts keep their actual status and next repair step; they do not
+pretend to have a successful best outcome. Full outputs and prior attempts stay in the session folder.
 
 The standalone `scripts/validate-interaction.mjs <branch>` gate and the generic response gate check
 proposed questions. These gates validate communication only; passing them authorizes no operation.
+
+The examples are guidance, not a format assigned to every job. Read the operator contract and mode: show expected versus actual, scope coverage and the next action alongside the chosen result. “Best” means most useful for judging the outcome, including diagnostic failures. A verifier may be done while its subject fails. Dry-run is proposed; reuse/no-op is an observed unchanged state; rollback is restoration. The full result summary must remain visible even when only one representative artifact is embedded.
 
 Sources: [Interaction evidence](../tests/evidence/20260904-interaction.md).

@@ -11,7 +11,16 @@
   "selectionSource": "user",
   "rule": "Every user prompt enters StarCi by opening or reusing the host-bound user session before any goal confirmation or work. The mission draft is shown as scopeTable. Its version is activated only by an explicit as-stated user answer; when the original prompt already states and authorizes exactly that table, its message reference is reused as the answer and no routine duplicate question is asked. Correction creates the next draft version; rejection or silence never activates work. Follow-ups, operator attempts, helpers, retries and nested exchanges keep the same host binding. Replan inside the confirmed scope is automatic. A change to goal or scope creates a versioned confirmation; budget and user routes remain typed choices. This communication policy grants no extra effect authority.",
   "gate": "scripts/validate-interaction.mjs",
-  "scopeTable": ["Goal", "Target", "In scope", "Out of scope", "Outputs", "Done when", "Verification reach", "Example"],
+  "scopeTable": [
+    "Goal",
+    "Target",
+    "In scope",
+    "Out of scope",
+    "Outputs",
+    "Done when",
+    "Verification reach",
+    "Example"
+  ],
   "language": {
     "source": "resources/settings.json#language, over resources/settings.example.json (default vi)",
     "rule": "Every line printed to the person — the goal block, the two-line transition log, the end-of-turn report, every question and its options — is in the display language the settings name; a new mission records it as mission.language unless the person's own message is plainly in another language, in which case that one is recorded and used. The law of the tree stays English and its mirrors Vietnamese; the display language changes nothing that is validated."
@@ -30,6 +39,12 @@
       "[N/M operator] goal: <doneWhen:n line | prerequisite: N/M>",
       "[N/M operator] <done | mismatch | blocked STOP> · <k>/<n> done-when evidenced · <artifact paths> · <next cell | repair | retry>"
     ],
-    "rule": "After every transition the orchestrator prints exactly these two lines to the root chat. The first names the branch goal. The second names done, mismatch or a blocked stop, the accepted done-when count, resolvable evidence paths, and the next cell or repair/retry action. Full outputs and prior failed attempts stay in the session folder ledger. A printed transition records logged:true."
+    "rule": "After every transition the orchestrator prints this two-line transition record to the root chat. The first names the branch goal. The second names done, mismatch or a blocked stop, the accepted done-when count, resolvable evidence paths, and the next cell or repair/retry action. An accepted v2.2 done result also presents outcomePresentation visibly after the pair. Only after the pair and required outcome block are emitted does the transition record logged:true. Full outputs and prior failed attempts stay in the session folder ledger."
+  },
+  "outcomePresentation": {
+    "heading": "The best outcome",
+    "source": "response.json.outcome validated against resources/outcomes.json",
+    "renderer": "node scripts/render-outcome.mjs <branch>",
+    "rule": "After a v2.2 operator is accepted as matched, call the renderer and emit its returned Markdown and media directly in the root chat in the display language, with this heading. Show the selected result and the evidence needed to review it: an actual rendered image for UI generation, readable code/diff for implementation, table/diagram/document for planning, and measured result plus evidence for verification. An image must be embedded visibly, never replaced by an opaque filename or a link-only report. The selected result is the best among the evidenced outcomes for this approved goal; the block grants no new success claim. Secondary links lead to full source, preview or proof. A blocked, waiting or mismatched attempt instead reports its truthful status, useful existing evidence and repair/next step; it never receives a success-shaped best-outcome block. Never expose credentials, tokens or private runtime dumps. The examples are not a fixed list of formats: inspect the operator contract and mode, then present its most decision-useful evidenced result. Always make expected versus actual, coverage, limitations and next action readable. Best does not mean most favorable: a verifier may complete correctly with failing findings. Show the full result summary and diagnostic failures before a representative passing item. Label dry-run, reuse/no-op and rollback explicitly; none implies a new applied delivery."
   }
 }

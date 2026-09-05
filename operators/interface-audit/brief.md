@@ -1,10 +1,6 @@
 # interface.audit — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop. You see only what request.json names; nothing else exists.
-
-## Job
-
-Observe the selected primary surfaces at the served route across their frozen audit matrix, measure every node that carries a claim, and judge each measurement against the published proof rules by the owner of the node it stands on.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback. Context is limited to what request.json names.
 
 ## Done when
 
@@ -14,7 +10,7 @@ Primary output: `frontend-surface-audit`
 
 ## Inputs
 
-`frontend-source-application`, `frontend-presentation-resolution`, `frontend-direction-decision`, `route`, `uat-account` (optional), `platform-operation-receipt` (optional), `seed-receipt` (optional), `units` (optional)
+`frontend-source-application`, `frontend-presentation-resolution`, `frontend-direction-decision`, `route`, `uat-account`?, `platform-operation-receipt`?, `seed-receipt`?, `units`?, `knowledge-repair-receipt`?
 
 ## Outputs
 
@@ -22,11 +18,14 @@ Primary output: `frontend-surface-audit`
 `capture` `response/data/captures/<matrixId>.json`
 `screenshot` `response/artifacts/<matrixId>.png`
 `verdicts` `response/data/verdicts.json`
-`findings` `response/data/findings.json` (optional)
-`uat-walk` `response/data/walks/<walk>/walk.json` (optional)
-`walk-result` `response/data/walks/<walk>/walk-result.json` (optional)
-`host` `response/artifacts/host.json` (optional)
+`findings` `response/data/findings.json`?
+`uat-walk` `response/data/walks/<walk>/walk.json`?
+`walk-result` `response/data/walks/<walk>/walk-result.json`?
+`host` `response/artifacts/host.json`?
+`knowledge-coverage` `response/data/knowledge-coverage.json`?
+`family-understanding` `response/data/family-understanding.json`?
+`knowledge-question` `response/data/knowledge-question.json`?
 
 ## Stops
 
-`INVALID_INPUT`, `SOURCE_DRIFT`, `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING`, `EVIDENCE_MISSING`, `UNKNOWN_RULE`, `SURFACE_CLASS_MISSING`, `CALIBRATION_OFF`, `UNCHECKED_UNLAWFUL`, `NO_PROGRESS`
+`INVALID_INPUT`, `SOURCE_DRIFT`, `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING`, `EVIDENCE_MISSING`, `UNKNOWN_RULE`, `KNOWLEDGE_QUESTION`, `SURFACE_CLASS_MISSING`, `CALIBRATION_OFF`, `UNCHECKED_UNLAWFUL`, `NO_PROGRESS`

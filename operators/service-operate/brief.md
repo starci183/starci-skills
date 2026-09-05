@@ -1,10 +1,6 @@
 # service.operate — brief
 
-Read operator.md at your step; write only response/ of your branch; replace the running response.json skeleton before you exit; * marks a fallback stop.
-
-## Job
-
-Bring one auxiliary service the environment declares — an observability stack, a code-quality service, a tunnel beside a served runtime — to the state that declaration asks for, prove from its own probe that it is in that state, and record the holder that answers, under the lease that orders sessions.
+Follow operator.md; write its declared paths and your branch response/; replace the running response.json before exit. ? optional; * fallback.
 
 ## Done when
 

@@ -219,8 +219,13 @@ output biên nhận đã khai và có trên đĩa, với ít nhất một cái �
 thêm bằng chứng cho dòng "xong khi" nào thì chuỗi dừng và hỏi người, không bao giờ điều phối nhánh
 thứ tư (`scripts/validate-session.mjs`). Sau mỗi chuyển bước orchestrator in vào chat gốc đúng hai
 dòng mà `resources/interaction.json#transitionLog` khai — mục tiêu của nhánh, rồi kết quả kèm số dòng
-"xong khi" đã có bằng chứng, đường dẫn artifact và ô kế tiếp — và ghi `logged: true` lên chuyển bước;
-output đầy đủ ở lại trong thư mục phiên.
+"xong khi" đã có bằng chứng, đường dẫn artifact và ô kế tiếp. Với v2.2 done đã nghiệm thu, chạy thêm
+`scripts/render-outcome.mjs <branch>` và hiện Markdown/media **The best outcome** ngay trong chat:
+hình render của UI được chọn phải được nhúng thành ảnh, còn operator khác hiện source/diff, sơ đồ,
+bảng, tài liệu hoặc kết quả đo dễ xem. `response.json.outcome` và `resources/outcomes.json` xác định
+phần cần hiển thị. Chỉ sau bản ghi hai dòng và khối outcome bắt buộc mới ghi `logged: true`; bằng
+chứng đầy đủ vẫn ở thư mục session. Attempt lỗi hoặc chưa hoàn tất hiện đúng trạng thái cùng bước
+sửa tiếp, không được mang lời khẳng định best outcome đã thành công.
 
 Một luật người nêu bằng lời của họ được nói lại cho họ trước khi thiết kế bất cứ gì trên đó:
 `business.decide` và `architecture.decide` viết một `restatement` tối đa năm dòng bằng ngôn ngữ của
