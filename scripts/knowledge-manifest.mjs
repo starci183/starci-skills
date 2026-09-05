@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { validateAgainst } from './json-schema.mjs';
 
 const BINDING_DIRS = {
   '@knowledge/ui/composition': 'knowledge/ui/composition',
@@ -11,7 +12,7 @@ const BINDING_DIRS = {
 const posix = (value) => value.split(path.sep).join('/');
 const sha = (value) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
 const stable = (value) => JSON.stringify(value, Object.keys(value).sort());
-const authorityOf = (relative) => relative.endsWith('.vi.md') ? 'mirror' : relative.endsWith('.md') ? 'canonical' : 'asset';
+const authorityOf = (relative) => relative.endsWith('.vi.md') ? 'mirror' : /\/INDEX\.md$/.test(relative) ? 'catalog' : relative.endsWith('.md') ? 'canonical' : 'asset';
 
 function filesUnder(directory) {
   const out = [];
@@ -121,15 +122,54 @@ export function manifestEntities(manifest) {
 const evidencePath = (value) => String(value).split('#')[0];
 
 export function knowledgeManifestErrors({ root, branchDir, bindings, family }) {
+  const errors = frozenKnowledgeManifestErrors({ root, branchDir, bindings, family });
   const manifestFile = path.join(branchDir, 'request', 'knowledge-manifest.json');
-  const errors = [];
-  if (!existsSync(manifestFile)) errors.push('request/knowledge-manifest.json: missing the frozen exact knowledge manifest');
   if (errors.length) return errors;
-  let frozen;
-  try { frozen = JSON.parse(readFileSync(manifestFile, 'utf8')); } catch { return ['request/knowledge-manifest.json: invalid JSON']; }
+  const frozen = JSON.parse(readFileSync(manifestFile, 'utf8'));
   let actual;
   try { actual = buildKnowledgeManifest(root, bindings, { family }); } catch (error) { return [error.message]; }
   if (JSON.stringify(frozen) !== JSON.stringify(actual)) errors.push('request/knowledge-manifest.json: stale or incomplete against the authored knowledge filesystem');
+  return errors;
+}
+
+export function frozenKnowledgeManifestErrors({ root, branchDir, bindings, family }) {
+  const manifestFile = path.join(branchDir, 'request', 'knowledge-manifest.json');
+  if (!existsSync(manifestFile)) return ['request/knowledge-manifest.json: missing the frozen exact knowledge manifest'];
+  let frozen;
+  try { frozen = JSON.parse(readFileSync(manifestFile, 'utf8')); } catch { return ['request/knowledge-manifest.json: invalid JSON']; }
+  const errors = [];
+  try {
+    const contract = JSON.parse(readFileSync(path.join(root, 'templates/kinds/knowledge-manifest.schema.json'), 'utf8'));
+    errors.push(...validateAgainst(contract, frozen, 'request/knowledge-manifest.json'));
+  } catch (error) { errors.push(`request/knowledge-manifest.json: schema cannot be loaded (${error.message})`); }
+  let resolved = [];
+  try { resolved = resolveKnowledgeBindings(bindings, family); } catch (error) { errors.push(error.message); }
+  const expectedBindings = resolved.map(({ binding }) => binding);
+  if (JSON.stringify(frozen.bindings ?? []) !== JSON.stringify(expectedBindings)) errors.push('request/knowledge-manifest.json: bindings differ from the routed operation knowledge contract');
+  const body = { schemaVersion: frozen.schemaVersion, bindings: frozen.bindings, files: frozen.files };
+  if (frozen.fingerprint !== sha(Buffer.from(JSON.stringify(body)))) errors.push('request/knowledge-manifest.json: fingerprint does not bind its exact semantic inventory');
+  const seenPaths = new Set();
+  const seenEntities = new Set();
+  for (const file of frozen.files ?? []) {
+    const relative = String(file?.path ?? '');
+    if (path.isAbsolute(relative) || path.win32.isAbsolute(relative) || relative.includes('\\') || relative.split('/').some((part) => !part || part === '.' || part === '..')) errors.push(`request/knowledge-manifest.json: unsafe path ${relative || '(missing)'}`);
+    if (seenPaths.has(relative)) errors.push(`request/knowledge-manifest.json: duplicate file ${relative}`);
+    seenPaths.add(relative);
+    const expectedAuthority = relative.endsWith('.vi.md') ? 'mirror' : /\/INDEX\.md$/.test(relative) ? 'catalog' : relative.endsWith('.md') ? 'canonical' : 'asset';
+    if (file.authority !== expectedAuthority) errors.push(`${relative}: authority must be ${expectedAuthority}`);
+    if (file.authority !== 'canonical' && (file.rules?.length ?? 0) > 0) errors.push(`${relative}: only canonical English knowledge publishes rule authority`);
+    if (['mirror', 'catalog'].includes(file.authority) && (file.cases?.length ?? 0) > 0) errors.push(`${relative}: mirrors and catalogs publish no Case authority`);
+    const owner = resolved.find(({ binding }) => binding === file.binding);
+    if (owner && relative !== owner.directory && !relative.startsWith(`${owner.directory}/`)) errors.push(`${relative}: leaves binding ${file.binding}`);
+    if (!owner && !['@knowledge/ui', '@knowledge/grammars'].includes(file.binding)) errors.push(`${relative}: unknown file binding ${file.binding}`);
+  }
+  for (const entity of manifestEntities(frozen)) {
+    if (seenEntities.has(entity.key)) errors.push(`request/knowledge-manifest.json: duplicate semantic address ${entity.key}`);
+    seenEntities.add(entity.key);
+  }
+  for (const { binding } of resolved) if (!(frozen.files ?? []).some((file) => file.binding === binding)) errors.push(`request/knowledge-manifest.json: ${binding} has no inventoried file`);
+  if (expectedBindings.some((binding) => binding.startsWith('@knowledge/ui/'))) for (const required of ['knowledge/ui/INDEX.md', 'knowledge/ui/INDEX.vi.md']) if (!seenPaths.has(required)) errors.push(`request/knowledge-manifest.json: missing ${required}`);
+  if (expectedBindings.some((binding) => binding.startsWith('@knowledge/grammars/'))) for (const required of ['knowledge/grammars/INDEX.md', 'knowledge/grammars/INDEX.vi.md']) if (!seenPaths.has(required)) errors.push(`request/knowledge-manifest.json: missing ${required}`);
   return errors;
 }
 

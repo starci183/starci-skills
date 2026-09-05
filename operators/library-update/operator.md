@@ -175,7 +175,7 @@ a proof from different bytes is rejected.
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the request, run the request preflight, and preflight the halves the mode names, all before the first write outside the session folder | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, input `route`, input `library-release` under `consume`, @workspaces/fe at the base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
+| 1 | Validate the request, freeze the exact family manifest and understanding brief, run the request preflight, and preflight the halves the mode names, all before the first write outside the session folder | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, input `route`, input `library-release` under `consume`, @knowledge/grammars/<family>, @workspaces/fe at the base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
 | 2 | Write only the paired regression tests in the owner package and prove the failure | `plan` | @workspaces/fe at the base, @tools/shell | @workspaces/fe/branch/session within the test ceiling, @tools/sourcewrite, `library-proof` | `LIBRARY_PROOF_FAILED` |
 | 3 | Repair the declared behavior and bump the next patch version | `plan` | @workspaces/fe inside the package ceiling | @workspaces/fe/branch/session within the declared file set, @tools/sourcewrite | `LIBRARY_BOUNDARY_REJECTED` |
 | 4 | Run the regression and the complete package test, typecheck and build scripts | `plan` | @workspaces/fe, @tools/shell | `library-proof` | `LIBRARY_PROOF_FAILED` |

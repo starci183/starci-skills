@@ -145,6 +145,7 @@ moved, which claims they carry, and which surface must be measured or walked aga
 
 | When | Operator |
 | --- | --- |
+| bound knowledge conflicts with the validated finding evidence, so its canonical owner repairs it before this same finding is retried | `knowledge.repair` |
 | the fix is committed and the surface must be measured again | `interface.audit` |
 | the fix is committed and the checkout's own gates must run | `quality.verify` |
 | the fix is committed and the head must be served before it is measured | `runtime.serve` |

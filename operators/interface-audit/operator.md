@@ -353,6 +353,7 @@ different tiering, never a smaller audit.
 
 | When | Operator |
 | --- | --- |
+| bound knowledge conflicts with validated rendered evidence, so its canonical owner repairs it before this same surface and reference are audited again | `knowledge.repair` |
 | a claim fails on an application-owned node, so one finding is repaired from the same resolution inventory inside the orchestrator's fix size | `interface.fix` |
 | a topic verdict is fix-first, or the direction declared no surface class, so the surface is generated again from a new direction before any value is | `interface.generate` |
 | every topic ships or passes and the checkout's own gates must run | `quality.verify` |

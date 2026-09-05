@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { buildKnowledgeManifest, knowledgeCoverageErrors, manifestEntities } from './knowledge-manifest.mjs';
+import { buildKnowledgeManifest, frozenKnowledgeManifestErrors, knowledgeCoverageErrors, manifestEntities } from './knowledge-manifest.mjs';
 
 const root = mkdtempSync(path.join(tmpdir(), 'knowledge-manifest-'));
 const branch = path.join(root, 'session', 'step-1', 'parallel-1');
@@ -10,6 +10,8 @@ mkdirSync(path.join(root, 'knowledge/ui/composition'), { recursive: true });
 mkdirSync(path.join(root, 'knowledge/grammars/starci'), { recursive: true });
 mkdirSync(path.join(branch, 'request'), { recursive: true });
 mkdirSync(path.join(branch, 'response/data'), { recursive: true });
+mkdirSync(path.join(root, 'templates/kinds'), { recursive: true });
+writeFileSync(path.join(root, 'templates/kinds/knowledge-manifest.schema.json'), readFileSync(path.resolve('templates/kinds/knowledge-manifest.schema.json')));
 writeFileSync(path.join(root, 'knowledge/ui/composition/layout.md'), '# Layout\n\n## LAYOUT-1 — Regions\n\n| Case | When |\n| --- | --- |\n| Case 1 | always |\n');
 writeFileSync(path.join(root, 'knowledge/ui/composition/layout.vi.md'), '# ignored mirror');
 writeFileSync(path.join(root, 'knowledge/grammars/starci/family.md'), '# Family\n');
@@ -33,4 +35,5 @@ assert.ok(knowledgeCoverageErrors({ root, branchDir: branch, bindings, family: '
 writeFileSync(path.join(branch, 'response/data/knowledge-coverage.json'), JSON.stringify(coverage()));
 writeFileSync(path.join(root, 'knowledge/ui/composition/layout.md'), '# changed\n');
 assert.ok(knowledgeCoverageErrors({ root, branchDir: branch, bindings, family: 'starci' }).some((error) => error.includes('stale or incomplete')));
+assert.deepEqual(frozenKnowledgeManifestErrors({ root, branchDir: branch, bindings, family: 'starci' }), []);
 rmSync(root, { recursive: true, force: true });

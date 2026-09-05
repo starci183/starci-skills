@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { buildKnowledgeManifest, manifestEntities } from '../../scripts/knowledge-manifest.mjs';
+import { buildKnowledgeManifest, manifestEntities } from './knowledge-manifest.mjs';
 
 export function fixtureFamilyUnderstanding() {
   return {

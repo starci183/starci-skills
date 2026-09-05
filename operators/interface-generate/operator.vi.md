@@ -464,6 +464,7 @@ minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bả
 
 | Khi | Operator |
 | --- | --- |
+| knowledge đã bind mâu thuẫn với bằng chứng phương án hay tham chiếu đã kiểm, nên owner chuẩn sửa nó trước khi sinh lại chính bề mặt này | `knowledge.repair` |
 | source đã commit và một bề mặt đang được phục vụ phải được bind ở head mới trước khi quan sát được | `workspace.bind` |
 | source đã commit và head của phiên phải được phục vụ trước khi quan sát được | `runtime.serve` |
 | source đã commit và bề mặt render ra phải được đo | `interface.audit` |

@@ -347,6 +347,7 @@ audit nhỏ hơn.
 
 | Khi | Operator |
 | --- | --- |
+| knowledge đã bind mâu thuẫn với bằng chứng render đã kiểm, nên owner chuẩn sửa nó trước khi audit lại cùng bề mặt và tham chiếu | `knowledge.repair` |
 | một lời khai hỏng trên node do ứng dụng sở hữu, nên một phát hiện được sửa từ chính kho resolution trong cỡ fix của orchestrator | `interface.fix` |
 | một verdict topic là fix-first, hoặc hướng không khai lớp bề mặt nào, nên bề mặt được sinh lại từ một hướng mới trước khi có giá trị nào được quyết | `interface.generate` |
 | mọi topic đều ship hoặc đạt, và các cổng của chính checkout phải chạy | `quality.verify` |

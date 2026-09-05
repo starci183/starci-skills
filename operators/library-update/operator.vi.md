@@ -167,7 +167,7 @@ những byte khác.
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm request, chạy preflight của request, và preflight những nửa mà chế độ gọi tên, tất cả trước lần ghi đầu ra ngoài thư mục phiên | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, đầu vào `route`, đầu vào `library-release` dưới `consume`, @workspaces/fe tại base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
+| 1 | Kiểm request, đóng băng manifest family chính xác cùng brief hiểu family, chạy preflight của request, và preflight những nửa mà chế độ gọi tên, tất cả trước lần ghi đầu ra ngoài thư mục phiên | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, đầu vào `route`, đầu vào `library-release` dưới `consume`, @knowledge/grammars/<family>, @workspaces/fe tại base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
 | 2 | Chỉ viết regression test đi cặp trong package owner và chứng minh thất bại | `plan` | @workspaces/fe tại base, @tools/shell | @workspaces/fe/branch/session trong trần test, @tools/sourcewrite, `library-proof` | `LIBRARY_PROOF_FAILED` |
 | 3 | Sửa hành vi đã khai và tăng version patch kế tiếp | `plan` | @workspaces/fe trong trần package | @workspaces/fe/branch/session trong tập file đã khai, @tools/sourcewrite | `LIBRARY_BOUNDARY_REJECTED` |
 | 4 | Chạy regression cùng toàn bộ script test, typecheck và build của package | `plan` | @workspaces/fe, @tools/shell | `library-proof` | `LIBRARY_PROOF_FAILED` |

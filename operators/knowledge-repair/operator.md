@@ -42,8 +42,8 @@ The operator writes only the challenged canonical English file and its Vietnames
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the question, applicability, evidence and frozen manifest | `manifest`, `resume` | `request/request.json`, input `knowledge-question`, @knowledge/ui, @knowledge/grammars/<family> | — | `INVALID_INPUT`, `KNOWLEDGE_EVIDENCE_MISSING`, `NO_PROGRESS` |
 | 2 | Find the one owner and decide repair-existing before append-new | — | the challenged rule and Case, UPDATE.md, the family understanding brief | — | `KNOWLEDGE_SCOPE_REJECTED` |
-| 3 | Repair the canonical English file and its mirror with stable ids | — | the owner file and evidence | @knowledge/ui or @knowledge/grammars/<family> on the session branch | `KNOWLEDGE_SCOPE_REJECTED` |
-| 4 | Rebuild the exact manifest and emit the typed retry | — | changed files, the before manifest | `knowledge-repair-receipt`, `response/response.json` | — |
+| 3 | Repair the canonical English file and its mirror with stable ids inside the declared write set | — | the owner file and evidence | @knowledge/ui or @knowledge/grammars/<family> on the session branch, @tools/sourcewrite | `KNOWLEDGE_SCOPE_REJECTED` |
+| 4 | Commit the bounded owner repair once, rebuild the exact manifest and emit the typed retry | — | changed files, the before manifest, @tools/git | the session-branch commit, `knowledge-repair-receipt`, `response/response.json` | — |
 
 ## Outputs
 

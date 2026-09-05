@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateFixStep, fixSizeErrors } from './validate.mjs';
 import { fingerprintOf } from '../interface-generate/validate.mjs';
-import { writeUiKnowledgeFixture } from '../../tests/support/ui-knowledge-fixture.mjs';
+import { writeUiKnowledgeFixture } from '../../scripts/ui-knowledge-fixture.mjs';
 
 const HEAD = '9a8b7c6d5e4f30211203344556677889900aabbc';
 const COMMIT = '1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d';

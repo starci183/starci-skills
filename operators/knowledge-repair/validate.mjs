@@ -29,6 +29,33 @@ export function knowledgeRepairEvidenceErrors(question, receipt) {
   return errors;
 }
 
+export function knowledgeRepairManifestErrors(before, after, receipt, question) {
+  const errors = [];
+  const beforeByPath = new Map((before?.files ?? []).map((file) => [file.path, file]));
+  const afterByPath = new Map((after?.files ?? []).map((file) => [file.path, file]));
+  const changed = [...new Set([...beforeByPath.keys(), ...afterByPath.keys()])].filter((file) => beforeByPath.get(file)?.sha256 !== afterByPath.get(file)?.sha256).sort();
+  const reported = [...new Set((receipt?.files ?? []).map((file) => file.path))].sort();
+  if (JSON.stringify(changed) !== JSON.stringify(reported)) errors.push('knowledge-repair receipt files are not the exact changed manifest set');
+  for (const file of receipt?.files ?? []) {
+    const actual = afterByPath.get(file.path);
+    const prior = beforeByPath.get(file.path);
+    if (!actual || actual.sha256 !== file.after) errors.push(`knowledge-repair receipt after hash is stale: ${file.path}`);
+    if ((prior?.sha256 ?? null) !== file.before) errors.push(`knowledge-repair receipt before hash is stale: ${file.path}`);
+    if (file.before === file.after) errors.push(`knowledge-repair receipt file made no progress: ${file.path}`);
+    if (!file.path.startsWith('knowledge/ui/') && !file.path.startsWith(`knowledge/grammars/${question?.family}/`)) errors.push(`knowledge repair leaves the challenged owner: ${file.path}`);
+    if (/(?:^|\/)(?:DNA|INDEX)(?:\.vi)?\.md$/.test(file.path)) errors.push(`knowledge repair may not edit generated DNA or indexes: ${file.path}`);
+  }
+  const touched = new Set(reported);
+  for (const file of receipt?.files ?? []) {
+    if (file.path.endsWith('.md') && !file.path.endsWith('.vi.md')) {
+      const mirror = file.path.replace(/\.md$/, '.vi.md');
+      if (!touched.has(mirror)) errors.push(`knowledge repair must carry the Vietnamese mirror: ${mirror}`);
+    }
+  }
+  if (!after?.files?.some((file) => file.rules?.some((rule) => rule.id === receipt?.rule))) errors.push(`rebuilt manifest does not publish repaired rule ${receipt?.rule}`);
+  return errors;
+}
+
 export async function validateKnowledgeRepairStep(branchDir, root = ROOT) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
@@ -61,24 +88,7 @@ export async function validateKnowledgeRepairStep(branchDir, root = ROOT) {
     try { after = buildKnowledgeManifest(root, before.bindings, { family: question.family }); } catch (error) { errors.push(error.message); }
     if (after) {
       if (receipt.manifestAfter !== after.fingerprint || receipt.retry.manifestFingerprint !== after.fingerprint) errors.push('knowledge-repair receipt and retry must bind the rebuilt exact manifest');
-      const byPath = new Map(after.files.map((file) => [file.path, file]));
-      const beforeByPath = new Map((before.files ?? []).map((file) => [file.path, file]));
-      for (const file of receipt.files ?? []) {
-        const actual = byPath.get(file.path);
-        if (!actual || actual.sha256 !== file.after) errors.push(`knowledge-repair receipt after hash is stale: ${file.path}`);
-        const prior = beforeByPath.get(file.path);
-        if ((prior?.sha256 ?? null) !== file.before) errors.push(`knowledge-repair receipt before hash is stale: ${file.path}`);
-        if (file.before === file.after) errors.push(`knowledge-repair receipt file made no progress: ${file.path}`);
-        if (!file.path.startsWith('knowledge/ui/') && !file.path.startsWith(`knowledge/grammars/${question.family}/`)) errors.push(`knowledge repair leaves the challenged owner: ${file.path}`);
-      }
-      const touched = new Set((receipt.files ?? []).map((file) => file.path));
-      for (const file of receipt.files ?? []) {
-        if (file.path.endsWith('.md') && !file.path.endsWith('.vi.md')) {
-          const mirror = file.path.replace(/\.md$/, '.vi.md');
-          if (!touched.has(mirror)) errors.push(`knowledge repair must carry the Vietnamese mirror: ${mirror}`);
-        }
-      }
-      if (!after.files.some((file) => file.rules.some((rule) => rule.id === receipt.rule))) errors.push(`rebuilt manifest does not publish repaired rule ${receipt.rule}`);
+      errors.push(...knowledgeRepairManifestErrors(before, after, receipt, question));
     }
   }
   if (response.next?.length !== 1 || response.next[0] !== question.sourceOperator) errors.push('response.next must return exactly to the originating operator');

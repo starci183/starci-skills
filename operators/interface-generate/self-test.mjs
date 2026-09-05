@@ -13,7 +13,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateGenerateStep, fingerprintOf } from './validate.mjs';
-import { writeUiKnowledgeFixture } from '../../tests/support/ui-knowledge-fixture.mjs';
+import { writeUiKnowledgeFixture } from '../../scripts/ui-knowledge-fixture.mjs';
 
 const HEAD = '0f1e2d3c4b5a69788796a5b4c3d2e1f009182736';
 const COMMIT = '9a8b7c6d5e4f30211203344556677889900aabbc';

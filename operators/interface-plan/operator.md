@@ -145,5 +145,6 @@ names the same units as the branch it resumes is `NO_PROGRESS`.
 
 | When | Operator |
 | --- | --- |
+| bound knowledge conflicts with validated task or reference evidence, so its canonical owner repairs it before this same map is retried | `knowledge.repair` |
 | the map is complete: every unit is generated on its own branch, one page or modal each, carrying its unit id | `interface.generate` |
 | a route the reference shows is one the person did not ask for, so the person says whether it belongs to the feature | `user` |

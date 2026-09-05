@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateAuditStep } from './validate.mjs';
-import { writeUiKnowledgeFixture } from '../../tests/support/ui-knowledge-fixture.mjs';
+import { writeUiKnowledgeFixture } from '../../scripts/ui-knowledge-fixture.mjs';
 
 const WIDE = 'wide-light-loaded';
 const NARROW = 'narrow-light-loaded';

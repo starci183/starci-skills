@@ -13,8 +13,8 @@
     "mode": "isolated",
     "tools": {
       "@tools/fileread": "context-aliases",
-      "@tools/git": "read-write",
-      "@tools/sourcewrite": "declared-paths"
+      "@tools/git": "commit-session-branch",
+      "@tools/sourcewrite": "declared-write-set"
     }
   },
   "primaryOutput": "knowledge-repair-receipt"

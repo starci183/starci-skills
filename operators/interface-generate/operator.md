@@ -477,6 +477,7 @@ surfaces must now be observed.
 
 | When | Operator |
 | --- | --- |
+| bound knowledge conflicts with validated candidate or reference evidence, so its canonical owner repairs it before this same surface is generated again | `knowledge.repair` |
 | the source is committed and a served surface must be bound at the new head before it can be observed | `workspace.bind` |
 | the source is committed and the session head must be served before it is observed | `runtime.serve` |
 | the source is committed and the rendered surface must be measured | `interface.audit` |

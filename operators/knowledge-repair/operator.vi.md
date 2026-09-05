@@ -42,8 +42,8 @@ Operator chỉ ghi file English chuẩn bị phản biện và mirror tiếng Vi
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm question, applicability, evidence và manifest đóng băng | `manifest`, `resume` | `request/request.json`, input `knowledge-question`, @knowledge/ui, @knowledge/grammars/<family> | — | `INVALID_INPUT`, `KNOWLEDGE_EVIDENCE_MISSING`, `NO_PROGRESS` |
 | 2 | Tìm đúng một owner và chọn sửa-existing trước nối-new | — | luật và Case bị phản biện, UPDATE.md, bản hiểu family | — | `KNOWLEDGE_SCOPE_REJECTED` |
-| 3 | Sửa file English chuẩn và mirror với id ổn định | — | file owner và bằng chứng | @knowledge/ui hay @knowledge/grammars/<family> trên nhánh phiên | `KNOWLEDGE_SCOPE_REJECTED` |
-| 4 | Dựng lại manifest chính xác và phát retry có kiểu | — | file đã đổi, manifest trước | `knowledge-repair-receipt`, `response/response.json` | — |
+| 3 | Sửa file English chuẩn và mirror với id ổn định trong write set đã khai | — | file owner và bằng chứng | @knowledge/ui hay @knowledge/grammars/<family> trên nhánh phiên, @tools/sourcewrite | `KNOWLEDGE_SCOPE_REJECTED` |
+| 4 | Commit lần sửa owner có giới hạn đúng một lần, dựng lại manifest chính xác và phát retry có kiểu | — | file đã đổi, manifest trước, @tools/git | commit nhánh phiên, `knowledge-repair-receipt`, `response/response.json` | — |
 
 ## Đầu ra
 

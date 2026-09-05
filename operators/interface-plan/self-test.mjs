@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateInterfacePlanStep } from './validate.mjs';
 import { uncheckedId, ledgerFile } from '../../scripts/unchecked.mjs';
-import { writeUiKnowledgeFixture } from '../../tests/support/ui-knowledge-fixture.mjs';
+import { writeUiKnowledgeFixture } from '../../scripts/ui-knowledge-fixture.mjs';
 
 const OPERATOR = 'interface.plan';
 const FEATURE = 'items';

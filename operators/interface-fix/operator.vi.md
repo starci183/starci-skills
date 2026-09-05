@@ -144,6 +144,7 @@ chuyển, chúng mang lời khai nào, và bề mặt nào phải được đo h
 
 | Khi | Operator |
 | --- | --- |
+| knowledge đã bind mâu thuẫn với bằng chứng finding đã kiểm, nên owner chuẩn sửa nó trước khi thử lại chính finding này | `knowledge.repair` |
 | fix đã commit và bề mặt phải được đo lại | `interface.audit` |
 | fix đã commit và các cổng của chính checkout phải chạy | `quality.verify` |
 | fix đã commit và head phải được phục vụ trước khi được đo | `runtime.serve` |
