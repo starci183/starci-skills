@@ -7,7 +7,7 @@
 // exchange's own response is checked the same way. Effective means after `unless` is evaluated
 // against request.json requirements. Operator-specific law lives in operators/<id>/validate.mjs.
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -184,6 +184,42 @@ export function attemptContractErrors(dir, response, request, { rel = (f) => f }
   if (response.goalCheck?.achieved === true && derived !== 'matched') errors.push(`${rel('response/response.json')}: goalCheck cannot be achieved while required expected criteria are ${derived}`);
   return errors;
 }
+
+async function loadProfiles(root) {
+  const profiles = {};
+  const profilesDir = path.join(root, 'resources', 'agents', 'profiles');
+  for (const file of (await readdir(profilesDir)).filter((name) => name.endsWith('.json')).sort()) {
+    const group = JSON.parse(await readFile(path.join(profilesDir, file), 'utf8'));
+    for (const [id, profile] of Object.entries(group.profiles ?? {})) profiles[id] = { ...profile, runtime: group.runtime };
+  }
+  return profiles;
+}
+
+export async function profileReceiptErrors(root, pkg, response, { renamed = false, at = 'response/response.json' } = {}) {
+  if (response?.contractVersion !== V22_CONTRACT) return [];
+  const errors = [];
+  const bound = response.boundProfile;
+  const ran = response.ranProfile;
+  const requiresRan = response.status !== 'running';
+  const expected = pkg?.manifest?.resources?.profile;
+  if (typeof bound !== 'string') errors.push(`${at}: every v2.2 receipt records boundProfile`);
+  if (requiresRan && typeof ran !== 'string') errors.push(`${at}: every completed or waiting v2.2 receipt records the profile that actually ran as ranProfile`);
+  if (typeof bound !== 'string') return errors;
+  if (!renamed && bound !== expected) errors.push(`${at}: boundProfile ${bound} is not the profile ${pkg.en.id} binds (${expected})`);
+
+  const [profiles, orchestrator] = await Promise.all([
+    loadProfiles(root),
+    readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8').then(JSON.parse)
+  ]);
+  if (!profiles[bound]) errors.push(`${at}: boundProfile ${bound} is not a declared profile`);
+  else if (profiles[bound].retired === true) errors.push(`${at}: boundProfile ${bound} is retired and cannot bind a v2.2 run`);
+  if (typeof ran === 'string' && !profiles[ran]) errors.push(`${at}: ranProfile ${ran} is not a declared profile`);
+  else if (typeof ran === 'string' && profiles[ran].retired === true) errors.push(`${at}: ranProfile ${ran} is retired and cannot run a v2.2 attempt`);
+
+  const equivalent = orchestrator.profileEquivalents?.pairs?.[bound];
+  if (typeof ran === 'string' && ran !== bound && ran !== equivalent) errors.push(`${at}: ranProfile ${ran} is neither boundProfile ${bound} nor its configured equivalent ${equivalent ?? '(none)'}`);
+  return errors;
+}
 // The goal the branch's request carried, read from disk when the caller did not pass it.
 async function requestOf(dir, exchange) {
   const file = path.join(exchange ? path.dirname(dir) : dir, 'request', 'request.json');
@@ -308,9 +344,9 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
     if (!packages.some((p) => p.manifest.id === nextId)) errors.push(`${rel('response/response.json')}: next names unknown operator ${nextId}`);
     else if (!nextTable.has(nextId)) errors.push(`${rel('response/response.json')}: next names ${nextId}, which the Next table of ${op.id} does not offer`);
   }
-  // A stand-in is recorded as a pair: the profile operator.json binds and the profile that actually ran.
-  if ((response.boundProfile === undefined) !== (response.ranProfile === undefined)) errors.push(`${rel('response/response.json')}: boundProfile and ranProfile are recorded together or not at all`);
-  if (response.boundProfile !== undefined && !renamed && response.boundProfile !== pkg.manifest.resources?.profile) errors.push(`${rel('response/response.json')}: boundProfile ${response.boundProfile} is not the profile ${op.id} binds (${pkg.manifest.resources?.profile})`);
+  // Every v2.2 receipt records both the bound profile and the active profile that actually ran. The
+  // latter is either the binding itself or the one configured cross-runtime equivalent.
+  errors.push(...await profileReceiptErrors(root, pkg, response, { renamed, at: rel('response/response.json') }));
   if (exchange && (response.next ?? []).length) errors.push(`${rel('response/response.json')}: a nested exchange does not route; next must be empty`);
   return { errors, response, present, pkg };
 }

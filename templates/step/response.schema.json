@@ -192,7 +192,7 @@
     "boundProfile": {
       "type": "string",
       "pattern": "^[a-z][a-z-]*$",
-      "description": "The profile operator.json binds; recorded with ranProfile when the processor ran a stand-in (resources/orchestrator.json#profileEquivalents)"
+      "description": "The active profile operator.json binds; every v2.2 receipt records it even when no stand-in ran"
     },
     "ranProfile": {
       "type": "string",
@@ -220,7 +220,11 @@
   "allOf": [
     {
       "if": { "required": ["contractVersion"] },
-      "then": { "required": ["attempt"] }
+      "then": { "required": ["attempt", "boundProfile"] }
+    },
+    {
+      "if": { "required": ["contractVersion"], "properties": { "status": { "enum": ["done", "blocked", "mismatch", "waiting"] } } },
+      "then": { "required": ["ranProfile"] }
     },
     {
       "if": { "required": ["contractVersion"], "properties": { "status": { "enum": ["done", "blocked", "mismatch"] } } },

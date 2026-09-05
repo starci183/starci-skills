@@ -77,7 +77,7 @@
     "prompt": "rendered at dispatch (mode dispatch or isolated) from operators/<id>/brief.md (generated, at most briefBytes) plus request.json; the agent reads operator.md sections through @tools/fileread for the step it is on; never stored",
     "isolation": "per resources.mode: isolated starts with no inherited turns and sees only what request.json names; dispatch inherits the orchestrator's transcript for forkTurns.dispatch turns of its profile; inline is the orchestrator itself",
     "writes": "only response/ of its own branch (step-N/parallel-M/response/); a nested-exchange agent writes only <exchange>/response/ of that branch; a source-writing operator also writes the session branch of its checkout under an exclusive lease (see sourceWrites)",
-    "profileRecord": "the orchestrator fills response.json boundProfile (operator.json → resources.profile) and ranProfile at dispatch whenever the two differ; validate-response refuses one without the other or a boundProfile that is not the operator's",
+    "profileRecord": "the orchestrator records response.json boundProfile (operator.json → resources.profile) and the active ranProfile on every v2.2 attempt, including when they are equal. boundProfile is known at attempt open; ranProfile is written when a worker is actually dispatched. validate-response requires both on the final receipt, rejects a boundProfile that is not the operator's, and accepts ranProfile only when it is that active binding or its configured active cross-runtime equivalent; retired profiles cannot run new attempts",
     "fills": [
       "project",
       "runId",
