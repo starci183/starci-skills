@@ -314,6 +314,19 @@
         "vi": "Một người trả lời lựa chọn budget có kiểu (thu hẹp, tiếp tục, dừng); lựa chọn được ghi vào state.json.choices và request kế tiếp mang nó."
       }
     },
+    "KNOWLEDGE_QUESTION": {
+      "scope": ["interface.plan", "interface.generate", "interface.fix", "interface.audit"],
+      "domain": "knowledge",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A bound rule and Case were applicable but conflict with concrete task, reference or rendered evidence. The finding belongs to the knowledge owner, not to an application workaround or an unvalidated preference.",
+        "vi": "Một luật và Case đã bind thực sự áp dụng nhưng mâu thuẫn với bằng chứng cụ thể từ tác vụ, tham chiếu hay bản render. Phát hiện thuộc owner knowledge, không thuộc cách vá application hay sở thích chưa kiểm chứng."
+      },
+      "resume": {
+        "en": "Emit a typed knowledge-question, repair it through knowledge.repair, rebind the exact manifest, then rerun the same operation on the same surface and reference.",
+        "vi": "Phát knowledge-question có kiểu, sửa qua knowledge.repair, bind lại manifest chính xác, rồi chạy lại cùng operation trên cùng bề mặt và tham chiếu."
+      }
+    },
     "RESTATEMENT_UNCONFIRMED": {
       "scope": [
         "business.decide",

@@ -10,6 +10,8 @@
     "files",
     "pairs",
     "regression",
+    "publicDelta",
+    "consumerImpact",
     "gates"
   ],
   "properties": {
@@ -94,6 +96,30 @@
           "type": "string",
           "minLength": 8,
           "description": "what the runner prints when the declared regression fails: the failing test's title as the runner prints it, or a sentence the failing block contains; matched against the whole failing output with whitespace collapsed"
+        }
+      }
+    },
+    "publicDelta": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["kind", "name", "evidence"],
+        "properties": {
+          "kind": { "enum": ["prop", "anatomy", "semantic-attribute", "token", "claim", "class"] },
+          "name": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "consumerImpact": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["consumer", "effect", "compatibility"],
+        "properties": {
+          "consumer": { "type": "string", "minLength": 1 },
+          "effect": { "type": "string", "minLength": 1 },
+          "compatibility": { "type": "string", "minLength": 1 }
         }
       }
     },

@@ -304,8 +304,8 @@ written source: it knows what it decided and what it wrote, never how it renders
 | `@knowledge/ui/composition` | the assertions the decision receipt has to satisfy, `COVERAGE-1` being the assertion about the receipt as a whole | yes |
 | `@knowledge/ui/presentation` | the closed rule inventory read at its fingerprint; the only source of valid identifiers | yes |
 | `@workspaces/fe` | the routed frontend checkout read at the frozen head; the current implementation as evidence, never as the requested direction, and the tree the write lands on, on its session branch and nowhere else | yes |
-| `@knowledge/grammars/<family>` | how the family the bound route names (`context.grammarId`) is meant to realize Common; law about the Grammar, never the Grammar itself | no |
-| `@knowledge/ui/proof` | the criteria every rendered candidate is scored against before one is picked; the same rubric the later audit measures, read only when more than one candidate is rendered | no |
+| `@knowledge/grammars/<family>` | how the concrete route family realizes Common; all authored family files are frozen and read before composition | yes |
+| `@knowledge/ui/proof` | every proof file, rule, Case and calibration asset used to score every rendered candidate, including a single candidate or refine | yes |
 | `@worktrees/uat/<flow>/<case>` | prior behaviour, UX and UI observations with their captures; evidence and counterevidence, and a prior pass is not current authority | no |
 
 ## Inputs
@@ -320,6 +320,7 @@ written source: it knows what it decided and what it wrote, never how it renders
 | `library-source-application` | `library.update`, the owner repair a `chain` route produced for a grammar gap this surface hit; present only when re-entering after that sibling mission | no |
 | `units` | `interface.plan`; the surface map whose one unit this branch generates, named by `request.unit` | no |
 | `findings` | the findings ledger, as `scripts/record-findings.mjs` materialized its open lines beside the last `interface.audit` or `uat.verify` receipt of this surface; every line for this target or unit is answered under `## Findings answered` of the direction, or the branch is refused | no |
+| `knowledge-repair-receipt` | `knowledge.repair`, when this is a retry with a rebound manifest | no |
 
 ## Requirements
 
@@ -349,7 +350,7 @@ written source: it knows what it decided and what it wrote, never how it renders
 | 4 | Resolve the reference standards by class, bounded | `references`, `changeLevel` | @knowledge/ui/composition (the gap the research must close), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 5 | Form the candidates and apply the Grammar filter | `candidates`, `ownerCeiling` | the compiled UI contract, @grammar/core (what a component owns and which props exist), @knowledge/grammars/<family> | — | `NO_VIABLE_DIRECTION`, `GRAMMAR_REQUIRED` |
 | 6 | Render every surviving candidate with its judged images, serve the pages for a person and print them | `candidates`, `preview` | the surviving candidates, @knowledge/grammars/<family>, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | `candidates`, `direction-image`, `host` | — |
-| 7 | Falsify, score the rendered candidates and write the decision | `selectionPolicy`, `approval` | the candidates, inputs `business-promise-authority` and `backend-source-application`, `ui-coverage`, @knowledge/ui/proof (the criteria a still render answers, per printed viewport) | `frontend-direction-decision` | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED` |
+| 7 | Falsify and score every rendered candidate for conformance and perceived task quality, then write the decision | `selectionPolicy`, `approval` | the candidates, reference, inputs `business-promise-authority` and `backend-source-application`, `ui-coverage`, @knowledge/ui/proof | `frontend-direction-decision`, `knowledge-coverage`, `family-understanding`, or `knowledge-question` when contradicted | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED`, `KNOWLEDGE_QUESTION` |
 | 8 | Bind the presentation authority and walk the decided tree once under the owner ceiling | — | @knowledge/ui/presentation (every topic with its fingerprint and rule inventory), @grammar/core (the published package's owned relationships), @workspaces/fe (the frozen tree, in document order), `frontend-direction-decision`, @tools/registry | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED`, `OWNER_CONFLICT` |
 | 9 | Resolve one published rule per application-owned property, remove what the tree may not carry, record the gaps and emit the claims | `contractEmission` | @knowledge/ui/presentation (the cases the bound topics publish), @grammar/core (the owned relationships, Grammar anatomy and the closed scale), @workspaces/fe (the properties each node presently carries) | `inventory`, `resolved-tree`, `frontend-presentation-resolution` | `RULE_MISSING`, `UNKNOWN_RULE` |
 | 10 | Project the resolved tree onto the declared write set, check every value against the inventory and sweep the projection | `mode` | `inventory` beside `resolved-tree`, @workspaces/fe (the declared paths and their owner roots), @tools/shell | `writes` | `RESOLUTION_STALE`, `OWNER_CONFLICT`, `WRITE_REJECTED` |
@@ -432,6 +433,9 @@ surfaces must now be observed.
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | no |
 | `direction-image` | `response/artifacts/images/<slot>.png` | artifact | no |
 | `host` | `response/artifacts/host.json` | artifact | no |
+| `knowledge-question` | `response/data/knowledge-question.json` | data | no |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | no |
+| `family-understanding` | `response/data/family-understanding.json` | data | no |
 | `frontend-presentation-resolution` | `response/resolution.md` | md | yes |
 | `inventory` | `response/data/inventory.json` | data | yes |
 | `resolved-tree` | `response/artifacts/<target>.resolved.tsx` | artifact | yes |
@@ -467,6 +471,7 @@ surfaces must now be observed.
 | `RESOLUTION_STALE` | terminate |
 | `WRITE_REJECTED` | terminate |
 | `NO_PROGRESS` | terminate |
+| `KNOWLEDGE_QUESTION` | terminate |
 
 ## Next
 

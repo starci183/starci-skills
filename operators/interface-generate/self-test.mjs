@@ -13,6 +13,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateGenerateStep, fingerprintOf } from './validate.mjs';
+import { writeUiKnowledgeFixture } from '../../tests/support/ui-knowledge-fixture.mjs';
 
 const HEAD = '0f1e2d3c4b5a69788796a5b4c3d2e1f009182736';
 const COMMIT = '9a8b7c6d5e4f30211203344556677889900aabbc';
@@ -34,7 +35,7 @@ const fp = (c) => `sha256:${c.repeat(64)}`;
 // `overrides` forces specific (id, rule[, viewport]) cells to a given score/verdict afterwards, used
 // to make a candidate's ## Scores row agree, or disagree, with what ## Candidate limits declares.
 function scoreTable(formed, selected, shape = 'dominant', overrides = []) {
-  if (formed.length < 2) return [];
+  if (formed.length < 1) return [];
   const rows = [];
   for (const id of formed) {
     for (const viewport of VIEWPORTS) {
@@ -420,7 +421,7 @@ const requestJson = ({ extra = {}, inputs = {} } = {}) => ({
   parallel: 1,
   sessionId: SESSION,
   ...(extra.approval ? { decisionId: 'layout-direction', selectedOption: extra.approval } : {}),
-  contexts: [{ alias: '@workspaces/fe', head: HEAD }, { alias: '@grammar/core', head: null }, { alias: '@knowledge/ui/composition', head: null }, { alias: '@knowledge/ui/presentation', head: null }],
+  contexts: [{ alias: '@workspaces/fe', head: HEAD }, { alias: '@grammar/core', head: null }, { alias: '@knowledge/ui/composition', head: null }, { alias: '@knowledge/ui/presentation', head: null }, { alias: '@knowledge/ui/proof', head: null }, { alias: '@knowledge/grammars/starci', head: null }],
   requirements: {
     target: '/plans',
     intent: 'modify',
@@ -475,6 +476,9 @@ function writeBranch(files) {
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
+  if (files['response/response.json']?.status === 'done') {
+    writeUiKnowledgeFixture(path.resolve('.'), branch, ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof', '@knowledge/grammars/<family>'], 'response/artifacts/one-column.html');
+  }
   return { branch, session };
 }
 
@@ -494,13 +498,11 @@ const baseline = () => ({
   'response/data/writes.json': plan(),
 });
 
-// A refine under the defaults renders nothing.
+// A refine is rendered and scored like every other candidate.
 const refine = (over = {}) => ({
   ...baseline(),
   'request/request.json': requestJson({ extra: { changeLevel: 'refine' } }),
-  'response/response.json': responseJson({ fields: allFields([]) }),
   'response/direction.md': directionMd({ changeLevel: 'refine', classification: 'locked-refine' }),
-  'response/artifacts/one-column.html': null,
   ...over,
 });
 
@@ -608,8 +610,7 @@ await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: 
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { changeLevel: '' } }) }, 'required field changeLevel has no value', 'missing change level');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { candidates: 2 } }), 'response/response.json': responseJson({ fields: allFields([]) }) }, 'more than one candidate was formed but none was rendered', 'comparison without pages');
-await expectError({ ...refine(), 'request/request.json': requestJson({ extra: { changeLevel: 'refine', preview: 'yes' } }) }, 'preview was asked for but no candidate page was rendered', 'preview without a page');
-await expectError(refine({ 'response/response.json': responseJson({ fields: allFields('response/artifacts/one-column.html') }), 'response/artifacts/one-column.html': '<!doctype html>' }), 'one candidate under no preview renders no page', 'unasked preview page on a refine');
+await expectValid(refine(), 'a single refine is rendered, printed and scored before source write');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ fields: allFields([]) }) }, 'a reconstruct direction renders every candidate it forms', 'a reconstruct whose candidate nobody can see');
 await expectError({ ...threeCandidates(), 'response/response.json': responseJson({ fields: allFields(['response/artifacts/one-column.html']) }) }, '3 formed and 1 rendered', 'a reconstruct that rendered only the candidate it liked');
 await expectError({ ...baseline(), 'response/direction.md': directionMd({ changeLevel: 'refine' }) }, 'Change level refine differs from the request', 'receipt and request disagree on the change level');

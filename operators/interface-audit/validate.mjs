@@ -12,6 +12,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
+import { knowledgeQuestionStopErrors, uiKnowledgeGateErrors } from '../../scripts/ui-knowledge-gate.mjs';
 import { tableUnder, userRouted } from '../../scripts/validate-response.mjs';
 import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
 import { sessionRootOf, missingStack } from '../../scripts/validate-request.mjs';
@@ -155,8 +156,10 @@ const sectionText = (text, heading) => {
 export async function validateAuditStep(branchDir, root = ROOT) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
-  const { response, requirements = {}, present = new Set() } = base;
+  const { request, response, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== 'interface.audit') return { errors };
+  errors.push(...knowledgeQuestionStopErrors({ branchDir, response }));
+  errors.push(...uiKnowledgeGateErrors({ root, branchDir, bindings: ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof', '@knowledge/grammars/<family>'], request, status: response.status }));
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
 

@@ -104,8 +104,8 @@ Fields, then the status sentence, then one primary submit — one column, one su
 ## Seen once, not yet an idiom
 
 Recorded so nobody re-derives them as if they were house style, and so a second occurrence can
-promote them. A direction may not compose from this table; a request that needs one of these shapes
-is a choice for the owner.
+support later promotion. A direction may use the underlying Common semantics and family anatomy
+when the product needs the shape, but it must not cite this table as reusable house style.
 
 | Composition | Where | What a second occurrence would settle |
 | --- | --- | --- |

@@ -38,7 +38,7 @@
         "properties": {
           "path": { "type": "string", "minLength": 1 },
           "owner": { "enum": ["app", "grammar"] },
-          "claims": { "type": "array", "maxItems": 32, "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]*-[0-9]+$" } },
+          "claims": { "type": "array", "maxItems": 32, "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]*-(?:[0-9]+|[A-Z][A-Z0-9-]*)$" } },
           "measured": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } }
         }
       }

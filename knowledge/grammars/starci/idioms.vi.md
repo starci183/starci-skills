@@ -104,9 +104,9 @@ Các ô nhập, rồi câu trạng thái, rồi một nút gửi chính — mộ
 
 ## Seen once, not yet an idiom
 
-Ghi lại để không ai suy ngược chúng thành gu nhà, và để lần xuất hiện thứ hai có thể nâng chúng lên.
-Một định hướng không được ghép từ bảng này; yêu cầu nào cần đúng những hình dạng ấy là một lựa chọn
-dành cho chủ sở hữu.
+Ghi lại để không ai suy ngược chúng thành gu nhà, và để lần xuất hiện thứ hai có thể làm bằng chứng
+cho việc nâng cấp sau này. Một định hướng có thể dùng ngữ nghĩa Common và giải phẫu family nằm bên
+dưới khi sản phẩm cần hình dạng ấy, nhưng không được viện bảng này như phong cách dùng lại của nhà.
 
 | Cách ghép | Ở đâu | Lần thứ hai sẽ chốt điều gì |
 | --- | --- | --- |

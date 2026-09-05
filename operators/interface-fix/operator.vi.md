@@ -78,7 +78,8 @@ lại sau đó. Nó không bao giờ stash, reset, force, clean, rebase hay chec
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
 | `@workspaces/fe` | checkout frontend được route ở commit mà phát hiện được nêu trên đó; lần ghi đáp xuống nhánh phiên của nó và không đâu khác | có |
-| `@knowledge/ui/presentation` | kho luật đóng, chỉ đọc để xác nhận các identifier mà kho đã bind mang vẫn còn được publish | không |
+| `@knowledge/ui/presentation` | mọi file, luật và Case presentation trong manifest chính xác đã đóng băng | có |
+| `@knowledge/grammars/<family>` | phân quyền, idiom, snapshot package và bảng gap chuẩn của family đã resolve | có |
 
 ## Đầu vào
 
@@ -88,6 +89,7 @@ lại sau đó. Nó không bao giờ stash, reset, force, clean, rebase hay chec
 | `frontend-source-application` | `interface.generate`, hoặc `interface.fix` trước đó; commit mà phát hiện được nêu trên đó | có |
 | `frontend-surface-audit` | `interface.audit`, khi phát hiện là một dòng trong bảng verdict của nó | không |
 | `uat-flow-verification` | `uat.verify`, khi phát hiện là một bước trong verdict của nó | không |
+| `knowledge-repair-receipt` | `knowledge.repair`, khi đây là lần thử lại với manifest đã bind lại | không |
 
 ## Yêu cầu
 
@@ -102,7 +104,7 @@ lại sau đó. Nó không bao giờ stash, reset, force, clean, rebase hay chec
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm gate và chạy lại, xác nhận phiên và head đóng băng, và chạy preflight của request trước lần ghi đầu ra ngoài thư mục phiên | `resume`, `mode` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, @workspaces/fe ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind đúng một phát hiện vào dòng đã nêu nó, và kho vào cây nó được đóng băng cho | `finding` | đầu vào `frontend-surface-audit` hoặc `uat-flow-verification` (dòng mà phát hiện gọi tên), `frontend-source-application` (commit nó được nêu trên đó), `frontend-presentation-resolution` (kho cạnh nó và cây đã resolve), @knowledge/ui/presentation | — | `RESOLUTION_STALE` |
+| 2 | Bind finding, knowledge chính xác và bản hiểu family; route luật sai về owner thay vì vá vòng | `finding` | receipt đã nêu, resolution đóng băng, @knowledge/ui/presentation, @knowledge/grammars/<family> | `knowledge-coverage`, `family-understanding`, hoặc `knowledge-question` khi mâu thuẫn | `RESOLUTION_STALE`, `KNOWLEDGE_QUESTION` |
 | 3 | Chiếu lần sửa nhỏ nhất lên write set đã khai và đo nó theo cỡ fix | — | @workspaces/fe (các path đã khai và gốc owner của chúng), kho, `fixSize` của orchestrator khi nó công bố | — | `OWNER_CONFLICT`, `FIX_TOO_LARGE` |
 | 4 | Đối chiếu mọi giá trị đã chiếu với kho, rồi quét bản chiếu | `mode` | kho, @workspaces/fe (write set đã chiếu), @tools/shell | `writes` | `WRITE_REJECTED` |
 | 5 | Ghi nguyên khối trên nhánh phiên, commit một lần rồi đọc lại cây ở commit | — | @workspaces/fe (nội dung hiện tại của từng path đã khai, dưới một lease độc quyền, rồi cây ở commit) | @workspaces/fe/branch/session, `writes`, @tools/sourcewrite, @tools/git | `WRITE_REJECTED` |
@@ -120,6 +122,9 @@ chuyển, chúng mang lời khai nào, và bề mặt nào phải được đo h
 | `frontend-source-application` | `response/response.md` | md | có |
 | `changes` | `response/changes.md` | md | có |
 | `writes` | `response/data/writes.json` | data | có |
+| `knowledge-question` | `response/data/knowledge-question.json` | data | không |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | không |
+| `family-understanding` | `response/data/family-understanding.json` | data | không |
 
 ## Dừng
 
@@ -133,6 +138,7 @@ chuyển, chúng mang lời khai nào, và bề mặt nào phải được đo h
 | `FIX_TOO_LARGE` | terminate |
 | `WRITE_REJECTED` | terminate |
 | `NO_PROGRESS` | terminate |
+| `KNOWLEDGE_QUESTION` | terminate |
 
 ## Kế tiếp
 

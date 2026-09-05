@@ -81,6 +81,8 @@ quyết nào về source.
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
 | `@grammar/core` | Grammar đã publish như app được ràng resolve: các composition shell và điều hướng mà một dòng Shell được gọi tên, và các composition một đơn vị có thể ràng sau này | có |
+| `@knowledge/ui/composition` | mọi file, luật và Case composition trong manifest chính xác đã đóng băng | có |
+| `@knowledge/grammars/<family>` | INDEX, DNA, family, idioms và playbook của family theo route, đọc trước khi chọn shell | có |
 | `@workspaces/fe` | checkout frontend được route ở head đã đóng băng: các route, layout, modal và drawer đã tồn tại, đọc như bằng chứng về thứ bản đồ phải gọi tên và không bao giờ như chính bản đồ | có |
 | `@worktrees/unchecked/<product>` | phần chưa kiểm mà tính năng này đang mang trong làn audit: mọi đơn vị một nhiệm vụ trước đã hoãn, để bản đồ này kiểm nó hay gia hạn nó thay vì lại lặng lẽ hoãn thêm lần nữa | không |
 
@@ -89,6 +91,7 @@ quyết nào về source.
 | Kind | Từ đâu | Bắt buộc |
 | --- | --- | --- |
 | `business-promise-authority` | `business.decide`; lời hứa có các hành trình, trạng thái và thao tác mà các đơn vị phải bao phủ, khi tính năng có một lời hứa | không |
+| `knowledge-repair-receipt` | `knowledge.repair`, khi đây là lần thử lại với manifest đã bind lại | không |
 
 ## Yêu cầu
 
@@ -106,7 +109,7 @@ quyết nào về source.
 | 2 | Đọc tham chiếu: mọi route, host và modal mà ảnh chụp hay văn xuôi cho thấy dưới tính năng | `reference`, `feature` | tham chiếu mà request mang | — | — |
 | 3 | Đọc source: mọi route, layout, modal và drawer mà checkout đã phục vụ dưới tính năng, ở head đã đóng băng | — | @workspaces/fe, @tools/git | — | `EVIDENCE_MISSING` |
 | 4 | Đọc lời hứa khi được ràng: các hành trình, trạng thái và thao tác mà các đơn vị phải bao phủ | — | đầu vào `business-promise-authority` | — | — |
-| 5 | Quyết định shell một lần: sidebar, header, breadcrumb và thứ tự điều hướng, mỗi cái với chủ sở hữu render nó | — | @grammar/core cho các composition shell và điều hướng mà family publish, tham chiếu, source | — | — |
+| 5 | Đóng băng coverage knowledge chính xác và bản hiểu family, rồi quyết shell một lần | — | @knowledge/ui/composition, @knowledge/grammars/<family>, @grammar/core, tham chiếu, source | `knowledge-coverage`, `family-understanding`, hoặc `knowledge-question` khi mâu thuẫn | `KNOWLEDGE_QUESTION` |
 | 6 | Gọi tên mọi đơn vị: một dòng cho mỗi trang và mỗi modal, với route hay host và một dòng goal | — | tham chiếu, source, lời hứa | — | `MAP_INCOMPLETE` |
 | 7 | Xếp tier cho từng đơn vị theo các dòng "xong khi" của nhiệm vụ: `journey` nơi hành trình đi qua nó, `secondary` kèm một câu lý do nơi hành trình không đi qua, và mọi mục chưa kiểm còn mở của tính năng này được lấy lại hay gia hạn | — | các dòng "xong khi" của nhiệm vụ, các đơn vị, @worktrees/unchecked/<product> | — | — |
 | 8 | Khai contract dữ liệu của từng đơn vị: nó đọc gì và ghi gì | — | các đơn vị, đầu vào `business-promise-authority` | — | — |
@@ -124,6 +127,9 @@ bắt đầu lại từ bước 1 và đọc lại tham chiếu và source; mộ
 | --- | --- | --- | --- |
 | `surface-map` | `response/response.md` | md | có |
 | `units` | `response/data/units.json` | data | có |
+| `knowledge-question` | `response/data/knowledge-question.json` | data | không |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | không |
+| `family-understanding` | `response/data/family-understanding.json` | data | không |
 
 ## Dừng
 
@@ -133,6 +139,7 @@ bắt đầu lại từ bước 1 và đọc lại tham chiếu và source; mộ
 | `NO_PROGRESS` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `MAP_INCOMPLETE` | terminate |
+| `KNOWLEDGE_QUESTION` | terminate |
 
 ## Kế tiếp
 

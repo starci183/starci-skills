@@ -70,9 +70,12 @@ nhánh trước qua `producer-import`; một route `chain` gọi tên operator n
 
 Manifest package tại base đóng băng chứng minh danh tính package; tên thư mục do caller đưa không đủ.
 Mọi file đã khai nằm trong package và write roots của route. Từ chối symlink, package lồng, file
-consumer, dependency mới, sửa script, asset, cấu trúc markup, class và inline style. File behavior là một
-script, hoặc chính style sheet mà package giao các recipe của nó trong đó — họ nào giữ luật bằng CSS thì sửa
-sheet ấy như behavior, với cùng regression cặp đôi đọc recipe. Chỉ sửa file
+consumer, dependency mới, sửa script, asset chưa khai và delta công khai chưa khai. Plan behavior có
+thể khai rõ delta prop, anatomy, semantic-attribute, token, claim hoặc class kèm bằng chứng owner cụ
+thể và tác động consumer chính xác; markup và attribute ngữ nghĩa hiện thực contract package đã khai
+khi ấy thuộc lần sửa của owner. File behavior là một script, hoặc chính style sheet mà package giao
+các recipe của nó trong đó — họ nào giữ luật bằng CSS thì sửa sheet ấy như behavior, với cùng
+regression cặp đôi đọc recipe. Chỉ sửa file
 hành vi hiện có, regression test đi cặp, version patch kế tiếp trong manifest hiện có, changelog
 package và metadata version của package trong lockfile. Lockfile workspace chỉ được phép khi cả plan và
 route đều gọi tên; JSON chỉ được thay version của entry package đã bind. Presentation đi qua pipeline
@@ -113,7 +116,10 @@ package đó; một entry link workspace giữ nguyên. Version mà workspace kh
 
 Chạy `validate.mjs <branch> --preflight` trước khi ghi. Gate đọc các plan có kiểu mà chế độ gọi tên,
 route đã bind và Git, từ chối cây bẩn và chứng minh ranh giới của những nửa sắp chạy; đường dẫn package
-chỉ được giải nơi có nửa package chạy. Dưới `full` và `publish`, viết test đi cặp trước rồi chạy
+chỉ được giải nơi có nửa package chạy. Trước mọi mutation, nó còn đóng băng manifest Grammar chính
+xác và brief hiểu family tách ngữ nghĩa Common, phong cách family và dữ kiện sản phẩm, rồi ghi thứ tự
+tìm kiếm: dùng lại, ghép, mở rộng owner hiện có, và chỉ đưa owner mới vào cho gap có bằng chứng. Dưới
+`full` và `publish`, viết test đi cặp trước rồi chạy
 `run-proof.mjs <branch> before`; helper buộc hành vi và manifest còn đúng base và ghi assertion
 regression thất bại. Sửa hành vi cùng version patch kế tiếp rồi chạy helper cho `after` và mọi gate
 package đã khai. Mỗi script test, typecheck, build hiện có của package phải chạy đầy đủ không filter.
@@ -137,6 +143,7 @@ những byte khác.
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
 | `@workspaces/fe` | checkout được route: package owner, consumer của nó, hoặc cả hai, tại base đóng băng; chỉ ghi nhánh phiên | có |
+| `@knowledge/grammars/<family>` | INDEX, snapshot DNA package, định nghĩa family, idiom, playbook và bảng gap chuẩn của family cụ thể theo route | có |
 
 ## Đầu vào
 
@@ -144,13 +151,14 @@ những byte khác.
 | --- | --- | --- |
 | `route` | `workspace.bind`; checkout, policy session và write roots đã kiểm chứng | có |
 | `library-release` | một nhánh `library.update` dưới mode `publish`, import vào phiên này qua `producer-import` hoặc do một nhánh sớm hơn của phiên sinh ra; bắt buộc dưới mode `consume` và bị từ chối dưới hai mode kia | không |
+| `knowledge-repair-receipt` | `knowledge.repair`, khi đây là lần thử lại với manifest đã bind lại | không |
 
 ## Yêu cầu
 
 | Field | Kiểu | Mặc định | Hỏi |
 | --- | --- | --- | --- |
 | `mode` | choice | full | `full` chạy cả hai nửa trong checkout được route; `publish` chạy riêng nửa owner và dừng ở bản phát hành đã ghi; `consume` chạy riêng nửa consumer trên `library-release` đã bind |
-| `plan` | object | null | Schema library-behavior-plan đóng: danh tính package, tập file, regression đi cặp, script hiện có và patch kế tiếp; cấp dưới `full` và `publish`, vắng dưới `consume` |
+| `plan` | object | null | Schema library-behavior-plan đóng: danh tính package, tập file, regression đi cặp, script hiện có, patch kế tiếp, delta công khai đã khai và tác động consumer chính xác; cấp dưới `full` và `publish`, vắng dưới `consume` |
 | `consumer` | object | null | Schema dependency-plan đóng: các manifest và lockfile consumer pin package, thẩm quyền trước-và-sau — một regression consumer không đổi, hoặc hai audit của một bản phát hành trình bày — và các gate bàn giao đầy đủ; cấp dưới `full` và `consume`, vắng dưới `publish` |
 | `publish` | choice | true | `true` phát hành bản đã đóng gói lên registry khi proof package đã xanh; `false` để nguyên bản đóng gói cho người; đọc dưới mode `publish`, nơi không gì khác đưa được bản phát hành lên registry |
 | `resume` | token | null | Token nhánh bị chặn khi vào lại với plan hoặc proof thay đổi |
@@ -170,7 +178,7 @@ những byte khác.
 | 9 | Cài bản phát hành đã bind trong ranh giới metadata consumer chính xác | `consumer` | @workspaces/fe và bản phát hành đã bind, @tools/shell | @workspaces/fe/branch/session trong trần metadata, @tools/sourcewrite | `DEPENDENCY_BOUNDARY_REJECTED` |
 | 10 | Kiểm byte đã cài và chạy regression consumer cùng gate đầy đủ, hoặc ràng audit sau của một bản phát hành trình bày | `consumer` | @workspaces/fe, nhánh `interface.audit` mà phiên này đã đo tại commit vừa tăng, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
 | 11 | Commit metadata consumer một lần rồi kiểm delta và hash proof của nó | `consumer` | @workspaces/fe tại commit consumer, @tools/git | @workspaces/fe/branch/session, `dependency-update` | `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
-| 12 | Phát | — | mọi thứ ở trên | `changes`, `response/response.json` | — |
+| 12 | Phát | — | mọi thứ ở trên | `changes`, `knowledge-coverage`, `family-understanding`, `response/response.json` | — |
 
 Bước 2 tới 6 là nửa package, chạy dưới `full` và `publish`; bước 7 là phát hành, chỉ chạy dưới
 `publish` và chỉ khi yêu cầu không đặt sẵn `publish: false`; bước 8 tới 11 là nửa consumer, chạy dưới
@@ -192,6 +200,8 @@ package mà không ghi đè.
 | `dependency-proof` | `response/data/proofs/consumer-<phase>.json` | data | không |
 | `dependency-log` | `response/artifacts/proofs/consumer-<phase>.log` | artifact | không |
 | `changes` | `response/changes.md` | md | có |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | không |
+| `family-understanding` | `response/data/family-understanding.json` | data | không |
 
 Mọi đầu ra trừ receipt đều thuộc về một nửa, nên nhánh done phải mang những cái nào là câu trả lời của
 chế độ chứ không phải của một cột: `validate.mjs` đòi tập package dưới `full` và `publish`, tập

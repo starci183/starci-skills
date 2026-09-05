@@ -22,6 +22,8 @@ const plan = {
   files: [{ path: 'package/index.js', kind: 'behavior' }, { path: 'package/index.spec.js', kind: 'test' }, { path: 'package/package.json', kind: 'manifest' }],
   pairs: [{ source: 'package/index.js', test: 'package/index.spec.js' }],
   regression: { command: command('test'), assertion: 'keeps the declared panel relationship' },
+  publicDelta: [],
+  consumerImpact: [{ consumer: 'apps/app', effect: 'uses the repaired relationship', compatibility: 'existing call remains source compatible' }],
   gates: ['test', 'build', 'typecheck'].map((id) => ({ id, command: command(id) })),
 };
 const consumer = {
@@ -171,7 +173,7 @@ try {
     checkout: { diskPath: repo, gitRoot: repo, gitRepository: 'https://example.invalid/library.git', branch: git(repo, ['branch', '--show-current']), repositoryKind: 'source', directory: null, sourceHead: base },
     gitPolicy: { worktreeBranches: 'session-only', mutationBranch: 'main' }, mutationReadiness: 'ready', writeRoots: ['package', 'apps/app', 'package-lock.json'], authorityRoots: { businesses: null }, runtime: null, provenanceHeadRef: null,
   };
-  const request = { schemaVersion: 9, operatorId: 'library.update', step: 2, parallel: 1, sessionId: 'library-test', contexts: [{ alias: '@workspaces/fe', head: base }], requirements: { plan, consumer, resume: null }, inputs: { route: routeRef }, resume: null };
+  const request = { schemaVersion: 9, operatorId: 'library.update', step: 2, parallel: 1, sessionId: 'library-test', contexts: [{ alias: '@workspaces/fe', head: base }, { alias: '@knowledge/grammars/starci', head: null }], requirements: { plan, consumer, resume: null }, inputs: { route: routeRef }, resume: null };
   const state = { id: 'library-test', project: 'example', startedAt: '2026-09-04', status: 'running', chain: [['1/1'], ['2/1']], steps: { '1/1': 'workspace.bind', '2/1': 'library.update' }, requestHashes: {} };
   write(path.join(session, 'state.json'), state); write(path.join(session, routeRef), route); write(path.join(branch, 'request/request.json'), request);
   const ctx = await loadContext(branch);

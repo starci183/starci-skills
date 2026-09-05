@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateInterfacePlanStep } from './validate.mjs';
 import { uncheckedId, ledgerFile } from '../../scripts/unchecked.mjs';
+import { writeUiKnowledgeFixture } from '../../tests/support/ui-knowledge-fixture.mjs';
 
 const OPERATOR = 'interface.plan';
 const FEATURE = 'items';
@@ -58,7 +59,7 @@ ${contractText}${contractText ? '\n' : ''}
 }
 const requestJson = ({ feature = FEATURE } = {}) => ({
   schemaVersion: 9, operatorId: OPERATOR, step: 1, parallel: 1, sessionId: 's-test',
-  contexts: [{ alias: '@grammar/core', head: null }, { alias: '@workspaces/fe', head: HEAD }],
+  contexts: [{ alias: '@grammar/core', head: null }, { alias: '@knowledge/ui/composition', head: null }, { alias: '@knowledge/grammars/starci', head: null }, { alias: '@workspaces/fe', head: HEAD }],
   requirements: { feature, reference: 'the reference shows an item list and a removal dialog', resume: null },
   inputs: {}, resume: null,
 });
@@ -76,6 +77,9 @@ function writeBranch(files) {
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+  if (files['response/response.json']?.status === 'done') {
+    writeUiKnowledgeFixture(path.resolve('.'), branch, ['@knowledge/ui/composition', '@knowledge/grammars/<family>'], 'response/data/units.json');
   }
   return { branch, session };
 }

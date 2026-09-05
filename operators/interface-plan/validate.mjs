@@ -21,6 +21,7 @@ import { tableUnder } from '../../scripts/validate-response.mjs';
 import { unitsErrors, hostRootOf } from '../../scripts/validate-request.mjs';
 import { openUnchecked, planUncheckedErrors, laneOfPlan, tierErrors } from '../../scripts/unchecked.mjs';
 import { ledgerKeyOf } from '../../scripts/record-unchecked.mjs';
+import { knowledgeQuestionStopErrors, uiKnowledgeGateErrors } from '../../scripts/ui-knowledge-gate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OPERATOR = 'interface.plan';
@@ -34,8 +35,10 @@ const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 export async function validateInterfacePlanStep(branchDir, root = ROOT, { uncheckedRoot = null } = {}) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
-  const { response, requirements = {}, present = new Set() } = base;
+  const { request, response, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== OPERATOR) return { errors };
+  errors.push(...knowledgeQuestionStopErrors({ branchDir, response }));
+  errors.push(...uiKnowledgeGateErrors({ root, branchDir, bindings: ['@knowledge/ui/composition', '@knowledge/grammars/<family>'], request, status: response.status }));
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
   const receipt = present.has('surface-map') && has(RECEIPT) ? await read(RECEIPT) : null;

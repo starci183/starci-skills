@@ -81,6 +81,8 @@ verdict about the source.
 | Alias | Bind | Required |
 | --- | --- | --- |
 | `@grammar/core` | the published Grammar as the bound app resolves it: the shell and navigation compositions a Shell row may name, and the compositions a unit may later bind | yes |
+| `@knowledge/ui/composition` | every composition file, rule and Case in the frozen exact manifest | yes |
+| `@knowledge/grammars/<family>` | the route family's INDEX, DNA, family, idioms and playbook used before choosing the shell | yes |
 | `@workspaces/fe` | the routed frontend checkout at the frozen head: the routes, layouts, modals and drawers that already exist, read as evidence of what the map must name and never as the map itself | yes |
 | `@worktrees/unchecked/<product>` | the unchecked coverage this feature already carries in the audit lane: every unit an earlier mission deferred, so this map covers it or extends it rather than deferring it again in silence | no |
 
@@ -89,6 +91,7 @@ verdict about the source.
 | Kind | From | Required |
 | --- | --- | --- |
 | `business-promise-authority` | `business.decide`; the promise whose journeys, states and operations the units must cover, when the feature has one | no |
+| `knowledge-repair-receipt` | `knowledge.repair`, when this is a retry with a rebound manifest | no |
 
 ## Requirements
 
@@ -106,7 +109,7 @@ verdict about the source.
 | 2 | Read the reference: every route, host and modal the screenshot or the prose shows under the feature | `reference`, `feature` | the reference the request carries | — | — |
 | 3 | Read the source: every route, layout, modal and drawer the checkout already serves under the feature, at the frozen head | — | @workspaces/fe, @tools/git | — | `EVIDENCE_MISSING` |
 | 4 | Read the promise when bound: the journeys, states and operations the units must cover | — | input `business-promise-authority` | — | — |
-| 5 | Decide the shell once: sidebar, header, breadcrumb and navigation order, each with the owner that renders it | — | @grammar/core for the shell and navigation compositions the family publishes, the reference, the source | — | — |
+| 5 | Freeze exact knowledge coverage and the family brief, then decide the shell once | — | @knowledge/ui/composition, @knowledge/grammars/<family>, @grammar/core, the reference, the source | `knowledge-coverage`, `family-understanding`, or `knowledge-question` when contradicted | `KNOWLEDGE_QUESTION` |
 | 6 | Name every unit: one row per page and per modal, with its route or host and one goal line | — | the reference, the source, the promise | — | `MAP_INCOMPLETE` |
 | 7 | Tier every unit against the mission's done-when lines: `journey` where the journey passes through it, `secondary` with one sentence of reason where it does not, and every open entry of this feature taken back or extended | — | the mission's done-when lines, the units, @worktrees/unchecked/<product> | — | — |
 | 8 | Declare each unit's data contract: what it reads and what it writes | — | the units, input `business-promise-authority` | — | — |
@@ -124,6 +127,9 @@ names the same units as the branch it resumes is `NO_PROGRESS`.
 | --- | --- | --- | --- |
 | `surface-map` | `response/response.md` | md | yes |
 | `units` | `response/data/units.json` | data | yes |
+| `knowledge-question` | `response/data/knowledge-question.json` | data | no |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | no |
+| `family-understanding` | `response/data/family-understanding.json` | data | no |
 
 ## Stops
 
@@ -133,6 +139,7 @@ names the same units as the branch it resumes is `NO_PROGRESS`.
 | `NO_PROGRESS` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `MAP_INCOMPLETE` | terminate |
+| `KNOWLEDGE_QUESTION` | terminate |
 
 ## Next
 

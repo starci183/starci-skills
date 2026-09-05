@@ -1,0 +1,16 @@
+{
+  "$id": "kind:knowledge-repair-receipt", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "questionFingerprint", "manifestBefore", "manifestAfter", "decision", "rule", "case", "files", "evidence", "retry"],
+  "properties": {
+    "schemaVersion": { "const": 10 },
+    "questionFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "manifestBefore": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "manifestAfter": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "decision": { "enum": ["repair-existing-rule", "append-new-evidenced-rule"] },
+    "rule": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]*-(?:[0-9]+|[A-Z][A-Z0-9-]*)$" },
+    "case": { "type": ["string", "null"], "pattern": "^Case [1-9][0-9]*$" },
+    "files": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["path", "before", "after"], "properties": { "path": { "type": "string", "pattern": "^knowledge/(?:ui|grammars)/" }, "before": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" }, "after": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" } } } },
+    "evidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "retry": { "type": "object", "additionalProperties": false, "required": ["operator", "surfaceRef", "manifestFingerprint"], "properties": { "operator": { "enum": ["interface.plan", "interface.generate", "interface.fix", "interface.audit", "library.update"] }, "surfaceRef": { "type": "string", "minLength": 1 }, "manifestFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" } } }
+  }
+}

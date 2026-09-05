@@ -2,9 +2,9 @@
   "kind": "frontend-presentation-resolution",
   "title": "^# frontend-presentation-resolution — [a-z0-9][a-z0-9-]*$",
   "sections": [
-    { "heading": "^## Owner map$", "table": "| Node | Property | Owner | Rule |", "minRows": 0, "cell": { "Node": "^`[^`]+`$", "Owner": "^(app|grammar)$", "Rule": "^`[A-Z][A-Z0-9-]*-[0-9]+`$" } },
-    { "heading": "^## Rules chosen$", "table": "| Node | Rule | Class | Condition |", "minRows": 0, "cell": { "Node": "^`[^`]+`$", "Rule": "^`[A-Z][A-Z0-9-]*-[0-9]+`$", "Class": "^`[^`]+`$", "Condition": "\\S" } },
-    { "heading": "^## Removed$", "table": "| Node | Class | Because |", "cell": { "Node": "^`[^`]+`$", "Because": "^(reimplements an owned relationship|overrides Grammar anatomy|off the closed scale|refused by [A-Z][A-Z0-9-]*-[0-9]+ Case [0-9]+)$" } },
+    { "heading": "^## Owner map$", "table": "| Node | Property | Owner | Rule |", "minRows": 0, "cell": { "Node": "^`[^`]+`$", "Owner": "^(app|grammar)$", "Rule": "^`[A-Z][A-Z0-9-]*-(?:[0-9]+|[A-Z][A-Z0-9-]*)`$" } },
+    { "heading": "^## Rules chosen$", "table": "| Node | Rule | Class | Condition |", "minRows": 0, "cell": { "Node": "^`[^`]+`$", "Rule": "^`[A-Z][A-Z0-9-]*-(?:[0-9]+|[A-Z][A-Z0-9-]*)`$", "Class": "^`[^`]+`$", "Condition": "\\S" } },
+    { "heading": "^## Removed$", "table": "| Node | Class | Because |", "cell": { "Node": "^`[^`]+`$", "Because": "^(reimplements an owned relationship|overrides Grammar anatomy|off the closed scale|refused by [A-Z][A-Z0-9-]*-(?:[0-9]+|[A-Z][A-Z0-9-]*) Case [0-9]+)$" } },
     { "heading": "^## Gaps$", "table": "| Node | Property | Missing path |", "cell": { "Node": "^`[^`]+`$", "Missing path": "\\S" } },
     { "heading": "^## Fallbacks taken$", "table": "| Code | Action |", "cell": { "Code": "^`[A-Z][A-Z0-9_]+`$" } }
   ]

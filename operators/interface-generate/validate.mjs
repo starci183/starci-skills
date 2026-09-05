@@ -32,6 +32,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
+import { knowledgeQuestionStopErrors, uiKnowledgeGateErrors } from '../../scripts/ui-knowledge-gate.mjs';
 import { tableUnder, userRouted, choiceHandoffErrors, printedCandidates } from '../../scripts/validate-response.mjs';
 import { loadErrorsRegistry } from '../../scripts/errors-registry.mjs';
 import { sessionRootOf } from '../../scripts/validate-request.mjs';
@@ -99,7 +100,7 @@ export function rankCandidates(scores) {
 // or the means cannot be compared.
 export function scoreCoverageErrors({ at, scores, rendered, printed }) {
   const errors = [];
-  if (rendered.length < 2) return errors;
+  if (rendered.length < 1) return errors;
   if (scores.length === 0) {
     errors.push(`${at}: ${rendered.length} candidates were rendered and ## Scores carries no row; a decision over several rendered candidates carries the scores that ranked them, or the tie they prove`);
     return errors;
@@ -242,19 +243,16 @@ export async function directionErrors({ branchDir, root = ROOT, request, respons
   if (!(candidates >= 1 && candidates <= 3)) errors.push(`request.json: candidates must be 1, 2 or 3, not ${requirements.candidates}`);
   if (policy === 'automatic' && approval !== null) errors.push('request.json: approval is bound under automatic policy; supplying both hides which one decided');
 
-  // A structural change is looked at before it is decided: `new` and `reconstruct` render every
-  // candidate they form, whatever the preview flag says, because the person cannot approve a
-  // structure nobody has seen. `refine` moves elements inside a structure that was already approved,
-  // so its page stays optional and is rendered only when a comparison or a preview asks for one.
+  // Every candidate is looked at before it is decided, including a single refine. A source-only
+  // judgement cannot establish reference fit or perceived quality.
   const structural = changeLevel === 'new' || changeLevel === 'reconstruct';
   const artifacts = new Set(list(response.fields?.candidates));
   if (response.status === 'done') {
-    if (structural && candidates >= 1 && artifacts.size !== candidates) {
+    if (candidates >= 1 && artifacts.size !== candidates) {
       errors.push(`response/response.json: a ${changeLevel} direction renders every candidate it forms; ${candidates} formed and ${artifacts.size} rendered, so the person is asked to approve a structure they cannot see`);
     }
     if (candidates > 1 && artifacts.size === 0) errors.push('response/response.json: more than one candidate was formed but none was rendered');
     if (preview === 'yes' && artifacts.size === 0) errors.push('response/response.json: preview was asked for but no candidate page was rendered');
-    if (!structural && candidates === 1 && preview === 'no' && artifacts.size > 0) errors.push('response/response.json: one candidate under no preview renders no page');
   }
 
   let coverage = null;
@@ -303,7 +301,7 @@ export async function directionErrors({ branchDir, root = ROOT, request, respons
     const scores = scoreRows(tableUnder(text, '## Scores'));
     const limits = candidateLimitRows(tableUnder(text, '## Candidate limits'));
     const ranking = rankCandidates(scores);
-    const scored = rendered.length > 1 && scores.length > 0;
+    const scored = rendered.length > 0 && scores.length > 0;
     if (response.status === 'done') {
       errors.push(...scoreCoverageErrors({ at, scores, rendered, printed: printedMap }));
       errors.push(...candidateLimitErrors({ at, limits, scores }));
@@ -313,6 +311,16 @@ export async function directionErrors({ branchDir, root = ROOT, request, respons
       const tookFallback = list(response.fallbacks).includes('DIRECTION_CHOICE_REQUIRED');
       if (scored && ranking.dominant && tookFallback) errors.push(`${at}: the scores make ${ranking.dominant} dominant, so no choice was required and DIRECTION_CHOICE_REQUIRED was not a fallback to take`);
       if (scored && !ranking.dominant && policy === 'automatic' && !tookFallback) errors.push(`${at}: no candidate dominates (${ranking.tie}) and no DIRECTION_CHOICE_REQUIRED fallback is recorded; a tie under automatic is broken by the fallback and recorded`);
+      if (scored && !ranking.dominant && policy === 'automatic') {
+        const nodeCounts = [];
+        for (const page of artifacts) {
+          const id = page.replace(/^.*\//, '').replace(/\.html$/, '');
+          const html = has(page) ? await read(page) : '';
+          nodeCounts.push({ id, nodes: [...html.matchAll(/<(?![!/])([a-z][a-z0-9-]*)\b/gi)].length });
+        }
+        nodeCounts.sort((a, b) => a.nodes - b.nodes || a.id.localeCompare(b.id));
+        if (nodeCounts[0] && selected !== nodeCounts[0].id) errors.push(`${at}: tied automatic candidates select ${nodeCounts[0].id}, the deterministic candidate with the fewest rendered nodes; selected ${selected}`);
+      }
     }
     if (policy === 'approval-required' && response.status === 'done') {
       if (approval === null) errors.push('response/response.json: approval-required with no approval cannot end done; the user selects the tier even when one candidate scores higher');
@@ -331,6 +339,11 @@ export async function directionErrors({ branchDir, root = ROOT, request, respons
     }
     for (const [standard, klass] of refs) {
       if (empty(klass)) errors.push(`${at}: the reference ${standard} names no class; a standard is named by the class a reader would sort it into, never by an adjective`);
+    }
+    for (const [slot, why, claim, file] of tableUnder(text, '## Images') ?? []) {
+      if (empty(why) || empty(claim)) errors.push(`${at}: image ${slot} requires a task or content role and the claim it serves`);
+      if (/fill(?:ing)? (?:an? )?(?:empty |blank )?(?:space|region)|decorat(?:e|ion)|density/i.test(`${why} ${claim}`)) errors.push(`${at}: image ${slot} is decorative filler; imagery must earn a content or task role`);
+      if (empty(file)) errors.push(`${at}: image ${slot} names no artifact`);
     }
     // The surface class is declared once, here, and the later audit reads it from the coverage. The
     // receipt says the same name in prose so a person reads it without opening the data, and the two
@@ -424,7 +437,7 @@ export async function publishedRuleIds(root = ROOT) {
   if (!existsSync(dir)) return ids;
   for (const name of (await readdir(dir)).filter((f) => f.endsWith('.md') && !f.endsWith('.vi.md') && f !== 'INDEX.md')) {
     const text = await readFile(path.join(dir, name), 'utf8');
-    for (const m of text.matchAll(/^##\s+([A-Z][A-Z0-9-]*-[0-9]+)\b/gm)) ids.add(m[1]);
+    for (const m of text.matchAll(/^##\s+([A-Z][A-Z0-9-]*-(?:[0-9]+|[A-Z][A-Z0-9-]*))\b/gm)) ids.add(m[1]);
   }
   return ids;
 }
@@ -524,6 +537,7 @@ export async function resolutionErrors({ branchDir, root = ROOT, response, requi
       if (!inventory.ruleIds.includes(rule)) errors.push(`${rel}: ${node} chooses ${rule}, which the inventory does not carry`);
       if (!inventory.classNames.includes(className)) errors.push(`${rel}: ${node} writes ${className}, which the inventory does not carry`);
       const pattern = SCALE_PATTERN[prefixOf(rule)];
+      if (rule === 'MARGIN-AUTO' && !className.split(/\s+/).includes('mx-auto')) errors.push(`${rel}: ${node} renders MARGIN-AUTO as ${className}, expected mx-auto`);
       if (pattern) {
         const expected = ORDINAL_TO_STEP[ordinalOf(rule)];
         const steps = className.split(/\s+/).map((token) => pattern.exec(token)).filter(Boolean).map((m) => m[1]);
@@ -703,6 +717,8 @@ export async function validateGenerateStep(branchDir, root = ROOT) {
   const errors = [...base.errors];
   const { request, response, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== OPERATOR_ID) return { errors };
+  errors.push(...knowledgeQuestionStopErrors({ branchDir, response }));
+  errors.push(...uiKnowledgeGateErrors({ root, branchDir, bindings: ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof', '@knowledge/grammars/<family>'], request, status: response.status }));
 
   const direction = await directionErrors({ branchDir, root, request, response, requirements, present });
   errors.push(...direction.errors);

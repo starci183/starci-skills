@@ -2,8 +2,9 @@
 
 Hình dạng nghiệp vụ nào đòi chuỗi idiom nào, và một tham chiếu được phép góp gì vào câu trả lời ấy.
 Bản thân các idiom nằm ở [Idiom](idioms.vi.md); còn package công bố những gì thì nằm ở
-[DNA](DNA.vi.md). Một hình dạng không có trong đây không phải là bị cấm — nó là chưa được quyết, mà
-chưa được quyết thì hỏi chủ sở hữu, không đoán.
+[DNA](DNA.vi.md). Một hình dạng không có trong đây không phải là idiom của nhà. Nó vẫn có thể được
+ghép cho định hướng sản phẩm đã duyệt khi ngữ nghĩa Common, giải phẫu family và dữ kiện sản phẩm hiện
+có biểu đạt được nó; chỉ việc nâng nó thành idiom dùng lại của family mới thuộc chủ family.
 
 ## Các hình dạng
 
@@ -27,9 +28,19 @@ chưa được quyết thì hỏi chủ sở hữu, không đoán.
    và để đọc bảng gap trong [Family và DNA](family.vi.md) trước khi hứa một năng lực. Cách ghép nào
    cần tới một gap đã ghi thì chưa phải một định hướng.
 
-Cái gì còn mở sau bốn bước ấy thì không giải bằng sở thích: nó dừng lại với
-`DIRECTION_CHOICE_REQUIRED` và về tay chủ sở hữu. Trong đó có mọi hình dạng vắng mặt ở bảng trên, mọi
-cách ghép chỉ nằm ở bảng "mới thấy một lần" của file idiom, và mọi điểm mà tham chiếu với idiom nói
-ngược nhau.
+5. **Rồi giải phần ghép sản phẩm còn lại.** Dùng lại idiom đã có khi phù hợp; nếu không thì ghép ngữ
+   nghĩa Common với giải phẫu family hiện có, mở rộng một owner hiện có khi bằng chứng cho thấy gap
+   đã khai của nó, và chỉ thêm owner mới cho một gap có bằng chứng. Hình dạng vắng khỏi bảng và hình
+   dạng mới thấy một lần chỉ giới hạn điều được gọi là gu nhà, không phải lý do dừng việc sáng tạo đã
+   nằm trong phạm vi sản phẩm được duyệt.
 
-Chốt của owner ngày 2026-09-03 về hình: hướng nào để lại một vùng đọc lên thấy trống thì tự thêm hình làm theo đúng một claim của lời hứa, tự xét và ghi lý do; không bao giờ chờ được yêu cầu và không bao giờ trang trí vùng mà chữ và Grammar object đã gánh được. `interface.generate` áp điều này trong bảng `## Images` của nó.
+`DIRECTION_CHOICE_REQUIRED` chỉ dành cho một lựa chọn sản phẩm trọng yếu mà các phương án chấp nhận
+được dẫn tới kết quả khác nhau và yêu cầu chưa trả lời. Xung đột tham chiếu/idiom được giải bằng phân
+quyền ở trên: dữ kiện sản phẩm và thứ tự vùng đã duyệt đến từ yêu cầu, ngữ nghĩa Common đến từ
+`knowledge/ui`, còn giải phẫu family và phong cách dùng lại đến từ Grammar này. Điểm số hoà không gây
+lần dừng này; `interface.generate` áp fallback xác định và tiếp tục.
+
+Chốt của owner ngày 2026-09-03 về hình: chỉ thêm hình khi nó có vai trò nội dung hoặc nhiệm vụ cụ thể
+và hỗ trợ một claim được gọi tên trong lời hứa. Khoảng trống tự nó không phải bằng chứng cần hình;
+ảnh lấp chỗ, trang trí và cân mật độ không phải vai trò. Một định hướng ghi vai trò và claim trong
+bảng `## Images`, hoặc ghi rõ không có hình nào đáng dùng.

@@ -37,6 +37,8 @@ import { validateRequest, sessionRootOf } from '../../scripts/validate-request.m
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { sourceWriteErrors } from '../../scripts/workspace-checkout.mjs';
+import { knowledgeManifestErrors } from '../../scripts/knowledge-manifest.mjs';
+import { frozenFamilyUnderstandingErrors, routedFamily, uiKnowledgeGateErrors } from '../../scripts/ui-knowledge-gate.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const OPERATOR_ID = 'library.update';
@@ -176,6 +178,8 @@ export function planErrors(plan, manifest) {
   if (manifest.name !== plan.packageName || manifest.version !== plan.baseVersion) errors.push('package name/version differs from the frozen manifest');
   if (manifest.private === true || !(manifest.exports || manifest.main || manifest.module)) errors.push('the bound manifest does not identify a distributable owner library');
   if (plan.targetVersion !== nextPatch(plan.baseVersion)) errors.push('targetVersion must be exactly the next patch');
+  if (!Array.isArray(plan.consumerImpact) || plan.consumerImpact.length === 0) errors.push('the plan carries the consumer-impact manifest before mutation');
+  if (!Array.isArray(plan.publicDelta)) errors.push('the plan classifies its public delta as prop, anatomy, semantic-attribute, token, claim or class');
   const seen = new Set();
   for (const file of plan.files) {
     if (seen.has(file.path)) errors.push(`duplicate file: ${file.path}`); seen.add(file.path);
@@ -401,7 +405,10 @@ export function changeErrors(ctx) {
     // A script repair changes no presentation: its projection stays what it was. A style sheet is the presentation
     // the family ships as its law (planErrors admits it as a behavior file), so the sheet itself is the repair and no
     // script projection reads it.
-    if (file.kind === 'behavior' && /\.[cm]?[jt]sx?$/.test(file.path) && !same(presentationProjection(ts, old.toString(), file.path), presentationProjection(ts, readFileSync(full, 'utf8'), file.path))) errors.push(`presentation changed in behavior repair: ${file.path}`);
+    if (file.kind === 'behavior' && /\.[cm]?[jt]sx?$/.test(file.path) && !same(presentationProjection(ts, old.toString(), file.path), presentationProjection(ts, readFileSync(full, 'utf8'), file.path))) {
+      const declared = new Set((ctx.plan.publicDelta ?? []).map((delta) => delta.kind));
+      if (![...declared].some((kind) => ['anatomy', 'semantic-attribute', 'class'].includes(kind))) errors.push(`presentation changed in behavior repair without a declared anatomy, semantic-attribute or class delta: ${file.path}`);
+    }
     if (file.kind === 'lockfile') {
       const original = JSON.parse(old);
       const expectedLock = structuredClone(original);
@@ -653,7 +660,14 @@ export async function validateLibraryUpdateStep(branch, root = ROOT, preflight =
       if (base.response?.status !== 'done') { errors.push(...publishStopErrors(base.response)); return { errors }; }
     }
     const ctx = await loadContext(branch, root);
-    if (preflight) return { errors: worktreeErrors(ctx, { phase: 'pristine' }) };
+    const family = routedFamily(ctx.request);
+    if (!family) errors.push('request/request.json: exactly one concrete @knowledge/grammars/<family> context is required');
+    else {
+      errors.push(...knowledgeManifestErrors({ root, branchDir: branch, bindings: ['@knowledge/grammars/<family>'], family }));
+      errors.push(...frozenFamilyUnderstandingErrors(branch, { root, family }));
+    }
+    if (preflight) return { errors: [...errors, ...worktreeErrors(ctx, { phase: 'pristine' })] };
+    errors.push(...uiKnowledgeGateErrors({ root, branchDir: branch, bindings: ['@knowledge/grammars/<family>'], request: ctx.request, status: base.response.status }));
     const fields = base.response.fields ?? {};
     // The receipt carries the sections of the halves this mode ran, and no others.
     errors.push(...modeSectionErrors(ctx.mode, fields));

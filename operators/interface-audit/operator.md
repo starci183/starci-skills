@@ -169,10 +169,12 @@ a node passes.
 
 | Alias | Bind | Required |
 | --- | --- | --- |
-| `@knowledge/ui/proof` | what only becomes true once rendered; the audit's whole rule inventory | yes |
+| `@knowledge/ui/composition` | every canonical composition rule and Case, each judged for applicability against the rendered surface | yes |
+| `@knowledge/ui/presentation` | every canonical presentation rule and Case, each judged for applicability against the rendered surface | yes |
+| `@knowledge/ui/proof` | every canonical rendered-proof rule, Case and calibration asset | yes |
 | `@workspaces/fe` | the routed checkout at the commit the application wrote; the owners and identifiers observed there | yes |
 | `@worktrees/sessions/central-runtime` | the shared runtime owner: the preview serving the session worktree at that commit | yes |
-| `@knowledge/grammars/<family>` | how the family the bound route names (`context.grammarId`) is meant to realize Common, and where its gaps are recorded | no |
+| `@knowledge/grammars/<family>` | every authored file of the concrete route family, including its package snapshot and canonical gaps | yes |
 | `@worktrees/unchecked/<product>` | the unchecked coverage of this feature: which units and states earlier missions left unproved in the audit lane, and which of them this round covers | no |
 
 ## Inputs
@@ -187,6 +189,7 @@ a node passes.
 | `platform-operation-receipt` | `runtime.serve`, the serve that put the commit under observation on the product port; absent when the surface is already served | no |
 | `seed-receipt` | `data.seed`, the rows placed at the flow's representative volume so density is judged against data, not against an empty store | no |
 | `units` | `interface.plan`; the surface map whose one page or modal this branch measures, named by `request.unit` | no |
+| `knowledge-repair-receipt` | `knowledge.repair`, when this is a retry with a rebound manifest | no |
 
 ## Requirements
 
@@ -205,13 +208,13 @@ a node passes.
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume, and confirm the applied commit is inside the head the route is serving | `resume` | `request/request.json`, input `frontend-source-application` (the commit it wrote), input `route` (the verified checkout and its source head), @worktrees/sessions/central-runtime (the entry of this route: the served branch, the served head and the commits it contains), @workspaces/fe at the frozen head, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind the authority | — | @knowledge/ui/proof (every topic with its fingerprint and inventory), input `frontend-source-application` (the claims), input `frontend-presentation-resolution` (the owner of every node), @worktrees/sessions/central-runtime | — | — |
+| 2 | Bind the complete UI and family authority | — | the exact manifest for @knowledge/ui/composition, @knowledge/ui/presentation, @knowledge/ui/proof, the Grammar catalog and every authored family file; input `frontend-source-application` (the claims), input `frontend-presentation-resolution` (the owner of every node), @worktrees/sessions/central-runtime | — | — |
 | 3 | Bind the primary-surface scope, selected matrix entries and declared surface class, and give every state this round will not reach the one sentence saying why | `feature`, `auditScope`, `matrix` | input `frontend-direction-decision` (its `response/data/coverage.json`: state by viewport by colour scheme, and the `surfaceClass` that decision declared), @worktrees/unchecked/<product> for what this feature already owes in the audit lane | — | `SURFACE_CLASS_MISSING`, `UNCHECKED_UNLAWFUL` |
 | 4 | Reach readiness for each entry on the port the runtime owner's entry for this route carries, in this session's own browser profile, signing in as the flow's account when the route requires an identity | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime for the entry of this project route and the endpoint it serves, input `uat-account` for the account of names, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Write one walk per matrix entry: the entry's viewport and scheme as the context, role-and-name targets to the state, the entry route once at step 1, a credential by name where the route is guarded, a capture named after the entry | — | input `frontend-direction-decision` (the matrix entries), input `route`, input `uat-account` for the account of names | `uat-walk` | — |
 | 6 | Run each walk through the tree's runner under @tools/browsercontrol mode `playwright` — a fresh browser context per walk at the endpoint the runtime owner's entry carries — or drive the entry through the browser under mode `required` when no walk was written | — | `uat-walk`, @worktrees/sessions/central-runtime for the endpoint, @tools/browsercontrol, @tools/secrets | `walk-result`, `response/artifacts/<matrixId>.png` | `RUNTIME_UNAVAILABLE` |
 | 7 | Capture and measure each entry, reading the nodes, their claims and their values off the record the runner wrote or the driven browser shows | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), `walk-result`, @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 8 | Judge the measurable lanes per entry: compare against the claims and the proof rules, judge by owner, and let each measurable topic close itself; under mode `playwright` every presentation, contrast, accessibility and responsive result cites the element of the runner's `capture-measurements` record it read — the `ref` and the value — so the receipt states no number the runner did not record | — | @knowledge/ui/proof, @knowledge/grammars/<family>, the captures, `walk-result` (the `capture-measurements` record it names beside each screenshot) | — | `UNKNOWN_RULE` |
+| 8 | Judge the measurable lanes per entry: compare against the claims and every applicable bound knowledge file, rule and Case, judge by owner, and let each measurable topic close itself; under mode `playwright` every presentation, contrast, accessibility and responsive result cites the element of the runner's `capture-measurements` record it read — the `ref` and the value — so the receipt states no number the runner did not record. Every non-applicable item carries a specific reason and evidence. If a bound knowledge item cannot be applied consistently, write the typed question and stop rather than changing knowledge here | — | the frozen knowledge manifest and family-understanding brief, all three @knowledge/ui groups, @knowledge/grammars/<family>, the captures, `walk-result` (the `capture-measurements` record it names beside each screenshot) | `knowledge-coverage`, `family-understanding`, or `knowledge-question` | `UNKNOWN_RULE`, `KNOWLEDGE_QUESTION` |
 | 9 | Score the taste lens once over every sheet of the scope, calibrated on the three anchors and ranked relatively, then emit | — | @knowledge/ui/proof (the calibration set under `calibration/`: the anchors, their bands and the tolerance), the captures of every selected surface | `verdicts`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALIBRATION_OFF`, `NO_PROGRESS` |
 
 Step 8 judges every claim and lets each measurable proof topic close itself. The canon judgement is
@@ -326,6 +329,9 @@ different tiering, never a smaller audit.
 | `uat-walk` | `response/data/walks/<walk>/walk.json` | data | no |
 | `walk-result` | `response/data/walks/<walk>/walk-result.json` | data | no |
 | `host` | `response/artifacts/host.json` | artifact | no |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | no |
+| `family-understanding` | `response/data/family-understanding.json` | data | no |
+| `knowledge-question` | `response/data/knowledge-question.json` | data | no |
 
 ## Stops
 
@@ -337,6 +343,7 @@ different tiering, never a smaller audit.
 | `IDENTITY_MISSING` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `UNKNOWN_RULE` | terminate |
+| `KNOWLEDGE_QUESTION` | terminate |
 | `SURFACE_CLASS_MISSING` | terminate |
 | `CALIBRATION_OFF` | terminate |
 | `UNCHECKED_UNLAWFUL` | terminate |

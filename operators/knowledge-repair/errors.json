@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 9,
+  "codes": {
+    "KNOWLEDGE_EVIDENCE_MISSING": { "domain": "caller", "disposition": "terminate", "meaning": { "en": "The challenge does not prove rule applicability or carry concrete surface evidence.", "vi": "Phản biện chưa chứng minh luật áp dụng hoặc chưa mang bằng chứng bề mặt cụ thể." }, "resume": { "en": "Return with the rule, Case, impact and resolvable evidence from the same surface.", "vi": "Quay lại với luật, Case, tác động và bằng chứng resolve được từ cùng bề mặt." } },
+    "KNOWLEDGE_SCOPE_REJECTED": { "domain": "knowledge", "disposition": "terminate", "meaning": { "en": "The proposed write leaves the challenged canonical knowledge owner or changes more than the evidence supports.", "vi": "Lần ghi đề xuất rời owner knowledge chuẩn bị phản biện hoặc đổi nhiều hơn bằng chứng cho phép." }, "resume": { "en": "Narrow the repair to the canonical owner and preserve every stable id.", "vi": "Thu hẹp sửa chữa vào owner chuẩn và giữ mọi id ổn định." } }
+  }
+}

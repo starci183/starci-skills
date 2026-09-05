@@ -166,10 +166,12 @@ làm bằng chứng rằng node đã pass.
 
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
-| `@knowledge/ui/proof` | thứ chỉ thành thật khi đã render; toàn bộ kho luật của lượt audit | có |
+| `@knowledge/ui/composition` | mọi rule và Case composition chuẩn, từng mục được phán tính áp dụng trên bề mặt đã render | có |
+| `@knowledge/ui/presentation` | mọi rule và Case presentation chuẩn, từng mục được phán tính áp dụng trên bề mặt đã render | có |
+| `@knowledge/ui/proof` | mọi rule, Case proof đã render và asset hiệu chuẩn chuẩn | có |
 | `@workspaces/fe` | checkout được route ở commit mà lần áp dụng đã ghi; chủ sở hữu và identifier được quan sát ở đó | có |
 | `@worktrees/sessions/central-runtime` | chủ runtime dùng chung: preview đang phục vụ worktree phiên ở commit ấy | có |
-| `@knowledge/grammars/<family>` | họ mà route đã bind gọi tên (`context.grammarId`) được kỳ vọng hiện thực hoá Common ra sao, và gap của họ được ghi ở đâu | không |
+| `@knowledge/grammars/<family>` | mọi file authored của family cụ thể theo route, gồm snapshot package và bảng gap chuẩn | có |
 | `@worktrees/unchecked/<product>` | phần chưa kiểm của tính năng này: những đơn vị và state mà các nhiệm vụ trước để lại chưa chứng minh trong làn audit, và cái nào trong số đó vòng này kiểm | không |
 
 ## Đầu vào
@@ -184,6 +186,7 @@ làm bằng chứng rằng node đã pass.
 | `platform-operation-receipt` | `runtime.serve`, lượt phục vụ đã đưa commit vào quan sát trên cổng của sản phẩm; vắng khi bề mặt đã được phục vụ sẵn | không |
 | `seed-receipt` | `data.seed`, những dòng đã đặt ở mức khối lượng đại diện của luồng để mật độ được chấm trên dữ liệu chứ không trên kho rỗng | không |
 | `units` | `interface.plan`; bản đồ bề mặt mà nhánh này đo đúng một trang hay một modal của nó, gọi tên bằng `request.unit` | không |
+| `knowledge-repair-receipt` | `knowledge.repair`, khi đây là lần thử lại với manifest đã bind lại | không |
 
 ## Yêu cầu
 
@@ -202,13 +205,13 @@ làm bằng chứng rằng node đã pass.
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Kiểm cổng vào và resume, và xác nhận commit đã áp nằm trong head mà route đang phục vụ | `resume` | `request/request.json`, đầu vào `frontend-source-application` (commit nó đã ghi), đầu vào `route` (nhánh đang phục vụ, head đang phục vụ và những commit head đó chứa), @workspaces/fe tại head đã đóng băng, @worktrees/sessions/central-runtime, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind thẩm quyền | — | @knowledge/ui/proof (mọi topic kèm fingerprint và kho luật), đầu vào `frontend-source-application` (các lời khai), đầu vào `frontend-presentation-resolution` (chủ sở hữu của từng node), @worktrees/sessions/central-runtime | — | — |
+| 2 | Bind toàn bộ thẩm quyền UI và family | — | manifest chính xác cho @knowledge/ui/composition, @knowledge/ui/presentation, @knowledge/ui/proof, catalog Grammar và mọi file family đã viết; đầu vào `frontend-source-application` (các lời khai), đầu vào `frontend-presentation-resolution` (chủ sở hữu của từng node), @worktrees/sessions/central-runtime | — | — |
 | 3 | Bind phạm vi bề mặt chính, các mục ma trận và lớp bề mặt đã khai, rồi cho mỗi state vòng này sẽ không tới đúng một câu nói vì sao | `feature`, `auditScope`, `matrix` | đầu vào `frontend-direction-decision` (chính `response/data/coverage.json` của nó: state nhân viewport nhân bảng màu, và `surfaceClass` mà quyết định ấy đã khai), @worktrees/unchecked/<product> cho thứ tính năng này đang nợ trong làn audit | — | `SURFACE_CLASS_MISSING`, `UNCHECKED_UNLAWFUL` |
 | 4 | Chờ từng mục tới lúc sẵn sàng trên cổng mà entry của chủ runtime cho route này mang theo, trong profile trình duyệt của riêng phiên này, đăng nhập bằng tài khoản của luồng khi route đòi một danh tính | `readinessProbe`, `account`, `env` | @worktrees/sessions/central-runtime để lấy entry của đúng route này và endpoint nó phục vụ, đầu vào `uat-account` cho hồ sơ toàn tên, @tools/http, @tools/secrets, @tools/browsercontrol | — | `RUNTIME_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 5 | Viết một lượt đi thử cho mỗi mục ma trận: viewport và tông màu của mục làm ngữ cảnh, target theo vai trò và tên để tới trạng thái, route vào đúng một lần ở bước 1, thông tin đăng nhập theo tên khi route có cổng canh, một bức chụp mang tên mục | — | đầu vào `frontend-direction-decision` (các mục ma trận), đầu vào `route`, đầu vào `uat-account` cho hồ sơ toàn tên | `uat-walk` | — |
 | 6 | Chạy từng lượt đi qua runner của cây dưới @tools/browsercontrol chế độ `playwright` — một ngữ cảnh trình duyệt mới tinh cho mỗi lượt đi tại endpoint mà entry của chủ runtime mang — hoặc lái mục đó qua trình duyệt dưới chế độ `required` khi không viết lượt đi nào | — | `uat-walk`, @worktrees/sessions/central-runtime để lấy endpoint, @tools/browsercontrol, @tools/secrets | `walk-result`, `response/artifacts/<matrixId>.png` | `RUNTIME_UNAVAILABLE` |
 | 7 | Chụp và đo từng mục, đọc các node, lời khai và giá trị của chúng từ bản ghi runner để lại hoặc từ trình duyệt đang lái | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), `walk-result`, @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
-| 8 | Phán các làn đo được theo từng mục: đối chiếu với lời khai và luật proof, phán theo chủ sở hữu, và để từng topic đo được tự đóng; dưới chế độ `playwright`, mọi kết quả presentation, contrast, accessibility và responsive trích dẫn đúng phần tử của bản ghi `capture-measurements` mà runner đã đo — `ref` và giá trị đọc được — để biên nhận không nêu một con số nào runner chưa ghi | — | @knowledge/ui/proof, @knowledge/grammars/<family>, các bức chụp, `walk-result` (bản ghi `capture-measurements` nó nêu cạnh từng bức chụp) | — | `UNKNOWN_RULE` |
+| 8 | Phán các làn đo được theo từng mục: đối chiếu với lời khai cùng mọi file, rule và Case kiến thức đã bind mà áp dụng được, phán theo chủ sở hữu, và để từng topic đo được tự đóng; dưới chế độ `playwright`, mọi kết quả presentation, contrast, accessibility và responsive trích dẫn đúng phần tử của bản ghi `capture-measurements` mà runner đã đo — `ref` và giá trị đọc được — để biên nhận không nêu một con số nào runner chưa ghi. Mỗi mục không áp dụng mang lý do cụ thể và bằng chứng. Nếu một mục kiến thức đã bind không thể áp dụng nhất quán, ghi câu hỏi có kiểu rồi dừng thay vì sửa kiến thức tại đây | — | manifest kiến thức và brief hiểu family đã đóng băng, cả ba nhóm @knowledge/ui, @knowledge/grammars/<family>, các bức chụp, `walk-result` (bản ghi `capture-measurements` nó nêu cạnh từng bức chụp) | `knowledge-coverage`, `family-understanding`, hoặc `knowledge-question` | `UNKNOWN_RULE`, `KNOWLEDGE_QUESTION` |
 | 9 | Chấm ống kính thẩm mỹ một lần trên mọi tấm của phạm vi, hiệu chuẩn trên ba tấm mốc và xếp hạng theo tương quan, rồi phát | — | @knowledge/ui/proof (bộ hiệu chuẩn dưới `calibration/`: các mốc, dải của chúng và khoảng dung sai), các bức chụp của mọi bề mặt đã chọn | `verdicts`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALIBRATION_OFF`, `NO_PROGRESS` |
 
 Bậc 8 phán mọi lời khai và để từng topic proof đo được tự đóng lại. Phần phán canon là cái ở trên: mọi
@@ -320,6 +323,9 @@ audit nhỏ hơn.
 | `uat-walk` | `response/data/walks/<walk>/walk.json` | data | không |
 | `walk-result` | `response/data/walks/<walk>/walk-result.json` | data | không |
 | `host` | `response/artifacts/host.json` | artifact | không |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | không |
+| `family-understanding` | `response/data/family-understanding.json` | data | không |
+| `knowledge-question` | `response/data/knowledge-question.json` | data | không |
 
 ## Dừng
 
@@ -331,6 +337,7 @@ audit nhỏ hơn.
 | `IDENTITY_MISSING` | terminate |
 | `EVIDENCE_MISSING` | terminate |
 | `UNKNOWN_RULE` | terminate |
+| `KNOWLEDGE_QUESTION` | terminate |
 | `SURFACE_CLASS_MISSING` | terminate |
 | `CALIBRATION_OFF` | terminate |
 | `UNCHECKED_UNLAWFUL` | terminate |

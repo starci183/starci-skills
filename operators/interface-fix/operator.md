@@ -79,7 +79,8 @@ a verdict, score or pass claim on the repaired source: the surface is audited or
 | Alias | Bind | Required |
 | --- | --- | --- |
 | `@workspaces/fe` | the routed frontend checkout at the commit the finding was raised against; the write lands on its session branch and nowhere else | yes |
-| `@knowledge/ui/presentation` | the closed rule inventory, read only to confirm the identifiers the bound inventory carries are still published | no |
+| `@knowledge/ui/presentation` | every presentation file, rule and Case in the frozen exact manifest | yes |
+| `@knowledge/grammars/<family>` | the resolved family's authority split, idioms, package snapshot and canonical gaps | yes |
 
 ## Inputs
 
@@ -89,6 +90,7 @@ a verdict, score or pass claim on the repaired source: the surface is audited or
 | `frontend-source-application` | `interface.generate`, or the prior `interface.fix`; the commit the finding was raised against | yes |
 | `frontend-surface-audit` | `interface.audit`, when the finding is a row of its verdict table | no |
 | `uat-flow-verification` | `uat.verify`, when the finding is a step of its verdict | no |
+| `knowledge-repair-receipt` | `knowledge.repair`, when this is a retry with a rebound manifest | no |
 
 ## Requirements
 
@@ -103,7 +105,7 @@ a verdict, score or pass claim on the repaired source: the surface is audited or
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume, confirm the session and the frozen head, and run the request preflight before the first write outside the session folder | `resume`, `mode` | `request/request.json`, the session's `state.json` and this branch's `step-N/parallel-M`, @workspaces/fe at the frozen head | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
-| 2 | Bind the one finding to the row that raised it, and the inventory to the tree it was frozen for | `finding` | inputs `frontend-surface-audit` or `uat-flow-verification` (the row the finding names), `frontend-source-application` (the commit it was raised against), `frontend-presentation-resolution` (the inventory beside it and its resolved tree), @knowledge/ui/presentation | — | `RESOLUTION_STALE` |
+| 2 | Bind the finding, exact knowledge and family brief; route a wrong rule to its owner instead of patching around it | `finding` | raising receipt, frozen resolution, @knowledge/ui/presentation, @knowledge/grammars/<family> | `knowledge-coverage`, `family-understanding`, or `knowledge-question` when contradicted | `RESOLUTION_STALE`, `KNOWLEDGE_QUESTION` |
 | 3 | Project the smallest repair onto the declared write set and measure it against the fix size | — | @workspaces/fe (the declared paths and their owner roots), the inventory, the orchestrator's `fixSize` when it publishes one | — | `OWNER_CONFLICT`, `FIX_TOO_LARGE` |
 | 4 | Check every projected value against the inventory, then sweep the projection | `mode` | the inventory, @workspaces/fe (the projected write set), @tools/shell | `writes` | `WRITE_REJECTED` |
 | 5 | Write atomically on the session branch, commit once and read the tree back at the commit | — | @workspaces/fe (the current content of each declared path, under an exclusive lease, then the tree at the commit) | @workspaces/fe/branch/session, `writes`, @tools/sourcewrite, @tools/git | `WRITE_REJECTED` |
@@ -121,6 +123,9 @@ moved, which claims they carry, and which surface must be measured or walked aga
 | `frontend-source-application` | `response/response.md` | md | yes |
 | `changes` | `response/changes.md` | md | yes |
 | `writes` | `response/data/writes.json` | data | yes |
+| `knowledge-question` | `response/data/knowledge-question.json` | data | no |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | no |
+| `family-understanding` | `response/data/family-understanding.json` | data | no |
 
 ## Stops
 
@@ -134,6 +139,7 @@ moved, which claims they carry, and which surface must be measured or walked aga
 | `FIX_TOO_LARGE` | terminate |
 | `WRITE_REJECTED` | terminate |
 | `NO_PROGRESS` | terminate |
+| `KNOWLEDGE_QUESTION` | terminate |
 
 ## Next
 

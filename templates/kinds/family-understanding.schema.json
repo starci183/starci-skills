@@ -1,0 +1,27 @@
+{
+  "$id": "kind:family-understanding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "grammarId", "packageBinding", "authoritySplit", "visualPrinciples", "businessShape", "reuse", "ownerSearch", "decision", "deltas", "consumers", "compatibility", "proof", "knowledgeChallenges", "rollback"],
+  "properties": {
+    "schemaVersion": { "const": 10 },
+    "grammarId": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "packageBinding": { "type": "object", "additionalProperties": false, "required": ["name", "version", "sourceRef"], "properties": { "name": { "type": "string", "minLength": 1 }, "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }, "sourceRef": { "type": "string", "minLength": 7 } } },
+    "authoritySplit": { "type": "object", "additionalProperties": false, "required": ["common", "family", "product"], "properties": { "common": { "type": "string", "minLength": 8 }, "family": { "type": "string", "minLength": 8 }, "product": { "type": "string", "minLength": 8 } } },
+    "visualPrinciples": { "type": "array", "minItems": 1, "items": { "type": "object", "additionalProperties": false, "required": ["principle", "source"], "properties": { "principle": { "type": "string", "minLength": 8 }, "source": { "type": "string", "minLength": 3 } } } },
+    "businessShape": { "type": "object", "additionalProperties": false, "required": ["shape", "fit", "source"], "properties": { "shape": { "type": "string", "minLength": 1 }, "fit": { "enum": ["published", "composed", "new-product-direction"] }, "source": { "type": "string", "minLength": 3 } } },
+    "reuse": { "type": "array", "minItems": 1, "items": { "type": "object", "additionalProperties": false, "required": ["concept", "owner", "source"], "properties": { "concept": { "type": "string", "minLength": 1 }, "owner": { "enum": ["common", "family", "product"] }, "source": { "type": "string", "minLength": 3 } } } },
+    "ownerSearch": { "type": "object", "additionalProperties": false, "required": ["common", "family", "product", "gaps"], "properties": { "common": { "type": "array", "items": { "type": "string" } }, "family": { "type": "array", "items": { "type": "string" } }, "product": { "type": "array", "items": { "type": "string" } }, "gaps": { "type": "array", "items": { "type": "string" } } } },
+    "decision": { "enum": ["reuse", "compose", "extend-owner", "new-evidenced-gap"] },
+    "deltas": { "type": "object", "additionalProperties": false, "required": ["props", "anatomy", "tokens", "claims", "classes"], "properties": { "props": { "$ref": "#/$defs/strings" }, "anatomy": { "$ref": "#/$defs/strings" }, "tokens": { "$ref": "#/$defs/strings" }, "claims": { "$ref": "#/$defs/strings" }, "classes": { "$ref": "#/$defs/strings" } } },
+    "consumers": { "$ref": "#/$defs/strings" },
+    "compatibility": { "type": "string", "minLength": 8 },
+    "proof": { "type": "object", "additionalProperties": false, "required": ["before", "after"], "properties": { "before": { "type": "string", "minLength": 1 }, "after": { "type": "string", "minLength": 1 } } },
+    "knowledgeChallenges": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["rule", "decision", "evidence"], "properties": { "rule": { "type": "string", "minLength": 1 }, "decision": { "enum": ["applied", "questioned", "repaired"] }, "evidence": { "$ref": "#/$defs/stringsNonEmpty" } } } },
+    "rollback": { "type": "string", "minLength": 8 }
+  },
+  "$defs": {
+    "strings": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "stringsNonEmpty": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 9,
+  "id": "knowledge.repair",
+  "domain": "knowledge",
+  "job": "Repair one challenged UI knowledge rule at its canonical owner from concrete evidence, publish a new exact manifest, and return the originating operation to the same surface and reference.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": { "profile": "sol-fresh", "grammarBound": false, "mode": "isolated", "tools": { "@tools/fileread": "context-aliases", "@tools/git": "read-write", "@tools/sourcewrite": "declared-paths" } },
+  "primaryOutput": "knowledge-repair-receipt"
+}

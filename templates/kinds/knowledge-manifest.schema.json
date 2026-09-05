@@ -1,0 +1,26 @@
+{
+  "$id": "kind:knowledge-manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "bindings", "files", "fingerprint"],
+  "properties": {
+    "schemaVersion": { "const": 10 },
+    "bindings": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^@knowledge/" } },
+    "files": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/file" } },
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "$defs": {
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["binding", "path", "sha256", "authority", "rules", "cases"],
+      "properties": {
+        "binding": { "type": "string", "pattern": "^@knowledge/" },
+        "path": { "type": "string", "pattern": "^knowledge/" },
+        "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "authority": { "enum": ["canonical", "mirror", "asset", "catalog"] },
+        "rules": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["id", "heading", "cases"], "properties": { "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]*-(?:[0-9]+|[A-Z][A-Z0-9-]*)$" }, "heading": { "type": "string", "minLength": 1 }, "cases": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^Case [1-9][0-9]*$" } } } },
+        "cases": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

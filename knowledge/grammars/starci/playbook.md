@@ -2,8 +2,9 @@
 
 Which idioms a business shape asks for, and what a supplied reference is allowed to contribute to
 that answer. The idioms themselves are in [Idioms](idioms.md); what the package publishes is in
-[DNA](DNA.md). A shape not listed here is not forbidden — it is undecided, and an undecided shape is
-a question for the owner, not a guess.
+[DNA](DNA.md). A shape not listed here is not a house idiom. It may still be composed for the
+approved product direction when existing Common semantics, family anatomy and product facts can
+express it; only promotion into the family's reusable idiom set belongs to the family owner.
 
 ## Shapes
 
@@ -28,9 +29,20 @@ a question for the owner, not a guess.
    read the gaps in [Family and DNA](family.md) before promising a capability. A composition that
    needs a recorded gap is not a direction yet.
 
-Anything still open after those four steps is not resolved by preference: it stops with
-`DIRECTION_CHOICE_REQUIRED` and goes to the owner. That includes any shape absent from the table
-above, any composition that appears only in the idioms file's seen-once table, and any point where
-the reference and an idiom disagree.
+5. **Then resolve the remaining product composition.** Reuse an established idiom where it fits;
+   otherwise compose existing Common semantics and family anatomy, extend an existing owner when
+   evidence shows its declared gap, and add a new owner only for an evidenced gap. A shape absent
+   from this table and a shape seen once are evidence limits on house style, not reasons to stop
+   creative work already inside the approved product scope.
 
-Owner ruling 2026-09-03 on images: a direction that leaves a region reading empty adds an image made to one claim of the promise, on its own judgement, and records why; it never waits to be asked and never decorates a region the copy and the Grammar objects already carry. `interface.generate` applies this in its `## Images` table.
+`DIRECTION_CHOICE_REQUIRED` is reserved for a material product choice whose acceptable options lead
+to different outcomes and whose answer is absent from the request. A reference/idiom conflict is
+resolved by the authority split above: product facts and approved region order come from the
+request, Common semantics come from `knowledge/ui`, and family anatomy and reusable style come from
+this Grammar. A tied score never causes this stop; `interface.generate` applies its deterministic
+fallback and continues.
+
+Owner ruling 2026-09-03 on images: an image is added only when it has a concrete content or task role
+and supports one named claim of the promise. Blank space alone is not evidence for an image; filler,
+decoration and density balancing are not roles. A direction records the role and the claim in its
+`## Images` table, or records that no image is warranted.

@@ -12,6 +12,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
+import { knowledgeQuestionStopErrors, uiKnowledgeGateErrors } from '../../scripts/ui-knowledge-gate.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { sessionRootOf } from '../../scripts/validate-request.mjs';
 import { applicationErrors, resolutionStaleErrors, fingerprintOf, FILES } from '../interface-generate/validate.mjs';
@@ -113,6 +114,8 @@ export async function validateFixStep(branchDir, root = ROOT) {
   const errors = [...base.errors];
   const { request, response, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== OPERATOR_ID) return { errors };
+  errors.push(...knowledgeQuestionStopErrors({ branchDir, response }));
+  errors.push(...uiKnowledgeGateErrors({ root, branchDir, bindings: ['@knowledge/ui/presentation', '@knowledge/grammars/<family>'], request, status: response.status }));
 
   errors.push(...(await findingErrors({ branchDir, request, requirements, response })).errors);
   const { inventory, tree, treeRef } = await boundResolution(branchDir, request);

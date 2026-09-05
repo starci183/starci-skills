@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateFixStep, fixSizeErrors } from './validate.mjs';
 import { fingerprintOf } from '../interface-generate/validate.mjs';
+import { writeUiKnowledgeFixture } from '../../tests/support/ui-knowledge-fixture.mjs';
 
 const HEAD = '9a8b7c6d5e4f30211203344556677889900aabbc';
 const COMMIT = '1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d';
@@ -131,7 +132,7 @@ ${rows.join('\n')}
 
 const requestJson = ({ extra = {}, inputs } = {}) => ({
   schemaVersion: 9, operatorId: 'interface.fix', step: 5, parallel: 1, sessionId: SESSION,
-  contexts: [{ alias: '@workspaces/fe', head: HEAD }],
+  contexts: [{ alias: '@workspaces/fe', head: HEAD }, { alias: '@knowledge/ui/presentation', head: null }, { alias: '@knowledge/grammars/starci', head: null }],
   requirements: { finding: AUDIT_FINDING, mode: 'apply', resume: null, ...extra },
   inputs: inputs ?? {
     'frontend-presentation-resolution': 'step-2/parallel-1/response/resolution.md',
@@ -172,6 +173,9 @@ function writeBranch(files, { producerInventory = inventory(), producerTree = tr
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+  if (files['response/response.json']?.status === 'done') {
+    writeUiKnowledgeFixture(path.resolve('.'), branch, ['@knowledge/ui/presentation', '@knowledge/grammars/<family>'], 'response/data/writes.json');
   }
   return { branch, session };
 }

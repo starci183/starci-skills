@@ -294,8 +294,8 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | `@knowledge/ui/composition` | các khẳng định mà biên nhận quyết định phải thoả, `COVERAGE-1` là khẳng định về toàn bộ biên nhận | có |
 | `@knowledge/ui/presentation` | kho luật đóng, đọc ở fingerprint của nó; nguồn duy nhất của identifier hợp lệ | có |
 | `@workspaces/fe` | checkout frontend được route, đọc ở head đóng băng; hiện trạng là bằng chứng, không bao giờ là hướng được yêu cầu, và là cây mà lần ghi đáp xuống, trên nhánh phiên của nó và không đâu khác | có |
-| `@knowledge/grammars/<family>` | họ mà route đã bind gọi tên (`context.grammarId`) được kỳ vọng hiện thực hoá Common ra sao; luật về Grammar, không phải chính Grammar | không |
-| `@knowledge/ui/proof` | các tiêu chí mà mọi phương án đã render được chấm theo trước khi chọn một; cùng thang điểm mà audit sau này đo, chỉ đọc khi có nhiều hơn một phương án được render | không |
+| `@knowledge/grammars/<family>` | cách family cụ thể theo route hiện thực Common; mọi file authored của family được đóng băng và đọc trước composition | có |
+| `@knowledge/ui/proof` | mọi file, luật, Case và calibration proof dùng để chấm mọi phương án đã render, kể cả một phương án hay refine | có |
 | `@worktrees/uat/<flow>/<case>` | quan sát hành vi, UX và UI của lần trước kèm ảnh chụp; bằng chứng và phản chứng, một lần pass cũ không phải thẩm quyền hiện tại | không |
 
 ## Đầu vào
@@ -310,6 +310,7 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | `library-source-application` | `library.update`, lần sửa owner mà một route `chain` sinh ra cho lỗ hổng grammar bề mặt này đụng phải; chỉ có mặt khi vào lại sau nhiệm vụ anh em đó | không |
 | `units` | `interface.plan`; bản đồ bề mặt mà nhánh này sinh đúng một đơn vị, gọi tên bằng `request.unit` | không |
 | `findings` | sổ cái findings, như `scripts/record-findings.mjs` đã vật chất hoá các dòng đang mở của nó cạnh biên nhận `interface.audit` hay `uat.verify` gần nhất của bề mặt này; mọi dòng cho target hay đơn vị này được trả lời dưới `## Findings answered` của quyết định, nếu không nhánh bị từ chối | không |
+| `knowledge-repair-receipt` | `knowledge.repair`, khi đây là lần thử lại với manifest đã bind lại | không |
 
 ## Yêu cầu
 
@@ -339,7 +340,7 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | 4 | Chốt các chuẩn tham chiếu theo lớp, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 5 | Hình thành các phương án và áp bộ lọc Grammar | `candidates`, `ownerCeiling` | UI contract vừa biên, @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/<family> | — | `NO_VIABLE_DIRECTION`, `GRAMMAR_REQUIRED` |
 | 6 | Render mọi phương án còn sống kèm hình đã tự xét, phục vụ các trang cho một người xem rồi in ra | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/<family>, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | `candidates`, `direction-image`, `host` | — |
-| 7 | Phản chứng, chấm các phương án đã render rồi viết quyết định | `selectionPolicy`, `approval` | các phương án, đầu vào `business-promise-authority` và `backend-source-application`, `ui-coverage`, @knowledge/ui/proof (các tiêu chí một bản render tĩnh trả lời được, theo từng viewport đã in) | `frontend-direction-decision` | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED` |
+| 7 | Phản chứng và chấm mọi phương án đã render theo conform cùng chất lượng thật cho tác vụ, rồi viết quyết định | `selectionPolicy`, `approval` | các phương án, tham chiếu, đầu vào `business-promise-authority` và `backend-source-application`, `ui-coverage`, @knowledge/ui/proof | `frontend-direction-decision`, `knowledge-coverage`, `family-understanding`, hoặc `knowledge-question` khi mâu thuẫn | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED`, `KNOWLEDGE_QUESTION` |
 | 8 | Bind thẩm quyền trình bày và đi hết cây đã quyết một lượt dưới trần owner | — | @knowledge/ui/presentation (mọi topic kèm fingerprint và kho luật), @grammar/core (các quan hệ đã sở hữu của gói đã publish), @workspaces/fe (cây đóng băng, theo thứ tự tài liệu), `frontend-direction-decision`, @tools/registry | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED`, `OWNER_CONFLICT` |
 | 9 | Chọn một luật đã publish cho mỗi thuộc tính ứng dụng sở hữu, bỏ những gì cây không được mang, ghi các khoảng trống và phát lời khai | `contractEmission` | @knowledge/ui/presentation (các case topic được bind publish), @grammar/core (các quan hệ đã sở hữu, giải phẫu Grammar và thang đóng), @workspaces/fe (thuộc tính mỗi node đang mang) | `inventory`, `resolved-tree`, `frontend-presentation-resolution` | `RULE_MISSING`, `UNKNOWN_RULE` |
 | 10 | Chiếu cây đã resolve lên write set đã khai, đối chiếu mọi giá trị với kho rồi quét bản chiếu | `mode` | `inventory` cạnh `resolved-tree`, @workspaces/fe (các path đã khai và gốc owner của chúng), @tools/shell | `writes` | `RESOLUTION_STALE`, `OWNER_CONFLICT`, `WRITE_REJECTED` |
@@ -419,6 +420,9 @@ minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bả
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | không |
 | `direction-image` | `response/artifacts/images/<slot>.png` | artifact | không |
 | `host` | `response/artifacts/host.json` | artifact | không |
+| `knowledge-question` | `response/data/knowledge-question.json` | data | không |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | không |
+| `family-understanding` | `response/data/family-understanding.json` | data | không |
 | `frontend-presentation-resolution` | `response/resolution.md` | md | có |
 | `inventory` | `response/data/inventory.json` | data | có |
 | `resolved-tree` | `response/artifacts/<target>.resolved.tsx` | artifact | có |
@@ -454,6 +458,7 @@ minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bả
 | `RESOLUTION_STALE` | terminate |
 | `WRITE_REJECTED` | terminate |
 | `NO_PROGRESS` | terminate |
+| `KNOWLEDGE_QUESTION` | terminate |
 
 ## Kế tiếp
 

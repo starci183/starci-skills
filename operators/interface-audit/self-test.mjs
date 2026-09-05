@@ -10,6 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateAuditStep } from './validate.mjs';
+import { writeUiKnowledgeFixture } from '../../tests/support/ui-knowledge-fixture.mjs';
 
 const WIDE = 'wide-light-loaded';
 const NARROW = 'narrow-light-loaded';
@@ -229,7 +230,7 @@ const requestJson = ({ extra = {}, contexts = [] } = {}) => ({
   step: 4,
   parallel: 1,
   sessionId: 's-test',
-  contexts: [{ alias: '@knowledge/ui/proof', head: null }, { alias: '@workspaces/fe', head: 'e'.repeat(40) }, { alias: '@worktrees/sessions/central-runtime', head: null }, ...contexts],
+  contexts: [{ alias: '@knowledge/ui/proof', head: null }, { alias: '@knowledge/grammars/starci', head: null }, { alias: '@workspaces/fe', head: 'e'.repeat(40) }, { alias: '@worktrees/sessions/central-runtime', head: null }, ...contexts],
   requirements: { feature: 'fixture-feature', auditScope: { surfaces: structuredClone(SURFACES) }, matrix: [], readinessProbe: 'route-served', resume: null, ...extra },
   inputs: {
     'frontend-source-application': 'step-3/parallel-1/response/response.md',
@@ -314,6 +315,9 @@ function writeBranch(files, { decisionClass = 'console', decision = {}, coverage
     if (content === null) continue;
     mkdirSync(path.dirname(path.join(branch, name)), { recursive: true });
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+  if (files['response/response.json']?.status === 'done') {
+    writeUiKnowledgeFixture(path.resolve('.'), branch, ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof', '@knowledge/grammars/<family>'], `response/data/captures/${WIDE}.json`);
   }
   return { branch, session };
 }
@@ -797,11 +801,10 @@ await expectError(withPageRecords(drivenFiles({ captures: { [WIDE]: { ...drivenC
 {
   const { recordFindings } = await import('../../scripts/record-findings.mjs');
   const files = withPageRecords(drivenFiles());
-  files['request/request.json'] = requestJson({ contexts: [{ alias: '@knowledge/grammars/core', head: null }] });
   const { branch, session } = writeBranch(files);
   const ledgerDir = path.join(session, 'ledger');
   const recorded = await recordFindings(branch, { ledgerDir });
-  assert.equal(recorded.family, 'core');
+  assert.equal(recorded.family, 'starci');
   assert.ok(recorded.appended >= 1, 'the failing verdict of a driven audit reaches the ledger');
   rmSync(session, { recursive: true, force: true });
 }
