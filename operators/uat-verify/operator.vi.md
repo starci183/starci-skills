@@ -13,7 +13,7 @@ Xong khi `uat-snapshot` đã đóng băng trước mọi hành động trên s�
 tên và fingerprint của seed, mọi case đã đóng băng có `uat-capture` và `screenshot` đã che của nó
 chụp sau khi redirect đăng nhập đã đến chỉ qua các điều khiển được render, `uat-verdicts` phán quyết
 các làn hành vi, trải nghiệm và giao diện trên bằng chứng riêng của mỗi làn với làn trải nghiệm được
-chấm theo từng tiêu chí, handoff rollback chính xác của namespace đã được `data.seed` nhận, hồ sơ lượt chạy
+chấm theo từng tiêu chí, handoff rollback chính xác của namespace đã được phát cho `data.seed`, hồ sơ lượt chạy
 chỉ-thêm tồn tại cùng con trỏ và dòng lịch sử của nó, và `uat-flow-verification` liệt kê `sheet`
 cùng bảng phán quyết nó đã in cho người xem, mang `audit-scope` nguyên vẹn khi audit được nhận vào
 có nó.

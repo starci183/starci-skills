@@ -13,7 +13,7 @@ served head that contains it, the cases in order with their assertions, the acco
 and the seed fingerprint, every frozen case has its `uat-capture` and masked `screenshot` taken
 after the sign-in redirect landed through the rendered controls alone, the `uat-verdicts` judge the
 behaviour, experience and interface lanes on their own evidence with the experience lane scored
-criterion by criterion, the exact rollback handoff for the run namespace was accepted by `data.seed`, the append-only run record
+criterion by criterion, the exact rollback handoff for the run namespace was emitted to `data.seed`, the append-only run record
 exists with its pointer and history line, and the `uat-flow-verification` lists the `sheet` and the
 verdict table it printed to the person, carrying the `audit-scope` unchanged when the admitted audit
 had one.
