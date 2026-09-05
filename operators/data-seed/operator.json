@@ -13,7 +13,6 @@
     "mode": "inline",
     "tools": {
       "@tools/fileread": "context-aliases",
-      "@tools/sourcewrite": "declared-write-set",
       "@tools/secrets": "resolve-by-name",
       "@tools/http": "probe",
       "@tools/database": "namespaced-write"
