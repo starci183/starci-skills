@@ -94,7 +94,7 @@ The operator writes the declared write-set paths on the session branch of `@work
 a mutable owner root, and `response/` of its own branch. It does not decide a direction, resolve a
 value, change the resolved tree or its inventory, create or delete a path, write a class the inventory
 does not publish, answer more than one finding, edit knowledge, publish Grammar, push, merge, or record
-a verdict, score or pass claim on the repaired source: the surface is audited or walked again after it.
+a verdict, score or pass claim on the repaired source: the surface is audited or walked again after it. It never stashes, resets, forces, cleans, rebases or checks out another branch inside the routed checkout, and it deletes nothing by hand under a checkout whose `node_modules` is a junction — a temporary worktree is removed with `git worktree remove --force`. `## Binding` of `changes.md` is where those two laws are read: `Preflight` as `<passed|failed> at <ISO 8601 instant>`, and `Reflog before` and `Reflog after` as `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
 
 ## Context
 
@@ -124,7 +124,7 @@ a verdict, score or pass claim on the repaired source: the surface is audited or
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume, confirm the session and the frozen head | `resume`, `mode` | `request/request.json`, the session's `state.json` and this branch's `step-N/parallel-M`, @workspaces/fe at the frozen head | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate and resume, confirm the session and the frozen head, and run the request preflight before the first write outside the session folder | `resume`, `mode` | `request/request.json`, the session's `state.json` and this branch's `step-N/parallel-M`, @workspaces/fe at the frozen head | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind the one finding to the row that raised it, and the inventory to the tree it was frozen for | `finding` | inputs `frontend-surface-audit` or `uat-flow-verification` (the row the finding names), `frontend-source-application` (the commit it was raised against), `frontend-presentation-resolution` (the inventory beside it and its resolved tree), @knowledge/ui/presentation | — | `RESOLUTION_STALE` |
 | 3 | Project the smallest repair onto the declared write set and measure it against the fix size | — | @workspaces/fe (the declared paths and their owner roots), the inventory, the orchestrator's `fixSize` when it publishes one | — | `OWNER_CONFLICT`, `FIX_TOO_LARGE` |
 | 4 | Check every projected value against the inventory, then sweep the projection | `mode` | the inventory, @workspaces/fe (the projected write set), @tools/shell | `writes` | `WRITE_REJECTED` |

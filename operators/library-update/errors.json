@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "Stop codes only library.update emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json. The LIBRARY_* codes belong to the package half of the job, the DEPENDENCY_* codes to the consumer half; both halves are one job because a repaired package nobody consumes repairs nothing, and the requirement mode says which of them a branch runs — a section of the other half, a plan the mode does not take, or a release input a mode that packs its own release cannot accept, is refused under the boundary code of the half it belongs to.",
+  "note": "Stop codes only library.update emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS) come from operators/errors.json. The LIBRARY_* codes belong to the package half of the job, the DEPENDENCY_* codes to the consumer half; both halves are one job because a repaired package nobody consumes repairs nothing, and the requirement mode says which of them a branch runs — a section of the other half, a plan the mode does not take, or a release input a mode that packs its own release cannot accept, is refused under the boundary code of the half it belongs to. LIBRARY_PUBLISH_REJECTED is where the package half ends under mode publish when the registry does not take the archive: a packed release that reached no registry is a stop with the registry's own answer, never a receipt that quietly says pending.",
   "codes": {
     "LIBRARY_BOUNDARY_REJECTED": {
       "domain": "caller",
@@ -24,6 +24,18 @@
       "resume": {
         "en": "Repair the declared behavior and rerun the complete proof set on the changed tree.",
         "vi": "Sửa hành vi đã khai và chạy lại toàn bộ bằng chứng trên cây thay đổi."
+      }
+    },
+    "LIBRARY_PUBLISH_REJECTED": {
+      "domain": "library",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The registry refused the publication, already serves this version, or serves this version under an integrity that is not the packed archive's.",
+        "vi": "Registry từ chối phát hành, đã phục vụ sẵn version này, hoặc phục vụ version này dưới integrity không phải của archive đã đóng gói."
+      },
+      "resume": {
+        "en": "Bring what the registry will take: a version it does not serve yet, a credential it accepts, or the archive whose integrity it already serves; a release meant to stay packed is requested with publish false.",
+        "vi": "Mang thứ registry chịu nhận: một version nó chưa phục vụ, credential nó chấp nhận, hoặc archive đúng integrity nó đang phục vụ; bản phát hành cố ý để nguyên đóng gói thì xin với publish false."
       }
     },
     "DEPENDENCY_BOUNDARY_REJECTED": {

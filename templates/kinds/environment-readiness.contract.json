@@ -22,7 +22,7 @@
       "minRows": 1,
       "cell": {
         "Check": "^`[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+`$",
-        "Family": "^(declaration|checkout|identity|runtime|host|approval)$",
+        "Family": "^(declaration|checkout|identity|runtime|service|host|approval)$",
         "Status": "^(ok|wall|skipped)$",
         "Evidence": "\\S"
       }
@@ -32,7 +32,7 @@
       "table": "| Wall | Owner | Repair |",
       "cell": {
         "Wall": "^`[a-z][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+`$",
-        "Owner": "^(declaration|checkout|identity|runtime|host|approval|person)$",
+        "Owner": "^(declaration|checkout|identity|runtime|service|host|approval|person)$",
         "Repair": "\\S"
       }
     },

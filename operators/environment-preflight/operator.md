@@ -74,6 +74,17 @@ records, and whether a checkout nested under another repository would have that 
 change explains. Every observation here is a declared command through `@tools/shell` with its output
 kept as evidence; nothing is started, stopped, installed or killed.
 
+## Services are asked about, never operated
+
+The environment declares the auxiliary services it runs beside its product routes, and readiness
+asks two questions of each: whether the declaration names it completely — its kind, its declared
+command, its probe and whether the environment keeps it with a person — and whether it answers its
+own probe when the declaration wants it up. A service the declaration wants down has its probe
+`skipped`, because nothing answering is the state that was asked for. Nothing here starts, stops or
+reconfigures a service: a wall of this family is owned by `service` and cleared by the operator that
+owns one service at a time, which is where the Next table sends it. An environment that declares no
+service has no check of this family, which is a fact the missing ids state and not a silence.
+
 ## Approvals are read from the declaration
 
 The environment declaration `.stacks/<env>/environment.json`, in the shape
@@ -135,9 +146,10 @@ replace. It makes no product decision and carries no verdict about the source.
 | 5 | Check the runtime: the registry entry of each route, whether the served head contains the checkout's head, whether the projected ports answer, and any port a foreign process holds | `runtimeRoles` | @worktrees/sessions/central-runtime, @workspaces/ports/<project>, @tools/http, @tools/shell | — | — |
 | 6 | Check the host: a browser binary for the audit profile, the Playwright install the walk runner loads (`host.playwright`, a wall in the runner's own wording when absent), a reachable container daemon, installed dependencies per checkout and ancestor type isolation | — | the resolved checkouts and their lockfiles, the install place `resources/tools.json` names for the browser tool, @tools/shell, @tools/container | — | — |
 | 7 | Check the approvals: which operation classes the environment declaration marks declared or person, an omitted class taking the schema default | `env` | the environment declaration of `env` and the environment schema | — | — |
-| 8 | Emit the report, blocked with every wall named when any stands | — | everything above | `response/response.md`, `response/data/readiness-report.json`, `response/response.json` | `ENVIRONMENT_NOT_READY` |
+| 8 | Check the declared services: each service the declaration names under `services` is complete, and its probe answers when the declaration wants it up | `env` | the environment declaration of `env` for its services, @tools/http, @tools/shell | — | — |
+| 9 | Emit the report, blocked with every wall named when any stands | — | everything above | `response/response.md`, `response/data/readiness-report.json`, `response/response.json` | `ENVIRONMENT_NOT_READY` |
 
-Step 8 is the only step that stops on a wall: a wall found at steps 2 to 7 is recorded and the next
+Step 9 is the only step that stops on a wall: a wall found at steps 2 to 8 is recorded and the next
 step runs, so the report the person reads is complete whichever check failed first. A role whose
 declaration is a wall has every other check of that role `skipped`, because there is no checkout to
 inspect; a flow that was not named has both flow checks `skipped`. A resume begins again at step 1
@@ -168,4 +180,5 @@ and runs every check again; a re-entry whose report names the same walls as the 
 | an identity wall must be cleared first | `identity.provision` |
 | a runtime wall must be cleared first | `runtime.serve` |
 | the mission routes no source and a curriculum unit follows | `content.generate` |
+| a service wall must be cleared first, or a service the mission needs must be brought up | `service.operate` |
 | a wall stands that only a person can clear | `user` |

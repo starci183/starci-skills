@@ -12,7 +12,10 @@
 // manifest or the changelog, and behavior repairs change no presentation; the package commit is one
 // single-parent commit after the base whose change set is exactly the declared set; the before proof
 // fails on the declared assertion against base bytes, the after proof and every declared gate pass on
-// the committed bytes, and each proof's log hash matches the log on disk.
+// the committed bytes, and each proof's log hash matches the log on disk. Under `publish` the archive
+// packed from that commit also ends where it belongs: the release record's publication names the
+// registry that serves exactly this version under exactly this archive's integrity, on proofs that
+// passed, and it stays pending only where the request preset publish false.
 //
 // The consumer half (moved from the former dependency operator): the release is the tarball packed
 // from the package commit, identified by its sha512 integrity and the bumped version; the consumer
@@ -29,9 +32,11 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAgainst } from '../../scripts/json-schema.mjs';
+import { credentialShaped } from '../../scripts/sweep-secrets.mjs';
 import { validateRequest, sessionRootOf } from '../../scripts/validate-request.mjs';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { sourceWriteErrors } from '../../scripts/workspace-checkout.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const OPERATOR_ID = 'library.update';
@@ -107,6 +112,49 @@ export function modeSectionErrors(mode, fields = {}) {
 }
 // Where the release record and its archive live in the branch that packed them.
 export const RELEASE_RECORD_REF = 'response/data/release.json';
+
+// ---------------------------------------------------------------------------------------------------
+// The publication. Under `publish` the packed archive is what the registry must end up serving, so the
+// release record is judged against the archive rather than against a claim: the version and the
+// integrity the registry answered with are the ones this branch packed, the proofs that stand behind
+// them are green, and the registry that serves them is named. `pending` says the archive reached no
+// registry, and that is an outcome a request asks for (`publish: false`, because a person will publish
+// it) — never the quiet ending of a run that meant to publish and did not.
+const isFalse = (value) => value === false || value === 'false' || value === 'no';
+const isTrue = (value) => value === true || value === 'true' || value === 'yes';
+export const PUBLISH_FIELD_VALUES = 'true or false';
+export const publishRequested = (request) => !isFalse(request?.requirements?.publish);
+export const publishFieldErrors = (request) => {
+  const value = request?.requirements?.publish;
+  return value === undefined || value === null || isTrue(value) || isFalse(value) ? [] : [`publish is the choice ${PUBLISH_FIELD_VALUES}`];
+};
+export const PUBLISH_STOP = 'LIBRARY_PUBLISH_REJECTED';
+// A refused publication is answered by whoever reads the receipt, and what they answer from is the
+// registry's own text: a version it already serves, a credential it would not take, a policy it names.
+// The answer travels; the credential that carried it never does.
+export function publishStopErrors(response) {
+  if (response?.status !== 'blocked' || response?.stop !== PUBLISH_STOP) return [];
+  const reason = String(response.reason ?? '').trim();
+  if (!reason) return [`response/response.json: ${PUBLISH_STOP} carries the registry's own refusal as its reason; a stop nobody can read is a stop nobody can answer`];
+  return credentialShaped(reason) ? [`response/response.json: ${PUBLISH_STOP} reason carries a credential-shaped value; the registry's answer is recorded, the credential that resolved it never is`] : [];
+}
+// `red` is every package phase that did not pass, the `before` regression excepted: it is meant to fail.
+export const redPhases = (proofs = {}) => Object.entries(proofs).filter(([phase, proof]) => phase !== 'before' && proof && proof.exitCode !== 0).map(([phase]) => phase);
+export function publicationErrors({ mode, publish, version, integrity }, record, proofs = {}) {
+  const errors = [];
+  const publication = record?.publication ?? {};
+  if (publication.state === 'published') {
+    if (mode !== 'publish') errors.push(`mode ${mode} sends no archive to a registry, so its release record cannot claim a publication`);
+    if (!publication.registry) errors.push('a published release names the registry that serves it');
+    if (publication.version !== version) errors.push('the published version is not the version this branch packed');
+    if (publication.integrity !== integrity) errors.push('the published integrity is not the integrity of the archive this branch packed');
+    const red = redPhases(proofs);
+    if (red.length) errors.push(`the package proofs are red (${red.join(', ')}); a release published on proofs that did not pass is refused`);
+    return errors;
+  }
+  if (mode === 'publish' && publish) errors.push(`mode publish ends at a published release: the packed archive reaches the registry the package manifest names, or the branch stops with ${PUBLISH_STOP}; a pending publication is the record of a request that preset publish false`);
+  return errors;
+}
 
 // The consumer phases sit beside the package phases under their own prefix.
 export const CONSUMER = 'consumer-';
@@ -206,6 +254,7 @@ export async function loadContext(branch, root = ROOT) {
   if (runsConsumerHalf(mode)) errors.push(...validateAgainst(schema(root, 'dependency-plan'), consumer, 'consumer'));
   else if (consumer) errors.push(`mode ${mode} touches no consumer metadata, so it carries no consumer plan`);
   if (mode !== 'consume' && request.inputs['library-release']) errors.push(`mode ${mode} packs its own release, so it binds no library-release input`);
+  errors.push(...publishFieldErrors(request));
   if (errors.length) throw new Error(errors.join('\n'));
   const session = sessionRootOf(branch);
   const routeRef = request.inputs.route;
@@ -277,7 +326,7 @@ export async function loadContext(branch, root = ROOT) {
     }
   }
   if (errors.length) throw new Error(errors.join('\n'));
-  return { root, branch, session, request, mode, plan: identity, consumer, releaseInput, route, checkout, base, packageDir, manifestPath, manifest, rootManifest, planHash: runsPackageHalf(mode) ? hash(JSON.stringify(plan)) : null, consumerPlanHash: runsConsumerHalf(mode) ? hash(JSON.stringify(consumer)) : null };
+  return { root, branch, session, request, mode, publish: publishRequested(request), plan: identity, consumer, releaseInput, route, checkout, base, packageDir, manifestPath, manifest, rootManifest, planHash: runsPackageHalf(mode) ? hash(JSON.stringify(plan)) : null, consumerPlanHash: runsConsumerHalf(mode) ? hash(JSON.stringify(consumer)) : null };
 }
 
 export function snapshots(ctx) { return Object.fromEntries(ctx.plan.files.map(({ path: file }) => [file, fileHash(safePath(ctx.checkout, file))])); }
@@ -544,7 +593,10 @@ export async function validateLibraryUpdateStep(branch, root = ROOT, preflight =
     // A blocked branch is judged on its stop, not on the checkout its plan could not resolve: the shared
     // step check and the status come first, and the context is loaded only for a done receipt or a preflight.
     const base = preflight ? null : await validateStep(root, branch);
-    if (base) { errors.push(...base.errors); if (base.response?.status !== 'done') return { errors }; }
+    if (base) {
+      errors.push(...base.errors);
+      if (base.response?.status !== 'done') { errors.push(...publishStopErrors(base.response)); return { errors }; }
+    }
     const ctx = await loadContext(branch, root);
     if (preflight) return { errors: worktreeErrors(ctx, { phase: 'pristine' }) };
     const fields = base.response.fields ?? {};
@@ -555,6 +607,7 @@ export async function validateLibraryUpdateStep(branch, root = ROOT, preflight =
     if (commits.length !== expectedCommits) errors.push(`response.json records ${commits.length} commits; mode ${ctx.mode} commits ${expectedCommits === 2 ? 'the package delivery and then the consumer metadata, in that order' : ctx.mode === 'publish' ? 'the package delivery alone' : 'the consumer metadata alone'}`);
     let declared = [];
     let packageCommit = null;
+    const proofs = {};
     // The package half.
     if (runsPackageHalf(ctx.mode)) {
       const delivery = json(path.join(branch, 'response/data/library.json'));
@@ -570,7 +623,6 @@ export async function validateLibraryUpdateStep(branch, root = ROOT, preflight =
         const old = baseBytes(ctx.checkout, ctx.base, file.path);
         if (file.before !== (old ? hash(old) : null) || file.after !== finalHashes[file.path]) errors.push(`delivery hash mismatch: ${file.path}`);
       }
-      const proofs = {};
       const expectedRefs = packagePhases(ctx.plan).map((phase) => `response/data/proofs/${phase}.json`);
       if (!same([...delivery.proofs].sort(), [...expectedRefs].sort()) || !same([...(fields['library-proof'] ?? [])].sort(), [...expectedRefs].sort())) errors.push('delivery and response must list the complete package proof set');
       for (const ref of expectedRefs) if (existsSync(path.join(branch, ref))) proofs[path.basename(ref, '.json')] = json(path.join(branch, ref));
@@ -585,7 +637,7 @@ export async function validateLibraryUpdateStep(branch, root = ROOT, preflight =
       if (fields['library-release'] !== RELEASE_RECORD_REF) errors.push(`response must list the release record as ${RELEASE_RECORD_REF}`);
       const record = json(path.join(branch, RELEASE_RECORD_REF));
       if (record.name !== ctx.plan.packageName || record.version !== ctx.plan.targetVersion || record.artifact !== releaseRef(ctx.plan) || record.packageCommit !== packageCommit || record.digest !== ctx.release.integrity) errors.push('the release record does not identify the archive this branch packed from its package commit');
-      if (record.publication?.state !== 'pending') errors.push('no operator of this tree publishes to a registry, so the release record leaves its publication pending for a person');
+      errors.push(...publicationErrors({ mode: ctx.mode, publish: ctx.publish, version: ctx.plan.targetVersion, integrity: ctx.release.integrity }, record, proofs));
     }
     const release = releaseErrors(ctx, ctx.artifact);
     errors.push(...(release.errors ?? release));
@@ -612,6 +664,14 @@ export async function validateLibraryUpdateStep(branch, root = ROOT, preflight =
     } else if (git(ctx.checkout, ['rev-parse', 'HEAD']) !== packageCommit) errors.push('the session branch head is not the package commit');
     if (git(ctx.checkout, ['status', '--porcelain=v1', '--untracked-files=all'])) errors.push('delivery working tree must be clean');
     const md = readFileSync(path.join(branch, 'response/changes.md'), 'utf8');
+    // What the branch did to the checkout, beside what it wrote into it: the preflight that ran before
+    // the first write, and the reflog entries the checkout gained while the branch held it — its own
+    // one or two commits and nothing else (scripts/workspace-checkout.mjs#sourceWriteErrors,
+    // orchestrator.json#sourceWrites).
+    errors.push(...sourceWriteErrors({
+      at: 'response/changes.md', binding: Object.fromEntries(tableUnder(md, '## Binding') ?? []),
+      base: ctx.base, branch: `session/${ctx.request.sessionId}`, commits, checkout: ctx.checkout,
+    }));
     const receiptFiles = [...new Set([...declared, ...(runsConsumerHalf(ctx.mode) ? metadataPaths(ctx.consumer) : [])])].sort();
     if (!same((tableUnder(md, '## Files') ?? []).map(([file]) => file).sort(), receiptFiles)) errors.push('changes receipt differs from the file sets this mode committed');
   } catch (error) { errors.push(error.message); }

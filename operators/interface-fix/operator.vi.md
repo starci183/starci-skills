@@ -72,8 +72,7 @@ một gốc owner được sửa, và `response/` của nhánh mình. Nó không
 không đổi cây đã resolve hay kho của nó, không tạo hay xoá path, không ghi class mà kho không công bố,
 không trả lời nhiều hơn một phát hiện, không sửa knowledge, không publish Grammar, không push, không
 merge, và không ghi phán quyết, điểm số hay tuyên bố pass lên source đã sửa: bề mặt được audit hay đi
-lại sau đó.
-
+lại sau đó. Nó không bao giờ stash, reset, force, clean, rebase hay checkout sang nhánh khác bên trong checkout được route, và không xoá bằng tay bất cứ thứ gì dưới một checkout có `node_modules` là junction — một worktree tạm được gỡ bằng `git worktree remove --force`. `## Binding` của `changes.md` là nơi đọc hai luật ấy: `Preflight` dạng `<passed|failed> at <ISO 8601 instant>`, còn `Reflog before` và `Reflog after` dạng `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
 ## Context
 
 | Alias | Bind | Bắt buộc |
@@ -102,7 +101,7 @@ lại sau đó.
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate và chạy lại, xác nhận phiên và head đóng băng | `resume`, `mode` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, @workspaces/fe ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Kiểm gate và chạy lại, xác nhận phiên và head đóng băng, và chạy preflight của request trước lần ghi đầu ra ngoài thư mục phiên | `resume`, `mode` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, @workspaces/fe ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind đúng một phát hiện vào dòng đã nêu nó, và kho vào cây nó được đóng băng cho | `finding` | đầu vào `frontend-surface-audit` hoặc `uat-flow-verification` (dòng mà phát hiện gọi tên), `frontend-source-application` (commit nó được nêu trên đó), `frontend-presentation-resolution` (kho cạnh nó và cây đã resolve), @knowledge/ui/presentation | — | `RESOLUTION_STALE` |
 | 3 | Chiếu lần sửa nhỏ nhất lên write set đã khai và đo nó theo cỡ fix | — | @workspaces/fe (các path đã khai và gốc owner của chúng), kho, `fixSize` của orchestrator khi nó công bố | — | `OWNER_CONFLICT`, `FIX_TOO_LARGE` |
 | 4 | Đối chiếu mọi giá trị đã chiếu với kho, rồi quét bản chiếu | `mode` | kho, @workspaces/fe (write set đã chiếu), @tools/shell | `writes` | `WRITE_REJECTED` |

@@ -118,7 +118,7 @@ export async function validateFixStep(branchDir, root = ROOT) {
   const { inventory, tree, treeRef } = await boundResolution(branchDir, request);
   errors.push(...resolutionStaleErrors({ at: 'input frontend-presentation-resolution', inventory, tree, treeRef }));
   if (inventory && tree === null && response.status === 'done') errors.push('input frontend-presentation-resolution: the inventory is read beside no resolved tree, so nothing proves it was frozen for the surface this fix repairs (RESOLUTION_STALE)');
-  const application = await applicationErrors({ branchDir, request, response, requirements, present, inventory, operatorId: OPERATOR_ID });
+  const application = await applicationErrors({ branchDir, root, request, response, requirements, present, inventory, operatorId: OPERATOR_ID });
   errors.push(...application.errors);
   errors.push(...fixSizeErrors({ at: FILES.writes, plan: application.plan, size: await fixSize(root) }));
   return { errors };

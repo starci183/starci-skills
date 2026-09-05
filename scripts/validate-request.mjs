@@ -113,7 +113,7 @@ export function sessionBudgetErrors(state, request) {
 // operators in its chain declare, never from a list of operator ids: an operator that gains
 // @tools/sourcewrite tomorrow needs the confirmation tomorrow without this file changing. A tool held
 // in mode never or read only inspects (git read, container read, database read) and counts for nothing.
-export const EFFECT_TOOLS = ['sourcewrite', 'git', 'container', 'database', 'browsercontrol', 'host'];
+export const EFFECT_TOOLS = ['sourcewrite', 'git', 'container', 'database', 'browsercontrol', 'host', 'registry'];
 const READ_ONLY_MODES = ['never', 'read'];
 export const goalDecisionId = (sessionId, version) => `goal:${sessionId}:v${version}`;
 export function operatorEffects(pkg) {

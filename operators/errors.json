@@ -7,7 +7,8 @@
         "runtime.serve",
         "identity.provision",
         "data.seed",
-        "uat.verify"
+        "uat.verify",
+        "api.verify"
       ],
       "domain": "caller",
       "disposition": "terminate",
@@ -148,7 +149,8 @@
     "RUNTIME_UNAVAILABLE": {
       "scope": [
         "interface.audit",
-        "uat.verify"
+        "uat.verify",
+        "api.verify"
       ],
       "domain": "runtime",
       "disposition": "terminate",

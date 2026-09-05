@@ -294,7 +294,7 @@ authentication, persistence or data behaviour, publish shared UI Grammar, edit k
 class, value or rule identifier absent from its own frozen inventory, reach into Grammar anatomy with
 a selector or a passed class, touch a file outside the declared write set, commit to any other branch,
 push, merge, start or reconfigure runtime services, or record a verdict, score or pass claim on the
-written source: it knows what it decided and what it wrote, never how it renders.
+written source: it knows what it decided and what it wrote, never how it renders. It never stashes, resets, forces, cleans, rebases or checks out another branch inside the routed checkout, and it deletes nothing by hand under a checkout whose `node_modules` is a junction — a temporary worktree is removed with `git worktree remove --force`. `## Binding` of `changes.md` is where those two laws are read: `Preflight` as `<passed|failed> at <ISO 8601 instant>`, and `Reflog before` and `Reflog after` as `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
 
 ## Context
 
@@ -343,7 +343,7 @@ written source: it knows what it decided and what it wrote, never how it renders
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume, count the audit rounds, confirm the session and the frozen head | `resume`, `approval`, `mode`, `maxRounds` | `request/request.json`, the session's `state.json` and this branch's `step-N/parallel-M`, inputs `frontend-direction-decision` when resuming and `frontend-surface-audit` when this is a loop, @workspaces/fe at the frozen head | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate and resume, count the audit rounds, confirm the session and the frozen head, and run the request preflight before the first write outside the session folder | `resume`, `approval`, `mode`, `maxRounds` | `request/request.json`, the session's `state.json` and this branch's `step-N/parallel-M`, inputs `frontend-direction-decision` when resuming and `frontend-surface-audit` when this is a loop, @workspaces/fe at the frozen head | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Check the request and bind the inputs the change level requires | `target`, `intent`, `changeLevel`, `ownerCeiling` | @workspaces/fe at the frozen head, @tools/git, inputs `business-promise-authority`, `backend-source-application` and `architecture-decision` | — | `ROUTE_UNVERIFIED`, `SCOPE_UNFROZEN`, `CHANGE_LEVEL_AMBIGUOUS`, `OWNER_CEILING_INVALID`, `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
 | 3 | Observe the existing context and the person's reference, then compile the UI contract, its coverage and the surface class | `references` | @workspaces/fe (the target's direct artifacts, or the authorized host and product family when the target is absent), @worktrees/uat/<flow>/<case> when present, @knowledge/ui/composition (`COVERAGE-1` Case 7 publishes the class vocabulary), input `business-promise-authority` when present | `ui-coverage` | `EVIDENCE_MISSING`, `SCOPE_UNFROZEN` |
 | 4 | Resolve the reference standards by class, bounded | `references`, `changeLevel` | @knowledge/ui/composition (the gap the research must close), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |

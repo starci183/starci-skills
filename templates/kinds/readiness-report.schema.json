@@ -142,6 +142,7 @@
         "checkout",
         "identity",
         "runtime",
+        "service",
         "host",
         "approval"
       ]
@@ -152,13 +153,14 @@
         "checkout",
         "identity",
         "runtime",
+        "service",
         "host",
         "approval",
         "person"
       ]
     },
     "checkIds": {
-      "description": "The closed vocabulary of checks, one template per readiness question. `<role>` expands over the requested roles, `<class>` over the operation classes the environment schema publishes under authorization. declaration: the portable declaration exists and its hydrated route projects it. checkout: the route carries a git policy, the tree is clean, the branch is one the policy permits. identity: the sealed admin credential preflight, and the flow's account record and sign-in probe when a flow is named. runtime: the registry entry of the route, the served head containing the bound head, the projected port answering, and no foreign process holding it. host: a browser binary for the audit profile, the host's Playwright install for @tools/browsercontrol mode playwright (present where resources/tools.json → browsercontrol.install says, with a Chromium under its browsers path), a reachable container daemon, installed dependencies per checkout, and no ancestor node_modules leaking types into the checkout's typecheck. approval: who authorises each operation class.",
+      "description": "The closed vocabulary of checks, one template per readiness question. `<role>` expands over the requested roles, `<class>` over the operation classes the environment schema publishes under authorization, and `<service>` over the auxiliary services the environment declaration names under `services` — none where it names none. service: the declaration names the service completely, and its probe answers when the declaration wants it up; a wall of this family is cleared by the service operator, never here. declaration: the portable declaration exists and its hydrated route projects it. checkout: the route carries a git policy, the tree is clean, the branch is one the policy permits. identity: the sealed admin credential preflight, and the flow's account record and sign-in probe when a flow is named. runtime: the registry entry of the route, the served head containing the bound head, the projected port answering, and no foreign process holding it. host: a browser binary for the audit profile, the host's Playwright install for @tools/browsercontrol mode playwright (present where resources/tools.json → browsercontrol.install says, with a Chromium under its browsers path), a reachable container daemon, installed dependencies per checkout, and no ancestor node_modules leaking types into the checkout's typecheck. approval: who authorises each operation class.",
       "templates": [
         "declaration.<role>",
         "checkout.<role>.policy",
@@ -171,6 +173,8 @@
         "runtime.<role>.head",
         "runtime.<role>.port",
         "runtime.<role>.holder",
+        "service.<service>.declared",
+        "service.<service>.probe",
         "host.browser",
         "host.playwright",
         "host.container",

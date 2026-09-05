@@ -1,5 +1,6 @@
 export default {
   "index": "Operators",
+  "api-verify": "api.verify",
   "architecture-decide": "architecture.decide",
   "backend-generate": "backend.generate",
   "backend-plan": "backend.plan",
@@ -20,6 +21,7 @@ export default {
   "quality-verify": "quality.verify",
   "release-deploy": "release.deploy",
   "runtime-serve": "runtime.serve",
+  "service-operate": "service.operate",
   "uat-plan": "uat.plan",
   "uat-verify": "uat.verify",
   "workspace-bind": "workspace.bind"

@@ -41,7 +41,8 @@
               "modal",
               "flow",
               "table",
-              "module"
+              "module",
+              "api"
             ]
           },
           "goal": {

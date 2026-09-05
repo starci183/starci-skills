@@ -14,9 +14,13 @@ buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán khô
    hiệu ứng ra bên ngoài, và thứ sẽ được tính là bằng chứng. Hai cách đọc làm đổi bất kỳ điểm nào
    trong số đó là một câu hỏi tập trung, không phải một phỏng đoán. Đóng băng không diễn ra trong im
    lặng: với nhiệm vụ sẽ ghi source đã route hay chạm tới một runtime, phạm vi đã đóng băng được in
-   cho người thành một khối tối đa bốn dòng bằng ngôn ngữ của họ — mục tiêu, cái gì trong và cái gì
-   ngoài, các dòng "xong khi", một câu hỏi — và được xác nhận một lần qua lựa chọn `goal-confirm`
-   trước bước 2. Mỗi dòng "xong khi" gọi tên operator mà biên nhận của nó là bằng chứng ấy, và một
+   cho người thành một khối tối đa bốn dòng bằng ngôn ngữ hiển thị (`resources/settings.json#language`
+   đè lên `settings.example.json`, mặc định `vi`; người viết bằng ngôn ngữ khác thì được trả lời bằng
+   ngôn ngữ đó) — mục tiêu, cái gì trong và cái gì ngoài, các dòng "xong khi", một câu hỏi — và được
+   xác nhận một lần qua lựa chọn `goal-confirm` trước bước 2. Khối đó là câu hỏi duy nhất một prompt
+   mới đặt ra; từ đó lượt chạy phải mượt: log transition in ra mà không chờ, vẽ lại dưới cùng goal và
+   vào lại theo route không hỏi gì, và chỉ route `user`, một `budget-choice` hay goal được sửa mới dừng
+   để hỏi người (`resources/interaction.json#asks`). Mỗi dòng "xong khi" gọi tên operator mà biên nhận của nó là bằng chứng ấy, và một
    yêu cầu không viết nổi dòng "xong khi" nào thì không bắt đầu. Khối và câu trả lời là thứ bước 4 ghi
    thành `state.json.mission` và `choices["goal:<sessionId>:v<version>"]`: `corrected` viết phiên
    bản kế tiếp rồi hỏi lại, và nhiệm vụ mà phiên bản mới nhất chưa là `as-stated` thì không chạy gì
@@ -86,7 +90,9 @@ Bằng chứng giữa các phiên dùng scripts/producer-import.mjs. Chép bundl
 | Một người thật có hoàn thành được một hành trình thật không | `uat.verify` |
 | Tài khoản mà một luồng đăng nhập bằng | `identity.provision` |
 | Những dòng dữ liệu một luồng cần, quy được nguồn và rút lại được | `data.seed` |
-| Phục vụ một head đã commit trên cổng của sản phẩm, giữ lease của nó, hay một tunnel tới nó | `runtime.serve` |
+| Phục vụ một head đã commit trên cổng của sản phẩm, giữ lease của nó | `runtime.serve` |
+| Observability, một dịch vụ Sonar, hay một tunnel cạnh runtime đang phục vụ | `service.operate` |
+| Backend đã phục vụ có làm đúng như suite e2e của chính nó nói không, như một client, trên dữ liệu seed | `api.verify` |
 | Áp một bộ migration đã khai đúng một lần | `migration.release` |
 | Thứ đã giao có khớp thứ đã hứa không | `business.reconcile` |
 | Phát hành một image, hay khôi phục một bản phát hành | `release.deploy` |

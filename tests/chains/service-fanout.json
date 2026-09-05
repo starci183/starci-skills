@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "service-fanout",
+  "when": {
+    "en": "Two auxiliary services the environment declares must stand before the work that needs them: the code-quality service a gate posts to, and the tunnel a walk reaches the product through. The mission names service.operate once per service, and because the services are enumerated by the environment there is no service.plan to fan out over: the planner's rule for an operator with no plan sibling puts each service on its own branch, the second after the first. The operator holds an effect tool, so environment.preflight opens the chain; nothing is written and nothing is published, so the chain ends in a person's hands with the two receipts.",
+    "vi": "Hai dịch vụ phụ trợ mà môi trường khai phải đứng sẵn trước công việc cần chúng: dịch vụ chấm chất lượng mã mà một gate gửi lên, và đường hầm mà một lần đi thử với tới sản phẩm qua đó. Nhiệm vụ gọi tên service.operate mỗi dịch vụ một lần, và vì các dịch vụ được môi trường liệt kê nên không có service.plan nào để toả ra: luật của planner cho một operator không có anh em plan đặt mỗi dịch vụ lên nhánh riêng, cái thứ hai sau cái thứ nhất. Operator giữ một tool có tác động, nên environment.preflight mở chuỗi; không gì được ghi và không gì được publish, nên chuỗi kết thúc trong tay một con người với hai biên nhận."
+  },
+  "mission": {
+    "goal": "the code-quality service and the tunnel the environment declares are both up and proved by their own probes",
+    "doneWhen": [
+      {
+        "evidence": "the code-quality service the gates post to is up and answers its declared probe",
+        "producedBy": "service.operate"
+      },
+      {
+        "evidence": "the tunnel the walk reaches the product through is up and answers its declared probe",
+        "producedBy": "service.operate"
+      }
+    ]
+  },
+  "options": {},
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "service.operate"
+    ],
+    [
+      "service.operate"
+    ]
+  ],
+  "ends": "user",
+  "rewrite": "New in 2.0.4: the row the 2.0.0 catalogue dropped — observability, the code-quality service and tunnels — returns as one operator with one job and one service per branch. There is no service.plan and no units list, because the environment declaration is the enumeration; the two done-when lines are therefore two branches of the same operator, which is the planner's rule for an operator whose domain has no plan sibling."
+}

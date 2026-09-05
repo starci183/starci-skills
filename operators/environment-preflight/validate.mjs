@@ -34,22 +34,28 @@ const SUGGESTION = /\bsuggested `([a-z0-9][a-z0-9-]*)`/g;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const familyOf = (id) => String(id).split('.')[0];
 // A check of one role: `<family>.<role>.<question>` for checkout and runtime, `host.<question>.<role>` for the host.
-const roleScoped = (id, role) => { const p = String(id).split('.'); return (p[0] !== 'declaration' && p[1] === role) || (p[0] === 'host' && p[2] === role); };
+// The service family is scoped to a declared service and never to a role, whatever a service is named.
+const roleScoped = (id, role) => { const p = String(id).split('.'); return (p[0] !== 'declaration' && p[0] !== 'service' && p[1] === role) || (p[0] === 'host' && p[2] === role); };
 const fields = (rows) => Object.fromEntries((rows ?? []).map(([k, v]) => [k, v]));
 const suggestedIds = (text) => [...String(text ?? '').matchAll(SUGGESTION)].map((m) => m[1]);
 
-// The vocabulary the report schema publishes, expanded over the roles and classes of this branch.
-export function expectedCheckIds(schema, roles, classes) {
+// The vocabulary the report schema publishes, expanded over the roles, classes and declared services
+// of this branch. An environment that declares no service expands the service templates to nothing,
+// which is how "there is no such service here" is said without a check that answers for one.
+export function expectedCheckIds(schema, roles, classes, services = []) {
   const out = [];
   for (const template of schema.$defs.checkIds.templates) {
     if (template.includes('<role>')) for (const role of roles) out.push(template.replace('<role>', role));
     else if (template.includes('<class>')) for (const cls of classes) out.push(template.replace('<class>', cls));
+    else if (template.includes('<service>')) for (const s of services) out.push(template.replace('<service>', s));
     else out.push(template);
   }
   return out;
 }
 // The operation classes are read from the environment schema, never listed here.
 export const authorizationClasses = (envSchema) => Object.keys(envSchema.properties.authorization.properties);
+// The services are read from the environment's own declaration, never listed here.
+export const declaredServices = (declaration) => (declaration?.services ?? []).map((s) => s.id);
 
 export async function validateEnvironmentStep(branchDir, root = ROOT, hostRoot = hostRootOf(root)) {
   const base = await validateStep(root, branchDir);
@@ -96,7 +102,12 @@ export async function validateEnvironmentStep(branchDir, root = ROOT, hostRoot =
     const envSchema = await loadEnvironmentSchema(root);
     const reportSchema = JSON.parse(await readFile(path.join(root, REPORT_SCHEMA), 'utf8'));
     const classes = authorizationClasses(envSchema);
-    const expected = expectedCheckIds(reportSchema, report.roles, classes);
+    // The declaration on disk says which services this environment runs; a declaration that fails its
+    // schema names none, and the service family then expands to nothing rather than to guesses.
+    const declaration = await stackDeclaration(root, report.env, hostRoot, envSchema);
+    const declarationValid = declaration.exists && declaration.errors.length === 0;
+    const services = declarationValid ? declaration.declaration.services ?? [] : [];
+    const expected = expectedCheckIds(reportSchema, report.roles, classes, declaredServices({ services }));
     const byId = new Map();
     for (const c of report.checks) {
       if (byId.has(c.id)) errors.push(`${REPORT}: check ${c.id} is recorded twice`);
@@ -174,9 +185,22 @@ export async function validateEnvironmentStep(branchDir, root = ROOT, hostRoot =
     }
     for (const w of report.walls) for (const id of suggestedIds(w.repair)) if (id === report.project || report.roles.includes(id)) errors.push(`${REPORT}: wall ${w.checkId} suggests \`${id}\`, which is the requested name itself`);
 
+    // The service family says what the declaration on disk says about each service it names: the
+    // declaration check is ok exactly where the declaration carries that service completely, and the
+    // probe check is skipped exactly where the declaration wants the service down, because nothing
+    // answering is then the state that was asked for. Nothing here starts, stops or moves a service.
+    for (const s of services) {
+      const declared = byId.get(`service.${s.id}.declared`);
+      if (declared && declared.status === 'wall') errors.push(`${REPORT}: check service.${s.id}.declared is a wall while ${declaration.rel} carries the service with its kind, command, probe and holder; the declaration answered this one`);
+      const probe = byId.get(`service.${s.id}.probe`);
+      if (!probe) continue;
+      if (s.desired === 'down' && probe.status !== 'skipped') errors.push(`${REPORT}: check service.${s.id}.probe is ${probe.status} while the declaration wants the service down; nothing answering is the state that was asked for, and the probe is skipped`);
+      if (s.desired === 'up' && probe.status === 'skipped') errors.push(`${REPORT}: check service.${s.id}.probe is skipped while the declaration wants the service up; a service the environment wants running is probed, and a probe that does not answer is a wall owned by service`);
+    }
+
     // Approvals say what the declaration on disk says, at the hash the report pinned.
-    const decl = await stackDeclaration(root, report.env, hostRoot, envSchema);
-    const valid = decl.exists && decl.errors.length === 0;
+    const decl = declaration;
+    const valid = declarationValid;
     if (valid) {
       if (report.declarationRef !== decl.reference) errors.push(`${REPORT}: declarationRef ${report.declarationRef} is not the declaration on disk (${decl.reference}); a moved declaration is authority drift, not a quieter approval`);
       for (const cls of classes) {

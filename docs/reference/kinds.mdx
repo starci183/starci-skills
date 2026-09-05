@@ -14,6 +14,22 @@ A kind types a file produced inside a branch and handed to a later branch by an 
 
 ## Markdown contracts
 
+### `api-verification`
+
+Title: `^# api-verification — [a-z0-9][a-z0-9-]*$`
+
+Skeleton: [`templates/kinds/api-verification.skeleton.md`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/api-verification.skeleton.md)
+
+| Section | Table header | Rows | Cell constraints |
+| --- | --- | --- | --- |
+| `^## Binding$` | `\| Field \| Value \|` | `Run`, `Approval`, `Flow`, `Environment`, `Pinned commit`, `Served head`, `Served contains pinned`, `Endpoint`, `Namespace`, `Account`, `Credential`, `Command`, `Command source`, `Exit code`, `Run record`, `Latest` | `Value`: `\S` |
+| `^## Cases$` | `\| Case \| Request \| Status \| Assertion \| Duration \| Evidence \|` | minRows 1 | `Case`: `\S`<br />`Request`: `\S`<br />`Status`: `^(pass\|fail\|skipped)$`<br />`Assertion`: `\S`<br />`Duration`: `^[0-9]+ms$`<br />`Evidence`: `\S` |
+| `^## Lanes$` | `\| Lane \| Verdict \| Evidence \|` | exactRows 3 | `Lane`: `^`(contract\|data\|lifecycle)`$`<br />`Verdict`: `^(pass\|fail)$`<br />`Evidence`: `\S` |
+| `^## Namespace$` | `\| Record \| Store \| Inside \| Read back \|` | — | `Record`: `\S`<br />`Store`: `\S`<br />`Inside`: `^(yes\|no)$`<br />`Read back`: `\S` |
+| `^## Printed$` | `\| Artifact \| Why \|` | — | `Artifact`: `^(`[^`]+`\|https?://\S+)$`<br />`Why`: `\S` |
+| `^## Findings$` | `\| Code \| Statement \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Statement`: `\S` |
+| `^## Fallbacks taken$` | `\| Code \| Action \|` | — | — |
+
 ### `architecture-decision`
 
 Title: `^# architecture-decision — [a-z0-9][a-z0-9-]*$`
@@ -84,7 +100,7 @@ Skeleton: [`templates/kinds/business-reconciliation.skeleton.md`](https://github
 | Section | Table header | Rows | Cell constraints |
 | --- | --- | --- | --- |
 | `^## Binding$` | `\| Field \| Value \|` | `Feature`, `Target state`, `Head`, `Claims fingerprint`, `Coverage fingerprint`, `Delivered source` | `Value`: `\S` |
-| `^## Lineage$` | `\| Field \| Value \|` | `Previous head`, `Previous state`, `Transition` | `Value`: `\S` |
+| `^## Lineage$` | `\| Field \| Value \|` | `Previous head`, `Previous head archived`, `Previous state`, `Transition`, `Head object` | `Value`: `\S` |
 | `^## Cited claims$` | `\| Claim \| Kind \| Role \| Source \| Lines \| Head \|` | minRows 1 | `Claim`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Kind`: `^(fact\|intent\|example\|unknown\|contradiction)$`<br />`Lines`: `^\d+-\d+$` |
 | `^## Reconciliation$` | `\| Dimension \| Delivered evidence \| Discrepancy \|` | minRows 1 | `Dimension`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Delivered evidence`: `\S`<br />`Discrepancy`: `\S` |
 | `^## Findings$` | `\| Code \| Severity \| Dimension \| Statement \|` | — | `Code`: `^`[A-Z][A-Z0-9_]*`$`<br />`Severity`: `^(info\|warning\|error)$` |
@@ -155,8 +171,8 @@ Skeleton: [`templates/kinds/environment-readiness.skeleton.md`](https://github.c
 | Section | Table header | Rows | Cell constraints |
 | --- | --- | --- | --- |
 | `^## Binding$` | `\| Field \| Value \|` | `Project`, `Roles`, `Environment`, `Flow`, `Declaration` | `Value`: `\S` |
-| `^## Checks$` | `\| Check \| Family \| Status \| Evidence \|` | minRows 1 | `Check`: `^`[a-z][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+`$`<br />`Family`: `^(declaration\|checkout\|identity\|runtime\|host\|approval)$`<br />`Status`: `^(ok\|wall\|skipped)$`<br />`Evidence`: `\S` |
-| `^## Walls$` | `\| Wall \| Owner \| Repair \|` | — | `Wall`: `^`[a-z][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+`$`<br />`Owner`: `^(declaration\|checkout\|identity\|runtime\|host\|approval\|person)$`<br />`Repair`: `\S` |
+| `^## Checks$` | `\| Check \| Family \| Status \| Evidence \|` | minRows 1 | `Check`: `^`[a-z][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+`$`<br />`Family`: `^(declaration\|checkout\|identity\|runtime\|service\|host\|approval)$`<br />`Status`: `^(ok\|wall\|skipped)$`<br />`Evidence`: `\S` |
+| `^## Walls$` | `\| Wall \| Owner \| Repair \|` | — | `Wall`: `^`[a-z][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+`$`<br />`Owner`: `^(declaration\|checkout\|identity\|runtime\|service\|host\|approval\|person)$`<br />`Repair`: `\S` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Action`: `\S` |
 
 ### `frontend-direction-decision`
@@ -358,6 +374,19 @@ Skeleton: [`templates/kinds/seed-receipt.skeleton.md`](https://github.com/starci
 | `^## Checks$` | `\| Check \| Status \| Evidence \|` | minRows 1 | `Check`: `^`(store-reachable\|rows-attributable\|expected-state\|rollback-listed)`$`<br />`Status`: `^(passed\|failed)$`<br />`Evidence`: `\S` |
 | `^## Findings$` | `\| Code \| Statement \|` | — | `Code`: `^`(SEED_DRAFTED\|SEED_ALREADY_APPLIED\|SEED_LIMITATION\|SEED_ROLLED_BACK\|SHARED_ROW_REFUSED)`$`<br />`Statement`: `\S` |
 
+### `service-receipt`
+
+Title: `^# service-receipt — [a-z0-9]+(?:-[a-z0-9]+)*$`
+
+Skeleton: [`templates/kinds/service-receipt.skeleton.md`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/service-receipt.skeleton.md)
+
+| Section | Table header | Rows | Cell constraints |
+| --- | --- | --- | --- |
+| `^## Binding$` | `\| Field \| Value \|` | `Operator`, `Step`, `Environment`, `Service`, `Kind`, `Desired`, `Observed`, `Endpoint`, `Holder`, `Approval` | `Value`: `\S` |
+| `^## Checks$` | `\| Check \| Status \| Evidence \|` | minRows 1 | `Check`: `^`(service-declared\|command-run\|probe-answered\|port-free\|holder-recorded)`$`<br />`Status`: `^(passed\|failed)$`<br />`Evidence`: `\S` |
+| `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Action`: `\S` |
+| `^## Findings$` | `\| Code \| Statement \|` | — | `Code`: `^`(SERVICE_ALREADY_IN_STATE\|SERVICE_OBSERVED_ONLY\|SERVICE_PORT_SHARED\|SERVICE_LIMITATION)`$`<br />`Statement`: `\S` |
+
 ### `surface-map`
 
 Title: `^# surface-map — [a-z0-9][a-z0-9-]*$`
@@ -420,6 +449,8 @@ Skeleton: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github
 
 | Kind | File | Required top-level properties |
 | --- | --- | --- |
+| `api-cases` | [`templates/kinds/api-cases.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/api-cases.schema.json) | `runId`, `flow`, `commit`, `servedHead`, `servedContainsCommit`, `endpoint`, `command`, `exitCode`, `outputRef`, `namespace`, `startedAt`, `cases` |
+| `api-verdicts` | [`templates/kinds/api-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/api-verdicts.schema.json) | `runId`, `commit`, `servedHead`, `namespace`, `flowRoot`, `resultRef`, `latestRef`, `historyRef`, `lanes`, `records`, `cleanup` |
 | `audit-scope` | [`templates/kinds/audit-scope.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/audit-scope.schema.json) | `mode`, `surfaces`, `deferredStates`, `coverageClaim` |
 | `capture-measurements` | [`templates/kinds/capture-measurements.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/capture-measurements.schema.json) | `schemaVersion`, `capture`, `viewport`, `deviceScaleFactor`, `colorScheme`, `elements` |
 | `capture` | [`templates/kinds/capture.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/capture.schema.json) | `matrixId`, `viewport`, `scheme`, `state`, `nodes` |

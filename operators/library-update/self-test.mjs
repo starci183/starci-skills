@@ -10,8 +10,9 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateAgainst } from '../../scripts/json-schema.mjs';
-import { ROOT, schema, planErrors, consumerPlanErrors, metadataErrors, safeRelative, safePath, nextPatch, hash, integrityOf, git, loadContext, worktreeErrors, proofErrors, consumerProofErrors, resolveCommand, consumerCommand, snapshots, consumerSnapshots, regressionFailed, proofEnvironment, consumerPhase, releaseRef, releaseFileName, baseWorkingBytes, modeSectionErrors, bindRelease, validateLibraryUpdateStep } from './validate.mjs';
+import { ROOT, schema, planErrors, consumerPlanErrors, metadataErrors, safeRelative, safePath, nextPatch, hash, integrityOf, git, loadContext, worktreeErrors, proofErrors, consumerProofErrors, resolveCommand, consumerCommand, snapshots, consumerSnapshots, regressionFailed, proofEnvironment, consumerPhase, releaseRef, releaseFileName, baseWorkingBytes, modeSectionErrors, bindRelease, publicationErrors, publishStopErrors, publishRequested, publishFieldErrors, PUBLISH_STOP, validateLibraryUpdateStep } from './validate.mjs';
 import { installInvocation } from './install.mjs';
+import { sourceWriteErrors } from '../../scripts/workspace-checkout.mjs';
 
 const manifest = { name: '@example/library', version: '1.2.3', exports: './index.js', scripts: { test: 'node index.spec.js', build: 'node --check index.js', typecheck: 'node --check index.js' } };
 const rootManifest = { name: 'consumer-root', private: true, workspaces: ['package', 'apps/app'], scripts: { test: 'node apps/app/index.spec.js', build: 'node --check apps/app/index.js' } };
@@ -93,6 +94,45 @@ assert.ok(modeSectionErrors('consume', { ...packageSections, ...consumerSections
 assert.ok(modeSectionErrors('publish', {}).some((e) => e.includes('library-release')), 'publish must record its release');
 assert.ok(modeSectionErrors('consume', {}).some((e) => e.includes('dependency-update')), 'consume must record its metadata commit');
 assert.ok(modeSectionErrors('full', packageSections).some((e) => e.includes('dependency-proof')), 'full runs both halves');
+
+// The publication under mode publish: the record is judged against the archive this branch packed and
+// the proofs it stands on, and pending is lawful only where the request asked for no publication.
+const packed = { version: plan.targetVersion, integrity: 'sha512-packed' };
+const greenProofs = { before: { exitCode: 1 }, after: { exitCode: 0 }, test: { exitCode: 0 }, build: { exitCode: 0 }, typecheck: { exitCode: 0 } };
+const publicationRecord = (over = {}) => ({ publication: { registry: 'https://registry.example.invalid/', version: packed.version, state: 'published', integrity: packed.integrity, at: '2026-09-05T10:00:00Z', ...over } });
+const releaseRecordOf = (publication) => ({ name: plan.packageName, version: plan.targetVersion, digest: integrityOf('a synthetic packed archive'), artifact: releaseRef(plan), packageCommit: 'b'.repeat(40), publication });
+const publishing = { mode: 'publish', publish: true, ...packed };
+assert.deepEqual(publicationErrors(publishing, publicationRecord(), greenProofs), [], 'a lawful publication');
+assert.deepEqual(publicationErrors({ ...publishing, publish: false }, releaseRecordOf({ registry: null, state: 'pending' }), greenProofs), [], 'publish false leaves the archive packed');
+assert.deepEqual(publicationErrors({ mode: 'full', publish: true, ...packed }, releaseRecordOf({ registry: null, state: 'pending' }), greenProofs), [], 'a run inside one checkout publishes nothing');
+for (const [record, proofs, needle] of [
+  [publicationRecord({ integrity: 'sha512-other' }), greenProofs, 'published integrity'],
+  [publicationRecord({ version: '9.9.9' }), greenProofs, 'published version'],
+  [publicationRecord({ registry: null }), greenProofs, 'names the registry'],
+  [publicationRecord(), { ...greenProofs, build: { exitCode: 1 } }, 'proofs are red'],
+  [releaseRecordOf({ registry: null, state: 'pending' }), greenProofs, 'ends at a published release'],
+]) assert.ok(publicationErrors(publishing, record, proofs).some((e) => e.includes(needle)), needle);
+assert.ok(publicationErrors({ mode: 'consume', publish: true, ...packed }, publicationRecord(), greenProofs).some((e) => e.includes('no archive to a registry')), 'a consumer branch claims no publication');
+// The record contract behind those gates: published carries its registry, version, integrity and moment.
+assert.deepEqual(validateAgainst(schema(ROOT, 'library-release'), releaseRecordOf(publicationRecord().publication)), []);
+assert.deepEqual(validateAgainst(schema(ROOT, 'library-release'), releaseRecordOf({ registry: null, state: 'pending' })), []);
+for (const publication of [
+  { registry: 'https://registry.example.invalid/', version: packed.version, state: 'published' },
+  { registry: null, version: packed.version, state: 'published', integrity: packed.integrity, at: '2026-09-05T10:00:00Z' },
+  { registry: 'https://registry.example.invalid/', version: packed.version, state: 'published', integrity: packed.integrity },
+  { registry: null, state: 'held' },
+]) assert.ok(validateAgainst(schema(ROOT, 'library-release'), releaseRecordOf(publication)).length, 'an incomplete publication record is refused');
+// The requirement, and the stop that carries the registry's own answer.
+assert.equal(publishRequested({ requirements: {} }), true);
+assert.equal(publishRequested({ requirements: { publish: 'false' } }), false);
+assert.deepEqual(publishFieldErrors({ requirements: { publish: false } }), []);
+assert.ok(publishFieldErrors({ requirements: { publish: 'later' } }).length);
+const stopped = (over = {}) => ({ status: 'blocked', stop: PUBLISH_STOP, ...over });
+assert.ok(publishStopErrors(stopped()).length, 'a publish stop with no reason');
+assert.deepEqual(publishStopErrors(stopped({ reason: 'the registry answered 403: you do not have permission to publish this version' })), []);
+assert.ok(publishStopErrors(stopped({ reason: 'npm ERR! with token password: hunter2secret' })).some((e) => e.includes('credential-shaped')), 'the answer travels, the credential does not');
+assert.deepEqual(publishStopErrors({ status: 'blocked', stop: 'LIBRARY_PROOF_FAILED' }), []);
+process.stdout.write('library.update self-test: the publication record, the publish requirement and the publish stop passed\n');
 
 // The install invocation: fixed argv, the consumer root as cwd, the packed release as the spec.
 const fakeCtx = { mode: 'full', checkout: 'D:/bound/session-consumer', branch: 'D:/bound/session/step-3/parallel-1', base: 'a'.repeat(40), packageCommit: 'b'.repeat(40), rootManifest, consumer, plan, artifact: `D:/bound/session/step-3/parallel-1/${releaseRef(plan)}`, release: { ...release, artifact: releaseRef(plan) } };
@@ -249,6 +289,16 @@ try {
   await assert.rejects(loadContext(branch), /binds a library-release input/);
   writeRequest(requestWith({ mode: 'publish', consumer: null }, { 'library-release': releaseInputRef }));
   await assert.rejects(loadContext(branch), /binds no library-release input/);
+  // The release a consume branch binds may already be published — the ordinary path now that a publish
+  // branch ends at the registry — or still pending, which is the rare one, because a pending archive
+  // lives only inside the session that packed it.
+  const publishedRelease = { ...releaseRecord, publication: { registry: 'https://registry.example.invalid/', version: plan.targetVersion, state: 'published', integrity: releaseRecord.digest, at: '2026-09-05T10:00:00Z' } };
+  write(path.join(session, releaseInputRef), publishedRelease);
+  writeRequest(requestWith({ mode: 'consume', plan: null }, { 'library-release': releaseInputRef }));
+  const publishedConsumeCtx = bindRelease(await loadContext(branch));
+  assert.equal(publishedConsumeCtx.releaseInput.record.publication.state, 'published');
+  assert.equal(publishedConsumeCtx.release.integrity, releaseRecord.digest);
+  write(path.join(session, releaseInputRef), releaseRecord);
   const wrongDigest = { ...releaseRecord, digest: integrityOf('other bytes') };
   write(path.join(session, releaseInputRef), wrongDigest);
   writeRequest(requestWith({ mode: 'consume', plan: null }, { 'library-release': releaseInputRef }));
@@ -265,6 +315,51 @@ try {
   await assert.rejects(loadContext(blockedBranch), /missing path: packages\/grammar/);
   assert.deepEqual((await validateLibraryUpdateStep(blockedBranch)).errors, []);
 
+  // A publication the registry refused is a lawful blocked receipt — and it is only lawful while it
+  // carries what the registry answered, because that text is what the next attempt is decided from.
+  const publishStopBranch = path.join(session, 'step-4/parallel-1');
+  write(path.join(publishStopBranch, 'request/request.json'), { ...request, step: 4, requirements: { ...request.requirements, mode: 'publish', consumer: null } });
+  const refusedPublication = (over = {}) => ({ schemaVersion: 9, operatorId: 'library.update', step: 4, parallel: 1, status: 'blocked', stop: PUBLISH_STOP, fields: {}, fallbacks: [], commits: [], next: [], ...over });
+  write(path.join(publishStopBranch, 'response/response.json'), refusedPublication());
+  assert.ok((await validateLibraryUpdateStep(publishStopBranch)).errors.some((e) => e.includes(PUBLISH_STOP)), 'a refused publication that reports no registry answer');
+  write(path.join(publishStopBranch, 'response/response.json'), refusedPublication({ reason: 'the registry answered 409: @example/library@1.2.4 cannot be republished' }));
+  assert.deepEqual((await validateLibraryUpdateStep(publishStopBranch)).errors, []);
+
+  // The receipt's account of what the branch did to the checkout, beside what it wrote into it: the
+  // preflight before the first write, and the entries the checkout gained while the branch held it —
+  // its own commits and nothing else. Its own worktree, so the marks are read against a reflog only
+  // this block wrote.
+  {
+    const marked = path.join(temp, 'marked-worktree');
+    git(repo, ['worktree', 'add', '--quiet', '-b', 'session/marks', marked]);
+    const markBase = git(marked, ['rev-parse', 'HEAD']);
+    write(path.join(marked, 'package/index.js'), 'export const relationship = 2;\n');
+    git(marked, ['add', 'package/index.js']); git(marked, ['commit', '--quiet', '-m', 'the branch own commit']);
+    const markCommit = git(marked, ['rev-parse', 'HEAD']);
+    const entries = () => git(marked, ['reflog', 'show', '--format=%H', 'HEAD']).split('\n').filter(Boolean).length;
+    const preflight = new Date(Date.parse(git(marked, ['show', '-s', '--format=%cI', markCommit])) - 60000).toISOString().replace(/\.\d+Z$/, 'Z');
+    const gained = entries();
+    const marks = (over = {}) => ({ Preflight: `passed at ${preflight}`, 'Reflog before': `HEAD ${gained - 1} ${markBase}; stash 0`, 'Reflog after': `HEAD ${gained} ${markCommit}; stash 0`, ...over });
+    const law = (over = {}) => sourceWriteErrors({ at: 'response/changes.md', binding: marks(over), base: markBase, branch: 'session/marks', commits: [markCommit], checkout: marked });
+    assert.deepEqual(law(), [], 'one commit on the session branch, with a preflight before it');
+    assert.ok(law({ Preflight: '—' }).some((e) => e.includes('records no Preflight')));
+    assert.ok(law({ Preflight: `passed at ${new Date(Date.parse(preflight) + 600000).toISOString().replace(/\.\d+Z$/, 'Z')}` }).some((e) => e.includes('before the preflight this receipt records')));
+    assert.ok(law({ 'Reflog after': `HEAD ${gained + 1} ${markCommit}; stash 0` }).some((e) => e.includes('gained 2 entries')));
+    assert.ok(law({ 'Reflog after': `HEAD ${gained} ${markCommit}; stash 1` }).some((e) => e.includes('stash reflog went from 0 to 1')));
+
+    // A stash inside the routed checkout, dropped afterwards, and the commit that followed it.
+    write(path.join(marked, 'package/index.js'), 'export const relationship = 3;\n');
+    git(marked, ['stash', 'push', '--quiet', '-m', 'wip']);
+    git(marked, ['stash', 'drop', '--quiet']);
+    write(path.join(marked, 'package/index.js'), 'export const relationship = 4;\n');
+    git(marked, ['add', 'package/index.js']); git(marked, ['commit', '--quiet', '-m', 'the commit after the stash']);
+    const second = git(marked, ['rev-parse', 'HEAD']);
+    const stashed = sourceWriteErrors({ at: 'response/changes.md', binding: marks({ 'Reflog after': `HEAD ${entries()} ${second}; stash 0` }), base: markBase, branch: 'session/marks', commits: [markCommit, second], checkout: marked }).join('\n');
+    assert.match(stashed, /reset: moving to HEAD/);
+    assert.match(stashed, /forbidden inside a routed checkout/);
+    git(repo, ['worktree', 'remove', '--force', marked]);
+  }
+
   git(checkout, ['checkout', '-q', '-b', 'other-session']);
   await assert.rejects(loadContext(branch), /exactly one worktree/);
 } finally {
@@ -273,4 +368,4 @@ try {
   rmSync(resolved, { recursive: true, force: true });
 }
 process.stdout.write('library.update self-test: package boundary, session binding, package and consumer proof mutations passed\n');
-process.stdout.write('library.update self-test: publish and consume bind one half each, cross-mode sections and inputs are refused, and a blocked branch whose plan cannot resolve validates\n');
+process.stdout.write('library.update self-test: publish and consume bind one half each, cross-mode sections and inputs are refused, a published release is consumed like a pending one, a refused publication validates only with the registry\'s answer, and a blocked branch whose plan cannot resolve validates\n');

@@ -307,8 +307,7 @@ chung, không sửa knowledge, không ghi class, giá trị hay identifier vắn
 của chính nó, không thò tay vào giải phẫu Grammar bằng selector hay class truyền vào, không chạm file
 ngoài write set đã khai, không commit lên nhánh nào khác, không push, không merge, không khởi động hay
 cấu hình lại dịch vụ runtime, và không ghi phán quyết, điểm số hay tuyên bố pass lên source đã ghi:
-nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render ra sao.
-
+nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render ra sao. Nó không bao giờ stash, reset, force, clean, rebase hay checkout sang nhánh khác bên trong checkout được route, và không xoá bằng tay bất cứ thứ gì dưới một checkout có `node_modules` là junction — một worktree tạm được gỡ bằng `git worktree remove --force`. `## Binding` của `changes.md` là nơi đọc hai luật ấy: `Preflight` dạng `<passed|failed> at <ISO 8601 instant>`, còn `Reflog before` và `Reflog after` dạng `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
 ## Context
 
 | Alias | Bind | Bắt buộc |
@@ -356,7 +355,7 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate và chạy lại, đếm số vòng audit, xác nhận phiên và head đóng băng | `resume`, `approval`, `mode`, `maxRounds` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, đầu vào `frontend-direction-decision` khi chạy lại và `frontend-surface-audit` khi đây là vòng lặp, @workspaces/fe ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Kiểm gate và chạy lại, đếm số vòng audit, xác nhận phiên và head đóng băng, và chạy preflight của request trước lần ghi đầu ra ngoài thư mục phiên | `resume`, `approval`, `mode`, `maxRounds` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, đầu vào `frontend-direction-decision` khi chạy lại và `frontend-surface-audit` khi đây là vòng lặp, @workspaces/fe ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Soát lời yêu cầu và bind các đầu vào mà change level đòi | `target`, `intent`, `changeLevel`, `ownerCeiling` | @workspaces/fe ở head đóng băng, @tools/git, đầu vào `business-promise-authority`, `backend-source-application` và `architecture-decision` | — | `ROUTE_UNVERIFIED`, `SCOPE_UNFROZEN`, `CHANGE_LEVEL_AMBIGUOUS`, `OWNER_CEILING_INVALID`, `BUSINESS_REQUIRED`, `BACKEND_REQUIRED`, `ARCHITECTURE_REQUIRED` |
 | 3 | Quan sát context đang có và tham chiếu của người, rồi biên UI contract, coverage của nó và lớp bề mặt | `references` | @workspaces/fe (artifact trực tiếp của target, hoặc host được uỷ quyền và họ sản phẩm khi target chưa tồn tại), @worktrees/uat/&lt;flow>/&lt;case> nếu có, @knowledge/ui/composition (`COVERAGE-1` Case 7 publish bộ từ vựng lớp), đầu vào `business-promise-authority` nếu có | `ui-coverage` | `EVIDENCE_MISSING`, `SCOPE_UNFROZEN` |
 | 4 | Chốt các chuẩn tham chiếu theo lớp, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |

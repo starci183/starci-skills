@@ -27,6 +27,7 @@ later work to open exactly this checkout at exactly this head and proves nothing
 | Source head | `0000000000000000000000000000000000000000` |
 | Mutation readiness | read-only |
 | Businesses root | — when the checkout carries no business worktree |
+| Installed tree | own directory, absent, or junction to the target the link resolves to |
 
 ## Policy
 

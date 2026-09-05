@@ -15,7 +15,9 @@
       "@tools/fileread": "context-aliases",
       "@tools/sourcewrite": "declared-write-set",
       "@tools/git": "commit-session-branch",
-      "@tools/shell": "declared-commands"
+      "@tools/shell": "declared-commands",
+      "@tools/registry": "publish",
+      "@tools/secrets": "resolve-by-name"
     }
   },
   "primaryOutput": "library-source-application"

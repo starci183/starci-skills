@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { validateWorkspaceStep } from '../operators/workspace-bind/validate.mjs';
+import { installedTreeOf } from './workspace-checkout.mjs';
 import { validateQualityStep, SCORECARD_TOPICS } from '../operators/quality-verify/validate.mjs';
 
 const digest = (value) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
@@ -42,7 +43,7 @@ export async function writeMigrationReleaseProducers({ root, session, checkout, 
     fields: { 'workspace-route-binding': 'response/response.md', route: 'response/data/route.json' } });
   write(routeBranch, 'response/response.md', `# workspace-route-binding — ${project}/be\n\nSynthetic source binding for the migration release regression.\n\n`
     + table('## Binding', ['Field', 'Value'], [['Project', project], ['Role', 'be'], ['Portable route', route.portableRouteRef], ['Hydrated route', route.hydratedRouteRef], ['Source head', head]])
-    + table('## Checkout', ['Field', 'Value'], [['Disk path', disk], ['Git root', disk], ['Git repository', route.checkout.gitRepository], ['Branch', branchName], ['Repository kind', 'source'], ['Directory', '—'], ['Source head', head], ['Mutation readiness', 'ready'], ['Businesses root', '—']])
+    + table('## Checkout', ['Field', 'Value'], [['Disk path', disk], ['Git root', disk], ['Git repository', route.checkout.gitRepository], ['Branch', branchName], ['Repository kind', 'source'], ['Directory', '—'], ['Source head', head], ['Mutation readiness', 'ready'], ['Businesses root', '—'], ['Installed tree', installedTreeOf(disk).label]])
     + table('## Policy', ['Field', 'Value'], [['Worktree branches', 'session-only'], ['Mutation branch', 'main']])
     + table('## Write roots', ['Path', 'Why']) + table('## Runtime', ['Field', 'Value'])
     + table('## Findings', ['Code', 'Subject', 'Statement'], [

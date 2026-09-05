@@ -11,6 +11,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 export const SECRET_PATTERNS = [
+  { id: 'npm-token', re: /npm_[A-Za-z0-9]{36}/ },
   { id: 'private-key', re: /-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----/ },
   { id: 'jwt', re: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/ },
   { id: 'bearer', re: /\bBearer\s+[A-Za-z0-9._~+/-]{24,}=*/ },

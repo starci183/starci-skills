@@ -31,7 +31,7 @@ test('imported migration validates original critique and the actual request CLI'
   const host = mkdtempSync(path.join(tmpdir(), 'migration-contract-'));
   try {
     const root = path.join(host, '.claude');
-    for (const folder of ['scripts', 'templates', 'operators', 'resources']) cpSync(path.join(ROOT, folder), path.join(root, folder), { recursive: true });
+    for (const folder of ['scripts', 'templates', 'operators', 'resources', 'readiness']) cpSync(path.join(ROOT, folder), path.join(root, folder), { recursive: true });
     cpSync(path.join(ROOT, 'routing.json'), path.join(root, 'routing.json'));
     const sessions = path.join(host, '.worktrees/sessions');
     const original = path.join(sessions, 'original');

@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 9,
+  "note": "The person's settings, outside the law. Copy this file to resources/settings.json (untracked; an update never overwrites it) to override a value. language: the tag every line printed to the person carries — the goal block, the two-line transition log, the end-of-turn report, every question — and the language a new mission records unless the person writes in another; the tree's law stays English, its mirrors Vietnamese, and neither depends on this.",
+  "language": "vi"
+}

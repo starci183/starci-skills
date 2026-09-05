@@ -101,6 +101,7 @@ và không mang phán quyết nào.
 | `checkout` | choice | routed | `routed` chọn checkout chuẩn; `session` chỉ chọn worktree đã đăng ký của chính phiên trong request theo chính sách đã khai |
 | `gitPolicy` | object `{worktreeBranches, mutationBranch}`, hai trường của `repository.gitPolicy` trong khai báo route mà binding được kiểm theo | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | Luật nhánh mà binding này được kiểm theo; `forbidden` giữ mọi lần ghi trên nhánh mutation |
 | `declaredWriteRoots` | list | empty | Những đường dẫn duy nhất mà việc sau được ghi; bẩn ngoài chúng là `CHECKOUT_DIRTY`, và bẩn bất kỳ khi checkout đang ở nhánh mutation thay vì nhánh `session/<sessionId>` cũng vậy |
+| `sharedInstall` | choice | false | Cây đã cài được chia sẻ qua junction một cách có chủ đích; xoá bên trong nó là bị cấm |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
 ## Các bước
@@ -110,7 +111,7 @@ và không mang phán quyết nào.
 | 1 | Kiểm gate và chạy lại, và từ chối mọi hint nó mang | `resume` | `request/request.json`, phần requirements và head đóng băng của nó | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng bootstrap và identity | — | @workspaces/device-state, định danh máy và roster credential đã niêm phong, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
 | 3 | Phân giải route | `project`, `role`, `checkout` | @workspaces/projects/<project>/<role> đúng project và role này, @workspaces/local/routes/<project>/<role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
-| 4 | Kiểm checkout: chính sách nhánh, cây sạch và các write root | `gitPolicy`, `declaredWriteRoots` | @workspaces/local/routes/<project>/<role>, checkout đã phân giải, nhánh, head và cây làm việc của nó, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
+| 4 | Kiểm checkout: chính sách nhánh, cây sạch, các write root và cây đã cài | `gitPolicy`, `declaredWriteRoots`, `sharedInstall` | @workspaces/local/routes/<project>/<role>, checkout đã phân giải, nhánh, head, cây làm việc và `node_modules` của nó, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
 | 5 | Ràng provenance và độ tươi, rồi phát | — | mọi thứ ở trên, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
 
 Dưới
@@ -131,8 +132,17 @@ bước 1, chỉ dùng lại quan sát có fingerprint không đổi, và tiêu 
 thay đổi tạo fingerprint route mới; dùng lại còn đòi hỏi cùng chế độ chọn, định danh checkout được
 chọn và source head đã quan sát.
 
+Cây đã cài là một phần của việc checkout là gì, và bước 4 quan sát nó: `## Checkout` mang hàng
+`Installed tree` đọc là `own directory`, `absent`, hay `junction to <target>` với đích đã phân giải. Một
+junction `node_modules` có đích nằm ngoài checkout là một cây đã cài mà nhiều checkout dùng chung, nên
+một lệnh xoá đệ quy bên trong checkout ấy đi xuyên qua liên kết và làm rỗng cây mà mọi checkout khác
+đang dùng; binding bị từ chối với `INVALID_INPUT` trừ khi request đã khai `sharedInstall`, và một
+checkout giữ junction thì không bao giờ bị xoá bằng tay — một worktree tạm được gỡ bằng
+`git worktree remove --force` và không gì khác. Hàng ấy là quan sát, không phải khẳng định: validator
+phản hồi đọc chính liên kết đó và so.
+
 Lệnh chọn chỉ đọc là `node scripts/workspace-checkout.mjs <project> <role> <sessionId>
-<routed|session> [declaredWriteRoot ...]`. Lệnh nhận trần ghi tương đối trong kho, không nhận đường
+<routed|session> [declaredWriteRoot ...] [--shared-install]`. Lệnh nhận trần ghi tương đối trong kho, không nhận đường
 dẫn checkout. JSON đó là quan sát checkout; operator vẫn phải ràng identity và gốc thẩm quyền
 đã yêu cầu để tạo biên nhận route đầy đủ. Bước 4 kiểm cây đã chọn; chọn phiên còn yêu cầu checkout mutation chuẩn sạch.
 Validator phản hồi tự chạy lại phép chọn và so các field route; gate request kiểm phép chọn phiên

@@ -92,7 +92,13 @@ ${rows.join('\n')}
 | --- | --- |
 `;
 };
-const changesMd = ({ files } = {}) => {
+// The marks a source-writing branch reads off the checkout: HEAD stood on the base at dispatch and on
+// the branch own commit at the end, one entry apart, with the stash reflog untouched.
+const PREFLIGHT = 'passed at 2026-09-05T09:12:00Z';
+const REFLOG_BEFORE = `HEAD 9 ${HEAD}; stash 0`;
+const REFLOG_AFTER = `HEAD 10 ${COMMIT}; stash 0`;
+
+const changesMd = ({ files, preflight = PREFLIGHT, reflogBefore = REFLOG_BEFORE, reflogAfter = REFLOG_AFTER } = {}) => {
   const rows = (files ?? plan().files).map(({ path: p, change, classes }) => `| ${BT}${p}${BT} | ${change} | the resolved value for this node | ${classes.length ? `${BT}GAP-5${BT}` : '—'} |`);
   return `# changes — interface.fix step-5/parallel-1
 
@@ -106,6 +112,9 @@ One finding repaired on the session branch from the generator's inventory.
 | Step | ${BT}step-5/parallel-1${BT} |
 | Checkout | ${BT}@workspaces/fe${BT} at ${BT}${HEAD}${BT} → ${BT}${COMMIT}${BT} on ${BT}session/${SESSION}${BT} |
 | Predecessor | ${BT}step-3/parallel-1/response/response.md${BT} |
+| Preflight | ${preflight} |
+| Reflog before | ${reflogBefore} |
+| Reflog after | ${reflogAfter} |
 
 ## Files
 
@@ -179,7 +188,7 @@ const dryRun = () => ({
   'request/request.json': requestJson({ extra: { mode: 'dry' } }),
   'response/response.json': responseJson({ commits: [] }),
   'response/response.md': applicationMd({ mode: 'dry', commit: null }),
-  'response/changes.md': changesMd({ files: plan({ mode: 'dry' }).files }),
+  'response/changes.md': changesMd({ files: plan({ mode: 'dry' }).files, reflogAfter: REFLOG_BEFORE }),
   'response/data/writes.json': plan({ mode: 'dry', commit: null }),
 });
 const uatFix = () => ({
@@ -247,5 +256,15 @@ await expectError({ ...baseline(), 'response/changes.md': changesMd({ files: [pl
 await expectError({ ...baseline(), 'response/response.md': applicationMd().replace('## Rejections', '## Rejected') }, 'missing section ^## Rejections$', 'receipt section renamed');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE' }) }, 'not a registered code', 'unknown stop code');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
+
+// The checkout is not only what the branch wrote into it. The preflight ran before the first write, and
+// the reflog entries the checkout gained while the branch held it are the branch's own commits and
+// nothing else: a stash (which resets HEAD and outlives its own drop), a reset, a force, a clean or a
+// checkout of another branch each leave one it never earned.
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ preflight: '—' }) }, 'records no Preflight', 'a source write with no preflight behind it');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ preflight: 'failed at 2026-09-05T09:12:00Z' }) }, 'a done source-writing branch carries a preflight that passed', 'a done branch on a failed preflight');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ reflogBefore: '—' }) }, 'carries no Reflog before', 'a receipt that never read the reflog');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ reflogAfter: `HEAD 99 ${COMMIT}; stash 0` }) }, "a routed checkout gains only the branch's own commits", 'an entry the branch never earned');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ reflogAfter: REFLOG_AFTER.replace('stash 0', 'stash 1') }) }, 'stash reflog went from 0 to 1 entries', 'a stash inside the routed checkout');
 
 process.stdout.write('interface.fix self-test: 5 valid branches, the fix-size rule and rejected mutations passed\n');

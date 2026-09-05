@@ -341,3 +341,5 @@ này.
 | runtime đang phục vụ và các hành trình sẽ đi trên nó phải được gọi tên, mỗi hành trình một luồng, trước khi mỗi nhánh đi một luồng | `uat.plan` |
 | serve hoàn tất phát changes đã merge để kiểm gate bàn giao độc lập | `quality.verify` |
 | runtime đã phục vụ được chứng thực và lượt chạy đang chờ nó có thể kiểm luồng | `uat.verify` |
+| runtime đã phục vụ được chứng thực và bộ kiểm end-to-end của chính bản giao giờ có thể chạy đối với nó như một client | `api.verify` |
+| runtime đang phục vụ và một đường hầm hay một dịch vụ quan trắc mà nhiệm vụ gọi tên phải được đưa lên bên cạnh nó | `service.operate` |

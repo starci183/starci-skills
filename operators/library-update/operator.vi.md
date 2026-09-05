@@ -20,7 +20,9 @@ metadata của commit thứ hai ấy chỉ chạm các mục dependency được
 consumer đã khai với package đã cài khớp từng file với bản phát hành, mỗi `dependency-proof` cùng
 `dependency-log` thô của nó cho thấy regression consumer không đổi và mọi gate consumer đã khai đạt
 trên đó, và `changes` nêu các đường dẫn của cả hai commit; hoặc, dưới mode `publish`, riêng nửa package
-dừng tại `library-release` ấy cạnh `library-archive` của nó mà không chạm metadata consumer nào; hoặc,
+dừng tại `library-release` ấy cạnh `library-archive` của nó, đã phát hành lên registry mà manifest
+package gọi tên dưới đúng integrity của archive trừ khi yêu cầu xin không phát hành, mà không chạm
+metadata consumer nào; hoặc,
 dưới mode `consume`, riêng nửa consumer chạy trên `library-release` mà một phiên anh em đã sinh, ghi
 đúng một commit metadata và không ghi một dòng source package nào.
 
@@ -40,16 +42,25 @@ gate bên dưới chỉ đọc đúng nửa mà chế độ ấy cần:
 - `full` — mặc định. Package owner và consumer cùng nằm trong checkout được route, cả hai plan đều
   được cấp, và nhánh tạo cả hai commit, package trước.
 - `publish` — riêng route owner. `plan` được cấp còn `consumer` thì không; nhánh sửa package cùng
-  bằng chứng trước và sau, tăng version, commit một lần, đóng gói archive rồi ghi `library-release`
-  định danh nó. Không đọc cũng không ghi metadata consumer, và receipt không được mang tiết mục
-  consumer nào. Đẩy bản phát hành ấy lên registry là thẩm quyền của người mà không operator nào của
-  cây này giữ: bản ghi mang publication ở trạng thái pending, và một lần chạy khai khác đi thì bị từ chối.
+  bằng chứng trước và sau, tăng version, commit một lần, đóng gói archive, phát hành nó rồi ghi
+  `library-release` định danh nó. Không đọc cũng không ghi metadata consumer, và receipt không được
+  mang tiết mục consumer nào. Phát hành là chỗ kết của chế độ này chứ không phải việc vặt để lại cho
+  người: khi proof package đã xanh và archive đã đóng gói cùng digest, chính archive ấy đi lên registry
+  mà manifest package gọi tên, theo `publishConfig` của chính manifest ấy cho provenance và access, với
+  credential giải theo tên và không bao giờ in ra. Rồi đọc ngược registry: nó phải phục vụ đúng version
+  ấy, và integrity nó phục vụ phải bằng digest của archive mà receipt mang. Chỉ khi ấy bản ghi mới nói
+  `publication { registry, version, state: "published", integrity, at }`. Registry đã phục vụ sẵn
+  version ấy, integrity lệch, hay một lần publish bị từ chối đều là `LIBRARY_PUBLISH_REJECTED` với
+  chính câu trả lời của registry làm lý do — không bao giờ là một receipt lặng lẽ ghi pending. Chỉ một
+  trường hợp pending là hợp lệ: yêu cầu đặt sẵn `publish: false` vì người sẽ tự phát hành archive ấy.
 - `consume` — riêng route consumer. `consumer` được cấp còn `plan` thì không; đầu vào là
   `library-release` của một nhánh trước — của phiên anh em đã import vào phiên này, hoặc của một nhánh
   sớm hơn trong chính phiên này — và việc đúng bằng nửa consumer: delta manifest chính xác, danh tính
   lock, bao đóng dependency và các proof consumer trên bản phát hành ấy. Không ghi source package,
   receipt không được mang tiết mục package nào, và danh tính package cùng version tiêu thụ được đọc từ
-  bản ghi phát hành chứ không từ một plan.
+  bản ghi phát hành chứ không từ một plan. Bản ghi ấy có thể `published` hoặc `pending`; pending giờ là
+  đường hiếm, vì nó gọi tên một archive chỉ sống bên trong phiên đã sinh ra nó, và một consumer có
+  metadata trỏ về chỗ không checkout nào khác có là `DEPENDENCY_BOUNDARY_REJECTED`.
 
 Vậy một package owner ở repository này và consumer của nó ở repository khác là một nhánh `publish`
 trên route owner và một nhánh `consume` trên route consumer, nhánh sau bind `library-release` của
@@ -65,8 +76,9 @@ sheet ấy như behavior, với cùng regression cặp đôi đọc recipe. Ch�
 hành vi hiện có, regression test đi cặp, version patch kế tiếp trong manifest hiện có, changelog
 package và metadata version của package trong lockfile. Lockfile workspace chỉ được phép khi cả plan và
 route đều gọi tên; JSON chỉ được thay version của entry package đã bind. Presentation đi qua pipeline
-interface. Package không bao giờ được publish, push, merge hay tag ở đây.
-
+interface. Package không bao giờ được push, merge hay tag ở đây, và lối duy nhất để nó rời checkout
+này là bước phát hành của mode `publish`: nguyên archive đã đóng gói, không sửa một byte, lên registry
+mà chính manifest của nó gọi tên. Nó không bao giờ stash, reset, force, clean, rebase hay checkout sang nhánh khác bên trong checkout được route, và không xoá bằng tay bất cứ thứ gì dưới một checkout có `node_modules` là junction — một worktree tạm được gỡ bằng `git worktree remove --force`. `## Binding` của `changes.md` là nơi đọc hai luật ấy: `Preflight` dạng `<passed|failed> at <ISO 8601 instant>`, còn `Reflog before` và `Reflog after` dạng `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
 ## Ranh giới nửa consumer
 
 Plan consumer pin các manifest consumer, npm lockfile, regression không đổi và các gate bàn giao đầy
@@ -85,7 +97,10 @@ chỉ được giải nơi có nửa package chạy. Dưới `full` và `publish
 `run-proof.mjs <branch> before`; helper buộc hành vi và manifest còn đúng base và ghi assertion
 regression thất bại. Sửa hành vi cùng version patch kế tiếp rồi chạy helper cho `after` và mọi gate
 package đã khai. Mỗi script test, typecheck, build hiện có của package phải chạy đầy đủ không filter.
-Commit tập package đã khai một lần, rồi đóng gói archive và ghi bản phát hành. Dưới `full` và
+Commit tập package đã khai một lần, rồi đóng gói archive và lấy digest. Dưới `publish`, trừ khi yêu
+cầu đặt sẵn `publish: false`, chính archive đã có digest ấy được phát hành ngay tại đó và registry
+được đọc ngược trước khi ghi bản phát hành; dưới hai chế độ kia archive được tiêu thụ ngay trong
+checkout này và không lên registry nào. Ghi bản phát hành. Dưới `full` và
 `consume`, chạy `install.mjs <branch> baseline` và `run-proof.mjs <branch> consumer-before` trên
 version đang cài và regression consumer không đổi, `install.mjs <branch> release` để tiêu thụ bản phát
 hành đã bind trong ranh giới metadata chính xác, và helper cho `consumer-after` cùng mọi gate consumer
@@ -117,25 +132,28 @@ những byte khác.
 | `mode` | choice | full | `full` chạy cả hai nửa trong checkout được route; `publish` chạy riêng nửa owner và dừng ở bản phát hành đã ghi; `consume` chạy riêng nửa consumer trên `library-release` đã bind |
 | `plan` | object | null | Schema library-behavior-plan đóng: danh tính package, tập file, regression đi cặp, script hiện có và patch kế tiếp; cấp dưới `full` và `publish`, vắng dưới `consume` |
 | `consumer` | object | null | Schema dependency-plan đóng: các manifest và lockfile consumer pin package, regression consumer không đổi và các gate bàn giao đầy đủ; cấp dưới `full` và `consume`, vắng dưới `publish` |
+| `publish` | choice | true | `true` phát hành bản đã đóng gói lên registry khi proof package đã xanh; `false` để nguyên bản đóng gói cho người; đọc dưới mode `publish`, nơi không gì khác đưa được bản phát hành lên registry |
 | `resume` | token | null | Token nhánh bị chặn khi vào lại với plan hoặc proof thay đổi |
 
 ## Các bước
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm request và preflight những nửa mà chế độ gọi tên trước lần ghi đầu | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, đầu vào `route`, đầu vào `library-release` dưới `consume`, @workspaces/fe tại base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
+| 1 | Kiểm request, chạy preflight của request, và preflight những nửa mà chế độ gọi tên, tất cả trước lần ghi đầu ra ngoài thư mục phiên | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, đầu vào `route`, đầu vào `library-release` dưới `consume`, @workspaces/fe tại base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
 | 2 | Chỉ viết regression test đi cặp trong package owner và chứng minh thất bại | `plan` | @workspaces/fe tại base, @tools/shell | @workspaces/fe/branch/session trong trần test, @tools/sourcewrite, `library-proof` | `LIBRARY_PROOF_FAILED` |
 | 3 | Sửa hành vi đã khai và tăng version patch kế tiếp | `plan` | @workspaces/fe trong trần package | @workspaces/fe/branch/session trong tập file đã khai, @tools/sourcewrite | `LIBRARY_BOUNDARY_REJECTED` |
 | 4 | Chạy regression cùng toàn bộ script test, typecheck và build của package | `plan` | @workspaces/fe, @tools/shell | `library-proof` | `LIBRARY_PROOF_FAILED` |
 | 5 | Commit bản bàn giao package một lần rồi kiểm diff Git và hash proof của nó | `plan` | @workspaces/fe tại commit package, @tools/git | @workspaces/fe/branch/session, `library-source-application` | `LIBRARY_BOUNDARY_REJECTED`, `LIBRARY_PROOF_FAILED` |
 | 6 | Đóng gói archive từ commit package và ghi bản phát hành mà nó định danh | `plan` | @workspaces/fe tại commit package, @tools/shell | `library-archive`, `library-release` | `DEPENDENCY_BOUNDARY_REJECTED` |
-| 7 | Cài baseline trong consumer và chạy regression consumer không đổi | `consumer` | @workspaces/fe, bản phát hành đã bind, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
-| 8 | Cài bản phát hành đã bind trong ranh giới metadata consumer chính xác | `consumer` | @workspaces/fe và bản phát hành đã bind, @tools/shell | @workspaces/fe/branch/session trong trần metadata, @tools/sourcewrite | `DEPENDENCY_BOUNDARY_REJECTED` |
-| 9 | Kiểm byte đã cài và chạy regression consumer cùng gate đầy đủ | `consumer` | @workspaces/fe, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
-| 10 | Commit metadata consumer một lần rồi kiểm delta và hash proof của nó | `consumer` | @workspaces/fe tại commit consumer, @tools/git | @workspaces/fe/branch/session, `dependency-update` | `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
-| 11 | Phát | — | mọi thứ ở trên | `changes`, `response/response.json` | — |
+| 7 | Phát hành archive đã có digest lên registry mà manifest gọi tên, đọc ngược version và integrity đang phục vụ, rồi ghi publication | `plan`, `publish` | @workspaces/fe tại commit package, `library-release`, @tools/registry, @tools/secrets | `library-release` | `LIBRARY_PUBLISH_REJECTED` |
+| 8 | Cài baseline trong consumer và chạy regression consumer không đổi | `consumer` | @workspaces/fe, bản phát hành đã bind, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
+| 9 | Cài bản phát hành đã bind trong ranh giới metadata consumer chính xác | `consumer` | @workspaces/fe và bản phát hành đã bind, @tools/shell | @workspaces/fe/branch/session trong trần metadata, @tools/sourcewrite | `DEPENDENCY_BOUNDARY_REJECTED` |
+| 10 | Kiểm byte đã cài và chạy regression consumer cùng gate đầy đủ | `consumer` | @workspaces/fe, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
+| 11 | Commit metadata consumer một lần rồi kiểm delta và hash proof của nó | `consumer` | @workspaces/fe tại commit consumer, @tools/git | @workspaces/fe/branch/session, `dependency-update` | `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
+| 12 | Phát | — | mọi thứ ở trên | `changes`, `response/response.json` | — |
 
-Bước 2 tới 6 là nửa package, chạy dưới `full` và `publish`; bước 7 tới 10 là nửa consumer, chạy dưới
+Bước 2 tới 6 là nửa package, chạy dưới `full` và `publish`; bước 7 là phát hành, chỉ chạy dưới
+`publish` và chỉ khi yêu cầu không đặt sẵn `publish: false`; bước 8 tới 11 là nửa consumer, chạy dưới
 `full` và `consume`. Dưới `full`, `response.json` mang cả hai sha dưới `commits`, commit package
 trước, và `dependency-update` gọi commit package là `base` của nó; dưới `publish` nó mang riêng commit
 package, dưới `consume` mang riêng commit consumer với base là head route đóng băng. Các proof consumer
@@ -169,6 +187,7 @@ quyền viết.
 | `NO_PROGRESS` | terminate |
 | `LIBRARY_BOUNDARY_REJECTED` | terminate |
 | `LIBRARY_PROOF_FAILED` | terminate |
+| `LIBRARY_PUBLISH_REJECTED` | terminate |
 | `DEPENDENCY_BOUNDARY_REJECTED` | terminate |
 | `DEPENDENCY_PROOF_FAILED` | terminate |
 

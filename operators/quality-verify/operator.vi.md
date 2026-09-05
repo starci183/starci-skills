@@ -181,6 +181,7 @@ Gate result giữ nhánh đo thực trong sessionBranch. Giá trị ngoài sessi
 | `changes` | `backend.generate`, `interface.generate`, `library.update` hoặc lượt phục vụ hoàn tất của `runtime.serve`, những path đã dịch chuyển cùng cổng và bề mặt chúng nêu | không |
 | `frontend-surface-audit` | `interface.audit`, tám topic proof nó đã đóng ở cùng head | không |
 | `uat-flow-verification` | `uat.verify`, topic trải nghiệm nó đã đóng ở cùng head | không |
+| `service-receipt` | `service.operate`, dịch vụ Sonar mà gate `sonar` gửi lên; vắng mặt khi gate ấy không nằm trong kế hoạch | không |
 
 ## Yêu cầu
 
@@ -254,4 +255,5 @@ thành đạt vì gate hoặc UAT đạt. Các gate chất lượng và các cas
 | phán quyết xanh và head đã publish phải tới được một môi trường | `release.deploy` |
 | các gate xanh và lời hứa phải được đối chiếu với source đã giao | `business.reconcile` |
 | các gate xanh và có người yêu cầu đi thử hành trình | `uat.verify` |
+| các gate xanh và bản giao giờ phải được vận hành như một client đối với runtime đang phục vụ | `api.verify` |
 | các gate xanh và nhiệm vụ nêu hơn một hành trình, nên các luồng được gọi tên trước khi mỗi nhánh đi một luồng | `uat.plan` |

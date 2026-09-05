@@ -11,7 +11,8 @@ now carries or stop on the first discrepancy that stands.
 Done when the `business-reconciliation` carries one row per dimension of the frozen coverage matrix
 with the delivered evidence each rests on and no discrepancy standing, the `claims` bind every
 delivered fact to the frozen source head, and the `model` republishes the same head under the
-exclusive lease with the reconciliation it performed and the legal transition it took.
+exclusive lease with the reconciliation it performed and the legal transition it took, archived under
+its content address and named by the head index with the state it now holds.
 
 ## A reconciliation reads delivered source, never a plan
 
@@ -43,6 +44,30 @@ alias. `features/` is the only segment between the root and a feature, so a head
 the previous head is named rather than erased, and the coverage fingerprint travels unchanged, so
 quality and UAT can prove they consumed the same matrix rather than a paraphrase of it.
 
+## Publishing a head is three writes or none
+
+A head written to its feature directory alone is a head no other reader finds: the index of the
+businesses root still names the head it replaced, and everything that binds a promise by content
+address goes on reading the promise that was superseded. Publishing the head is therefore this
+operator's job and not a person's afterwards, and it is one write set: the feature directory, the
+canonical model archived in the content store under its own address, and the feature's entry in the
+head index naming that address with the state the head now holds, the base head unchanged, the head
+replaced, the delivered source heads the claims bind, and the addresses of the frozen claims and
+matrix. An index that names a source head no fact claim binds rests the promise on evidence nobody
+read, and is refused the same way a missing object is.
+
+A head carries two numbers and they are never substituted for each other. Its **address** — what the
+store files it under and what the index names — is the document exactly as it stands, its own
+fingerprint field included, which is what makes an archived object hash to its own name. Its
+**fingerprint** is the document without that field, and it is what a receipt correlates a matrix or a
+claim set by. Reading one where the other is meant publishes a head under a name the store does not
+hold.
+
+`previousHeadRef` names the archived object of the head it replaced, never a session file: a session
+is deleted and a lineage pointing into one stops resolving, so a lineage is a chain of objects. When
+the head being replaced was never archived, this operator archives it first, from the feature
+directory as it stood, and the receipt's `## Lineage` says which of the two happened.
+
 ## A reconciled head is reconciled again when the delivery moves
 
 A head published `implemented` binds its fact claims to one source head. When the delivered source moves
@@ -54,19 +79,22 @@ a decision that changes the promise still moves the state.
 
 ## Boundary
 
-Context is read-only apart from the one feature head. The operator writes only `response/` of its
-own branch — `response.md`, `response/data/claims.json`, `response/data/model.json` and
-`response.json` — plus the republished head under `@worktrees/businesses/<featureId>`. It never
-models a promise, freezes or edits a coverage matrix, restates a promise, promotes an example or an
-intent into product truth, publishes a head while a discrepancy stands, advances a head through a
-transition the lifecycle does not allow, modifies product source, or claims that a quality gate or a
-UAT run has passed.
+Context is read-only apart from the one head it publishes. The operator writes only `response/` of
+its own branch — `response.md`, `response/data/claims.json`, `response/data/model.json` and
+`response.json` — plus that head under `@worktrees/businesses`, which is three files and no others:
+the feature directory `features/<featureId>`, the objects the publication archives under
+`objects/sha256/<address>.json`, and the feature's entry in the head index
+`business-registry-v1.json`. It never models a promise, freezes or edits a coverage matrix, restates
+a promise, promotes an example or an intent into product truth, publishes a head while a discrepancy
+stands, leaves a published head unarchived or unnamed by the index, rewrites another feature's entry
+or an object already archived, advances a head through a transition the lifecycle does not allow,
+modifies product source, or claims that a quality gate or a UAT run has passed.
 
 ## Context
 
 | Alias | Bind | Required |
 | --- | --- | --- |
-| `@worktrees/businesses/<featureId>` | the published head, its state and its frozen coverage matrix, by content address from the registry; the one place this operator writes outside its branch | yes |
+| `@worktrees/businesses/<featureId>` | the published head, its state and its frozen coverage matrix, by content address from the head index; the one place this operator writes outside its branch, as the feature directory, the archived objects and the feature's index entry together | yes |
 | `@workspaces/be` | the routed backend checkout read at the frozen head; every fact claim cites it by path, line range and head | yes |
 
 ## Inputs
@@ -76,6 +104,7 @@ UAT run has passed.
 | `backend-source-application` | `backend.generate`; the delivered source the reconciliation reads | yes |
 | `quality-verification` | `quality.verify`; the gates that passed on the delivered head, read as evidence only | no |
 | `uat-flow-verification` | `uat.verify`; the journey that was walked on the delivered head, read as evidence only | no |
+| `api-verification` | `api.verify`; the end-to-end suite run as a client against the delivered head, read as evidence only | no |
 
 ## Requirements
 
@@ -94,7 +123,7 @@ UAT run has passed.
 | 2 | Read the published head, its state and its frozen coverage matrix, and check the transition and the authority it needs | `featureId`, `targetState`, `approval` | @worktrees/businesses/<featureId>: the current head, its state, its matrix and its fingerprints | — | `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED` |
 | 3 | Normalize the delivered source into fact claims, each with its path, line range and head | — | input `backend-source-application`, @workspaces/be at the frozen head, inputs `quality-verification` and `uat-flow-verification` as evidence only, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING` |
 | 4 | Compare every row of the frozen matrix with the delivered claims and record each discrepancy against its dimension | — | `response/data/claims.json`, @worktrees/businesses/<featureId> for the matrix at the published head | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
-| 5 | Republish the head under an exclusive lease with the reconciliation it now carries | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head | @worktrees/businesses/<featureId> as the new model.json head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
+| 5 | Publish the head under an exclusive lease with the reconciliation it now carries: the feature directory, the object it is archived under and the entry that names it | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head, its archived object and the head index entry that names it | @worktrees/businesses/<featureId> as the new model.json head, its object in the content store and the feature's entry in the head index, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
 | 6 | Emit | — | everything above | `response/response.json` | — |
 
 A resume begins again at step 1, reuses only unchanged fingerprinted observations, and reads the

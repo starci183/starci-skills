@@ -14,7 +14,7 @@ Primary output: `quality-verification`
 
 ## Inputs
 
-`backend-source-application` (optional), `frontend-source-application` (optional), `changes` (optional), `frontend-surface-audit` (optional), `uat-flow-verification` (optional)
+`backend-source-application` (optional), `frontend-source-application` (optional), `changes` (optional), `frontend-surface-audit` (optional), `uat-flow-verification` (optional), `service-receipt` (optional)
 
 ## Outputs
 

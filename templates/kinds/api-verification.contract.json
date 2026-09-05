@@ -1,0 +1,89 @@
+{
+  "kind": "api-verification",
+  "title": "^# api-verification — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Binding$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Run",
+        "Approval",
+        "Flow",
+        "Environment",
+        "Pinned commit",
+        "Served head",
+        "Served contains pinned",
+        "Endpoint",
+        "Namespace",
+        "Account",
+        "Credential",
+        "Command",
+        "Command source",
+        "Exit code",
+        "Run record",
+        "Latest"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Cases$",
+      "table": "| Case | Request | Status | Assertion | Duration | Evidence |",
+      "minRows": 1,
+      "cell": {
+        "Case": "\\S",
+        "Request": "\\S",
+        "Status": "^(pass|fail|skipped)$",
+        "Assertion": "\\S",
+        "Duration": "^[0-9]+ms$",
+        "Evidence": "\\S"
+      }
+    },
+    {
+      "heading": "^## Lanes$",
+      "table": "| Lane | Verdict | Evidence |",
+      "exactRows": 3,
+      "rows": [
+        "contract",
+        "data",
+        "lifecycle"
+      ],
+      "cell": {
+        "Lane": "^`(contract|data|lifecycle)`$",
+        "Verdict": "^(pass|fail)$",
+        "Evidence": "\\S"
+      }
+    },
+    {
+      "heading": "^## Namespace$",
+      "table": "| Record | Store | Inside | Read back |",
+      "cell": {
+        "Record": "\\S",
+        "Store": "\\S",
+        "Inside": "^(yes|no)$",
+        "Read back": "\\S"
+      }
+    },
+    {
+      "heading": "^## Printed$",
+      "table": "| Artifact | Why |",
+      "cell": {
+        "Artifact": "^(`[^`]+`|https?://\\S+)$",
+        "Why": "\\S"
+      }
+    },
+    {
+      "heading": "^## Findings$",
+      "table": "| Code | Statement |",
+      "cell": {
+        "Code": "^`[A-Z][A-Z0-9_]+`$",
+        "Statement": "\\S"
+      }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |"
+    }
+  ]
+}

@@ -156,7 +156,7 @@ const fixturesDir = path.join(root, 'tests', 'chains');
 const fixtures = await Promise.all((await readdir(fixturesDir)).filter((f) => f.endsWith('.json')).sort().map(async (f) => JSON.parse(await readFile(path.join(fixturesDir, f), 'utf8'))));
 const strip = (id) => id.split('#')[0];
 test('every fixture names its mission, its example chain and its end, and its id equals its file name', async () => {
-  assert.equal(fixtures.length, 14);
+  assert.equal(fixtures.length, 16);
   for (const fx of fixtures) {
     assert.ok(fx.mission?.doneWhen?.length, `${fx.id}: mission.doneWhen`);
     assert.ok(Array.isArray(fx.example) && fx.example.length, `${fx.id}: example`);

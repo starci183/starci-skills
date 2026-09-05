@@ -172,19 +172,20 @@
       }
     },
     "registry": {
-      "purpose": "Read a package registry: the published Grammar, its version, its files.",
+      "purpose": "Read a package registry — a published package, its version, its files — and publish one packed release to it.",
       "modes": {
         "never": "no registry reads",
-        "read": "npm view and the installed package in node_modules; publishing stays with a person"
+        "read": "npm view and the installed package in node_modules; nothing is published",
+        "publish": "read, and publish one packed release of the owner package to the registry the package manifest names, exactly the tarball the receipt digests, under that manifest's own publishConfig, with the credential resolved by name through @tools/secrets and never printed; never a version the registry already serves, and the served version and the integrity it serves are read back and compared with the receipt before any publication is recorded"
       },
       "support": {
         "openai": {
           "supported": true,
-          "via": "npm through the Codex shell"
+          "via": "npm view, and npm publish for mode publish, through the Codex shell"
         },
         "claude": {
           "supported": true,
-          "via": "npm through Bash"
+          "via": "npm view, and npm publish for mode publish, through Bash"
         }
       }
     },

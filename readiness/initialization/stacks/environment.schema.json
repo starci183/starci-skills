@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://starci.dev/v9/readiness/initialization/stacks/environment.schema.json",
   "title": "Environment declaration",
-  "description": "`<Source>/.stacks/<env>/environment.json`: what one environment of the installation declares about itself. The folder's presence is what names the environment — an `env` requirement is checked against the folder, never against a list. This file declares who authorises each operation class and which nonsecret migration targets the environment owns. Authority for a platform operation comes from the environment's declaration, not from a per-run approval, whenever the declaration marks that operation's class `declared`; a class marked `person` needs an approval id. A request's `approval` therefore accepts either an approval id or a reference to this file — its path and the hash of its bytes, in the shape `$defs.reference` gives — and the reference is an approval only for a class this declaration marks `declared`, in this environment. A class the declaration omits takes the default `$defs.defaults` gives for its `production` value: a non-production environment authorises identity provisioning, seeding, the shared runtime's rungs, the stack's bring-up and outbound quality uploads by declaration and keeps release with a person; a production environment keeps every class with a person. Any declaration may tighten a class to `person`; a production declaration may not loosen `release`, and this schema refuses one that tries. Silence remains silence: a request with no `approval` is not one whose environment answered.",
+  "description": "`<Source>/.stacks/<env>/environment.json`: what one environment of the installation declares about itself. The folder's presence is what names the environment — an `env` requirement is checked against the folder, never against a list. This file declares who authorises each operation class, which auxiliary services the environment runs beside its product routes, and which nonsecret migration targets it owns. Authority for a platform operation comes from the environment's declaration, not from a per-run approval, whenever the declaration marks that operation's class `declared`; a class marked `person` needs an approval id. A request's `approval` therefore accepts either an approval id or a reference to this file — its path and the hash of its bytes, in the shape `$defs.reference` gives — and the reference is an approval only for a class this declaration marks `declared`, in this environment. A class the declaration omits takes the default `$defs.defaults` gives for its `production` value: a non-production environment authorises identity provisioning, seeding, the shared runtime's rungs, the stack's bring-up, its own declared services and outbound quality uploads by declaration and keeps release with a person; a production environment keeps every class with a person. Any declaration may tighten a class to `person`; a production declaration may not loosen `release`, and this schema refuses one that tries. Silence remains silence: a request with no `approval` is not one whose environment answered.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -26,6 +26,63 @@
     "production": {
       "type": "boolean",
       "description": "Whether people are served from this environment. It selects which column of `$defs.defaults` an omitted class takes, and it is what forbids loosening `release`."
+    },
+    "services": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "The auxiliary services this environment runs beside its product routes — an observability stack, a code-quality service, a tunnel to a served runtime — enumerated here and nowhere else, so the operator that brings one up takes the service the declaration names and never one a request invented. A service is addressed by its `id`; readiness asks one question per declared service and the service operator runs one of them per branch. An environment that declares none has no such service, which is a fact and not a gap.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "desired",
+          "command",
+          "probe",
+          "holder"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "The name a request and a receipt address this service by; unique within the declaration."
+          },
+          "kind": {
+            "enum": [
+              "observability",
+              "sonar",
+              "tunnel",
+              "other"
+            ],
+            "description": "What the service is for, which is what tells a reader why the chain needs it: metrics and logs, the code-quality service a gate posts to, a tunnel that carries a served runtime outward, or anything else the environment owns."
+          },
+          "desired": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "description": "The state this environment wants the service in when nothing asks otherwise. A request may ask for the other state or for `attested`, and the receipt records both what was asked and what was observed."
+          },
+          "command": {
+            "$ref": "#/$defs/commandRef",
+            "description": "The declared command that brings the service up and takes it down. It is a reference the environment publishes, never a shell line typed into a request, so what runs is what the environment declared."
+          },
+          "probe": {
+            "$ref": "#/$defs/serviceProbe"
+          },
+          "holder": {
+            "$ref": "#/$defs/authority",
+            "description": "`declared`: this declaration is the approval for operating this one service. `person`: the environment keeps this service with a person, and an operator asked to move it stops for them."
+          },
+          "publicPort": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "description": "The port this service binds when it is up, where the environment fixes one. A port a product route is already projected onto is a collision the readiness check reports rather than a port either side may move."
+          }
+        }
+      }
     },
     "migrationTargets": {
       "type": "array",
@@ -98,6 +155,10 @@
         "stack-up": {
           "$ref": "#/$defs/authority",
           "description": "Bringing up the environment's declared infrastructure."
+        },
+        "service": {
+          "$ref": "#/$defs/authority",
+          "description": "Operating one auxiliary service this declaration names under `services`: bringing it up, taking it down, or attesting it where it stands. A service whose own `holder` is `person` stays with a person whatever this class says."
         },
         "external-upload": {
           "$ref": "#/$defs/authority",
@@ -195,6 +256,43 @@
         }
       }
     },
+    "commandRef": {
+      "type": "string",
+      "pattern": "^command-ref://[A-Za-z0-9][A-Za-z0-9_./-]*$",
+      "description": "A command the environment publishes, named rather than spelled out, so the thing that runs is the thing the environment declared and a request can neither widen it nor add an argument to it."
+    },
+    "serviceProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How a service is proved to answer: one endpoint to request, or one port to connect to, never both. The probe is what turns `up` from an assertion into an observation, and the same probe read the other way is what proves a `down`.",
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "url"
+              ]
+            },
+            {
+              "required": [
+                "port"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "pattern": "^https?://[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    },
     "authority": {
       "enum": [
         "declared",
@@ -209,6 +307,7 @@
         "seed": "person",
         "runtime": "person",
         "stack-up": "person",
+        "service": "person",
         "external-upload": "person",
         "release": "person"
       },
@@ -217,6 +316,7 @@
         "seed": "declared",
         "runtime": "declared",
         "stack-up": "declared",
+        "service": "declared",
         "external-upload": "declared",
         "release": "person"
       }

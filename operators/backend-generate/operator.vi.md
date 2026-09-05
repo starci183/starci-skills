@@ -155,8 +155,7 @@ với cổng riêng của chúng.
 
 Khi đầu vào `model` có mặt, nó là thẩm quyền của lượt chạy này và head đã publish chỉ còn là dòng dõi:
 một chuỗi vừa mô hình hoá xong một head không được quyết ngược lại một lời hứa cũ hơn chỉ vì lần
-publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền.
-
+publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền. Nó không bao giờ stash, reset, force, clean, rebase hay checkout sang nhánh khác bên trong checkout được route, và không xoá bằng tay bất cứ thứ gì dưới một checkout có `node_modules` là junction — một worktree tạm được gỡ bằng `git worktree remove --force`. `## Binding` của `changes.md` là nơi đọc hai luật ấy: `Preflight` dạng `<passed|failed> at <ISO 8601 instant>`, còn `Reflog before` và `Reflog after` dạng `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
 ## Context
 
 | Alias | Bind | Bắt buộc |
@@ -192,7 +191,7 @@ publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền.
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate, chạy lại và xác nhận phiên | `resume`, `mode` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, đầu vào `backend-source-application` nếu có, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Kiểm gate, chạy lại, xác nhận phiên, và chạy preflight của request trước lần ghi đầu ra ngoài thư mục phiên | `resume`, `mode` | `request/request.json`, `state.json` của phiên và `step-N/parallel-M` của nhánh này, đầu vào `backend-source-application` nếu có, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng thẩm quyền, contract và pattern | `featureId`, `contractFingerprint` | đầu vào `model` khi có, nếu không thì @worktrees/businesses/<featureId> ở head đã publish, đầu vào `architecture-decision` làm contract đóng băng và làm nguồn `operations` của nó, @knowledge/patterns/be mỗi khía cạnh một pattern | — | `CONTRACT_UNFROZEN`, `BUSINESS_AUTHORITY_MISSING`, `PATTERN_UNBOUND` |
 | 3 | Điền từng operation của contract, trên nhánh phiên, đầy đủ hoặc như một fix | `mutableFileRefs`, `protectedRefs`, `scope` | @knowledge/patterns/be cho từng khía cạnh, @workspaces/be trong ranh giới chủ sở hữu | @workspaces/be/branch/session trong ranh giới chủ sở hữu, hoặc ngoài nó dưới dạng một lần nới có ghi nhận và không bao giờ trong một ref được bảo vệ, dưới một lease độc quyền, @tools/sourcewrite | `CONTRACT_WIDENED`, `OWNER_WIDENED`, `OWNER_CONFLICT` |
 | 4 | Đối chiếu mọi mutation với contract đóng băng và ghi nó kèm hash trước và sau | `mode` | @workspaces/be, các file bị chạm và contract đóng băng | `response/data/mutations.json` | — |

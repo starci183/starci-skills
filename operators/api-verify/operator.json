@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 9,
+  "id": "api.verify",
+  "domain": "api",
+  "job": "Run the repository's own end-to-end suite as a client against the served runtime, on the namespace the seed placed, and publish one append-only run record whose cases are the runner's and whose three lanes are judged apart, or stop at the exact unavailability instead of manufacturing a verdict.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "astra",
+    "grammarBound": false,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/sourcewrite": "declared-write-set",
+      "@tools/git": "read",
+      "@tools/shell": "declared-commands",
+      "@tools/http": "probe",
+      "@tools/secrets": "resolve-by-name",
+      "@tools/print": "decision-points"
+    }
+  },
+  "primaryOutput": "api-verification"
+}

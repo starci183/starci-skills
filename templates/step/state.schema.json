@@ -468,7 +468,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 16,
-          "description": "the person's language tag; the block is printed in it"
+          "description": "the language tag the block is printed in: the display language of resources/settings.json#language (over settings.example.json, default vi) unless the person's own message is plainly in another, which is then recorded here"
         },
         "goal": {
           "type": "string",

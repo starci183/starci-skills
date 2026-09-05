@@ -190,6 +190,7 @@ Gate results retain their actual measured branch in sessionBranch. A non-session
 | `changes` | `backend.generate`, `interface.generate`, `library.update` or a completed `runtime.serve`, the paths that moved and the gates and surfaces they name | no |
 | `frontend-surface-audit` | `interface.audit`, the eight proof topics it closed at the same head | no |
 | `uat-flow-verification` | `uat.verify`, the experience topic it closed at the same head | no |
+| `service-receipt` | `service.operate`, the Sonar service the `sonar` gate posts to; absent when the gate is not planned | no |
 
 ## Requirements
 
@@ -263,4 +264,5 @@ passed because quality gates or UAT pass. Quality thresholds and frozen UAT case
 | the verdict is green and the published head must reach an environment | `release.deploy` |
 | the gates are green and the promise must be reconciled against the delivered source | `business.reconcile` |
 | the gates are green and a person asked for the journey to be walked | `uat.verify` |
+| the gates are green and the delivery must now be exercised as a client against the served runtime | `api.verify` |
 | the gates are green and the mission names more than one journey, so the flows are named before one is walked per branch | `uat.plan` |

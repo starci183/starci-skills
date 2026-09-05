@@ -21,7 +21,9 @@ dependency entries of the declared consumer manifests and lockfile with the inst
 matching the release file for file, each `dependency-proof` with its raw `dependency-log` shows the
 unchanged consumer regression and every declared consumer gate passing on it, and the `changes` names
 the paths of both commits; or, under mode `publish`, the package half alone ends at that
-`library-release` beside its `library-archive` with no consumer metadata touched; or, under mode
+`library-release` beside its `library-archive`, published to the registry the package manifest names
+under the archive's own integrity unless the request asked for no publication, with no consumer
+metadata touched; or, under mode
 `consume`, the consumer half alone runs against the `library-release` a sibling session produced,
 writing the one metadata commit and no package source at all.
 
@@ -41,17 +43,28 @@ gate below reads only the half its mode needs:
 - `full` — the default. The owner package and the consumer live in the routed checkout, both plans
   are supplied, and the branch makes both commits, package first.
 - `publish` — the owner route alone. `plan` is supplied and `consumer` is not; the branch repairs the
-  package with its before and after proof, bumps the version, commits once, packs the archive and
-  records the `library-release` that identifies it. No consumer metadata is read or written, and no
-  consumer section may appear in the receipt. Publishing that release to a registry is a person's
-  authority, which no operator of this tree holds: the record carries its publication as pending, and
-  a run that claims otherwise is refused.
+  package with its before and after proof, bumps the version, commits once, packs the archive,
+  publishes it and records the `library-release` that identifies it. No consumer metadata is read or
+  written, and no consumer section may appear in the receipt. Publication is the end of this mode, not
+  an errand left for a person: with the package proofs green and the archive packed and digested, the
+  archive itself goes to the registry the package manifest names, under that manifest's own
+  `publishConfig` for provenance and access, with the credential resolved by name and never printed.
+  The registry is then read back: it must serve that exact version, and the integrity it serves must
+  equal the digest of the archive the receipt carries. Only then does the record say
+  `publication { registry, version, state: "published", integrity, at }`. A registry that already
+  serves the version, an integrity that differs, or a refused publish is `LIBRARY_PUBLISH_REJECTED`
+  with the registry's own answer as the reason — never a receipt that quietly says pending. A pending
+  publication is lawful in one case only: a request that preset `publish: false` because a person will
+  publish that archive themselves.
 - `consume` — the consumer route alone. `consumer` is supplied and `plan` is not; the input is the
   `library-release` of an earlier branch — a sibling session's, imported into this session, or an
   earlier branch of this one — and the job is exactly the consumer half: the exact manifest delta,
   the lock identity, the dependency closure and the consumer proofs against that release. No package
   source is written, no package section may appear in the receipt, and the package identity and the
-  version consumed are read from the release record rather than from a plan.
+  version consumed are read from the release record rather than from a plan. That record may be
+  `published` or `pending`; a pending one is the rare path, because it names an archive that lives
+  only inside the producing session, and a consumer whose metadata resolves to a place no other
+  checkout has is `DEPENDENCY_BOUNDARY_REJECTED`.
 
 So an owner package in one repository and its consumer in another are a `publish` branch on the owner
 route and a `consume` branch on the consumer route, the second binding the first's `library-release`
@@ -68,7 +81,9 @@ with the same paired regression reading the recipe. Only existing behavior files
 regression tests, the existing manifest's next patch version, the package changelog and package
 version metadata in a lockfile may change. A workspace lockfile is allowed only when the plan and
 route both name it; its parsed content may change only the bound package entry's version. Presentation
-changes use the interface pipeline. The package is never published, pushed, merged or tagged here.
+changes use the interface pipeline. The package is never pushed, merged or tagged here, and the only
+way it leaves this checkout is the publication step of mode `publish`: the packed archive, whole and
+unmodified, to the registry its own manifest names. It never stashes, resets, forces, cleans, rebases or checks out another branch inside the routed checkout, and it deletes nothing by hand under a checkout whose `node_modules` is a junction — a temporary worktree is removed with `git worktree remove --force`. `## Binding` of `changes.md` is where those two laws are read: `Preflight` as `<passed|failed> at <ISO 8601 instant>`, and `Reflog before` and `Reflog after` as `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
 
 ## Boundary of the consumer half
 
@@ -90,7 +105,10 @@ the paired tests first. Run `run-proof.mjs <branch> before`; it requires behavio
 remain at the base, and records the declared regression's failing assertion. Apply the behavior repair
 and the next patch version, then run the helper for `after` and every declared package gate. Each
 existing package test, typecheck and build script is required without filters. Commit the declared
-package set once, then pack the archive and record the release. Under `full` and `consume`, run
+package set once, then pack the archive and digest it. Under `publish`, unless the request preset
+`publish: false`, that digested archive is published then and there and the registry is read back
+before the release is recorded; under the other two modes the archive is consumed inside this
+checkout and reaches no registry. Record the release. Under `full` and `consume`, run
 `install.mjs <branch> baseline` and `run-proof.mjs <branch> consumer-before` against the installed
 version and the unchanged consumer regression, `install.mjs <branch> release` to consume the bound
 release within the exact metadata boundary, and the helper for `consumer-after` and every declared
@@ -123,26 +141,29 @@ a proof from different bytes is rejected.
 | `mode` | choice | full | `full` runs both halves in the routed checkout; `publish` runs the owner half alone and ends at the recorded release; `consume` runs the consumer half alone against a bound `library-release` |
 | `plan` | object | null | The closed library-behavior-plan schema: owner package identity, exact file set, paired regression, existing scripts and next patch; supplied under `full` and `publish`, absent under `consume` |
 | `consumer` | object | null | The closed dependency-plan schema: the consumer manifests and lockfile that pin the package, the unchanged consumer regression and the complete delivery gates; supplied under `full` and `consume`, absent under `publish` |
+| `publish` | choice | true | `true` publishes the packed release to the registry when the package proofs are green; `false` leaves it packed for a person; read under mode `publish`, where nothing else makes a release reach a registry |
 | `resume` | token | null | The blocked branch token when re-entering with a changed plan or proof |
 
 ## Steps
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the request and preflight the halves the mode names before the first write | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, input `route`, input `library-release` under `consume`, @workspaces/fe at the base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
+| 1 | Validate the request, run the request preflight, and preflight the halves the mode names, all before the first write outside the session folder | `mode`, `plan`, `consumer`, `resume` | `request/request.json`, input `route`, input `library-release` under `consume`, @workspaces/fe at the base, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `LIBRARY_BOUNDARY_REJECTED`, `DEPENDENCY_BOUNDARY_REJECTED` |
 | 2 | Write only the paired regression tests in the owner package and prove the failure | `plan` | @workspaces/fe at the base, @tools/shell | @workspaces/fe/branch/session within the test ceiling, @tools/sourcewrite, `library-proof` | `LIBRARY_PROOF_FAILED` |
 | 3 | Repair the declared behavior and bump the next patch version | `plan` | @workspaces/fe inside the package ceiling | @workspaces/fe/branch/session within the declared file set, @tools/sourcewrite | `LIBRARY_BOUNDARY_REJECTED` |
 | 4 | Run the regression and the complete package test, typecheck and build scripts | `plan` | @workspaces/fe, @tools/shell | `library-proof` | `LIBRARY_PROOF_FAILED` |
 | 5 | Commit the package delivery once and verify its Git change set and proof hashes | `plan` | @workspaces/fe at the package commit, @tools/git | @workspaces/fe/branch/session, `library-source-application` | `LIBRARY_BOUNDARY_REJECTED`, `LIBRARY_PROOF_FAILED` |
 | 6 | Pack the archive from the package commit and record the release it identifies | `plan` | @workspaces/fe at the package commit, @tools/shell | `library-archive`, `library-release` | `DEPENDENCY_BOUNDARY_REJECTED` |
-| 7 | Install the baseline in the consumer and run the unchanged consumer regression | `consumer` | @workspaces/fe, the bound release, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
-| 8 | Install the bound release within the exact consumer metadata boundary | `consumer` | @workspaces/fe and the bound release, @tools/shell | @workspaces/fe/branch/session within the metadata ceiling, @tools/sourcewrite | `DEPENDENCY_BOUNDARY_REJECTED` |
-| 9 | Verify the installed bytes and run the consumer regression and complete gates | `consumer` | @workspaces/fe, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
-| 10 | Commit the consumer metadata once and verify its delta and proof hashes | `consumer` | @workspaces/fe at the consumer commit, @tools/git | @workspaces/fe/branch/session, `dependency-update` | `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
-| 11 | Emit | — | everything above | `changes`, `response/response.json` | — |
+| 7 | Publish the digested archive to the registry the manifest names, read the served version and integrity back, and record the publication | `plan`, `publish` | @workspaces/fe at the package commit, `library-release`, @tools/registry, @tools/secrets | `library-release` | `LIBRARY_PUBLISH_REJECTED` |
+| 8 | Install the baseline in the consumer and run the unchanged consumer regression | `consumer` | @workspaces/fe, the bound release, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
+| 9 | Install the bound release within the exact consumer metadata boundary | `consumer` | @workspaces/fe and the bound release, @tools/shell | @workspaces/fe/branch/session within the metadata ceiling, @tools/sourcewrite | `DEPENDENCY_BOUNDARY_REJECTED` |
+| 10 | Verify the installed bytes and run the consumer regression and complete gates | `consumer` | @workspaces/fe, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
+| 11 | Commit the consumer metadata once and verify its delta and proof hashes | `consumer` | @workspaces/fe at the consumer commit, @tools/git | @workspaces/fe/branch/session, `dependency-update` | `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
+| 12 | Emit | — | everything above | `changes`, `response/response.json` | — |
 
-Steps 2 to 6 are the package half and run under `full` and `publish`; steps 7 to 10 are the consumer
-half and run under `full` and `consume`. Under `full`, `response.json` carries both shas under
+Steps 2 to 6 are the package half and run under `full` and `publish`; step 7 is the publication and
+runs under `publish` alone, and only where the request did not preset `publish: false`; steps 8 to 11
+are the consumer half and run under `full` and `consume`. Under `full`, `response.json` carries both shas under
 `commits`, the package commit first, and the `dependency-update` names the package commit as its
 `base`; under `publish` it carries the package commit alone, under `consume` the consumer commit
 alone, whose base is the frozen route head. The consumer proofs are the phases `consumer-before`,
@@ -175,6 +196,7 @@ branch had no authority to write.
 | `NO_PROGRESS` | terminate |
 | `LIBRARY_BOUNDARY_REJECTED` | terminate |
 | `LIBRARY_PROOF_FAILED` | terminate |
+| `LIBRARY_PUBLISH_REJECTED` | terminate |
 | `DEPENDENCY_BOUNDARY_REJECTED` | terminate |
 | `DEPENDENCY_PROOF_FAILED` | terminate |
 

@@ -8,13 +8,13 @@ Compare one published business promise, dimension by dimension of its frozen cov
 
 ## Done when
 
-Done when the `business-reconciliation` carries one row per dimension of the frozen coverage matrix with the delivered evidence each rests on and no discrepancy standing, the `claims` bind every delivered fact to the frozen source head, and the `model` republishes the same head under the exclusive lease with the reconciliation it performed and the legal transition it took.
+Done when the `business-reconciliation` carries one row per dimension of the frozen coverage matrix with the delivered evidence each rests on and no discrepancy standing, the `claims` bind every delivered fact to the frozen source head, and the `model` republishes the same head under the exclusive lease with the reconciliation it performed and the legal transition it took, archived under its content address and named by the head index with the state it now holds.
 
 Primary output: `business-reconciliation`
 
 ## Inputs
 
-`backend-source-application`, `quality-verification` (optional), `uat-flow-verification` (optional)
+`backend-source-application`, `quality-verification` (optional), `uat-flow-verification` (optional), `api-verification` (optional)
 
 ## Outputs
 

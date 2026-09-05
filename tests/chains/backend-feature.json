@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "id": "backend-feature",
   "when": {
-    "en": "Server behaviour, an API contract, persistence or a job changes for one business feature; the architecture is decided first and the promise is reconciled after the code lands. This chain writes no surface, so it carries no interface.audit and no uat.verify: uat.verify requires a frontend-surface-audit input and a bound fe route, and neither exists here. A feature whose promise reaches a person through a screen is not this chain — it is full-feature, which walks the journey before it publishes.",
-    "vi": "Hành vi server, contract API, persistence hay job đổi cho một feature nghiệp vụ; kiến trúc quyết trước, lời hứa được đối chiếu sau khi code đã vào. Chuỗi này không ghi bề mặt nào nên không mang interface.audit và không mang uat.verify: uat.verify cần đầu vào frontend-surface-audit và một route fe đã bind, ở đây không có cái nào. Một feature mà lời hứa chạm tới người qua màn hình thì không thuộc chuỗi này — nó là full-feature, nơi hành trình được đi trước khi publish."
+    "en": "Server behaviour, an API contract, persistence or a job changes for one business feature; the architecture is decided first, the delivery is exercised as a client before it is trusted, and the promise is reconciled after the code lands. This chain writes no surface, so it carries no interface.audit and no uat.verify: uat.verify requires a frontend-surface-audit input and a bound fe route, and neither exists here. What a backend delivery owes instead is api.verify — the repository's own end-to-end suite run as a client against the served runtime rather than as a gate inside the checkout — which is why the chain serves the head before it publishes it. A feature whose promise reaches a person through a screen is not this chain — it is full-feature, which walks the journey before it publishes.",
+    "vi": "Hành vi server, contract API, persistence hay job đổi cho một feature nghiệp vụ; kiến trúc quyết trước, bản giao được vận hành như một client trước khi được tin, và lời hứa được đối chiếu sau khi code đã vào. Chuỗi này không ghi bề mặt nào nên không mang interface.audit và không mang uat.verify: uat.verify cần đầu vào frontend-surface-audit và một route fe đã bind, ở đây không có cái nào. Thứ một bản giao backend nợ thay vào đó là api.verify — chính bộ kiểm end-to-end của repository chạy như một client đối với runtime đang phục vụ chứ không phải như một gate bên trong checkout — nên chuỗi phục vụ head trước khi publish nó. Một feature mà lời hứa chạm tới người qua màn hình thì không thuộc chuỗi này — nó là full-feature, nơi hành trình được đi trước khi publish."
   },
   "mission": {
-    "goal": "one backend feature lands against a decided architecture and a reconciled promise",
+    "goal": "one backend feature lands against a decided architecture, answers a client, and carries a reconciled promise",
     "doneWhen": [
       {
         "evidence": "the promise is modelled and published",
@@ -15,6 +15,10 @@
       {
         "evidence": "the backend contract is filled on the session branch",
         "producedBy": "backend.generate"
+      },
+      {
+        "evidence": "the delivery answers a client through its own end-to-end suite on the served runtime",
+        "producedBy": "api.verify"
       },
       {
         "evidence": "the promise is reconciled against the delivered source",
@@ -57,7 +61,13 @@
       "backend.generate"
     ],
     [
+      "runtime.serve"
+    ],
+    [
       "quality.verify"
+    ],
+    [
+      "api.verify"
     ],
     [
       "business.reconcile"
@@ -67,5 +77,5 @@
     ]
   ],
   "ends": "git.publish",
-  "rewrite": "backend.source.apply → backend.generate; business.decide (mode reconcile) → business.reconcile."
+  "rewrite": "backend.source.apply → backend.generate; business.decide (mode reconcile) → business.reconcile. The e2e line is api.verify's, not quality.verify's: the gate proves the code and never leaves the checkout, so the chain serves the head first and runtime.serve lands before quality.verify because its Next table hands the merged changes to the gates."
 }

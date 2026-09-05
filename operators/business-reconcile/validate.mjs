@@ -3,7 +3,9 @@
 // receipt and the frozen matrix's fingerprint are the same reconciliation read three ways; the lineage
 // transition is legal and agrees with both states; every fact claim binds the frozen source head and
 // every row of the reconciliation rests on delivered evidence; a discrepancy stops the branch and
-// publishes no head; and an implemented head carries the reconciliation that earned it.
+// publishes no head; an implemented head carries the reconciliation that earned it; and the head is
+// published rather than merely written — archived under its content address and named by the index of
+// the businesses root, with a lineage that is a chain of objects.
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -11,6 +13,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { businessesRootOf, contentAddress, objectRef, openStore, verifyHeadPublication } from '../../scripts/business-registry.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const OPERATOR = 'business.reconcile';
@@ -100,6 +103,14 @@ export async function validateReconcileStep(branchDir, root = ROOT) {
     else if (model.reconciliation.discrepancies.length) errors.push(`response/data/model.json: ${model.reconciliation.discrepancies.length} discrepancy or discrepancies remain, so the branch is RECONCILIATION_DISCREPANCY and publishes no head`);
   } else if (response.status === 'done') errors.push('response/data/model.json: a done reconciliation republishes the head');
 
+  // Publishing the head is this operator's job, not a person's follow-up: a done branch has archived
+  // the model under its content address and named it in the index of the same businesses root, or the
+  // feature directory says implemented while every other reader still sees the head it replaced. The
+  // whole law lives in scripts/business-registry.mjs, so the operator that writes it and the validator
+  // that reads it back cannot drift apart.
+  const publishedRoot = model && response.status === 'done' ? businessesRootOf(String(model.headRef ?? '')) : null;
+  if (publishedRoot && claimsDoc) errors.push(...verifyHeadPublication({ store: openStore(publishedRoot), featureId: model.featureId, model, claims: claimsDoc }));
+
   if (present.has('business-reconciliation') && has('response/response.md')) {
     const text = await read('response/response.md');
     const binding = fields(tableUnder(text, '## Binding'));
@@ -110,6 +121,12 @@ export async function validateReconcileStep(branchDir, root = ROOT) {
     if (model) {
       if (binding.Head !== model.headRef) errors.push(`response/response.md: Head ${binding.Head} differs from the published head ${model.headRef}`);
       if (lineage.Transition !== model.lineage.transition) errors.push(`response/response.md: Transition ${lineage.Transition} differs from the model's ${model.lineage.transition}`);
+      if (lineage['Previous head'] !== model.lineage.previousHeadRef) errors.push(`response/response.md: Previous head ${lineage['Previous head']} differs from the model's ${String(model.lineage.previousHeadRef)}`);
+      // The receipt names the object the head was archived under, so a reader who has only this file
+      // can find the head in the store without recomputing an address.
+      const root = businessesRootOf(String(model.headRef ?? ''));
+      const expected = root ? objectRef(root, contentAddress(model)) : null;
+      if (expected && lineage['Head object'] !== expected) errors.push(`response/response.md: Head object ${lineage['Head object']} is not the archived object of the published head, ${expected}`);
       if (binding['Claims fingerprint'] !== model.claimsFingerprint) errors.push('response/response.md: Claims fingerprint must equal the model claimsFingerprint');
       if (binding['Coverage fingerprint'] !== model.coverageFingerprint) errors.push('response/response.md: Coverage fingerprint must equal the model coverageFingerprint, or backend and UAT cannot correlate the same matrix');
     }

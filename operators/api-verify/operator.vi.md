@@ -1,0 +1,188 @@
+# api.verify
+
+## Việc
+
+Chạy chính bộ kiểm end-to-end của repository như một client đối với runtime đang được phục vụ, trên
+namespace mà seed đã đặt, rồi phát hành một hồ sơ lượt chạy chỉ-thêm mà các case là của runner và ba
+làn được xét riêng, hoặc dừng đúng chỗ không sẵn sàng thay vì chế ra một phán quyết.
+
+## Xong khi
+
+Xong khi `api-cases` mang mọi case mà chính bộ kiểm của repository báo về cùng trạng thái và bằng
+chứng của nó, không case nào do nhánh này viết ra, `api-verdicts` xét riêng ba làn contract, data và
+lifecycle trên đúng bằng chứng ấy, namespace của lượt chạy được đọc lại qua API rồi bị xoá và không gì
+khác bị xoá, hồ sơ lượt chạy chỉ-thêm đã có trong lịch sử API của luồng cùng con trỏ và dòng lịch sử
+của nó, và `api-verification` gọi tên head đang phục vụ đã trả lời, commit mà head ấy chứa, lệnh đã
+chạy và bảng làn nó in ra cho người.
+
+## Một bộ kiểm chạy như gate chứng minh mã, chạy như client chứng minh sản phẩm
+
+Cùng một bộ kiểm end-to-end mang hai nghĩa khác nhau tuỳ chỗ nó được chạy. Chạy bên trong chính
+checkout của bản giao, nối vào bất cứ thứ gì bộ khung kiểm dựng lên, nó là một gate: nó chứng minh mã
+biên dịch thành hành vi mà tác giả mong đợi, và đó là việc của operator chạy gate. Chạy từ bên ngoài,
+đối với endpoint mà một runtime đang thực sự phục vụ, trên những hàng một người có thể đã nhập, đăng
+nhập bằng một tài khoản một người có thể cầm, nó là một lượt đi: nó chứng minh sản phẩm trả lời một
+client đúng như nó hứa. Một bản giao backend mà bằng chứng duy nhất là gate thì chưa từng bị vận hành
+như một client, và khác biệt giữa hai thứ ấy vô hình trong biên nhận trừ khi mỗi thứ có một operator
+sở hữu. Operator này sở hữu lượt đi. Nó không khởi động server nào, không sửa mã nguồn nào, và không
+ghi gì vào bản giao.
+
+## Bộ kiểm là của repository; một case nhánh này viết ra là một lần ghi mã nguồn
+
+Các case không phải thứ operator này được bịa ra. Nó lấy lệnh mà gate plan của route khai báo cho gate
+end-to-end — hoặc tham chiếu lệnh mà plan ấy gọi tên — rồi chạy đúng lệnh đó, không bao giờ một script
+soạn riêng cho nhánh này, bởi một script soạn riêng chứng minh đúng thứ tác giả nó muốn thấy và không
+phải bộ kiểm mà bản giao được đo. Mọi hàng của hồ sơ case được chép từ đầu ra của runner cùng định danh
+đúng như runner in ra, và một định danh case không đứng trong đầu ra nào của runner thì bị từ chối chứ
+không được xét. Một case sản phẩm cần mà bộ kiểm không có là một lỗ hổng trong mã nguồn, và lấp nó là
+một lần ghi mã nguồn thuộc về operator sở hữu mã backend; việc ấy không bao giờ xảy ra ở đây, nơi
+không gì được phép ghi vào bản giao.
+
+## Endpoint là cái đã được chứng thực, không bao giờ là cái tự suy lại
+
+Bộ kiểm được trỏ vào entry mà `platform-operation-receipt` chứng thực, và operator này không tự suy
+lại trạng thái sẵn sàng từ sổ runtime: một sổ quảng cáo sẵn sàng trong khi không gì lắng nghe chính là
+nguồn đẩy một client vào một cổng đã chết. Khi entry đã chứng thực không trả lời, lệnh dừng là
+`RUNTIME_UNAVAILABLE` đối với một endpoint có tên chứ không phải một phỏng đoán xem origin nào được
+nhắc tới, và nó chuyển cho ai phục vụ route ấy; operator này không bao giờ tự khởi động một cái.
+
+Endpoint ấy phục vụ một nhánh tích hợp mang việc của mọi phiên đã xin nó, nên head nó chạy hầu như
+không bao giờ là commit lượt chạy này kiểm. Hồ sơ vì thế mang cả hai: commit đã ghim và head đang phục
+vụ, cùng phép thử tổ tiên giữa chúng. Một head đang phục vụ không chứa commit đã ghim là lệch, và lệch
+là một lần dừng không chạy gì — nhưng một head chứa nó và chứa thêm việc khác nữa thì đúng là hình
+dáng của một nhánh tích hợp dùng chung, và chẳng phải phát hiện nào cả.
+
+## Mật khẩu là một cái tên, không bao giờ là một giá trị
+
+Tài khoản bộ kiểm đăng nhập là tài khoản riêng của luồng, và credential dùng chung được giải theo tên
+đúng nơi bộ kiểm tiêu thụ nó chứ không ở khoảnh khắc nào khác. Nó không bao giờ được chép vào một biến
+operator này ghi, một fixture, một lệnh nó ghi lại, một dòng biến môi trường nó phát hành, hay một câu
+nó in ra. Đầu ra của chính runner là bằng chứng đã phát hành và chịu cùng một luật: một giá trị đã
+lọt vào đầu ra thì đã rời khỏi vòng giữ, và hồ sơ bị từ chối. Bản ghi tài khoản vì thế mang một
+username, một vai, một tên credential và tham chiếu tới file đã niêm, và không gì có thể chứa một bí
+mật.
+
+## Namespace sở hữu mọi thứ lượt chạy này ghi
+
+Mọi bản ghi bộ kiểm tạo ra đều mang namespace mà seed đã đặt, nên thứ lượt chạy này ghi tách được khỏi
+thứ sản phẩm đã có sẵn. Làn data đọc lại những bản ghi ấy đúng cách một client đọc — qua API, không
+bao giờ bằng cách hỏi thẳng kho — bởi một hàng chỉ một truy vấn thẳng mới thấy là một hàng sản phẩm
+không thực sự phục vụ. Một bản ghi lượt chạy đặt ra ngoài namespace ấy là `API_NAMESPACE_LEAK`: bộ
+kiểm đã với tới một hàng luồng không sở hữu, và không lần dọn dẹp nào operator này được phép làm lấy
+lại được. Dọn dẹp sau đó xoá đúng namespace ấy và không gì khác: không phải namespace của lượt chạy
+khác, không phải một bản ghi chỉ tình cờ mang cùng một cờ, và không bao giờ là một hồ sơ lượt chạy.
+Bản thân việc thẩm tra chỉ đọc chứ không ghi.
+
+## Ba làn, xét riêng
+
+Contract, data và lifecycle được xét trên bằng chứng của riêng mình và không bao giờ mượn kết luận của
+nhau. Contract là mọi case runner gọi tên đều đứng vững; data là mọi lần ghi rơi vào trong namespace và
+không cái nào rơi ra ngoài, đọc lại qua API; lifecycle là namespace thẩm tra được ở chế độ chỉ-đọc rồi
+bị gỡ đi, và không gì khác đi cùng nó. Đúng ba làn được phát hành, mỗi làn có phán quyết và bằng chứng
+riêng. Một lượt chạy mà ba làn không cùng đạt thì chưa xong: một case hỏng, hoặc một case runner gọi
+tên rồi không chạy, dừng bằng `API_CASE_FAILED` và trao câu trả lời cho người sở hữu bản giao, còn một
+bản ghi ngoài namespace dừng bằng `API_NAMESPACE_LEAK` và trao ranh giới fixture cho người gọi đã khai
+báo nó.
+
+## Lượt chạy chỉ được thêm
+
+Hồ sơ lượt chạy được ghi một lần, ở cuối, dưới `runs/<runId>/` bên cạnh lịch sử trình duyệt của
+luồng chứ không nằm bên trong nó; con trỏ được chỉ vào nó và lịch sử có thêm dòng của nó. Một thư mục
+lượt chạy đã tồn tại thì không bao giờ bị ghi đè, bị cắt bớt hay bị sửa lại: lần thử thứ hai là một
+`runId` mới, và hồ sơ cũ ở lại làm bằng chứng cho điều đã quan sát được khi ấy. Một lượt chạy đã tới
+được kết quả từng case thì phát hành hồ sơ của nó dù chúng đạt hay không, bởi các hàng case chính là
+thứ người sở hữu bản giao đọc; một lượt chạy chưa từng tới được bộ kiểm thì không phát hành gì, bởi một
+hồ sơ viết dở là thứ người đọc sau này nhầm thành một quyết định.
+
+## Ranh giới
+
+Context là chỉ-đọc trừ lịch sử API của luồng. Operator ghi hồ sơ lượt chạy dưới `@worktrees/e2e/<flow>`
+và chỉ ghi `response/` của nhánh mình: `data/cases.json`, `data/verdicts.json`, đầu ra của runner dưới
+`response/artifacts/`, `response.md` và `response.json`. Nó không đọc và không ghi credential như một
+giá trị, không nhờ người đăng nhập hay dán một cái vào, không khởi động, khởi động lại hay dừng một
+server, không sửa bản giao để một case đạt, không viết một case, một fixture hay một script vào mã
+nguồn, không ghi đè hay xoá một hồ sơ lượt chạy, và không xoá bất cứ gì ngoài namespace mà seed đã gọi
+tên.
+
+## Context
+
+| Alias | Bind | Bắt buộc |
+| --- | --- | --- |
+| `@worktrees/e2e/<flow>` | thư mục luồng API: `flow.md` nêu bộ kiểm, route được phục vụ và namespace nó đi trên đó, cùng lịch sử chỉ-thêm `runs/<runId>/` với con trỏ `latest.json` và `history.md`, chỉ ghi ở cuối lượt chạy | có |
+| `@worktrees/uat/<flow>` | luồng trình duyệt cùng tên, chỉ đọc: bản ghi tài khoản bộ kiểm đăng nhập và seed các hàng đến từ đó, khi luồng API dùng chung | không |
+| `@worktrees/sessions/central-runtime` | generation của chủ runtime đứng sau entry đã chứng thực; trạng thái sẵn sàng do `platform-operation-receipt` chứng minh, không bao giờ tự suy lại từ sổ này | có |
+| `@workspaces/device-state` | sổ credential đã niêm; credential UAT dùng chung được giải theo tên đúng nơi bộ kiểm tiêu thụ nó và không đọc ở đâu khác | có |
+| `@workspaces/be` | checkout backend đã định tuyến tại commit đã ghim, mà bộ kiểm end-to-end và gate plan của chính nó là thứ lượt chạy này thi hành chứ không bao giờ sửa | có |
+
+## Đầu vào
+
+| Kind | Từ đâu | Bắt buộc |
+| --- | --- | --- |
+| `platform-operation-receipt` | `runtime.serve`; entry đã chứng thực mà bộ kiểm được trỏ vào, và head nó phục vụ | có |
+| `uat-account` | `identity.provision`; tài khoản bộ kiểm đăng nhập, mang theo bằng tên | không |
+| `seed-receipt` | `data.seed`; các hàng bộ kiểm chạy trên đó và namespace chúng mang | không |
+| `quality-verification` | `quality.verify`; các gate đã đạt tại cùng head, để lượt đi được đọc cùng điều gate đã nói | không |
+| `units` | `uat.plan`; danh sách luồng mà nhánh này chạy đúng một luồng API của nó, gọi tên bằng `request.unit` | không |
+
+## Yêu cầu
+
+| Field | Kiểu | Mặc định | Hỏi |
+| --- | --- | --- | --- |
+| `approval` | id | — | Thẩm quyền phủ những lần ghi của chính lượt chạy này — chạy bộ kiểm trên dữ liệu của môi trường và đăng nhập bằng tài khoản của luồng: một id phê duyệt, hoặc tham chiếu của bản khai báo môi trường, đường dẫn và hash nội dung của nó, khi bản khai báo ấy đánh dấu `seed` và `identity-provisioning` là `declared` cho `env`; không có mặc định, bởi im lặng không phải là đồng ý |
+| `flow` | id | — | Đúng một luồng API lần gọi này chạy: nó địa chỉ hoá thư mục luồng và gọi tên bộ kiểm mà gate plan khai báo |
+| `env` | id | dev | Stack lượt chạy này vận hành: nó chọn bản ghi tài khoản, bí mật đã niêm, mục sổ runtime và namespace seed đã đặt |
+| `runId` | id | — | Không hỏi người: orchestrator điền, và nó gọi tên hồ sơ lượt chạy mà mọi quan sát được ghi dưới đó |
+| `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một lần dừng |
+
+## Các bước
+
+| # | Bước | Tham số | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Kiểm gate, lần vào lại và thẩm quyền của lượt chạy | `approval`, `resume` | `request/request.json`, @worktrees/e2e/<flow> cho lịch sử API và hồ sơ lượt chạy trước, @workspaces/be tại commit đã ghim, bản khai báo môi trường khi `approval` tham chiếu nó, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
+| 2 | Bind entry đang phục vụ mà platform receipt chứng thực, head nó phục vụ, và việc head ấy có chứa commit đã ghim hay không | — | input `platform-operation-receipt`, @worktrees/sessions/central-runtime cho generation đứng sau entry ấy, @tools/http | — | `RUNTIME_UNAVAILABLE` |
+| 3 | Bind namespace seed đã đặt và tài khoản bộ kiểm đăng nhập, giải credential theo tên | `env` | input `seed-receipt`, input `uat-account`, @worktrees/e2e/<flow> cho bản ghi tài khoản, @workspaces/device-state, @tools/secrets | — | `INVALID_INPUT` |
+| 4 | Lấy lệnh mà gate plan của route khai báo cho gate end-to-end; một case hay một script nhánh này định viết thuộc về operator sở hữu mã nguồn | `flow` | @workspaces/be cho các lệnh đã khai báo và bộ kiểm mà luồng gọi tên, input `quality-verification` cho các gate đã lấy tại head này | — | `INVALID_INPUT` |
+| 5 | Chạy đúng lệnh ấy như một client đối với entry đã bind và giữ nguyên vẹn đầu ra của chính runner | `runId` | @workspaces/be, @tools/shell | `api-output` | `RUNTIME_UNAVAILABLE` |
+| 6 | Chép kết quả từng case của runner — định danh nó in ra, request, trạng thái, assertion, thời lượng và chỗ đọc lại từng thứ — không bịa cái nào | — | `api-output` | `api-cases` | `API_CASE_FAILED` |
+| 7 | Đọc lại qua API mọi bản ghi bộ kiểm đã ghi rồi xét ba làn riêng nhau | — | `api-cases`, @tools/http | `api-verdicts` | `API_NAMESPACE_LEAK` |
+| 8 | Thẩm tra namespace ở chế độ chỉ-đọc, rồi xoá nó qua API và không gì khác | `runId` | `api-verdicts`, @tools/http | — | `API_NAMESPACE_LEAK` |
+| 9 | Thêm hồ sơ lượt chạy dưới `runs/<runId>/`, chỉ con trỏ vào nó, thêm dòng lịch sử, và phát hành | `runId` | mọi thứ ở trên | @worktrees/e2e/<flow>, `response/response.md`, `response/response.json`, @tools/sourcewrite, @tools/print | — |
+
+Một phán quyết không ai được xem là một phán quyết không ai đọc. Bước 6 in kết quả từng case và bước 9
+in bảng làn qua @tools/print, vào đúng cuộc trò chuyện người đang đọc, và biên nhận liệt kê cả hai dưới
+`## Printed` kèm lý do mỗi thứ được in.
+
+Một lần vào lại bắt đầu lại từ khâu kiểm, chỉ dùng lại những quan sát mà lệnh và head đang phục vụ
+không đổi, và một lần vào lại không thêm head đang phục vụ, không thêm lệnh và không thêm thay đổi case
+nào là `NO_PROGRESS`. Lần thử thứ hai sau một lượt chạy đã phát hành là một `runId` mới, không bao giờ
+là một lần sửa hồ sơ cũ.
+
+## Đầu ra
+
+| Kind | File | Kiểu | Bắt buộc |
+| --- | --- | --- | --- |
+| `api-verification` | `response/response.md` | md | có |
+| `api-cases` | `response/data/cases.json` | data | có |
+| `api-verdicts` | `response/data/verdicts.json` | data | có |
+| `api-output` | `response/artifacts/api-output.txt` | artifact | có |
+
+## Dừng
+
+| Code | Xử lý |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `SOURCE_DRIFT` | terminate |
+| `NO_PROGRESS` | terminate |
+| `AUTHORITY_DRIFT` | terminate |
+| `RUNTIME_UNAVAILABLE` | terminate |
+| `API_CASE_FAILED` | terminate |
+| `API_NAMESPACE_LEAK` | terminate |
+
+## Kế tiếp
+
+| Khi | Operator |
+| --- | --- |
+| cả ba làn đều đạt | `git.publish` |
+| cả ba làn đều đạt và lời hứa phải được đối chiếu với hành trình một client thực sự đã đi | `business.reconcile` |
+| một case runner gọi tên không đứng vững | `backend.generate` |
+| entry đã chứng thực thôi trả lời, nên route được phục vụ lại trước khi bộ kiểm chạy lại | `runtime.serve` |

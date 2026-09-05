@@ -97,7 +97,13 @@ ${fallbackRows}
 `;
 }
 
-const changesMd = ({ files = null, checkout = `\`@workspaces/be\` at \`${BASE}\` → \`${COMMIT}\` on \`${BRANCH}\`` } = {}) => {
+// The marks a source-writing branch reads off the checkout: HEAD stood on the base at dispatch and on
+// the branch's own commit at the end, one entry apart, with the stash reflog untouched.
+const PREFLIGHT = 'passed at 2026-09-05T09:12:00Z';
+const REFLOG_BEFORE = `HEAD 4 ${BASE}; stash 0`;
+const REFLOG_AFTER = `HEAD 5 ${COMMIT}; stash 0`;
+
+const changesMd = ({ files = null, checkout = `\`@workspaces/be\` at \`${BASE}\` → \`${COMMIT}\` on \`${BRANCH}\``, preflight = PREFLIGHT, reflogBefore = REFLOG_BEFORE, reflogAfter = REFLOG_AFTER } = {}) => {
   const rows = (files ?? [[WRITER, 'created'], [SPEC, 'created']]).map(([p, kind, why]) => `| \`${p}\` | ${kind} | ${why ?? 'the decision this file carries'} | BE-1 |`).join('\n');
   return `# changes — backend.generate step-1/parallel-1
 
@@ -112,6 +118,9 @@ checkout and committed once.
 | Step | \`step-1/parallel-1\` |
 | Checkout | ${checkout} |
 | Predecessor | \`step-1/parallel-2/response/response.md\` |
+| Preflight | ${preflight} |
+| Reflog before | ${reflogBefore} |
+| Reflog after | ${reflogAfter} |
 
 ## Files
 
@@ -227,7 +236,7 @@ const dryFiles = () => ({
   'response/response.md': responseMd({ mode: 'dry', commit: '—', changes: [[WRITER, 'added', OP, '—', '—'], [SPEC, 'added', OP, '—', '—']] }),
   'response/changes.md': changesMd({
     files: [[WRITER, 'unchanged', 'the mutation handler this run would add'], [SPEC, 'unchanged', 'the unit spec this run would add']],
-    checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written`,
+    checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written`, reflogAfter: REFLOG_BEFORE,
   }),
   'response/data/mutations.json': mutationsJson({ mode: 'dry', commit: null, changes: DRY_CHANGES }),
 });
@@ -289,7 +298,7 @@ export const migrationFiles = ({ dry = false } = {}) => {
   files['request/request.json'].requirements.contractFingerprint = fingerprint;
   const changes = CHANGES.map((change, index) => ({ ...change, path: index ? spec : writer, ...(dry ? { afterHash: null } : {}) }));
   files['response/data/mutations.json'] = mutationsJson({ operations: [op], changes, ...(dry ? { mode: 'dry', commit: null } : {}) });
-  files['response/changes.md'] = changesMd({ files: [[writer, dry ? 'unchanged' : 'created'], [spec, dry ? 'unchanged' : 'created']], ...(dry ? { checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written` } : {}) });
+  files['response/changes.md'] = changesMd({ files: [[writer, dry ? 'unchanged' : 'created'], [spec, dry ? 'unchanged' : 'created']], ...(dry ? { checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written`, reflogAfter: REFLOG_BEFORE } : {}) });
   files['response/response.md'] = responseMd({ operations: [[OP, op.transport, writer, op.transactionBoundary, op.idempotencyKind, op.authorityDimensionIds.join(', ')]], changes: changes.map(change => [change.path, change.change, OP, '—', change.afterHash ?? '—']), ...(dry ? { mode: 'dry', commit: '—' } : {}) });
   if (dry) {
     files['request/request.json'].requirements.mode = 'dry';
@@ -405,7 +414,7 @@ await expectError({ ...dryFiles(), 'response/data/mutations.json': mutationsJson
 await expectError({ ...dryFiles(), 'response/response.json': responseJson({ commits: [COMMIT], fields: { 'backend-source-application': 'response/response.md', changes: 'response/changes.md', mutations: 'response/data/mutations.json' } }) }, 'a dry run records no commit', 'a dry run that committed');
 await expectError({ ...dryFiles(), 'response/data/mutations.json': mutationsJson({ mode: 'dry', commit: null }) }, 'reports an after hash under a dry run', 'a dry plan carrying an after hash');
 await expectError({ ...dryFiles(), ...records(), 'response/response.json': responseJson({ commits: [], fields: { ...responseJson().fields } }) }, 'a dry run measures nothing', 'a dry run carrying conformance and proof records');
-await expectError({ ...dryFiles(), 'response/changes.md': changesMd({ files: [[WRITER, 'created'], [SPEC, 'created']], checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written` }) }, 'under a dry run, which leaves every path unchanged', 'a dry change record reporting a move');
+await expectError({ ...dryFiles(), 'response/changes.md': changesMd({ files: [[WRITER, 'created'], [SPEC, 'created']], checkout: `\`@workspaces/be\` at \`${BASE}\` on \`${BRANCH}\`, nothing written`, reflogAfter: REFLOG_BEFORE }) }, 'under a dry run, which leaves every path unchanged', 'a dry change record reporting a move');
 await expectError({ ...dryFiles(), 'response/data/mutations.json': mutationsJson({ commit: null, changes: DRY_CHANGES }) }, "mode apply differs from the request's dry", 'a plan that re-decides the mode');
 
 // scope fix: the same conforming branch inside a fix, and a widening refused under it.
@@ -413,6 +422,18 @@ await expectValid({ ...baseline(), 'request/request.json': requestJson({ extra: 
 await expectError(widenedFiles({ extra: { scope: 'fix' } }), 'OWNER_WIDENED was taken under scope fix', 'a fix that widened the owner boundary');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { scope: 'patch' } }) }, 'is neither full nor fix', 'an unknown scope');
 
-process.stdout.write('backend.generate self-test: 8 valid branches, 65 rejected mutations\n');
+// The checkout is not only what the branch wrote into it. The preflight ran before the first write,
+// and the reflog entries the checkout gained while the branch held it are the branch's own commits and
+// nothing else: a stash (which resets HEAD and outlives its own drop), a reset, a force, a clean or a
+// checkout of another branch each leave one it never earned.
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ preflight: '—' }) }, 'records no Preflight', 'a source write with no preflight behind it');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ preflight: 'ran before the write' }) }, 'is not `<passed|failed> at', 'a preflight with no verdict and no instant');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ preflight: 'failed at 2026-09-05T09:12:00Z' }) }, 'a done source-writing branch carries a preflight that passed', 'a done branch on a failed preflight');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ reflogBefore: '—' }) }, 'carries no Reflog before', 'a receipt that never read the reflog');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ reflogBefore: `HEAD 4 ${COMMIT}; stash 0` }) }, "at dispatch the checkout stood on the branch's base", 'a before mark that is not the base');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ reflogAfter: `HEAD 6 ${COMMIT}; stash 0` }) }, 'gained 2 entries while the branch made 1 commit', 'an entry the branch never earned');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ reflogAfter: `HEAD 5 ${COMMIT}; stash 1` }) }, 'stash reflog went from 0 to 1 entries', 'a stash inside the routed checkout');
+
+process.stdout.write('backend.generate self-test: 8 valid branches, 72 rejected mutations\n');
 
 }

@@ -8,7 +8,7 @@
   "validator": "validate.mjs",
   "selfTest": "self-test.mjs",
   "resources": {
-    "profile": "sol-reviewer",
+    "profile": "astra",
     "grammarBound": true,
     "mode": "isolated",
     "tools": {

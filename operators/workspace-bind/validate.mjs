@@ -12,7 +12,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
-import { validateWorkspaceCheckoutBinding, gitPolicyErrors } from '../../scripts/workspace-checkout.mjs';
+import { validateWorkspaceCheckoutBinding, gitPolicyErrors, installedTreeOf } from '../../scripts/workspace-checkout.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
@@ -99,6 +99,21 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
       if (checkout['Repository kind'] !== route.checkout.repositoryKind) errors.push('response/response.md: Repository kind differs from the route binding');
       const businesses = route.authorityRoots.businesses;
       if ((empty(checkout['Businesses root']) ? null : checkout['Businesses root']) !== businesses) errors.push(`response/response.md: Businesses root ${checkout['Businesses root']} differs from the derived ${String(businesses)}`);
+
+      // The installed tree is part of what a checkout is. `node_modules` is routinely a junction onto one
+      // installed tree several checkouts share, and a recursive delete inside such a checkout travels
+      // through the link and empties the tree every other checkout is using; a reader who is told the
+      // link is there before they reach for one is the only thing that stops it. The label is observed,
+      // never asserted, and a shared tree is bound only where the request declared it on purpose.
+      const installed = checkout['Installed tree'];
+      if (empty(installed)) errors.push('response/response.md: the Checkout table records no Installed tree; a binding says whether node_modules is a junction and to where, because nothing under a checkout that holds one is ever deleted by hand');
+      else {
+        const observed = existsSync(route.checkout.diskPath) ? installedTreeOf(route.checkout.diskPath) : null;
+        if (observed && installed !== observed.label) errors.push(`response/response.md: Installed tree ${installed} differs from the observed ${observed.label}`);
+        const target = /^junction to (.+)$/.exec(installed)?.[1] ?? null;
+        const shared = target !== null && target !== 'an unresolvable target' && comparablePath(target) !== comparablePath(route.checkout.diskPath) && !comparablePath(target).startsWith(`${comparablePath(route.checkout.diskPath)}/`);
+        if (shared && requirements.sharedInstall !== true && String(requirements.sharedInstall) !== 'true') errors.push(`response/response.md: Installed tree is a junction to ${target}, outside the checkout; a binding takes a shared installed tree only when the request declares sharedInstall: true`);
+      }
       if (policy['Worktree branches'] !== route.gitPolicy.worktreeBranches) errors.push('response/response.md: Worktree branches differs from the route binding');
       if (policy['Mutation branch'] !== route.gitPolicy.mutationBranch) errors.push('response/response.md: Mutation branch differs from the route binding');
       if (writeRoots.length !== route.writeRoots.length || writeRoots.some((p) => !route.writeRoots.includes(p))) errors.push('response/response.md: Write roots differ from the route binding');

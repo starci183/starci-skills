@@ -9,3 +9,6 @@ dist/
 
 # Claude sessions spawned into this checkout keep their worktrees here
 worktrees/
+
+# the person's own settings; resources/settings.example.json is the tracked shape
+resources/settings.json

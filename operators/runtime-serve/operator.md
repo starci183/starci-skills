@@ -348,3 +348,5 @@ Raw gate evidence stays bound to this merged head.
 | the runtime is serving and the journeys to walk on it must be named, one flow each, before one is walked per branch | `uat.plan` |
 | a completed serve emits merged changes for independent delivery gates | `quality.verify` |
 | the served runtime is attested and the run that waited on it may verify the flow | `uat.verify` |
+| the served runtime is attested and the delivery's own end-to-end suite may now be run against it as a client | `api.verify` |
+| the runtime is serving and a tunnel or an observability service the mission names must be brought up beside it | `service.operate` |

@@ -33,7 +33,8 @@ tiên còn đứng.
 Xong khi `business-reconciliation` mang đúng một hàng cho mỗi chiều của ma trận phủ đã đóng băng với
 bằng chứng đã giao mà mỗi hàng tựa vào và không còn sai lệch nào, `claims` ràng mọi fact đã giao vào
 head source đóng băng, và `model` publish lại chính head ấy dưới lease độc quyền cùng phần đối chiếu
-đã làm và chuyển trạng thái hợp lệ nó đã đi.
+đã làm và chuyển trạng thái hợp lệ nó đã đi, được lưu trữ theo địa chỉ nội dung của nó và được chỉ
+mục head gọi tên cùng trạng thái nó đang mang.
 
 ## Đối chiếu đọc source đã giao, không bao giờ đọc kế hoạch
 
@@ -65,6 +66,30 @@ chối. Chuyển trạng thái hợp lệ so với trạng thái head được t
 không xoá, và fingerprint phủ đi nguyên vẹn, để quality và UAT chứng minh được rằng chúng tiêu thụ
 đúng ma trận ấy chứ không phải một bản diễn giải.
 
+## Publish một head là ba lần ghi, hoặc không lần nào
+
+Một head chỉ ghi vào thư mục feature của nó là một head không người đọc nào khác tìm thấy: chỉ mục
+của gốc businesses vẫn gọi tên cái head nó vừa thay, và mọi thứ ràng một lời hứa theo địa chỉ nội
+dung vẫn tiếp tục đọc lời hứa đã bị thay. Vì thế publish head là việc của chính operator này chứ
+không phải việc người làm sau, và nó là một tập ghi duy nhất: thư mục feature, model chuẩn hoá được
+lưu trữ trong kho nội dung theo địa chỉ của chính nó, và mục của feature trong chỉ mục head gọi tên
+địa chỉ ấy cùng trạng thái head đang mang, head gốc giữ nguyên, head vừa bị thay, các head source đã
+giao mà claim ràng vào, và địa chỉ của claims cùng ma trận đã đóng băng. Một chỉ mục gọi tên một head
+source mà không fact claim nào ràng là đặt lời hứa lên bằng chứng chưa ai đọc, và bị từ chối y như
+một object thiếu.
+
+Một head mang hai con số và không bao giờ được thay con này bằng con kia. **Địa chỉ** của nó — thứ
+kho lưu trữ đặt tên file theo và thứ chỉ mục gọi tên — là tài liệu đúng như đang có, kể cả trường
+fingerprint của chính nó, và đó là lý do một object đã lưu trữ băm ra đúng tên của mình.
+**Fingerprint** của nó là tài liệu sau khi bỏ trường ấy, và đó là thứ một receipt dùng để đối chiếu
+một ma trận hay một tập claim. Đọc con này khi cần con kia thì publish một head dưới một cái tên kho
+lưu trữ không hề giữ.
+
+`previousHeadRef` gọi tên object đã lưu trữ của head nó vừa thay, không bao giờ là một file session:
+session bị xoá thì một lineage trỏ vào đó thôi không phân giải được nữa, nên lineage là một chuỗi
+object. Khi head bị thay chưa từng được lưu trữ, operator này lưu trữ nó trước, từ thư mục feature
+đúng như đang đứng, và bảng `## Lineage` của receipt nói rõ đã xảy ra trường hợp nào trong hai.
+
 ## Head đã đối chiếu được đối chiếu lại khi bản giao dời đi
 
 Một head đã công bố `implemented` ràng các fact claim của nó vào một source head. Khi source đã giao dời
@@ -75,18 +100,22 @@ trạng thái, ràng buộc mới, vì một head đã công bố mà trích m�
 
 ## Ranh giới
 
-Context chỉ đọc, trừ đúng một head feature. Operator chỉ ghi `response/` của nhánh mình —
+Context chỉ đọc, trừ đúng một head nó publish. Operator chỉ ghi `response/` của nhánh mình —
 `response.md`, `response/data/claims.json`, `response/data/model.json` và `response.json` — cùng
-head publish lại dưới `@worktrees/businesses/<featureId>`. Nó không bao giờ mô hình hoá một lời hứa,
-đóng băng hay sửa ma trận phủ, nói lại lời hứa, nâng một ví dụ hay ý định thành sự thật sản phẩm,
-publish head khi còn sai lệch, đẩy head qua một chuyển trạng thái vòng đời không cho phép, sửa source
-sản phẩm, hay tuyên bố rằng một cổng chất lượng hay một lượt UAT đã qua.
+head ấy dưới `@worktrees/businesses`, gồm ba chỗ và không chỗ nào khác: thư mục feature
+`features/<featureId>`, các object mà lần publish lưu trữ dưới `objects/sha256/<địa chỉ>.json`, và
+mục của feature trong chỉ mục head `business-registry-v1.json`. Nó không bao giờ mô hình hoá một lời
+hứa, đóng băng hay sửa ma trận phủ, nói lại lời hứa, nâng một ví dụ hay ý định thành sự thật sản
+phẩm, publish head khi còn sai lệch, để một head đã publish mà không lưu trữ hay không được chỉ mục
+gọi tên, viết đè mục của feature khác hay một object đã lưu trữ, đẩy head qua một chuyển trạng thái
+vòng đời không cho phép, sửa source sản phẩm, hay tuyên bố rằng một cổng chất lượng hay một lượt UAT
+đã qua.
 
 ## Context
 
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
-| `@worktrees/businesses/<featureId>` | head đã publish, trạng thái và ma trận phủ đã đóng băng của nó, theo địa chỉ nội dung từ registry; nơi duy nhất operator này ghi ngoài nhánh của mình | có |
+| `@worktrees/businesses/<featureId>` | head đã publish, trạng thái và ma trận phủ đã đóng băng của nó, theo địa chỉ nội dung từ chỉ mục head; nơi duy nhất operator này ghi ngoài nhánh của mình, gồm thư mục feature, các object đã lưu trữ và mục chỉ mục của feature đi cùng nhau | có |
 | `@workspaces/be` | checkout backend được route, đọc ở head đã đóng băng; mọi fact claim dẫn nó theo path, khoảng dòng và head | có |
 
 ## Đầu vào
@@ -96,6 +125,7 @@ sản phẩm, hay tuyên bố rằng một cổng chất lượng hay một lư�
 | `backend-source-application` | `backend.generate`; source đã giao mà cuộc đối chiếu đọc | có |
 | `quality-verification` | `quality.verify`; các gate đã đạt trên head đã giao, chỉ đọc như bằng chứng | không |
 | `uat-flow-verification` | `uat.verify`; hành trình đã đi trên head đã giao, chỉ đọc như bằng chứng | không |
+| `api-verification` | `api.verify`; bộ kiểm end-to-end chạy như một client đối với head đã giao, chỉ đọc như bằng chứng | không |
 
 ## Yêu cầu
 
@@ -114,7 +144,7 @@ sản phẩm, hay tuyên bố rằng một cổng chất lượng hay một lư�
 | 2 | Đọc head đã publish, trạng thái và ma trận phủ đã đóng băng của nó, rồi kiểm chuyển trạng thái và thẩm quyền nó cần | `featureId`, `targetState`, `approval` | @worktrees/businesses/&lt;featureId>: head hiện tại, trạng thái, ma trận và các fingerprint của nó | — | `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED` |
 | 3 | Chuẩn hoá source đã giao thành fact claim, mỗi claim kèm path, khoảng dòng và head | — | đầu vào `backend-source-application`, @workspaces/be ở head đóng băng, đầu vào `quality-verification` và `uat-flow-verification` chỉ như bằng chứng, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING` |
 | 4 | So từng hàng của ma trận đóng băng với các claim đã giao và ghi từng sai lệch theo chiều của nó | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> cho ma trận ở head đã publish | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
-| 5 | Publish lại head dưới lease độc quyền cùng phần đối chiếu nó đang mang | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> ở head trước | @worktrees/businesses/&lt;featureId> thành model.json head mới, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
+| 5 | Publish head dưới lease độc quyền cùng phần đối chiếu nó đang mang: thư mục feature, object nó được lưu trữ dưới, và mục gọi tên nó | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> ở head trước, object đã lưu trữ của nó và mục chỉ mục head gọi tên nó | @worktrees/businesses/&lt;featureId> thành model.json head mới, object của nó trong kho nội dung và mục của feature trong chỉ mục head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
 | 6 | Phát | — | mọi thứ ở trên | `response/response.json` | — |
 
 Chạy lại thì bắt đầu lại từ bước 1, chỉ dùng lại quan sát có fingerprint không đổi, và đọc lại

@@ -7,6 +7,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { settingsErrors } from './settings.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const errors = [];
@@ -145,6 +146,9 @@ const log = interaction.transitionLog;
 if (!log || log.linesPerBranch !== 2 || !Array.isArray(log.shape) || log.shape.length !== 2 || log.shape.some((s) => typeof s !== 'string' || !s.trim()) || typeof log.rule !== 'string' || !log.rule.trim()) errors.push('interaction.json: transitionLog must declare linesPerBranch 2, a shape of exactly two line templates and a rule');
 if (interaction.schemaVersion !== 3 || !Array.isArray(interaction.questionKinds) || !interaction.questionKinds.length || interaction.questionKinds.some((kind) => typeof kind !== 'string' || !kind.trim())) errors.push('interaction.json: schemaVersion and questionKinds must declare a communication contract');
 if (!Number.isInteger(interaction.minOptions) || !Number.isInteger(interaction.maxOptions) || interaction.minOptions < 1 || interaction.maxOptions < interaction.minOptions) errors.push('interaction.json: option bounds must be ordered positive integers');
+// The display language: interaction.json#language names the settings pair, and the pair itself parses to a language tag.
+if (!interaction.language?.source?.includes('resources/settings.json#language') || !interaction.asks?.rule) errors.push('interaction.json: language.source names resources/settings.json#language and asks.rule states when the person is asked');
+errors.push(...settingsErrors(root));
 if (!interaction.selectionSource || !interaction.rule || interaction.gate !== 'scripts/validate-interaction.mjs') errors.push('interaction.json: selectionSource, rule and interaction gate must be declared');
 const pairs = orchestrator.profileEquivalents?.pairs ?? {};
 const identity = JSON.parse(await readFile(path.join(root, 'resources/identity.json'), 'utf8'));

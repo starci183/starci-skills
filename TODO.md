@@ -152,27 +152,68 @@ context khai đủ để agent mù chạy được, log đủ để người đ�
 
 ## 2e. Nợ 2.0.4 lộ ra trong hai lần chạy trên 2.0.3
 
-- [ ] Gate cho lệnh git bị cấm: brief cấm stash/reset/force nhưng không gate nào đọc reflog; một nhánh
-      `backend.generate` đã `git stash push` trong checkout sản phẩm (tự khai, không mất gì). Sửa: receipt ghi
-      source bị từ chối khi reflog stash của checkout có thêm entry trong thời gian nhánh chạy, hay HEAD reflog có
-      reset/checkout không phải commit của nhánh (`validate-response` hoặc `validate.mjs` của operator ghi source).
-- [ ] Junction và xoá tay: một session `rm -rf node_modules` trong worktree tạm có junction tới cây cài chung, Windows đi
-      xuyên junction và xoá `node_modules/.bin` của mọi checkout dùng chung (đã tự phục hồi 174 file bin). Luật: worktree
-      tạm gỡ bằng `git worktree remove --force`, không bao giờ xoá tay bên trong checkout có junction; gate: brief của
-      operator ghi source cấm `rm -rf` trong checkout, và readiness ghi rõ checkout nào là junction.
+- [x] Gate cho lệnh git bị cấm: `changes.md` ghi `Reflog before`/`Reflog after` (`HEAD <entries> <sha>; stash <entries>`),
+      và validator của cả bốn operator ghi source đọc reflog sống của checkout: cửa sổ từ base tới commit đã ghi chỉ
+      được chứa commit của chính nhánh, nên stash (entry reset sống lâu hơn cả lệnh drop), reset, force, clean,
+      checkout nhánh khác, rebase và am đều bị từ chối đích danh; hai entry `git worktree add` sinh ra không tính.
+      (`scripts/workspace-checkout.mjs#reflogErrors`, `#sourceWriteErrors`, `workspace-checkout.spec.mjs`,
+      self-test của backend.generate, interface.generate, interface.fix, library.update)
+- [x] Junction và xoá tay: binding của `workspace.bind` ghi hàng `Installed tree` (`own directory`, `absent`,
+      `junction to <target>`) trong `## Checkout`, validator đọc lại chính liên kết ấy, và một junction trỏ ra ngoài
+      checkout chỉ được ràng khi request khai `sharedInstall`; Ranh giới của cả bốn operator ghi source nói worktree tạm
+      gỡ bằng `git worktree remove --force` và không xoá tay dưới checkout có junction.
+      (`scripts/workspace-checkout.mjs#junctionErrors`, `#installedTreeOf`, `workspace-checkout.spec.mjs`,
+      `operators/workspace-bind/self-test.mjs`)
 - [x] `validate-step` chưa từng gọi `operators/<id>/validate.mjs`: mọi "step valid" của ba lần chạy chỉ chứng minh
       contract chung (session recovery phát hiện bằng cách chèn lỗi cố ý). Sửa: CLI và `validateStep(..., {operator:true})`
       dispatch validator của operator sau luật chung, CLI không dùng top-level await vì validator import ngược lại
       (`scripts/validate-step.mjs#operatorValidator`, `validate-step.spec.mjs`).
-- [ ] Receipt của `workspace.bind` không kiểm lại được sau khi chuỗi đã dời head: validator chạy lại phép chọn và thấy
-      head mới; receipt phải được chấm theo head đã ghim lúc request, không theo checkout đang sống.
+- [x] Receipt của `workspace.bind` chấm theo head đã ghi: head ấy phải bằng head hiện tại của checkout hoặc là tổ tiên
+      của nó trên cùng nhánh (chuỗi đi tiếp một cách hợp lệ); checkout dời sang commit lạ hay nhánh khác vẫn bị từ chối.
+      Mọi field khác vẫn phải trùng khít. (`scripts/workspace-checkout.mjs#validateWorkspaceCheckoutBinding`,
+      `workspace-checkout.spec.mjs`)
 - [x] Sửa nóng làm gãy phiên đang chạy (`b21fd9ab`): dải slot import bị áp cả trên đường đọc nên slot cũ (8/1, 9/1) mất
       tín nhiệm, 3/1 và 6/1 của recovery đỏ trong 20 phút. Sửa ở `541142a6`: dải chỉ áp khi ghi import mới. Luật cho
       người sửa harness: bản vá chạm đường đọc phải được probe trên ledger sống trước khi ff runtime.
 - [x] D16: head đã `implemented` không reconcile lại được sau khi bản giao dời đi → transition `implemented->implemented`
       (rebinding, không sai lệch) ở `business.reconcile`; head publish trích đúng commit gate đã pass.
-- [ ] Preflight trước lần ghi đầu: session Setup viết bản sửa owner rồi mới chạy `--preflight`; brief của operator
-      ghi source nên đặt preflight là dòng Steps đầu và validator từ chối receipt không có bằng chứng preflight.
+- [x] Preflight trước lần ghi đầu: dòng Steps 1 của cả bốn operator ghi source nói preflight chạy trước lần ghi đầu ra
+      ngoài thư mục phiên, `## Binding` của `changes.md` mang `Preflight` (`<passed|failed> at <ISO 8601 instant>`),
+      và validator từ chối receipt done không có nó, có verdict không phải `passed`, hay có commit đầu sớm hơn thời điểm
+      ấy. (`scripts/workspace-checkout.mjs#sourceWriteErrors`, self-test của bốn operator)
+- [x] Head publish mà chỉ mục không biết: `business.reconcile` ghi thư mục feature nói `implemented` trong khi
+      `business-registry-v1.json` vẫn gọi tên head cũ, và `previousHeadRef` trỏ vào một file session vì chưa object nào
+      được lưu trữ — cả hai đều đúng luật của một tập ghi chỉ có thư mục feature, và cả hai để lại cho người. Sửa:
+      publish head là việc của operator, một tập ghi gồm thư mục feature, object theo địa chỉ nội dung và mục chỉ mục;
+      một nhà duy nhất cho phép ghi ấy để `business.decide` dùng lại (`scripts/business-registry.mjs` + spec,
+      `business-reconcile/validate.mjs`, `self-test.mjs`, hai hàng `## Lineage` mới của
+      `business-reconciliation`).
+- [x] Bản sửa owner dừng ở "đã đóng gói, chờ người phát hành" nên consumer vẫn giữ bản cũ: mode `publish` của
+      `library.update` giờ tự đẩy chính archive đã digest lên registry mà manifest gọi tên khi proof package đã xanh
+      (`@tools/registry: publish`, credential giải theo tên qua `@tools/secrets`), đọc ngược version cùng integrity rồi
+      ghi `publication { registry, version, state, integrity, at }`; `pending` chỉ hợp lệ khi request đặt sẵn
+      `publish: false`, và registry từ chối là `LIBRARY_PUBLISH_REJECTED` mang chính câu trả lời của registry
+      (`operators/library-update/validate.mjs#publicationErrors`, `#publishStopErrors`, `self-test.mjs`).
+
+- [x] Hàng "observability, dịch vụ Sonar, tunnel" mà catalogue 2.0.0 bỏ đi không có nhà nào: một nhiệm vụ cần chúng
+      không gọi tên được operator nào và không nói được chúng có chạy hay không. Sửa: môi trường khai chúng
+      (`services` trong `environment.schema.json`, mỗi cái có kind, trạng thái mong muốn, lệnh đã khai, probe và
+      `holder`), `environment.preflight` thêm họ `service` với hai phép kiểm mỗi dịch vụ và tường thuộc `service`,
+      và `service.operate` dời đúng một dịch vụ mỗi nhánh, chứng minh trạng thái chỉ từ probe (`SERVICE_UNPROVEN`),
+      dừng trước khi dời với một dịch vụ môi trường giữ với người (`SERVICE_APPROVAL_REQUIRED`); enumeration là của
+      bản khai báo nên không có `service.plan` (`tests/chains/service-fanout.json`).
+
+- [x] Một nhiệm vụ chỉ-backend không có lượt đi nào: bộ kiểm tích hợp chạy như gate bên trong checkout và không gì
+      từng vận hành API theo cách một client vận hành, nên biên nhận xanh trên một sản phẩm chưa ai gọi
+      (`tests/evidence/20260905-nivo-recovery-on-2.0.3.md`). Sửa: `api.verify` — UAT của backend — chạy chính bộ kiểm
+      end-to-end mà gate plan của route khai báo, như một client đối với entry mà `platform-operation-receipt` chứng
+      thực chứ không phải một server nó tự khởi động, trên namespace mà `seed-receipt` gọi tên và bằng tài khoản mà
+      `uat-account` gọi tên; các case là của runner (một định danh không đứng trong đầu ra của runner bị từ chối chứ
+      không được xét, vì một case nhánh viết ra là một lần ghi mã nguồn thuộc `backend.generate`), ba làn contract,
+      data và lifecycle được xét riêng, và hồ sơ chỉ-thêm nằm dưới `@worktrees/e2e/<flow>/runs/<runId>/` bên cạnh
+      lịch sử trình duyệt chứ không nằm trong nó. Gate `e2e` của `quality.verify` giữ nguyên luật cũ — không chạy trừ
+      khi có người hỏi — vì gate chứng minh mã còn lượt đi chứng minh sản phẩm (`operators/api-verify/**`,
+      `templates/kinds/api-*`, `tests/chains/backend-feature.json`, `tests/chains/backend-e2e.json`).
 
 ## 2c. Bốn chỗ yếu của harness, mỗi chỗ một gate
 

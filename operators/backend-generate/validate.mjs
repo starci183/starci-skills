@@ -20,6 +20,7 @@ import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { validateMigrationOperation } from '../../scripts/migration-operation.mjs';
 import { validateMigrationContract } from '../../scripts/migration-contract.mjs';
+import { sourceCheckoutOf, sourceWriteErrors } from '../../scripts/workspace-checkout.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // A change record is the only durable trace that a file was mutated, so the hash pair has to agree with
@@ -284,7 +285,16 @@ export async function validateBackendStep(branchDir, root = ROOT) {
   if (present.has('changes') && has('response/changes.md')) {
     const text = await read('response/changes.md');
     if (mutations) {
-      const checkout = fields(tableUnder(text, '## Binding')).Checkout ?? '';
+      const binding = fields(tableUnder(text, '## Binding'));
+      // What the branch did to the checkout, beside what it wrote into it: the preflight that ran before
+      // the first write, and the reflog entries the checkout gained while the branch held it
+      // (scripts/workspace-checkout.mjs#sourceWriteErrors, orchestrator.json#sourceWrites).
+      errors.push(...sourceWriteErrors({
+        at: 'response/changes.md', binding, base: mutations.base, branch: mutations.branch, mode,
+        commits: response.commits ?? [], status: response.status,
+        checkout: sourceCheckoutOf(root, branchDir, base.request),
+      }));
+      const checkout = binding.Checkout ?? '';
       // A dry run wrote nothing, so the next request can only pin the base it read.
       const expected = mode === 'dry'
         ? `@workspaces/be at ${mutations.base} on ${mutations.branch}, nothing written`

@@ -7,7 +7,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateWorkspaceStep } from './validate.mjs';
-import { resolveWorkspaceCheckout } from '../../scripts/workspace-checkout.mjs';
+import { installedTreeOf, resolveWorkspaceCheckout } from '../../scripts/workspace-checkout.mjs';
 import { workspaceCheckoutFixture } from '../../scripts/workspace-checkout-fixture.mjs';
 
 const head = 'd'.repeat(40);
@@ -51,7 +51,9 @@ function routeBinding(overrides = {}) {
   };
 }
 
-function responseMd({ binding = routeBinding(), findings = null, runtimeRows = null } = {}) {
+function responseMd({ binding = routeBinding(), findings = null, runtimeRows = null, installedTree } = {}) {
+  // Observed, never asserted: the receipt says what the checkout's own node_modules is.
+  installedTree ??= installedTreeOf(binding.checkout.diskPath).label;
   const defaultFindings = [
     ['ROUTE_HYDRATED_FROM_PORTABLE', binding.hydratedRouteRef, 'the portable declaration resolved to this local route'],
     ['IDENTITY_ROSTER_SEALED', 'the credential roster reference', 'the roster was bound by name and never read'],
@@ -94,6 +96,7 @@ The routed backend checkout of this project, bound at the frozen head with its d
 | Source head | ${binding.checkout.sourceHead} |
 | Mutation readiness | ${binding.mutationReadiness} |
 | Businesses root | ${binding.authorityRoots.businesses ?? '—'} |
+| Installed tree | ${installedTree} |
 
 ## Policy
 
@@ -173,6 +176,21 @@ async function expectError(files, needle, label) {
 }
 
 await expectValid(baseline(), 'a source checkout bound with no runtime');
+
+// The installed tree: a binding says what node_modules is, and a tree shared through a junction into
+// another checkout is bound only where the request declared it on purpose, because a delete inside a
+// checkout that holds one empties the tree every other checkout is using.
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace(/\n\| Installed tree \| [^\n]*\|/, '') }, 'records no Installed tree', 'a binding that never looked at node_modules');
+{
+  const absent = `${SOURCE}/a-checkout-this-machine-does-not-have`;
+  const shared = routeBinding({
+    checkout: { ...routeBinding().checkout, diskPath: absent, gitRoot: absent },
+    authorityRoots: { businesses: `${absent}/.worktrees/businesses` },
+  });
+  const label = 'junction to D:/Repositories/another-session/node_modules';
+  await expectError({ ...baseline(), 'response/data/route.json': shared, 'response/response.md': responseMd({ binding: shared, installedTree: label }) }, 'only when the request declares sharedInstall: true', 'a shared installed tree nobody declared');
+  await expectValid({ ...baseline(), 'request/request.json': requestJson({ extra: { sharedInstall: true } }), 'response/data/route.json': shared, 'response/response.md': responseMd({ binding: shared, installedTree: label }) }, 'a shared installed tree the request declared on purpose');
+}
 await expectError(withBinding(routeBinding({ runtime: runtimeConsumption() })), 'the route carries a runtime binding', 'a route that bound a runtime the runtime owner should have');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ runtimeRows: [['Owner task', OWNER]] }) }, 'the Runtime section carries rows', 'a receipt describing a runtime nobody bound');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['RUNTIME_CONSUMED_NOT_OWNED', OWNER, 'consumed']] }) }, 'records a runtime this route never bound', 'a finding about a runtime nobody bound');

@@ -18,9 +18,14 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
 1. Freeze one mission scope: the unit, the target, inclusions and exclusions, write roots, external
    effects, and what will count as proof. Two readings that would change any of those is one focused
    question, not a guess. Freezing is not silent: for a mission that will write routed source or touch
-   a runtime, the frozen scope is printed to the person as one block of at most four lines in their
-   language — the goal, what is in and what is out, the "done when" lines, one question — and
-   confirmed once through a `goal-confirm` choice before step 2. Each "done when" line names the
+   a runtime, the frozen scope is printed to the person as one block of at most four lines in the
+   display language (`resources/settings.json#language` over `settings.example.json`, default `vi`;
+   a person who writes in another language is answered in it) — the goal, what is in and what is
+   out, the "done when" lines, one question — and confirmed once through a `goal-confirm` choice
+   before step 2. That block is the one question a new prompt asks; from then on the run is smooth:
+   the transition log prints and never waits, a replan under the same goal and a routed re-entry ask
+   nothing, and only a `user` route, a `budget-choice` or a corrected goal stops for the person
+   (`resources/interaction.json#asks`). Each "done when" line names the
    operator whose receipt is that evidence, and a request from which no "done when" line can be
    written does not start. The block and the answer are what step 4 records as `state.json.mission`
    and `choices["goal:<sessionId>:v<version>"]`: `corrected` writes the next version and asks again,
@@ -92,7 +97,9 @@ Cross-session evidence uses scripts/producer-import.mjs. Copy a completed produc
 | Whether a real person can complete a real journey | `uat.verify` |
 | An account a flow signs in as | `identity.provision` |
 | The rows a flow needs, attributable and reversible | `data.seed` |
-| Serving a committed head on the product port, holding its lease, or a tunnel to it | `runtime.serve` |
+| Serving a committed head on the product port, holding its lease | `runtime.serve` |
+| Observability, a Sonar service, or a tunnel beside the served runtime | `service.operate` |
+| Whether the served backend does what its own e2e suite says, as a client, on seeded data | `api.verify` |
 | Applying a declared migration set once | `migration.release` |
 | Whether what was delivered matches what was promised | `business.reconcile` |
 | Shipping an image release, or recovering one | `release.deploy` |

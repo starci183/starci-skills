@@ -38,6 +38,7 @@ import { sessionRootOf } from '../../scripts/validate-request.mjs';
 import { validateAgainst } from '../../scripts/json-schema.mjs';
 import { loadFindingsSchema } from '../../scripts/record-findings.mjs';
 import { TASTE_RULES } from '../interface-audit/validate.mjs';
+import { sourceCheckoutOf, sourceWriteErrors } from '../../scripts/workspace-checkout.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const OPERATOR_ID = 'interface.generate';
@@ -572,7 +573,7 @@ export function resolutionStaleErrors({ at, inventory, tree, treeRef }) {
 // the values must come from. `operatorId` names the operator whose changes.md is checked;
 // `inventory` is null when the branch could not read one, which a done branch reports as
 // RESOLUTION_STALE.
-export async function applicationErrors({ branchDir, request, response, requirements = {}, present = new Set(), inventory, operatorId = OPERATOR_ID }) {
+export async function applicationErrors({ branchDir, root = ROOT, request, response, requirements = {}, present = new Set(), inventory, operatorId = OPERATOR_ID }) {
   const errors = [];
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
@@ -682,6 +683,14 @@ export async function applicationErrors({ branchDir, request, response, requirem
     }
     const binding = Object.fromEntries((tableUnder(text, '## Binding') ?? []).map(([k, v]) => [k, v]));
     if (!empty(binding.Checkout) && !binding.Checkout.includes(plan.branch)) errors.push(`${rel}: the Checkout row does not name the session branch ${plan.branch}`);
+    // What the branch did to the checkout, beside what it wrote into it: the preflight that ran before
+    // the first write, and the reflog entries the checkout gained while the branch held it
+    // (scripts/workspace-checkout.mjs#sourceWriteErrors, orchestrator.json#sourceWrites).
+    errors.push(...sourceWriteErrors({
+      at: rel, binding, base: plan.base, branch: plan.branch, mode,
+      commits: response.commits ?? [], status: response.status,
+      checkout: sourceCheckoutOf(root, branchDir, request),
+    }));
   }
   return { errors, plan };
 }

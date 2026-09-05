@@ -356,7 +356,13 @@ ${fallbacks.map((c) => `| ${BT}${c}${BT} | among the tied top scorers, the candi
 `;
 };
 
-const changesMd = ({ files, operator = 'interface.generate' } = {}) => {
+// The marks a source-writing branch reads off the checkout: HEAD stood on the base at dispatch and on
+// the branch own commit at the end, one entry apart, with the stash reflog untouched.
+const PREFLIGHT = 'passed at 2026-09-05T09:12:00Z';
+const REFLOG_BEFORE = `HEAD 7 ${HEAD}; stash 0`;
+const REFLOG_AFTER = `HEAD 8 ${COMMIT}; stash 0`;
+
+const changesMd = ({ files, operator = 'interface.generate', preflight = PREFLIGHT, reflogBefore = REFLOG_BEFORE, reflogAfter = REFLOG_AFTER } = {}) => {
   const rows = (files ?? plan().files).map(({ path: p, change, classes }) => `| ${BT}${p}${BT} | ${change} | ${change === 'created' ? 'the application-owned leaf the direction marked' : 'the resolved value for this node'} | ${classes.length ? `${BT}GAP-5${BT}` : '—'} |`);
   return `# changes — ${operator} step-2/parallel-1
 
@@ -370,6 +376,9 @@ The plans page and its application-owned canvas carry the resolved spacing on th
 | Step | ${BT}step-2/parallel-1${BT} |
 | Checkout | ${BT}@workspaces/fe${BT} at ${BT}${HEAD}${BT} → ${BT}${COMMIT}${BT} on ${BT}session/${SESSION}${BT} |
 | Predecessor | ${BT}step-1/parallel-1/response/response.md${BT} |
+| Preflight | ${preflight} |
+| Reflog before | ${reflogBefore} |
+| Reflog after | ${reflogAfter} |
 
 ## Files
 
@@ -530,7 +539,7 @@ const dryRun = () => ({
   'request/request.json': requestJson({ extra: { mode: 'dry' } }),
   'response/response.json': responseJson({ commits: [] }),
   'response/response.md': applicationMd({ mode: 'dry', commit: null, files: dryPlan().files }),
-  'response/changes.md': changesMd({ files: dryPlan().files }),
+  'response/changes.md': changesMd({ files: dryPlan().files, reflogAfter: REFLOG_BEFORE }),
   'response/data/writes.json': dryPlan(),
 });
 
@@ -745,5 +754,15 @@ await expectError(withPlan((p) => { p.sweep.command = 'node scripts/lint.mjs'; }
 await expectError(withPlan((p) => { p.sweep.findings = [{ code: 'APP_REIMPLEMENTATION', file: PAGE, line: 12, object: 'SectionHeader', token: 'flex-col', statement: 'SectionHeader owns its collapse' }]; }), 'any finding is WRITE_REJECTED', 'a finding carried into a done receipt');
 await expectError(withPlan((p) => { p.sweep.exitCode = 1; }), 'exited 1 with no finding recorded', 'a red sweep with an empty finding list');
 await expectError(withPlan((p) => { p.sweep.findings = [{ code: 'OFF_SCALE', file: 'app/other/page.tsx', line: 3, object: '—', token: 'gap-5', statement: 'off the closed gap scale' }]; p.sweep.exitCode = 1; }), 'which the declared write set does not carry', 'the sweep read outside the write set');
+
+// The checkout is not only what the branch wrote into it. The preflight ran before the first write, and
+// the reflog entries the checkout gained while the branch held it are the branch's own commits and
+// nothing else: a stash (which resets HEAD and outlives its own drop), a reset, a force, a clean or a
+// checkout of another branch each leave one it never earned.
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ preflight: '—' }) }, 'records no Preflight', 'a source write with no preflight behind it');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ preflight: 'failed at 2026-09-05T09:12:00Z' }) }, 'a done source-writing branch carries a preflight that passed', 'a done branch on a failed preflight');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ reflogBefore: '—' }) }, 'carries no Reflog before', 'a receipt that never read the reflog');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ reflogAfter: `HEAD 99 ${COMMIT}; stash 0` }) }, "a routed checkout gains only the branch's own commits", 'an entry the branch never earned');
+await expectError({ ...baseline(), 'response/changes.md': changesMd({ reflogAfter: REFLOG_AFTER.replace('stash 0', 'stash 1') }) }, 'stash reflog went from 0 to 1 entries', 'a stash inside the routed checkout');
 
 process.stdout.write('interface.generate self-test: lawful branches of all three receipts and rejected mutations passed\n');

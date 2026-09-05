@@ -20,7 +20,13 @@ const PROJECT = 'sample-product';
 // The synthetic host: a non-production environment that tightens one class to a person.
 const host = mkdtempSync(path.join(tmpdir(), 'environment-host-'));
 mkdirSync(path.join(host, '.stacks', ENV), { recursive: true });
-writeFileSync(path.join(host, '.stacks', ENV, 'environment.json'), JSON.stringify({ schemaVersion: 9, env: ENV, production: false, authorization: { 'external-upload': 'person' } }, null, 2));
+// It also declares two auxiliary services: one it wants up, whose probe is asked, and one it wants
+// down, whose probe is skipped because nothing answering is the state that was asked for.
+const SERVICES = [
+  { id: 'metrics', kind: 'observability', desired: 'up', command: 'command-ref://stacks/metrics', probe: { url: 'http://127.0.0.1:9000/health' }, holder: 'declared', publicPort: 9000 },
+  { id: 'edge-tunnel', kind: 'tunnel', desired: 'down', command: 'command-ref://stacks/tunnel', probe: { port: 7000 }, holder: 'declared' },
+];
+writeFileSync(path.join(host, '.stacks', ENV, 'environment.json'), JSON.stringify({ schemaVersion: 9, env: ENV, production: false, services: SERVICES, authorization: { 'external-upload': 'person' } }, null, 2));
 // The synthetic host also carries a Playwright install of the shape the walk runner loads — the
 // package under the install and a Chromium under its browsers path — so the ready branch is ready;
 // the mutation below removes it and the report's ok is refused against the host, not the report.
@@ -33,6 +39,8 @@ assert.equal(playwrightInstallStatus(host, ROOT).present, true, 'the synthetic i
 const envSchema = await loadEnvironmentSchema(ROOT);
 const reportSchema = JSON.parse(await readFile(path.join(ROOT, 'templates', 'kinds', 'readiness-report.schema.json'), 'utf8'));
 const CLASSES = authorizationClasses(envSchema);
+const SERVICE_IDS = SERVICES.map((x) => x.id);
+const wantsDown = new Set(SERVICES.filter((x) => x.desired === 'down').map((x) => `service.${x.id}.probe`));
 const declaration = await stackDeclaration(ROOT, ENV, host, envSchema);
 assert.equal(declaration.errors.length, 0, 'the synthetic declaration passes its schema');
 
@@ -45,6 +53,7 @@ function evidenceFor(id, authorization) {
   if (id === 'identity.flow.account') return 'the account record names one alias with its credential name';
   if (id === 'identity.flow.signin') return 'sign-in answered 200 with the password resolved by name';
   if (family === 'runtime') return { entry: 'the registry holds the entry of this route', head: 'the served head contains the checkout head', port: 'the projected port answers 200', holder: 'the port is held by the process the registry records' }[id.split('.')[2]];
+  if (family === 'service') return second === undefined ? 'observed' : id.endsWith('.declared') ? 'the declaration names this service with its kind, command, probe and holder' : 'the declared probe answers';
   if (id === 'host.browser') return 'a browser binary resolves for the audit profile';
   if (id === 'host.playwright') return 'playwright 0.0.0-synthetic and a chromium stand at the install the runner loads';
   if (id === 'host.container') return 'the container daemon answers an inspection';
@@ -55,10 +64,11 @@ function evidenceFor(id, authorization) {
 }
 function buildReport({ project = PROJECT, roles = ['fe', 'be'], env = ENV, flow = null, walls = [], statuses = {}, declarationRef = declaration.reference } = {}) {
   const wallById = new Map(walls.map((w) => [w.checkId, w]));
-  const checks = expectedCheckIds(reportSchema, roles, CLASSES).map((id) => {
+  const checks = expectedCheckIds(reportSchema, roles, CLASSES, SERVICE_IDS).map((id) => {
     const wall = wallById.get(id);
     let status = wall ? 'wall' : statuses[id] ?? 'ok';
     if (!wall && flow === null && id.startsWith('identity.flow.')) status = 'skipped';
+    if (!wall && wantsDown.has(id) && statuses[id] === undefined) status = 'skipped';
     for (const role of roles) if (!wall && wallById.has(`declaration.${role}`) && id !== `declaration.${role}` && (id.split('.')[1] === role && !id.startsWith('declaration.') || (id.startsWith('host.') && id.endsWith(`.${role}`)))) status = 'skipped';
     const evidence = status === 'skipped' ? 'not inspectable: the requirement or the declaration it needs is absent' : wall ? wall.evidence : evidenceFor(id, declaration.authorization);
     return { id, family: id.split('.')[0], status, evidence, owner: wall ? wall.owner : null };
@@ -211,6 +221,11 @@ await expectError(mutateBoth(blocked(), (r) => { r.checks.find((c) => c.id === '
 await expectError(mutateBoth(ready(), (r) => { r.checks.find((c) => c.id === 'checkout.fe.clean').status = 'skipped'; }), 'while declaration.fe is ok; a declared route has a checkout to inspect', 'a checkout skipped under a declared route');
 await expectError(mutateBoth(ready(), (r) => { r.checks.find((c) => c.id === 'identity.flow.signin').status = 'ok'; }), 'while no flow was named; both flow checks are skipped', 'a flow probed with no flow named');
 await expectError(mutateBoth(flowNamed(), (r) => { r.checks.find((c) => c.id === 'identity.flow.account').status = 'skipped'; }), 'is skipped while flow sign-in was named', 'an account record skipped under a named flow');
+
+// The declared services: the family says what the declaration on disk says, and no more.
+await expectError(mutateBoth(ready(), (r) => { r.checks.find((c) => c.id === 'service.edge-tunnel.probe').status = 'ok'; }), 'while the declaration wants the service down', 'a probe run against a service the declaration wants down');
+await expectError(mutateBoth(ready(), (r) => { r.checks.find((c) => c.id === 'service.metrics.probe').status = 'skipped'; }), 'while the declaration wants the service up', 'a probe skipped for a service the declaration wants up');
+await expectError(mutateBoth(ready(), (r) => { const c = r.checks.find((x) => x.id === 'service.metrics.declared'); c.status = 'wall'; c.owner = 'service'; r.walls.push({ checkId: c.id, owner: 'service', repair: 'declare it' }); }), 'the declaration answered this one', 'a declaration wall over a service the declaration carries');
 
 // The near match.
 await expectError(blocked({ walls: [{ ...WALLS[0], repair: 'no declaration names this role' }, WALLS[1]] }), 'is taken while no declaration wall names a suggested id', 'a fallback with no suggestion');

@@ -2,7 +2,7 @@
   "schemaVersion": 8,
   "runtime": "openai",
   "provider": "openai",
-  "note": "Execution profiles run by the OpenAI runtime: Sol 5.6, on two roles. These models do not run through Codex; a Codex runtime (Terra 5.6) gets its own file here only when an operator binds it. Profile ids are unique across every file in this directory and are what each operator binds under `resources` in its operator.json. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile may use, and must be a subset of capabilities. `forkTurns` states, per resources/orchestrator.json#modes, how many of the orchestrator's turns an agent in mode dispatch inherits and that one in mode isolated inherits none; inline runs no agent and has no entry.",
+  "note": "Execution profiles run by the OpenAI runtime, split by task: Sol 5.6 (`sol-fresh`) produces — decisions, generation, execution, publication; Astra 6 (`astra`) reads and judges — readiness, plans, audits, gates, walks — and repairs nothing. These models do not run through Codex. Profile ids are unique across every file in this directory and are what each operator binds under `resources` in its operator.json. `capabilities` states what the model can do in this workspace; `permits` states what a role on this profile may use, and must be a subset of capabilities; the operator's own tool grants stay the real bound. `forkTurns` states, per resources/orchestrator.json#modes, how many of the orchestrator's turns an agent in mode dispatch inherits and that one in mode isolated inherits none; inline runs no agent and has no entry.",
   "profiles": {
     "sol-fresh": {
       "model": "gpt-5.6-sol",
@@ -51,14 +51,14 @@
         "print": true
       }
     },
-    "sol-reviewer": {
-      "model": "gpt-5.6-sol",
+    "astra": {
+      "model": "gpt-6-astra",
       "forkTurns": {
         "isolated": "none",
         "dispatch": 40
       },
       "count": 1,
-      "role": "One fresh reviewer that receives artifacts and claims only, never the producer's rationale, and returns findings without repairing anything. The model can write and draw; this role is forbidden to, by policy.",
+      "role": "One fresh reader that receives artifacts, claims and tables only, never the producer's rationale: it plans (one unit per page, modal, flow or module), audits, gates and walks, and returns findings and records without repairing product source. It writes only what its operator's own grants name (a readiness report, a plan, an audit sheet, a UAT run record) and never a source tree.",
       "capabilities": {
         "fileread": true,
         "sourcewrite": true,
@@ -80,7 +80,7 @@
       },
       "permits": {
         "fileread": true,
-        "sourcewrite": false,
+        "sourcewrite": true,
         "git": true,
         "shell": true,
         "websearch": true,
@@ -89,7 +89,7 @@
         "browsercontrol": true,
         "http": true,
         "registry": true,
-        "container": false,
+        "container": true,
         "ci": true,
         "objectstorage": false,
         "secrets": true,

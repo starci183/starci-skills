@@ -89,23 +89,24 @@
       "wait: status waiting runs the nested exchange, then resumes the same agent; the branch stays running in state.json",
       "block: status blocked keeps the session on disk. When routing.json answers the stop's domain with kind resume, the orchestrator asks the person for the field the stop names and re-enters the operator in step-(N+1)/parallel-1 with resume set and state.json.resumes recorded. When it answers operator, the named operator runs next and the blocked branch is re-entered the same way once that operator is done. When it answers user or external, the branch stays blocked and the chain continues only after the person or the outside party has changed something the stop names; that continuation is also a step-(N+1)/parallel-1 re-entry with resume set, and request.json must carry the changed requirement or input, because a re-entry with no delta is NO_PROGRESS",
       "done: when routing reaches user or external, or git.publish emits done, the orchestrator releases the leases and deletes the session folder; what survives is what the steps published (commits, business heads, UAT pairs, remote runs) and any audit record the owner copies out first",
-      "report: every turn the orchestrator ends with a person is one of resources/interaction.json#reportShapes in the person's language, recorded in brief.report; a hand-off to a peer session is a waiting branch with a wake condition in brief.peers, never the end of a turn"
+      "report: every turn the orchestrator ends with a person is one of resources/interaction.json#reportShapes in the display language (resources/settings.json#language over settings.example.json, default vi; interaction.json#language), recorded in brief.report; a hand-off to a peer session is a waiting branch with a wake condition in brief.peers, never the end of a turn"
     ]
   },
   "sourceWrites": {
-    "rule": "an operator that writes source (interface.generate, backend.generate, library.update, library.update) writes only on the session branch session/<sessionId> of the routed checkout, in a git worktree the orchestrator prepared from the frozen head; it commits the declared write set once and records the sha in response.json.commits; the person's checked-out branch is never touched",
+    "rule": "an operator that writes source (interface.generate, interface.fix, backend.generate, library.update) writes only on the session branch session/<sessionId> of the routed checkout, in a git worktree the orchestrator prepared from the frozen head; it commits the declared write set once and records the sha in response.json.commits; the person's checked-out branch is never touched",
     "track": "changes.md names every path with before/after hashes and the commit; the next requests pin @workspaces/<role> at that sha (contexts[].head) so quality.verify and interface.audit verify exactly what was written",
     "publish": "git.publish merges the session branch into the target branch: fast-forward when the target has not moved; a merge commit only when there is no conflict and the gates are re-run on the merge result; a conflict is NON_FAST_FORWARD and a person resolves it; never rebase, never force",
     "cleanup": "after a successful publish the worktree and the session branch are removed together with the session folder; a blocked session keeps both",
+    "history": "a source-writing operator runs the request preflight before it writes any file outside the session folder and records its verdict and instant in `## Binding` of changes.md as `Preflight` (`<passed|failed> at <ISO 8601 instant>`), beside `Reflog before` and `Reflog after` (`HEAD <reflog entries> <head sha>; stash <reflog entries>`) read at dispatch and at its last commit; a routed checkout gains only that branch's own commits, so a stash, a reset, a force, a clean, a checkout of another branch, a rebase or an am inside one is refused, a temporary worktree is removed with `git worktree remove --force`, and nothing under a checkout whose `node_modules` is a junction is deleted by hand",
     "policy": "the routed checkout must declare gitPolicy.worktreeBranches = session-only (readiness/initialization/workspaces); a route declaring forbidden binds read-only and no source-writing operator may run against it; mode dry is exempt, because it writes nothing: a dry backend.generate or interface.generate may run against a read-only binding, and its plan records a null commit"
   },
   "profileEquivalents": {
     "rule": "an operator binds one profile; when the processor runs on a runtime that lacks that profile, it runs the equivalent profile of its own runtime with exactly the grants the operator requires, and response.json records both (boundProfile, ranProfile) so an audit can tell a stand-in from the binding",
     "pairs": {
       "opus": "sol-fresh",
-      "fable": "sol-reviewer",
+      "fable": "astra",
       "sol-fresh": "opus",
-      "sol-reviewer": "fable"
+      "astra": "fable"
     },
     "grants": "the equivalent runs with the tools the operator declares that its own profile permits and its runtime supports (resources/tools.json); a tool the runtime does not support is unavailable for that run: a judged imagegen step records that no artwork could be made and continues, any other unsupported tool blocks the branch with the operator's own code",
     "imageVersusVisualize": "imageGeneration means artwork: a digital image produced by an image model (OpenAI profiles only). Rendering HTML (direction candidates, audit sheets, previews) is visualization, needs no grant, and every runtime does it."

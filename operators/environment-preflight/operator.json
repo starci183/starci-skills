@@ -8,7 +8,7 @@
   "validator": "validate.mjs",
   "selfTest": "self-test.mjs",
   "resources": {
-    "profile": "sol-fresh",
+    "profile": "astra",
     "grammarBound": false,
     "mode": "inline",
     "tools": {

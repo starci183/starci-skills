@@ -119,6 +119,23 @@ request gate, no sealed credential is `PROVISIONING_UNAVAILABLE`, and nothing se
 `RUNTIME_UNAVAILABLE`. On this machine round 2 met the first and the last, which is why no record in
 this folder yet contains a UAT verdict — an absence that is now legible instead of invisible.
 
+`api.verify` is the backend's half of the same law, and the recovery run on 2.0.3
+([evidence](evidence/20260905-nivo-recovery-on-2.0.3.md)) is why it exists: a backend-only mission has no
+walk, so its integration tests ran as gates inside the checkout and nothing ever exercised the API the
+way a client would, leaving a green receipt over a product nobody had called. The API walk runs
+whenever a delivery is served — one flow per branch, against the entry the `platform-operation-receipt`
+attests and never a server it starts, as the account the `uat-account` names, on the namespace the
+`seed-receipt` names — and it runs the repository's own end-to-end command exactly as the route's gate
+plan declares it, never a script written for the branch, so its case rows are the runner's and a case
+identifier standing in no runner output is refused rather than judged. Its preconditions are the served
+head and the seed rather than a person's request: nothing serving is `RUNTIME_UNAVAILABLE`, a case the
+runner reported failing or named and never ran is `API_CASE_FAILED` and goes back to the delivery owner,
+and a record written outside the run namespace is `API_NAMESPACE_LEAK` and goes back to whoever declared
+the fixture boundary. `backend-feature` now carries one and `backend-e2e` runs two of them on one served
+head; the `e2e` gate of `quality.verify` stays exactly what it was — never run unless a person asked —
+because a gate proves the code and a walk proves the product, and a receipt that shows only the first
+cannot be told from one that showed both.
+
 ## Still open after round 2
 
 - The `.claude` head is not in `request.json.contexts`, so a tree edit under a running session is invisible
@@ -243,3 +260,78 @@ stops at that step with the rest skipped. That run needs the host's Playwright i
 with the runner's own wording as the reason, on a host that has none — it is never faked. The three
 operator self-tests carry the same lawful walk and the same refusals through `uat.verify`,
 `interface.audit` and `environment.preflight`.
+
+## The registry publication
+
+`library.update` under mode `publish` used to end at a packed archive nobody had published, because
+publishing was a person's authority; a repair therefore reached the owner and never reached the
+consumer, which is what the Setup rerun measured
+(`evidence/20260905-nivo-setup-uxui-on-2.0.3.md`). The mode now ends at the registry, and the operator's
+self-test proves that ending without a registry, a network or npm: a publication is lawful only when it
+names the registry serving exactly the version this branch packed under exactly that archive's
+integrity, on package proofs that passed; a record left `pending` is lawful only where the request
+preset `publish: false`; a published claim on red proofs, on a wrong integrity or a wrong version, and
+one made by a mode that sends no archive anywhere, are each refused by name; the release contract
+refuses a published record missing its registry, integrity or moment; and a refused publication
+validates as a blocked receipt only while it carries the registry's own answer and never the credential
+that resolved it. A `consume` branch binds a `published` release the way it binds a `pending` one — the
+pending path is now the rare one, since a pending archive lives only inside the session that packed it.
+
+## Publishing a business head
+
+The Nivo rerun (`evidence/20260905-nivo-recovery-on-2.0.3.md`) ended with a feature directory saying
+`implemented` while the head index of the businesses root still named the head it replaced, and with a
+lineage pointing at a session file because no object had been archived — both correct refusals by a
+write set that was the feature directory alone, and both left for a person. From 2.0.4 publishing the
+head is `business.reconcile`'s own job and one write set: the feature directory, the canonical model
+archived under its content address, and the feature's entry in the index naming that address with the
+state the head now holds. `scripts/business-registry.mjs` is the single home for it — the RFC 8785
+canonical form, the content address a store files an object under, the self-fingerprint a document
+carries about itself, the plan, the apply and the verification — so an operator that publishes and a
+validator that reads the publication back cannot drift apart; `scripts/business-registry.spec.mjs`
+proves the two halves against each other on a real store, and the operator's self-test now builds a
+businesses root per branch and refuses a head that was archived nowhere, an index still naming the old
+head or the old state, an object that does not hash to the head it is filed under, a lineage naming a
+session file or an object the store does not hold, and an index resting the promise on a source head no
+fact claim binds.
+
+## The services beside the runtime
+
+The 2.0.0 catalogue dropped the row that used to read "observability, the Sonar service, tunnels" and
+put nothing in its place, so a mission that needed one of those had no operator to name and no way to
+say whether it was running. From 2.0.4 the environment declares them — `services` in
+`readiness/initialization/stacks/environment.schema.json`, each with its kind, the state the
+environment wants it in, the declared command that moves it, the probe that proves it and whether the
+environment keeps it with a person — `environment.preflight` asks two questions of each and owns
+neither, and `service.operate` moves exactly one of them per branch. Both halves are proved without a
+service at all: the preflight's synthetic host now declares one service it wants up and one it wants
+down, and refuses a probe run against the second, a probe skipped for the first, and a declaration
+wall over a service the declaration carries; the service operator's self-test builds a host with three
+declared services and refuses a receipt about another service, a kind the declaration does not give, an
+`up` observed without its probe, a holder that is a name rather than a pid, a `down` whose probe
+answered or that still claims a holder, an attestation that ran the declared command, a move that
+recorded neither a command nor a no-op, a person-held service brought up anyway, an approval naming a
+declaration that moved, and a receipt that printed the command's credential. `tests/chains/service-fanout.json`
+is the planner's half: two services named on two done-when lines become two branches of one operator,
+because the enumeration is the declaration's and there is no plan to fan out over.
+
+## What a source-writing branch did to its checkout
+
+The Nivo reruns on 2.0.3 (`evidence/20260905-nivo-recovery-on-2.0.3.md`,
+`evidence/20260905-nivo-setup-uxui-on-2.0.3.md`) left four traces nobody read: a branch that ran
+`git stash push` inside a routed checkout and reported it itself because no gate could have found it,
+a Setup branch that wrote the owner repair before its preflight ran, a bind receipt that could not be
+re-validated once the chain had moved the head it recorded, and a session that deleted `node_modules`
+by hand inside a worktree whose junction pointed at the installed tree several checkouts shared. From
+2.0.4 each is a refusal with one home. `scripts/workspace-checkout.mjs` reads the checkout's own
+history — `#reflogErrors` over the window between a branch's base and the commit it recorded,
+`#junctionErrors` over its installed tree, `#sourceWriteErrors` over the `Preflight`, `Reflog before`
+and `Reflog after` rows of `changes.md` — and every operator that writes source calls the last of
+those, so a stash (whose reset entry outlives its own drop), a reset, a force, a clean, a checkout of
+another branch, a rebase, an am, a first commit older than the recorded preflight, or a missing mark
+each refuse the receipt by name; a bind is judged against the head it recorded, which a later branch
+of the same chain is allowed to have advanced past and an unrelated commit or another branch is not.
+`scripts/workspace-checkout.spec.mjs` proves all of it on temporary repositories — the worktree coming
+into being is not read as the branch gaining an entry, a stash and its drop are, and a shared installed
+tree binds only where the request declared `sharedInstall` — and the five operator self-tests carry the
+same refusals through their own receipts.

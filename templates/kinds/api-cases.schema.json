@@ -1,0 +1,156 @@
+{
+  "$id": "kind:api-cases",
+  "description": "What the repository's own end-to-end runner reported when it was run as a client against the served runtime: the command that was run, the head that answered, the namespace the rows carried, and one row per case the runner named. Every row is copied from the runner's output. Nothing here is authored: a case the branch writes is a source write and belongs to the operator that owns source, so an id that stands in no runner output is refused rather than judged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runId",
+    "flow",
+    "commit",
+    "servedHead",
+    "servedContainsCommit",
+    "endpoint",
+    "command",
+    "exitCode",
+    "outputRef",
+    "namespace",
+    "startedAt",
+    "cases"
+  ],
+  "properties": {
+    "runId": {
+      "description": "The run this record belongs to. It is the moment the suite ran and the head it verified, so two runs of one flow at one commit stay distinguishable and neither can overwrite the other.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "flow": {
+      "$ref": "#/$defs/slug"
+    },
+    "commit": {
+      "description": "The commit this run verifies: the head the request pinned on the backend checkout whose suite ran.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "servedHead": {
+      "description": "The head the runtime was serving when the suite ran, as the platform receipt attested it. It carries the work of every session that asked for it, so it is almost never equal to the commit this run verifies.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "servedContainsCommit": {
+      "description": "Whether the served head contains the pinned commit. False is drift, and drift is a stop with nothing run.",
+      "type": "boolean"
+    },
+    "receiptRef": {
+      "description": "The platform-operation-receipt this run bound its entry from. A run that names none named no server it could have been talking to.",
+      "type": "string",
+      "minLength": 1
+    },
+    "endpoint": {
+      "description": "The entry the suite was pointed at, as the platform receipt carries it. It is never an endpoint this run started.",
+      "type": "string",
+      "minLength": 1
+    },
+    "command": {
+      "description": "The command as it was run, exactly as the route's gate plan declares it. A command this branch composed is a bespoke script and is not the repository's suite.",
+      "type": "string",
+      "minLength": 1
+    },
+    "commandRef": {
+      "description": "Where the command is declared: the gate plan entry or the package script the route publishes.",
+      "type": "string",
+      "minLength": 1
+    },
+    "exitCode": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "outputRef": {
+      "description": "The runner's own output, kept whole beside the record, so every case row can be read back to the line that produced it.",
+      "type": "string",
+      "pattern": "^response/artifacts/[A-Za-z0-9_.-]+$"
+    },
+    "namespace": {
+      "description": "The namespace every row this run wrote carries, as the seed named it. Cleanup deletes exactly this and nothing else.",
+      "$ref": "#/$defs/namespace"
+    },
+    "account": {
+      "description": "The account the suite signed in as, by name. A password has nowhere to live here even by accident.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alias",
+        "username",
+        "credentialName",
+        "credentialRef",
+        "plaintextRecorded"
+      ],
+      "properties": {
+        "alias": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "username": { "type": "string", "pattern": "^uat-[A-Za-z0-9._-]+$" },
+        "credentialName": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "credentialRef": { "type": "string", "pattern": "^\\.stacks/[a-z0-9][a-z0-9-]*/secrets/uat\\.enc$" },
+        "plaintextRecorded": { "const": false }
+      }
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cases": {
+      "description": "One row per case the runner named, in the order the runner named them. A case with no status and no evidence is not a case anyone can judge.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "caseId",
+          "request",
+          "status",
+          "assertion",
+          "durationMs",
+          "evidenceRef"
+        ],
+        "properties": {
+          "caseId": {
+            "description": "The case's identifier as the runner printed it. It is the runner's, never the agent's.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "request": {
+            "description": "What the client did, in one line: the method and the route as the case issued them.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "status": {
+            "description": "pass when the runner reported the case held; fail when it reported it did not; skipped when the runner named it and ran nothing. A skipped case proved nothing and is not a pass.",
+            "enum": ["pass", "fail", "skipped"]
+          },
+          "assertion": {
+            "description": "The assertion the case makes, as the suite states it.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "evidenceRef": {
+            "description": "Where this row can be read back in the runner's own output: the artifact and the place in it. A row nobody can trace to the runner is a row the agent could have written.",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "namespace": { "type": "string", "pattern": "^uat-[A-Za-z0-9._-]+$" }
+  }
+}
