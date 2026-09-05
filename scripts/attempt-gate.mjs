@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { validateRequest, sessionRootOf, V22_CONTRACT } from './validate-request.mjs';
 import { validateStep } from './validate-step.mjs';
 import { mutateSession } from './session-lock.mjs';
+import { buildEvidenceManifest } from './evidence-manifest.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sha = (value) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
@@ -95,6 +96,7 @@ export async function acceptAttempt(branch) {
   const responseFile = path.join(branch, 'response', 'response.json');
   const responseBytes = await readFile(responseFile);
   const response = exchange ? JSON.parse(responseBytes) : checked.response;
+  const evidenceManifest = await buildEvidenceManifest(branch);
   const key = branchKey(branch);
   const result = await mutateSession(session, async (state) => {
     const record = state.attempts?.[key];
@@ -103,6 +105,8 @@ export async function acceptAttempt(branch) {
     const requestCheck = await validateRequest(root, branch, undefined, { phase: 'accept' });
     if (requestCheck.errors.length) throw new Error(requestCheck.errors.join('\n'));
     if (sha(await readFile(responseFile)) !== sha(responseBytes)) throw new Error('response/response.json changed during acceptance; rerun the full step gate');
+    const stableManifest = await buildEvidenceManifest(branch);
+    if (stableManifest.fingerprint !== evidenceManifest.fingerprint || JSON.stringify(stableManifest.files) !== JSON.stringify(evidenceManifest.files)) throw new Error('request/response evidence changed during acceptance; rerun the full step gate');
     if (response.actual && Date.parse(response.actual.observedAt) < Date.parse(record.startedAt)) throw new Error(`response/response.json: actual.observedAt predates attempt ${record.id}; stale evidence cannot satisfy its expected`);
     const mapped = response.status === 'done' ? 'matched' : response.status === 'mismatch' ? response.comparison.verdict : response.status;
     record.status = mapped;
@@ -110,6 +114,7 @@ export async function acceptAttempt(branch) {
     record.responseRef = `${refBase}/response/response.json`;
     record.endedAt = new Date().toISOString();
     if (response.comparison) record.comparison = response.comparison;
+    record.evidenceManifest = evidenceManifest;
     state.workerSlots = (state.workerSlots ?? []).filter((lease) => lease.attemptId !== record.id);
     delete state.leases?.[key];
     return { state: mapped, next: response.comparison?.next ?? null, attempt: record };

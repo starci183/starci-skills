@@ -11,12 +11,15 @@ const processLives = (pid) => {
   catch (error) { return error.code === 'EPERM'; }
 };
 
-export async function withOwnedFileLock(lock, operation) {
+export async function withOwnedFileLock(lock, operation, { requiredFile = null } = {}) {
   lock = path.resolve(lock);
+  requiredFile = requiredFile ? path.resolve(requiredFile) : null;
+  if (requiredFile && !existsSync(requiredFile)) throw new Error('SESSION_MISSING: state.json is absent');
   await mkdir(path.dirname(lock), { recursive: true });
   const owner = { pid: process.pid, token: randomUUID(), acquiredAt: new Date().toISOString() };
   let handle;
   for (let tries = 0; tries < 400; tries += 1) {
+    if (requiredFile && !existsSync(requiredFile)) throw new Error('SESSION_MISSING: state.json was removed while waiting for its lock');
     try {
       handle = await open(lock, 'wx');
       await handle.writeFile(`${JSON.stringify(owner)}\n`, 'utf8');
@@ -24,7 +27,10 @@ export async function withOwnedFileLock(lock, operation) {
       break;
     } catch (error) {
       if (!['EEXIST', 'EPERM', 'ENOENT'].includes(error.code)) throw error;
-      if (error.code === 'ENOENT') await mkdir(path.dirname(lock), { recursive: true });
+      if (error.code === 'ENOENT') {
+        if (requiredFile && !existsSync(requiredFile)) throw new Error('SESSION_MISSING: state.json was removed while waiting for its lock');
+        await mkdir(path.dirname(lock), { recursive: true });
+      }
       if (error.code === 'EEXIST') {
         try {
           const held = JSON.parse(await readFile(lock, 'utf8'));
@@ -50,7 +56,7 @@ export async function withOwnedFileLock(lock, operation) {
 
 export async function withSessionLock(session, operation) {
   session = path.resolve(session);
-  return withOwnedFileLock(path.join(session, 'runtime', '.session-lock'), operation);
+  return withOwnedFileLock(path.join(session, 'runtime', '.session-lock'), operation, { requiredFile: path.join(session, 'state.json') });
 }
 
 export async function mutateSession(session, operation) {

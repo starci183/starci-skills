@@ -8,10 +8,12 @@ import { fileURLToPath } from 'node:url';
 import { openSession, confirmSession } from './session-open.mjs';
 import { openAttempt } from './attempt-gate.mjs';
 import { attemptContractErrors } from './validate-response.mjs';
-import { validateRequest, V22_CONTRACT } from './validate-request.mjs';
+import { uiKnowledgeRequestErrors, validateRequest, V22_CONTRACT } from './validate-request.mjs';
 import { v22SessionErrors } from './validate-session.mjs';
 import { acquireWorkerSlot, normalizeResource, releaseWorkerSlot, resourcesOverlap } from './worker-slots.mjs';
-import { mutateSession } from './session-lock.mjs';
+import { mutateSession, withSessionLock } from './session-lock.mjs';
+import { withRequestPhase } from './validation-phase.mjs';
+import { buildEvidenceManifest } from './evidence-manifest.mjs';
 
 const sha = (bytes) => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -64,6 +66,27 @@ test('concurrent first prompts create one host session and unsafe explicit ids c
   await assert.rejects(() => openSession(sessions, { ...draft(worktree, 'another-host'), sessionId: '../escape' }), /safe direct-child/);
 }));
 
+test('a session lock waiter never recreates a session removed by its current owner', async () => fixture(async ({ sessions, worktree }) => {
+  const opened = await openSession(sessions, draft(worktree));
+  let entered;
+  let release;
+  const inside = new Promise((resolve) => { entered = resolve; });
+  const hold = new Promise((resolve) => { release = resolve; });
+  const owner = withSessionLock(opened.session, async () => {
+    entered();
+    await hold;
+    rmSync(opened.session, { recursive: true, force: true });
+  });
+  await inside;
+  const waiter = mutateSession(opened.session, async (state) => { state.status = 'blocked'; });
+  const rejected = assert.rejects(waiter, /SESSION_MISSING/);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  release();
+  await owner;
+  await rejected;
+  assert.equal(existsSync(opened.session), false);
+}));
+
 test('attempt gate freezes expected and request artifacts before dispatch; actual comparison covers every criterion', async () => fixture(async ({ sessions, worktree }) => {
   const opened = await openSession(sessions, draft(worktree));
   await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:1' });
@@ -106,11 +129,13 @@ test('attempt gate freezes expected and request artifacts before dispatch; actua
   assert.ok(attemptContractErrors(branch, falseDone, request).some((error) => error.includes('status done advances only')));
   assert.deepEqual(attemptContractErrors(branch, { ...falseDone, status: 'mismatch' }, request), []);
   writeFileSync(path.join(branch, 'response', 'response.json'), JSON.stringify(baseResponse));
+  const evidenceManifest = await buildEvidenceManifest(branch);
   await mutateSession(opened.session, async (fresh) => {
     fresh.attempts['1/1'].status = 'matched';
     fresh.attempts['1/1'].responseRef = 'step-1/parallel-1/response/response.json';
     fresh.attempts['1/1'].endedAt = new Date().toISOString();
     fresh.attempts['1/1'].comparison = baseResponse.comparison;
+    fresh.attempts['1/1'].evidenceManifest = evidenceManifest;
     fresh.status = 'done';
     fresh.lifecycle = { ...fresh.lifecycle, phase: 'closed-success', closedAt: new Date().toISOString(), closeReason: 'All done-when criteria matched.', compactRef: '.worktrees/done/session/bundle' };
     fresh.brief.proven = ['doneWhen:0 readiness proof retained'];
@@ -119,7 +144,9 @@ test('attempt gate freezes expected and request artifacts before dispatch; actua
   assert.deepEqual(await v22SessionErrors(opened.session, closed), []);
   baseResponse.actual.observations[0].evidence = [];
   writeFileSync(path.join(branch, 'response', 'response.json'), JSON.stringify(baseResponse));
-  assert.ok((await v22SessionErrors(opened.session, closed)).some((error) => error.includes('not backed by a matched v2.2 attempt')));
+  const tampered = await v22SessionErrors(opened.session, closed);
+  assert.ok(tampered.some((error) => error.includes('response/response.json changed after acceptance')));
+  assert.ok(tampered.some((error) => error.includes('not backed by a matched v2.2 attempt')));
 }));
 
 test('one atomic session gate caps concurrent workers at three, prevents duplicate owners, and detects parent-child resource conflicts', async () => fixture(async ({ sessions, worktree }) => {
@@ -206,4 +233,22 @@ test('a source-writing attempt automatically leases the real workspace behind a 
   const second = await acquireWorkerSlot(path.join(opened.session, 'step-2', 'parallel-1'), 'writer-2');
   assert.equal(second.reason, 'resource-conflict');
   assert.equal(second.conflictsWith, '1/1');
+}));
+
+test('knowledge mutation acceptance validates the frozen manifest while predispatch validates live sources', async () => fixture(async ({ base }) => {
+  const scripts = path.join(base, 'scripts');
+  const branch = path.join(base, 'session', 'step-1', 'parallel-1');
+  mkdirSync(path.join(branch, 'request'), { recursive: true });
+  mkdirSync(scripts, { recursive: true });
+  writeFileSync(path.join(scripts, 'knowledge-manifest.mjs'), [
+    "export const knowledgeManifestErrors = () => ['live-manifest-check'];",
+    "export const frozenKnowledgeManifestErrors = () => ['frozen-manifest-check'];"
+  ].join('\n'));
+  writeFileSync(path.join(scripts, 'ui-knowledge-gate.mjs'), [
+    "export const routedFamily = () => 'core';",
+    'export const frozenFamilyUnderstandingErrors = () => [];'
+  ].join('\n'));
+  const request = { contractVersion: V22_CONTRACT, operatorId: 'interface.plan', contexts: [{ alias: '@knowledge/grammars/core' }] };
+  assert.deepEqual(await uiKnowledgeRequestErrors(base, branch, request), ['live-manifest-check']);
+  assert.deepEqual(await withRequestPhase('accept', () => uiKnowledgeRequestErrors(base, branch, request)), ['frozen-manifest-check']);
 }));

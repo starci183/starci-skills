@@ -63,7 +63,27 @@
           "responseRef": { "type": "string", "minLength": 1 },
           "startedAt": { "type": "string", "minLength": 1 },
           "endedAt": { "type": "string", "minLength": 1 },
-          "comparison": { "type": "object" }
+          "comparison": { "type": "object" },
+          "evidenceManifest": {
+            "type": "object", "additionalProperties": false,
+            "required": ["version", "responseHash", "fingerprint", "files"],
+            "properties": {
+              "version": { "const": 1 },
+              "responseHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+              "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+              "files": {
+                "type": "array", "minItems": 2,
+                "items": {
+                  "type": "object", "additionalProperties": false,
+                  "required": ["ref", "sha256"],
+                  "properties": {
+                    "ref": { "type": "string", "pattern": "^(?:request|response)/[A-Za-z0-9_./-]+$" },
+                    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },

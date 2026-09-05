@@ -30,6 +30,7 @@ import { extractUnchecked, UNCHECKED_OPERATORS } from './record-unchecked.mjs';
 import { budgetUnitsOf, hostRootOf, loadUnits } from './validate-request.mjs';
 import { readUnchecked } from './unchecked.mjs';
 import { readBank, currentApproval, sessionOf, isDone, canonical } from './bank.mjs';
+import { evidenceManifestErrors } from './evidence-manifest.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const STATE_SCHEMA = path.join('templates', 'step', 'state.schema.json');
@@ -88,6 +89,10 @@ export async function v22SessionErrors(session, state) {
       else if (previous.number + 1 !== attempt.number) errors.push(`state.json: attempts[${branch}].number does not follow ${previous.id}`);
     }
     if (attempt.status !== 'running' && attempt.status !== 'waiting' && !attempt.responseRef) errors.push(`state.json: terminal attempt ${attempt.id} preserves no responseRef`);
+    if (attempt.status !== 'running' && attempt.status !== 'waiting') {
+      const branchDir = path.join(session, `step-${parts[0]}`, `parallel-${parts[1]}`, ...(parts[2] ? [parts[2]] : []));
+      for (const error of await evidenceManifestErrors(branchDir, attempt.evidenceManifest)) errors.push(`state.json: attempts[${branch}] ${error}`);
+    }
   }
   if (state.status === 'done' || phase === 'closed-success') {
     for (let index = 0; index < (mission.doneWhen ?? []).length; index += 1) {

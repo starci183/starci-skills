@@ -21,7 +21,8 @@ thể; source-writing tự lease worktree thật sau khi chuẩn hóa junction, 
 Windows. Thiếu input, tài nguyên exclusive chồng nhau
 và worker sẵn sàng thứ tư phải chờ; trạng thái waiting trả slot. `attempt-gate accept` chạy đủ gate
 chung và gate operator, phân giải bằng chứng actual rồi đối chiếu từng tiêu chí. Chỉ receipt match mới
-được advance. Mismatch được giữ lại và dẫn tới repair, retry hoặc blocked; retry trỏ về attempt trước
+được advance; sau đó attempt đóng băng inventory chính xác của mọi file request/response trong
+`evidenceManifest`. Mismatch được giữ lại và dẫn tới repair, retry hoặc blocked; retry trỏ về attempt trước
 và không được hạ expected bắt buộc trong cùng goal version.
 
 ## Chuỗi được suy ra thế nào

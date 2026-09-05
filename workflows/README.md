@@ -21,7 +21,8 @@ overlapping exclusive paths/resources and the fourth ready worker queue. A writi
 concrete owner; source-writing work automatically leases the real workspace even through a junction,
 symlink or Windows case alias. Waiting releases its slot.
 `attempt-gate accept` runs the full shared and operator gates, resolves actual evidence and compares
-every criterion. Only a matched receipt advances. Mismatch is preserved and leads to repair, retry or
+every criterion, then seals the exact request/response file inventory in the attempt's
+`evidenceManifest`. Only a matched receipt advances. Mismatch is preserved and leads to repair, retry or
 blocked; a retry points to it and cannot weaken required expected under the same goal version.
 
 ## How a chain is derived
