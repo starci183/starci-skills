@@ -260,9 +260,10 @@ Skeleton: [`templates/kinds/git-publication.skeleton.md`](https://github.com/sta
 | `^## Binding$` | `\| Field \| Value \|` | `Operator`, `Step`, `Project`, `Boundary`, `Approval`, `Route receipt`, `Worktree branches`, `Mutation branch`, `Frozen head` | `Value`: `\S` |
 | `^## Publication$` | `\| Field \| Value \|` | `Remote`, `Ref`, `Mode`, `Forced`, `Session branch`, `Target branch`, `Merge`, `Verified commit`, `Cleanup` | `Value`: `\S` |
 | `^## Published heads$` | `\| Checkout \| Branch \| Head \| Previous remote head \| Commits \|` | minRows 1 | `Head`: `^`[0-9a-f]&#123;40}`$`<br />`Commits`: `^[1-9][0-9]*$` |
+| `^## Resolutions$` | `\| File \| Hunk \| Rule \|` | minRows 0 | `File`: `\S`<br />`Hunk`: `^[0-9]+-[0-9]+$`<br />`Rule`: `^[a-z][a-z-]*$` |
 | `^## Hooks$` | `\| Hook \| Reference \| Outcome \|` | minRows 1 | `Hook`: `^`(pre-commit\|commit-msg\|pre-push)`$`<br />`Outcome`: `^(passed\|failed)$` |
 | `^## Continuation tag$` | `\| Field \| Value \|` | `Tag`, `Ref`, `Head` | `Value`: `\S` |
-| `^## Findings$` | `\| Code \| Subject \| Statement \|` | minRows 1 | `Code`: `^`(HOOK_ENFORCED\|BOUNDARY_CLEAN\|REMOTE_FAST_FORWARDED\|REMOTE_REF_CREATED\|CONTINUATION_TAG_PUBLISHED)`$`<br />`Subject`: `\S`<br />`Statement`: `\S` |
+| `^## Findings$` | `\| Code \| Subject \| Statement \|` | minRows 1 | `Code`: `^`(HOOK_ENFORCED\|BOUNDARY_CLEAN\|REMOTE_FAST_FORWARDED\|REMOTE_REF_CREATED\|CONTINUATION_TAG_PUBLISHED\|MERGE_RESOLVED\|MERGE_GATED)`$`<br />`Subject`: `\S`<br />`Statement`: `\S` |
 
 ### `independent-critique`
 

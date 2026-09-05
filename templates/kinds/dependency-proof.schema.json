@@ -1,1 +1,76 @@
-{"$id":"kind:dependency-proof","type":"object","additionalProperties":false,"required":["phase","base","planHash","command","commandHash","files","regressionHash","installed","exitCode","outputRef","outputHash","startedAt","finishedAt"],"properties":{"phase":{"type":"string"},"base":{"type":"string"},"planHash":{"type":"string"},"command":{"type":"object"},"commandHash":{"type":"string"},"files":{"type":"object"},"regressionHash":{"type":"string"},"installed":{"type":"object"},"exitCode":{"type":"integer"},"outputRef":{"type":"string","pattern":"^response/artifacts/proofs/[a-z][a-z-]*\\.log$"},"outputHash":{"type":"string"},"startedAt":{"type":"string"},"finishedAt":{"type":"string"},"environment":{"type":"object","additionalProperties":false,"properties":{"COVERAGE_BASE_SHA":{"type":"string","pattern":"^[a-f0-9]{40}$"}}}}}
+{
+  "$id": "kind:dependency-proof",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "phase",
+    "base",
+    "planHash",
+    "command",
+    "commandHash",
+    "files",
+    "regressionHash",
+    "installed",
+    "exitCode",
+    "outputRef",
+    "outputHash",
+    "startedAt",
+    "finishedAt"
+  ],
+  "properties": {
+    "phase": {
+      "type": "string"
+    },
+    "base": {
+      "type": "string"
+    },
+    "planHash": {
+      "type": "string"
+    },
+    "command": {
+      "type": "object"
+    },
+    "commandHash": {
+      "type": "string"
+    },
+    "files": {
+      "type": "object"
+    },
+    "regressionHash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The hash of the unchanged consumer regression this proof ran against, and null where the consume is proved by two audits rather than a consumer spec (dependency-plan#regression kind audit): there is no consumer file to bind a gate proof to."
+    },
+    "installed": {
+      "type": "object"
+    },
+    "exitCode": {
+      "type": "integer"
+    },
+    "outputRef": {
+      "type": "string",
+      "pattern": "^response/artifacts/proofs/[a-z][a-z-]*\\.log$"
+    },
+    "outputHash": {
+      "type": "string"
+    },
+    "startedAt": {
+      "type": "string"
+    },
+    "finishedAt": {
+      "type": "string"
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "COVERAGE_BASE_SHA": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    }
+  }
+}

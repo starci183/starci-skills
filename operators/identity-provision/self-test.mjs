@@ -201,6 +201,19 @@ await expectError(provisioning({ 'response/data/account.json': accountRecord({ e
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { username: `uat-${FLOW}-learner`, role: 'learner', credentialName: 'uat-shared', sealed: `.stacks/${ENV}/secrets/uat.enc`, provisionedBy: null, createdAt: '2026-01-10T00:05:00.000Z' } } }) }), 'names the run that provisioned it', 'an account this run created and left unattributed');
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { username: `uat-${FLOW}-learner`, role: 'password: hunter2-hunter2', credentialName: 'uat-shared', sealed: `.stacks/${ENV}/secrets/uat.enc`, provisionedBy: '20260110-000000-1111111', createdAt: '2026-01-10T00:05:00.000Z' } } }) }), 'carries a credential', 'a secret filed in the account record');
 await expectError(provisioning({ 'response/data/account.json': { ...accountRecord(), password: 'x' } }), 'unexpected property', 'an account record with a place to hold a secret');
+
+// One branch, the flow's whole cast: the plan lists every alias and the record publishes every one.
+const castAccount = (alias) => ({ username: `uat-${FLOW}-${alias}`, role: alias, credentialName: 'uat-shared', sealed: `.stacks/${ENV}/secrets/uat.enc`, provisionedBy: '20260110-000000-1111111', createdAt: '2026-01-10T00:05:00.000Z' });
+const castPlan = (aliases) => ({ accounts: aliases.map((alias) => ({ alias, username: `uat-${FLOW}-${alias}`, email: `uat-${FLOW}-${alias}@example.test`, firstName: 'Uat', lastName: alias, usernameMaxLength: 40 })) });
+const cast = (planned, published, over = {}) => provisioning({
+  'request/identity-plan.json': castPlan(planned),
+  'response/data/account.json': accountRecord({ accounts: Object.fromEntries(published.map((alias) => [alias, castAccount(alias)])) }),
+  ...over,
+});
+await expectValid(cast(['learner', 'reviewer'], ['learner', 'reviewer']), 'a two-alias flow provisioned by one branch');
+await expectError(cast(['learner', 'reviewer'], ['learner']), 'the record publishes no such alias', 'a cast the plan named and the branch left half-created');
+await expectError(cast(['learner'], ['learner', 'reviewer']), 'the plan does not name it', 'an alias published as provisioned that no plan asked for');
+await expectError(cast(['learner'], ['learner'], { 'request/identity-plan.json': { accounts: [{ alias: 'learner', username: 'uat-someone-else', email: 'x@example.test', firstName: 'Uat', lastName: 'Learner', usernameMaxLength: 40 }] } }), 'in the plan', 'an alias published under a name the plan did not ask for');
 await expectError(provisioning({ 'response/response.md': responseMd({ operator: 'platform.operate' }) }), 'this receipt is written by identity.provision', 'a receipt signed by the retired operator');
 await expectError(provisioning({ 'response/response.md': responseMd().replace('## Checks', '## Proofs') }), 'missing section ^## Checks$', 'receipt section renamed');
 await expectError(provisioning({ 'response/response.json': (() => { const o = responseJson(); delete o.fields.checks; return o; })() }), 'required output checks is not in fields', 'missing required output');

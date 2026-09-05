@@ -17,11 +17,35 @@ const BOUNDARY = 'api.core';
 const APPROVAL = '@worktrees/businesses/features/api-core/model.json#approval';
 const SESSION = 'session/s-test';
 const TAG = { name: 'v1.4.0', message: 'continuation' };
+// The producer's own receipt, which is what says which files the session's write set owns: the one
+// place the incoming session's side may be taken when a conflicting hunk is resolved.
+const OWNED = 'src/modules/session/session.service.ts';
+const CHANGES = `# changes — interface.generate step-1/parallel-1
+
+## Binding
+
+| Field | Value |
+| --- | --- |
+| Operator | \`interface.generate\` |
+| Step | \`step-1/parallel-1\` |
+| Checkout | \`@workspaces/be\` |
+| Predecessor | \`${REMOTE}\` |
+
+## Files
+
+| Path | Change | Why | Claims |
+| --- | --- | --- | --- |
+| \`${OWNED}\` | modified | the three-line fix | — |
+
+## What the next step must know
+
+The write set is the one file above.
+`;
 
 function responseMd({
   boundary = BOUNDARY, approval = APPROVAL, mode = 'fast-forward-only', forced = 'no', merge = 'fast-forward',
   verified = HEAD, heads = [['`@workspaces/be`', '`mtp`', HEAD, REMOTE, '4']], hooks = [['`pre-push`', '`.husky/pre-push`', 'passed']],
-  tag = null, cleanup = 'worktree and session branch removed',
+  tag = null, cleanup = 'worktree and session branch removed', resolutions = [],
   findings = [['HOOK_ENFORCED', '`pre-push`', 'the hook ran and was not bypassed'], ['REMOTE_FAST_FORWARDED', '`@workspaces/be`', 'the ref advanced from the remote head it carried']],
 } = {}) {
   return `# git-publication — ${boundary}
@@ -62,6 +86,12 @@ hooks, without force.
 | Checkout | Branch | Head | Previous remote head | Commits |
 | --- | --- | --- | --- | --- |
 ${heads.map((h) => `| ${h[0]} | ${h[1]} | \`${h[2]}\` | \`${h[3]}\` | ${h[4]} |`).join('\n')}
+
+## Resolutions
+
+| File | Hunk | Rule |
+| --- | --- | --- |
+${resolutions.map((r) => `| \`${r[0]}\` | ${r[1]} | ${r[2]} |`).join('\n')}
 
 ## Hooks
 
@@ -114,7 +144,8 @@ function writeBranch(files, { producer = { operatorId: 'interface.generate', sta
 
   const producerDir = path.join(session, 'step-1', 'parallel-1', 'response');
   mkdirSync(producerDir, { recursive: true });
-  for (const name of ['response.md', 'changes.md', 'quality.md']) writeFileSync(path.join(producerDir, name), '# placeholder\n');
+  for (const name of ['response.md', 'quality.md']) writeFileSync(path.join(producerDir, name), '# placeholder\n');
+  writeFileSync(path.join(producerDir, 'changes.md'), CHANGES);
   if (producer) {
     writeFileSync(path.join(producerDir, 'response.json'), JSON.stringify({
       schemaVersion: 9, operatorId: producer.operatorId, step: 1, parallel: 1, status: producer.status,
@@ -219,4 +250,18 @@ await expectError(baseline({ 'response/response.json': responseJson({ commits: [
 await expectError(baseline({ 'request/request.json': requestJson({ inputs: { 'workspace-route-binding': 'step-1/parallel-1/response/response.md', changes: 'step-1/parallel-1/response/changes.md' } }) }), 'required input quality-verification is absent', 'a publish with nothing verified');
 await expectError(baseline({ 'response/response.md': responseMd().replace('## Hooks', '## Checks') }), 'missing section ^## Hooks$', 'receipt section renamed');
 
-process.stdout.write('git.publish self-test: 6 valid branches, 30 rejected mutations\n');
+// A conflict resolves by rule, or it stops. The rule set is the runtime owner's, shared as one module,
+// and the file a side may be taken in is the one the producer's `changes` receipt names.
+const RESOLVED_FINDINGS = [['HOOK_ENFORCED', '`pre-push`', 'the hook ran and was not bypassed'], ['REMOTE_FAST_FORWARDED', '`@workspaces/be`', 'the ref advanced'], ['MERGE_RESOLVED', `\`${OWNED}\``, 'the format baseline and the fix touched the same lines'], ['MERGE_GATED', '`lint:check`', 'the gates the verification named passed on the merged head']];
+const resolved = (over = {}) => responseMd({ merge: 'merge-commit', findings: RESOLVED_FINDINGS, resolutions: [[OWNED, '12-18', 'incoming-session-owned'], ['package-lock.json', '4-9', 'one-side-touched']], ...over });
+await expectValid(baseline({ 'response/response.md': resolved() }), 'a merge whose every conflicting hunk resolved under the rule set');
+await expectError(baseline({ 'response/response.md': resolved({ resolutions: [[OWNED, '12-18', 'ours']] }) }), 'is not one of the closed rule set', 'a hunk resolved by a rule nobody published');
+await expectError(baseline({ 'response/response.md': resolved({ resolutions: [['src/other/untouched.ts', '12-18', 'incoming-session-owned']] }) }), 'the session\'s write set does not own', 'the incoming side taken in a file the session never wrote');
+await expectError(baseline({ 'response/response.md': resolved({ resolutions: [[OWNED, 'somewhere', 'one-side-touched']] }) }), 'records the hunk range as', 'a resolution nobody can find again');
+await expectError(baseline({ 'response/response.md': resolved({ resolutions: [[OWNED, '12-18', 'one-side-touched'], [OWNED, '12-18', 'branch-elsewhere']] }) }), 'is recorded twice', 'one hunk resolved by two rules');
+await expectError(baseline({ 'response/response.md': resolved({ merge: 'fast-forward' }) }), 'a fast-forward creates nothing to resolve', 'a fast-forward that claims to have resolved a hunk');
+await expectError(baseline({ 'response/response.md': resolved({ findings: RESOLVED_FINDINGS.filter(([code]) => code !== 'MERGE_RESOLVED') }) }), 'records no MERGE_RESOLVED finding', 'a merge that took a side and never said so');
+await expectError(baseline({ 'response/response.md': resolved({ findings: RESOLVED_FINDINGS.filter(([code]) => code !== 'MERGE_GATED') }) }), 'records no MERGE_GATED finding', 'a resolved merge pushed without gating the merged head');
+await expectError(baseline({ 'response/response.md': responseMd({ findings: [...RESOLVED_FINDINGS.slice(0, 2), RESOLVED_FINDINGS[2]] }) }), 'the finding names hunks the receipt does not carry', 'MERGE_RESOLVED over an empty Resolutions table');
+
+process.stdout.write('git.publish self-test: 7 valid branches, 39 rejected mutations\n');

@@ -62,9 +62,28 @@ Người sản xuất đã không viết trên nhánh mà người ta đang chec
 commit tập ghi của mình đúng một lần. Operator này merge nhánh phiên ấy vào nhánh đích trước khi
 push. Khi nhánh đích chưa dịch chuyển kể từ base của phiên, merge là fast-forward và không có gì mới
 sinh ra. Khi nhánh đích đã dịch chuyển, một merge commit chỉ được phép dưới hai điều kiện đồng thời:
-merge không sinh xung đột, và những cổng mà bản kiểm định đã nêu được chạy lại trên kết quả merge và
-đều pass. Xung đột là `NON_FAST_FORWARD`, nó terminate, và một con người giải quyết; operator không
-bao giờ rebase, không bao giờ force, và không bao giờ chạy với hook bị tắt.
+mọi hunk mà merge xung đột đều được giải bằng bộ luật dưới đây, và những cổng mà bản kiểm định đã nêu
+được chạy lại trên kết quả merge và đều pass. Operator không bao giờ rebase, không bao giờ force, và
+không bao giờ chạy với hook bị tắt.
+
+## Xung đột giải được bằng luật, hoặc nó dừng
+
+Một nhánh phiên được cắt từ một head và đẩy lên một head đã dịch chuyển, nên xung đột mà operator này
+gặp thường không phải bất đồng về hành vi: một baseline lint hay format đã định dạng lại đúng những
+dòng mà một bản sửa ba dòng chạm vào, và cả hai bên đều đúng. Giao chuyện đó cho một con người tốn cả
+một nhiệm vụ và chẳng dạy được gì. Vì thế đúng bộ bốn luật đóng mà chủ runtime dùng để giải một lần
+merge tích hợp — nêu một lần dưới mục *Xung đột do người tích hợp giải, không đẩy lên cho người* của
+`runtime.serve`, và dùng chung như một module chứ không chép lại (`scripts/merge-resolution.mjs`) —
+cũng giải lần merge này, dưới đúng hai điều kiện ấy: mọi hunk đã giải đều được ghi trên biên bản, gọi
+tên file, dải dòng của hunk trong kết quả merge và luật nào đã áp, và những cổng mà
+`quality-verification` đã nêu được chạy lại trên head đã merge trước khi push.
+
+Một lần merge chỉ được giải theo cách này khi **mọi** hunk xung đột đều rơi vào một luật. Một hunk
+không rơi vào luật nào là `NON_FAST_FORWARD`, nó terminate, và một con người giải quyết — operator
+không bao giờ giải phần còn lại rồi push phần dư, vì một lời giải nửa vời publish một lần merge không
+ai quyết. Luật lấy phía của phiên đi vào chỉ được lấy bên trong một file mà tập ghi của chính phiên ấy
+sở hữu, và đó là lý do đầu vào `changes` là thứ nói những file ấy là file nào. Và giải không phải là
+tin: một cổng đỏ trên head đã merge dừng lần publish đúng như một cổng đỏ dừng lần serve.
 
 ## Nhánh phiên không có biên nhận thì không publish được
 
@@ -166,10 +185,11 @@ giới đã duyệt; và không publish khi chưa có route đã kiểm và mộ
 | 3 | Ràng phê duyệt vào đúng ranh giới này | `boundary`, `approval` | phần requirements của `request/request.json`, Đầu vào `changes` là tập file, Đầu vào `quality-verification` là commit đã đo | — | `APPROVAL_MISSING` |
 | 4 | Kiểm cây: bẩn ngoài ranh giới, chính sách nhánh | — | @workspaces/local/routes/<project>/<role>, các path bẩn, mọi nhánh, chính sách đã route | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
 | 5 | Chạy hook | — | @workspaces/<project>/<role>/husky: các hook đã cài, trong đó có `pre-push` | @tools/shell | `HOOK_BLOCKED` |
-| 6 | Ràng biên nhận của phiên, rồi merge nhánh phiên vào nhánh đích | — | thư mục phiên: `state.json`, nhánh `interface.generate`, `interface.fix`, `backend.generate` hay `library.update` có `commits` mang head phiên, và các nhánh `interface.audit` cùng `uat.verify` với artifact `screenshot` của chúng khi chuỗi có các bước đó; @workspaces/local/routes/<project>/<role> cho head đích, base phiên và head phiên | @workspaces/local/routes/<project>/<role>, nhánh đích của checkout đó, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
-| 7 | Push non-force, chỉ fast-forward | — | @workspaces/local/routes/<project>/<role> cho head đã duyệt, @remote/git/<project>/<role> tại remote head quan sát được, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
-| 8 | Push tag tiếp nối | `tag` | @workspaces/local/routes/<project>/<role> cho head mà lần publish này đã đẩy | @remote/git/<project>/<role>, @tools/git | — |
-| 9 | Xóa worktree và nhánh phiên, viết biên bản và phát | — | mọi thứ ở trên | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
+| 6 | Ràng biên nhận của phiên, rồi merge nhánh phiên vào nhánh đích, giải từng hunk xung đột bằng bộ luật dùng chung và ghi lại | — | thư mục phiên: `state.json`, nhánh `interface.generate`, `interface.fix`, `backend.generate` hay `library.update` có `commits` mang head phiên, và các nhánh `interface.audit` cùng `uat.verify` với artifact `screenshot` của chúng khi chuỗi có các bước đó; đầu vào `changes` cho những file mà tập ghi của phiên sở hữu; @workspaces/local/routes/<project>/<role> cho head đích, base phiên và head phiên | @workspaces/local/routes/<project>/<role>, nhánh đích của checkout đó, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
+| 7 | Chạy lại những cổng mà bản kiểm định đã nêu trên head đã merge khi lần merge có giải một hunk | — | đầu vào `quality-verification` cho những cổng nó đã chạy, @workspaces/local/routes/<project>/<role> tại head đã merge, @tools/shell | @tools/shell | `NON_FAST_FORWARD` |
+| 8 | Push non-force, chỉ fast-forward | — | @workspaces/local/routes/<project>/<role> cho head đã duyệt, @remote/git/<project>/<role> tại remote head quan sát được, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
+| 9 | Push tag tiếp nối | `tag` | @workspaces/local/routes/<project>/<role> cho head mà lần publish này đã đẩy | @remote/git/<project>/<role>, @tools/git | — |
+| 10 | Xóa worktree và nhánh phiên, viết biên bản và phát | — | mọi thứ ở trên | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
 
 Tạo một remote ref và fast-forward một remote ref là hai hành động khác nhau với hai người duyệt khác
 nhau, nên head đã publish ghi lại nó đã làm cái nào. Một lần resume bắt đầu lại từ cổng vào, chỉ dùng

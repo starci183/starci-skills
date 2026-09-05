@@ -29,6 +29,15 @@ all is `INVALID_INPUT` naming the field it lacks, and a provider or sealed file 
 reached is `PROVISIONING_UNAVAILABLE`. The seed is not this operator's either: it is placed by the
 operator that owns data, against the account this one created.
 
+One branch provisions the flow's whole cast. The plan the branch is frozen against
+(`resources/identity-plan.schema.json`) lists one account per alias the flow's accounts file names,
+each with the alias it plays, and the branch creates every one under the same bound custody and the
+same plan hash. A flow that is only true when two roles meet therefore takes one branch and not two:
+splitting the cast across branches splits one flow's identity across two plans that nothing joins,
+and the second alias's absence is invisible until a walk needs it. The published record is the join —
+every alias the plan names is published, under the username the plan asked for, and no alias is
+published that no plan asked for.
+
 ## A credential is a name, and it reaches a form or a body
 
 Before resolving a value, apply [the identity preflight](../../resources/identity.md) for the selected

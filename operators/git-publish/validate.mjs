@@ -1,7 +1,9 @@
 // git.publish's own law over one branch, on top of the shared step check: the receipt names the
 // boundary and the approval the request bound; the published head is the commit the
 // quality-verification input measured; the mode is fast-forward only and nothing was forced; the
-// session branch was merged, never rebased, and a merge commit exists only when the target moved;
+// session branch was merged, never rebased, and a merge commit exists only when the target moved; every
+// hunk that merge conflicted on was resolved under the shared closed rule set and recorded, with the
+// incoming session's side taken only inside the files its own write set owns;
 // every hook ran and passed, `pre-push` among them; the head actually advanced; a continuation tag
 // exists exactly when the request asked for one and points at the head this run pushed; the session
 // that produced the merged branch is on disk with the receipt that authorized it; and the worktree
@@ -14,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { sessionRootOf } from '../../scripts/validate-request.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
+import { resolutionErrors } from '../../scripts/merge-resolution.mjs';
 
 const PRODUCERS = new Set(['interface.generate', 'interface.fix', 'backend.generate', 'library.update']);
 
@@ -78,6 +81,20 @@ const SHA = /^[0-9a-f]{40}$/;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const rows = (text, heading) => tableUnder(text, heading) ?? [];
 const fields = (text, heading) => Object.fromEntries(rows(text, heading).map(([k, v]) => [k, v]));
+const unbacktick = (v) => String(v ?? '').replace(/^`|`$/g, '').trim();
+
+// The files the session's write set owns, read from the `changes` input this publication binds: its
+// `## Files` table is the exact set the producing branch committed, and it is what says where the
+// incoming session's side may be taken when a hunk is resolved. A `changes` that cannot be read
+// leaves the ownership rule unchecked rather than guessed.
+export async function sessionWriteSet(branchDir, request) {
+  const ref = (request?.inputs ?? {}).changes;
+  const session = sessionRootOf(branchDir);
+  if (!ref || !session) return null;
+  let text; try { text = await readFile(path.join(session, ref), 'utf8'); } catch { return null; }
+  const files = (tableUnder(text, '## Files') ?? []).map(([file]) => unbacktick(file)).filter(Boolean);
+  return files.length ? files : null;
+}
 
 export async function validateGitPublishStep(branchDir, root = ROOT, { verifiedCommit = null } = {}) {
   const base = await validateStep(root, branchDir);
@@ -103,7 +120,7 @@ export async function validateGitPublishStep(branchDir, root = ROOT, { verifiedC
   const heads = rows(text, '## Published heads');
   const hooks = rows(text, '## Hooks');
   const tag = fields(text, '## Continuation tag');
-  const findings = new Set(rows(text, '## Findings').map(([code]) => code));
+  const findings = new Set(rows(text, '## Findings').map(([code]) => unbacktick(code)));
 
   if (!empty(requirements.boundary) && binding.Boundary !== requirements.boundary) errors.push(`response/response.md: Binding publishes ${binding.Boundary} but the request bound ${requirements.boundary}`);
   if (!empty(requirements.approval) && binding.Approval !== requirements.approval) errors.push('response/response.md: Binding names an approval the request did not bind; an approval for another boundary is somebody else\'s');
@@ -112,6 +129,20 @@ export async function validateGitPublishStep(branchDir, root = ROOT, { verifiedC
   if (publication.Forced !== 'no') errors.push('response/response.md: Forced is not no; a forced push rewrites what other people have already pulled');
   if (!/^session\//.test(publication['Session branch'] ?? '')) errors.push('response/response.md: the producer wrote on a session branch, and the receipt must name it');
   if (!['fast-forward', 'merge-commit'].includes(publication.Merge)) errors.push(`response/response.md: Merge is ${publication.Merge}; the session branch is merged, never rebased or squashed`);
+
+  // A conflict resolves by rule or it stops, and the rules are the ones the runtime owner resolves an
+  // integration merge under — one module, not a copy (scripts/merge-resolution.mjs). Which files the
+  // incoming session's side may be taken in is the `changes` input's file set, so the ownership rule is
+  // checked against what the session actually committed.
+  const resolutions = rows(text, '## Resolutions').map(([file, hunkRange, rule]) => ({ file: unbacktick(file), hunkRange: unbacktick(hunkRange), rule: unbacktick(rule) }));
+  errors.push(...resolutionErrors(resolutions, { at: 'response/response.md: Resolutions', owned: await sessionWriteSet(branchDir, request), root }));
+  if (resolutions.length) {
+    if (publication.Merge !== 'merge-commit') errors.push('response/response.md: Merge is fast-forward and Resolutions records a resolved hunk; a fast-forward creates nothing to resolve');
+    if (!findings.has('MERGE_RESOLVED')) errors.push('response/response.md: the merge resolved a conflicting hunk and the receipt records no MERGE_RESOLVED finding; a merge that took a side says so');
+    if (!findings.has('MERGE_GATED')) errors.push('response/response.md: the merge resolved a conflicting hunk and the receipt records no MERGE_GATED finding; a resolved merge is gated on the merged head before the push, and only a green gate publishes it');
+  } else {
+    for (const code of ['MERGE_RESOLVED', 'MERGE_GATED']) if (findings.has(code)) errors.push(`response/response.md: ${code} is recorded and Resolutions is empty; the finding names hunks the receipt does not carry`);
+  }
 
   // The published head is the commit quality measured, not one commit further on.
   const verified = verifiedCommit ?? (publication['Verified commit'] ?? '');

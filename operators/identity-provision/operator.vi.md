@@ -29,6 +29,15 @@ còn thiếu, và một provider hay file niêm phong không tới được là 
 không phải của operator này: nó do operator sở hữu dữ liệu đặt, theo tài khoản mà operator này đã
 tạo.
 
+Một nhánh cấp phát trọn dàn diễn viên của luồng. Kế hoạch mà nhánh bị đóng băng theo
+(`resources/identity-plan.schema.json`) liệt kê một tài khoản cho mỗi alias mà file tài khoản của
+luồng nêu tên, mỗi tài khoản mang alias nó đóng, và nhánh tạo hết dưới cùng một custody đã ràng và
+cùng một plan hash. Một luồng chỉ đúng khi hai vai gặp nhau vì thế đi trong một nhánh chứ không phải
+hai: chia dàn diễn viên ra nhiều nhánh là chia danh tính của một luồng thành hai kế hoạch mà không gì
+nối lại, và sự vắng mặt của alias thứ hai chỉ lộ ra khi một lượt đi thử cần tới nó. Hồ sơ được công bố
+chính là mối nối ấy — mọi alias kế hoạch nêu đều được công bố, dưới đúng username kế hoạch đòi, và
+không alias nào được công bố mà không kế hoạch nào đòi.
+
 ## Thông tin đăng nhập là một cái tên, và nó đi vào một form hay một body
 
 Trước khi resolve giá trị, áp dụng [preflight danh tính](../../resources/identity.vi.md) cho thao tác

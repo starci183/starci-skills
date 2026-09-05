@@ -43,45 +43,66 @@ export const privateStatusRequest = async (url, init, fetcher = fetch) => {
 
 // The only mutating identity transport. Adapters exist for contract tests; returned data is closed
 // status evidence, never a provider response, credential, cookie or token.
-export async function provisionAccount({ plan, password, headers, frontend, requestJson = privateJsonRequest, requestStatus = privateStatusRequest }) {
+export async function provisionAccount({ plan, account, password, headers, frontend, requestJson = privateJsonRequest, requestStatus = privateStatusRequest }) {
   const result = { status: 'blocked', stage: 'account-validation', checks: [], mutations: [], partialMutation: false };
   let attempted = false, confirmed = false, lookup;
   try {
     const schema = JSON.parse(fs.readFileSync(new URL('../resources/identity-plan.schema.json', import.meta.url), 'utf8'));
-    requireThat(validateAgainst(schema.properties.account, plan.account).length === 0 && plan.account.username.length <= plan.account.usernameMaxLength && ['firstName', 'lastName'].every(field => plan.account[field].trim()), 'ACCOUNT_PROFILE_INVALID');
+    requireThat(validateAgainst(schema.properties.accounts.items, account).length === 0 && account.username.length <= account.usernameMaxLength && ['firstName', 'lastName'].every(field => account[field].trim()), 'ACCOUNT_PROFILE_INVALID');
     lookup = async () => {
-      const response = await requestJson(plan.provider + '/admin/realms/' + plan.realm + '/users?username=' + encodeURIComponent(plan.account.username) + '&exact=true', { headers });
+      const response = await requestJson(plan.provider + '/admin/realms/' + plan.realm + '/users?username=' + encodeURIComponent(account.username) + '&exact=true', { headers });
       requireThat(response.ok && Array.isArray(response.data), 'ACCOUNT_QUERY_FAILED'); return response.data;
     };
     requireThat((await lookup()).length === 0, 'ACCOUNT_ALREADY_EXISTS');
     result.stage = 'account-create'; attempted = true;
-    const created = await requestStatus(plan.provider + '/admin/realms/' + plan.realm + '/users', { method: 'POST', headers, body: JSON.stringify({ username: plan.account.username, email: plan.account.email, firstName: plan.account.firstName, lastName: plan.account.lastName, enabled: true, emailVerified: true, requiredActions: [], credentials: [{ type: 'password', temporary: false, value: password }] }) });
+    const created = await requestStatus(plan.provider + '/admin/realms/' + plan.realm + '/users', { method: 'POST', headers, body: JSON.stringify({ username: account.username, email: account.email, firstName: account.firstName, lastName: account.lastName, enabled: true, emailVerified: true, requiredActions: [], credentials: [{ type: 'password', temporary: false, value: password }] }) });
     requireThat(created.ok && created.status === 201, 'ACCOUNT_CREATE_UNCONFIRMED');
     const accounts = await lookup();
-    requireThat(accounts.length === 1 && accounts[0].username === plan.account.username && accounts[0].email === plan.account.email && accounts[0].enabled, 'ACCOUNT_NOT_PROVED');
+    requireThat(accounts.length === 1 && accounts[0].username === account.username && accounts[0].email === account.email && accounts[0].enabled, 'ACCOUNT_NOT_PROVED');
     confirmed = true; result.accountId = accounts[0].id;
     result.mutations.push({ effect: 'provision-identity', accountId: accounts[0].id, username: accounts[0].username });
-    result.checks.push({ name: 'account-exists', passed: true });
+    result.checks.push({ name: 'account-exists', passed: true, account: account.username });
     result.stage = 'provider-sign-in';
-    const grant = await requestJson(plan.provider + '/realms/' + plan.realm + '/protocol/openid-connect/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: plan.clientId, grant_type: 'password', scope: 'openid', username: plan.account.username, password }) });
+    const grant = await requestJson(plan.provider + '/realms/' + plan.realm + '/protocol/openid-connect/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: plan.clientId, grant_type: 'password', scope: 'openid', username: account.username, password }) });
     requireThat(grant.ok && typeof grant.data?.access_token === 'string', 'PROVIDER_SIGNIN_FAILED');
     result.stage = 'product-sign-in';
-    const login = await requestJson(plan.api, { method: 'POST', headers: { 'content-type': 'application/json', origin: frontend }, body: JSON.stringify({ query: 'mutation IdentityLogin($input: SignInInput!) { signIn(input: $input) { success error data { accessToken requiresTwoFactor } } }', variables: { input: { email: plan.account.email, password } } }) });
+    const login = await requestJson(plan.api, { method: 'POST', headers: { 'content-type': 'application/json', origin: frontend }, body: JSON.stringify({ query: 'mutation IdentityLogin($input: SignInInput!) { signIn(input: $input) { success error data { accessToken requiresTwoFactor } } }', variables: { input: { email: account.email, password } } }) });
     const auth = login.data?.data?.signIn;
     requireThat(login.ok && !login.data?.errors?.length && auth?.success && typeof auth.data?.accessToken === 'string' && auth.data.requiresTwoFactor === false, 'PRODUCT_SIGNIN_FAILED');
-    result.checks.push({ name: 'account-signs-in', passed: true });
+    result.checks.push({ name: 'account-signs-in', passed: true, account: account.username });
     result.status = 'done'; result.partialMutation = true;
     requireThat(![password, grant.data.access_token, auth.data.accessToken].some(value => value.length >= 8 && JSON.stringify(result).includes(value)), 'OUTPUT_SECRET_DETECTED');
     return result;
   } catch (error) {
     if (attempted && !confirmed && lookup) {
-      try { const observed = await lookup(); result.reconciliation = { accountCount: observed.length }; if (observed.length === 1 && observed[0].username === plan.account.username && observed[0].email === plan.account.email) { confirmed = true; result.accountId = observed[0].id; } }
+      try { const observed = await lookup(); result.reconciliation = { accountCount: observed.length }; if (observed.length === 1 && observed[0].username === account.username && observed[0].email === account.email) { confirmed = true; result.accountId = observed[0].id; } }
       catch { /* An ambiguous create never retries; its exact uncertainty is durable. */ }
     }
     result.failureCode = error instanceof IdentityOperationError ? error.message : 'PRIVATE_OPERATION_FAILED';
     result.partialMutation = confirmed ? true : attempted ? (result.reconciliation?.accountCount === 0 ? false : 'unknown') : false;
     return result;
   }
+}
+
+// Every alias the flow names, in the plan's order, under one plan and one admin session. The first
+// account that fails ends the run: what was created before it stands and is reported as a mutation,
+// because an identity that exists at the provider is never quietly unreported.
+export async function provisionAccounts({ plan, password, headers, frontend, requestJson = privateJsonRequest, requestStatus = privateStatusRequest }) {
+  const all = { status: 'done', stage: 'accounts', checks: [], mutations: [], partialMutation: false, accounts: [] };
+  for (const account of plan.accounts) {
+    const one = await provisionAccount({ plan, account, password, headers, frontend, requestJson, requestStatus });
+    all.checks.push(...one.checks);
+    all.mutations.push(...one.mutations);
+    if (one.accountId) all.accounts.push({ alias: account.alias ?? null, username: account.username, email: account.email, accountId: one.accountId });
+    if (one.partialMutation === true || all.partialMutation === true) all.partialMutation = true;
+    else if (one.partialMutation === 'unknown') all.partialMutation = 'unknown';
+    if (one.status !== 'done') {
+      all.status = 'blocked'; all.stage = one.stage; all.failureCode = one.failureCode;
+      if (one.reconciliation) all.reconciliation = one.reconciliation;
+      return all;
+    }
+  }
+  return all;
 }
 
 export async function provisionIdentity(sourceRoot, branchDir) {
@@ -114,12 +135,17 @@ export async function provisionIdentity(sourceRoot, branchDir) {
     requireThat(authority.length === 0, 'PLATFORM_AUTHORITY_INVALID');
     requireThat(parseDeclarationReference(await loadEnvironmentSchema(runtime), request.requirements.approval), 'DECLARED_AUTHORITY_REQUIRED');
     requireThat(KIND_CAPABILITIES.identity.every(capability => plan.capabilities.some(value => value.capability === capability)), 'CAPABILITY_UNBOUND');
-    requireThat(/^uat-[A-Za-z0-9._-]+$/.test(plan.account?.username ?? ''), 'ACCOUNT_NAMESPACE');
-    requireThat(Number.isInteger(plan.account.usernameMaxLength) && plan.account.usernameMaxLength > 0 && plan.account.username.length <= plan.account.usernameMaxLength, 'ACCOUNT_NAME_LIMIT');
-    requireThat(typeof plan.account.email === 'string' && /^[^\s@]+@[^\s@]+$/.test(plan.account.email), 'ACCOUNT_EMAIL');
+    requireThat(Array.isArray(plan.accounts) && plan.accounts.length > 0, 'ACCOUNT_NAMESPACE');
+    requireThat(new Set(plan.accounts.map(account => account.alias)).size === plan.accounts.length, 'ACCOUNT_NAMESPACE');
+    for (const account of plan.accounts) {
+      requireThat(/^uat-[A-Za-z0-9._-]+$/.test(account?.username ?? ''), 'ACCOUNT_NAMESPACE');
+      requireThat(Number.isInteger(account.usernameMaxLength) && account.usernameMaxLength > 0 && account.username.length <= account.usernameMaxLength, 'ACCOUNT_NAME_LIMIT');
+      requireThat(typeof account.email === 'string' && /^[^\s@]+@[^\s@]+$/.test(account.email), 'ACCOUNT_EMAIL');
+    }
     requireThat(typeof plan.clientId === 'string' && /^[A-Za-z0-9._-]+$/.test(plan.clientId), 'CLIENT_UNBOUND');
     outputDir = path.join(branch, 'response/artifacts');
-    result.sessionId = plan.sessionId; result.routeKey = plan.routeKey; result.username = plan.account.username; result.email = plan.account.email;
+    result.sessionId = plan.sessionId; result.routeKey = plan.routeKey;
+    result.planned = plan.accounts.map(account => ({ alias: account.alias, username: account.username, email: account.email }));
     lock = path.join(source, '.worktrees/sessions/central-runtime', 'identity-' + plan.routeKey.replace('/', '-') + '.lease.json');
     lockToken = crypto.randomUUID();
     fs.writeFileSync(lock, JSON.stringify({ sessionId: plan.sessionId, token: lockToken, operation: 'provision-identity' }), { flag: 'wx' });
@@ -155,14 +181,14 @@ export async function provisionIdentity(sourceRoot, branchDir) {
     requireThat((await proveUserAdminCapability({ claims, realm: plan.realm, provider: plan.provider, username, headers })).authorized, 'CAPABILITY_MISSING');
     const clients = await privateJsonRequest(plan.provider + '/admin/realms/' + plan.realm + '/clients?clientId=' + encodeURIComponent(plan.clientId), { headers });
     requireThat(clients.ok && Array.isArray(clients.data) && clients.data.length === 1 && clients.data[0].clientId === plan.clientId && clients.data[0].enabled && clients.data[0].publicClient && clients.data[0].directAccessGrantsEnabled, 'CLIENT_PROVIDER_MISMATCH');
-    const completed = await provisionAccount({ plan, password, headers, frontend: entry.endpoints.frontend });
+    const completed = await provisionAccounts({ plan, password, headers, frontend: entry.endpoints.frontend });
     const priorChecks = result.checks;
     Object.assign(result, completed);
     result.checks = [...priorChecks, ...completed.checks];
     attempted = completed.partialMutation !== false;
     confirmed = completed.partialMutation === true;
     if (completed.status !== 'done') throw new IdentityOperationError(completed.failureCode);
-    const output = writeResult(); return { status: 'done', output, accountId: result.accountId };
+    const output = writeResult(); return { status: 'done', output, accounts: result.accounts };
   } catch (error) {
     result.failureCode = error instanceof IdentityOperationError ? error.message : 'PRIVATE_OPERATION_FAILED';
     result.partialMutation = confirmed ? true : attempted ? (result.reconciliation?.accountCount === 0 ? false : 'unknown') : false;

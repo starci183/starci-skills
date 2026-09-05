@@ -38,6 +38,11 @@ exactly this ref; it carries no verdict about the change itself.
 | --- | --- | --- | --- | --- |
 | `@workspaces/be` | `branch` | `1111111111111111111111111111111111111111` | `2222222222222222222222222222222222222222` | 4 |
 
+## Resolutions
+
+| File | Hunk | Rule |
+| --- | --- | --- |
+
 ## Hooks
 
 | Hook | Reference | Outcome |

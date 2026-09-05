@@ -161,7 +161,11 @@ export const CONSUMER = 'consumer-';
 export const consumerPhase = (phase) => `${CONSUMER}${phase}`;
 export const bareConsumerPhase = (phase) => (phase.startsWith(CONSUMER) ? phase.slice(CONSUMER.length) : phase);
 export const packagePhases = (plan) => ['before', 'after', ...plan.gates.map((g) => g.id)];
-export const consumerPhases = (consumer) => ['before', 'after', ...consumer.gates.map((g) => g.id)].map(consumerPhase);
+// Which shape the consume's before-and-after authority takes. A spec regression is run, so it has the
+// `before` and `after` proof phases; an audit authority was already run by two branches of this
+// session, so those two phases have nowhere to go and the gates are the only proofs this branch runs.
+export const isAuditRegression = (regression) => regression?.kind === 'audit';
+export const consumerPhases = (consumer) => [...(isAuditRegression(consumer.regression) ? [] : ['before', 'after']), ...consumer.gates.map((g) => g.id)].map(consumerPhase);
 export const metadataPaths = (consumer) => [...consumer.manifests, consumer.lockfile];
 
 // ---------------------------------------------------------------------------------------------------
@@ -214,7 +218,13 @@ export function consumerPlanErrors(consumer, plan, rootManifest, { manifestAt = 
   }
   const lock = lockAt(consumer.lockfile);
   if (lock && !lock.packages) errors.push('npm lock requires a packages map');
-  if (!safeRelative(consumer.regression.file) || files.includes(consumer.regression.file) || !exists(consumer.regression.file)) errors.push('regression must be an existing unchanged source test');
+  // The ordinary authority is a consumer test that already exists and is not part of what this branch
+  // writes. An audit authority names no file here at all: it names two branches of this session, and
+  // `auditProofErrors` is where they are read.
+  if (isAuditRegression(consumer.regression)) {
+    if (!plan.family) errors.push(`an audit is the consume authority only for a presentation release, and the release this branch installs of ${plan.packageName} names no family; a package a consumer can call is proved by a consumer regression`);
+    if (consumer.regression.before === consumer.regression.after) errors.push('the before and after audits must be two branches; one branch cannot have measured both versions');
+  } else if (!safeRelative(consumer.regression.file) || files.includes(consumer.regression.file) || !exists(consumer.regression.file)) errors.push('regression must be an existing unchanged source test');
   const requiredScripts = ['test:ci', 'typecheck', 'lint:check', 'build'].filter((name) => rootManifest.scripts?.[name]);
   if (!rootManifest.scripts?.['test:ci'] && rootManifest.scripts?.test) requiredScripts.push('test');
   for (const name of requiredScripts) if (!consumer.gates.some((g) => g.command.kind === 'npm-script' && g.command.name === name && g.command.args.length === 0)) errors.push(`missing complete delivery gate: ${name}`);
@@ -310,7 +320,7 @@ export async function loadContext(branch, root = ROOT) {
     if (pins.size !== 1 || pins.has(undefined)) errors.push(`the declared consumer manifests do not pin ${releaseInput.record.name} at one version at the frozen base`);
     const [baseVersion] = [...pins];
     if (baseVersion === releaseInput.record.version) errors.push('the consumer already pins the bound release version; there is nothing to consume');
-    identity = { packageName: releaseInput.record.name, baseVersion, targetVersion: releaseInput.record.version };
+    identity = { packageName: releaseInput.record.name, baseVersion, targetVersion: releaseInput.record.version, family: releaseInput.record.family ?? null };
   }
   // The consumer half: the root manifest names the gates, every metadata path exists at the base and is
   // writable, and a consumer manifest is never a file of the package half.
@@ -555,13 +565,51 @@ export function consumerChangeErrors(ctx) {
   return metadataErrors({ packageName: ctx.plan.packageName, fromVersion: ctx.plan.baseVersion, toVersion: ctx.plan.targetVersion, manifests: ctx.consumer.manifests, release: ctx.release }, oldManifests, newManifests, JSON.parse(baseBytes(ctx.checkout, ctx.packageCommit, ctx.consumer.lockfile)), json(safePath(ctx.checkout, ctx.consumer.lockfile, false)));
 }
 
+// The audit-shaped before-and-after half of a `consume`. A presentation release repairs behaviour that
+// exists only once rendered, so a consumer that calls none of it has no spec to fail before and pass
+// after — and writing one to satisfy the shape proves the stamp, not the surface. Two audits of that
+// surface are the proof instead: one at the version the consumer still runs, where the family's own
+// claims fail and are routed to the family owner as a grammar gap, and one at the version this branch
+// bumped to, where the same claims pass. Both are branches of this session, so both were already held
+// to `interface.audit`'s own law; what is checked here is that they are the two halves of this
+// consume — the same claims, the two versions, and the after-audit measuring the commit this branch
+// made rather than some other head.
+export function auditProofErrors(ctx, { session = ctx.session, branchOf = (ref) => safePath(session, ref, true) } = {}) {
+  const errors = [];
+  const { claims, before, after } = ctx.consumer.regression;
+  const halves = { before: { ref: before, version: ctx.plan.baseVersion }, after: { ref: after, version: ctx.plan.targetVersion } };
+  for (const [half, { ref, version }] of Object.entries(halves)) {
+    let dir; try { dir = branchOf(ref); } catch { errors.push(`the ${half} audit ${ref} is not a branch of this session`); continue; }
+    let verdicts, receipt;
+    try { verdicts = json(path.join(dir, 'response', 'data', 'verdicts.json')); } catch { errors.push(`the ${half} audit ${ref} has no verdicts to read`); continue; }
+    try { receipt = readFileSync(path.join(dir, 'response', 'response.md'), 'utf8'); } catch { errors.push(`the ${half} audit ${ref} has no receipt to read`); continue; }
+    const served = Object.fromEntries((tableUnder(receipt, '## Served surface') ?? []).map(([k, v]) => [k, String(v ?? '').replace(/^`|`$/g, '').trim()]));
+    if (served['Family version observed'] !== version) errors.push(`the ${half} audit ${ref} observed family version ${served['Family version observed'] ?? '—'} and this consume moves ${ctx.plan.baseVersion} to ${ctx.plan.targetVersion}; a half that measured another version proves nothing about this one`);
+    const results = (verdicts.entries ?? []).flatMap((e) => e.results ?? []).filter((r) => r.owner === 'grammar' && claims.includes(r.rule));
+    for (const claim of claims) {
+      const found = results.filter((r) => r.rule === claim);
+      if (!found.length) { errors.push(`the ${half} audit ${ref} carries no family-owned result for ${claim}; both halves judge the same claims or they are not two halves of one proof`); continue; }
+      if (half === 'before') {
+        if (!found.some((r) => r.verdict === 'fail')) errors.push(`${claim} passes on the before audit ${ref}; the before half is the gap this release repairs, and a claim that already passed was never repaired here`);
+        if (!found.some((r) => r.verdict === 'fail' && r.routeTo === 'grammar-gap')) errors.push(`${claim} fails on the before audit ${ref} and is not routed to the family owner as a grammar gap; a claim the delivery owns is not a reason to consume a release`);
+      } else if (found.some((r) => r.verdict === 'fail')) errors.push(`${claim} still fails on the after audit ${ref}; the release did not repair what this consume says it repaired`);
+    }
+    if (half === 'after' && served['Applied commit'] !== ctx.consumerCommit) errors.push(`the after audit ${ref} measured the surface at applied commit ${served['Applied commit'] ?? '—'} and this branch committed ${ctx.consumerCommit}; the after half is the bumped head or it is an audit of something else`);
+  }
+  return errors;
+}
+
 export function consumerProofErrors(ctx, proof, phase, finalHashes) {
   const errors = validateAgainst(schema(ctx.root, 'dependency-proof'), proof, `proof.${phase}`);
   const bare = bareConsumerPhase(phase);
   const command = ['before', 'after'].includes(bare) ? ctx.consumer.regression.command : ctx.consumer.gates.find((g) => g.id === bare).command;
   if (proof.phase !== phase || proof.base !== ctx.packageCommit || proof.planHash !== ctx.consumerPlanHash || !same(proof.command, command) || proof.commandHash !== consumerCommand(ctx, command).commandHash) errors.push(`proof binding differs: ${phase}`);
   if (!same(proof.environment ?? {}, proofEnvironment(ctx, command))) errors.push(`proof coverage base differs: ${phase}`);
-  if (proof.regressionHash !== hash(baseWorkingBytes(ctx.checkout, ctx.packageCommit, ctx.consumer.regression.file))) errors.push('proof did not use the unchanged regression');
+  // An audit authority has no consumer file to bind a gate proof to: the two audits are the before and
+  // after, and what is unchanged about them is the claims, checked in auditProofErrors.
+  if (isAuditRegression(ctx.consumer.regression)) {
+    if (proof.regressionHash !== null) errors.push(`the consume is proved by two audits, so ${phase} binds no consumer regression file and its regressionHash is null`);
+  } else if (proof.regressionHash !== hash(baseWorkingBytes(ctx.checkout, ctx.packageCommit, ctx.consumer.regression.file))) errors.push('proof did not use the unchanged regression');
   if (proof.outputRef !== `response/artifacts/proofs/${phase}.log`) errors.push('proof log must belong to its phase');
   let output = ''; try { output = readFileSync(safePath(ctx.branch, proof.outputRef, false), 'utf8'); } catch { errors.push(`missing proof log: ${phase}`); }
   if (!output.trim() || hash(output) !== proof.outputHash) errors.push(`proof output missing or changed: ${phase}`);
@@ -667,7 +715,10 @@ export async function validateLibraryUpdateStep(branch, root = ROOT, preflight =
       if (!same([...consumerDelivery.proofs].sort(), [...refs].sort()) || !same([...(fields['dependency-proof'] ?? [])].sort(), [...refs].sort()) || !same([...(fields['dependency-log'] ?? [])].sort(), [...logs].sort())) errors.push('response must declare every consumer proof and log');
       const consumerProofs = {};
       for (const phase of phases) { const proof = json(path.join(branch, `response/data/proofs/${phase}.json`)); consumerProofs[phase] = proof; errors.push(...consumerProofErrors(ctx, proof, phase, hashes)); }
-      if (Date.parse(consumerProofs[consumerPhase('before')].finishedAt) > Date.parse(consumerProofs[consumerPhase('after')].startedAt)) errors.push('consumer before proof must precede consumer after proof');
+      if (isAuditRegression(ctx.consumer.regression)) {
+        ctx.consumerCommit = consumerCommit;
+        errors.push(...auditProofErrors(ctx));
+      } else if (Date.parse(consumerProofs[consumerPhase('before')].finishedAt) > Date.parse(consumerProofs[consumerPhase('after')].startedAt)) errors.push('consumer before proof must precede consumer after proof');
     } else if (git(ctx.checkout, ['rev-parse', 'HEAD']) !== packageCommit) errors.push('the session branch head is not the package commit');
     if (git(ctx.checkout, ['status', '--porcelain=v1', '--untracked-files=all'])) errors.push('delivery working tree must be clean');
     const md = readFileSync(path.join(branch, 'response/changes.md'), 'utf8');

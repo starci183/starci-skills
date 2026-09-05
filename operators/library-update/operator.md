@@ -85,6 +85,25 @@ changes use the interface pipeline. The package is never pushed, merged or tagge
 way it leaves this checkout is the publication step of mode `publish`: the packed archive, whole and
 unmodified, to the registry its own manifest names. It never stashes, resets, forces, cleans, rebases or checks out another branch inside the routed checkout, and it deletes nothing by hand under a checkout whose `node_modules` is a junction — a temporary worktree is removed with `git worktree remove --force`. `## Binding` of `changes.md` is where those two laws are read: `Preflight` as `<passed|failed> at <ISO 8601 instant>`, and `Reflog before` and `Reflog after` as `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
 
+## A presentation release is proved on the surface it repairs
+
+The consumer half's before-and-after proof asks the consumer to fail at the installed version and pass
+at the release. For a package a consumer calls, that is a consumer test and nothing else will do. For a
+package whose behaviour exists only once rendered — a visual family, whose repair is a stamp on the
+markup or a rule in the recipe sheet — a consumer that composes the family and calls none of it has no
+such test, and one written for the occasion proves the stamp rather than the surface: it passes at the
+new version because the attribute is there, whatever the surface then looks like.
+
+So a release may declare the family it realizes, and a release that declares one is a **presentation
+release**. Its consume may take the before and after halves from two `interface.audit` branches of the
+same session instead: the first at the head the consumer still serves, where the family-owned claims
+this release repairs fail and are routed to the family owner as a grammar gap; the second at the head
+this branch bumped, where the same claims pass. Both refs must resolve, both audits must judge the same
+claims by identifier, the version each observed must be the version its half stands for, and the after
+audit must have measured the commit this branch committed — an audit of some other head is an audit of
+something else. This authority is lawful nowhere else: a release that names no family is proved by a
+consumer regression, because a package a consumer can call can be failed by calling it.
+
 ## Boundary of the consumer half
 
 The consumer plan pins the consumer manifests, the npm lockfile, the unchanged regression and the
@@ -140,7 +159,7 @@ a proof from different bytes is rejected.
 | --- | --- | --- | --- |
 | `mode` | choice | full | `full` runs both halves in the routed checkout; `publish` runs the owner half alone and ends at the recorded release; `consume` runs the consumer half alone against a bound `library-release` |
 | `plan` | object | null | The closed library-behavior-plan schema: owner package identity, exact file set, paired regression, existing scripts and next patch; supplied under `full` and `publish`, absent under `consume` |
-| `consumer` | object | null | The closed dependency-plan schema: the consumer manifests and lockfile that pin the package, the unchanged consumer regression and the complete delivery gates; supplied under `full` and `consume`, absent under `publish` |
+| `consumer` | object | null | The closed dependency-plan schema: the consumer manifests and lockfile that pin the package, the before-and-after authority — an unchanged consumer regression, or the two audits of a presentation release — and the complete delivery gates; supplied under `full` and `consume`, absent under `publish` |
 | `publish` | choice | true | `true` publishes the packed release to the registry when the package proofs are green; `false` leaves it packed for a person; read under mode `publish`, where nothing else makes a release reach a registry |
 | `resume` | token | null | The blocked branch token when re-entering with a changed plan or proof |
 
@@ -155,9 +174,9 @@ a proof from different bytes is rejected.
 | 5 | Commit the package delivery once and verify its Git change set and proof hashes | `plan` | @workspaces/fe at the package commit, @tools/git | @workspaces/fe/branch/session, `library-source-application` | `LIBRARY_BOUNDARY_REJECTED`, `LIBRARY_PROOF_FAILED` |
 | 6 | Pack the archive from the package commit and record the release it identifies | `plan` | @workspaces/fe at the package commit, @tools/shell | `library-archive`, `library-release` | `DEPENDENCY_BOUNDARY_REJECTED` |
 | 7 | Publish the digested archive to the registry the manifest names, read the served version and integrity back, and record the publication | `plan`, `publish` | @workspaces/fe at the package commit, `library-release`, @tools/registry, @tools/secrets | `library-release` | `LIBRARY_PUBLISH_REJECTED` |
-| 8 | Install the baseline in the consumer and run the unchanged consumer regression | `consumer` | @workspaces/fe, the bound release, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
+| 8 | Install the baseline in the consumer and run the unchanged consumer regression, or bind the before audit of a presentation release | `consumer` | @workspaces/fe, the bound release, the `interface.audit` branch this session measured the installed version on, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
 | 9 | Install the bound release within the exact consumer metadata boundary | `consumer` | @workspaces/fe and the bound release, @tools/shell | @workspaces/fe/branch/session within the metadata ceiling, @tools/sourcewrite | `DEPENDENCY_BOUNDARY_REJECTED` |
-| 10 | Verify the installed bytes and run the consumer regression and complete gates | `consumer` | @workspaces/fe, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
+| 10 | Verify the installed bytes and run the consumer regression and complete gates, or bind the after audit of a presentation release | `consumer` | @workspaces/fe, the `interface.audit` branch this session measured the bumped commit on, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
 | 11 | Commit the consumer metadata once and verify its delta and proof hashes | `consumer` | @workspaces/fe at the consumer commit, @tools/git | @workspaces/fe/branch/session, `dependency-update` | `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
 | 12 | Emit | — | everything above | `changes`, `response/response.json` | — |
 

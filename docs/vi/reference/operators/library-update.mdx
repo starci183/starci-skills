@@ -101,6 +101,26 @@ route đều gọi tên; JSON chỉ được thay version của entry package đ
 interface. Package không bao giờ được push, merge hay tag ở đây, và lối duy nhất để nó rời checkout
 này là bước phát hành của mode `publish`: nguyên archive đã đóng gói, không sửa một byte, lên registry
 mà chính manifest của nó gọi tên. Nó không bao giờ stash, reset, force, clean, rebase hay checkout sang nhánh khác bên trong checkout được route, và không xoá bằng tay bất cứ thứ gì dưới một checkout có `node_modules` là junction — một worktree tạm được gỡ bằng `git worktree remove --force`. `## Binding` của `changes.md` là nơi đọc hai luật ấy: `Preflight` dạng `<passed|failed> at <ISO 8601 instant>`, còn `Reflog before` và `Reflog after` dạng `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
+## Bản phát hành trình bày được chứng minh trên chính bề mặt nó sửa
+
+Proof trước-và-sau của nửa consumer đòi consumer fail ở version đang cài và pass ở bản phát hành. Với
+một package mà consumer gọi được, đó là một bài test của consumer và không gì khác thay được. Với một
+package mà hành vi chỉ tồn tại khi đã render — một họ hình ảnh, mà bản sửa là một cái dấu trên markup
+hay một luật trong sheet công thức — một consumer soạn theo họ ấy mà không gọi gì của nó thì không có
+bài test như vậy, và một bài viết ra cho dịp này chỉ chứng minh cái dấu chứ không chứng minh bề mặt:
+nó pass ở version mới vì thuộc tính có ở đó, còn bề mặt sau đó trông ra sao thì mặc kệ.
+
+Vì thế một bản phát hành có thể khai họ mà nó hiện thực hoá, và một bản phát hành khai họ là một **bản
+phát hành trình bày**. Lần consume của nó được lấy hai nửa trước và sau từ hai nhánh `interface.audit`
+của cùng phiên: nhánh thứ nhất tại head mà consumer còn đang phục vụ, nơi các lời khai thuộc sở hữu
+của họ mà bản phát hành này sửa đều fail và được định tuyến về chủ họ như một grammar gap; nhánh thứ
+hai tại head mà nhánh này vừa tăng, nơi đúng những lời khai ấy pass. Cả hai ref phải giải được, cả hai
+audit phải chấm đúng những lời khai ấy theo định danh, version mà mỗi bên quan sát phải là version mà
+nửa của nó đại diện, và audit sau phải đã đo tại chính commit mà nhánh này commit — một audit của head
+khác là audit của chuyện khác. Thẩm quyền này không hợp lệ ở đâu khác: một bản phát hành không khai họ
+được chứng minh bằng một regression của consumer, vì một package mà consumer gọi được thì làm nó fail
+bằng cách gọi nó.
+
 ## Ranh giới nửa consumer
 
 Plan consumer pin các manifest consumer, npm lockfile, regression không đổi và các gate bàn giao đầy
@@ -153,7 +173,7 @@ những byte khác.
 | --- | --- | --- | --- |
 | `mode` | choice | full | `full` chạy cả hai nửa trong checkout được route; `publish` chạy riêng nửa owner và dừng ở bản phát hành đã ghi; `consume` chạy riêng nửa consumer trên `library-release` đã bind |
 | `plan` | object | null | Schema library-behavior-plan đóng: danh tính package, tập file, regression đi cặp, script hiện có và patch kế tiếp; cấp dưới `full` và `publish`, vắng dưới `consume` |
-| `consumer` | object | null | Schema dependency-plan đóng: các manifest và lockfile consumer pin package, regression consumer không đổi và các gate bàn giao đầy đủ; cấp dưới `full` và `consume`, vắng dưới `publish` |
+| `consumer` | object | null | Schema dependency-plan đóng: các manifest và lockfile consumer pin package, thẩm quyền trước-và-sau — một regression consumer không đổi, hoặc hai audit của một bản phát hành trình bày — và các gate bàn giao đầy đủ; cấp dưới `full` và `consume`, vắng dưới `publish` |
 | `publish` | choice | true | `true` phát hành bản đã đóng gói lên registry khi proof package đã xanh; `false` để nguyên bản đóng gói cho người; đọc dưới mode `publish`, nơi không gì khác đưa được bản phát hành lên registry |
 | `resume` | token | null | Token nhánh bị chặn khi vào lại với plan hoặc proof thay đổi |
 
@@ -168,9 +188,9 @@ những byte khác.
 | 5 | Commit bản bàn giao package một lần rồi kiểm diff Git và hash proof của nó | `plan` | @workspaces/fe tại commit package, @tools/git | @workspaces/fe/branch/session, `library-source-application` | `LI<br />ARY_BOUNDARY_REJECTED`, `LI<br />ARY_PROOF_FAILED` |
 | 6 | Đóng gói archive từ commit package và ghi bản phát hành mà nó định danh | `plan` | @workspaces/fe tại commit package, @tools/shell | `library-archive`, `library-release` | `DEPENDENCY_BOUNDARY_REJECTED` |
 | 7 | Phát hành archive đã có digest lên registry mà manifest gọi tên, đọc ngược version và integrity đang phục vụ, rồi ghi publication | `plan`, `publish` | @workspaces/fe tại commit package, `library-release`, @tools/registry, @tools/secrets | `library-release` | `LI<br />ARY_PUBLISH_REJECTED` |
-| 8 | Cài baseline trong consumer và chạy regression consumer không đổi | `consumer` | @workspaces/fe, bản phát hành đã bind, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
+| 8 | Cài baseline trong consumer và chạy regression consumer không đổi, hoặc ràng audit trước của một bản phát hành trình bày | `consumer` | @workspaces/fe, bản phát hành đã bind, nhánh `interface.audit` mà phiên này đã đo tại version đang cài, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
 | 9 | Cài bản phát hành đã bind trong ranh giới metadata consumer chính xác | `consumer` | @workspaces/fe và bản phát hành đã bind, @tools/shell | @workspaces/fe/branch/session trong trần metadata, @tools/sourcewrite | `DEPENDENCY_BOUNDARY_REJECTED` |
-| 10 | Kiểm byte đã cài và chạy regression consumer cùng gate đầy đủ | `consumer` | @workspaces/fe, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
+| 10 | Kiểm byte đã cài và chạy regression consumer cùng gate đầy đủ, hoặc ràng audit sau của một bản phát hành trình bày | `consumer` | @workspaces/fe, nhánh `interface.audit` mà phiên này đã đo tại commit vừa tăng, @tools/shell | `dependency-proof`, `dependency-log` | `DEPENDENCY_PROOF_FAILED` |
 | 11 | Commit metadata consumer một lần rồi kiểm delta và hash proof của nó | `consumer` | @workspaces/fe tại commit consumer, @tools/git | @workspaces/fe/branch/session, `dependency-update` | `DEPENDENCY_BOUNDARY_REJECTED`, `DEPENDENCY_PROOF_FAILED` |
 | 12 | Phát | — | mọi thứ ở trên | `changes`, `response/response.json` | — |
 

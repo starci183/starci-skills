@@ -19,7 +19,8 @@ buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán khô
    ngôn ngữ đó) — mục tiêu, cái gì trong và cái gì ngoài, các dòng "xong khi", việc kiểm chứng với
    tới đâu, một câu hỏi — và được xác nhận một lần qua lựa chọn `goal-confirm` trước bước 2. Dòng
    phạm vi là nơi duy nhất phần thu hẹp được đưa ra cho người: nó được điền từ chính các con số đếm
-   của kế hoạch khi một kế hoạch tới nơi (`state.json.mission.scope`, `resources/interaction.json#rule`),
+   của mọi kế hoạch phiên này đã cho tới nơi, tại mỗi lần một kế hoạch tới
+   (`state.json.mission.scope`, `resources/interaction.json#rule`),
    và thứ nó nói là đã hoãn thì đứng trên sổ chưa kiểm dưới `@worktrees/unchecked` chứ không đứng
    trong một câu hỏi thứ hai. Khối đó là câu hỏi duy nhất một prompt mới đặt ra; từ đó lượt chạy phải mượt: log transition in ra mà không chờ, vẽ lại dưới cùng goal và
    vào lại theo route không hỏi gì, và chỉ route `user`, một `budget-choice` hay goal được sửa mới dừng
@@ -110,6 +111,19 @@ Bằng chứng giữa các phiên dùng scripts/producer-import.mjs. Chép bundl
 
 Một yêu cầu không gọi tên chủ nào, hoặc gọi hai chủ có phạm vi khác nhau đáng kể, dừng lại ở đây với
 một câu hỏi tập trung nêu tên các ranh giới đang cạnh tranh.
+
+Một prompt gọi tên kho nhiệm vụ của một sản phẩm chứ không gọi tên một kết quả — "chạy kho cho
+<product>" — là route `bank` (`routing.json#kinds.bank`, `resources/orchestrator.json#helpers.bank`), và
+nó không chọn dòng nào của bảng trên: nhiệm vụ mà dòng ấy lẽ ra được chọn cho đã được viết sẵn.
+Orchestrator lấy `scripts/bank.mjs#next` — mục banked đầu tiên có mọi `dependsOn` đã done, và không lấy
+gì cả khi một mục anh em cùng sản phẩm còn đang chạy — đánh dấu mục ấy `running:<sessionId>`, mở phiên
+ở bước 4 với `state.json.mission` chép nguyên từ bản nháp goal của mục và `mission.bankRef` gọi tên mục
+cùng phê duyệt, rồi vẽ chuỗi của phiên ấy từ chính các dòng "xong khi" của nó như mọi nhiệm vụ khác.
+Khi phiên kết thúc `done` thì mục được đánh dấu `done:<sessionId>` và mục kế tiếp được lấy; một phiên
+kết thúc blocked hay stopped để mục của nó ở `running`, và đó chính là cách một nhiệm vụ dừng lại vì
+người tạm dừng cả kho thay vì để mục sau nó mở ra. Orchestrator là người ghi `queue.json` duy nhất
+trong một lượt chạy, và `scripts/validate-session.mjs#bankRefErrors` từ chối một hàng đợi đọc ngược lại
+với những gì đã xảy ra.
 
 Việc hỗ trợ không nằm trong bảng đó, vì nó không phải một nhiệm vụ. Một yêu cầu chuẩn bị hay dọn dẹp —
 đọc những gì một sản phẩm để lại rồi phác một kho nhiệm vụ từ đó, và bất cứ thứ gì tầng hỗ trợ sẽ có
@@ -202,7 +216,8 @@ File này không cấp gì cả. Mọi ranh giới thẩm quyền đều do các
 `validate.mjs` của chính operator thực thi, và file này không nới rộng được:
 
 - `git.publish` không có yêu cầu nào gọi tên được force push, hook bị bỏ qua, reset, clean, stash hay
-  xoá nhánh; nó merge nhánh phiên, push không force, và xung đột là `NON_FAST_FORWARD` cho người xử.
+  xoá nhánh; nó merge nhánh phiên, push không force, và một hunk xung đột mà bộ luật dùng chung không
+  phủ là `NON_FAST_FORWARD` cho người xử.
 - `release.deploy`, `migration.release`, `runtime.serve` và `uat.verify` đòi `approval`, lấy từ chính khai báo của môi
   trường khi khai báo đó đánh dấu lớp thao tác bị chạm là `declared`, và từ một con người chỉ khi môi
   trường đánh dấu là `person`; `release.deploy` chỉ chạy trên đầu vào `quality-verification`.

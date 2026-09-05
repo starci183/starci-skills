@@ -48,6 +48,16 @@
       }
     },
     {
+      "heading": "^## Resolutions$",
+      "table": "| File | Hunk | Rule |",
+      "minRows": 0,
+      "cell": {
+        "File": "\\S",
+        "Hunk": "^[0-9]+-[0-9]+$",
+        "Rule": "^[a-z][a-z-]*$"
+      }
+    },
+    {
       "heading": "^## Hooks$",
       "table": "| Hook | Reference | Outcome |",
       "minRows": 1,
@@ -73,7 +83,7 @@
       "table": "| Code | Subject | Statement |",
       "minRows": 1,
       "cell": {
-        "Code": "^`(HOOK_ENFORCED|BOUNDARY_CLEAN|REMOTE_FAST_FORWARDED|REMOTE_REF_CREATED|CONTINUATION_TAG_PUBLISHED)`$",
+        "Code": "^`(HOOK_ENFORCED|BOUNDARY_CLEAN|REMOTE_FAST_FORWARDED|REMOTE_REF_CREATED|CONTINUATION_TAG_PUBLISHED|MERGE_RESOLVED|MERGE_GATED)`$",
         "Subject": "\\S",
         "Statement": "\\S"
       }

@@ -23,8 +23,8 @@ authorizations below remain in force. An Ask column or diagnostic reason is not 
    a person who writes in another language is answered in it) — the goal, what is in and what is
    out, the "done when" lines, how far the verification reaches, one question — and confirmed once
    through a `goal-confirm` choice before step 2. The scope line is the one place the narrowing is put
-   to the person: it is filled from the plan's own counts when a plan lands
-   (`state.json.mission.scope`, `resources/interaction.json#rule`), and what it says was deferred
+   to the person: it is filled from the counts of every plan this session has landed, at each plan
+   transition (`state.json.mission.scope`, `resources/interaction.json#rule`), and what it says was deferred
    stands on the unchecked ledger under `@worktrees/unchecked` rather than in a second question. That
    block is the one question a new prompt asks; from then on the run is smooth:
    the transition log prints and never waits, a replan under the same goal and a routed re-entry ask
@@ -118,6 +118,19 @@ Cross-session evidence uses scripts/producer-import.mjs. Copy a completed produc
 
 A request that names no owner, or two owners whose scopes differ materially, stops here with one
 focused question naming the competing boundaries.
+
+A prompt that names a product's bank rather than an outcome — "run the bank for <product>" — is the
+`bank` route (`routing.json#kinds.bank`, `resources/orchestrator.json#helpers.bank`), and it selects no
+row of that table: the mission the row would have been chosen for is already written down. The
+orchestrator takes `scripts/bank.mjs#next` — the first banked entry whose every `dependsOn` is done,
+and nothing at all while a sibling of the same product is running — marks that entry
+`running:<sessionId>`, opens the session at step 4 with `state.json.mission` copied from the entry's
+goal draft and `mission.bankRef` naming the entry and the approval, and plans that session's chain from
+its own done-when lines like any other mission. When the session ends `done` the entry is marked
+`done:<sessionId>` and the next one is taken; a session that ended blocked or stopped leaves its entry
+`running`, which is how a mission that stopped for the person pauses the bank instead of letting the
+one behind it open. The orchestrator is the only writer of `queue.json` during a run, and
+`scripts/validate-session.mjs#bankRefErrors` refuses a queue that reads the opposite of what happened.
 
 Support work is not in that table, because it is not a mission. A request to prepare or tidy — to read
 what a product left behind and draft a bank of missions from it, and whatever else the support layer
@@ -213,8 +226,8 @@ This file grants nothing. Every authority boundary is enforced by the operator's
 tables and `validate.mjs`, which this file cannot widen:
 
 - `git.publish` has no requirement that can name a force push, a bypassed hook, a reset, a clean, a
-  stash, or a branch deletion; it merges the session branch, pushes non-force, and a conflict is
-  `NON_FAST_FORWARD` for a person.
+  stash, or a branch deletion; it merges the session branch, pushes non-force, and
+  a conflicting hunk the shared rule set does not cover is `NON_FAST_FORWARD` for a person.
 - `release.deploy`, `migration.release`, `runtime.serve` and `uat.verify` require an `approval`, taken from the
   environment's own declaration where it marks the touched operation class `declared` and from a
   person only where the environment marks it `person`; `release.deploy` runs only on a

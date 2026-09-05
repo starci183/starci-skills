@@ -379,10 +379,54 @@ mục dưới đây đóng một cái, bằng một gate kèm spec, không bằn
       `dependsOn` được chờ; `state.json.mission.bankRef` bị từ chối khi phê duyệt hết hiệu lực
       (`scripts/validate-session.mjs#bankRefErrors`).
 - [x] Helper đầu tiên `generate-banks` chạy trên profile đọc (`astra`) và self-test của nó.
-- [ ] Chưa có: harness chưa tự nhận nhiệm vụ kế tiếp từ kho. `bank.mjs#next|markRunning|markDone` đã
-      có và đã được spec, nhưng chưa vòng nào của orchestrator gọi chúng, và chưa có `SKILL.md` bước
-      nào nói ai ghi `queue.json` khi một phiên mở ra hay đóng lại. Làm điều đó rồi mới ghi bằng chứng.
+- [x] Chạy thật: route `bank` (`routing.json#kinds.bank`, một đoạn trong Entry của `SKILL.md` + gương)
+      nói orchestrator lấy `bank.mjs#next`, đánh dấu `running:<sessionId>`, mở phiên với
+      `mission.bankRef`, và chỉ đánh dấu `done:<sessionId>` khi phiên kết thúc done;
+      `validate-session.mjs#bankRefErrors` từ chối một mục đọc ngược lại trạng thái của phiên, nên một
+      nhiệm vụ dừng vì người ở lại `running` và tạm dừng cả kho. Spec: một kho ba nhiệm vụ chạy hết
+      trình tự và dừng ở nhiệm vụ blocked (`scripts/bank.spec.mjs`).
 - [ ] Chưa có: kho `nivo-agentos` mà một phiên Astra đã viết vẫn ở hình dạng cũ
       (`index.json`/`ORDER.md`/`workflows/<id>/workflow.json`/`BRIEF.md`). 17 nhiệm vụ của nó hợp lệ
       với `banked-mission.schema.json` sau khi đổi tên và dời trường, không phải sửa nội dung nào; việc
       chuyển thật thuộc về chủ kho ấy, không phải phiên này.
+
+## 8. Bảy khoản nợ của ba phiên nivo trên 2.1.2 và 2.1.3 (2.1.4)
+
+Ba phiên chạy thật (`tests/evidence/20260905-nivo-setup-uat-on-2.1.2.md`,
+`20260905-nivo-recovery-e2e-on-2.1.2.md`, `20260905-nivo-recovery-operations-fix-on-2.1.3.md`) để lại
+bảy khiếm khuyết của cây chứ không phải của công việc. Mỗi khoản đóng bằng một cửa và một spec, mỗi
+khái niệm một nhà.
+
+- [x] `library.update` tiêu thụ được nửa-trước từ một audit: một bản phát hành có thể khai `family`
+      (`library-release.schema.json`) và một bản khai họ là bản phát hành trình bày; `regression` của
+      `dependency-plan` thành hai hình dạng, và hình dạng `audit` gọi tên hai nhánh `interface.audit`
+      của cùng phiên cùng các lời khai. Cửa: `operators/library-update/validate.mjs#auditProofErrors`
+      kiểm cả hai ref giải được, cùng lời khai theo định danh, version mỗi nửa quan sát, và audit sau
+      đo tại commit mà nhánh này commit; hợp lệ chỉ khi bản phát hành khai họ. Luật ở operator.md +
+      gương, self-test theo hình dạng 3/2 của phiên `20260905-130417`.
+- [x] `identity.provision` cấp phát trọn dàn diễn viên trong một nhánh: `identity-plan.schema.json`
+      đổi `account` thành `accounts` (mỗi mục mang `alias`), `scripts/identity-provision.mjs#provisionAccounts`
+      chạy hết theo thứ tự và dừng ở tài khoản đầu tiên hỏng, luật plan-sha giữ nguyên. Cửa:
+      `operators/identity-provision/validate.mjs#planCastErrors` — kế hoạch liệt kê N thì hồ sơ công bố
+      N, đúng username, không thừa alias nào.
+- [x] `browser-walk` che giá trị ô mật khẩu trong bản ghi DOM và bản chụp accessibility trước khi ghi
+      (`maskPasswordInputs`, `maskPasswordValues`, `PASSWORD_FIELD`), nên trạng thái đăng nhập bị từ
+      chối chụp được thay vì bị `OUTPUT_SECRET_DETECTED`; sweep bí mật vẫn đọc mọi byte. Spec trên một
+      DOM mẫu (`scripts/browser-walk.spec.mjs`).
+- [x] `mission.scope` đếm mọi kế hoạch phiên đã cho tới nơi chứ không riêng kế hoạch mới nhất, nên một
+      kế hoạch toàn journey không xoá được phần hoãn của kế hoạch trước khỏi dòng người đã đọc. Cửa:
+      `scripts/validate-session.mjs#missionScopeErrors` (tách khỏi `unitBudgetErrors`, vốn bỏ qua kiểm
+      tra khi `budget.units` vắng); luật ở `state.schema.json#mission.scope`, `interaction.json#rule`,
+      `orchestrator.json#session`, `SKILL.md` bước 1 + gương.
+- [x] `git.publish` giải xung đột chỉ-định-dạng bằng luật: cùng bộ bốn luật đóng mà `runtime.serve`
+      dùng, dùng chung một module `scripts/merge-resolution.mjs` (tên luật đọc từ
+      `delta.schema.json`) chứ không chép. Cửa: mục `## Resolutions` của `git-publication`, các finding
+      `MERGE_RESOLVED` + `MERGE_GATED`, và `operators/git-publish/validate.mjs` kiểm luật, dải hunk,
+      trùng lặp và quyền sở hữu file theo tập ghi của phiên; một hunk ngoài bộ luật vẫn là
+      `NON_FAST_FORWARD` cho người.
+- [x] Kho được chạy thật — xem mục 7.
+- [x] Bản sửa nóng đang nằm trong cây (`interface.audit` khai `feature`; audit thừa kế lens mang
+      `calibration` rỗng) có luật, hợp đồng, self-test và tài liệu khớp nhau và có gương: `feature` là
+      trường bắt buộc nên cổng request từ chối một audit không gọi tên sổ nào
+      (`operators/interface-audit/self-test.mjs`), và `record-unchecked.mjs` không còn in ra một file
+      nó chưa từng mở khi nhánh không gọi tên feature.

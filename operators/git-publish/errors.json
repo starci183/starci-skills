@@ -42,12 +42,12 @@
       "domain": "remote",
       "disposition": "terminate",
       "meaning": {
-        "en": "The remote carries commits the local ref does not, so the push is not fast-forward.",
-        "vi": "Remote mang những commit mà ref cục bộ không có, nên cú push không phải fast-forward."
+        "en": "The remote carries commits the local ref does not, or the merge into the target branch conflicted on a hunk the closed rule set does not resolve, so the push is not fast-forward.",
+        "vi": "Remote mang những commit mà ref cục bộ không có, hoặc lần merge vào nhánh đích xung đột ở một hunk mà bộ luật đóng không giải được, nên cú push không phải fast-forward."
       },
       "resume": {
-        "en": "The branch owner reconciles the divergence and a new head arrives.",
-        "vi": "Người sở hữu nhánh hoà giải phần phân kỳ và một head mới tới."
+        "en": "The branch owner reconciles the divergence, or resolves the hunk no rule covers, and a new head arrives.",
+        "vi": "Người sở hữu nhánh hoà giải phần phân kỳ, hoặc xử hunk mà không luật nào phủ, và một head mới tới."
       }
     }
   }

@@ -493,6 +493,10 @@ await expectError(refineFiles(notApplicable), 'a delivery that composed somethin
 await expectError(refineFiles(notApplicable, { calibrationRows: `| ${BT}inherited${BT} | taste 1–2 | — |` }), 'names no branch it was scored in', 'an inherited lens with no branch behind it', REFINE);
 await expectError(refineFiles(notApplicable, { calibrationRows: `| ${BT}inherited${BT} | taste step-4/parallel-1 | — |` }), 'which is this branch', 'a lens inherited from itself', REFINE);
 await expectError(refineFiles(notApplicable, { calibration: CALIBRATION, calibrationRows: `${INHERITED_ROW}` }), 'an inherited lens took no anchors of its own', 'an inherited lens with anchor scores beside it', REFINE);
+
+// The unchecked ledger is addressed by the feature this audit belongs to, so a request that names
+// none has nowhere to write what it deferred (scripts/record-unchecked.mjs, validate-session).
+await expectError({ ...baseline(), 'request/request.json': (() => { const r = requestJson(); delete r.requirements.feature; return r; })() }, 'required field feature has no value', 'an audit that defers coverage and names no ledger to address');
 await expectValid(refineFiles(notApplicable, { calibrationRows: CALIBRATION_ROWS(), calibration: CALIBRATION }), 'a refine that scores its own lens on its own anchors: inheriting is a permission, not an obligation', REFINE);
 await expectError(refineFiles(() => { const l = notApplicable(); l.entries[11] = { ...l.entries[11], score: 4 }; return l; }), 'passes nothing and routes nowhere', 'a criterion that does not apply and still carries a score', REFINE);
 await expectError(refineFiles(() => { const l = notApplicable(); l.entries[0] = { rule: 'TASTE-1', measured: 'n/a: not looked at', score: null, verdict: 'pass', routeTo: 'none' }; return l; }), 'only the reference criterion TASTE-12 stops applying', 'another criterion marked as not applying', REFINE);

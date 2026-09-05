@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { validateSession, missionHistoryErrors, provenErrors, threeBranchStopErrors, loggedErrors } from './validate-session.mjs';
+import { validateSession, missionHistoryErrors, missionScopeErrors, provenErrors, threeBranchStopErrors, loggedErrors } from './validate-session.mjs';
 import { sessionBudgetErrors, effectiveBudget, goalDecisionId, validateRequest } from './validate-request.mjs';
 import { fakeTree } from './chain-fixture.mjs';
 
@@ -285,4 +285,44 @@ test('a done audit with a failing verdict is refused until its findings are in t
   const orphan = await auditSession({ contexts: [] });
   assert.equal(orphan.length, 1);
   assert.ok(orphan[0].includes('no family to record them under'));
+});
+
+// The scope line of the goal block: what the person read about how far the verification reaches. A
+// mission plans surfaces and then plans flows; both plans landed, so the coverage is both plans'. The
+// counts are the plans' own — journey is what a verifying lane is dispatched over, deferred is every
+// unit a plan tiered secondary — and reading them off the newest plan alone lets an all-journey second
+// plan erase the first plan's deferrals from the one line the person was shown.
+function scopeSession(plans, scope) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'scope-'));
+  const steps = {};
+  plans.forEach(({ branch, producedBy }, i) => { steps[branch] = producedBy; });
+  const state = { id: 'x', project: 'p', startedAt: 'now', status: 'running', chain: chainOf(steps), steps, current: plans[plans.length - 1]?.branch ?? '1/1', requestHashes: {}, transitions: [dispatched], mission: { ...mission(), ...(scope ? { scope } : {}) } };
+  for (const { branch, producedBy, units: list, status = 'done' } of plans) {
+    const [n, m] = branch.split('/');
+    const b = path.join(dir, `step-${n}`, `parallel-${m}`, 'response', 'data');
+    mkdirSync(b, { recursive: true });
+    writeFileSync(path.join(b, 'units.json'), JSON.stringify({ schemaVersion: 9, producedBy, units: list }));
+    writeFileSync(path.join(path.dirname(b), 'response.json'), JSON.stringify({ status }));
+  }
+  return { dir, state };
+}
+const scopeUnit = (id, tier) => ({ id, kind: 'page', goal: `show ${id}`, inputs: [], dependsOn: [], ...(tier === 'secondary' ? { tier, deferral: { reason: 'no done-when line reaches it' } } : {}) });
+const surfacePlan = { branch: '3/1', producedBy: 'interface.plan', units: [scopeUnit('sign-in'), scopeUnit('setup'), scopeUnit('control-centre'), ...Array.from({ length: 11 }, (_, i) => scopeUnit(`secondary-${i + 1}`, 'secondary'))] };
+const flowPlan = { branch: '9/1', producedBy: 'uat.plan', units: [scopeUnit('setup-reach'), scopeUnit('module-setup'), scopeUnit('control-centre-unprovisioned')] };
+const scopeErrors = async (plans, scope) => { const s = scopeSession(plans, scope); try { return await missionScopeErrors(root, s.dir, s.state); } finally { rmSync(s.dir, { recursive: true, force: true }); } };
+
+test('the scope line counts every plan the mission landed, not the newest one', async () => {
+  assert.deepEqual(await scopeErrors([surfacePlan], { journey: 3, deferred: 11 }), [], 'one plan: its own counts');
+  assert.deepEqual(await scopeErrors([surfacePlan, flowPlan], { journey: 6, deferred: 11 }), [], 'two plans: one coverage, both counted');
+  const erased = await scopeErrors([surfacePlan, flowPlan], { journey: 3, deferred: 0 });
+  assert.equal(erased.length, 1);
+  assert.ok(erased[0].includes('says 3 journey and 0 unchecked') && erased[0].includes('carry 6 and 11'));
+  assert.ok(erased[0].includes('step-3/parallel-1, step-9/parallel-1'), 'the error names every plan it counted');
+  // A plan branch that is not done is not a landed plan.
+  assert.deepEqual(await scopeErrors([surfacePlan, { ...flowPlan, status: 'running' }], { journey: 3, deferred: 11 }), []);
+  // No plan has landed and the line claims a count: the line is filled from a plan or it is absent.
+  const early = await scopeErrors([], { journey: 3, deferred: 0 });
+  assert.equal(early.length, 1);
+  assert.ok(early[0].includes('no plan of this session has landed a units.json'));
+  assert.deepEqual(await scopeErrors([surfacePlan], null), [], 'before the block carries a scope there is nothing to check');
 });

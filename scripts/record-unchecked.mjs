@@ -115,13 +115,16 @@ export async function recordUnchecked(branchDir, { root = ROOT, hostRoot = hostR
   const { resolved } = found.resolve.length
     ? await resolveUnchecked(hostRoot, found.product, found.featureId, found.resolve, { resolvedBy: found.recordedBy, resolvedAt: now, root })
     : { resolved: 0 };
-  return { file, lane: found.lane, appended, resolved };
+  return { file, lane: found.lane, product: found.product, featureId: found.featureId, appended, resolved };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const target = process.argv[2];
   if (!target) { process.stderr.write('usage: node scripts/record-unchecked.mjs <session>/step-N/parallel-M\n'); process.exit(2); }
   recordUnchecked(target).then((r) => {
-    process.stdout.write(`unchecked: ${r.appended} appended, ${r.resolved} resolved in the ${r.lane} lane of ${path.relative(ROOT, r.file).split(path.sep).join('/')}\n`);
+    // A branch whose request names no feature addresses no ledger, and says so: naming a file it never
+    // opened is how a run that recorded nothing reads as a run that recorded nothing *there*.
+    const where = r.featureId ? `of ${path.relative(ROOT, r.file).split(path.sep).join('/')}` : 'of no ledger; this branch\'s request names no feature, so nothing addresses one';
+    process.stdout.write(`unchecked: ${r.appended} appended, ${r.resolved} resolved in the ${r.lane} lane ${where}\n`);
   }, (error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
 }

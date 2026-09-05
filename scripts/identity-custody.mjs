@@ -34,8 +34,14 @@ export function assertIdentityPlan({ plan, sourceRoot, read = readFileSync }) {
     requireThat(fingerprint(bytes) === plan.productContract.fingerprint, 'PRODUCT_CONTRACT_DRIFT');
     const contract = JSON.parse(bytes.toString());
     requireThat(contract.routeKey === plan.routeKey && contract.clientId === plan.clientId, 'CLIENT_CONTRACT_MISMATCH');
-    requireThat(contract.usernameMaxLength === plan.account.usernameMaxLength && plan.account.username.length <= contract.usernameMaxLength, 'ACCOUNT_NAME_LIMIT');
-    requireThat(Array.isArray(contract.requiredProfileFields) && ['firstName', 'lastName'].every(field => contract.requiredProfileFields.includes(field) && typeof plan.account[field] === 'string' && plan.account[field].trim()), 'PROFILE_CONTRACT_MISMATCH');
+    // Every account the plan lists is held to the product's own contract, and the usernames are
+    // distinct: one branch provisions a flow's whole cast, so a repeated name is two aliases pointing
+    // at one identity rather than the two the flow needs.
+    requireThat(new Set(plan.accounts.map(account => account.username)).size === plan.accounts.length, 'ACCOUNT_NAMESPACE');
+    for (const account of plan.accounts) {
+      requireThat(contract.usernameMaxLength === account.usernameMaxLength && account.username.length <= contract.usernameMaxLength, 'ACCOUNT_NAME_LIMIT');
+      requireThat(Array.isArray(contract.requiredProfileFields) && ['firstName', 'lastName'].every(field => contract.requiredProfileFields.includes(field) && typeof account[field] === 'string' && account[field].trim()), 'PROFILE_CONTRACT_MISMATCH');
+    }
     return { planBound: true, routeKey: plan.routeKey };
   } catch (error) {
     if (error instanceof IdentityOperationError) throw error;

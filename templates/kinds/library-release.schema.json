@@ -1,31 +1,97 @@
 {
   "$id": "kind:library-release",
-  "description": "The identity of one packed owner release: the package it carries, the version the package half bumped to, the sha512 digest of the tarball, the branch-relative path of that tarball, and the package commit it was packed from. It is what crosses between an owner route and a consumer route: a library.update branch under mode publish writes it beside its archive, and a library.update branch under mode consume reads it as its input. publication says where that archive now lives: published names the registry that serves this exact version, the integrity it serves — the archive's own — and the moment it began to; pending is the record of an archive that was packed and not published, which is what a request that preset publish false asked for and what a run inside one checkout leaves behind.",
+  "description": "The identity of one packed owner release: the package it carries, the version the package half bumped to, the sha512 digest of the tarball, the branch-relative path of that tarball, and the package commit it was packed from. It is what crosses between an owner route and a consumer route: a library.update branch under mode publish writes it beside its archive, and a library.update branch under mode consume reads it as its input. family, when the package realizes one, says the release is a presentation release and what family it belongs to. publication says where that archive now lives: published names the registry that serves this exact version, the integrity it serves — the archive's own — and the moment it began to; pending is the record of an archive that was packed and not published, which is what a request that preset publish false asked for and what a run inside one checkout leaves behind.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "version", "digest", "artifact", "packageCommit", "publication"],
+  "required": [
+    "name",
+    "version",
+    "digest",
+    "artifact",
+    "packageCommit",
+    "publication"
+  ],
   "properties": {
-    "name": { "type": "string", "minLength": 1 },
-    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
-    "digest": { "type": "string", "pattern": "^sha512-[A-Za-z0-9+/]+=*$" },
-    "artifact": { "type": "string", "pattern": "^response/artifacts/release/[A-Za-z0-9_.@-]+\\.tgz$" },
-    "packageCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha512-[A-Za-z0-9+/]+=*$"
+    },
+    "artifact": {
+      "type": "string",
+      "pattern": "^response/artifacts/release/[A-Za-z0-9_.@-]+\\.tgz$"
+    },
+    "packageCommit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
     "publication": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["registry", "state"],
+      "required": [
+        "registry",
+        "state"
+      ],
       "properties": {
-        "registry": { "type": ["string", "null"] },
-        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
-        "state": { "enum": ["pending", "published"] },
-        "integrity": { "type": "string", "pattern": "^sha512-[A-Za-z0-9+/]+=*$" },
-        "at": { "type": "string", "format": "date-time" }
+        "registry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "published"
+          ]
+        },
+        "integrity": {
+          "type": "string",
+          "pattern": "^sha512-[A-Za-z0-9+/]+=*$"
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "if": { "properties": { "state": { "const": "published" } } },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "published"
+          }
+        }
+      },
       "then": {
-        "required": ["registry", "version", "state", "integrity", "at"],
-        "properties": { "registry": { "type": "string", "minLength": 1 } }
+        "required": [
+          "registry",
+          "version",
+          "state",
+          "integrity",
+          "at"
+        ],
+        "properties": {
+          "registry": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
+    },
+    "family": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "The visual family this package realizes (@knowledge/grammars/<family>), when it realizes one. A release that names a family is a presentation release: what it repaired is observable on a rendered surface and nowhere else, which is what lets a consumer that has no spec exercising the family stamp prove its consume with an audit of that surface before and after instead of a runtime regression (dependency-plan#regression, kind audit). A release that names none is proved the ordinary way."
     }
   }
 }

@@ -455,3 +455,60 @@ one lawful bank of three missions drafted from an unchecked entry, a finding and
 a tier hint no unchecked entry backs, a queue that ignores its own dependency order, a bank that names
 another run, a run that wrote product source, a stop that still left a bank behind. Every fixture lives
 in a temporary host root, so no test reads or writes the machine's own `@worktrees/banked`.
+
+## What the three live nivo sessions cost, and the seven gates that answer them
+
+Three sessions on 2.1.2 and 2.1.3 — the AgentOS Setup journey proved and published, the workspace
+auto-recovery journey proved through the repository's own e2e suite, and the operations-history repair
+that closed its one finding — left seven defects of the tree rather than of the work
+(`tests/evidence/20260905-nivo-setup-uat-on-2.1.2.md`, `20260905-nivo-recovery-e2e-on-2.1.2.md`,
+`20260905-nivo-recovery-operations-fix-on-2.1.3.md`). Each is closed by a gate with a spec.
+
+`operators/library-update/self-test.mjs` carries the consume the Setup session could not write: a
+presentation release — one whose `library-release` names the family it realizes — consumed by a
+consumer that composes that family and calls none of it. Its before and after halves are two
+`interface.audit` branches of the same session rather than a spec written for the occasion, and
+`auditProofErrors` holds them to being two halves of one proof: both refs resolve inside the session,
+both judge the same claims by identifier, the family version each observed is the version its half
+stands for, the before half's claims fail routed to the family owner as a grammar gap, the after
+half's pass, and the after half measured the commit this branch committed. The mutations are the ways
+a pair can be two audits of different things — the wrong version, a gap that was never a gap, an
+app-side failure dressed as a family gap, a claim only one half judged, a release that repaired
+nothing, an after half on another head. A release that names no family is still proved by a consumer
+regression, and the plan gate says so.
+
+`operators/identity-provision/self-test.mjs` proves the flow's whole cast in one branch: the plan
+lists one account per alias and the published record publishes every one, under the username the plan
+asked for and no alias the plan never named. `scripts/identity-provision.spec.mjs` proves the runner
+half — two aliases created in order under one admin session and one plan hash, and a second alias that
+fails its product sign-in leaving the first standing, reported as a mutation and the run blocked.
+
+`scripts/browser-walk.spec.mjs` gains the fixture DOM of a refused sign-in: a password field, a field
+whose type is text and whose name says password, a value that is a prefix of another, and prose that
+merely contains the word. The DOM record and the accessibility snapshot are written with those values
+masked, so the state a refused sign-in exists to prove is capturable rather than refused whole — and
+the secret sweep still reads every byte of every file the run left.
+
+`scripts/validate-session.spec.mjs` proves the scope line the person reads: a mission that plans
+surfaces and then plans flows has two plans and one coverage, and the counts are both plans'. Reading
+them off the newest plan alone is what let an all-journey second plan erase eleven deferred surfaces
+from the line, while the ledger under `@worktrees/unchecked` still carried them; the check no longer
+hides behind a `budget.units` that may be absent.
+
+`operators/git-publish/self-test.mjs` proves the publish half of one law: the closed four-rule set the
+runtime owner resolves an integration merge under, shared as `scripts/merge-resolution.mjs` and not
+copied, now resolves the merge into the target branch too. A receipt records every resolved hunk with
+its file, its range in the merged result and the rule, records `MERGE_RESOLVED` and `MERGE_GATED`, and
+is refused for a rule nobody published, a range nobody can find again, one hunk resolved twice, a
+fast-forward that claims to have resolved anything, and the incoming session's side taken in a file
+its own `changes` receipt does not name.
+
+`scripts/bank.spec.mjs` runs a synthetic bank of three missions end to end: taken one at a time in the
+order the queue holds, the entry marked when the session opens and again when it ends, the third
+waiting for the first, and the queue hash untouched by any of it. A session that ended blocked leaves
+its entry `running`, which is how a mission that stopped for the person pauses the bank — and a done
+session over an entry still marked running is refused.
+
+`operators/interface-audit/self-test.mjs` closes the loop on the live hot-fix: an audit that names no
+`feature` has no ledger to address and never reaches the surface, and an inherited lens still carries
+no anchors of its own while a lens scored here still owes them.

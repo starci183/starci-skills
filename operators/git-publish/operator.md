@@ -62,9 +62,29 @@ The producer did not write on the person's checked-out branch. It wrote on the s
 committed its write set once. This operator merges that session branch into the target branch before
 it pushes. When the target has not moved since the session base, the merge is a fast-forward and
 nothing new is created. When the target has moved, a merge commit is allowed only under two
-conditions together: the merge produced no conflict, and the gates the verification named were re-run
-on the merge result and passed. A conflict is `NON_FAST_FORWARD`, it terminates, and a person
-resolves it; the operator never rebases, never forces, and never runs with hooks disabled.
+conditions together: every hunk the merge conflicted on was resolved by the rule set below, and the
+gates the verification named were re-run on the merge result and passed. The operator never rebases,
+never forces, and never runs with hooks disabled.
+
+## A conflict resolves by rule, or it stops
+
+A session branch is cut from a head and pushed onto a head that has moved, so the conflict this
+operator meets is usually not a disagreement about behaviour at all: a lint or format baseline
+reformatted the same lines a three-line fix touched, and both sides are right. Handing that to a
+person costs a mission and teaches nothing. So the same closed four-rule set the runtime owner
+resolves an integration merge under — stated once under *A conflict is resolved by the integrator, not
+escalated to a person* in `runtime.serve`, and shared as one module rather than copied
+(`scripts/merge-resolution.mjs`) — resolves this merge too, and under the same two conditions: every
+resolved hunk is recorded on the receipt, naming the file, the hunk's range in the merged result and
+which of the rules applied, and the gates the `quality-verification` named are re-run on the merged
+head before the push.
+
+A merge is resolved this way only when **every** conflicting hunk falls under a rule. One hunk that
+does not is `NON_FAST_FORWARD`, it terminates, and a person resolves it — the operator never resolves
+the rest and pushes the remainder, because a partial resolution publishes a merge nobody decided. The
+rule that takes the incoming session's side may only take it inside a file the session's own write set
+owns, which is why the `changes` input is what says which files those are. And resolving is not
+trusting: a red gate on the merged head stops the publish exactly as a red gate stops the serve.
 
 ## An unreceipted session branch is not publishable
 
@@ -169,10 +189,11 @@ publish without a verified route and an approval bound to this exact boundary.
 | 3 | Bind the approval to this exact boundary | `boundary`, `approval` | `request/request.json` requirements, input `changes` as the file set, input `quality-verification` as the measured commit | — | `APPROVAL_MISSING` |
 | 4 | Verify the tree: dirty outside the boundary, branch policy | — | @workspaces/local/routes/<project>/<role>, the dirty paths, every branch, the routed policy | — | `DIRTY_OUTSIDE_BOUNDARY`, `BRANCH_POLICY_VIOLATION` |
 | 5 | Run the hooks | — | @workspaces/<project>/<role>/husky: the installed hooks, `pre-push` among them | @tools/shell | `HOOK_BLOCKED` |
-| 6 | Bind the session's receipts, then merge the session branch into the target branch | — | the session folder: `state.json`, the `interface.generate`, `interface.fix`, `backend.generate` or `library.update` branch whose `commits` carry the session head, and the `interface.audit` and `uat.verify` branches with their `screenshot` artifacts when the chain has them; @workspaces/local/routes/<project>/<role> for the target head, the session base and the session head | @workspaces/local/routes/<project>/<role>, the target branch of that checkout, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
-| 7 | Push non-force, fast-forward only | — | @workspaces/local/routes/<project>/<role> for the approved head, @remote/git/<project>/<role> at the observed remote head, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
-| 8 | Push the continuation tag | `tag` | @workspaces/local/routes/<project>/<role> for the head this publication pushed | @remote/git/<project>/<role>, @tools/git | — |
-| 9 | Remove the worktree and the session branch, write the receipt and emit | — | everything above | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
+| 6 | Bind the session's receipts, then merge the session branch into the target branch, resolving each conflicting hunk under the shared rule set and recording it | — | the session folder: `state.json`, the `interface.generate`, `interface.fix`, `backend.generate` or `library.update` branch whose `commits` carry the session head, and the `interface.audit` and `uat.verify` branches with their `screenshot` artifacts when the chain has them; input `changes` for the files the session's write set owns; @workspaces/local/routes/<project>/<role> for the target head, the session base and the session head | @workspaces/local/routes/<project>/<role>, the target branch of that checkout, @tools/git | `SESSION_MISSING`, `NON_FAST_FORWARD` |
+| 7 | Re-run the gates the verification named on the merged head when the merge resolved a hunk | — | input `quality-verification` for the gates it ran, @workspaces/local/routes/<project>/<role> at the merged head, @tools/shell | @tools/shell | `NON_FAST_FORWARD` |
+| 8 | Push non-force, fast-forward only | — | @workspaces/local/routes/<project>/<role> for the approved head, @remote/git/<project>/<role> at the observed remote head, @tools/ci | @remote/git/<project>/<role>, @tools/git | `NON_FAST_FORWARD` |
+| 9 | Push the continuation tag | `tag` | @workspaces/local/routes/<project>/<role> for the head this publication pushed | @remote/git/<project>/<role>, @tools/git | — |
+| 10 | Remove the worktree and the session branch, write the receipt and emit | — | everything above | @workspaces/local/routes/<project>/<role>, `response/response.md`, `response/response.json`, @tools/git | — |
 
 Creating a remote ref and fast-forwarding one are different acts with different reviewers, so the
 published head records which of the two it performed. A resume begins again at validation, reuses

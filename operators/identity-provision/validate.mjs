@@ -34,6 +34,29 @@ export function operationClasses(kind, effects) {
 const UNAVAILABLE_CHECKS = new Set(['provider-reachable', 'credential-resolvable']);
 export const ROUTE_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+// One branch provisions a flow's whole cast. `request/identity-plan.json` is where that cast is
+// declared (resources/identity-plan.schema.json#accounts, whose alias is the key both sides join on)
+// and the published account record is what the branch left behind: the two must name the same aliases,
+// each with the username the plan asked for. A branch with no plan file on disk is a rotation or a
+// blocked run and this says nothing about it.
+export async function planCastErrors(branchDir, aliases, accountFile) {
+  const errors = [];
+  const planFile = path.join(branchDir, 'request', 'identity-plan.json');
+  if (!existsSync(planFile)) return errors;
+  let plan = null; try { plan = JSON.parse(await readFile(planFile, 'utf8')); } catch { return errors; }
+  const planned = Array.isArray(plan?.accounts) ? plan.accounts : null;
+  if (!planned) return errors;
+  const published = new Map(aliases);
+  for (const account of planned) {
+    const entry = published.get(account.alias);
+    if (!entry) { errors.push(`${accountFile}: the plan provisions ${account.alias} and the record publishes no such alias; one branch provisions every alias the flow names`); continue; }
+    if (entry.username !== account.username) errors.push(`${accountFile}: ${account.alias} is ${entry.username} here and ${account.username} in the plan`);
+  }
+  const names = new Set(planned.map((account) => account.alias));
+  for (const [alias] of aliases) if (!names.has(alias)) errors.push(`${accountFile}: ${alias} is published as provisioned here and the plan does not name it`);
+  return errors;
+}
+
 // A credential is resolved for use, never written down. Fingerprints and commit heads are legitimate
 // long hex, so they are scrubbed before the unbroken-run heuristic runs.
 export function credentialLeak(value) {
@@ -206,6 +229,10 @@ export async function validateIdentityStep(branchDir, root = ROOT, { hostRoot = 
         if (!empty(requirements.env) && account.env !== requirements.env) errors.push(`${accountFile}: the record belongs to environment ${account.env}, not to ${requirements.env}; an account of one environment is not an account in another`);
         const aliases = Object.entries(account.accounts ?? {});
         if (!aliases.length) errors.push(`${accountFile}: a flow names its actors by alias and this record carries none`);
+        // The plan is the branch's whole cast, and the record is what it left: a plan that lists N
+        // aliases and a record that publishes fewer is a flow whose other actors nobody created and
+        // no second branch is coming for (resources/identity-plan.schema.json#accounts).
+        errors.push(...await planCastErrors(branchDir, aliases, accountFile));
         for (const [alias, entry] of aliases) {
           if (provisioned && entry.provisionedBy === null) errors.push(`${accountFile}: this run created ${alias}, so the record names the run that provisioned it`);
           if (account.env && !String(entry.sealed).startsWith(`.stacks/${account.env}/`)) errors.push(`${accountFile}: ${alias} is sealed in another environment than ${account.env}; an account of one environment is not an account in another`);

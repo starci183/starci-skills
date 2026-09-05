@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, unlinkSync 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateAgainst } from '../../scripts/json-schema.mjs';
-import { ROOT, schema, planErrors, consumerPlanErrors, metadataErrors, safeRelative, safePath, nextPatch, hash, integrityOf, git, loadContext, worktreeErrors, proofErrors, consumerProofErrors, resolveCommand, consumerCommand, snapshots, consumerSnapshots, regressionFailed, proofEnvironment, consumerPhase, releaseRef, releaseFileName, baseWorkingBytes, modeSectionErrors, bindRelease, publicationErrors, publishStopErrors, publishRequested, publishFieldErrors, PUBLISH_STOP, validateLibraryUpdateStep } from './validate.mjs';
+import { ROOT, schema, planErrors, consumerPlanErrors, metadataErrors, safeRelative, safePath, nextPatch, hash, integrityOf, git, loadContext, worktreeErrors, proofErrors, consumerProofErrors, resolveCommand, consumerCommand, snapshots, consumerSnapshots, regressionFailed, proofEnvironment, consumerPhase, releaseRef, releaseFileName, baseWorkingBytes, modeSectionErrors, bindRelease, consumerPhases, auditProofErrors, isAuditRegression, publicationErrors, publishStopErrors, publishRequested, publishFieldErrors, PUBLISH_STOP, validateLibraryUpdateStep } from './validate.mjs';
 import { installInvocation } from './install.mjs';
 import { sourceWriteErrors } from '../../scripts/workspace-checkout.mjs';
 
@@ -277,7 +277,7 @@ try {
   assert.equal(consumeCtx.mode, 'consume');
   assert.equal(consumeCtx.packageDir, null);
   assert.equal(consumeCtx.planHash, null);
-  assert.deepEqual(consumeCtx.plan, { packageName: plan.packageName, baseVersion: plan.baseVersion, targetVersion: plan.targetVersion });
+  assert.deepEqual(consumeCtx.plan, { packageName: plan.packageName, baseVersion: plan.baseVersion, targetVersion: plan.targetVersion, family: null });
   bindRelease(consumeCtx);
   assert.equal(consumeCtx.packageCommit, base);
   assert.equal(consumeCtx.release.integrity, releaseRecord.digest);
@@ -369,3 +369,72 @@ try {
 }
 process.stdout.write('library.update self-test: package boundary, session binding, package and consumer proof mutations passed\n');
 process.stdout.write('library.update self-test: publish and consume bind one half each, cross-mode sections and inputs are refused, a published release is consumed like a pending one, a refused publication validates only with the registry\'s answer, and a blocked branch whose plan cannot resolve validates\n');
+
+// ---------------------------------------------------------------------------------------------------
+// A presentation release consumed with no consumer spec of its own. The shape is the one a real session
+// met: a `consume` branch at step 3, parallel 2, of a family release the consumer composes and calls
+// nowhere, with the before half an audit of the served head at the installed version and the after half
+// an audit of the head this branch bumped. The consumer plan carries no regression file, and the two
+// halves are branch refs the validator resolves inside the session.
+{
+  const family = 'core';
+  const CLAIMS = ['OVERFLOW-3', 'PADDING-4'];
+  const auditConsumer = { manifests: ['apps/app/package.json'], lockfile: 'package-lock.json', regression: { kind: 'audit', claims: CLAIMS, before: 'step-3/parallel-1', after: 'step-5/parallel-1' }, gates: [{ id: 'build', command: command('build') }, { id: 'test', command: command('test') }] };
+  assert.deepEqual(validateAgainst(schema(ROOT, 'dependency-plan'), auditConsumer), [], 'an audit authority is a lawful consumer plan');
+
+  // The plan gate: lawful only for a release that names a family, and only across two branches.
+  const presentation = { packageName: '@example/library', baseVersion: '1.2.3', targetVersion: '1.2.4', family };
+  const plain = { ...presentation, family: null };
+  assert.deepEqual(consumerPlanErrors(auditConsumer, presentation, rootManifest, lookups), []);
+  assert.ok(consumerPlanErrors(auditConsumer, plain, rootManifest, lookups).some((e) => e.includes('names no family')), 'an audit authority over a package a consumer can call');
+  assert.ok(consumerPlanErrors({ ...auditConsumer, regression: { ...auditConsumer.regression, after: 'step-3/parallel-1' } }, presentation, rootManifest, lookups).some((e) => e.includes('one branch cannot have measured both versions')), 'both halves on one branch');
+  // The proof phases: two audits are the before and after, so this branch runs only its gates.
+  assert.deepEqual(consumerPhases(auditConsumer), ['consumer-build', 'consumer-test']);
+  assert.deepEqual(consumerPhases(consumer), ['consumer-before', 'consumer-after', ...consumer.gates.map((g) => `consumer-${g.id}`)]);
+
+  // The two halves on disk: the verdicts each carries and the served surface each measured.
+  const session = mkdtempSync(path.join(tmpdir(), 'library-audit-'));
+  const CONSUMER_COMMIT = 'c'.repeat(40);
+  const auditBranch = (ref, { version, verdict, routeTo = 'grammar-gap', applied = 'a'.repeat(40), claims = CLAIMS }) => {
+    const dir = path.join(session, ...ref.split('/'));
+    mkdirSync(path.join(dir, 'response', 'data'), { recursive: true });
+    writeFileSync(path.join(dir, 'response', 'data', 'verdicts.json'), JSON.stringify({
+      entries: [{ matrixId: 'control-centre', surfaceClass: 'console', results: claims.map((rule) => ({ path: 'SurfaceCard', owner: 'grammar', rule, measured: 'the family shell clips its own overflow', verdict, routeTo })) }],
+    }));
+    writeFileSync(path.join(dir, 'response', 'response.md'), [
+      '# frontend-surface-audit — control-centre', '', '## Served surface', '', '| Field | Value |', '| --- | --- |',
+      `| Applied commit | \`${applied}\` |`, '| Served branch | `uat` |', `| Served head | \`${'d'.repeat(40)}\` |`,
+      '| Contains applied commit | yes |', '| Browser profile | `session` |',
+      `| Family version observed | ${version} |`, `| Family version resolved against | ${version} |`, '',
+    ].join('\n'));
+    return dir;
+  };
+  const ctx = { root: ROOT, session, plan: presentation, consumer: auditConsumer, consumerCommit: CONSUMER_COMMIT };
+  try {
+    auditBranch('step-3/parallel-1', { version: '1.2.3', verdict: 'fail' });
+    auditBranch('step-5/parallel-1', { version: '1.2.4', verdict: 'pass', routeTo: 'none', applied: CONSUMER_COMMIT });
+    assert.deepEqual(auditProofErrors(ctx), [], 'the claims fail at the installed version and pass at the bumped one');
+
+    // A before half at the wrong version proves nothing about this consume.
+    auditBranch('step-3/parallel-1', { version: '1.2.2', verdict: 'fail' });
+    assert.ok(auditProofErrors(ctx).some((e) => e.includes('observed family version 1.2.2')), 'a before half measured at another version');
+    // A before half whose claims already passed repaired nothing here.
+    auditBranch('step-3/parallel-1', { version: '1.2.3', verdict: 'pass', routeTo: 'none' });
+    assert.ok(auditProofErrors(ctx).some((e) => e.includes('passes on the before audit')), 'a gap that was never a gap');
+    // A failing claim the delivery owns is not a reason to consume a release.
+    auditBranch('step-3/parallel-1', { version: '1.2.3', verdict: 'fail', routeTo: 'resolve' });
+    assert.ok(auditProofErrors(ctx).some((e) => e.includes('not routed to the family owner')), 'an app-side failure dressed as a family gap');
+    // The halves must judge the same claims.
+    auditBranch('step-3/parallel-1', { version: '1.2.3', verdict: 'fail', claims: ['OVERFLOW-3'] });
+    assert.ok(auditProofErrors(ctx).some((e) => e.includes('carries no family-owned result for PADDING-4')), 'a claim only one half judged');
+    // The after half must still be passing, and must be the commit this branch made.
+    auditBranch('step-3/parallel-1', { version: '1.2.3', verdict: 'fail' });
+    auditBranch('step-5/parallel-1', { version: '1.2.4', verdict: 'fail', applied: CONSUMER_COMMIT });
+    assert.ok(auditProofErrors(ctx).some((e) => e.includes('still fails on the after audit')), 'a release that repaired nothing');
+    auditBranch('step-5/parallel-1', { version: '1.2.4', verdict: 'pass', routeTo: 'none', applied: 'e'.repeat(40) });
+    assert.ok(auditProofErrors(ctx).some((e) => e.includes('the after half is the bumped head')), 'an after half measured on another head');
+    // A half that is not there at all.
+    assert.ok(auditProofErrors({ ...ctx, consumer: { ...auditConsumer, regression: { ...auditConsumer.regression, before: 'step-9/parallel-9' } } }).some((e) => e.includes('has no verdicts to read')), 'a half nobody wrote');
+  } finally { rmSync(session, { recursive: true, force: true }); }
+}
+process.stdout.write('library.update self-test: a presentation release consumes on two audits of the surface it repairs, and the halves are held to the same claims, the two versions and the bumped head\n');

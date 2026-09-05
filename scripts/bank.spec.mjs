@@ -155,3 +155,59 @@ test('enqueue, reorder and drop refuse what they cannot mean', () => {
   assert.throws(() => markDone(BASE, 'zz', 's-1'), /is not banked/);
   assert.equal(enqueue(BASE, { missionId: 'd' }, { at: 0 }).entries[0].missionId, 'd');
 });
+
+// The bank actually run: three missions, taken one at a time in the order the queue holds, with the
+// entry marked when the session opens and again when it ends. `next` is what the orchestrator takes
+// from, `markRunning`/`markDone` are what it writes back, and the session gate is what refuses a queue
+// that reads the opposite of what happened.
+test('three banked missions run in order, and one that stops for the person pauses the bank', async () => {
+  const hostRoot = mkdtempSync(path.join(tmpdir(), 'bank-run-'));
+  const dir = path.join(hostRoot, '.worktrees', 'banked', PRODUCT);
+  mkdirSync(dir, { recursive: true });
+  for (const id of ['a', 'b', 'c']) {
+    mkdirSync(path.join(dir, id), { recursive: true });
+    writeFileSync(path.join(dir, id, 'mission.json'), JSON.stringify(mission(id)));
+    writeFileSync(path.join(dir, id, 'mission.md'), `# Do ${id}\n`);
+  }
+  let q = BASE;
+  const write = () => writeFileSync(path.join(dir, 'queue.json'), JSON.stringify(q));
+  write();
+  const hash = (await readBank(hostRoot, PRODUCT)).hash;
+  const choice = approvalId(PRODUCT, 1);
+  writeFileSync(path.join(dir, 'approvals.json'), JSON.stringify({ schemaVersion: 9, product: PRODUCT, approvals: [{ choice, who: 'the owner', at: '2026-09-05T10:00:00Z', queueHash: hash, missionIds: ['a', 'b', 'c'] }] }));
+  const opened = (missionId, sessionId, status) => {
+    const draft = mission(missionId).goalDraft;
+    return { id: sessionId, status, choices: { [`goal:${sessionId}:v1`]: { selected: 'as-stated', selectedBy: 'user', sourceRef: `@worktrees/banked/${PRODUCT}/approvals.json#${choice}` } }, mission: { version: 1, language: draft.language, goal: draft.goal, includes: draft.includes, excludes: draft.excludes, doneWhen: draft.doneWhen, sourceRef: 'the bank', bankRef: { product: PRODUCT, missionId, approval: choice } } };
+  };
+  const taken = [];
+
+  // Mission 1: taken, opened, ended done.
+  let pick = next(q);
+  assert.equal(pick.missionId, 'a');
+  taken.push(pick.missionId);
+  q = markRunning(q, 'a', 's-1'); write();
+  assert.deepEqual(await bankRefErrors(opened('a', 's-1', 'running'), { hostRoot }), []);
+  assert.equal(next(q), null, 'nothing is taken while a sibling of the same product is running');
+  assert.ok((await bankRefErrors(opened('a', 's-1', 'done'), { hostRoot })).some((e) => e.includes('stays running and pauses the bank')), 'a done session over an entry still marked running');
+  q = markDone(q, 'a', 's-1'); write();
+  assert.deepEqual(await bankRefErrors(opened('a', 's-1', 'done'), { hostRoot }), []);
+  assert.equal(queueHash(q, (await readBank(hostRoot, PRODUCT)).digests), hash, 'running and finishing left the approval alone');
+
+  // Mission 2: taken next, and it stops for the person. The entry stays running, so nothing else opens.
+  pick = next(q);
+  assert.equal(pick.missionId, 'b');
+  taken.push(pick.missionId);
+  q = markRunning(q, 'b', 's-2'); write();
+  assert.deepEqual(await bankRefErrors(opened('b', 's-2', 'blocked'), { hostRoot }), [], 'a session that stopped for the person leaves its entry running');
+  assert.ok((await bankRefErrors({ ...opened('b', 's-2', 'blocked'), id: 's-2' }, { hostRoot: hostRoot })).length === 0);
+  assert.equal(next(q), null, 'the bank is paused while the blocked mission holds its entry');
+  q = markDone(markDone(q, 'b', 's-2'), 'a', 's-1'); write();
+
+  // Mission 3 waited for mission 1 and is taken only now.
+  pick = next(q);
+  assert.equal(pick.missionId, 'c');
+  taken.push(pick.missionId);
+  assert.deepEqual(taken, ['a', 'b', 'c']);
+  assert.deepEqual((await validateBank(hostRoot, PRODUCT)).errors, []);
+  rmSync(hostRoot, { recursive: true, force: true });
+});

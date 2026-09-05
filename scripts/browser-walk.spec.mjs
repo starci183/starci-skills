@@ -11,7 +11,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { walkErrors, sweepWalkText, sweepWalkRun, sweepFindingErrors, originOf, stepControl, stepOwnControl, controlOfStep, citedMeasurement, loadMeasurementsSchema, validateWalkFile, walkFingerprint, walkFiles, SECRET_FIELD, AGENT_CODE } from './validate-walk.mjs';
 import { validateAgainst } from './json-schema.mjs';
-import { playwrightInstallOf, playwrightInstallStatus, missingInstallMessage, loadPlaywright, runWalk, CHECK_ID } from './browser-walk.mjs';
+import { playwrightInstallOf, playwrightInstallStatus, missingInstallMessage, loadPlaywright, runWalk, maskPasswordInputs, maskPasswordValues, isPasswordField, MASK, CHECK_ID } from './browser-walk.mjs';
 import { hostRootOf } from './validate-request.mjs';
 import { start } from './host-artifacts.mjs';
 
@@ -167,6 +167,40 @@ test('a run beside its walk: the result hashes the walk, and every text the run 
     writeFileSync(under(files.walk), JSON.stringify({ ...w, flow: 'edited' }, null, 2));
     assert.ok(validateWalkFile(under(files.walk), response, { root }).errors.some((e) => e.includes('a walk edited after its run')));
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// A refused sign-in is a state a walk must be able to capture, and the form still holds the value that
+// was typed into it when the refusal renders. The fixture DOM below is that form: a password field, a
+// field whose type is text but whose name says password, an unrelated field that must survive
+// untouched, and a value that is a prefix of another so the order of replacement matters.
+test('a password field is masked in the DOM record and the accessibility snapshot, and nothing else is', () => {
+  const fixture = [
+    '<!doctype html><html><body><form>',
+    '<input type="text" name="email" value="learner@example.test">',
+    '<input type="password" name="password" value="hunter2-hunter2">',
+    '<input type="text" name="confirm_password" autocomplete="new-password" value="hunter2">',
+    '<input id="pwd-hint" type="text">',
+    '<input type="checkbox" name="remember" checked/>',
+    '</form><p class="password-hint">Use a strong password</p></body></html>',
+  ].join('');
+  const masked = maskPasswordInputs(fixture);
+  assert.ok(!masked.includes('hunter2'), 'no password value survives in the DOM record');
+  assert.ok(masked.includes('value="learner@example.test"'), 'a field that is not a password field is left alone');
+  assert.ok(masked.includes('Use a strong password'), 'prose that merely says the word is not a field');
+  assert.equal((masked.match(/value="\*\*\*"/g) ?? []).length, 3, 'both password fields and the value-less one read as the mask');
+  assert.ok(/<input id="pwd-hint" type="text" value="\*\*\*">/.test(masked), 'a field with no value attribute gains the mask rather than keeping nothing');
+  assert.ok(masked.includes('<input type="checkbox" name="remember" checked/>'), 'a self-closing tag outside the set is untouched');
+
+  const snapshot = '- textbox "Email": learner@example.test\n- textbox "Password": hunter2-hunter2\n- textbox "Confirm": hunter2\n- alert "Sai mật khẩu"';
+  const swept = maskPasswordValues(snapshot, ['hunter2', 'hunter2-hunter2']);
+  assert.ok(!swept.includes('hunter2'), 'the snapshot carries no typed password, longest value replaced first');
+  assert.ok(swept.includes('learner@example.test') && swept.includes('Sai mật khẩu'), 'the refusal the capture exists to prove is still readable');
+  assert.equal(swept.split(MASK).length - 1, 2);
+
+  assert.equal(isPasswordField({ type: 'PASSWORD' }), true);
+  assert.equal(isPasswordField({ type: 'text', autocomplete: 'current-password' }), true);
+  assert.equal(isPasswordField({ type: 'text', name: 'passwordless-token' }), false, 'a longer word that merely contains it is not a password field');
+  assert.equal(isPasswordField({ type: 'email', name: 'email' }), false);
 });
 
 test('the host install is read from the tool registry, and its absence has one wording', () => {

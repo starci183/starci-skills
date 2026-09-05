@@ -28,7 +28,7 @@ import { extractFindings, readLedger, LEDGER_DIR, LEDGER_OPERATORS } from './rec
 import { extractUnchecked, UNCHECKED_OPERATORS } from './record-unchecked.mjs';
 import { budgetUnitsOf, hostRootOf, loadUnits } from './validate-request.mjs';
 import { readUnchecked } from './unchecked.mjs';
-import { readBank, currentApproval, sessionOf, canonical } from './bank.mjs';
+import { readBank, currentApproval, sessionOf, isDone, canonical } from './bank.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const STATE_SCHEMA = path.join('templates', 'step', 'state.schema.json');
@@ -192,28 +192,48 @@ export async function uncheckedLedgerErrors(root, session, state, { hostRoot = h
 // how many units the latest plan produced that a verifying lane will actually be dispatched over —
 // the journey units — so a mission that defers half its surfaces does not also carry the budget for
 // verifying them (resources/orchestrator.json#budget, scripts/validate-request.mjs#effectiveBudget).
-export async function unitBudgetErrors(root, session, state) {
-  const errors = [];
-  if (state?.budget?.units === undefined) return errors;
-  let latest = null;
+export async function plannedUnits(root, session, state) {
+  const out = [];
   for (const branch of Object.keys(state?.steps ?? {}).sort(byChainOrder)) {
     const file = path.join(branchDir(session, branch), 'response', 'data', 'units.json');
     if (!existsSync(file)) continue;
     const response = await readJson(path.join(branchDir(session, branch), 'response', 'response.json'));
     if (response?.status !== 'done') continue;
-    latest = { branch, file };
+    const { units } = await loadUnits(root, file, file);
+    if (units) out.push({ branch, at: `step-${branch.replace('/', '/parallel-')}`, units });
   }
+  return out;
+}
+
+export async function unitBudgetErrors(root, session, state) {
+  const errors = [];
+  if (state?.budget?.units === undefined) return errors;
+  const plans = await plannedUnits(root, session, state);
+  const latest = plans[plans.length - 1];
   if (!latest) return errors;
-  const { units } = await loadUnits(root, latest.file, latest.file);
-  if (!units) return errors;
-  const expected = budgetUnitsOf(units);
-  if (state.budget.units !== expected) errors.push(`state.json: budget.units is ${state.budget.units} and the plan of step-${latest.branch.replace('/', '/parallel-')} carries ${expected} journey unit(s) of ${units.units.length}; the step cap grows per unit a lane is dispatched over, and a deferred unit is unchecked rather than a branch`);
-  // The scope line of the goal block, once a plan has said how far the verification reaches.
-  const scope = state.mission?.scope;
-  if (scope && (scope.journey !== expected || scope.deferred !== units.units.length - expected)) {
-    errors.push(`state.json: mission.scope says ${scope.journey} journey and ${scope.deferred} deferred, and the plan of step-${latest.branch.replace('/', '/parallel-')} carries ${expected} and ${units.units.length - expected}; the scope line the person read is the plan's own count, not a second one`);
-  }
+  const expected = budgetUnitsOf(latest.units);
+  if (state.budget.units !== expected) errors.push(`state.json: budget.units is ${state.budget.units} and the plan of ${latest.at} carries ${expected} journey unit(s) of ${latest.units.units.length}; the step cap grows per unit a lane is dispatched over, and a deferred unit is unchecked rather than a branch`);
   return errors;
+}
+
+// The scope line of the goal block: how far this mission's verification reaches, over every plan the
+// mission landed and not only the newest one. A mission that plans surfaces and then plans flows has
+// two plans and one coverage, and the person read one line: taking the count off the latest plan alone
+// lets a second plan whose units are all journey erase the first plan's deferrals from the line the
+// person was shown, while the ledger under @worktrees/unchecked still carries them. The counts are the
+// plans' own — journey is what a verifying lane is dispatched over (scripts/unchecked.mjs#VERIFY_LANES,
+// budgetUnitsOf), deferred is every unit the plans tiered secondary — so the line is never a second
+// count somebody wrote by hand.
+export async function missionScopeErrors(root, session, state) {
+  const scope = state?.mission?.scope;
+  if (!scope) return [];
+  const plans = await plannedUnits(root, session, state);
+  if (!plans.length) return [`state.json: mission.scope says ${scope.journey} journey and ${scope.deferred} unchecked, and no plan of this session has landed a units.json; the scope line is filled from a plan's own counts and is absent before one`];
+  let journey = 0, total = 0;
+  for (const plan of plans) { journey += budgetUnitsOf(plan.units); total += plan.units.units.length; }
+  const deferred = total - journey;
+  if (scope.journey === journey && scope.deferred === deferred) return [];
+  return [`state.json: mission.scope says ${scope.journey} journey and ${scope.deferred} unchecked, and the plans of this session (${plans.map((p) => p.at).join(', ')}) carry ${journey} and ${deferred}; the scope line the person read is every landed plan's own count, not the newest plan's alone`];
 }
 
 // A mission opened from an approved bank (@worktrees/banked/<product>, scripts/bank.mjs): the person
@@ -237,6 +257,18 @@ export async function bankRefErrors(state, { hostRoot = hostRootOf(process.cwd()
   if (!entry) return [`state.json: mission.bankRef names ${missionId}, which ${at}/queue.json does not list`];
   if (entry.status === 'dropped') errors.push(`state.json: mission.bankRef names ${missionId}, which the bank dropped; a dropped mission is not taken`);
   else if (sessionOf(entry) !== state.id) errors.push(`state.json: ${at}/queue.json has ${missionId} at status ${entry.status} and this session is ${state.id}; the bank entry names the session that took it, and one mission of a product runs at a time`);
+  // The queue is what the next mission is taken from, so it says where this one got to. The
+  // orchestrator marks the entry `running:<sessionId>` when it opens the session and `done:<sessionId>`
+  // when the session ends done (resources/orchestrator.json#helpers.bank), and nothing else moves it:
+  // a session that ended blocked or stopped leaves the entry `running`, which is how a mission that
+  // stopped for the person pauses the bank rather than letting the next one open behind its back
+  // (scripts/bank.mjs#next). An entry left `running` under a done session, or marked `done` under a
+  // session that stopped, is a queue that reads the opposite of what happened.
+  else {
+    const wanted = state.status === 'done' ? 'done' : 'running';
+    const got = isDone(entry) ? 'done' : 'running';
+    if (got !== wanted) errors.push(`state.json: ${at}/queue.json has ${missionId} at ${entry.status} and this session is ${state.status}; the entry is marked running when the session opens and done only when the session ends done, so a mission that stopped for the person stays running and pauses the bank`);
+  }
   const banked = bank.missions.get(missionId);
   if (!banked) errors.push(`${at}/${missionId}/mission.json: missing, and the session says it opened from it`);
   else {
@@ -286,6 +318,7 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   // the fan-out budget counts the journey the mission actually verifies.
   errors.push(...await uncheckedLedgerErrors(root, session, state, uncheckedRoot ? { hostRoot: uncheckedRoot } : {}));
   errors.push(...await unitBudgetErrors(root, session, state));
+  errors.push(...await missionScopeErrors(root, session, state));
   // A mission opened from an approved bank names an entry that is there, is its own, and is still covered.
   errors.push(...await bankRefErrors(state, { hostRoot: uncheckedRoot ?? hostRootOf(root) }));
   if (state.brief?.report) {

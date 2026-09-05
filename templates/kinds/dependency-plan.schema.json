@@ -1,1 +1,148 @@
-{"$id":"kind:dependency-plan","description":"The consumer half of library.update: which consumer manifests and lockfile pin the owner package, the unchanged consumer regression, and the complete delivery gates. The package identity and the versions come from the library-behavior-plan beside it, and the release from the tarball the run packs.","type":"object","additionalProperties":false,"required":["manifests","lockfile","regression","gates"],"properties":{"manifests":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string"}},"lockfile":{"const":"package-lock.json"},"regression":{"type":"object","additionalProperties":false,"required":["file","assertion","command"],"properties":{"file":{"type":"string"},"assertion":{"type":"string","minLength":8},"command":{"$ref":"#/$defs/command"}}},"gates":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["id","command"],"properties":{"id":{"type":"string","pattern":"^[a-z][a-z-]*$"},"command":{"$ref":"#/$defs/command"}}}}},"$defs":{"command":{"type":"object","additionalProperties":false,"required":["kind","name","args"],"properties":{"kind":{"enum":["npm-script","package-bin"]},"name":{"type":"string","pattern":"^[a-z][a-z0-9:-]*$"},"args":{"type":"array","items":{"type":"string"}}}}}}
+{
+  "$id": "kind:dependency-plan",
+  "description": "The consumer half of library.update: which consumer manifests and lockfile pin the owner package, the unchanged consumer regression, and the complete delivery gates. The package identity and the versions come from the library-behavior-plan beside it, and the release from the tarball the run packs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifests",
+    "lockfile",
+    "regression",
+    "gates"
+  ],
+  "properties": {
+    "manifests": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "lockfile": {
+      "const": "package-lock.json"
+    },
+    "regression": {
+      "description": "What proves the consume: a consumer regression that fails before and passes after, or, for a presentation release the consumer exercises through no spec, the two audits of the surface that carry the same verdict (kind audit).",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/specRegression"
+        },
+        {
+          "$ref": "#/$defs/auditRegression"
+        }
+      ]
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "command"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z-]*$"
+          },
+          "command": {
+            "$ref": "#/$defs/command"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name",
+        "args"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "npm-script",
+            "package-bin"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9:-]*$"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "specRegression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "assertion",
+        "command"
+      ],
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "assertion": {
+          "type": "string",
+          "minLength": 8
+        },
+        "command": {
+          "$ref": "#/$defs/command"
+        },
+        "kind": {
+          "const": "spec"
+        }
+      },
+      "description": "A consumer test that exists at the base, fails against the installed version and passes against the release: the ordinary proof, and the only one for a package whose behaviour a consumer can call."
+    },
+    "auditRegression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "claims",
+        "before",
+        "after"
+      ],
+      "description": "The before-and-after authority of a presentation release the consumer exercises through no spec of its own: two interface.audit branches of this session, the first at the served head the consumer still runs and the second at the head this branch bumped, and the family-owned claims that fail on the first and pass on the second. It is lawful only where the bound library-release names a family, because only there is the repaired behaviour unreachable except by rendering it.",
+      "properties": {
+        "kind": {
+          "const": "audit"
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "description": "The rule identifiers of the family-owned claims the release repairs: each one fails on the before-audit, routed to the family owner as a grammar gap, and passes on the after-audit.",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9-]*-[0-9]+$"
+          }
+        },
+        "before": {
+          "type": "string",
+          "pattern": "^step-[0-9]+/parallel-[0-9]+$",
+          "description": "The interface.audit branch of this session that measured the surface at the installed version."
+        },
+        "after": {
+          "type": "string",
+          "pattern": "^step-[0-9]+/parallel-[0-9]+$",
+          "description": "The interface.audit branch of this session that measured the same surface at the version this branch bumped to."
+        }
+      }
+    }
+  }
+}

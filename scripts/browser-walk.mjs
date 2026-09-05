@@ -27,6 +27,15 @@
 // The ledger labels each step with the control the step itself named (validate-walk#stepOwnControl):
 // its own target, the entry route for the goto, null for a capture, a wait or a url-only expectation —
 // never the previous step's target, so a failed targetless step is not read as a failure of a button.
+//
+// A password field is masked before a record is written, never after. A sign-in form still holds the
+// value that was typed into it when the refusal renders, so a page record taken there carries the
+// credential and the whole capture is refused — which loses exactly the state a refused sign-in is
+// there to prove. Every password field's value is therefore replaced by MASK in the DOM record and in
+// the accessibility snapshot as they are written: a field is one whose type is password, or whose
+// name, id or autocomplete says so (PASSWORD_FIELD). The masking replaces a value, never a check: the
+// secret sweep still reads every byte of every file this runner leaves, so a credential that reaches a
+// record any other way is still OUTPUT_SECRET_DETECTED.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -105,6 +114,51 @@ function refuseLeak(text, secrets, what) {
   return text;
 }
 const locatorOf = (page, target) => { let l = page.getByRole(target.role, { name: target.name, exact: target.exact ?? false }); if (target.nth !== undefined) l = l.nth(target.nth); return l; };
+
+// --- password masking, the one home ----------------------------------------------------------------
+// What makes an input a password field, in the one place that decides it: the type says so, or the
+// name, id or autocomplete does. `MASK` is what its value reads as everywhere a record is written.
+export const MASK = '***';
+export const PASSWORD_FIELD = /(?:^|[^a-z])(?:password|passwd|pwd|passphrase)(?:[^a-z]|$)/i;
+export const isPasswordField = ({ type = '', name = '', id = '', autocomplete = '' } = {}) =>
+  String(type).toLowerCase() === 'password' || [name, id, autocomplete].some((value) => PASSWORD_FIELD.test(String(value ?? '')));
+
+// The DOM record: every password field's `value` attribute reads as the mask. Serialized HTML is what
+// is rewritten, so the live page is never touched and no step after the capture sees a changed field.
+export function maskPasswordInputs(html, mask = MASK) {
+  return String(html ?? '').replace(/<input\b[^>]*>/gi, (tag) => {
+    const attribute = (name) => { const m = new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i').exec(tag); return m ? (m[2] ?? m[3] ?? m[4] ?? '') : ''; };
+    if (!isPasswordField({ type: attribute('type'), name: attribute('name'), id: attribute('id'), autocomplete: attribute('autocomplete') })) return tag;
+    return /\bvalue\s*=/i.test(tag)
+      ? tag.replace(/\bvalue\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/i, `value="${mask}"`)
+      : tag.replace(/\s*(\/?)>$/, ` value="${mask}"$1>`);
+  });
+}
+
+// The accessibility snapshot renders a textbox's value as text, so there is no attribute to rewrite:
+// the values the page-side reader collected are what is replaced, longest first so one field's value
+// being a prefix of another's cannot leave half of it behind.
+export function maskPasswordValues(text, values = [], mask = MASK) {
+  let out = String(text ?? '');
+  for (const value of [...new Set(values)].filter(Boolean).sort((a, b) => b.length - a.length)) out = out.split(value).join(mask);
+  return out;
+}
+
+// Runs inside the page at every capture: the value each password field currently holds, which is what
+// the snapshot has to be swept of. It returns values and never a field's identity, so nothing here
+// becomes a second description of what a password field is — `PASSWORD_FIELD` is passed in as source.
+export function readPasswordValues({ pattern }) {
+  const re = new RegExp(pattern, 'i');
+  const out = [];
+  for (const el of document.querySelectorAll('input')) {
+    const type = String(el.getAttribute('type') || '').toLowerCase();
+    const named = [el.getAttribute('name'), el.getAttribute('id'), el.getAttribute('autocomplete')].some((v) => v && re.test(String(v)));
+    if (type !== 'password' && !named) continue;
+    const value = typeof el.value === 'string' ? el.value : '';
+    if (value) out.push(value);
+  }
+  return out;
+}
 
 // Runs inside the page, once per capture, serialized by Playwright: it may reference nothing from this
 // module and loads no library. It returns the `elements` of a capture-measurements record — one entry
@@ -282,7 +336,10 @@ export async function runWalk(walkFile, responseDir, { hostRoot = hostRootOf(ROO
     await page.screenshot({ path: shot, fullPage, mask: maskTargets.map((t) => locatorOf(page, t)) });
     let ax;
     try { ax = await page.locator('body').ariaSnapshot(); } catch { ax = JSON.stringify(await page.accessibility.snapshot(), null, 2); }
-    const dom = JSON.stringify({ url: page.url(), title: await page.title(), html: await page.content() }, null, 2);
+    // What the password fields hold right now, so the record can be written masked rather than refused.
+    const typed = await page.evaluate(readPasswordValues, { pattern: PASSWORD_FIELD.source });
+    ax = maskPasswordValues(ax, typed);
+    const dom = JSON.stringify({ url: page.url(), title: await page.title(), html: maskPasswordValues(maskPasswordInputs(await page.content()), typed) }, null, 2);
     // The measurement, in one evaluation of the page-side function above; the cap is the kind's own.
     const elements = await page.evaluate(measurePage, { cap: measureCap });
     const measurements = JSON.stringify({ schemaVersion: 9, capture: name, viewport: [walk.entry.viewport.width, walk.entry.viewport.height], deviceScaleFactor: walk.entry.viewport.deviceScaleFactor, colorScheme: walk.entry.colorScheme, elements }, null, 2);

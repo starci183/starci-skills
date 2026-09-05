@@ -16,6 +16,7 @@ import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { hostRootOf, missingStack } from '../../scripts/validate-request.mjs';
 import { platformAuthorityErrors } from '../../scripts/platform-authority.mjs';
+import { resolutionErrors } from '../../scripts/merge-resolution.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const OPERATOR = 'runtime.serve';
@@ -167,6 +168,9 @@ export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, 
       if (m.kind === 'session' && !gateFailed && !ladder.contains.includes(m.commit)) say(`commit ${m.commit} was merged and is absent from contains, so no consumer can prove its work is served`);
       if (m.kind === 'session' && gateFailed && ladder.contains.includes(m.commit)) say(`commit ${m.commit} failed its delivery gate and the server never restarted on it, so it cannot appear in the served head's contains`);
       if (m.kind !== 'session' && m.resolutions.length) say(`the ${m.kind} merge of ${m.ref} records resolutions; only the session merge meets a conflict serve resolves`);
+      // Which rule may resolve which hunk is one law, shared with the publish that merges the same
+      // branch into the target branch (scripts/merge-resolution.mjs).
+      for (const e of resolutionErrors(m.resolutions, { at: `the merge of ${m.ref}` })) say(e);
     }
     if (ladder.rung === 'serve' && !ladder.integration.merges.some((m) => m.kind === 'session')) say('a serve merges the asking session branch, and this integration merged none');
   }
