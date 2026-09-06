@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0
+# StarCi Skills 2.6.0
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.6.0 (2026-09-06): continuation do owner yêu cầu ghi audit và resume mission blocked trong cùng mutation, ánh xạ edit trước khi có plan history và giữ evidence thất bại đã niêm phong qua thay đổi luật operator, đồng thời yêu cầu invocation mới chứng minh theo luật hiện tại. Xem tests/evidence/20260906-blocked-continuation.md.
 
 2.5.0 (2026-09-06): business model có documentation sinh head nhiều file được validate qua publication có lease vào authority Workflow tách theo project; readiness theo scope tài liệu giữ gate ghi source, còn admission metadata đầy đủ validate trước immutable history. Xem tests/evidence/20260906-business-head-bundle.md, tests/evidence/20260906-scoped-handoff-readiness.md và tests/evidence/20260906-session-metadata-admission.md.
 

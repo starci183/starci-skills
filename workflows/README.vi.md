@@ -166,7 +166,7 @@ lưu context lúc acceptance thành công, ghi rõ thời điểm `acceptance`.
 Trong cùng goal đã xác nhận, giữ dự báo hiện tại và dùng `flags.edit` khi preview:
 
 - `{"kind":"resume","cell":"N/M"}` vào lại node blocked đã được chấp nhận. Restatement cần đáp
-  án thật khớp nội dung; stop khác phải route tới resume của operator đó. `source` tùy chọn chỉ một
+  án thật khớp nội dung; stop khác dùng route resume hoặc continuation của owner bên dưới. `source` tùy chọn chỉ một
   reading blocked đã chấp nhận của phiên bản hiện tại cho node chưa mở cùng operator và goal logic.
   Request mới ghi đúng đích resume và lựa chọn thật mà kết quả trả về.
 - `{"kind":"expand","cell":"N/M","producer":"P/Q"}` mở fanout chưa dispatch từ output `units`
@@ -182,6 +182,27 @@ Trong cùng goal đã xác nhận, giữ dự báo hiện tại và dùng `flags
   hoặc chưa được chứng minh vẫn blocked. Attestation prerequisite không cấp quyền sửa source hay
   công nhận delivery tương lai; node runtime delivery gốc, tọa độ đã dispatch và các peer độc lập
   chưa mở vẫn được giữ trong dự báo.
+
+Session kết thúc ở blocked chỉ tiếp tục khi native owner yêu cầu rõ ràng, trong cùng mission đã
+xác nhận. Truyền `flags.continuation` theo
+[`continuation.schema.json`](../templates/step/continuation.schema.json): `hostId` của owner,
+`sourceRef` của yêu cầu thật và `delta` mô tả điều kiện đã thay đổi, cùng edit resume của cell blocked
+hiện tại. Preview chỉ đọc. Commit kế hoạch đã review kiểm ownership, scope đóng băng, lease rảnh,
+evidence blocked còn niêm phong và preview chưa đổi; sau đó ghi lifecycle và stop trước đó vào
+revision bất biến, thêm transition `resumed` có audit và kích hoạt dự báo mới trong cùng mutation.
+Yêu cầu owner cho phép quan sát lại sau stop user hoặc external; không cấp thêm operation, scope
+hay approval. Ledger active chưa có plan history mà invocation hiện tại vẫn blocked có thể dùng
+cùng yêu cầu để ghi audit continuation trung thực từ trạng thái active thực tế.
+
+Edit chưa có plan history phải ánh xạ chain đã giữ với dự báo suy từ goal hiện tại, cùng thứ tự
+operator và bố trí parallel, giữ các requirement đã định. Không khớp thì từ chối; không bỏ edit
+hay thay bằng công việc mới không liên quan. Receipt blocked còn niêm phong được đọc qua
+`scripts/accepted-blocked.mjs` như lý do lịch sử để vào lại, kiểm các cam kết request, invocation,
+mission, comparison và evidence gốc. Luật operator thay đổi không sửa hay chấm lại thất bại ấy.
+Invocation tiếp theo chạy gate request và operator hiện tại; lịch sử blocked không cấp input
+matched hay proof hoàn thành. Reuse matched hiện tại và typed runtime repair giữ các gate ngữ nghĩa.
+
+Evidence: [tương thích continuation blocked](../tests/evidence/20260906-blocked-continuation.md).
 
 Dự báo active qua đủ gate Input, Context, Next, goal, luồng dài và budget hữu hạn. Handoff phụ
 thuộc đã khai có thể tiếp tục từ owner input hoặc context trước đó khi Next của owner gọi tên

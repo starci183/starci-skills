@@ -341,10 +341,10 @@ export function previewChain(plan, mission) {
   return out.join('\n');
 }
 
-export function planningStateErrors(state) {
+export function planningStateErrors(state, { continuation = false } = {}) {
   if (state?.contractVersion !== V22_CONTRACT) return ['WORKFLOW_RESET_REQUIRED: planning requires the current session wire contract'];
   const errors = [];
-  if (state.lifecycle?.phase !== 'active') errors.push(`state.json: lifecycle.phase is ${state.lifecycle?.phase ?? 'missing'}; ${V22_CONTRACT} planning requires an active, confirmed session`);
+  if (state.lifecycle?.phase !== 'active' && !continuation) errors.push(`state.json: lifecycle.phase is ${state.lifecycle?.phase ?? 'missing'}; ${V22_CONTRACT} planning requires an active, confirmed session`);
   if (state.runtimeRevision !== 3) errors.push('WORKFLOW_RESET_REQUIRED: archive obsolete execution evidence and open a fresh current session before planning');
   errors.push(...frozenScopeErrors(state));
   const mission = state.mission;
@@ -364,7 +364,9 @@ export function planningStateErrors(state) {
 export async function planSession(root, session, flags = {}) {
   const state = JSON.parse(await readFile(path.join(session, 'state.json'), 'utf8'));
   if (!state.mission) throw new PlanError(['state.json carries no mission; the chain is planned from mission.doneWhen']);
-  const stateErrors = planningStateErrors(state);
+  const { continuationErrors } = await import('./session-continuation.mjs');
+  const continuation = await continuationErrors(root, session, state, flags);
+  const stateErrors = [...continuation, ...planningStateErrors(state, { continuation: Boolean(flags.continuation) && !continuation.length })];
   if (state.runtimeRevision === 3) stateErrors.push(...workflowOwnerErrors(root, session, state, { dispatch: true }));
   if (stateErrors.length) throw new PlanError(stateErrors);
   const packages = await loadOperatorPackages(root);

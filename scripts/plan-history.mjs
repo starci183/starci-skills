@@ -9,9 +9,13 @@ import { retainContext, readContext, retainMission, invocationState } from './mi
 import { scopeHash } from './mission-scope.mjs';
 import { mutateSession } from './session-lock.mjs';
 import { evidenceManifestErrors } from './evidence-manifest.mjs';
+import { acceptedBlockedResponse } from './accepted-blocked.mjs';
+import { validateAgainst } from './json-schema.mjs';
 
 const sha = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const fingerprint = value => sha(JSON.stringify(value));
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const continuationNote = (continuation, address) => `Owner continuation ${continuation.request.sourceRef}; ${continuation.request.delta}; audited by ${address.ref}`;
 const keyOf = cell => cell.split('/').slice(0, 2).join('/');
 const branchPath = (session, cell) => { if (!/^[1-9][0-9]*\/[1-9][0-9]*$/.test(cell)) throw Error('PLAN_HISTORY_UNBOUND: retained coordinate is not a positive step/parallel cell'); const [n, m] = cell.split('/'); return path.join(session, `step-${n}`, `parallel-${m}`); };
 export const activePlanCells = state => new Set((state.chain ?? []).flat());
@@ -33,8 +37,7 @@ function inventory(session, cells) {
   return out;
 }
 
-export function offsetForecast(plan, offset) {
-  const cell = value => `${Number(value.split('/')[0]) + offset}/${value.split('/')[1]}`;
+function mappedForecast(plan, cell) {
   const out = structuredClone(plan);
   out.chain = plan.chain.map(step => step.map(cell));
   for (const field of ['steps', 'goals', 'reasons', 'dependencies', 'evidenceDependencies', 'handoffs', 'requestRefs', 'presets', 'fanout', 'imports', 'nodes', 'resumes', 'units', 'repairs', 'repairDependencies']) out[field] = Object.fromEntries(Object.entries(plan[field] ?? {}).map(([key, value]) => [cell(key), structuredClone(value)]));
@@ -45,7 +48,31 @@ export function offsetForecast(plan, offset) {
   for (const key of Object.keys(out.steps)) { const [n, m] = key.split('/'); out.requestRefs[key] = `step-${n}/parallel-${m}/request/request.json`; }
   for (const repair of Object.values(out.repairs ?? {})) { repair.source = cell(repair.source); repair.resume = cell(repair.resume); }
   for (const [key, dependency] of Object.entries(out.repairDependencies ?? {})) out.repairDependencies[key] = cell(dependency);
+  for (const [key, source] of Object.entries(out.resumes ?? {})) out.resumes[key] = cell(source);
+  for (const unit of Object.values(out.units ?? {})) unit.dependsOn = (unit.dependsOn ?? []).map(cell);
   return out;
+}
+
+export const offsetForecast = (plan, offset) => mappedForecast(plan, value => `${Number(value.split('/')[0]) + offset}/${value.split('/')[1]}`);
+
+// Bootstrap only a structurally identical legacy forecast. An edit must never be discarded or
+// guess which of several former logical nodes it meant when current derivation has changed.
+function legacyForecast(state, plan) {
+  const before = state.chain ?? [];
+  if (before.length !== plan.chain.length || before.some((step, index) => step.length !== plan.chain[index].length)) throw Error('PLAN_LEGACY_MAPPING_REQUIRED: the retained chain differs from the derived forecast; an explicit matching plan is required');
+  const mapping = new Map();
+  for (let n = 0; n < before.length; n++) for (let p = 0; p < before[n].length; p++) {
+    const old = before[n][p], current = plan.chain[n][p];
+    if (state.steps?.[old] !== plan.steps[current]) throw Error('PLAN_LEGACY_MAPPING_REQUIRED: the retained operator sequence differs from the derived forecast');
+    mapping.set(current, old);
+  }
+  const forecast = mappedForecast(plan, value => mapping.get(value) ?? value);
+  for (const cell of before.flat()) {
+    // Retain the original requirement floor, including route/role and runtime impact. The normal
+    // chain and request gates validate it; regeneration cannot silently narrow a planned operation.
+    forecast.presets[cell] = { ...forecast.presets[cell], ...structuredClone(state.planned?.[cell]?.requirements ?? {}) };
+  }
+  return forecast;
 }
 
 const plannedOf = plan => Object.fromEntries(Object.keys(plan.steps).map(cell => [cell, { requirements: plan.presets[cell] ?? {}, ...(plan.imports[cell] ? { inputs: Object.fromEntries(Object.entries(plan.imports[cell]).map(([kind, value]) => [kind, value.input])) } : {}) }]));
@@ -84,10 +111,13 @@ async function runtimeRepairSource(root, session, state, source, wall, requireme
 
 // Re-entry edits the remaining execution mapping of the same forecast. The dispatched prefix and
 // every request stay at their original coordinates; only unopened cells receive new coordinates.
-export async function editForecast(root, session, state, original, edit, top) {
+export async function editForecast(root, session, state, original, edit, top, continuation = null) {
   const forecast = structuredClone(original);
   if (!edit || !['resume', 'expand', 'repair'].includes(edit.kind) || !forecast.steps[edit.cell]) throw Error('PLAN_EDIT_INVALID: name one current resume, unit expansion or typed repair');
-  for (const cell of forecast.chain.flat()) if (state.attempts?.[cell]) await acceptedCurrent(root, session, state, cell, state.attempts[cell].status);
+  for (const cell of forecast.chain.flat()) if (state.attempts?.[cell]) {
+    if (edit.kind === 'resume' && state.attempts[cell].status === 'blocked') await acceptedBlockedResponse(root, session, state, cell);
+    else await acceptedCurrent(root, session, state, cell, state.attempts[cell].status);
+  }
   const cell = edit.cell, operator = forecast.steps[cell];
   if (edit.kind === 'repair') {
     const binding = await runtimeRepairSource(root, session, state, cell, edit.wall, edit.requirements);
@@ -116,7 +146,7 @@ export async function editForecast(root, session, state, original, edit, top) {
   } else if (edit.kind === 'resume') {
     const sourceCell = edit.source ?? cell;
     if (state.steps[sourceCell] !== operator || sourceCell !== cell && state.attempts?.[cell]) throw Error('PLAN_EDIT_INVALID: a prior reading can replace only an unopened node of the same operator');
-    const response = await acceptedCurrent(root, session, state, sourceCell, 'blocked');
+    const response = await acceptedBlockedResponse(root, session, state, sourceCell);
     const originalRequest = JSON.parse(readFileSync(path.join(branchPath(session, sourceCell),'request/request.json')));
     if (sourceCell !== cell && !isDeepStrictEqual(originalRequest.goal, forecast.goals[cell])) throw Error('PLAN_EDIT_INVALID: the prior reading belongs to a different logical goal');
     const routing = JSON.parse(readFileSync(path.join(root, 'routing.json')));
@@ -132,7 +162,9 @@ export async function editForecast(root, session, state, original, edit, top) {
       const shared = JSON.parse(readFileSync(path.join(root, 'operators/errors.json'))).codes;
       const own = JSON.parse(readFileSync(path.join(root, 'operators', operator.replaceAll('.','-'), 'errors.json'))).codes;
       const definition = own[response.stop] ?? shared[response.stop];
-      if (!stop || routing.routes?.[operator]?.[definition?.domain]?.kind !== 'resume') throw Error('PLAN_REENTRY_UNAUTHORIZED: the accepted stop does not route to this operator resume');
+      const route = routing.routes?.[operator]?.[definition?.domain]?.kind;
+      const ownerContinuation = continuation && sourceCell === state.current && ['user', 'external'].includes(route);
+      if (!stop || route !== 'resume' && !ownerContinuation) throw Error('PLAN_REENTRY_UNAUTHORIZED: the accepted stop requires an explicit owner continuation or an operator resume route');
     }
     const next = `pending:${cell}`;
     for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes']) (forecast[field] ??= {})[next] = structuredClone(forecast[field]?.[cell] ?? (['dependencies','evidenceDependencies'].includes(field) ? [] : {}));
@@ -222,9 +254,13 @@ export async function previewRevision(root, session, flags = {}) {
   const top = Math.max(0, ...Object.keys(state.attempts ?? {}).map(cell => Number(cell.split('/')[0])), ...readdirSync(session).filter(name => /^step-\d+$/.test(name) && !readdirSync(path.join(session,name)).some(parallel=>existsSync(path.join(session,name,parallel,'import.json')))).map(name => Number(name.slice(5))));
   const active = state.planHistory?.active ? readContext(session, state.planHistory.active, 'plans') : null;
   if (active?.missionVersion === state.mission.version && !flags.edit && !Object.keys(flags.requirements ?? {}).length && !flags.roles?.length) throw Error('PLAN_EDIT_REQUIRED: the unchanged goal keeps its current forecast; use an explicit resume or accepted unit expansion instead of restarting it');
-  const forecast = flags.edit && active?.missionVersion === state.mission.version ? await editForecast(root, session, state, active.forecast, flags.edit, top) : offsetForecast(plan, top);
-  const basis = { mission: scopeHash(state.mission), active: state.planHistory?.active ?? null, chain: state.chain, steps: state.steps, planned: state.planned, choices: state.choices, attempts: state.attempts, requestHashes: state.requestHashes, forecast };
-  return { state, forecast, previewHash: fingerprint(basis), preview: previewChain(forecast, state.mission) };
+  if (flags.edit && active && active.missionVersion !== state.mission.version) throw Error('PLAN_EDIT_INVALID: an edit cannot reinterpret the prior mission forecast');
+  const baseline = flags.edit ? active?.forecast ?? legacyForecast(state, plan) : null;
+  const forecast = flags.edit ? await editForecast(root, session, state, baseline, flags.edit, top, flags.continuation) : offsetForecast(plan, top);
+  const continuation = flags.continuation ? { request: structuredClone(flags.continuation), fromLifecycle: structuredClone(state.lifecycle), fromStatus: state.status, current: state.current, stoppedAt: structuredClone(state.stoppedAt ?? null), attempt: state.attempts[state.current].id, context: state.attempts[state.current].context } : null;
+  const basis = { mission: scopeHash(state.mission), active: state.planHistory?.active ?? null, chain: state.chain, steps: state.steps, planned: state.planned, choices: state.choices, attempts: state.attempts, requestHashes: state.requestHashes, lifecycle: state.lifecycle, status: state.status, stoppedAt: state.stoppedAt ?? null, continuation, forecast };
+  const preview = [continuation ? `Owner continuation (${continuation.request.sourceRef}): ${continuation.request.delta}. Historical stop remains sealed; the new invocation must prove current readiness.` : null, previewChain(forecast, state.mission)].filter(Boolean).join('\n');
+  return { state, forecast, continuation, previewHash: fingerprint(basis), preview };
 }
 
 export async function commitRevision(root, session, input) {
@@ -260,11 +296,11 @@ export async function commitRevision(root, session, input) {
     if (errors.length) throw Error(errors.join('\n'));
     const cells = Object.keys(state.steps ?? {});
     const inventoryCells = cells.filter(cell=>existsSync(branchPath(session,cell)));
-    const retained = structuredClone({ chain: state.chain, steps: state.steps, planned: state.planned, choices: state.choices, attempts: state.attempts, requestHashes: state.requestHashes, brief: state.brief, inventoryCells, files: inventory(session, inventoryCells) });
+    const retained = structuredClone({ chain: state.chain, steps: state.steps, planned: state.planned, choices: state.choices, attempts: state.attempts, requestHashes: state.requestHashes, brief: state.brief, lifecycle: state.lifecycle, status: state.status, stoppedAt: state.stoppedAt ?? null, inventoryCells, files: inventory(session, inventoryCells) });
     const prior = state.planHistory?.active ?? null;
     const previousForecast = prior ? readContext(session, prior, 'plans').forecast : null;
     const mappings = Object.entries(previousForecast?.nodes ?? {}).map(([from, node]) => ({ node, from, to: Object.keys(forecast.nodes ?? {}).find(cell => forecast.nodes[cell] === node) ?? null, disposition: state.attempts?.[from] ? 'retained-execution' : 'superseded-forecast' }));
-    const record = { version: 1, sessionId: state.id, mission, missionVersion: state.mission.version, scopeHash: scopeHash(state.mission), previous: prior, reason: input.reason, choicesHash: fingerprint(state.choices), previewHash: input.previewHash, at: new Date().toISOString(), forecast, planned, mappings, retained };
+    const record = { version: 1, sessionId: state.id, mission, missionVersion: state.mission.version, scopeHash: scopeHash(state.mission), previous: prior, reason: input.reason, choicesHash: fingerprint(state.choices), previewHash: input.previewHash, at: new Date().toISOString(), forecast, planned, mappings, retained, ...(next.continuation ? { continuation: next.continuation } : {}) };
     const address = await retainContext(session, 'plans', record);
     state.planHistory ??= { revisions: [] };
     state.planHistory.revisions.push(address); state.planHistory.active = address;
@@ -275,6 +311,10 @@ export async function commitRevision(root, session, input) {
     state.current = forecast.chain.flat().find(cell => !state.attempts?.[cell]) ?? forecast.chain.at(-1)[0];
     state.brief = { ...state.brief, proven: [], blocked: [], next: `Forecast ${state.planHistory.revisions.length} is planned, not executed or verified. Open ${state.current} with its exact request before work.` };
     state.transitions ??= [];
+    if (next.continuation) {
+      state.lifecycle.phase = 'active'; state.status = 'running'; delete state.stoppedAt;
+      state.transitions.push({ branch: next.continuation.current, event: 'resumed', at: record.at, goalVersion: state.mission.version, note: continuationNote(next.continuation, address), logged: true });
+    }
     state.transitions.push({ branch: state.current, event: 'replanned', at: new Date().toISOString(), goalVersion: state.mission.version, note: input.reason, logged: true });
     return { status: 'planned', active: address, forecast, retainedExecutions: Object.keys(retained.attempts ?? {}).length, historicalReuse: 'none' };
   });
@@ -288,6 +328,12 @@ export function planHistoryErrors(session, state) {
     try {
       const record = readContext(session, address, 'plans');
       if (record.sessionId !== state.id || !isDeepStrictEqual(record.previous, previous)) errors.push('PLAN_HISTORY_UNBOUND: forecast lineage differs from its sealed predecessor');
+      if (record.continuation) {
+        const continued = record.continuation, old = record.retained, attempt = old.attempts?.[continued.current];
+        errors.push(...validateAgainst(JSON.parse(readFileSync(path.join(ROOT, 'templates/step/continuation.schema.json'))), continued.request, 'plan.continuation.request'));
+        if (continued.request.hostId !== state.hostBinding?.hostId || !isDeepStrictEqual(continued.fromLifecycle, old.lifecycle) || continued.fromStatus !== old.status || !isDeepStrictEqual(continued.stoppedAt, old.stoppedAt) || attempt?.status !== 'blocked' || continued.attempt !== attempt.id || !isDeepStrictEqual(continued.context, attempt.context) || !Object.values(record.forecast.resumes ?? {}).includes(continued.current)) errors.push('PLAN_CONTINUATION_UNBOUND: the owner request must bind its retained terminal stop and explicit successor');
+        if (!(state.transitions ?? []).some(event => event.event === 'resumed' && event.at === record.at && event.branch === continued.current && event.goalVersion === record.missionVersion && event.note === continuationNote(continued, address))) errors.push('PLAN_CONTINUATION_UNBOUND: the audited owner continuation transition is missing');
+      }
       for (const [id, choice] of Object.entries(record.retained.choices ?? {})) if (!isDeepStrictEqual(choice, state.choices?.[id])) errors.push(`PLAN_HISTORY_TAMPERED: retained user answer ${id} changed`);
       for (const [cell, attempt] of Object.entries(record.retained.attempts ?? {})) if (!isDeepStrictEqual(attempt, state.attempts?.[cell])) errors.push(`PLAN_HISTORY_TAMPERED: retained attempt ${cell} changed`);
       for (const [cell, hash] of Object.entries(record.retained.requestHashes ?? {})) if (state.requestHashes?.[cell] !== hash) errors.push(`PLAN_HISTORY_TAMPERED: retained request commitment ${cell} changed`);
@@ -322,7 +368,7 @@ export async function planAdmissionErrors(root, session, state, request) {
   if (!isDeepStrictEqual(request.goal, forecast.goals[cell])) errors.push('PLAN_GOAL_UNBOUND: the invocation must bind the current reviewed logical goal mapping');
   const resume = request.resume ? `${request.resume.step}/${request.resume.parallel}` : null;
   if (resume !== (forecast.resumes?.[cell] ?? null)) errors.push('PLAN_REENTRY_UNBOUND: invocation resume differs from the reviewed execution mapping');
-  if (resume) try { await acceptedCurrent(root, session, state, resume, 'blocked'); } catch (error) { errors.push(error.message); }
+  if (resume) try { await acceptedBlockedResponse(root, session, state, resume); } catch (error) { errors.push(error.message); }
   const repair = forecast.repairs?.[cell];
   if (repair) try {
     const { loadOperatorGraph, repairShapeErrors } = await import('./validate-chain.mjs');

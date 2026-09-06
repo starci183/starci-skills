@@ -1,0 +1,12 @@
+{
+  "$id": "step:continuation",
+  "title": "Native owner request to review a continuation of the same blocked mission",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["hostId", "sourceRef", "delta"],
+  "properties": {
+    "hostId": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "\\S" },
+    "sourceRef": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "\\S" },
+    "delta": { "type": "string", "minLength": 1, "maxLength": 2000, "pattern": "\\S" }
+  }
+}

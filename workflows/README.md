@@ -171,7 +171,7 @@ without a context may retain one only during successful acceptance, explicitly m
 For the same confirmed goal, retain the current forecast and use `flags.edit` in the preview:
 
 - `{"kind":"resume","cell":"N/M"}` re-enters an accepted blocked node. Restatements require their
-  exact recorded user answer; other stops must route to that operator's resume. An optional `source`
+  exact recorded user answer; other stops use their resume route or the owner continuation below. An optional `source`
   names an accepted current-version blocked reading for an unopened node with the same operator and
   logical goal. The resulting request names the returned resume target and actual choice.
 - `{"kind":"expand","cell":"N/M","producer":"P/Q"}` expands an unopened fanout from its actual
@@ -186,6 +186,28 @@ For the same confirmed goal, retain the current forecast and use `flags.edit` in
   sealed reused-head receipt without integration changes. A failed or unproved repair stays blocked.
   This prerequisite attestation grants no source write or future delivery credit; the original
   delivery runtime node, dispatched coordinates and independent planned peers remain in the forecast.
+
+A terminal blocked session continues only on its native owner's explicit request, in the same
+confirmed mission. Supply `flags.continuation` in the shape
+[`continuation.schema.json`](../templates/step/continuation.schema.json): the owning `hostId`, actual
+request `sourceRef` and concrete changed condition `delta`, together with the current blocked cell's
+resume edit. Preview is read-only. A reviewed commit verifies ownership, frozen scope, idle leases,
+sealed blocked evidence and the unchanged preview, then atomically records the prior lifecycle and
+stop in the immutable plan revision, appends its audited `resumed` transition and activates the new
+forecast. The owner request allows re-observation after a user or external stop; it grants no new
+operation, scope or approval. An active ledger without plan history whose current invocation remains
+blocked may use the same request to retain an honest continuation audit from its actual active state.
+
+An edit without plan history must map the retained chain to the current goal-derived forecast with
+the same operator sequence and parallel layout, preserving its requirement floor. A mismatch is a
+refusal; an edit is never ignored or replaced by unrelated fresh work. A sealed blocked receipt is
+read through `scripts/accepted-blocked.mjs` as the historical reason for re-entry, with its original
+request, invocation, mission, comparison and evidence commitments verified. Changed operator law
+does not rewrite or rejudge that failure. The successor runs current request and operator gates,
+and blocked history cannot supply a matched input or goal proof. Current matched reuse and typed
+runtime repairs retain their existing semantic gates.
+
+Evidence: [blocked continuation compatibility](../tests/evidence/20260906-blocked-continuation.md).
 
 The active forecast passes Input, Context, Next, goal, long-flow and finite budget gates. A declared
 dependency handoff can continue from an earlier input or context owner whose authored Next names
