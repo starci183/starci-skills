@@ -235,3 +235,25 @@ test('a source-writing receipt states its preflight and the entries its checkout
     assert.match(call({ binding: { 'Reflog after': `HEAD ${entries} ${commit}; stash 1` } }).join('\n'), /stash reflog went from 0 to 1 entries/);
   } finally { f.dispose(); }
 });
+
+
+test('any declared application route role binds through the portable identifier contract', () => {
+  const f = workspaceCheckoutFixture({ role: 'public-site' });
+  try {
+    const routed = resolveWorkspaceCheckout({ ...f.options, checkout: 'routed' });
+    assert.equal(routed.role, 'public-site');
+    assert.equal(path.resolve(routed.checkout.diskPath), path.resolve(f.canonical));
+    assert.equal(routed.portableRouteRef, '.workspaces/projects/fixture/public-site.json');
+    const request = { sessionId: f.sessionId, step: 1, parallel: 1, requirements: { project: f.project, role: f.role, checkout: 'session', declaredWriteRoots: ['src'] } };
+    const branch = f.freezeRequest(request);
+    const bound = resolveWorkspaceCheckout(f.options);
+    assert.equal(path.resolve(bound.checkout.diskPath), path.resolve(f.selected));
+    assert.deepEqual(validateWorkspaceCheckoutRequest(f.runtime, request, branch), []);
+    assert.deepEqual(validateWorkspaceCheckoutBinding(f.runtime, request, bound, branch), []);
+    assert.throws(() => resolveWorkspaceCheckout({ ...f.options, role: 'undeclared-app' }), /ROUTE_UNDECLARED/);
+    for (const role of ['../be', 'public/site', 'Public', '', 'x'.repeat(81), null]) assert.throws(() => resolveWorkspaceCheckout({ ...f.options, role }), /INVALID_INPUT/);
+    assert.throws(() => resolveWorkspaceCheckout({ ...f.options, project: '../fixture' }), /INVALID_INPUT/);
+    f.local.role = 'other-app'; f.saveRoutes();
+    assert.throws(() => resolveWorkspaceCheckout(f.options), /ROUTE_MISMATCH/);
+  } finally { f.dispose(); }
+});

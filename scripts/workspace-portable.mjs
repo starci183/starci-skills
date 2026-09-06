@@ -14,12 +14,14 @@ import {
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validatorFor } from './json-schema.mjs';
+import { validatorFor, validateAgainst } from './json-schema.mjs';
 
 const scriptRoot = dirname(fileURLToPath(import.meta.url));
 const starciRoot = resolve(scriptRoot, '..');
 const defaultSource = resolve(starciRoot, '..');
 const portableSchemaPath = join(starciRoot, 'readiness', 'initialization', 'workspaces', 'portable-route.schema.json');
+const routeIdentifierSchema = JSON.parse(readFileSync(portableSchemaPath, 'utf8')).$defs.slug;
+export const isRouteIdentifier = value => validateAgainst(routeIdentifierSchema, value).length === 0;
 const localSchemaPath = join(starciRoot, 'readiness', 'initialization', 'workspaces', 'local-route.schema.json');
 const configSchemaPath = join(starciRoot, 'readiness', 'initialization', 'workspaces', 'config.schema.json');
 const validatePortableSchema = validatorFor(new URL('../readiness/initialization/workspaces/portable-route.schema.json', import.meta.url));

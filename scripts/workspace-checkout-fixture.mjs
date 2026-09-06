@@ -8,13 +8,13 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const fixtureGit = (cwd, ...args) => execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-export function workspaceCheckoutFixture({ attachRuntime = false, repositoryKind = 'sibling' } = {}) {
+export function workspaceCheckoutFixture({ attachRuntime = false, repositoryKind = 'sibling', role = 'be' } = {}) {
   const temporary = mkdtempSync(path.join(tmpdir(), 'workspace-checkout-'));
   const source = path.join(temporary, 'source');
   const runtime = path.join(source, '.claude');
   const canonical = repositoryKind === 'source' ? source : path.join(temporary, 'declared-repository');
   const selected = path.join(temporary, 'unrelated-directory-name');
-  const project = 'fixture', role = 'be', sessionId = 's-test';
+  const project = 'fixture', sessionId = 's-test';
   const origin = 'https://github.com/example/workspace-checkout-fixture.git';
   const write = (file, value) => { mkdirSync(path.dirname(file), { recursive: true }); writeFileSync(file, typeof value === 'string' ? value : `${JSON.stringify(value, null, 2)}\n`); };
   mkdirSync(runtime, { recursive: true });

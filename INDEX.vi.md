@@ -1,4 +1,4 @@
-# StarCi Skills 2.4.0
+# StarCi Skills 2.4.1
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.4.1 (2026-09-06): bind workspace kiểm tra mọi role ứng dụng đã khai báo theo schema định danh route portable, xuyên suốt request và worktree đã đăng ký; ý nghĩa role nguồn vẫn giữ nguyên.
 
 2.4.0 (2026-09-06): UAT công khai đóng băng anonymous/không fixture với bằng chứng frontend hiện tại; đối soát chỉ frontend dùng đúng đầu ra nguồn. Thực thi từ chối adapter ledger cũ; StarCi Lite tùy chọn đưa công việc nhỏ qua entry riêng. Operator Result hiện tóm tắt gọn trước ảnh nhúng và chi tiết có link. Xem tests/evidence/20260906-current-public-workflows.md và tests/evidence/20260906-starci-lite-profile.md.
 

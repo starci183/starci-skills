@@ -129,7 +129,7 @@ workspace, or provisions an account. It makes no product decision and carries no
 | Field | Type | Default | Ask |
 | --- | --- | --- | --- |
 | `project` | id | — | The project to bind |
-| `role` | choice | — | `fe` or `be`: the role of that project to bind |
+| `role` | id | — | The declared project route role, using the identifier shape in `readiness/initialization/workspaces/portable-route.schema.json#/$defs/slug`; application route identities do not change source context roles |
 | `checkout` | choice | routed | `routed` selects the canonical checkout; `session` selects only this request session's registered worktree under the declared policy |
 | `gitPolicy` | object `{worktreeBranches, mutationBranch}`, the two fields of the declared route's `repository.gitPolicy` the binding is checked against | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | The branch law this binding is verified against; `forbidden` keeps every write on the mutation branch |
 | `declaredWriteRoots` | list | empty | The only paths later work may write; anything dirty outside them is `CHECKOUT_DIRTY`, and so is anything dirty at all when the checkout sits on the mutation branch rather than a `session/<sessionId>` branch |

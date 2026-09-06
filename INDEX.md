@@ -1,4 +1,4 @@
-# StarCi Skills 2.4.0
+# StarCi Skills 2.4.1
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.4.1 (2026-09-06): workspace binding enforces the portable route identifier schema for every declared application role, including request and registered-worktree validation; source-role semantics remain unchanged.
 
 2.4.0 (2026-09-06): public UAT freezes anonymous/no-fixture modes with current frontend evidence; frontend-only reconciliation consumes its actual source producer. Execution refuses old-ledger adapters, while optional StarCi Lite routes bounded work through a separate installed entry. Operator Result presents a compact summary before native images and linked detail. See tests/evidence/20260906-current-public-workflows.md and tests/evidence/20260906-starci-lite-profile.md.
 

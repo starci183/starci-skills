@@ -7,7 +7,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
-import { validateLocalRoute, validatePortableRoute } from './workspace-portable.mjs';
+import { isRouteIdentifier, validateLocalRoute, validatePortableRoute } from './workspace-portable.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const isSessionId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value);
@@ -234,7 +234,7 @@ export function sourceCheckoutOf(root, branchDir, request) {
 }
 
 export function resolveWorkspaceCheckout({ source = path.dirname(ROOT), project, role, sessionId, checkout = 'routed', declaredWriteRoots = [], sharedInstall = false }) {
-  requireThat(/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(project ?? '') && /^(fe|be)$/.test(role ?? ''), 'INVALID_INPUT', 'project and role must be declared route identifiers');
+  requireThat(isRouteIdentifier(project) && isRouteIdentifier(role), 'INVALID_INPUT', 'project and role must be declared route identifiers');
   requireThat(['routed', 'session'].includes(checkout), 'INVALID_INPUT', 'checkout must be routed or session');
   requireThat(isSessionId(sessionId), 'INVALID_INPUT', 'sessionId must identify one session');
   source = real(source);

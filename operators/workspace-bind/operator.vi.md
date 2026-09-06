@@ -107,7 +107,7 @@ và không mang phán quyết nào.
 | Field | Kiểu | Mặc định | Hỏi |
 | --- | --- | --- | --- |
 | `project` | id | — | Project cần ràng |
-| `role` | choice | — | `fe` hay `be`: vai của project ấy cần ràng |
+| `role` | id | — | Vai route đã khai của project, theo định dạng định danh tại `readiness/initialization/workspaces/portable-route.schema.json#/$defs/slug`; định danh route ứng dụng không thay đổi vai context source |
 | `checkout` | choice | routed | `routed` chọn checkout chuẩn; `session` chỉ chọn worktree đã đăng ký của chính phiên trong request theo chính sách đã khai |
 | `gitPolicy` | object `{worktreeBranches, mutationBranch}`, hai trường của `repository.gitPolicy` trong khai báo route mà binding được kiểm theo | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | Luật nhánh mà binding này được kiểm theo; `forbidden` giữ mọi lần ghi trên nhánh mutation |
 | `declaredWriteRoots` | list | empty | Những đường dẫn duy nhất mà việc sau được ghi; bẩn ngoài chúng là `CHECKOUT_DIRTY`, và bẩn bất kỳ khi checkout đang ở nhánh mutation thay vì nhánh `session/<sessionId>` cũng vậy |
