@@ -14,8 +14,10 @@ Primary output: `seed-plan`
 
 ## Outputs
 
-`seed-plan` `response/response.md`
-`units` `response/data/units.json`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`seed-plan` `response/response.md` (md)
+`units` `response/data/units.json` (data)
 
 ## Stops
 

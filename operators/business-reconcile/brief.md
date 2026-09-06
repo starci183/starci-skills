@@ -14,9 +14,11 @@ Primary output: `business-reconciliation`
 
 ## Outputs
 
-`business-reconciliation` `response/response.md`
-`claims` `response/data/claims.json`
-`model` `response/data/model.json`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`business-reconciliation` `response/response.md` (md)
+`claims` `response/data/claims.json` (data)
+`model` `response/data/model.json` (data)
 
 ## Stops
 

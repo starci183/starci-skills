@@ -14,10 +14,12 @@ Primary output: `api-verification`
 
 ## Outputs
 
-`api-verification` `response/response.md`
-`api-cases` `response/data/cases.json`
-`api-verdicts` `response/data/verdicts.json`
-`api-output` `response/artifacts/api-output.txt`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`api-verification` `response/response.md` (md)
+`api-cases` `response/data/cases.json` (data)
+`api-verdicts` `response/data/verdicts.json` (data)
+`api-output` `response/artifacts/api-output.txt` (artifact)
 
 ## Stops
 

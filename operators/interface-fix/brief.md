@@ -14,12 +14,14 @@ Primary output: `frontend-source-application`
 
 ## Outputs
 
-`frontend-source-application` `response/response.md`
-`changes` `response/changes.md`
-`writes` `response/data/writes.json`
-`knowledge-question` `response/data/knowledge-question.json`?
-`knowledge-coverage` `response/data/knowledge-coverage.json`?
-`family-understanding` `response/data/family-understanding.json`?
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`frontend-source-application` `response/response.md` (md)
+`changes` `response/changes.md` (md)
+`writes` `response/data/writes.json` (data)
+`knowledge-question` `response/data/knowledge-question.json`? (data)
+`knowledge-coverage` `response/data/knowledge-coverage.json`? (data)
+`family-understanding` `response/data/family-understanding.json`? (data)
 
 ## Stops
 

@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAgainst } from './json-schema.mjs';
-import { contentHash, RUNTIME_REVISION, sameRoot } from './workflow-root.mjs';
+import { contentHash, digest, locateWorkflowSession, realPath, RUNTIME_REVISION, sameRoot, workflowOwnerErrors } from './workflow-root.mjs';
+import { canonicalRepository, repositoryPath, requestRoots } from './workflow-coordination.mjs';
 import { parseOperatorMd, cellAliases } from './operator-md.mjs';
 import { requiredWhen, requirementValues } from './operator-conditions.mjs';
 import { resolveWorkspaceCheckout } from './workspace-checkout.mjs';
@@ -58,7 +59,8 @@ export function scopeErrors(mission, { root = ROOT, complete = false } = {}) {
 }
 export function authorityErrors(mission, authority, root = ROOT) {
   const errors = scopeErrors(mission, { root, complete: true });
-  if (!authority || !['opening-scope', 'scope-answer', 'bank-approval'].includes(authority.kind)) errors.push('GOAL_AUTHORITY_REQUIRED: record opening-scope, scope-answer or bank-approval provenance');
+  if (!authority || !['opening-scope', 'scope-answer', 'bank-approval', 'coordination-extraction'].includes(authority.kind)) errors.push('GOAL_AUTHORITY_REQUIRED: record original user authority or a sealed coordination extraction');
+  if (authority?.kind === 'coordination-extraction' && (!authority.derivation?.coordinator?.sessionId || !authority.derivation?.preparation?.hash)) errors.push('GOAL_AUTHORITY_REQUIRED: derived scope requires its exact coordinator preparation');
   if (authority?.scopeHash !== scopeHash(mission)) errors.push('GOAL_SCOPE_CHANGED: authority does not seal this exact mission version and impact');
   if (!authority?.sourceRef || !authority?.statement?.trim()) errors.push('GOAL_AUTHORITY_REQUIRED: retain the actual authorizing statement and its message reference');
   const fields = deliveryPolicy(root).authorityFields;
@@ -99,7 +101,49 @@ export function frozenScopeErrors(state, { root = ROOT } = {}) {
 export function deliveryTargets(mission, root = ROOT) {
   if (!mission?.discovery) return [];
   const stage = mission.discovery.stage; const policy = deliveryPolicy(root);
-  return [...new Set(Object.entries(mission.discovery.lanes).filter(([, lane]) => lane.status === 'planned').flatMap(([id]) => policy.lanes[id]?.[stage === 'handoff' ? 'plan' : 'execute'] ?? []))];
+  const impacts = mission.discovery.impacts ?? [];
+  const localTags = new Set(impacts.filter(impact => !impact.producer).flatMap(impact => impact.tags));
+  const peerTags = new Set(impacts.filter(impact => impact.producer).flatMap(impact => impact.tags));
+  const local = Object.entries(mission.discovery.lanes).filter(([id, lane]) => lane.status === 'planned'
+    && (policy.lanes[id]?.when.some(tag => localTags.has(tag)) || !policy.lanes[id]?.when.some(tag => peerTags.has(tag))));
+  return [...new Set([...local.flatMap(([id]) => policy.lanes[id]?.[stage === 'handoff' ? 'plan' : 'execute'] ?? []),
+    ...(impacts.some(impact => impact.producer) ? ['workflow.verify'] : [])])];
+}
+
+// Peer impacts retain their actual product classification. These immutable scope selectors grant
+// verification responsibility only; executable writer ownership remains the assignment history.
+export function peerScopeErrors(state, { root = ROOT, current = true } = {}) {
+  const errors = [], impacts = state.mission?.discovery?.impacts?.filter(impact => impact.producer) ?? [];
+  if (!impacts.length) return errors;
+  if (state.topology?.mode !== 'coordinated') errors.push('GOAL_PEER_SCOPE: peer impact authority requires a coordinated workflow');
+  const seen = new Set();
+  for (const impact of impacts) try {
+    const selected = impact.producer;
+    if (selected.sessionId === state.id || seen.has(`${selected.sessionId}:${selected.impactId}`)) throw Error('a peer impact must be a distinct exact source selection');
+    seen.add(`${selected.sessionId}:${selected.impactId}`);
+    const source = state.workflowOwner?.sourceRoot;
+    const located = locateWorkflowSession(source, selected.sessionId);
+    const peer = JSON.parse(readFileSync(path.join(located.session, 'state.json'), 'utf8'));
+    const ownerErrors = workflowOwnerErrors(root, located.session, peer);
+    if (ownerErrors.length || peer.id !== selected.sessionId || peer.runtimeRevision !== RUNTIME_REVISION) throw Error('peer must have its original current workflow identity');
+    const address = selected.mission;
+    if (!/^sha256:[a-f0-9]{64}$/.test(address?.hash ?? '') || address.ref !== `runtime/history/missions/${address.hash.slice(7)}.json`) throw Error('peer mission requires its exact original content address');
+    const file = path.resolve(located.session, address.ref);
+    if (!realPath(file).startsWith(`${realPath(located.session)}${path.sep}`)) throw Error('peer mission escaped its original workflow');
+    const bytes = readFileSync(file), retained = JSON.parse(bytes);
+    if (digest(bytes) !== address.hash || retained.sessionId !== peer.id || JSON.stringify(peer.missionSnapshots?.[retained.mission.version]) !== JSON.stringify(address)) throw Error('peer scope differs from its original retained seal');
+    const mission = retained.mission;
+    if (mission.confirmation?.status !== 'confirmed' || mission.confirmation.scopeHash !== scopeHash(mission) || authorityErrors(mission, mission.confirmation.authority, root).length) throw Error('peer scope has no exact confirmed authority');
+    if (current && (peer.mission.confirmation?.status !== 'confirmed' || scopeHash(peer.mission) !== scopeHash(mission))) throw Error('peer scope changed or was revoked after selection');
+    const original = mission.discovery.impacts.find(item => item.id === selected.impactId);
+    if (!original || original.producer) throw Error('peer scope must select a directly owned impact');
+    const { id, producer, ...actual } = impact, { id: originalId, ...expected } = original;
+    if (contentHash(actual) !== contentHash(expected)) throw Error('peer impact changes the original role, routes, code, behavior, tags or evidence');
+    const declared = state.mission.discovery.repositories.find(repo => repo.role === impact.role);
+    const originalRepository = mission.discovery.repositories.find(repo => repo.role === original.role);
+    if (canonicalRepository(declared?.repository) !== canonicalRepository(originalRepository?.repository)) throw Error('peer impact crosses repository identity');
+  } catch (error) { errors.push(`GOAL_PEER_SCOPE: ${impact.id}: ${error.message}`); }
+  return errors;
 }
 export function completeDeliveryMission(mission, root = ROOT) {
   if (!mission.discovery) return mission;
@@ -110,6 +154,7 @@ export function completeDeliveryMission(mission, root = ROOT) {
 export function deliveryRequestErrors(state, request, root = ROOT) {
   if (state?.runtimeRevision !== RUNTIME_REVISION) return [];
   const errors = frozenScopeErrors(state, { root });
+  errors.push(...peerScopeErrors(state, { root }));
   const stage = state.mission.discovery?.stage;
   const policy = deliveryPolicy(root);
   if (!policy.stages[stage]?.includes(request.operatorId) && stage === 'handoff') errors.push(`DELIVERY_STAGE: ${request.operatorId} is not a handoff planning operation`);
@@ -163,6 +208,19 @@ export function scopeBindingErrors(state, request, root = ROOT) {
   // Binding a read-only context never adds a product write role to the confirmed mission.
   const op = authoredOperator(root, request.operatorId);
   const writeRoles = new Set((op?.tables.steps?.rows ?? []).flatMap(row => cellAliases(row.writes)).map(alias => /^@workspaces\/(fe|be)(?:\/|$)/.exec(alias)?.[1]).filter(Boolean));
-  for (const role of writeRoles) if (!discovery.repositories.some(repository => repository.role === role && repository.project === state.project)) errors.push(`GOAL_SOURCE_UNBOUND: product source writes to ${role} are outside the frozen discovery; a prerequisite bind grants no write impact`);
+  for (const role of writeRoles) {
+    if (!discovery.repositories.some(repository => repository.role === role && repository.project === state.project)) errors.push(`GOAL_SOURCE_UNBOUND: product source writes to ${role} are outside the frozen discovery; a prerequisite bind grants no write impact`);
+    if (discovery.impacts.some(impact => impact.role === role && impact.producer) && !discovery.impacts.some(impact => impact.role === role && !impact.producer)) errors.push(`GOAL_SOURCE_UNBOUND: peer-owned ${role} impact grants coordinator verification, not source writes`);
+  }
+  if (discovery.impacts.some(impact => impact.producer) && request.environment?.writes?.length) try {
+    const contains=(parent,child)=>parent==='.'||parent===child||child.startsWith(parent+'/');
+    for(const wanted of requestRoots(state,request)){
+      const impacts=discovery.impacts.filter(impact=>canonicalRepository(discovery.repositories.find(repo=>repo.role===impact.role).repository)===wanted.repository);
+      if(!impacts.some(impact=>impact.producer))continue;
+      const local=impacts.filter(impact=>!impact.producer).flatMap(impact=>impact.code.map(repositoryPath));
+      const delegated=impacts.filter(impact=>impact.producer).flatMap(impact=>impact.code.map(repositoryPath));
+      if(!local.some(code=>contains(code,wanted.root))||delegated.some(code=>contains(code,wanted.root)||contains(wanted.root,code)))errors.push('GOAL_SOURCE_UNBOUND: declared coordinator writes overlap or exceed its local impact beside peer-owned source');
+    }
+  }catch(error){errors.push(`GOAL_SOURCE_UNBOUND: ${error.message}`);}
   return errors;
 }

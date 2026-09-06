@@ -332,3 +332,4 @@ Khi `done`, hiện tổng quan đầy đủ kết quả các case làm **Operato
 | cần tạo seed receipt hợp lệ hoặc rollback exact namespace sau attempt đã action, dù complete, failed hay incomplete | `data.seed` |
 | làn UX fail: người quyết định trải nghiệm phải thế nào, và luồng chỉ được kiểm lại sau quyết định ấy | `user` |
 | lượt chạy sinh ra bản tham chiếu đầu tiên của luồng, nên một con người nâng bản ứng viên trước khi nó thành chuẩn | `user` |
+| điều phối đã chấp nhận bộ kiểm thử tích hợp và cần kết thúc các workflow được phân công | `workflow.verify` |

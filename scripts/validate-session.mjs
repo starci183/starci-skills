@@ -1,7 +1,8 @@
 import { activePlanView, retiredPlanCell, mappedPlanRequests } from './plan-history.mjs';
-import { missionHistorySnapshotErrors } from './mission-history.mjs';
+import { missionHistorySnapshotErrors, missionChoiceSource } from './mission-history.mjs';
+import { coordinationStateErrors } from './workflow-coordination.mjs';
 import { workflowOwnerErrors, workflowRootOf } from './workflow-root.mjs';
-import { frozenScopeErrors } from './mission-scope.mjs';
+import { frozenScopeErrors, peerScopeErrors } from './mission-scope.mjs';
 // One session as a whole, checked by the orchestrator after every transition and by a person reading
 // a session folder: state.json against its schema; from the first transition on, the brief and the
 // budget are present and the brief's report is one of the declared shapes; no branch the chain moved
@@ -49,7 +50,9 @@ export async function v22SessionErrors(session, state, root = ROOT) {
   if (state?.contractVersion !== V22_CONTRACT) return errors;
   errors.push(...workflowOwnerErrors(root, session, state));
   errors.push(...missionHistorySnapshotErrors(session, state));
+  errors.push(...await coordinationStateErrors(root, session, state));
   if (state.runtimeRevision === 3 && state.mission?.discovery) errors.push(...frozenScopeErrors(state, { root }));
+  if (state.runtimeRevision === 3 && state.lifecycle?.phase !== 'draft') errors.push(...peerScopeErrors(state, { root }));
   const phase = state.lifecycle?.phase;
   const terminalSession = state.status === 'done' || ['closing', 'closed-success'].includes(phase);
   const workflowTopologyPolicy = JSON.parse(readFileSync(path.join(root, 'resources', 'orchestrator.json'), 'utf8')).workflowTopologies;
@@ -71,7 +74,7 @@ export async function v22SessionErrors(session, state, root = ROOT) {
     const confirmation = mission.confirmation;
     if (confirmation?.status !== 'confirmed') errors.push('state.json: an active session carries a confirmed mission version');
     const choice = state.choices?.[confirmation?.decisionId];
-    if (!choice || choice.selected !== 'as-stated' || choice.selectedBy !== 'user' || choice.sourceRef !== confirmation?.sourceRef) errors.push('state.json: mission.confirmation does not bind the matching explicit user goal-confirm choice');
+    if (!choice || choice.selected !== 'as-stated' || choice.selectedBy !== missionChoiceSource(mission) || choice.sourceRef !== confirmation?.sourceRef) errors.push('state.json: mission.confirmation does not bind its retained user or derived authority');
   }
   if (phase === 'closed-success') {
     if (state.status !== 'done') errors.push('state.json: closed-success requires status done');

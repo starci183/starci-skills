@@ -141,6 +141,24 @@
               "maxLength": 1000
             },
             "minItems": 1
+          },
+          "producer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sessionId", "impactId", "mission"],
+            "properties": {
+              "sessionId": { "type": "string", "pattern": "^(?!central-runtime$)(?!.*\\.\\.)[a-z0-9][a-z0-9.-]{0,127}$" },
+              "impactId": { "type": "string", "minLength": 1 },
+              "mission": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ref", "hash"],
+                "properties": {
+                  "ref": { "type": "string", "pattern": "^runtime/history/missions/[a-f0-9]{64}\\.json$" },
+                  "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+                }
+              }
+            }
           }
         }
       }

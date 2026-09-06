@@ -272,3 +272,4 @@ In **Operator Result** là bảng gate trong `response/response.md`, link từng
 | các gate xanh và có người yêu cầu đi thử hành trình | `uat.verify` |
 | các gate xanh và bản giao giờ phải được vận hành như một client đối với runtime đang phục vụ | `api.verify` |
 | các gate xanh và nhiệm vụ nêu hơn một hành trình, nên các luồng được gọi tên trước khi mỗi nhánh đi một luồng | `uat.plan` |
+| điều phối đã chấp nhận bộ kiểm thử tích hợp và cần kết thúc các workflow được phân công | `workflow.verify` |

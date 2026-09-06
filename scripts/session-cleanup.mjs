@@ -64,12 +64,24 @@ async function retainedFiles(session, state) {
   const contexts = new Set();
   const retainAddresses = async value => {
     if (!value || typeof value !== 'object') return;
+    // Derived authority points to the original coordinator's retained preparation, not a copy in
+    // this producer. The topology gate verifies that foreign seal; it is never rehomed here.
+    if (value.kind === 'coordination-extraction') return;
+    // A delegated impact keeps the original peer mission selector. Its referenced bytes belong
+    // to that peer's retention bundle, just as an extraction's foreign authority does.
+    if (typeof value.sessionId === 'string' && typeof value.impactId === 'string' && value.mission?.ref?.startsWith('runtime/history/missions/')) return;
     if (typeof value.ref === 'string' && value.ref.startsWith('runtime/history/')) {
-      const kind = /^runtime\/history\/(missions|invocations|plans)\//.exec(value.ref)?.[1];
+      const kind = /^runtime\/history\/(missions|invocations|plans|assignments|extractions|incorporations)\//.exec(value.ref)?.[1];
       if (!kind) throw Error('RETENTION_PATH: invalid immutable context address');
       if (contexts.has(value.ref)) return;
       const record = readContext(session, value, kind);
       contexts.add(value.ref); await add(value.ref);
+      if (kind === 'assignments') {
+        for (const address of [record.previous, record.coordinatorMission, record.extraction]) await retainAddresses(address);
+        return;
+      }
+      if (kind === 'extractions') { await retainAddresses(record.assignment); return; }
+      if (kind === 'incorporations') { if (record.intent) await retainAddresses(record.intent); return; }
       if (kind === 'plans') for (const [ref, expected] of Object.entries(record.retained?.files ?? {})) {
         await add(ref);
         if (await digest(await confinedFile(session,ref)) !== expected) throw Error(`RETENTION_CHANGED: retained plan evidence ${ref}`);
@@ -81,6 +93,8 @@ async function retainedFiles(session, state) {
   };
   await retainAddresses(state.missionSnapshots);
   await retainAddresses(state.planHistory);
+  if (state.coordination && !state.coordination.coordinatorSessionId) await retainAddresses(state.coordination);
+  await retainAddresses(state.coordination?.incorporations);
   for (const attempt of Object.values(state.attempts ?? {})) await retainAddresses(attempt.context);
   for (const attempt of Object.values(state.attempts ?? {})) {
     await add(attempt.requestRef);

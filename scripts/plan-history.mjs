@@ -302,6 +302,35 @@ export async function editForecast(root, session, state, original, edit, top) {
     forecast.chain.splice(index, 1, ...expanded.map(target => [target]));
     for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes','fanout','handoffs']) delete forecast[field]?.[cell];
   }
+  // Execution coordinates are immutable. Pull independent retained groups ahead of work that
+  // receives fresh coordinates, then project pending groups in stable dependency order.
+  const groups = forecast.chain.map((cells, index) => ({ cells, index, fixed: cells.some(cell => state.attempts?.[cell]), before: new Set() }));
+  const groupOf = new Map(groups.flatMap(group => group.cells.map(cell => [cell, group])));
+  const edge = (source, target) => {
+    const before = groupOf.get(source), after = groupOf.get(target);
+    if (!before || !after) return;
+    if (before === after) throw Error('PLAN_EDIT_DEPENDENCY: dependent cells cannot occupy the same parallel step');
+    after.before.add(before);
+  };
+  for (const group of groups) for (const cell of group.cells) {
+    if (group.fixed && !state.attempts?.[cell]) throw Error('PLAN_EDIT_BUSY: seal or explicitly reschedule every peer of a dispatched parallel step');
+    for (const dependency of [...(forecast.dependencies[cell] ?? []), ...(forecast.evidenceDependencies[cell] ?? []), ...(forecast.units?.[cell]?.dependsOn ?? [])]) edge(dependency, cell);
+    if (forecast.handoffs?.[cell]) edge(forecast.handoffs[cell], cell);
+    if (forecast.goals?.[cell]?.prerequisite) edge(cell, forecast.goals[cell].prerequisite);
+  }
+  const ordered = [], emitted = new Set();
+  const append = group => { ordered.push(group); emitted.add(group); };
+  for (const group of groups.filter(group => group.fixed)) {
+    if ([...group.before].some(dependency => !emitted.has(dependency))) throw Error('PLAN_EDIT_DEPENDENCY: retained execution cannot follow an unopened or later prerequisite');
+    append(group);
+  }
+  const pending = groups.filter(group => !group.fixed);
+  while (pending.length) {
+    const index = pending.findIndex(group => [...group.before].every(dependency => emitted.has(dependency)));
+    if (index < 0) throw Error('PLAN_EDIT_DEPENDENCY: pending forecast has no dependency-ordered projection');
+    append(pending.splice(index, 1)[0]);
+  }
+  forecast.chain = ordered.map(group => group.cells);
   const mapping = new Map(); let nextStep = Math.max(0,...Object.keys(state.attempts ?? {}).map(cell=>Number(cell.split('/')[0])));
   const occupied = new Set(readdirSync(session).filter(name=>/^step-\d+$/.test(name)).map(name=>Number(name.slice(5))));
   for (const step of forecast.chain) {
@@ -333,8 +362,24 @@ export async function previewRevision(root, session, flags = {}) {
   const active = state.planHistory?.active ? readContext(session, state.planHistory.active, 'plans') : null;
   if (active?.missionVersion === state.mission.version && !flags.edit && !Object.keys(flags.requirements ?? {}).length && !flags.roles?.length) throw Error('PLAN_EDIT_REQUIRED: the unchanged goal keeps its current forecast; use an explicit resume or accepted unit expansion instead of restarting it');
   const forecast = flags.edit && active?.missionVersion === state.mission.version ? await editForecast(root, session, state, active.forecast, flags.edit, top) : offsetForecast(plan, top);
+  const errors = await forecastErrors(root, session, state, forecast);
+  if (errors.length) throw Error(errors.join('\n'));
   const basis = { mission: scopeHash(state.mission), active: state.planHistory?.active ?? null, chain: state.chain, steps: state.steps, planned: state.planned, choices: state.choices, attempts: state.attempts, requestHashes: state.requestHashes, forecast };
   return { state, forecast, previewHash: fingerprint(basis), preview: previewChain(forecast, state.mission) };
+}
+
+async function forecastErrors(root, session, state, forecast) {
+  const { loadOperatorPackages } = await import('./operator-md.mjs');
+  const { validateChain, loadOperatorGraph, loadMaxParallel, readImportedInputs } = await import('./validate-chain.mjs');
+  const packages = await loadOperatorPackages(root), graph = await loadOperatorGraph(root, packages), planned = plannedOf(forecast);
+  const offset = Number(forecast.chain[0][0].split('/')[0]) - 1;
+  const plannedRequests = Object.fromEntries(Object.keys(forecast.steps).map(cell => [cell, { operatorId: forecast.steps[cell], goal: forecast.goals[cell], requirements: planned[cell].requirements }]));
+  const errors = validateChain(root, packages, forecast.chain, forecast.steps, plannedRequests, { graph, forecast, resumeOwners: state.steps, mission: state.mission, maxParallel: await loadMaxParallel(root), planned, coordinateOffset: offset, imported: await readImportedInputs(root, session, {}, { planned }) });
+  const { effectiveBudget } = await import('./validate-request.mjs');
+  const budget = effectiveBudget(state), combinedSteps = { ...state.steps, ...forecast.steps };
+  if (budget && Math.max(...Object.keys(combinedSteps).map(cell => Number(cell.split('/')[0]))) > budget.maxSteps) errors.push('BUDGET_EXHAUSTED: the reviewed forecast exceeds the retained finite step budget');
+  if (budget && budget.maxSameOperator !== null) for (const op of new Set(Object.values(combinedSteps))) if (new Set(Object.entries(combinedSteps).filter(([, value]) => value === op).map(([cell]) => cell.split('/')[0])).size > budget.maxSameOperator) errors.push(`BUDGET_EXHAUSTED: the forecast exceeds the retained same-operator budget for ${op}`);
+  return errors;
 }
 
 export async function commitRevision(root, session, input) {
@@ -357,19 +402,7 @@ export async function commitRevision(root, session, input) {
       if (isDeepStrictEqual(normalized(previousRecord.forecast), normalized(next.forecast))) throw Error('NO_PROGRESS: an identical forecast does not justify replacing current execution; use the exact blocked resume or accepted unit expansion');
     }
     const mission = await retainMission(session, state, { root });
-    const { loadOperatorPackages } = await import('./operator-md.mjs');
-    const { validateChain, loadOperatorGraph, loadMaxParallel, readImportedInputs } = await import('./validate-chain.mjs');
-    const packages = await loadOperatorPackages(root), graph = await loadOperatorGraph(root, packages);
     const forecast = next.forecast, planned = plannedOf(forecast);
-    const offset = Number(forecast.chain[0][0].split('/')[0]) - 1;
-    const plannedRequests = Object.fromEntries(Object.keys(forecast.steps).map(cell => [cell, { operatorId: forecast.steps[cell], goal: forecast.goals[cell], requirements: planned[cell].requirements }]));
-    const errors = validateChain(root, packages, forecast.chain, forecast.steps, plannedRequests, { graph, forecast, resumeOwners: state.steps, mission: state.mission, maxParallel: await loadMaxParallel(root), planned, coordinateOffset: offset, imported: await readImportedInputs(root, session, {}, { planned }) });
-    const { effectiveBudget } = await import('./validate-request.mjs');
-    const budget = effectiveBudget(state);
-    const combinedSteps = { ...state.steps, ...forecast.steps };
-    if (budget && Math.max(...Object.keys(combinedSteps).map(cell => Number(cell.split('/')[0]))) > budget.maxSteps) errors.push('BUDGET_EXHAUSTED: the reviewed forecast exceeds the retained finite step budget');
-    if (budget && budget.maxSameOperator !== null) for (const op of new Set(Object.values(combinedSteps))) if (new Set(Object.entries(combinedSteps).filter(([, value]) => value === op).map(([cell]) => cell.split('/')[0])).size > budget.maxSameOperator) errors.push(`BUDGET_EXHAUSTED: the forecast exceeds the retained same-operator budget for ${op}`);
-    if (errors.length) throw Error(errors.join('\n'));
     const cells = Object.keys(state.steps ?? {});
     const inventoryCells = cells.filter(cell=>existsSync(branchPath(session,cell)));
     const retained = structuredClone({ chain: state.chain, steps: state.steps, planned: state.planned, choices: state.choices, attempts: state.attempts, requestHashes: state.requestHashes, brief: state.brief, inventoryCells, files: inventory(session, inventoryCells) });

@@ -14,16 +14,18 @@ Primary output: `library-source-application`
 
 ## Outputs
 
-`library-source-application` `response/data/library.json`?
-`library-proof` `response/data/proofs/<phase>.json`?
-`library-release` `response/data/release.json`?
-`library-archive` `response/artifacts/release/<file>.tgz`?
-`dependency-update` `response/data/dependency.json`?
-`dependency-proof` `response/data/proofs/consumer-<phase>.json`?
-`dependency-log` `response/artifacts/proofs/consumer-<phase>.log`?
-`changes` `response/changes.md`
-`knowledge-coverage` `response/data/knowledge-coverage.json`?
-`family-understanding` `response/data/family-understanding.json`?
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`library-source-application` `response/data/library.json`? (data)
+`library-proof` `response/data/proofs/<phase>.json`? (data)
+`library-release` `response/data/release.json`? (data)
+`library-archive` `response/artifacts/release/<file>.tgz`? (artifact)
+`dependency-update` `response/data/dependency.json`? (data)
+`dependency-proof` `response/data/proofs/consumer-<phase>.json`? (data)
+`dependency-log` `response/artifacts/proofs/consumer-<phase>.log`? (artifact)
+`changes` `response/changes.md` (md)
+`knowledge-coverage` `response/data/knowledge-coverage.json`? (data)
+`family-understanding` `response/data/family-understanding.json`? (data)
 
 ## Stops
 

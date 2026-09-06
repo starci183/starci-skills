@@ -14,21 +14,23 @@ Primary output: `frontend-source-application`
 
 ## Outputs
 
-`frontend-direction-decision` `response/direction.md`
-`ui-coverage` `response/data/coverage.json`
-`candidates` `response/artifacts/<candidateId>.html`?
-`selected-candidate-capture` `response/artifacts/<candidateId>.<viewport>.png`
-`direction-image` `response/artifacts/images/<slot>.png`?
-`host` `response/artifacts/host.json`?
-`knowledge-question` `response/data/knowledge-question.json`?
-`knowledge-coverage` `response/data/knowledge-coverage.json`?
-`family-understanding` `response/data/family-understanding.json`?
-`frontend-presentation-resolution` `response/resolution.md`
-`inventory` `response/data/inventory.json`
-`resolved-tree` `response/artifacts/<target>.resolved.tsx`
-`frontend-source-application` `response/response.md`
-`changes` `response/changes.md`
-`writes` `response/data/writes.json`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`frontend-direction-decision` `response/direction.md` (md)
+`ui-coverage` `response/data/coverage.json` (data)
+`candidates` `response/artifacts/<candidateId>.html`? (artifact)
+`selected-candidate-capture` `response/artifacts/<candidateId>.<viewport>.png` (artifact)
+`direction-image` `response/artifacts/images/<slot>.png`? (artifact)
+`host` `response/artifacts/host.json`? (artifact)
+`knowledge-question` `response/data/knowledge-question.json`? (data)
+`knowledge-coverage` `response/data/knowledge-coverage.json`? (data)
+`family-understanding` `response/data/family-understanding.json`? (data)
+`frontend-presentation-resolution` `response/resolution.md` (md)
+`inventory` `response/data/inventory.json` (data)
+`resolved-tree` `response/artifacts/<target>.resolved.tsx` (artifact)
+`frontend-source-application` `response/response.md` (md)
+`changes` `response/changes.md` (md)
+`writes` `response/data/writes.json` (data)
 
 ## Stops
 

@@ -6,6 +6,14 @@ import path from 'node:path';
 import process from 'node:process';
 
 const mutations = new AsyncLocalStorage();
+const coordinationLocks = new AsyncLocalStorage();
+export async function withCoordinationLock(source, operation) {
+  if (!source) return operation();
+  source = path.resolve(source);
+  if (coordinationLocks.getStore() === source) return operation();
+  return withOwnedFileLock(path.join(source, '.workspaces', 'local', 'workflows', '.coordination-lock'),
+    () => coordinationLocks.run(source, operation));
+}
 export const currentSessionMutation = session => mutations.getStore()?.active && mutations.getStore().session === path.resolve(session) ? mutations.getStore().state : null;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function replaceFile(temp, file, { renameFile = rename, platform = process.platform, pause = wait } = {}) {
@@ -24,6 +32,24 @@ const processLives = (pid) => {
   try { process.kill(pid, 0); return true; }
   catch (error) { return error.code === 'EPERM'; }
 };
+
+async function recoverDeadOwner(lock) {
+  // Reapers serialize before reading the owner. Otherwise a second stale snapshot can unlink
+  // the fresh lock acquired after the first reaper removed the dead one. A damaged recovery
+  // marker fails closed; ordinary lock acquisition never removes an ambiguous live owner.
+  const recovery = `${lock}.recovery`;
+  let guard;
+  try { guard = await open(recovery, 'wx'); }
+  catch (error) { if (['EEXIST', 'EPERM', 'ENOENT'].includes(error.code)) return; throw error; }
+  try {
+    await guard.writeFile(JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }));
+    await guard.sync();
+    let held;
+    try { held = JSON.parse(await readFile(lock, 'utf8')); }
+    catch { return; }
+    if (!processLives(held.pid)) await rm(lock, { force: true });
+  } finally { await guard.close(); await rm(recovery, { force: true }); }
+}
 
 export async function withOwnedFileLock(lock, operation, { requiredFile = null } = {}) {
   lock = path.resolve(lock);
@@ -46,10 +72,7 @@ export async function withOwnedFileLock(lock, operation, { requiredFile = null }
         await mkdir(path.dirname(lock), { recursive: true });
       }
       if (error.code === 'EEXIST') {
-        try {
-          const held = JSON.parse(await readFile(lock, 'utf8'));
-          if (!processLives(held.pid)) await rm(lock, { force: true });
-        } catch {}
+        await recoverDeadOwner(lock);
       }
       // Windows can briefly return EPERM while another owner has closed and its lock file is
       // delete-pending. Retrying never removes that ambiguous file and therefore cannot unlock a
@@ -80,7 +103,10 @@ export async function withSessionLock(session, operation) {
 
 export async function mutateSession(session, operation) {
   session = path.resolve(session);
-  return withSessionLock(session, async () => {
+  // All Source-bound sessions share the admission domain, including a not-yet-enrolled writer.
+  // Only the metadata compare/reserve transition holds it; workers execute after this returns.
+  const initial = JSON.parse(await readFile(path.join(session, 'state.json'), 'utf8'));
+  return withCoordinationLock(initial.workflowOwner?.sourceRoot, () => withSessionLock(session, async () => {
     if (existsSync(path.join(session, 'relocation.json'))) throw Error('WORKFLOW_RELOCATED: retained source ledger is read-only; use its verified destination');
     const file = path.join(session, 'state.json');
     const state = JSON.parse(await readFile(file, 'utf8'));
@@ -93,7 +119,7 @@ export async function mutateSession(session, operation) {
     await writeFile(temp, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
     await replaceFile(temp, file);
     return result;
-  });
+  }));
 }
 
 export async function readSessionState(session) {

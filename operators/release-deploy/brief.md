@@ -14,8 +14,10 @@ Primary output: `release-deployment`
 
 ## Outputs
 
-`release-deployment` `response/response.md`
-`probes` `response/data/probes.json`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`release-deployment` `response/response.md` (md)
+`probes` `response/data/probes.json` (data)
 
 ## Stops
 

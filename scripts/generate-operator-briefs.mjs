@@ -27,8 +27,8 @@ export function renderBrief(pkg) {
   // The Requirements are not repeated here: the orchestrator fills their defaults into request.json
   // before dispatch (resources/orchestrator.json#agent.requirements), so the agent reads every value
   // there. The Next table is the orchestrator's, not the agent's: an agent ends its branch and never
-  // routes. The profile and dispatch mode are the orchestrator's too. Output types are not repeated
-  // either; the file name carries them, and the kind contract is read at the step that writes it.
+  // routes. The profile and dispatch mode are the orchestrator's too. Output types select the
+  // canonical kind authority and its copyable skeleton at the step that writes or resumes it.
   // An isolated agent (resources.mode) starts with an empty context: the brief says so in one line,
   // because nothing else in its context could.
   const isolated = pkg.manifest.resources?.mode === 'isolated';
@@ -49,7 +49,9 @@ export function renderBrief(pkg) {
     '',
     '## Outputs',
     '',
-    (op.tables.outputs?.rows ?? []).map((r) => `\`${kindOf(r.kind)}\` \`${unquote(r.file)}\`${optional(r)}`).join('\n'),
+    'Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.',
+    '',
+    (op.tables.outputs?.rows ?? []).map((r) => `\`${kindOf(r.kind)}\` \`${unquote(r.file)}\`${optional(r)} (${unquote(r.type)})`).join('\n'),
     '',
     '## Stops',
     '',

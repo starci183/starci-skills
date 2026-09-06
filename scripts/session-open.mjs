@@ -1,7 +1,7 @@
 import { retainMission } from './mission-history.mjs';
 import { evidenceManifestErrors } from './evidence-manifest.mjs';
 import { resolveWorkflowOwner, workflowOwnerErrors, sameRoot, RUNTIME_REVISION } from './workflow-root.mjs';
-import { scopeErrors, authorityErrors, scopeHash, scopeBindingErrors, completeDeliveryMission } from './mission-scope.mjs';
+import { scopeErrors, authorityErrors, scopeHash, scopeBindingErrors, completeDeliveryMission, peerScopeErrors } from './mission-scope.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, realpath, rename, writeFile } from 'node:fs/promises';
@@ -98,7 +98,7 @@ export async function openSession(sessionsRoot, input, { sourceRoot = path.dirna
     const sourceSessions = path.join(sourceRoot, '.worktrees', 'sessions');
     if (!sameRoot(sourceSessions, sessionsRoot) && await findReusable(sourceSessions, input.hostBinding)) throw Error('WORKFLOW_RESET_REQUIRED: archive the old Source ledger before opening the fresh project workflow');
     for (const name of await readdir(locatorRoot)) {
-      if (!name.endsWith('.json')) continue;
+      if (name.startsWith('.') || !name.endsWith('.json')) continue;
       const locator = await readWorkflowLocator(path.join(locatorRoot, name));
       if (locator === null) continue;
       const otherRoot = path.join(locator.ownerRoot, '.worktrees', 'sessions');
@@ -217,6 +217,7 @@ export async function missionCorrectionBusy(session, state, { waitingReentry = n
 
 export async function confirmSession(session, decision) {
   session = path.resolve(session);
+  if (decision.authority?.kind === 'coordination-extraction') throw Error('GOAL_AUTHORITY_REQUIRED: derived scope is admitted only by the producer self-enrolment command');
   if (!['as-stated', 'corrected', 'rejected'].includes(decision.selected)) throw new Error('decision.selected must be as-stated, corrected or rejected');
   if (decision.selectedBy !== 'user' || !decision.sourceRef) throw new Error('confirmation must bind the user message in selectedBy:user and sourceRef');
   const result = await mutateSession(session, async (state) => {
@@ -234,6 +235,7 @@ export async function confirmSession(session, decision) {
     if (decision.selected === 'as-stated') {
       if (state.runtimeRevision !== RUNTIME_REVISION) throw Error('WORKFLOW_RESET_REQUIRED: old scope cannot be confirmed for current dispatch');
       const authorizationErrors = authorityErrors(current, decision.authority, root);
+      authorizationErrors.push(...peerScopeErrors(state, { root }));
       authorizationErrors.push(...scopeBindingErrors(state, {}));
       if (decision.authority?.kind === 'bank-approval') {
         if (!current.bankRef) authorizationErrors.push('GOAL_AUTHORITY_REQUIRED: bank approval requires its unchanged bankRef');

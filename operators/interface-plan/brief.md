@@ -14,11 +14,13 @@ Primary output: `surface-map`
 
 ## Outputs
 
-`surface-map` `response/response.md`
-`units` `response/data/units.json`
-`knowledge-question` `response/data/knowledge-question.json`?
-`knowledge-coverage` `response/data/knowledge-coverage.json`?
-`family-understanding` `response/data/family-understanding.json`?
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`surface-map` `response/response.md` (md)
+`units` `response/data/units.json` (data)
+`knowledge-question` `response/data/knowledge-question.json`? (data)
+`knowledge-coverage` `response/data/knowledge-coverage.json`? (data)
+`family-understanding` `response/data/family-understanding.json`? (data)
 
 ## Stops
 

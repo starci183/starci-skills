@@ -203,3 +203,4 @@ Khi `done`, in **Operator Result** thành bảng verdict theo case và lane từ
 | một case runner gọi tên không đứng vững | `backend.generate` |
 | entry đã chứng thực thôi trả lời, nên route được phục vụ lại trước khi bộ kiểm chạy lại | `runtime.serve` |
 | hành trình API đã được chứng minh và cùng bản giao cần kiểm tra hành trình trình duyệt | `uat.verify` |
+| điều phối đã chấp nhận bộ kiểm thử tích hợp và cần kết thúc các workflow được phân công | `workflow.verify` |

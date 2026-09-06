@@ -290,7 +290,8 @@ test('a planned read-only prerequisite may bind a declared context without grant
   const f = workspaceCheckoutFixture();
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   try {
-    const state = { id: f.sessionId, project: f.project, workflowOwner: { sourceRoot: f.source }, mission: { doneWhen: [{ producedBy: 'business.decide' }], discovery: { repositories: [], lanes: {} } }, chain: [['1/1'], ['2/1']], steps: { '1/1': 'workspace.bind', '2/1': 'business.decide' }, planned: { '1/1': { requirements: { role: 'be' } }, '2/1': { requirements: {} } } };
+    // Direct-helper projection with no product authority, not a schema-valid opened session.
+    const state = { id: f.sessionId, project: f.project, workflowOwner: { sourceRoot: f.source }, mission: { doneWhen: [{ producedBy: 'business.decide' }], discovery: { repositories: [], impacts: [], lanes: {} } }, chain: [['1/1'], ['2/1']], steps: { '1/1': 'workspace.bind', '2/1': 'business.decide' }, planned: { '1/1': { requirements: { role: 'be' } }, '2/1': { requirements: {} } } };
     const request = { operatorId: 'workspace.bind', step: 1, parallel: 1, requirements: { project: f.project, role: 'be', checkout: 'routed', declaredWriteRoots: [] }, goal: { prerequisite: '2/1' }, environment: { workspace: null, writes: [] } };
     assert.equal(readOnlyPrerequisiteBinding(state, request, root), true);
     assert.deepEqual(scopeBindingErrors(state, request, root), []);
@@ -305,6 +306,7 @@ test('a planned read-only prerequisite may bind a declared context without grant
     ]) { const s = structuredClone(state), r = structuredClone(request); mutate(s, r); assert.equal(readOnlyPrerequisiteBinding(s, r, root), false); }
     assert.ok(scopeBindingErrors(state, { operatorId: 'backend.generate' }, root).some(error => error.includes('prerequisite bind grants no write impact')));
     assert.deepEqual(state.mission.discovery.repositories, [], 'read-only admission never rewrites discovery');
+    assert.deepEqual(state.mission.discovery.impacts, [], 'read-only admission grants no product impact');
   } finally { f.dispose(); }
 });
 

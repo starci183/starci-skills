@@ -25,6 +25,64 @@
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/taskId" },
           "additionalProperties": { "$ref": "#/$defs/peerV2" }
+        },
+        "coordination": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["assignment", "consumers", "combined"],
+          "properties": {
+            "assignment": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ref", "hash"],
+              "properties": {
+                "ref": { "type": "string", "pattern": "^runtime/history/assignments/[0-9a-f]{64}\\.json$" },
+                "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+              }
+            },
+            "consumers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["dependencyId", "incorporation", "regression"],
+                "properties": {
+                  "dependencyId": { "type": "string", "minLength": 1 },
+                  "incorporation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["step", "parallel", "kind"],
+                    "properties": {
+                      "step": { "type": "integer", "minimum": 1 },
+                      "parallel": { "type": "integer", "minimum": 1 },
+                      "kind": { "type": "string", "minLength": 1 }
+                    }
+                  },
+                  "regression": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["step", "parallel", "kind"],
+                    "properties": {
+                      "step": { "type": "integer", "minimum": 1 },
+                      "parallel": { "type": "integer", "minimum": 1 },
+                      "kind": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                }
+              }
+            },
+            "combined": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["sessionId", "step", "parallel", "kind"],
+              "properties": {
+                "sessionId": { "type": "string", "minLength": 1 },
+                "step": { "type": "integer", "minimum": 1 },
+                "parallel": { "type": "integer", "minimum": 1 },
+                "kind": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
         }
       }
     }

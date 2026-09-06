@@ -14,12 +14,14 @@ Primary output: `architecture-decision`
 
 ## Outputs
 
-`architecture-decision` `response/response.md`
-`restatement` `response/restatement.md`?
-`current-state` `response/data/current-state.json`
-`stack-model` `response/data/stack-model.json`
-`alternatives` `response/artifacts/<decisionId>-alternatives.html`?
-`independent-critique` `critique/response/critique.md`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`architecture-decision` `response/response.md` (md)
+`restatement` `response/restatement.md`? (md)
+`current-state` `response/data/current-state.json` (data)
+`stack-model` `response/data/stack-model.json` (data)
+`alternatives` `response/artifacts/<decisionId>-alternatives.html`? (artifact)
+`independent-critique` `critique/response/critique.md` (md)
 
 ## Stops
 

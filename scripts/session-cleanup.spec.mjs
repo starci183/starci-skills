@@ -8,6 +8,7 @@ import { retainSessionBundle, verifyRetention, closeSuccessfulSession } from './
 import { openSession, confirmSession, cleanupFixtureOwners } from './v23-test-fixture.mjs';
 import { openAttempt } from './attempt-gate.mjs';
 import { buildEvidenceManifest } from './evidence-manifest.mjs';
+import { retainContext } from './mission-history.mjs';
 
 async function fixture(run) {
   const base = mkdtempSync(path.join(tmpdir(), 'starci-retention-'));
@@ -54,6 +55,17 @@ test('retention copies imported slots as a closed bundle while local producer in
   const result = await retainSessionBundle(session,state,'finished');
   assert.ok(existsSync(path.join(result.bundle,'step-0/parallel-1/import.json')));
   assert.ok(existsSync(path.join(result.bundle,'step-0/parallel-1/response/artifacts/sidecar.txt')));
+}));
+
+test('coordinator retention preserves original delegated mission selectors without rehoming foreign proof', async () => fixture(async ({session,state,branch}) => {
+  branch('1/1');
+  const selector = {sessionId:'original-peer',impactId:'source',mission:{ref:'runtime/history/missions/'+'a'.repeat(64)+'.json',hash:'sha256:'+'a'.repeat(64)}};
+  const snapshot = await retainContext(session,'missions',{sessionId:state.id,mission:{...state.mission,discovery:{impacts:[{id:'delegated',producer:selector}]}}});
+  state.missionSnapshots = {1:snapshot};
+  const result = await retainSessionBundle(session,state,'finished');
+  const retained = JSON.parse(readFileSync(path.join(result.bundle,snapshot.ref),'utf8'));
+  assert.deepEqual(retained.mission.discovery.impacts[0].producer,selector);
+  assert.ok(!existsSync(path.join(result.bundle,selector.mission.ref)),'the foreign mission stays owned and retained by its original peer');
 }));
 
 test('a close interrupted before writing the sibling compact is recoverable; changed proof cannot reuse an archive', async () => fixture(async ({session,state,branch}) => {

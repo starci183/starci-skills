@@ -15,7 +15,7 @@ function scopeRows(mission) {
     'Impact: routes': list(impacts.map(item => `${item.role}: ${list(item.routes)}`)),
     'Impact: code': list(impacts.map(item => {
       const repository = discovery.repositories?.find(repo => repo.role === item.role);
-      return `${item.role} (${printable(repository?.repository)}): ${list(item.code)}`;
+      return `${item.role} (${printable(repository?.repository)}): ${list(item.code)}${item.producer ? `; executed by ${item.producer.sessionId}, impact ${item.producer.impactId}, scope ${item.producer.mission.hash}` : ''}`;
     })),
     'Workflow forecast': list(Object.entries(discovery.lanes ?? {}).map(([id, lane]) => `${id}: ${lane.status}; owner ${printable(lane.owner)}; depends on ${list(lane.dependsOn)}; ${printable(lane.reason)}`)),
     'Done when': list(mission.doneWhen),

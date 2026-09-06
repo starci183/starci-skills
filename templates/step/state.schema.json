@@ -992,7 +992,8 @@
                   "enum": [
                     "opening-scope",
                     "scope-answer",
-                    "bank-approval"
+                    "bank-approval",
+                    "coordination-extraction"
                   ]
                 },
                 "sourceRef": {
@@ -1047,6 +1048,57 @@
                     ]
                   },
                   "type": "object"
+                },
+                "derivation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "coordinator",
+                    "preparation"
+                  ],
+                  "properties": {
+                    "coordinator": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "sessionId",
+                        "taskId",
+                        "locatorHash"
+                      ],
+                      "properties": {
+                        "sessionId": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9.-]*$"
+                        },
+                        "taskId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "locatorHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        }
+                      }
+                    },
+                    "preparation": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "ref",
+                        "hash"
+                      ],
+                      "properties": {
+                        "ref": {
+                          "type": "string",
+                          "pattern": "^runtime/history/(assignments|extractions)/[0-9a-f]{64}\\.json$"
+                        },
+                        "hash": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -1242,6 +1294,43 @@
                       "maxLength": 1000
                     },
                     "minItems": 1
+                  },
+                  "producer": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "sessionId",
+                      "impactId",
+                      "mission"
+                    ],
+                    "properties": {
+                      "sessionId": {
+                        "type": "string",
+                        "pattern": "^(?!central-runtime$)(?!.*\\.\\.)[a-z0-9][a-z0-9.-]{0,127}$"
+                      },
+                      "impactId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "mission": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "ref",
+                          "hash"
+                        ],
+                        "properties": {
+                          "ref": {
+                            "type": "string",
+                            "pattern": "^runtime/history/missions/[a-f0-9]{64}\\.json$"
+                          },
+                          "hash": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -1449,6 +1538,173 @@
           "minItems": 1,
           "items": {
             "$ref": "#/$defs/historyAddress"
+          }
+        }
+      }
+    },
+    "coordination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "coordinatorSessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coordinator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sessionId",
+            "taskId",
+            "locatorHash"
+          ],
+          "properties": {
+            "sessionId": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9.-]*$"
+            },
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "locatorHash": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        },
+        "active": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ref",
+            "hash"
+          ],
+          "properties": {
+            "ref": {
+              "type": "string",
+              "pattern": "^runtime/history/(assignments|extractions)/[0-9a-f]{64}\\.json$"
+            },
+            "hash": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        },
+        "revisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ref",
+              "hash"
+            ],
+            "properties": {
+              "ref": {
+                "type": "string",
+                "pattern": "^runtime/history/(assignments|extractions)/[0-9a-f]{64}\\.json$"
+              },
+              "hash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "preparations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ref",
+              "hash"
+            ],
+            "properties": {
+              "ref": {
+                "type": "string",
+                "pattern": "^runtime/history/(assignments|extractions)/[0-9a-f]{64}\\.json$"
+              },
+              "hash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "incorporations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dependencyId",
+              "alias",
+              "intent",
+              "receipt"
+            ],
+            "properties": {
+              "dependencyId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "alias": {
+                "enum": [
+                  "@workspaces/be",
+                  "@workspaces/fe"
+                ]
+              },
+              "intent": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "ref",
+                  "hash"
+                ],
+                "properties": {
+                  "ref": {
+                    "type": "string",
+                    "pattern": "^runtime/history/incorporations/[a-f0-9]{64}\\.json$"
+                  },
+                  "hash": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "receipt": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "ref",
+                      "hash"
+                    ],
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "pattern": "^runtime/history/incorporations/[a-f0-9]{64}\\.json$"
+                      },
+                      "hash": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
           }
         }
       }

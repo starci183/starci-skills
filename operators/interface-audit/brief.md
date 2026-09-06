@@ -14,17 +14,19 @@ Primary output: `frontend-surface-audit`
 
 ## Outputs
 
-`frontend-surface-audit` `response/response.md`
-`capture` `response/data/captures/<matrixId>.json`
-`screenshot` `response/artifacts/<matrixId>.png`
-`verdicts` `response/data/verdicts.json`
-`findings` `response/data/findings.json`?
-`uat-walk` `response/data/walks/<walk>/walk.json`?
-`walk-result` `response/data/walks/<walk>/walk-result.json`?
-`host` `response/artifacts/host.json`?
-`knowledge-coverage` `response/data/knowledge-coverage.json`?
-`family-understanding` `response/data/family-understanding.json`?
-`knowledge-question` `response/data/knowledge-question.json`?
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`frontend-surface-audit` `response/response.md` (md)
+`capture` `response/data/captures/<matrixId>.json` (data)
+`screenshot` `response/artifacts/<matrixId>.png` (artifact)
+`verdicts` `response/data/verdicts.json` (data)
+`findings` `response/data/findings.json`? (data)
+`uat-walk` `response/data/walks/<walk>/walk.json`? (data)
+`walk-result` `response/data/walks/<walk>/walk-result.json`? (data)
+`host` `response/artifacts/host.json`? (artifact)
+`knowledge-coverage` `response/data/knowledge-coverage.json`? (data)
+`family-understanding` `response/data/family-understanding.json`? (data)
+`knowledge-question` `response/data/knowledge-question.json`? (data)
 
 ## Stops
 

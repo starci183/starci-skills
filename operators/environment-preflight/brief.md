@@ -14,8 +14,10 @@ none
 
 ## Outputs
 
-`environment-readiness` `response/response.md`
-`readiness-report` `response/data/readiness-report.json`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`environment-readiness` `response/response.md` (md)
+`readiness-report` `response/data/readiness-report.json` (data)
 
 ## Stops
 

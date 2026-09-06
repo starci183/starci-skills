@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { validateAgainst } from './json-schema.mjs';
 import { evidenceManifestErrors } from './evidence-manifest.mjs';
 import { workflowTopologyMode, workflowTopologyPeers, sessionWorkflowTopologyErrors } from './workflow-topology.mjs';
+import { buildCoordinationVerification } from './workflow-coordination.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WORKFLOW_OPERATOR = 'workflow.verify';
@@ -67,15 +68,18 @@ export function workflowPeerSnapshotErrors(root, branch, request, state) {
   const shapeErrors = validateAgainst(schema(root, 'workflow-peers'), snapshot, WORKFLOW_PEERS);
   if (shapeErrors.length) return [...errors, ...shapeErrors];
   if (!(request.frozenInputs ?? []).some(item => item.ref === WORKFLOW_PEERS && item.sha256 === sha(bytes))) errors.push('workflow peers snapshot must be sealed in frozenInputs at its exact digest');
+  if (state.coordination?.active && (snapshot.version !== 2 || canonical(snapshot.coordination?.assignment) !== canonical(state.coordination.active))) errors.push('workflow peers snapshot must freeze its current coordinated assignment');
   const tracked = workflowTopologyPeers(policy, state) ?? {};
   if (Object.keys(tracked).sort().join('\n') !== Object.keys(snapshot.peers).sort().join('\n')) errors.push('workflow peers snapshot must name exactly the tracked peer tasks');
   const expectedGoals = (state.mission?.doneWhen ?? []).filter(line => line.producedBy === WORKFLOW_OPERATOR).map(line => line.evidence);
   if (!expectedGoals.length || new Set(expectedGoals).size !== expectedGoals.length) errors.push('workflow.verify requires distinct coordinator doneWhen evidence lines produced by this operator');
   const covered = new Set();
   const sessionIds = new Set();
+  for (const impact of state.mission?.discovery?.impacts ?? []) if (impact.producer && !Object.values(snapshot.peers).some(peer => peer.sessionId === impact.producer.sessionId)) errors.push(`workflow peers snapshot omits the original owner of impact ${impact.id}`);
   const contexts = request.contexts ?? [];
   const boundAliases = new Set(contexts.map(context => context.alias));
   const allowedPeerAliases = new Set(Object.values(snapshot.peers).flatMap(peer => ['sessions', 'done'].map(zone => `@worktrees/${zone}/${peer.sessionId}`)));
+  if (snapshot.coordination) for (const zone of ['sessions', 'done']) allowedPeerAliases.add(`@worktrees/${zone}/${state.id}`);
   const seenPeerAliases = new Set();
   for (const [index, context] of contexts.entries()) {
     const alias = context?.alias;
@@ -369,6 +373,11 @@ export async function buildWorkflowVerification(root, branch, request, state, { 
       report.peers.push(peerReport);
     } catch (error) { errors.push(`workflow peer ${taskId}: ${error.message}`); }
   }
+  if (!errors.length) try {
+    const coordinatorSession = path.resolve(branch, '..', '..');
+    const coordination = await buildCoordinationVerification(root, coordinatorSession, state, snapshot, report.peers, request);
+    if (coordination) report.coordination = coordination;
+  } catch (error) { errors.push(`workflow coordination: ${error.message}`); }
   if (sha(readFileSync(confined(branch, WORKFLOW_PEERS))) !== report.snapshotHash) errors.push('workflow peer snapshot changed during verification');
   return { errors, report: errors.length ? null : report };
 }

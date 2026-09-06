@@ -14,9 +14,11 @@ Primary output: `migration-release`
 
 ## Outputs
 
-`migration-release` `response/migration-release.md`
-`migration-release-proof` `response/data/migration-release.json`
-`migration-log` `response/artifacts/migration-<n>.log`?
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`migration-release` `response/migration-release.md` (md)
+`migration-release-proof` `response/data/migration-release.json` (data)
+`migration-log` `response/artifacts/migration-<n>.log`? (artifact)
 
 ## Stops
 

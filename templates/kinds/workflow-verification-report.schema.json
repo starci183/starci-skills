@@ -27,6 +27,165 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/peerV2" }
+        },
+        "coordination": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["assignment", "edges", "heads", "fingerprint", "combined"],
+          "properties": {
+            "assignment": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ref", "hash"],
+              "properties": {
+                "ref": { "type": "string", "pattern": "^runtime/history/assignments/[0-9a-f]{64}\\.json$" },
+                "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+              }
+            },
+            "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "edges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["dependencyId", "producerSessionId", "consumerSessionId", "producer", "incorporation", "regression"],
+                "properties": {
+                  "dependencyId": { "type": "string", "minLength": 1 },
+                  "producerSessionId": { "type": "string", "minLength": 1 },
+                  "consumerSessionId": { "type": "string", "minLength": 1 },
+                  "producer": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["fingerprint", "requestHash"],
+                    "properties": {
+                      "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                      "requestHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+                    }
+                  },
+                  "incorporation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["step", "parallel", "fingerprint", "requestHash", "sourceReceipts"],
+                    "properties": {
+                      "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                      "requestHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                      "step": { "type": "integer", "minimum": 1 },
+                      "parallel": { "type": "integer", "minimum": 1 },
+                      "sourceReceipts": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["alias", "intent", "receipt"],
+                          "properties": {
+                            "alias": { "type": "string", "pattern": "^@workspaces/(fe|be)$" },
+                            "intent": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["ref", "hash"],
+                              "properties": {
+                                "ref": { "type": "string", "pattern": "^runtime/history/incorporations/[0-9a-f]{64}\\.json$" },
+                                "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+                              }
+                            },
+                            "receipt": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": ["ref", "hash"],
+                              "properties": {
+                                "ref": { "type": "string", "pattern": "^runtime/history/incorporations/[0-9a-f]{64}\\.json$" },
+                                "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "regression": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["step", "parallel", "fingerprint", "requestHash"],
+                    "properties": {
+                      "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                      "requestHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                      "step": { "type": "integer", "minimum": 1 },
+                      "parallel": { "type": "integer", "minimum": 1 }
+                    }
+                  }
+                }
+              }
+            },
+            "heads": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["sessionId", "alias", "head"],
+                "properties": {
+                  "sessionId": { "type": "string", "minLength": 1 },
+                  "alias": { "type": "string", "minLength": 1 },
+                  "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+                }
+              }
+            },
+            "combined": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["sessionId", "step", "parallel", "fingerprint", "requestHash", "heads", "runtime"],
+              "properties": {
+                "sessionId": { "type": "string", "minLength": 1 },
+                "step": { "type": "integer", "minimum": 1 },
+                "parallel": { "type": "integer", "minimum": 1 },
+                "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "requestHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "heads": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["repository", "head", "contributions", "alias"],
+                    "properties": {
+                      "repository": { "type": "string", "minLength": 1 },
+                      "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+                      "contributions": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["sessionId", "head"],
+                          "properties": {
+                            "sessionId": { "type": "string", "minLength": 1 },
+                            "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+                          }
+                        }
+                      },
+                      "alias": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "runtime": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["alias", "head", "repositoryHash", "endpoint", "fingerprint"],
+                    "properties": {
+                      "alias": { "enum": ["@workspaces/fe", "@workspaces/be"] },
+                      "head": { "$ref": "#/$defs/head" },
+                      "repositoryHash": { "$ref": "#/$defs/hash" },
+                      "endpoint": { "type": "string", "pattern": "^https?://" },
+                      "fingerprint": { "$ref": "#/$defs/hash" }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

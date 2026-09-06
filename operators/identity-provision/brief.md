@@ -14,10 +14,12 @@ Primary output: `uat-account`
 
 ## Outputs
 
-`platform-operation-receipt` `response/response.md`
-`delta` `response/data/delta.json`
-`checks` `response/data/checks.json`
-`uat-account` `response/data/account.json`?
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`platform-operation-receipt` `response/response.md` (md)
+`delta` `response/data/delta.json` (data)
+`checks` `response/data/checks.json` (data)
+`uat-account` `response/data/account.json`? (data)
 
 ## Stops
 

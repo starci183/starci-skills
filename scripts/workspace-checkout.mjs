@@ -25,6 +25,10 @@ function git(cwd, ...args) {
   try { return execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: gitEnv() }); }
   catch { fail('ROUTE_MISMATCH', 'read-only Git identity verification failed'); }
 }
+function gitMutation(cwd, ...args) {
+  try { return execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: gitEnv() }); }
+  catch { fail('COORDINATION_MERGE_FAILED', 'normal Git merge or commit failed, including repository hooks or signing; retain the pending checkout for owner repair'); }
+}
 // The same read, without the refusal: a history question whose answer may lawfully be "there is none"
 // (a checkout with no stash ref, a commit this repository never had) is asked here and read as null.
 function gitTry(cwd, ...args) {
@@ -241,6 +245,63 @@ export function sourceCheckoutOf(root, branchDir, request) {
     if (!state?.project || !alias || !isSessionId(request?.sessionId)) return null;
     return sessionWorktreeOf({ source: path.dirname(root), project: state.project, role: alias.slice('@workspaces/'.length), sessionId: request.sessionId });
   } catch { return null; }
+}
+
+// Consumer-owned shared-source integration. Ownership/import authority is established by the
+// coordination caller; this boundary measures Git, preserves dirty work and honors normal hooks.
+export function sharedSourceIntent(worktree, sourceHead, roots) {
+  const head = git(worktree, 'rev-parse', 'HEAD').trim();
+  requireThat(/^[a-f0-9]{40}$/.test(sourceHead), 'COORDINATION_INCORPORATION', 'producer must name an exact commit');
+  requireThat(git(worktree, 'status', '--porcelain', '--untracked-files=normal').trim() === '', 'COORDINATION_DIRTY', 'consumer checkout is dirty; preserve and finish its local work before incorporation');
+  const bases = git(worktree, 'merge-base', '--all', head, sourceHead).trim().split(/\s+/);
+  requireThat(bases.length === 1, 'COORDINATION_INCORPORATION', 'shared source requires one unambiguous merge base');
+  const paths = git(worktree, 'diff', '--no-renames', '--name-only', '-z', bases[0], sourceHead).split('\0').filter(Boolean);
+  for (const file of paths) {
+    requireThat(roots.some(root => root === '.' || file === root || file.startsWith(root + '/')), 'COORDINATION_INCORPORATION', 'producer diff leaves the transferred roots, including rename/delete paths');
+    for (const revision of [bases[0], sourceHead]) {
+      const entry = git(worktree, 'ls-tree', revision, '--', file).trim();
+      requireThat(!/^(120000|160000)\s/.test(entry), 'COORDINATION_INCORPORATION', 'changed symlinks and submodules require separate source review');
+    }
+    const absolute = path.resolve(worktree, file), nearest = realExistingAncestor(absolute);
+    requireThat(within(real(worktree), nearest), 'COORDINATION_INCORPORATION', 'producer path traverses a consumer filesystem alias outside its checkout');
+  }
+  const already = gitTry(worktree, 'merge-base', '--is-ancestor', sourceHead, head) !== null;
+  let tree;
+  try { tree = already ? git(worktree, 'rev-parse', `${head}^{tree}`).trim() : git(worktree, 'merge-tree', '--write-tree', head, sourceHead).trim().split('\n')[0]; }
+  catch { fail('COORDINATION_CONFLICT', 'shared source conflicts with consumer changes; no checkout or ref was changed'); }
+  requireThat(/^[a-f0-9]{40}$/.test(tree), 'COORDINATION_INCORPORATION', 'Git did not produce one intended merge tree');
+  return { oldHead: head, sourceHead, base: bases[0], tree, paths, mode: already ? 'already-present' : 'merge' };
+}
+function realExistingAncestor(file) {
+  let parent = file;
+  while (!existsSync(parent) && path.dirname(parent) !== parent) parent = path.dirname(parent);
+  return real(parent);
+}
+export function sharedSourceResult(worktree, intent, { execute = false } = {}) {
+  const head = () => git(worktree, 'rev-parse', 'HEAD').trim();
+  const clean = () => git(worktree, 'status', '--porcelain', '--untracked-files=normal').trim() === '';
+  let actual = head();
+  if (actual === intent.oldHead && intent.mode === 'merge' && execute) {
+    const mergeHead = gitTry(worktree, 'rev-parse', '--verify', 'MERGE_HEAD')?.trim();
+    if (mergeHead) {
+      requireThat(git(worktree, 'ls-files', '--others', '--exclude-standard').trim() === '', 'COORDINATION_DIRTY', 'untracked consumer work appeared during the pending merge; retain it before retry');
+      requireThat(mergeHead === intent.sourceHead && git(worktree, 'write-tree').trim() === intent.tree && git(worktree, 'diff', '--name-only').trim() === '', 'COORDINATION_INCORPORATION', 'interrupted merge differs from the frozen intent; retain it for owner repair');
+      gitMutation(worktree, 'commit', '-m', intent.message);
+    } else {
+      requireThat(clean(), 'COORDINATION_DIRTY', 'consumer changed after its frozen incorporation intent');
+      // git merge performs an expected-old reference update and executes repository hooks/signing.
+      // A hook failure remains a real pending merge; it is never bypassed or reset by this helper.
+      gitMutation(worktree, 'merge', '--no-ff', '--no-edit', '--no-stat', '-m', intent.message, intent.sourceHead);
+    }
+    actual = head();
+  }
+  const parents = git(worktree, 'show', '-s', '--format=%P', actual).trim().split(/\s+/).filter(Boolean);
+  requireThat(intent.mode === 'already-present' ? actual === intent.oldHead : parents.length === 2 && parents[0] === intent.oldHead && parents[1] === intent.sourceHead,
+    'COORDINATION_INCORPORATION', 'consumer HEAD does not have the frozen expected-old and producer parents');
+  requireThat(git(worktree, 'rev-parse', `${actual}^{tree}`).trim() === intent.tree, 'COORDINATION_INCORPORATION', 'actual merge tree differs from the frozen intent');
+  if (intent.mode === 'merge') requireThat(git(worktree, 'show', '-s', '--format=%B', actual).trim() === intent.message, 'COORDINATION_INCORPORATION', 'actual merge message does not identify the frozen consumption');
+  requireThat(clean(), 'COORDINATION_DIRTY', 'incorporation left local changes; preserve them and repair before recording completion');
+  return { head: actual, parents, tree: intent.tree };
 }
 
 export function resolveWorkspaceCheckout({ source = path.dirname(ROOT), project, role, sessionId, checkout = 'routed', declaredWriteRoots = [], sharedInstall = false }) {

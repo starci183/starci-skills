@@ -14,14 +14,16 @@ Primary output: `content-generation-receipt`
 
 ## Outputs
 
-`content-generation-receipt` `response/response.md`
-`content-brief` `response/brief.md`
-`e2e` `response/data/e2e.json`?
-`content-review` `review/response/review.md`
-`article` `response/artifacts/article.<language>.md`
-`image` `response/artifacts/image.<name>`?
-`image-prompt` `response/artifacts/prompt.<name>.txt`?
-`track` `response/artifacts/track.<language>.<extension>`?
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`content-generation-receipt` `response/response.md` (md)
+`content-brief` `response/brief.md` (md)
+`e2e` `response/data/e2e.json`? (data)
+`content-review` `review/response/review.md` (md)
+`article` `response/artifacts/article.<language>.md` (artifact)
+`image` `response/artifacts/image.<name>`? (artifact)
+`image-prompt` `response/artifacts/prompt.<name>.txt`? (artifact)
+`track` `response/artifacts/track.<language>.<extension>`? (artifact)
 
 ## Stops
 

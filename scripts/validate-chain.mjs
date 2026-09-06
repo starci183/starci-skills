@@ -307,7 +307,7 @@ export async function readImportedInputs(root, session, byBranch, { hostRoot, pl
     for (const [kind, ref] of Object.entries(refs)) {
       const m = /^step-(\d+)\/parallel-(\d+)\//.exec(String(ref));
       if (!m || !existsSync(path.join(session, `step-${m[1]}`, `parallel-${m[2]}`, 'import.json'))) continue;
-      const errors = await validateImportedInput(root, session, ref, kind, { ...(hostRoot ? { hostRoot } : {}), receivingSessionId: request?.sessionId ?? path.basename(session) });
+      const errors = await validateImportedInput(root, session, ref, kind, { ...(hostRoot ? { hostRoot } : {}), receivingSessionId: request?.sessionId ?? path.basename(session), receivingContractVersion: request?.contractVersion });
       if (!errors.length) (out[cell] ??= new Set()).add(kind);
     }
   }

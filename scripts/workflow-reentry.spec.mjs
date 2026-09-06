@@ -196,6 +196,33 @@ function seedOutputs(f,cell) {
  f.write(path.join(f.branch(cell),'response/response.md'),md);f.write(path.join(f.branch(cell),'response/data/units.json'),{schemaVersion:9,producedBy:'data.plan',units});
 }
 
+for(const pendingDependsOnFailure of [false,true]) test(`retry preview and commit preserve an accepted later independent cell with ${pendingDependsOnFailure?'dependent':'independent'} pending work`,async t=>{
+ const f=await fixture(t),request=cell=>f.request(cell,'data.plan',{goal:'Two attributable fixture units',feature:'items',env:'dev'},[{alias:'@workspaces/be',head:f.sessionHead},{alias:'@worktrees/_templates',head:null},{alias:'@worktrees/uat/items',head:null}]);
+ let state=f.state();state.choices['budget:independent-retry']={selected:'continue',selectedBy:'user',sourceRef:'user:fixture-authorized-independent-retry'};state.budget.extensions=[{decisionId:'budget:independent-retry',maxSteps:24,maxSameOperator:8}];state.chain=[['1/1'],['2/1'],['3/1'],['4/1'],['5/1']];state.steps={'1/1':'workspace.bind','2/1':'data.plan','3/1':'data.plan','4/1':'data.plan','5/1':'data.plan'};f.save(state);
+ for(const [cell,status]of [['2/1','mismatch'],['4/1','done']]) {
+  const r=request(cell);await f.open(r);seedOutputs(f,cell);
+  assert.equal((await f.accept(r,f.response(r,status,{'seed-plan':'response/response.md',units:'response/data/units.json'}))).state,status==='done'?'matched':'mismatched');
+ }
+ state=f.state();const forecast={chain:state.chain,steps:state.steps,goals:{},presets:{},nodes:{},dependencies:{'1/1':[],'2/1':['1/1'],'3/1':[pendingDependsOnFailure?'2/1':'1/1'],'4/1':['1/1'],'5/1':['2/1','3/1']},evidenceDependencies:{},reasons:{},imports:{},fanout:{},handoffs:{}};
+ for(const cell of state.chain.flat()){const r=cell==='1/1'?f.bind:request(cell);forecast.goals[cell]=r.goal;forecast.presets[cell]=r.requirements;forecast.nodes[cell]=`original:${cell}`;forecast.evidenceDependencies[cell]=[];}
+ state.planned=Object.fromEntries(Object.entries(forecast.presets).map(([cell,requirements])=>[cell,{requirements}]));
+ const original=await retainContext(f.session,'plans',{version:1,sessionId:state.id,previous:null,missionVersion:1,scopeHash:scopeHash(state.mission),forecast,planned:state.planned,retained:{choices:{},attempts:{},requestHashes:{},steps:{},inventoryCells:[],files:{}}});state.planHistory={active:original,revisions:[original]};f.save(state);
+ const accepted=structuredClone(state.attempts['4/1']),files=['request/request.json','response/response.json','response/response.md','response/data/units.json'],bytes=files.map(ref=>readFileSync(path.join(f.branch('4/1'),ref)));
+ const flags={edit:{kind:'retry',cell:'2/1'}},preview=await f.plans.previewRevision(f.runtime,f.session,flags);
+ const committed=await f.plans.commitRevision(f.runtime,f.session,{flags,previewHash:preview.previewHash,reason:'Retain the accepted independent plan while retrying the earlier failed plan and preserving remaining dependencies.'});
+ assert.deepEqual(committed.forecast,preview.forecast,'commit accepts exactly the reviewed projection');
+ assert.deepEqual(committed.forecast.chain,[['1/1'],['2/1'],['4/1'],['5/1'],['6/1'],['7/1']]);
+ const retryCell=pendingDependsOnFailure?'5/1':'6/1',pendingCell=pendingDependsOnFailure?'6/1':'5/1';
+ assert.equal(committed.forecast.nodes['4/1'],'original:4/1');assert.equal(committed.forecast.nodes[pendingCell],'original:3/1');assert.equal(committed.forecast.nodes['7/1'],'original:5/1');
+ assert.equal(committed.forecast.retries[retryCell].source,'2/1');assert.deepEqual(committed.forecast.dependencies['7/1'],[retryCell,pendingCell]);
+ if(pendingDependsOnFailure)assert.deepEqual(committed.forecast.dependencies[pendingCell],[retryCell],'the newly numbered retry precedes the earlier planned dependent node');
+ assert.deepEqual(f.state().attempts['4/1'],accepted);files.forEach((ref,index)=>assert.deepEqual(readFileSync(path.join(f.branch('4/1'),ref)),bytes[index]));assert.equal(f.state().attempts['3/1'],undefined);assert.equal(f.state().current,'5/1');
+ assert.deepEqual(planHistoryErrors(f.session,f.state()),[]);assert.deepEqual(await(await f.load('scripts/validate-chain.mjs')).validateSessionChain(f.runtime,f.session,f.state()),[]);
+ const impossible=structuredClone(forecast);impossible.dependencies['4/1']=['3/1'];await assert.rejects(f.plans.editForecast(f.runtime,f.session,f.state(),impossible,flags.edit),/PLAN_EDIT_DEPENDENCY: retained execution/);
+ const cycle=structuredClone(forecast);cycle.dependencies['3/1']=['5/1'];await assert.rejects(f.plans.editForecast(f.runtime,f.session,f.state(),cycle,flags.edit),/PLAN_EDIT_DEPENDENCY: pending forecast/);
+ assert.deepEqual(f.state().attempts['4/1'],accepted);files.forEach((ref,index)=>assert.deepEqual(readFileSync(path.join(f.branch('4/1'),ref)),bytes[index]));
+});
+
 for(const status of ['mismatched','inconclusive']) test(`sealed historical bind survives later dirt; ${status} preview/commit preserves proof and official fresh retry requires progress`,async t=>{
  const f=await fixture(t),original=await seedFailure(f,status),before=readFileSync(path.join(f.branch('2/1'),'response/response.json'));
  f.write(path.join(f.selected,'outside.md'),'Later work outside the old binding.\n');

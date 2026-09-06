@@ -182,7 +182,7 @@ publish bị giữ lại. Khi nó vắng, head đã publish là thẩm quyền. 
 | `business-reconciliation` | `business.reconcile`; những sai lệch mà một lần đối chiếu ghi nhận trên source đã giao, sửa dưới scope `fix` mà không nới contract | không |
 | `architecture-decision` | `architecture.decide`; contract mutation đã đóng băng mà phần cài đặt điền vào và không được nới, và là nguồn của mọi operation lượt chạy này thuật lại | có |
 | `model` | `business.decide`; head mà nhánh đó đã mô hình hoá, khi nó chưa được publish | không |
-| `backend-source-application` | một lượt chạy trước của `backend.generate` cho cùng kết quả; lịch sử hồi quy, vắng mặt ở lần đầu | không |
+| `backend-source-application` | lượt trước cho cùng kết quả, hoặc producer chung được chấp nhận đúng theo phân công điều phối; gắn bản nhập có kiểu từ bản gốc trước khi tích hợp | không |
 | `units` | `backend.plan`; danh sách module mà nhánh này điền đúng một module dưới scope full, gọi tên bằng `request.unit` | không |
 
 ## Yêu cầu

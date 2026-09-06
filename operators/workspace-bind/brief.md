@@ -14,8 +14,10 @@ none
 
 ## Outputs
 
-`workspace-route-binding` `response/response.md`
-`route` `response/data/route.json`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`workspace-route-binding` `response/response.md` (md)
+`route` `response/data/route.json` (data)
 
 ## Stops
 

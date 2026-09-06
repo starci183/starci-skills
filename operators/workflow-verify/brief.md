@@ -14,7 +14,9 @@ none
 
 ## Outputs
 
-`workflow-verification-report` `response/data/workflow-verification-report.json`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`workflow-verification-report` `response/data/workflow-verification-report.json` (data)
 
 ## Stops
 

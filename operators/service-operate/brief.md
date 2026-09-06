@@ -14,7 +14,9 @@ none
 
 ## Outputs
 
-`service-receipt` `response/response.md`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`service-receipt` `response/response.md` (md)
 
 ## Stops
 

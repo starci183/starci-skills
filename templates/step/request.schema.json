@@ -135,6 +135,102 @@
           "properties": { "step": { "type": "integer", "minimum": 1 }, "parallel": { "type": "integer", "minimum": 1 }, "token": { "type": "string", "minLength": 1 } }
         }
       ]
+    },
+    "coordination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coordinatorSessionId", "assignment"],
+      "properties": {
+        "coordinatorSessionId": { "type": "string", "minLength": 1 },
+        "assignment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref", "hash"],
+          "properties": {
+            "ref": { "type": "string", "pattern": "^runtime/history/(assignments|extractions)/[0-9a-f]{64}\\.json$" },
+            "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+          }
+        },
+        "integration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterionId", "repositories", "runtime"],
+          "properties": {
+            "criterionId": { "type": "string", "minLength": 1 },
+            "repositories": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["repository", "head", "contributions"],
+                "properties": {
+                  "repository": { "type": "string", "minLength": 1 },
+                  "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+                  "contributions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["sessionId", "head"],
+                      "properties": {
+                        "sessionId": { "type": "string", "minLength": 1 },
+                        "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "runtime": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["alias", "routeKey", "before", "after", "verification"],
+                "properties": {
+                  "alias": { "enum": ["@workspaces/fe", "@workspaces/be"] },
+                  "routeKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*/(fe|be)$" },
+                  "before": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["sessionId", "step", "parallel"],
+                    "properties": {
+                      "sessionId": { "type": "string", "pattern": "^(?!central-runtime$)(?!.*\\.\\.)[a-z0-9][a-z0-9.-]{0,127}$" },
+                      "step": { "type": "integer", "minimum": 1 },
+                      "parallel": { "type": "integer", "minimum": 1 }
+                    }
+                  },
+                  "after": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["sessionId", "step", "parallel"],
+                    "properties": {
+                      "sessionId": { "type": "string", "pattern": "^(?!central-runtime$)(?!.*\\.\\.)[a-z0-9][a-z0-9.-]{0,127}$" },
+                      "step": { "type": "integer", "minimum": 1 },
+                      "parallel": { "type": "integer", "minimum": 1 }
+                    }
+                  },
+                  "verification": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["sessionId", "step", "parallel", "kind"],
+                    "properties": {
+                      "sessionId": { "type": "string", "pattern": "^(?!central-runtime$)(?!.*\\.\\.)[a-z0-9][a-z0-9.-]{0,127}$" },
+                      "step": { "type": "integer", "minimum": 1 },
+                      "parallel": { "type": "integer", "minimum": 1 },
+                      "kind": { "enum": ["api-verification", "uat-flow-verification"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "allOf": [

@@ -23,7 +23,8 @@ import { evidenceManifestErrors } from './evidence-manifest.mjs';
 import { isJourney, journeyUnits, tierOf, verifiesUnits, laneOf } from './unchecked.mjs';
 import { normalizeResource, resourcesOverlap } from './resource-locks.mjs';
 import { retiredPlanCell, activePlanView, planAdmissionErrors } from './plan-history.mjs';
-import { invocationState } from './mission-history.mjs';
+import { invocationState, missionChoiceSource } from './mission-history.mjs';
+import { coordinationAdmissionErrors } from './workflow-coordination.mjs';
 import { currentRequestPhase } from './validation-phase.mjs';
 import { sessionWorkflowTopologyErrors } from './workflow-topology.mjs';
 import { resolvedWaitingReplanErrors } from './resolved-waiting.mjs';
@@ -161,7 +162,7 @@ export function missionGateErrors(state, request, packages, policy = { selection
   if (!choice) { refuse(`no choices["${decisionId}"]; the person answers the goal-confirm question and the answer is recorded before the first dispatch`); return errors; }
   if (choice.selected === 'corrected') refuse(`version ${mission.version} was corrected; the corrected goal is written as version ${mission.version + 1} and asked again`);
   else if (choice.selected !== 'as-stated') refuse(`choices["${decisionId}"].selected is ${choice.selected}, not as-stated`);
-  if (choice.selectedBy !== policy.selectionSource) refuse(`choices["${decisionId}"] is selected by ${choice.selectedBy}, never by an agent`);
+  if (choice.selectedBy !== (missionChoiceSource(mission) === 'coordinator' ? 'coordinator' : policy.selectionSource)) refuse(`choices["${decisionId}"] must be selected by its retained user or exact derived authority, never by an agent self-assertion`);
   if (typeof choice.sourceRef !== 'string' || !choice.sourceRef.trim()) refuse(`choices["${decisionId}"] carries no sourceRef to the person's message`);
   return errors;
 }
@@ -737,12 +738,16 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   for (const [kind, p] of Object.entries(request.inputs ?? {})) {
     if (!sessionRoot) { errors.push(`request.json: inputs.${kind} cannot be resolved; the branch is not under a session`); continue; }
     if (!existsSync(path.join(sessionRoot, p))) errors.push(`request.json: inputs.${kind} = ${p} does not exist in the session`);
-    errors.push(...await validateImportedInput(root,sessionRoot,p,kind,{receivingSessionId:request.sessionId}));
+    errors.push(...await validateImportedInput(root,sessionRoot,p,kind,{receivingSessionId:request.sessionId,receivingContractVersion:request.contractVersion}));
   }
   // The orchestrator hashes every request into state.json; a request that changed since is tampering.
   if (sessionRoot && existsSync(path.join(sessionRoot, 'state.json'))) {
     try {
       let state = JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8'));
+      const coordinationAttempt = state.attempts?.[`${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`];
+      errors.push(...await coordinationAdmissionErrors(root, sessionRoot, state, request, {
+        historical: phase === 'accept' && !!coordinationAttempt?.evidenceManifest && coordinationAttempt.status !== 'running'
+      }));
       if (phase === 'accept') state = invocationState(sessionRoot, state, request);
       else if (state.planHistory) {
         errors.push(...await planAdmissionErrors(root, sessionRoot, state, request));

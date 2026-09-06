@@ -14,16 +14,18 @@ Primary output: `uat-flow-verification`
 
 ## Outputs
 
-`uat-flow-verification` `response/response.md`
-`uat-snapshot` `response/data/snapshot.json`
-`uat-capture` `response/data/captures/<case>.json`
-`uat-verdicts` `response/data/verdicts.json`
-`audit-scope` `response/data/audit-scope.json`?
-`findings` `response/data/findings.json`?
-`uat-walk` `response/data/walks/<walk>/walk.json`?
-`walk-result` `response/data/walks/<walk>/walk-result.json`?
-`screenshot` `response/artifacts/<case>.png`
-`sheet` `response/artifacts/sheet.png`
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`uat-flow-verification` `response/response.md` (md)
+`uat-snapshot` `response/data/snapshot.json` (data)
+`uat-capture` `response/data/captures/<case>.json` (data)
+`uat-verdicts` `response/data/verdicts.json` (data)
+`audit-scope` `response/data/audit-scope.json`? (data)
+`findings` `response/data/findings.json`? (data)
+`uat-walk` `response/data/walks/<walk>/walk.json`? (data)
+`walk-result` `response/data/walks/<walk>/walk-result.json`? (data)
+`screenshot` `response/artifacts/<case>.png` (artifact)
+`sheet` `response/artifacts/sheet.png` (artifact)
 
 ## Stops
 

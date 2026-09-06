@@ -14,10 +14,12 @@ Primary output: `platform-operation-receipt`
 
 ## Outputs
 
-`platform-operation-receipt` `response/response.md`
-`delta` `response/data/delta.json`
-`checks` `response/data/checks.json`
-`changes` `response/changes.md`?
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+
+`platform-operation-receipt` `response/response.md` (md)
+`delta` `response/data/delta.json` (data)
+`checks` `response/data/checks.json` (data)
+`changes` `response/changes.md`? (md)
 
 ## Stops
 

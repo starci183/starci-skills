@@ -10,6 +10,7 @@ const digest = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex
 const encode = value => `${JSON.stringify(value, null, 2)}\n`;
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export const invocationKey = request => `${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`;
+export const missionChoiceSource = mission => mission?.confirmation?.authority?.kind === 'coordination-extraction' ? 'coordinator' : 'user';
 
 export async function retainContext(session, kind, value) {
   const bytes = encode(value); const hash = digest(bytes);
@@ -38,7 +39,7 @@ export function readContext(session, address, kind) {
 export async function retainMission(session, state, { root, mission = state.mission } = {}) {
   const choice = state.choices?.[mission?.confirmation?.decisionId];
   const errors = frozenScopeErrors({ ...state, mission }, root ? { root } : {});
-  if (!choice || choice.selected !== 'as-stated' || choice.selectedBy !== 'user' || !choice.sourceRef || choice.sourceRef !== mission.confirmation?.sourceRef) errors.push('MISSION_HISTORY_UNBOUND: confirmed scope requires its exact retained user choice');
+  if (!choice || choice.selected !== 'as-stated' || choice.selectedBy !== missionChoiceSource(mission) || !choice.sourceRef || choice.sourceRef !== mission.confirmation?.sourceRef) errors.push('MISSION_HISTORY_UNBOUND: confirmed scope requires its exact retained authority');
   if (errors.length) throw Error(errors.join('\n'));
   state.missionSnapshots ??= {};
   const value = { version: 1, sessionId: state.id, mission, choice };
@@ -56,7 +57,7 @@ export function missionAt(session, state, version) {
   const record = readContext(session, state.missionSnapshots?.[version], 'missions');
   if (record.sessionId !== state.id || record.mission?.version !== version || record.mission.confirmation?.scopeHash !== scopeHash(record.mission)) throw Error('MISSION_HISTORY_UNBOUND: scope identity or confirmation hash differs');
   const choice = record.choice;
-  if (!choice || choice.selected !== 'as-stated' || choice.selectedBy !== 'user' || !choice.sourceRef || choice.sourceRef !== record.mission.confirmation.sourceRef) throw Error('MISSION_HISTORY_UNBOUND: snapshot contains no matching user confirmation');
+  if (!choice || choice.selected !== 'as-stated' || choice.selectedBy !== missionChoiceSource(record.mission) || !choice.sourceRef || choice.sourceRef !== record.mission.confirmation.sourceRef) throw Error('MISSION_HISTORY_UNBOUND: snapshot contains no matching confirmation authority');
   return record;
 }
 
