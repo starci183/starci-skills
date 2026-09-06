@@ -1,5 +1,7 @@
 # Goal discovery and project workflow storage
 
+Before confirmation, render the reviewed discovery with `node scripts/session-open.mjs preview <session>` according to [interaction.json#scopePresentation](../resources/interaction.json).
+
 The executable contract is [delivery.json](../resources/delivery.json), [goal-discovery](../templates/kinds/goal-discovery.schema.json), and [workflow-root.mjs](../scripts/workflow-root.mjs). The runtime stays under Source. A project declares one workflow owner role in `.workspaces/projects/<project>/workflow.json`; its hydrated canonical route resolves Workflow. All routed repositories of that project share this workflow evidence home. The central runtime, route declarations and environment declarations remain Source-owned.
 
 Open the draft ledger before discovery. Read-only inspection of declared route files and repository identity establishes actual route patterns, generalized code ownership, repository heads, verification reach, final destinations and remaining material decisions. Discovery does not create an implementation worktree. Use `session-open.mjs discover` to record the reviewed result. The goal-discovery schema records one planned or justified not-applicable handoff disposition per delivery lane, including inputs, outputs, owner, dependencies and verification. The planner derives applicable operators from those impacts and the operator contracts. A handoff stage plans future implementation and evidence without authorizing product writes, runtime operation or publication.

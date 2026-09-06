@@ -16,8 +16,8 @@ Do not create a new decision id merely to ask the same question again. Every v2.
 has one confirmation record; an already explicit and authorized prompt can be that record.
 
 `scripts/session-open.mjs` opens or reuses the user session from the first prompt, before confirmation
-and before operator work. The draft is shown as a table with Goal, Target, In scope, Out of scope,
-Outputs, Done when, Verification reach and Example. The answer is recorded at
+and before operator work. Display the draft with `interaction.json#scopePresentation`, using
+`node scripts/session-open.mjs preview <session>`. The answer is recorded at
 `state.json.choices["goal:<sessionId>:v<version>"]` and bound again in `mission.confirmation`.
 When the opening prompt already states and authorizes exactly that scope, its message reference is
 reused as `as-stated`; no routine second question is sent. A correction creates the next draft version.
@@ -34,3 +34,14 @@ proposed questions. These gates validate communication only; passing them author
 The examples are guidance, not a format assigned to every job. Read the operator contract and mode: show expected versus actual, scope coverage and the next action alongside the chosen result. The selected result is useful for judging the outcome, including diagnostic failures. A verifier may be done while its subject fails. Dry-run is proposed; reuse/no-op is an observed unchanged state; rollback is restoration. The full result summary must remain visible even when only one representative artifact is embedded.
 
 Sources: [Interaction evidence](../tests/evidence/20260904-interaction.md).
+
+## Restatement identity
+
+A restatement choice belongs to its operator, confirmed mission version and exact rendered reading.
+After writing `response/restatement.md`, run `node scripts/restatement-choice.mjs <branch>` to derive
+the decision id; use that exact id in the blocked interaction. The digest normalizes line endings
+only. Record an actual answer through `node scripts/restatement-choice.mjs answer <blocked-branch> <actual-answer.json>`, which verifies the accepted blocked
+receipt and its evidence inventory before retaining the answer. A resumed request names that blocked
+branch and its choice; it cannot reuse a reading from another mission version. The former choice and
+receipt stay unchanged. The invocation context preserves the choices available when it opened, so
+an answered historical question is not mistaken for a new request to ask again.

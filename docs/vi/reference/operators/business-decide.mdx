@@ -59,7 +59,7 @@ ngữ thường, trong số dòng mà kind `restatement` cho phép, nói lời h
 văn lời của người dưới `## Source`. Các dòng ấy viết bằng ngôn ngữ của `promise`, vì một bản nói lại
 mà người không đọc được thì không xác nhận được gì; validator kiểm hình dạng và phần trích dẫn chứ
 không kiểm ngôn ngữ, nên ngôn ngữ là bổn phận của agent. Trừ khi request mang `decisionId` cấp gốc
-`restatement:<featureId>` cùng một `selectedOption` đã ghi trong state.json.choices, nhánh kết thúc
+gắn nội dung theo [chính sách tương tác](../../resources/interaction.vi.md) cùng một `selectedOption` đã ghi trong state.json.choices, nhánh kết thúc
 `blocked` với `RESTATEMENT_UNCONFIRMED`, có `fields.restatement` và không có đầu ra nào khác, cùng
 `interaction` kiểu `restatement-confirm` trên đúng decisionId ấy với đúng hai lựa chọn `as-stated` và
 `corrected`. Một lần vào lại chọn `corrected` nêu nhánh bị chặn trong `resume` và mang một `promise`
@@ -223,6 +223,7 @@ Khi `done`, in **Operator Result** là bảng phủ lời hứa trong `response/
 
 | Khi | Operator |
 | --- | --- |
+| lời hứa có nhiều đơn vị frontend, nên lập đủ bản đồ bề mặt trước khi sinh từng đơn vị | `interface.plan` |
 | lời hứa đã publish và một bề mặt frontend phải mang nó | `interface.generate` |
 | lời hứa đã publish và một contract backend phải mang nó | `backend.generate` |
 | lời hứa cần quyết ranh giới và quyền sở hữu dữ liệu trước khi thực thi được | `architecture.decide` |

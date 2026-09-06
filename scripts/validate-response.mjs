@@ -18,6 +18,7 @@ import { loadOperatorPackages, kindOf, isYes, exchangeOf } from './operator-md.m
 import { loadErrorsRegistry } from './errors-registry.mjs';
 import { sessionRootOf } from './validate-request.mjs';
 import { packageForOrigin } from './retired-operators.mjs';
+import { invocationState } from './mission-history.mjs';
 import { loadInteractionPolicy, interactionErrors } from './validate-interaction.mjs';
 import { secretErrors } from './sweep-secrets.mjs';
 
@@ -382,7 +383,7 @@ export async function validateResponse(root, dir, { requirements = {}, exchange 
   const stateFile = path.join(sessionRootOf(dir) ?? dir, 'state.json');
   let choices = {};
   if (existsSync(stateFile)) {
-    try { choices = JSON.parse(await readFile(stateFile, 'utf8')).choices ?? {}; }
+    try { const state = JSON.parse(await readFile(stateFile, 'utf8')); choices = request && state.attempts?.[`${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`]?.context ? invocationState(sessionRootOf(dir), state, request).choices : state.choices ?? {}; }
     catch (e) { errors.push(`state.json: ${e.message}`); }
   }
   errors.push(...interactionErrors(await loadInteractionPolicy(root), response.interaction, choices, response.status));

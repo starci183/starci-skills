@@ -1,3 +1,4 @@
+import { restatementDecisionId, restatementChoiceSource } from '../../scripts/restatement-choice.mjs';
 // business.decide's own law over one branch, on top of the shared step check: the branch models and
 // never reconciles, so delivered source and an implemented state are refused here and belong to
 // business.reconcile; the head is exactly one feature directory below the businesses root; the model,
@@ -55,7 +56,11 @@ const RESTATEMENT_STOP = 'RESTATEMENT_UNCONFIRMED';
 const collapse = (s) => String(s ?? '').replace(/\\\|/g, '|').replace(/\s+/g, ' ').trim();
 export async function restatementErrors({ branchDir, request, response, requirements, present, field, id, owed }) {
   const errors = [];
-  const decisionId = `restatement:${id}`;
+  let decisionId = `restatement:${id}`;
+  if (owed && Number.isInteger(request.expected?.goalVersion)) {
+    try { const source = restatementChoiceSource(branchDir, request); decisionId = restatementDecisionId(source.request, id, source.text); }
+    catch (error) { errors.push(error.message); }
+  }
   const asked = response.status === 'blocked' && response.stop === RESTATEMENT_STOP;
   if (!owed) {
     if (present.has('restatement')) errors.push(`response/response.json: the request supplies no ${field}, so there is nothing to restate and fields.restatement is refused`);
@@ -100,6 +105,12 @@ export async function restatementErrors({ branchDir, request, response, requirem
   if (!request.resume) {
     errors.push(...refusalErrors(`the request carries ${request.selectedOption} on ${decisionId} without resume; malformed selected restatement input`));
     return errors;
+  }
+  if (Number.isInteger(request.expected?.goalVersion) && request.selectedOption === 'as-stated' && existsSync(file)) {
+    try {
+      const source = restatementChoiceSource(branchDir, request);
+      if ((await readFile(file, 'utf8')).replace(/\r\n/g,'\n') !== source.text.replace(/\r\n/g,'\n')) errors.push(...refusalErrors('the as-stated rendered reading changed after its answer'));
+    } catch (error) { errors.push(error.message); }
   }
   const resumed = `step-${request.resume.step}/parallel-${request.resume.parallel}`;
   const target = path.join(sessionRootOf(branchDir) ?? branchDir, resumed, 'request', 'request.json');

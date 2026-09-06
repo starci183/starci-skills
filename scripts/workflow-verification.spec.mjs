@@ -123,6 +123,10 @@ test('ordinary-message coordination closes only with a verified local receipt, w
   assert.ok(children.every(child => existsSync(child.session)), 'verification edits or imports no child');
   const archive = await retainSessionBundle(parent.session, parent.state, 'Synthetic coordinated goal verified');
   assert.ok(existsSync(path.join(archive.bundle, 'step-1/parallel-1', WORKFLOW_PEERS)));
+  for (const address of [...Object.values(parent.state.missionSnapshots),...Object.values(parent.state.attempts).map(attempt=>attempt.context)]) {
+    assert.ok(archive.manifest.files.some(file=>file.ref === `bundle/${address.ref}` && file.sha256 === address.hash),'archive seals every referenced mission and invocation context');
+    assert.deepEqual(readFileSync(path.join(archive.bundle,address.ref)),readFileSync(path.join(parent.session,address.ref)));
+  }
   assert.deepEqual((await validateSession(root, archive.bundle)).errors, []);
 }));
 

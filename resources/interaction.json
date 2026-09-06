@@ -12,15 +12,22 @@
   "rule": "Every user prompt enters StarCi by opening or reusing the host-bound user session before any goal confirmation or work. The mission draft is shown as scopeTable. Its version is activated only by an explicit as-stated user answer; when the original prompt already states and authorizes exactly that table, its message reference is reused as the answer and no routine duplicate question is asked. Correction creates the next draft version; rejection or silence never activates work. Follow-ups, operator attempts, helpers, retries and nested exchanges keep the same host binding. Replan inside the confirmed scope is automatic. A change to goal or scope creates a versioned confirmation; budget and user routes remain typed choices. This communication policy grants no extra effect authority.",
   "gate": "scripts/validate-interaction.mjs",
   "scopeTable": [
-    "Goal",
+    "Biz/Goal",
+    "Impact: routes",
+    "Impact: code",
+    "Workflow forecast",
+    "Done when",
     "Target",
     "In scope",
     "Out of scope",
     "Outputs",
-    "Done when",
     "Verification reach",
     "Example"
   ],
+  "scopePresentation": {
+    "renderer": "node scripts/session-open.mjs preview <session>",
+    "rule": "Before confirmation, print scopeTable in its declared order from the current mission and reviewed discovery. Show concrete route patterns and repository/generalized code impact without inventing missing values. The discovery lanes and their dependencies form the initial forecast, labelled planned rather than executed or verified. For a corrected mission print changed scope rows and the new forecast against the retained prior mission. This presentation grants no authority and does not ask again for an already explicit authorized correction. The complete operator forecast remains owned by plan-history."
+  },
   "language": {
     "source": "resources/settings.json#language, over resources/settings.example.json (default vi)",
     "rule": "Every line printed to the person — the goal block, the Operator Result summary, the end-of-turn report, every question and its options — is in the display language the settings name; a new mission records it as mission.language unless the person's own message is plainly in another language, in which case that one is recorded and used. The law of the tree stays English and its mirrors Vietnamese; the display language changes nothing that is validated."

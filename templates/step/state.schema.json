@@ -8,6 +8,24 @@
       "description": "The two spellings an entry of brief.proven opens with on a mission, and the whole of what may open one: `doneWhen:<n> ` for a done-when line of the mission, and `prerequisite:<N/M> ` for a branch whose goal was to enable another branch (request.json.goal.prerequisite) — a bind, a preflight, an audit a later walk needed. Both name a branch whose receipt is done and whose goalCheck the response gate accepted, which is the only thing that puts an entry here; the gate that resolves them reads this pattern rather than carrying a copy of it (scripts/validate-session.mjs#provenErrors)",
       "type": "string",
       "pattern": "^(?:doneWhen:(?<doneWhen>[0-9]+)|prerequisite:(?<prerequisite>[0-9]+/[0-9]+)) "
+    },
+    "historyAddress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "hash"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "pattern": "^runtime/history/(?:missions|invocations|plans)/[a-f0-9]{64}\\.json$"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
     }
   },
   "required": [
@@ -229,6 +247,9 @@
                 }
               }
             }
+          },
+          "context": {
+            "$ref": "#/$defs/historyAddress"
           }
         }
       }
@@ -1403,6 +1424,32 @@
             "object",
             "null"
           ]
+        }
+      }
+    },
+    "missionSnapshots": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/historyAddress"
+      }
+    },
+    "planHistory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "active",
+        "revisions"
+      ],
+      "properties": {
+        "active": {
+          "$ref": "#/$defs/historyAddress"
+        },
+        "revisions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/historyAddress"
+          }
         }
       }
     }

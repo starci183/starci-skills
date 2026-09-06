@@ -20,7 +20,7 @@ trước khi hiện trạng được quan sát: những dòng bằng ngôn ngữ
 `restatement` cho phép, nói mục tiêu đã được hiểu là gì, và nguyên văn lời của người dưới
 `## Source`. Các dòng ấy viết bằng ngôn ngữ của `objective`, vì một bản nói lại mà người không đọc
 được thì không xác nhận được gì; validator kiểm hình dạng và phần trích dẫn chứ không kiểm ngôn ngữ,
-nên ngôn ngữ là bổn phận của agent. Lựa chọn được khoá theo `restatement:<decisionId>` bằng
+nên ngôn ngữ là bổn phận của agent. Lựa chọn theo [chính sách tương tác](../../resources/interaction.vi.md), dùng
 `decisionId` hiệu lực: chính yêu cầu ấy, hoặc mặc định của nó khi request để trống. Trừ khi request
 mang `decisionId` cấp gốc ấy cùng một `selectedOption` đã ghi trong state.json.choices, nhánh kết thúc
 `blocked` với `RESTATEMENT_UNCONFIRMED`, có `fields.restatement` và không có đầu ra nào khác, cùng

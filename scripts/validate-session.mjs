@@ -1,3 +1,5 @@
+import { activePlanView, retiredPlanCell, mappedPlanRequests } from './plan-history.mjs';
+import { missionHistorySnapshotErrors } from './mission-history.mjs';
 import { workflowOwnerErrors, workflowRootOf } from './workflow-root.mjs';
 import { frozenScopeErrors } from './mission-scope.mjs';
 // One session as a whole, checked by the orchestrator after every transition and by a person reading
@@ -46,6 +48,7 @@ export async function v22SessionErrors(session, state, root = ROOT) {
   const errors = [];
   if (state?.contractVersion !== V22_CONTRACT) return errors;
   errors.push(...workflowOwnerErrors(root, session, state));
+  errors.push(...missionHistorySnapshotErrors(session, state));
   if (state.runtimeRevision === 3 && state.mission?.discovery) errors.push(...frozenScopeErrors(state, { root }));
   const phase = state.lifecycle?.phase;
   const terminalSession = state.status === 'done' || ['closing', 'closed-success'].includes(phase);
@@ -60,7 +63,7 @@ export async function v22SessionErrors(session, state, root = ROOT) {
   if (!path.isAbsolute(state.hostBinding?.worktree ?? '')) errors.push('state.json: hostBinding.worktree is not an absolute user worktree binding');
   if (state.hostBinding?.hostId === state.id) errors.push('state.json: hostBinding.hostId is the native Codex task or Claude session id, not the StarCi session id');
   if (phase === 'draft') {
-    if ((state.chain ?? []).length || Object.keys(state.steps ?? {}).length || Object.keys(state.attempts ?? {}).length) errors.push('state.json: a draft session has no planned or dispatched operator work');
+    if (!state.missionSnapshots?.[mission.version - 1] && ((state.chain ?? []).length || Object.keys(state.steps ?? {}).length || Object.keys(state.attempts ?? {}).length)) errors.push('state.json: a draft session has no planned or dispatched operator work');
     if (Object.keys(state.leases ?? {}).length) errors.push('state.json: a draft session holds no worker or resource lease');
     if (mission.confirmation?.status === 'confirmed') errors.push('state.json: a confirmed mission is active, not draft');
   }
@@ -118,7 +121,7 @@ export async function v22SessionErrors(session, state, root = ROOT) {
     for (let index = 0; index < (mission.doneWhen ?? []).length; index += 1) {
       let backed = false;
       for (const [branch, attempt] of Object.entries(state.attempts ?? {})) {
-        if (attempt.status !== 'matched') continue;
+        if (attempt.status !== 'matched' || retiredPlanCell(state, branch)) continue;
         try {
           const parts = branch.split('/');
           const base = path.join(session, `step-${parts[0]}`, `parallel-${parts[1]}`, ...(parts[2] ? [parts[2]] : []));
@@ -136,7 +139,7 @@ export async function v22SessionErrors(session, state, root = ROOT) {
               && observation.evidence.every((ref) => declared.has(ref) && existsSync(path.join(base, ref)))
               && comparison.evidence.every((ref) => observation.evidence.includes(ref));
           });
-          if (request.goal?.doneWhen === index
+          if (request.expected?.goalVersion === mission.version && request.goal?.doneWhen === index
             && response.contractVersion === V22_CONTRACT
             && response.status === 'done'
             && response.attempt?.id === attempt.id
@@ -175,8 +178,8 @@ export async function goalLedger(session, state) {
     const request = await readJson(path.join(dir, 'request', 'request.json'));
     const response = await readJson(path.join(dir, 'response', 'response.json'));
     const goal = request?.goal ?? null;
-    const done = response?.status === 'done';
-    const accepted = done && response.goalCheck !== undefined && goalCheckErrors(dir, response, goal).length === 0;
+    const done = response?.status === 'done' && !retiredPlanCell(state, branch) && (!request?.expected || request.expected.goalVersion === state.mission?.version);
+    const accepted = done && !retiredPlanCell(state, branch) && (!request?.expected || request.expected.goalVersion === state.mission?.version) && response.goalCheck !== undefined && goalCheckErrors(dir, response, goal).length === 0;
     out.push({ branch, operator: state.steps[branch], doneWhen: goal?.doneWhen ?? null, prerequisite: goal?.prerequisite ?? null, done, achieved: accepted && response.goalCheck.achieved === true });
   }
   return out;
@@ -315,6 +318,7 @@ export async function uncheckedLedgerErrors(root, session, state, { hostRoot = w
 export async function plannedUnits(root, session, state) {
   const out = [];
   for (const branch of Object.keys(state?.steps ?? {}).sort(byChainOrder)) {
+    if (retiredPlanCell(state, branch)) continue;
     const file = path.join(branchDir(session, branch), 'response', 'data', 'units.json');
     if (!existsSync(file)) continue;
     const response = await readJson(path.join(branchDir(session, branch), 'response', 'response.json'));
@@ -427,9 +431,12 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   errors.push(...missionGateErrors(state, null, packages, policy));
   errors.push(...missionHistoryErrors(state));
   // The chain is lawful against the operator tables and each branch's request: reachable, fed (by an earlier step or an accepted imported slot), bound (by a written or a planned bind), capped, proved, ended, and on a mission every branch names its goal.
-  const byBranch = await readBranchRequests(session, state.steps);
-  const graph = await loadOperatorGraph(root, packages);
-  errors.push(...validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: state.planned ?? {} }), evidenceCells: (await readImportedSlots(session, graph, root)).map((s) => s.cell) }));
+  try {
+    const view = activePlanView(session, state), active = view.state;
+    const byBranch = mappedPlanRequests(session, active, await readBranchRequests(session, active.steps), view.forecast);
+    const graph = await loadOperatorGraph(root, packages);
+    errors.push(...validateChain(root, packages, active.chain, active.steps, byBranch, { graph, forecast: view.forecast, resumeOwners: view.resumeOwners, coordinateOffset: view.coordinateOffset, mission: active.mission ?? null, maxParallel: await loadMaxParallel(root), planned: active.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: active.planned ?? {} }), evidenceCells: (await readImportedSlots(session, graph, root)).map(s => s.cell) }));
+  } catch (error) { errors.push(error.message); }
   // On a mission: proven cites only evidenced done-when lines, three unevidenced done branches in a row stop the chain, every transition was logged.
   const ledger = await goalLedger(session, state);
   errors.push(...provenErrors(state, ledger, { root }));
@@ -454,7 +461,7 @@ export async function validateSession(root, session, { packages = null, ledgerDi
     const dir = branchDir(session, branch);
     const hasRequest = existsSync(path.join(dir, 'request', 'request.json'));
     const responseFile = path.join(dir, 'response', 'response.json');
-    if (!hasRequest) continue;
+    if (!hasRequest || retiredPlanCell(state, branch) && !state.attempts?.[branch]) continue;
     if (stepOf(branch) >= current) continue;
     if (!existsSync(responseFile)) { errors.push(`step-${branch.replace('/', '/parallel-')}: dispatched and passed with no response.json (RECEIPT_MISSING); a branch the chain moved past owes a receipt`); continue; }
     try { if (JSON.parse(await readFile(responseFile, 'utf8')).status === 'running') errors.push(`step-${branch.replace('/', '/parallel-')}: still carries the dispatch skeleton (RECEIPT_MISSING) while the chain moved past it`); }

@@ -129,7 +129,7 @@ function authoredOperator(root, id) {
 export function readOnlyPrerequisiteBinding(state, request, root = ROOT) {
   const requirements = request.requirements ?? {}, key = `${request.step}/${request.parallel}`, consumerKey = request.goal?.prerequisite;
   if (request.operatorId !== 'workspace.bind' || requirements.project !== state.project || requirements.checkout !== 'routed' || (requirements.declaredWriteRoots ?? []).length || request.environment?.workspace || (request.environment?.writes ?? []).length) return false;
-  if (state.steps?.[key] !== request.operatorId || !state.chain?.[request.step - 1]?.includes(key) || state.planned?.[key]?.requirements?.role !== requirements.role) return false;
+  if (state.steps?.[key] !== request.operatorId || !(state.planHistory ? state.chain?.some(step => step.includes(key)) : state.chain?.[request.step - 1]?.includes(key)) || state.planned?.[key]?.requirements?.role !== requirements.role) return false;
   if (!/^\d+\/\d+$/.test(consumerKey ?? '') || Number(consumerKey.split('/')[0]) <= request.step || !state.chain?.flat().includes(consumerKey) || !state.planned?.[consumerKey]) return false;
   const consumer = state.steps?.[consumerKey];
   if (!(state.mission?.doneWhen ?? []).some(line => line.producedBy === consumer) && !deliveryTargets(state.mission, root).includes(consumer)) return false;

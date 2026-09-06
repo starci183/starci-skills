@@ -8,6 +8,7 @@ import { V22_CONTRACT } from './validate-request.mjs';
 import { validateSession } from './validate-session.mjs';
 import { withSessionLock } from './session-lock.mjs';
 import { resolvedWaitingAttemptKeys } from './resolved-waiting.mjs';
+import { readContext } from './mission-history.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hash = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -60,6 +61,27 @@ async function retainedFiles(session, state) {
   };
   const inputRefs = new Set();
   if (state.upgrade) throw Error('WORKFLOW_RESET_REQUIRED: archive obsolete history separately; it cannot be retained as current completion proof');
+  const contexts = new Set();
+  const retainAddresses = async value => {
+    if (!value || typeof value !== 'object') return;
+    if (typeof value.ref === 'string' && value.ref.startsWith('runtime/history/')) {
+      const kind = /^runtime\/history\/(missions|invocations|plans)\//.exec(value.ref)?.[1];
+      if (!kind) throw Error('RETENTION_PATH: invalid immutable context address');
+      if (contexts.has(value.ref)) return;
+      const record = readContext(session, value, kind);
+      contexts.add(value.ref); await add(value.ref);
+      if (kind === 'plans') for (const [ref, expected] of Object.entries(record.retained?.files ?? {})) {
+        await add(ref);
+        if (await digest(await confinedFile(session,ref)) !== expected) throw Error(`RETENTION_CHANGED: retained plan evidence ${ref}`);
+      }
+      await retainAddresses(record);
+      return;
+    }
+    for (const child of Object.values(value)) await retainAddresses(child);
+  };
+  await retainAddresses(state.missionSnapshots);
+  await retainAddresses(state.planHistory);
+  for (const attempt of Object.values(state.attempts ?? {})) await retainAddresses(attempt.context);
   for (const attempt of Object.values(state.attempts ?? {})) {
     await add(attempt.requestRef);
     const requestFile = await confinedFile(session, attempt.requestRef);
@@ -104,6 +126,7 @@ export async function verifyRetention(doneDir, manifest, sourceState = null) {
   if (JSON.stringify(await archiveInventory(doneDir))!==JSON.stringify([...seen].sort())) throw new Error('RETENTION_CHANGED: archive file inventory differs from its sealed manifest');
   const archived = await json(path.join(doneDir, 'bundle', 'state.json'));
   if (archived.id !== manifest.sessionId || stateHash(archived) !== manifest.sourceStateHash || archived.lifecycle?.phase !== 'closed-success') throw new Error('RETENTION_CONFLICT: archived state does not match its manifest');
+  for (const ref of await retainedFiles(path.join(doneDir,'bundle'), archived)) if (!seen.has(`bundle/${ref}`)) throw Error(`RETENTION_MISSING: immutable proof dependency ${ref}`);
   return archived;
 }
 

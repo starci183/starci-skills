@@ -1,3 +1,4 @@
+import { activePlanView, mappedPlanRequests } from './plan-history.mjs';
 import { deliveryTargets, deliveryPolicy } from './mission-scope.mjs';
 import { effectiveOperator } from './operator-conditions.mjs';
 // A chain is never chosen from an example: scripts/plan-chain.mjs derives it from the mission's
@@ -115,6 +116,20 @@ export function planOf(graph, id) {
   return pkg && pkg.manifest.id !== id ? graph.get(pkg.manifest.id) ?? null : null;
 }
 
+// A forecast handoff is an actual declared dependency, never a search through arbitrary history.
+export function dependencyHandoffErrors(graph, forecast, consumer) {
+  const owner = forecast?.handoffs?.[consumer];
+  if (!owner) return ['PLAN_HANDOFF_UNBOUND: no declared dependency handoff'];
+  const source = graph.get(forecast.steps?.[owner]);
+  const raw = graph.get(forecast.steps?.[consumer]);
+  if (!source || !raw || stepOf(owner) >= stepOf(consumer)) return ['PLAN_HANDOFF_UNBOUND: dependency owner must be an earlier declared operator'];
+  const target = effectiveOperator(raw, forecast.presets?.[consumer] ?? {});
+  const input = target.inputs.some(i => source.outputs.has(i.kind) && (!i.from.length || i.from.includes(source.id)));
+  const binding = source.id === BIND_OPERATOR && target.roles.has(forecast.presets?.[owner]?.role);
+  if (!forecast.evidenceDependencies?.[consumer]?.includes(owner) || !forecast.dependencies?.[consumer]?.includes(owner) || !source.next.has(target.id) || !(input || binding)) return ['PLAN_HANDOFF_UNBOUND: owner must be a declared input/context dependency whose authored Next permits this consumer'];
+  return [];
+}
+
 // The gate. `chain` and `steps` are state.json's; `byBranch` maps "N/M" to that branch's request.json
 // (operatorId, requirements, goal) or to null when the request is not written yet. Options: mission
 // (state.json.mission; goal rules apply only when present), maxParallel, graph or aliases, planned
@@ -137,7 +152,7 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
     if (!Array.isArray(step) || !step.length) { errors.push(`state.json: chain[${n}] must be a non-empty array of branches`); return; }
     step.forEach((cell) => {
       cells.add(cell);
-      if (stepOf(cell) !== n + 1) errors.push(`state.json: chain[${n}] holds ${cell}, whose step number is not ${n + 1}`);
+      if (options.forecast ? !/^[1-9][0-9]*\/[1-9][0-9]*$/.test(cell) || stepOf(cell) !== stepOf(step[0]) || n > 0 && stepOf(cell) <= stepOf(chain[n-1][0]) : stepOf(cell) !== n + 1 + (options.coordinateOffset ?? 0)) errors.push(`state.json: chain[${n}] holds ${cell}, whose step number is not ${options.forecast ? 'ordered correctly' : n + 1 + (options.coordinateOffset ?? 0)}`);
       if (opOf(cell) === undefined) errors.push(`state.json: chain names ${cell} and steps records no operator for it`);
       else if (req(cell)?.operatorId && req(cell).operatorId !== opOf(cell)) errors.push(`${cell}: request.json runs ${req(cell).operatorId}, state.json.steps says ${opOf(cell)}`);
     });
@@ -168,7 +183,9 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
       if (!rawNode) { errors.push(`${cell}: unknown operator ${id}`); continue; }
       const node = effectiveOperator(rawNode, req(cell)?.requirements ?? planned[cell]?.requirements ?? {});
       const r = req(cell);
-      if (previous && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id))) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
+      const reentry = options.forecast?.resumes?.[cell];
+      const resumedOwner = reentry && stepOf(reentry) < stepOf(cell) && (opOf(reentry) === id || options.resumeOwners?.[reentry] === id);
+      if (previous && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id)) && !resumedOwner && (!options.forecast || dependencyHandoffErrors(graph, options.forecast, cell).length)) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
       for (const input of node.required) if (!produced.has(input.kind) && !imported[cell]?.has(input.kind)) errors.push(`${cell}: ${id} requires input ${input.kind}, which no earlier step produces and no imported slot the request names supplies`);
       if (id !== BIND_OPERATOR) for (const role of node.roles) if (!boundRoles.has(role)) errors.push(`${cell}: ${id} requires @workspaces/${role}, which no earlier ${BIND_OPERATOR} (role ${role}) bound or is planned to bind`);
       if (r && planned[cell]) errors.push(...plannedRequirementErrors(planned[cell], r, `${cell}: request.json`));
@@ -188,7 +205,7 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
           else if (line.producedBy !== id) errors.push(`${cell}: goal.doneWhen ${goal.doneWhen} is produced by ${line.producedBy}, not by ${id}`);
         } else if (goal.prerequisite !== undefined) {
           if (opOf(goal.prerequisite) === undefined) errors.push(`${cell}: goal.prerequisite names ${goal.prerequisite}, which the chain does not have`);
-          else if (stepOf(goal.prerequisite) <= n + 1) errors.push(`${cell}: goal.prerequisite names ${goal.prerequisite}, which does not run after this branch; a prerequisite enables a later branch`);
+          else if (stepOf(goal.prerequisite) <= stepOf(cell)) errors.push(`${cell}: goal.prerequisite names ${goal.prerequisite}, which does not run after this branch; a prerequisite enables a later branch`);
         }
       }
       // Fan-out: when the chain holds the plan of this operator's domain, the plan runs in an earlier step
@@ -278,11 +295,13 @@ export async function readImportedInputs(root, session, byBranch, { hostRoot, pl
   return out;
 }
 export async function validateSessionChain(root, session, state, packages) {
+  let view;
+  try { view = activePlanView(session, state); state = view.state; } catch (error) { return [error.message]; }
   packages ??= await loadOperatorPackages(root);
   const graph = await loadOperatorGraph(root, packages);
-  const byBranch = await readBranchRequests(session, state.steps);
+  const byBranch = mappedPlanRequests(session, state, await readBranchRequests(session, state.steps), view.forecast);
   const slots = await readImportedSlots(session, graph, root);
-  return validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: state.planned ?? {} }), evidenceCells: slots.map((s) => s.cell) });
+  return validateChain(root, packages, state.chain, state.steps, byBranch, { graph, forecast: view.forecast, resumeOwners: view.resumeOwners, coordinateOffset: view.coordinateOffset, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: state.planned ?? {} }), evidenceCells: slots.map((s) => s.cell) });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -16,8 +16,8 @@ lại cùng một điều. Mỗi phiên bản nhiệm vụ v2.2 có đúng một
 cấp quyền có thể chính là bản ghi đó.
 
 `scripts/session-open.mjs` mở hoặc dùng lại phiên người dùng ngay từ prompt đầu, trước xác nhận và
-trước mọi công việc operator. Draft được trình bày bằng bảng gồm Goal, Target, Trong scope, Ngoài
-scope, Đầu ra, Đạt khi, Phạm vi kiểm và Ví dụ. Câu trả lời được ghi ở
+trước mọi công việc operator. Hiển thị draft theo `interaction.json#scopePresentation`, bằng
+`node scripts/session-open.mjs preview <session>`. Câu trả lời được ghi ở
 `state.json.choices["goal:<sessionId>:v<version>"]` và bind lại trong `mission.confirmation`.
 Khi prompt mở đầu đã nêu và cấp quyền đúng scope đó, tham chiếu tới chính prompt được dùng làm
 `as-stated`; không hỏi xác nhận thường lệ lần hai. Sửa scope tạo phiên bản draft kế tiếp. Từ chối
@@ -34,3 +34,13 @@ Các gate này chỉ kiểm giao tiếp; qua gate không cấp quyền thực hi
 Các ví dụ là định hướng, không ép một định dạng cho mọi việc. Đọc contract và mode của operator: hiện expected so với actual, coverage và bước tiếp cạnh kết quả được chọn. Kết quả được chọn giúp đánh giá kết quả, kể cả lỗi quan trọng. Operator kiểm xong vẫn có thể kết luận đối tượng bị kiểm không đạt. Dry-run là đề xuất; reuse/no-op là trạng thái không đổi đã quan sát; rollback là khôi phục. Tổng quan kết quả phải hiện đủ dù chỉ nhúng một artifact đại diện.
 
 Sources: [Bằng chứng tương tác](../tests/evidence/20260904-interaction.md).
+
+## Danh tính lời nói lại
+
+Lựa chọn lời nói lại thuộc operator, phiên bản mục tiêu đã xác nhận và đúng nội dung đã hiển thị.
+Sau khi ghi `response/restatement.md`, chạy `node scripts/restatement-choice.mjs <branch>` để suy id;
+interaction bị chặn dùng đúng id đó. Digest chỉ chuẩn hóa xuống dòng. Ghi câu trả lời thật qua
+`node scripts/restatement-choice.mjs answer <blocked-branch> <actual-answer.json>`; lệnh kiểm receipt bị chặn đã chấp nhận cùng inventory evidence trước khi
+lưu đáp án. Request vào lại gọi nhánh bị chặn và lựa chọn của nó; không dùng lời đọc của phiên bản
+mục tiêu khác. Lựa chọn và receipt trước giữ nguyên. Context invocation giữ lựa chọn tại lúc mở,
+vì vậy câu hỏi lịch sử đã được trả lời không bị hiểu là yêu cầu hỏi lại.

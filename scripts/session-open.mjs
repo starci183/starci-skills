@@ -1,3 +1,4 @@
+import { retainMission } from './mission-history.mjs';
 import { resolveWorkflowOwner, workflowOwnerErrors, sameRoot, RUNTIME_REVISION } from './workflow-root.mjs';
 import { scopeErrors, authorityErrors, scopeHash, scopeBindingErrors, completeDeliveryMission } from './mission-scope.mjs';
 import { createHash, randomUUID } from 'node:crypto';
@@ -181,8 +182,13 @@ export async function confirmSession(session, decision) {
     const current = state.mission;
     const decisionId = current.confirmation.decisionId;
     if (current.confirmation.status === 'confirmed' && decision.selected === 'as-stated') return { status: 'already-confirmed', sessionId: state.id, version: current.version };
+    if (current.confirmation.status === 'confirmed' && decision.selected === 'corrected') {
+      if ((state.workerSlots ?? []).length || Object.keys(state.leases ?? {}).length || Object.values(state.attempts ?? {}).some(attempt => ['running', 'waiting'].includes(attempt.status))) throw Error('MISSION_BUSY: seal active attempts before correcting their mission');
+      await retainMission(session, state, { root });
+      state.lifecycle.phase = 'draft';
+    }
     if (state.lifecycle.phase !== 'draft') throw new Error(`state.json: lifecycle ${state.lifecycle.phase} cannot confirm another draft`);
-    state.choices[decisionId] = { selected: decision.selected, selectedBy: 'user', sourceRef: decision.sourceRef };
+    if (current.confirmation.status !== 'confirmed') state.choices[decisionId] = { selected: decision.selected, selectedBy: 'user', sourceRef: decision.sourceRef };
     if (decision.selected === 'as-stated') {
       if (state.runtimeRevision !== RUNTIME_REVISION) throw Error('WORKFLOW_RESET_REQUIRED: old scope cannot be confirmed for current dispatch');
       const authorizationErrors = authorityErrors(current, decision.authority, root);
@@ -194,6 +200,7 @@ export async function confirmSession(session, decision) {
       if (decision.authority?.sourceRef !== decision.sourceRef) authorizationErrors.push('GOAL_AUTHORITY_REQUIRED: decision source must match the retained authority');
       if (authorizationErrors.length) throw Error(authorizationErrors.join('\n'));
       current.confirmation = { status: 'confirmed', decisionId, sourceRef: decision.sourceRef, confirmedAt: now(), scopeHash: scopeHash(current), authority: decision.authority };
+      await retainMission(session, state, { root });
       state.lifecycle.phase = 'active';
       state.brief.next = 'Plan the chain dynamically from the confirmed done-when evidence, then open the first attempt.';
       return { status: 'confirmed', sessionId: state.id, version: current.version };
@@ -206,6 +213,8 @@ export async function confirmSession(session, decision) {
       const validation = draftErrors({ project: state.project, hostBinding: state.hostBinding, mission: corrected, topology });
       if (validation.length) throw new Error(validation.join('\n'));
       state.mission = normalizeMission(state.id, corrected, current.version + 1);
+      state.transitions ??= [];
+      state.transitions.push({ branch: state.current ?? '1/1', event: 'replanned', at: new Date().toISOString(), goalVersion: state.mission.version, note: 'The user supplied a corrected scope; its new version is draft until confirmed.', logged: true });
       setWorkflowTopologyMode(topologyPolicy, state, topology.mode);
       if (topologyPolicy.modes[topology.mode].maximumPeers === 0) setWorkflowTopologyPeers(topologyPolicy, state, {});
       state.brief.next = `Present corrected scope version ${state.mission.version} for explicit confirmation.`;
@@ -235,6 +244,11 @@ export async function discoverSession(session, mission) {
 
 async function main() {
   const [command, target, inputFile] = process.argv.slice(2);
+  if (command === 'preview' && target && !inputFile) {
+    const { previewScope } = await import('./scope-presentation.mjs');
+    process.stdout.write(`${previewScope(path.resolve(target))}\n`);
+    return;
+  }
   if (!target || !inputFile || !['open', 'confirm', 'discover'].includes(command)) throw new Error('usage: node scripts/session-open.mjs open <sessionsRoot> <draft.json> | confirm <session> <decision.json>');
   const input = JSON.parse(await readFile(path.resolve(inputFile), 'utf8'));
   const result = command === 'open' ? await openSession(target, input) : command === 'discover' ? await discoverSession(target, input) : await confirmSession(target, input);

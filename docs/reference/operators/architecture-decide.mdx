@@ -43,8 +43,8 @@ before the current state is observed: plain-language lines, within the count the
 allows, saying what the objective was read to mean, and the person's own words quoted verbatim under
 `## Source`. The lines are written in the language of `objective`, because a restatement the person
 cannot read confirms nothing; the validator checks the shape and the quote, not the language, so the
-language is the agent's duty. The choice is keyed `restatement:<decisionId>` by the effective
-`decisionId`: the requirement, or its default when the request leaves it empty. Unless the request
+language is the agent's duty. The choice follows [the interaction policy](../../resources/interaction.md), using the effective
+`decisionId` requirement, or its default when the request leaves it empty. Unless the request
 carries that top-level `decisionId` with a `selectedOption` recorded in state.json.choices, the branch
 ends `blocked` with `RESTATEMENT_UNCONFIRMED`, `fields.restatement` set and no other output, and
 `interaction` of kind `restatement-confirm` on that decisionId offering exactly `as-stated` and

@@ -22,6 +22,8 @@ import { validateImportedInput } from './producer-import.mjs';
 import { evidenceManifestErrors } from './evidence-manifest.mjs';
 import { isJourney, journeyUnits, tierOf, verifiesUnits, laneOf } from './unchecked.mjs';
 import { normalizeResource, resourcesOverlap } from './resource-locks.mjs';
+import { retiredPlanCell, activePlanView, planAdmissionErrors } from './plan-history.mjs';
+import { invocationState } from './mission-history.mjs';
 import { currentRequestPhase } from './validation-phase.mjs';
 import { sessionWorkflowTopologyErrors } from './workflow-topology.mjs';
 import { resolvedWaitingReplanErrors } from './resolved-waiting.mjs';
@@ -328,6 +330,7 @@ export async function localAcceptedInputErrors(sessionRoot, state, inputRef, kin
   try { producerResponse = JSON.parse(await readFile(path.join(branch, 'response', 'response.json'), 'utf8')); }
   catch (error) { errors.push(`request.json: inputs.${kind} producer ${key} response is unreadable: ${error.message}`); }
   if (producerRequest) {
+    if (consumerRequest && (retiredPlanCell(state, key) || producerRequest.expected?.goalVersion !== undefined && producerRequest.expected.goalVersion !== consumerRequest.expected?.goalVersion)) errors.push(`request.json: inputs.${kind} producer ${key} belongs to a superseded forecast or another mission version; revalidate through current execution before reuse`);
     const requestHash = `sha256:${createHash('sha256').update(await readFile(path.join(branch, 'request', 'request.json'))).digest('hex')}`;
     if (producerRequest.contractVersion !== V22_CONTRACT || state.requestHashes?.[key] !== requestHash) errors.push(`request.json: inputs.${kind} producer ${key} does not match its frozen v2.2 request hash`);
     if (producerRequest.attempt?.id !== attempt.id || producerRequest.operatorId !== attempt.operatorId || state.steps?.[`${step}/${parallel}`] !== attempt.operatorId) errors.push(`request.json: inputs.${kind} producer ${key} is not linked to attempt ${attempt.id} and its recorded operator`);
@@ -717,6 +720,11 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   if (sessionRoot && existsSync(path.join(sessionRoot, 'state.json'))) {
     try {
       let state = JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8'));
+      if (phase === 'accept') state = invocationState(sessionRoot, state, request);
+      else if (state.planHistory) {
+        errors.push(...await planAdmissionErrors(root, sessionRoot, state, request));
+        if (retiredPlanCell(state, `${request.step}/${request.parallel}`)) errors.push('PLAN_SUPERSEDED: this coordinate is retained history and cannot dispatch; use the current forecast');
+      }
       recordedChoices = state.choices ?? {};
       errors.push(...validateAgainst(JSON.parse(await readFile(path.join(root, 'templates', 'step', 'state.schema.json'), 'utf8')), state, 'state.json'));
       const topologyPolicy = JSON.parse(await readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8')).workflowTopologies;
@@ -739,6 +747,14 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
         if (state.resumes && !state.resumes[mine]) errors.push(`request.json: state.json records no resumes[${mine}] for this re-entry`);
         else if (state.resumes?.[mine] && state.resumes[mine].resumes !== target) errors.push(`request.json: state.json resumes[${mine}] names ${state.resumes[mine].resumes}, the request names ${target}`);
         const targetAttempt = state.attempts?.[target];
+        if (Number.isInteger(request.expected?.goalVersion) && String(request.decisionId ?? '').startsWith('restatement:')) {
+          try {
+            const { restatementChoiceSource, restatementDecisionId } = await import('./restatement-choice.mjs');
+            const source = restatementChoiceSource(dir, request);
+            const subject = /^# restatement — ([a-z0-9][a-z0-9-]*)\r?$/m.exec(source.text)?.[1];
+            if (!subject || request.decisionId !== restatementDecisionId(source.request, subject, source.text)) errors.push('RESTATEMENT_CONTENT_MISMATCH: dispatch must bind the exact current-version rendered reading and its user answer');
+          } catch (error) { errors.push(error.message); }
+        }
         if (targetAttempt?.status === 'waiting') errors.push(...await resolvedWaitingReplanErrors(root, sessionRoot, state, request));
         else if (targetAttempt && targetAttempt.status !== 'blocked') errors.push(`request.json: resume target ${target} is ${targetAttempt.status}; only a blocked attempt or an accepted waiting parent resolved by its terminal review may re-enter`);
       }

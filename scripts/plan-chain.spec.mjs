@@ -150,7 +150,7 @@ test('the preview prints two lines per branch and the end', () => {
   assert.deepEqual(p.dependencies, { '1/1': [] });
   assert.deepEqual(p.requestRefs, { '1/1': 'step-1/parallel-1/request/request.json' });
   assert.deepEqual(text.split('\n'), [
-    '[1/1 content.generate] expected: doneWhen:0 the unit exists · source: state.json#mission:v1/doneWhen:0',
+    '[1/1 content.generate] planned (not executed or verified): doneWhen:0 the unit exists · source: state.json#mission:v1/doneWhen:0',
     '[1/1 content.generate] evidence for done-when 0: "the unit exists" · dependencies: none · request: step-1/parallel-1/request/request.json (pending expected.criteria and environment isolationId/mode/workspace/reads/writes/exclusive/outputRoot; freeze before dispatch)',
     'ends: user'
   ]);

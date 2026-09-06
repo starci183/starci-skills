@@ -1,4 +1,4 @@
-# StarCi Skills 2.4.2
+# StarCi Skills 2.4.3
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.4.3 (2026-09-06): lựa chọn lời nói lại gắn với mission và revision forecast bất biến giữ bằng chứng trước, đồng thời định tuyến công việc đã sửa qua phụ thuộc tường minh; preview xác nhận hiện mục tiêu nghiệp vụ, route và phạm vi code. Xem tests/evidence/20260906-coherent-revisions.md.
 
 2.4.2 (2026-09-06): bind checkout phiên lần đầu đóng băng request trong mutation sở hữu; prerequisite route chỉ đọc được tách khỏi quyền tác động code sản phẩm. Xem tests/evidence/20260906-bind-admission.md.
 

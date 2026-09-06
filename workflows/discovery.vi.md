@@ -1,5 +1,7 @@
 # Khám phá mục tiêu và nơi lưu workflow của dự án
 
+Trước xác nhận, hiển thị discovery đã xem bằng `node scripts/session-open.mjs preview <session>` theo [interaction.json#scopePresentation](../resources/interaction.json).
+
 Hợp đồng thực thi nằm tại [delivery.json](../resources/delivery.json), [goal-discovery](../templates/kinds/goal-discovery.schema.json) và [workflow-root.mjs](../scripts/workflow-root.mjs). Runtime ở Source. Mỗi dự án khai báo đúng một vai trò sở hữu workflow trong `.workspaces/projects/<project>/workflow.json`; route canonical đã hydrate xác định Workflow. Các repository trong dự án dùng chung nơi lưu bằng chứng này. Runtime trung tâm, khai báo route và môi trường vẫn thuộc Source.
 
 Mở ledger nháp trước khi khám phá. Kiểm tra chỉ đọc route đã khai báo và danh tính repository để xác định mẫu route thực tế, phạm vi mã ở mức khái quát, Git head, phạm vi chứng minh, nơi bàn giao và quyết định còn thiếu. Khám phá không tạo worktree triển khai. Dùng `session-open.mjs discover` ghi kết quả đã xem. Schema ghi từng lane bàn giao là có kế hoạch hoặc không áp dụng kèm lý do; lane có kế hoạch chỉ rõ đầu vào, đầu ra, chủ sở hữu, phụ thuộc và kiểm chứng. Planner suy ra operator từ impact và hợp đồng operator. Stage handoff mô tả triển khai và bằng chứng tương lai, không cấp quyền sửa mã sản phẩm, vận hành runtime hoặc xuất bản.

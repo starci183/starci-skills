@@ -144,3 +144,48 @@ and a note on how it was rewritten. They are inputs to the planner's spec, not t
 entry never reads them.
 
 Goal discovery, handoff scope and project workflow ownership follow [discovery.md](discovery.md).
+
+## Immutable forecast revisions
+
+The planner owns one forecast history. Confirmation retains the exact mission and user answer under
+`runtime/history/missions/`; opening an attempt retains its mission, choices and forecast context under
+`runtime/history/invocations/`. State contains their content addresses. Acceptance resolves the context
+that invocation froze; a later goal or answer cannot reinterpret its proof. Current completion counts
+only current mission evidence, never an older done-when index with the same number.
+
+Use `node scripts/plan-history.mjs preview <session> [flags.json]` to derive and display the complete
+mission forecast with its dependency and handoff lanes. It is labelled planned, not executed or
+verified. Then pass the returned `previewHash`, unchanged `flags` and a concrete `reason` to
+`node scripts/plan-history.mjs commit <session> <reviewed-plan.json>`. A changed scope, attempt or plan
+makes the preview stale. The owning lock refuses any running or waiting invocation and active lease.
+
+A forecast describes logical work; only dispatch freezes its concrete invocation. A revision may
+reassign a future coordinate that has no request directory or attempt. Dispatched coordinates and
+all existing branch files remain reserved, unchanged and sealed by the revision inventory. The
+logical node map records supersession, never execution. Original request prerequisites remain in
+their invocation context; the current map identifies the future consumer without pretending the
+original physical coordinate was fulfilled. Missing historical context is unavailable for proof
+reuse, never reconstructed from prose or retired execution. A still-running current-version attempt
+without a context may retain one only during successful acceptance, explicitly marked `acceptance`.
+
+For the same confirmed goal, retain the current forecast and use `flags.edit` in the preview:
+
+- `{"kind":"resume","cell":"N/M"}` re-enters an accepted blocked node. Restatements require their
+  exact recorded user answer; other stops must route to that operator's resume. An optional `source`
+  names an accepted current-version blocked reading for an unopened node with the same operator and
+  logical goal. The resulting request names the returned resume target and actual choice.
+- `{"kind":"expand","cell":"N/M","producer":"P/Q"}` expands an unopened fanout from its actual
+  matched plan's sealed `units` output, preserving already executed nodes. Unit dependencies run
+  first. When the operator owns several done-when lines, `goals` maps each unit id to its confirmed
+  line index. The resulting request binds the returned unit id and exact `inputs.units` reference.
+
+The active forecast passes Input, Context, Next, goal, long-flow and finite budget gates. A declared
+dependency handoff can continue from an earlier input or context owner whose authored Next names
+the consumer; it cannot search unrelated history. The preview records that edge. Dispatch requires
+the owner to have matched current-version, validator-accepted sealed evidence and the invocation
+to consume that actual output. An ordinary unsealed chain keeps immediate Next validation.
+
+A material goal correction uses `session-open.mjs confirm` with `corrected`, followed by the actual
+confirmation of its new version. Its complete new forecast retains prior execution as historical
+evidence that cannot dispatch, feed current inputs or close the new goal. The old inventory and
+answers remain checked. No arbitrary step boundary exempts history from its immutable commitments.

@@ -1,3 +1,4 @@
+import { invocationState } from './mission-history.mjs';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -80,7 +81,9 @@ export async function branchInteraction(root, dir) {
   let parent = path.resolve(dir);
   while (!/^step-\d+$/.test(path.basename(parent)) && path.dirname(parent) !== parent) parent = path.dirname(parent);
   const stateFile = path.join(path.dirname(parent), 'state.json');
-  const state = existsSync(stateFile) ? JSON.parse(await readFile(stateFile, 'utf8')) : {};
+  let state = existsSync(stateFile) ? JSON.parse(await readFile(stateFile, 'utf8')) : {};
+  const request = JSON.parse(await readFile(path.join(dir, 'request/request.json'), 'utf8'));
+  if (state.attempts?.[`${request.step}/${request.parallel}${request.exchange ? `/${request.exchange}` : ''}`]?.context) state = invocationState(path.dirname(stateFile), state, request);
   const schema = JSON.parse(await readFile(path.join(root, 'templates/step/response.schema.json'), 'utf8'));
   const errors = response.interaction === undefined ? [] : validateAgainst(schema.properties.interaction, response.interaction, 'interaction');
   return [...errors, ...interactionErrors(await loadInteractionPolicy(root), response.interaction, state.choices, response.status ?? null)];

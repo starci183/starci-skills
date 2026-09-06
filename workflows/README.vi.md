@@ -140,3 +140,47 @@ ghi chú về cách viết lại. Chúng là đầu vào cho spec của planner,
 không bao giờ đọc chúng.
 
 Hợp đồng khám phá mục tiêu, phạm vi bàn giao và owner của workflow: [discovery.md](discovery.md).
+
+## Các bản dự báo bất biến
+
+Planner sở hữu một lịch sử dự báo. Xác nhận lưu nguyên mục tiêu và đáp án tại
+`runtime/history/missions/`; mở attempt lưu mục tiêu, lựa chọn và context dự báo tại
+`runtime/history/invocations/`. State giữ địa chỉ nội dung. Chấp nhận dùng context đã đóng băng
+của invocation; mục tiêu hay đáp án về sau không diễn giải lại proof. Hoàn thành hiện tại chỉ tính
+evidence của phiên bản hiện tại, không lấy dòng done-when cũ chỉ vì cùng số.
+
+Chạy `node scripts/plan-history.mjs preview <session> [flags.json]` để suy và hiển thị toàn bộ
+dự báo mục tiêu, các phụ thuộc và lane bàn giao. Nó ghi rõ planned, chưa thực thi hay kiểm chứng.
+Sau đó chuyển `previewHash`, `flags` giữ nguyên và `reason` cụ thể vào
+`node scripts/plan-history.mjs commit <session> <reviewed-plan.json>`. Scope, attempt hay plan đổi
+làm preview hết hiệu lực. Lock owner từ chối khi còn invocation chạy/chờ hoặc lease đang giữ.
+
+Dự báo mô tả công việc logic; chỉ dispatch mới đóng băng invocation cụ thể. Revision có thể đổi
+tọa độ tương lai chưa có thư mục request hay attempt. Tọa độ đã dispatch và mọi file nhánh hiện
+có được giữ nguyên, niêm phong bằng inventory. Ánh xạ node ghi sự thay thế, không ghi thực thi.
+Prerequisite gốc vẫn nằm trong context invocation; ánh xạ hiện tại chỉ ra consumer tương lai mà
+không coi tọa độ gốc đã được đáp ứng. Context lịch sử thiếu không dùng làm proof, không dựng từ
+văn xuôi hay execution đã nghỉ. Attempt phiên bản hiện tại còn chạy mà thiếu context chỉ được
+lưu context lúc acceptance thành công, ghi rõ thời điểm `acceptance`.
+
+Trong cùng goal đã xác nhận, giữ dự báo hiện tại và dùng `flags.edit` khi preview:
+
+- `{"kind":"resume","cell":"N/M"}` vào lại node blocked đã được chấp nhận. Restatement cần đáp
+  án thật khớp nội dung; stop khác phải route tới resume của operator đó. `source` tùy chọn chỉ một
+  reading blocked đã chấp nhận của phiên bản hiện tại cho node chưa mở cùng operator và goal logic.
+  Request mới ghi đúng đích resume và lựa chọn thật mà kết quả trả về.
+- `{"kind":"expand","cell":"N/M","producer":"P/Q"}` mở fanout chưa dispatch từ output `units`
+  được niêm phong của plan matched thật, giữ node đã chạy. Phụ thuộc unit chạy trước. Khi operator
+  sở hữu nhiều dòng done-when, `goals` ánh xạ mỗi id unit tới chỉ số dòng đã xác nhận. Request mới
+  bind đúng id unit và `inputs.units` trả về.
+
+Dự báo active qua đủ gate Input, Context, Next, goal, luồng dài và budget hữu hạn. Handoff phụ
+thuộc đã khai có thể tiếp tục từ owner input hoặc context trước đó khi Next của owner gọi tên
+consumer; không tìm lịch sử không liên quan. Preview ghi cạnh này. Dispatch yêu cầu owner có
+evidence matched đúng phiên bản, qua validator và còn niêm phong; invocation phải dùng output
+thật đó. Chuỗi chưa niêm phong vẫn kiểm Next của step liền trước.
+
+Goal đổi đáng kể dùng `session-open.mjs confirm` với `corrected`, rồi đáp án thật xác nhận phiên
+bản mới. Dự báo mới đầy đủ giữ execution trước như evidence lịch sử, không dispatch, cấp input
+hiện tại hoặc đóng goal mới. Inventory và đáp án cũ vẫn được kiểm. Không có ranh giới step tùy ý
+bỏ kiểm các cam kết bất biến của lịch sử.

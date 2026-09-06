@@ -1,4 +1,4 @@
-# StarCi Skills 2.4.2
+# StarCi Skills 2.4.3
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.4.3 (2026-09-06): mission-bound restatement choices and immutable forecast revisions preserve prior evidence while routing corrected work through explicit dependencies; confirmation previews expose business goals, routes and code impact. See tests/evidence/20260906-coherent-revisions.md.
 
 2.4.2 (2026-09-06): initial session checkout binding freezes its request under the owning mutation; read-only required route prerequisites remain separate from authorized product write impact. See tests/evidence/20260906-bind-admission.md.
 

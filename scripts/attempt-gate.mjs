@@ -1,3 +1,4 @@
+import { retainInvocation } from './mission-history.mjs';
 import { workflowOwnerErrors, readSessionState } from './workflow-root.mjs';
 import { deliveryRequestErrors } from './mission-scope.mjs';
 import { createHash } from 'node:crypto';
@@ -65,6 +66,7 @@ export async function openAttempt(branch, { runtimeRoot = root } = {}) {
       expected: request.expected,
       frozenInputs: request.frozenInputs,
       status: 'running',
+      context: await retainInvocation(session, state, request, { root: runtimeRoot }),
       requestRef: `${refBase}/request/request.json`,
       startedAt: new Date().toISOString()
     };
@@ -112,6 +114,7 @@ export async function acceptAttempt(branch) {
     if (record.status !== 'running' && record.status !== 'waiting') throw new Error(`state.json: attempt ${record.id} is already ${record.status}`);
     const requestCheck = await validateRequest(root, branch, undefined, { phase: 'accept' });
     if (requestCheck.errors.length) throw new Error(requestCheck.errors.join('\n'));
+    if (!record.context) record.context = await retainInvocation(session, state, request, { root, phase: 'acceptance' });
     if (sha(await readFile(responseFile)) !== sha(responseBytes)) throw new Error('response/response.json changed during acceptance; rerun the full step gate');
     const stableManifest = await buildEvidenceManifest(branch);
     if (stableManifest.fingerprint !== evidenceManifest.fingerprint || JSON.stringify(stableManifest.files) !== JSON.stringify(evidenceManifest.files)) throw new Error('request/response evidence changed during acceptance; rerun the full step gate');

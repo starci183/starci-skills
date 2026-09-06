@@ -344,7 +344,9 @@ test('a source-writing attempt automatically leases the real workspace behind a 
 }));
 
 test('a same-session input cannot dispatch until its exact producer is matched and sealed', async () => fixture(async ({ sessions, worktree }) => {
-  const opened = await openSession(sessions, draft(worktree));
+  const input = draft(worktree);
+  input.mission.doneWhen = [{ evidence: 'an architecture decision is accepted', producedBy: 'architecture.decide' }];
+  const opened = await openSession(sessions, input);
   await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:1' });
   const stateFile = path.join(opened.session, 'state.json');
   const producer = path.join(opened.session, 'step-1', 'parallel-1');
@@ -363,9 +365,6 @@ test('a same-session input cannot dispatch until its exact producer is matched a
   writeFileSync(path.join(producer, 'response', 'response.json'), JSON.stringify(producerResponse));
   const producerRequestBytes = readFileSync(path.join(producer, 'request', 'request.json'));
   const state = JSON.parse(readFileSync(stateFile, 'utf8'));
-  state.mission.doneWhen = [{ evidence: 'an architecture decision is accepted', producedBy: 'architecture.decide' }];
-  state.mission.confirmation.authority = answerFor(state.mission, state.mission.confirmation.sourceRef);
-  state.mission.confirmation.scopeHash = state.mission.confirmation.authority.scopeHash;
   state.chain = [['1/1'], ['2/1'], ['3/1']];
   state.steps = { '1/1': 'business.decide', '2/1': 'architecture.decide', '3/1': 'architecture.decide' };
   state.requestHashes['1/1'] = sha(producerRequestBytes);

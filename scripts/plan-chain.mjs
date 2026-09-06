@@ -240,44 +240,58 @@ export function planChain({ packages, mission, options = {} }) {
   // 7. Packing.
   const descendants = (key) => { const seen = new Set(); const stack = [key]; while (stack.length) { const k = stack.pop(); for (const [other, deps] of edges) if (deps.has(k) && !seen.has(other)) { seen.add(other); stack.push(other); } } return seen.size; };
   const weight = new Map([...nodes.keys()].map((k) => [k, descendants(k)]));
-  const placed = new Map(); // key -> step index
-  const steps = [];
-  while (placed.size < nodes.size) {
-    const ready = [...nodes.keys()].filter((k) => !placed.has(k) && [...edges.get(k)].every((d) => placed.has(d))).sort((a, b) => weight.get(b) - weight.get(a) || byKey(a, b));
-    if (!ready.length) throw new PlanError([`the chain has a cycle among ${[...nodes.keys()].filter((k) => !placed.has(k)).join(', ')}`]);
-    const previous = steps.length ? steps[steps.length - 1].map((k) => nodes.get(k).operator) : null;
-    // A publish or a deploy ends the chain: it is placed only when nothing else is left to place —
-    // that is, when every node still unplaced is itself a boundary. A mission that publishes two routes
-    // holds two of them, one after the other, and the second is not a reason to hold the first back.
-    const terminal = (k) => [PUBLISH_OPERATOR, DEPLOY_OPERATOR].includes(nodes.get(k).operator);
-    const working = [...nodes.keys()].some((k) => !placed.has(k) && !terminal(k));
-    const pending = ready.filter((k) => !terminal(k) || !working);
-    const allowed = previous ? pending.filter((k) => previous.some((p) => p === nodes.get(k).operator || graph.get(p).next.has(nodes.get(k).operator))) : pending;
-    if (!allowed.length) throw new PlanError([`${(pending.length ? pending : ready).map((k) => nodes.get(k).operator).join(', ')} could run next, and no Next table of ${(previous ?? []).join(', ')} permits any of them${pending.length ? '' : ' before the chain ends'}`]);
-    const chosen = [];
-    const writes = new Set();
-    for (const k of allowed) {
-      if (chosen.length >= maxParallel) break;
-      const n = nodes.get(k);
-      if (n.fanout) { if (!chosen.length) chosen.push(k); break; } // a fan-out branch stands alone so its units expand in place
-      const w = graph.get(n.operator).writes;
-      if ([...w].some((a) => writes.has(a))) continue;
-      for (const a of w) writes.add(a);
-      chosen.push(k);
+  // A greedy valid step can leave no lawful Next edge for a later ready node. Explore the
+  // compatible step choices, retaining all dependency/write/fanout/boundary constraints. Memoize
+  // equivalent frontiers; the result is still one complete forecast, never a bridge invocation.
+  const failed = new Set();
+  let lastWall = [];
+  const schedule = (placed, previous) => {
+    if (placed.size === nodes.size) return [];
+    const signature = JSON.stringify([[...placed].sort(), [...(previous ?? [])].sort()]);
+    if (failed.has(signature)) return null;
+    const ready = [...nodes.keys()].filter(k => !placed.has(k) && [...edges.get(k)].every(d => placed.has(d))).sort((a, b) => weight.get(b) - weight.get(a) || byKey(a, b));
+    if (!ready.length) { lastWall = [`the chain has a cycle among ${[...nodes.keys()].filter(k => !placed.has(k)).join(', ')}`]; failed.add(signature); return null; }
+    const terminal = k => [PUBLISH_OPERATOR, DEPLOY_OPERATOR].includes(nodes.get(k).operator);
+    const working = [...nodes.keys()].some(k => !placed.has(k) && !terminal(k));
+    const pending = ready.filter(k => !terminal(k) || !working);
+    const allowed = previous ? pending.filter(k => previous.some(p => p === nodes.get(k).operator || graph.get(p).next.has(nodes.get(k).operator)) || options.dependencyHandoffs && [...nodes.get(k).deps, ...nodes.get(k).soft].some(p => placed.has(p) && graph.get(nodes.get(p).operator).next.has(nodes.get(k).operator))) : pending;
+    if (!allowed.length) { lastWall = [`${(pending.length ? pending : ready).map(k => nodes.get(k).operator).join(', ')} could run next, and no Next table of ${(previous ?? []).join(', ')} permits any of them`]; failed.add(signature); return null; }
+    const groups = [];
+    const collect = (at, group, writes) => {
+      if (group.length) groups.push([...group]);
+      if (group.length >= maxParallel || group.some(k => nodes.get(k).fanout)) return;
+      for (let i = at; i < allowed.length; i += 1) {
+        const k = allowed[i], node = nodes.get(k), owned = graph.get(node.operator).writes;
+        if (node.fanout && group.length || [...owned].some(alias => writes.has(alias))) continue;
+        collect(i + 1, [...group, k], new Set([...writes, ...owned]));
+      }
+    };
+    collect(0, [], new Set());
+    groups.sort((a, b) => b.length - a.length || b.reduce((n,k) => n + weight.get(k),0) - a.reduce((n,k) => n + weight.get(k),0));
+    for (const group of groups) {
+      const tail = schedule(new Set([...placed, ...group]), group.map(k => nodes.get(k).operator));
+      if (tail) return [[...group].sort(byKey), ...tail];
     }
-    chosen.sort(byKey);
-    steps.push(chosen);
-    for (const k of chosen) placed.set(k, steps.length - 1);
-  }
+    failed.add(signature); return null;
+  };
+  const steps = schedule(new Set(), null);
+  if (!steps) throw new PlanError(lastWall);
   // 8. Cells, goals, reasons.
   const cell = new Map();
   steps.forEach((step, n) => step.forEach((k, m) => cell.set(k, cellOf(n + 1, m + 1))));
   const chain = steps.map((step) => step.map((k) => cell.get(k)));
-  const out = { chain, steps: {}, goals: {}, reasons: {}, dependencies: {}, requestRefs: {}, presets: {}, fanout: {}, imports: {}, dropped: [], ends: 'user' };
+  const out = { chain, steps: {}, goals: {}, reasons: {}, dependencies: {}, handoffs: {}, evidenceDependencies: {}, requestRefs: {}, nodes: {}, presets: {}, fanout: {}, imports: {}, dropped: [], ends: 'user' };
   for (const step of chain) for (const c of step) {
     const k = [...cell].find(([, v]) => v === c)[0];
     const n = nodes.get(k);
     out.steps[c] = n.operator;
+    out.nodes[c] = n.key;
+    out.evidenceDependencies[c] = [...new Set([...n.deps, ...n.soft])].map(dependency => cell.get(dependency));
+    const previous = steps[stepOf(c) - 2];
+    if (previous && !previous.some(p => nodes.get(p).operator === n.operator || graph.get(nodes.get(p).operator).next.has(n.operator))) {
+      const owner = [...n.deps, ...n.soft].filter(p => stepOf(cell.get(p)) < stepOf(c) && graph.get(nodes.get(p).operator).next.has(n.operator)).sort((a,b) => stepOf(cell.get(b)) - stepOf(cell.get(a)))[0];
+      if (owner) out.handoffs[c] = cell.get(owner);
+    }
     out.dependencies[c] = [...edges.get(k)].map((dependency) => cell.get(dependency)).sort((a, b) => stepOf(a) - stepOf(b) || parallelOf(a) - parallelOf(b));
     out.requestRefs[c] = `step-${stepOf(c)}/parallel-${parallelOf(c)}/request/request.json`;
     if (Object.keys(n.presets).length) out.presets[c] = n.presets;
@@ -315,7 +329,7 @@ export function previewChain(plan, mission) {
     const dependencies = plan.dependencies?.[c]?.length ? plan.dependencies[c].join(', ') : 'none';
     const requestRef = plan.requestRefs?.[c] ?? `step-${stepOf(c)}/parallel-${parallelOf(c)}/request/request.json`;
     const extras = [plan.reasons[c], plan.presets[c] ? Object.entries(plan.presets[c]).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ') : null, plan.fanout[c] ? `fanout: ${plan.fanout[c]}` : null].filter(Boolean);
-    out.push(`[${c} ${op}] expected: ${line} · source: ${expectedSource}`);
+    out.push(`[${c} ${op}] planned (not executed or verified): ${line} · source: ${expectedSource}`);
     out.push(`[${c} ${op}] ${extras.join(' · ')} · dependencies: ${dependencies} · request: ${requestRef} (pending expected.criteria and environment isolationId/mode/workspace/reads/writes/exclusive/outputRoot; freeze before dispatch)`);
     for (const [kind, from] of Object.entries(plan.imports?.[c] ?? {})) out.push(`[${c} ${op}] ${kind} imported from ${from.sourceSessionId} step ${from.sourceStep} (${from.input})`);
   }
@@ -356,7 +370,8 @@ export async function planSession(root, session, flags = {}) {
   const packages = await loadOperatorPackages(root);
   const graph = await loadOperatorGraph(root, packages);
   const imported = await readImportedSlots(session, graph, root);
-  const plan = planChain({ packages, mission: state.mission, options: { graph, maxParallel: await loadMaxParallel(root), roles: flags.roles ?? [], requirements: flags.requirements ?? {}, imported } });
+  const declaredRoles = state.mission.doneWhen.some(line => line.producedBy !== PREFLIGHT_OPERATOR) ? [...new Set((state.mission.discovery?.repositories ?? []).map(repository => repository.role))] : [];
+  const plan = planChain({ packages, mission: state.mission, options: { graph, maxParallel: await loadMaxParallel(root), roles: flags.roles?.length ? flags.roles : declaredRoles, requirements: flags.requirements ?? {}, dependencyHandoffs: true, imported } });
   return { state, plan };
 }
 

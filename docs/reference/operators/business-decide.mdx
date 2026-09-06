@@ -61,7 +61,7 @@ count the `restatement` kind allows, saying what the promise was read to mean, a
 words quoted verbatim under `## Source`. The lines are written in the language of `promise`, because
 a restatement the person cannot read confirms nothing; the validator checks the shape and the quote,
 not the language, so the language is the agent's duty. Unless the request carries the top-level
-`decisionId` `restatement:<featureId>` with a `selectedOption` recorded in state.json.choices, the
+content-bound `decisionId` defined by [the interaction policy](../../resources/interaction.md) with a `selectedOption` recorded in state.json.choices, the
 branch ends `blocked` with `RESTATEMENT_UNCONFIRMED`, `fields.restatement` set and no other output,
 and `interaction` of kind `restatement-confirm` on that decisionId offering exactly `as-stated` and
 `corrected`. A re-entry that selects `corrected` names the blocked branch in `resume` and carries a
@@ -226,6 +226,7 @@ On `done`, print **Operator Result** as the promise coverage table in `response/
 
 | When | Operator |
 | --- | --- |
+| the promise names multiple frontend units, so their complete surface map is planned before generation | `interface.plan` |
 | the promise is published and a frontend surface must carry it | `interface.generate` |
 | the promise is published and a backend contract must carry it | `backend.generate` |
 | the promise needs boundaries and data ownership decided before it can be enforced | `architecture.decide` |
