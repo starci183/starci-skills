@@ -135,6 +135,30 @@ mô tả nó sẽ phá đúng trạng thái mà bước sau định đo, cũng l
 động lại thứ gì. `restart` và `reset` tồn tại cho lúc một con người thật sự muốn điều đó, và chúng
 được gọi đích danh.
 
+### Bằng chứng chỉ đọc cho serve đã hội tụ
+
+`serve` có `already-converged` chỉ ghi artifact response của chính nó. Nó không lấy write lease chung,
+không sửa registry, không áp effect, không phát integration `changes`, và giữ `runtimeLadder.lease`
+là null. Bộ proof là `entry-declared`, `endpoints-served`, `head-observed`, `generation-unchanged`,
+`server-pid-owned`, và `lease-unheld`. Bộ proof của các rung có mutation giữ nguyên; attestation đã áp
+vẫn phải có mutation tương ứng và bằng chứng lease.
+
+Thu hai observation riêng bằng `scripts/runtime-observation.mjs <branch> <label> <GET URL...>` trong
+invocation đang mở. Mỗi lần collector giữ nguyên byte registry và observation có hash dưới
+`response/artifacts/`; đặt hai địa chỉ trả về vào `delta.noOpProof.before` và `.after`. Probe mọi origin
+endpoint đã khai bằng GET an toàn trả lời thành công (GraphQL có thể cần query chỉ đọc cụ thể).
+URL và artifact không chứa credential.
+
+Hai lần thu phải giữ cùng toàn bộ byte registry, generation, head và bản ghi process; bảng socket của
+OS phải chỉ đúng listener đã ghi. Registry phải có `server.worktree`; Git HEAD thực tế tại đó phải
+bằng head entry và Git ancestry phải chứa commit được yêu cầu. Lease trong entry và file lease runtime/
+identity liên quan phải trống. Nhận diện các biến thể tên lease route đang dùng; lease của route khác
+không chặn observation, nhưng bất cứ thay đổi byte registry nào đều chặn. Thời điểm probe và observation
+phải hữu hạn, nằm giữa `startedAt` của attempt và `actual.observedAt` của response. Khi accept, gate đo
+lại registry, lease, process, socket, Git và HTTP; proof đã accepted chỉ replay artifact được seal,
+không khẳng định runtime vẫn hiện hành. Một snapshot cũ, boolean tự khai hay check cũ không thay cho cặp
+này. Proof response tùy chọn không sửa request đã mở hoặc context invocation đã đóng băng.
+
 ## Lease chính là thứ tự merge
 
 Mỗi lúc chỉ một phiên tích hợp. Phiên nào serve thì giữ lease trong lúc merge và khởi động lại, rồi
@@ -235,7 +259,7 @@ Các row của operator này được gate bởi hợp đồng attempt expected/
 
 | Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
 | --- | --- | --- | --- |
-| entry serve head chứa requested commit, config và health khớp | tái dùng process và lease; không restart | đọc generation, ancestry, endpoint, process, probe | phát runtime receipt hiện có |
+| entry serve head chứa requested commit, config và health khớp | quan sát process không lấy write lease; không restart | cặp proof registry, Git, socket và HTTP với generation giữ nguyên | phát runtime receipt no-op đã chứng minh |
 | process hoặc entry thiếu | tạo generation và start source-owned command trên projected port | chứng minh ancestry và health | phát generation và lease mới |
 | head/config/health sai | dưới exclusive lease update integration head hoặc declared process | đọc lại generation, process, ancestry, health | repair attempt mới; handoff foreign owner |
 | ownership lần start không chắc | không kill hay overwrite | ghi pid, port, registry mismatch | block tới khi ownership được chứng minh |
@@ -245,7 +269,8 @@ Các row của operator này được gate bởi hợp đồng attempt expected/
 Context chỉ đọc, trừ phần delta đã duyệt. Operator chỉ áp delta effect đã duyệt lên entry route đã
 kiểm kê, dưới một lease độc quyền trên `@worktrees/sessions/central-runtime`, và chỉ ghi `response/`
 của nhánh mình: `data/delta.json`, `data/checks.json`, `changes.md`, `response.md` và `response.json`.
-Nó cũng ghi entry runtime của route nó chứng thực, và không gì khác ngoài `response/`. Nó là chủ duy
+Nó chỉ ghi entry runtime khi áp mutation được duyệt; no-op chỉ đọc chỉ ghi artifact response của mình.
+Không có ghi nào khác ngoài `response/`. Nó là chủ duy
 nhất của vòng đời một runtime đang phục vụ: nó merge vào nhánh tích hợp rồi khởi động, khởi động lại,
 reset và dừng server của một route mà sổ đăng ký ghi nhận, dưới một bậc có tên, và nó chỉ dừng đúng
 cây tiến trình của pid mà chính entry đã ghi. Nó không deploy, migrate, cấp tài khoản, seed dữ liệu
@@ -299,7 +324,7 @@ phê duyệt release hay bằng chứng UAT nào.
 | 4 | Phân giải các port claim theo phép chiếu và ghi ai đang giữ từng cổng | `portClaims` | @workspaces/ports/<project> cho các cổng được chiếu ra, @worktrees/sessions/central-runtime cho chủ giữ quan sát được của chúng, @tools/shell cho bảng socket | — | `PORT_CONFLICT` |
 | 5 | Ghi desired delta: tái dùng generation healthy khớp, tạo generation thiếu, hoặc chỉ update declared field sai; holder foreign/uncertain không bị mutation | `desiredState` | @worktrees/sessions/central-runtime cho entry quan sát được, `request/request.json` cho trạng thái mong muốn | `response/data/delta.json` | `EFFECT_UNAUTHORIZED` |
 | 6 | Dưới lease chỉ làm create hoặc update đã phân loại, queue khi conflict, và giữ effect transcript trước để resume không lặp mù | `operation`, `commit` | @workspaces/projects/<project>/<role> cho lệnh dev và nhánh tích hợp, đầu vào `changes` cho tập ghi của phiên, @worktrees/sessions/central-runtime cho lease và hàng đợi, @tools/git, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json`, `changes` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
-| 7 | Chứng thực entry: ping mọi endpoint đã khai, ghi head đang phục vụ, những gì nó chứa và bản ghi server, rồi đặt trạng thái theo cái đã trả lời | — | @worktrees/sessions/central-runtime cho các endpoint của entry, @tools/http | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE` |
+| 7 | Chứng thực entry: probe mọi endpoint, ghi head và server; no-op đã hội tụ thu cặp proof chỉ đọc thay vì cập nhật entry | — | @worktrees/sessions/central-runtime cho các endpoint của entry, @tools/http, @tools/git, @tools/shell | @worktrees/sessions/central-runtime chỉ khi có mutation, `response/artifacts/`, `response/data/delta.json` | `SERVICE_UNAVAILABLE` |
 | 8 | Chứng minh trọn bộ check của bậc trên entry đã chứng thực | — | @worktrees/sessions/central-runtime đọc lại theo bộ chứng minh của bậc, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 9 | Viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
 

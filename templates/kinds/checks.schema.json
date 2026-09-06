@@ -168,7 +168,9 @@
         "integration-merged",
         "server-pid-owned",
         "lease-honoured",
-        "gates-passed"
+        "gates-passed",
+        "generation-unchanged",
+        "lease-unheld"
       ]
     }
   }

@@ -819,6 +819,53 @@
           "const": true
         }
       }
+    },
+    "noOpProof": {
+      "description": "Paired immutable runtime observations for an already-converged read-only serve; both captures are produced within this invocation, and acceptance verifies the unchanged live registry, healthy endpoints and unleased processes.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "before",
+        "after"
+      ],
+      "properties": {
+        "before": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ref",
+            "sha256"
+          ],
+          "properties": {
+            "ref": {
+              "type": "string",
+              "pattern": "^response/artifacts/[A-Za-z0-9_.-]+\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        },
+        "after": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ref",
+            "sha256"
+          ],
+          "properties": {
+            "ref": {
+              "type": "string",
+              "pattern": "^response/artifacts/[A-Za-z0-9_.-]+\\.json$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
     }
   },
   "$defs": {

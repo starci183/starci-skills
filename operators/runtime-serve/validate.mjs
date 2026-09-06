@@ -17,6 +17,7 @@ import { tableUnder } from '../../scripts/validate-response.mjs';
 import { hostRootOf, missingStack } from '../../scripts/validate-request.mjs';
 import { platformAuthorityErrors } from '../../scripts/platform-authority.mjs';
 import { resolutionErrors } from '../../scripts/merge-resolution.mjs';
+import { runtimeNoopProofErrors } from '../../scripts/runtime-observation.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const OPERATOR = 'runtime.serve';
@@ -68,7 +69,8 @@ export const RUNG_CHECKS = {
 };
 // A serve that only took a queue position merged nothing and started nothing.
 export const QUEUED_CHECKS = ['entry-declared', 'generation-advanced', 'lease-honoured'];
-export const RUNTIME_CHECKS = [...new Set([...Object.values(RUNG_CHECKS).flat(), ...QUEUED_CHECKS])];
+export const NOOP_CHECKS = ['entry-declared', 'endpoints-served', 'head-observed', 'generation-unchanged', 'server-pid-owned', 'lease-unheld'];
+export const RUNTIME_CHECKS = [...new Set([...Object.values(RUNG_CHECKS).flat(), ...QUEUED_CHECKS, ...NOOP_CHECKS])];
 export const RUNTIME_CAPABILITY = 'runtime:registry-write';
 // One rung, one effect. Every rung attests on top of it; a reused or queued serve applies no rung effect.
 export const RUNG_EFFECTS = { 'stack-up': 'bring-up-infra-stack', locate: 'locate-routed-checkouts', 'start-role': 'start-role-runtime', serve: 'serve-runtime-head', restart: 'restart-runtime-server', reset: 'reset-runtime-server', stop: 'stop-runtime-server' };
@@ -95,7 +97,7 @@ const asList = (v) => (Array.isArray(v) ? v : []);
 // The runtime ladder's own law, over the block the delta publishes. One server per route on one fixed
 // port, served from one integration branch: a session gets its commit merged in and the server
 // restarted on the result, or it waits behind the lease.
-export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, findings, gateFailed = false }) {
+export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, findings, gateFailed = false, readOnlyNoop = false }) {
   const errors = [];
   const at = 'response/data/delta.json';
   const started = RUNGS_THAT_START.has(ladder.rung) && !gateFailed;
@@ -107,7 +109,9 @@ export function runtimeLadderErrors(ladder, { requirements, sessionId, applied, 
   if (!empty(requirements.routeKey) && ladder.routeKey !== String(requirements.routeKey)) say(`the ladder acts on ${ladder.routeKey}, not on the requested route ${requirements.routeKey}`);
   if (!empty(requirements.commit) && ladder.wantedCommit !== String(requirements.commit)) say('the wanted commit is not the one the request named');
   if (ladder.sessionId !== null && sessionId && ladder.sessionId !== sessionId) say(`the ladder acts for session ${ladder.sessionId}, and this branch belongs to ${sessionId}`);
-  if (!applied.has('attest-runtime-entry')) say('every rung attests, because a status nobody probed is an assertion');
+  if (readOnlyNoop) {
+    if (ladder.rung !== 'serve' || !ladder.reused || !ladder.observed.pidAlive || !ladder.observed.probeAnswered || applied.size || ladder.integration !== null || ladder.lease !== null || ladder.observed.leaseSessionId !== null || queued) say('an already-converged observation only reuses a healthy unleased runtime and applies no effect');
+  } else if (!applied.has('attest-runtime-entry')) say('every rung attests, because a status nobody probed is an assertion');
 
   const rungEffect = RUNG_EFFECTS[ladder.rung];
   if (ladder.reused || queued || gateFailed) {
@@ -292,7 +296,10 @@ export async function validateRuntimeStep(branchDir, root = ROOT, { hostRoot = h
 
   const ladder = delta?.runtimeLadder ?? null;
   const queuedServe = Boolean(ladder && ladder.queuePosition !== null);
-  const requiredChecks = ladder ? (queuedServe ? QUEUED_CHECKS : (RUNG_CHECKS[ladder.rung] ?? [])) : [];
+  const readOnlyNoop = delta?.convergence === 'already-converged';
+  const requiredChecks = ladder ? (readOnlyNoop ? NOOP_CHECKS : queuedServe ? QUEUED_CHECKS : (RUNG_CHECKS[ladder.rung] ?? [])) : [];
+  if (readOnlyNoop) errors.push(...await runtimeNoopProofErrors({ root, hostRoot, branch: branchDir, request, response, delta }));
+  else if (delta?.noOpProof) errors.push('response/data/delta.json: paired no-op proof belongs only to an already-converged observation');
 
   let findingCount = 0;
   if (checks) {
@@ -301,6 +308,7 @@ export async function validateRuntimeStep(branchDir, root = ROOT, { hostRoot = h
     const requested = new Set(checks.requiredCheckNames);
     for (const n of requiredChecks) if (!requested.has(n)) errors.push(`response/data/checks.json: the ${ladder?.rung ?? 'runtime'} rung must require the ${n} check`);
     for (const n of requested) if (!RUNTIME_CHECKS.includes(n)) errors.push(`response/data/checks.json: check ${n} does not belong to the runtime ladder`);
+    if (readOnlyNoop) for (const n of requested) if (!NOOP_CHECKS.includes(n)) errors.push(`response/data/checks.json: an unchanged observation cannot claim ${n}`);
     const seen = new Set();
     const proved = new Set();
     for (const c of checks.checks) {
@@ -341,7 +349,7 @@ export async function validateRuntimeStep(branchDir, root = ROOT, { hostRoot = h
     }
   }
   if (ladder && delta) {
-    errors.push(...runtimeLadderErrors(ladder, { requirements, sessionId: request?.sessionId ?? null, applied: new Set(delta.appliedEffects), findings: new Set((checks?.findings ?? []).map((f) => f.code)), gateFailed }));
+    errors.push(...runtimeLadderErrors(ladder, { requirements, sessionId: request?.sessionId ?? null, applied: new Set(delta.appliedEffects), findings: new Set((checks?.findings ?? []).map((f) => f.code)), gateFailed, readOnlyNoop }));
   }
 
   if (present.has('platform-operation-receipt') && has('response/response.md')) {

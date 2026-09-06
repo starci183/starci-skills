@@ -139,6 +139,31 @@ server to be allowed to describe it destroys the state the next step was going t
 the same reason attestation never restarts anything. `restart` and `reset` exist for when a person
 actually wants that, and they are asked for by name.
 
+### Read-only proof of an already-converged serve
+
+An `already-converged` `serve` writes only its own response artifacts. It takes no shared write
+lease, updates no registry field, applies no effect, emits no integration `changes`, and keeps
+`runtimeLadder.lease` null. Its proof set is `entry-declared`, `endpoints-served`, `head-observed`,
+`generation-unchanged`, `server-pid-owned`, and `lease-unheld`. The normal mutating rung proof sets
+remain unchanged; an applied attestation still requires its recorded mutation and lease evidence.
+
+Collect two separate observations with `scripts/runtime-observation.mjs <branch> <label> <GET URL...>`
+inside the open invocation. Each collector call writes an immutable registry byte snapshot and a
+hashed observation under `response/artifacts/`; put the returned addresses in `delta.noOpProof.before`
+and `.after`. Probe every declared endpoint origin with a safe, successful GET URL (a GraphQL endpoint
+may require an explicit read-only query). No credentials belong in these URLs or artifacts.
+
+Both captures must retain identical full registry bytes, generation, head and process records; the
+OS socket table must identify the recorded listener. The registry must name `server.worktree`, whose
+actual Git HEAD equals the entry and whose Git ancestry contains the requested commit. The route
+entry and relevant runtime/identity lease files must be unheld. Existing route lease filename variants
+are recognized; unrelated route leases do not block observation, while any registry byte change does.
+Probe and observation times are finite and fall between this attempt's `startedAt` and the response's
+`actual.observedAt`. Live acceptance repeats registry, lease, process, socket, Git and HTTP checks;
+accepted historical proof replays its sealed artifacts without claiming the runtime is still current.
+An earlier single snapshot, a claimed boolean, or old checks do not substitute for the pair. This
+optional response proof does not rewrite an already-open request or its frozen invocation context.
+
 ## The lease is the merge order
 
 One session integrates at a time. The session that serves takes the lease while it merges and
@@ -241,7 +266,7 @@ This operator's rows are gated by the shared expected/actual attempt contract in
 
 | Observed state | Action | Actual check | Next branch |
 | --- | --- | --- | --- |
-| entry serves a head containing requested commit with matching config and health | reuse process and lease; do not restart | read generation, ancestry, endpoint, process and probes | emit existing runtime receipt |
+| entry serves a head containing requested commit with matching config and health | observe the process without taking a write lease; do not restart | paired registry, Git, socket and HTTP proof with unchanged generation | emit the proved no-op runtime receipt |
 | process or entry missing | create generation and start source-owned command on projected port | prove served head ancestry and health | emit created generation and lease |
 | head/config/health invalid | under exclusive lease update integration head or declared process | reread generation, process, ancestry and health | new repair attempt; foreign owner handoff |
 | start ownership uncertain | do not kill or overwrite | record pid, port and registry mismatch | block until ownership is proved |
@@ -252,7 +277,8 @@ Context is read-only apart from the approved delta. The operator applies only th
 delta on the inventoried route entry, under an exclusive lease on
 `@worktrees/sessions/central-runtime`, and writes only `response/` of its own branch:
 `data/delta.json`, `data/checks.json`, `changes.md`, `response.md` and `response.json`. It also
-writes the runtime entry of the route it attests, and nothing else outside `response/`. It is the one
+writes the runtime entry only when applying an approved mutation; a read-only no-op writes only its
+own response artifacts. It writes nothing else outside `response/`. It is the one
 owner of a served runtime's lifecycle: it merges into the integration branch and starts, restarts,
 resets and stops the server of a route the registry records, under a named rung, and it stops only
 the process tree of the pid the entry itself recorded. It does not deploy, migrate, provision an
@@ -306,7 +332,7 @@ release approval, or UAT proof.
 | 4 | Resolve the port claims against the projection and record who holds each | `portClaims` | @workspaces/ports/<project> for the projected ports, @worktrees/sessions/central-runtime for their observed holders, @tools/shell for the socket table | — | `PORT_CONFLICT` |
 | 5 | Write the desired delta: reuse a matching healthy generation, create a missing generation, or update only invalid declared fields; an uncertain or foreign holder is never mutated | `desiredState` | @worktrees/sessions/central-runtime for the observed entry, `request/request.json` for the desired state | `response/data/delta.json` | `EFFECT_UNAUTHORIZED` |
 | 6 | Under the lease perform only the classified create or update, queue on conflict, and preserve the previous effect transcript so a resume never blindly repeats it | `operation`, `commit` | @workspaces/projects/<project>/<role> for the dev command and the integration branch, input `changes` for the session's write set, @worktrees/sessions/central-runtime for the lease and queue, @tools/git, @tools/container, @tools/shell | @worktrees/sessions/central-runtime, `response/data/delta.json`, `changes` | `SERVICE_UNAVAILABLE`, `PROVISIONING_UNAVAILABLE`, `INTEGRATION_FAILED`, `INVALID_INPUT` |
-| 7 | Attest the entry: probe every declared endpoint, record the served head, what it contains and the server record, and set the status from what answered | — | @worktrees/sessions/central-runtime for the entry's endpoints, @tools/http | @worktrees/sessions/central-runtime, `response/data/delta.json` | `SERVICE_UNAVAILABLE` |
+| 7 | Attest the entry: probe every declared endpoint and record the served head and server; for an already-converged no-op collect paired read-only proof instead of updating the entry | — | @worktrees/sessions/central-runtime for the entry's endpoints, @tools/http, @tools/git, @tools/shell | @worktrees/sessions/central-runtime only for mutations, `response/artifacts/`, `response/data/delta.json` | `SERVICE_UNAVAILABLE` |
 | 8 | Prove the rung's whole check set against the attested entry | — | @worktrees/sessions/central-runtime re-read against the rung's proof set, @tools/http | `response/data/checks.json` | `PROOF_FAILED` |
 | 9 | Write the receipt and emit | — | everything above | `response/response.md`, `response/response.json` | — |
 
