@@ -173,12 +173,21 @@ Trong cùng goal đã xác nhận, giữ dự báo hiện tại và dùng `flags
   Root thêm phải nằm trong mutable ownership của request thất bại và không đụng protected owner;
   route hiện tại, dirty paths và source authority đều được kiểm lại. Retry chờ binding mới matched
   đúng nội dung. Bind lịch sử kiểm request, invocation và toàn bộ evidence seal gốc, không xem dirt
-  phát sinh sau là input của lần cũ. `INVALID_INPUT` blocked không có đường retry tổng quát. Chỉ
+  phát sinh sau là input của lần cũ. `INVALID_INPUT` blocked không có đường retry tổng quát.
   `correction: "source-history"` với `revision` bằng HEAD hiện tại đã đo mới mở lại cửa sổ source
   có changes binding được giữ và reflog còn đọc được chứng minh thao tác bị từ chối. HEAD đó làm
   base mới; cửa sổ cũ không cấp proof implementation. Interaction chưa được trả lời và stop của
   caller hay bên ngoài khác vẫn qua gate của owner. Receipt source mới phải qua toàn bộ luật ghi
   source và expected/actual, gồm commit policy của chính invocation đó.
+  `correction: "source-proof-review"` thay vào đó ghi `criterionId` bắt buộc vẫn chưa đạt trong
+  observation và comparison đã niêm phong, cùng trỏ tới changes evidence được khai báo. Cửa sổ
+  source còn đọc được phải có đúng một commit bình thường, với commit cuối đã giữ là ancestor của
+  HEAD thật mới được ghi bằng `revision`. Công việc xen giữa không cấp proof cho outcome thất bại này.
+  `methodRef` chỉ artifact chuẩn dưới `request/` của request mới; request đóng băng byte thật bằng
+  `frozenInputs`, với nội dung khác mọi frozen input cũ. Chỉ đổi base hoặc đổi tên byte phương pháp
+  không đổi là chưa đủ. Invocation mới giữ goal, unit, inputs, requirements, effects và criterion
+  bắt buộc, rồi tạo commit sửa của chính nó và toàn bộ source proof. Commit blocked được giữ cùng
+  lựa chọn review không cấp proof implementation hay bỏ qua interaction chưa được trả lời.
 - `{"kind":"resume","cell":"N/M"}` vào lại node blocked đã được chấp nhận. Restatement cần đáp
   án thật khớp nội dung; stop khác phải route tới resume của operator đó. `source` tùy chọn chỉ một
   reading blocked đã chấp nhận của phiên bản hiện tại cho node chưa mở cùng operator và goal logic.

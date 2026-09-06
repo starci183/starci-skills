@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.7
+# StarCi Skills 2.5.0-rc.8
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.5.0-rc.8 (2026-09-06): sealed non-passing source proof can re-enter the same unit with a changed frozen verification method and a new normal source commit; accepted intervening work remains intact.
 
 2.5.0-rc.7 (2026-09-06): workflow retries retain sealed historical bindings while checking current write authority on fresh invocations; corrected technical inputs re-enter through explicit progress and preserved failure evidence.
 

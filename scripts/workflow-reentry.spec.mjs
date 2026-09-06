@@ -76,18 +76,50 @@ async function freezeForecast(f) {
  const address=await retainContext(f.session,'plans',{version:1,sessionId:state.id,previous:null,missionVersion:1,scopeHash:scopeHash(state.mission),forecast,planned:state.planned,retained:{choices:{},attempts:{},requestHashes:{},steps:{},inventoryCells:[],files:{}}});state.planHistory={active:address,revisions:[address]};f.save(state);
 }
 
-test('source-history correction opens at a fresh base, preserves rejected amend proof and rejects unreadable or unchanged windows',async t=>{
+for (const scenario of ['source-history','source-proof-review','wrong-stop']) test(`${scenario}: sealed source correction and refusal lifecycle`,async t=>{
+ const correction=scenario==='wrong-stop'?'source-proof-review':scenario;
  const f=await fixture(t,{backend:true}),a=await architecture(f),model=a.files['response/data/stack-model.json'];
  const contexts=[{alias:'@workspaces/be',head:f.sessionHead},{alias:'@knowledge/patterns/be',head:null}];
  const request=f.request('4/1','backend.generate',{featureId:'fixture',outcome:'Implement the bounded fixture contract.',mutableFileRefs:['src/**'],protectedRefs:['outside.md'],contractFingerprint:sha(readFileSync(path.join(f.branch('3/1'),'response/data/stack-model.json'))),mode:'apply',scope:'full',resume:null},contexts);
  request.inputs={'architecture-decision':'step-3/parallel-1/response/response.md'};request.environment.workspace={alias:'@workspaces/be',worktree:f.selected,revision:f.sessionHead};request.environment.writes=['@workspaces/be/branch/session/src','response'];request.environment.exclusive=[f.selected];
+ const oldMethod='Check the preexisting fixture behavior without the newly identified invalid-input regression.';
+ if(correction==='source-proof-review') {
+   f.write(path.join(f.branch('4/1'),'request/artifacts/old-method.md'),oldMethod);request.frozenInputs=[{ref:'request/artifacts/old-method.md',sha256:sha(oldMethod)}];
+   request.expected.criteria.push({id:'optional',required:false,expected:'Optional fixture observation.',verification:'Read optional evidence.'},{id:'already-passed',required:true,expected:'The fixture source window is readable.',verification:'Read the actual source window.'});
+   const originalResponse=f.response;f.response=(r,status,fields)=>{const response=originalResponse(r,status,fields);for(const criterion of r.expected.criteria.filter(c=>c.id!=='bounded')){const evidence=['response/changes.md'];response.actual.observations.push({criterionId:criterion.id,observed:'The retained fixture evidence was inspected.',evidence});response.comparison.criteria.push({criterionId:criterion.id,verdict:status==='done'||criterion.id==='already-passed'?'matched':'inconclusive',evidence,note:'Actual runtime fixture evidence.'});}return response;};
+ }
  await f.open(request);
  const count=()=>reflogEntries(f.selected).length,before=count(),base=git(f.selected,'rev-parse','HEAD');
  f.write(path.join(f.selected,'src/model.txt'),'A real fixture implementation.\n');git(f.selected,'add','src/model.txt');git(f.selected,'commit','-m','Implement fixture');
- f.write(path.join(f.selected,'src/model.txt'),'A real fixture implementation with corrected guard.\n');git(f.selected,'add','src/model.txt');git(f.selected,'commit','--amend','--no-edit');const head=git(f.selected,'rev-parse','HEAD');
+ if(correction==='source-history'){f.write(path.join(f.selected,'src/model.txt'),'A real fixture implementation with corrected guard.\n');git(f.selected,'add','src/model.txt');git(f.selected,'commit','--amend','--no-edit');}const head=git(f.selected,'rev-parse','HEAD');
  const changes=`# changes — backend.generate step-4/parallel-1\n`+table('Binding',['Field','Value'],[['Operator','backend.generate'],['Step','4/1'],['Checkout',`@workspaces/be at ${base} → ${head} on session/${f.sessionId}`],['Predecessor',request.inputs['architecture-decision']],['Preflight','passed at '+new Date().toISOString()],['Reflog before',`HEAD ${before} ${base}; stash 0`],['Reflog after',`HEAD ${count()} ${head}; stash 0`]])+table('Files',['Path','Change','Why','Claims'],[['src/model.txt','modified','Implement fixture','bounded']])+'\n## What the next step must know\n\nThe rejected window is preserved; reverify at the current head.\n';
- f.write(path.join(f.branch('4/1'),'response/changes.md'),changes);const response=f.response(request,'blocked',{changes:'response/changes.md'});response.boundProfile=response.ranProfile='sol-fresh';response.stop='INVALID_INPUT';response.reason='The observed amend makes the old source window inadmissible.';await f.accept(request,response);await freezeForecast(f);
- const flags={edit:{kind:'retry',cell:'4/1',correction:'source-history',revision:head}},preview=await f.plans.previewRevision(f.runtime,f.session,flags);
+ f.write(path.join(f.branch('4/1'),'response/changes.md'),changes);const response=f.response(request,'blocked',{changes:'response/changes.md'});response.boundProfile=response.ranProfile='sol-fresh';response.stop=scenario==='wrong-stop'?'SOURCE_DRIFT':'INVALID_INPUT';response.reason=correction==='source-history'?'The observed amend makes the old source window inadmissible.':'A required regression remains unproved after the single source commit; preserve it and correct the proof in a fresh source invocation.';await f.accept(request,response);
+ let retryStep=5;
+ if(scenario==='source-proof-review') {
+  // Independent admitted work may advance the same checkout while the failed proof is retained.
+  const independent=structuredClone(request);independent.step=5;independent.attempt={id:'5/1:a1',number:1,kind:'initial',previous:null};independent.environment.isolationId=independent.attempt.id;independent.environment.workspace.revision=head;independent.contexts[0].head=head;independent.frozenInputs=[];
+  const state=f.state();state.chain.push(['5/1']);state.steps['5/1']='backend.generate';state.current='5/1';f.save(state);
+  await f.open(independent);await completeWorker(f,independent,model.operations[0]);assert.equal(f.state().attempts['5/1'].status,'matched');
+  // A normal upstream merge is an ancestry-preserving base change, not this retry's source credit.
+  const upstream=path.join(f.temporary,'upstream');git(f.canonical,'worktree','add','-b','fixture-upstream',upstream,'HEAD');
+  f.write(path.join(upstream,'src/upstream.txt'),'Independent upstream fixture content.\n');git(upstream,'add','src/upstream.txt');git(upstream,'commit','-m','Independent upstream fixture');
+  git(f.selected,'merge','--no-ff','-m','Integrate normal upstream fixture','fixture-upstream');
+  retryStep=6;
+ }
+ await freezeForecast(f);const revision=git(f.selected,'rev-parse','HEAD');
+ const review={criterionId:'bounded',methodRef:'request/artifacts/proof-review-method.md'};
+ const flags={edit:{kind:'retry',cell:'4/1',correction,revision,...(correction==='source-proof-review'?review:{})}};
+ if(scenario==='wrong-stop'){await assert.rejects(f.plans.previewRevision(f.runtime,f.session,flags),/no generic retry/);return;}
+ const preview=await f.plans.previewRevision(f.runtime,f.session,flags);
+ if(correction==='source-proof-review') {
+  await assert.rejects(f.plans.previewRevision(f.runtime,f.session,{edit:{...flags.edit,cell:'2/1'}}),/interaction.*owning resolution gate/);
+  for(const criterionId of [undefined,'missing','optional','already-passed']) await assert.rejects(f.plans.previewRevision(f.runtime,f.session,{edit:{...flags.edit,criterionId}}),/required nonpassing criterion/);
+  for(const methodRef of [undefined,'../method.md','response/method.md','request/../method.md','request/request.json']) await assert.rejects(f.plans.previewRevision(f.runtime,f.session,{edit:{...flags.edit,methodRef}}),/method artifact/);
+  await assert.rejects(f.plans.previewRevision(f.runtime,f.session,{edit:{...flags.edit,correction:'source-history'}}),/does not establish a failed technical window/);
+  await assert.rejects(f.plans.previewRevision(f.runtime,f.session,{edit:{...flags.edit,revision:head}}),/PLAN_RETRY_STALE/);
+  const branchRef=git(f.selected,'rev-parse','--path-format=absolute','--git-path',`refs/heads/session/${f.sessionId}`),branchBytes=readFileSync(branchRef);
+  try{writeFileSync(branchRef,base+'\n');await assert.rejects(f.plans.previewRevision(f.runtime,f.session,{edit:{...flags.edit,revision:base}}),/retain the original committed source by ancestry/);}finally{writeFileSync(branchRef,branchBytes);}
+ } else await assert.rejects(f.plans.previewRevision(f.runtime,f.session,{edit:{...flags.edit,correction:'source-proof-review',...review}}),/normal one-commit/);
  await assert.rejects(f.plans.previewRevision(f.runtime,f.session,{edit:{...flags.edit,revision:base}}),/PLAN_RETRY_STALE/);
  await assert.rejects(f.plans.previewRevision(f.runtime,f.session,{edit:{kind:'retry',cell:'4/1'}}),/no generic retry/);
  const failureFile=path.join(f.branch('4/1'),'response/changes.md');writeFileSync(failureFile,changes+'Altered failure');
@@ -96,35 +128,44 @@ test('source-history correction opens at a fresh base, preserves rejected amend 
  // observations inside this disposable repository, then restore the exact original bytes.
  const logs=['logs/HEAD',`logs/refs/heads/session/${f.sessionId}`].map(ref=>git(f.selected,'rev-parse','--path-format=absolute','--git-path',ref));
  const logBytes=logs.map(file=>readFileSync(file));for(const file of logs)writeFileSync(file,'');
- try { assert.equal(reflogEntries(f.selected).length,0);await assert.rejects(f.plans.previewRevision(f.runtime,f.session,flags),/window must remain readable/); }
+ try { assert.equal(reflogEntries(f.selected).length,0);await assert.rejects(f.plans.previewRevision(f.runtime,f.session,flags),/window must remain readable|keeps no HEAD reflog/); }
  finally { logs.forEach((file,index)=>writeFileSync(file,logBytes[index])); }
  await f.plans.commitRevision(f.runtime,f.session,{flags,previewHash:preview.previewHash,reason:'Retain the rejected amend and independently reverify the current checkout under the same scope.'});
- const retry={...structuredClone(request),step:5,attempt:{id:'5/1:a2',number:2,kind:'retry',previous:request.attempt.id}};retry.environment.isolationId=retry.attempt.id;retry.environment.workspace.revision=head;retry.contexts[0].head=head;
- for(const change of [r=>{r.requirements.scope='fix';},r=>{r.environment.workspace.worktree=f.canonical;},r=>{r.environment.writes.push('@workspaces/fe');},r=>{r.goal={doneWhen:9};},r=>{r.environment.workspace.revision=base;}]) {const bad=structuredClone(retry);change(bad);assert.ok((await f.plans.planAdmissionErrors(f.runtime,f.session,f.state(),bad)).length);}
+ const retryCell=`${retryStep}/1`,retry={...structuredClone(request),step:retryStep,attempt:{id:retryCell+':a2',number:2,kind:'retry',previous:request.attempt.id}};retry.environment.isolationId=retry.attempt.id;retry.environment.workspace.revision=revision;retry.contexts[0].head=revision;
+ if(correction==='source-proof-review') {
+  await assert.rejects(f.open(retry),/NO_PROGRESS/);assert.equal(f.state().attempts[retryCell],undefined);
+  f.write(path.join(f.branch(retryCell),review.methodRef),oldMethod);retry.frozenInputs=[{ref:review.methodRef,sha256:sha(oldMethod)}];await assert.rejects(f.open(retry),/NO_PROGRESS/);
+  const method='Exercise real invalid and concurrent stateless worker inputs, preserve caller input, and run the Node regression before the new normal commit.';
+  retry.frozenInputs=[{ref:review.methodRef,sha256:sha(method)}];await assert.rejects(f.open(retry),/request-side evidence changed/);assert.equal(f.state().attempts[retryCell],undefined);
+  f.write(path.join(f.branch(retryCell),review.methodRef),method);
+ }
+ for(const change of [r=>{r.requirements.scope='fix';},r=>{r.environment.workspace.worktree=f.canonical;},r=>{r.environment.writes.push('@workspaces/fe');},r=>{r.goal={doneWhen:9};},r=>{r.unit='foreign';},r=>{r.environment.workspace.revision=base;}]) {const bad=structuredClone(retry);change(bad);assert.ok((await f.plans.planAdmissionErrors(f.runtime,f.session,f.state(),bad)).length);}
  assert.equal((await f.open(retry)).state,'opened');
- await completeWorker(f,retry,model.operations[0]);
- assert.notEqual(git(f.selected,'rev-parse','HEAD'),head);
+ await completeWorker(f,retry,model.operations[0],{reviewCorrection:correction==='source-proof-review'});
+ assert.notEqual(git(f.selected,'rev-parse','HEAD'),revision);
  // Revalidation uses the frozen invocation context, not a fresh comparison with its opening HEAD.
- assert.deepEqual((await (await f.load('scripts/validate-request.mjs')).validateRequest(f.runtime,f.branch('5/1'),undefined,{phase:'accept'})).errors,[]);
+ assert.deepEqual((await (await f.load('scripts/validate-request.mjs')).validateRequest(f.runtime,f.branch(retryCell),undefined,{phase:'accept'})).errors,[]);
  f.write(path.join(f.selected,'src/later.txt'),'Later independently owned fixture work.\n');git(f.selected,'add','src/later.txt');git(f.selected,'commit','-m','Later fixture progress');f.write(path.join(f.selected,'outside.md'),'Unrelated later dirt.\n');
- assert.deepEqual((await f.validation.validateStep(f.runtime,f.branch('5/1'),{operator:true,requestPhase:'accept'})).errors,[]);
+ assert.deepEqual((await f.validation.validateStep(f.runtime,f.branch(retryCell),{operator:true,requestPhase:'accept'})).errors,[]);
  assert.deepEqual(await (await f.load('scripts/validate-session.mjs')).v22SessionErrors(f.session,f.state(),f.runtime),[]);
  await f.plans.previewRevision(f.runtime,f.session,{roles:['be']});
  assert.deepEqual(readFileSync(path.join(f.branch('4/1'),'response/changes.md'),'utf8'),changes);
 });
 
-async function completeWorker(f,r,contract) {
+async function completeWorker(f,r,contract,{reviewCorrection=false}={}) {
  const dir=f.branch(`${r.step}/1`),base=r.environment.workspace.revision,branch=git(f.selected,'branch','--show-current'),before=reflogEntries(f.selected).length,preflight='passed at '+new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
  const files={'src/worker.mjs':"export function runFixtureWorker(input) { if (typeof input !== 'string') throw new TypeError('input must be a string'); return input.toUpperCase(); }\n",'src/worker.spec.mjs':"import test from 'node:test'; import assert from 'node:assert/strict'; import {runFixtureWorker as run} from './worker.mjs'; test('deterministic and concurrent value; invalid input stays unchanged', async()=>{ assert.equal(run('a'),'A'); assert.equal(run(''),''); assert.deepEqual(await Promise.all(['b','b'].map(v=>Promise.resolve(run(v)))),['B','B']); const input=Object.freeze({value:'x'}); for(const bad of [input,null,undefined,4]) assert.throws(()=>run(bad),TypeError); assert.equal(input.value,'x'); });\n"};
+ if(reviewCorrection){delete files['src/worker.mjs'];files['src/worker.spec.mjs']+="test('Unicode case expansion and rejected symbol keep input untouched',()=>{assert.equal(run('straße'),'STRASSE'); const value=Symbol('input');assert.throws(()=>run(value),TypeError);assert.equal(value.description,'input');});\n";}
+ const beforeBytes=Object.fromEntries(Object.keys(files).map(file=>{try{return[file,readFileSync(path.join(f.selected,file))]}catch{return[file,null]}}));
  for(const [file,bytes]of Object.entries(files))f.write(path.join(f.selected,file),bytes);
- const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('NODE_TEST_'))),output=execFileSync(process.execPath,['--test','src/worker.spec.mjs'],{cwd:f.selected,encoding:'utf8',windowsHide:true,env});assert.match(output,/pass 1/);
+ const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('NODE_TEST_'))),output=execFileSync(process.execPath,['--test','src/worker.spec.mjs'],{cwd:f.selected,encoding:'utf8',windowsHide:true,env});assert.match(output,reviewCorrection?/pass 2/:/pass 1/);
  git(f.selected,'add',...Object.keys(files));git(f.selected,'commit','-m','Implement and regress the admitted stateless fixture worker');const head=git(f.selected,'rev-parse','HEAD'),fingerprint=r.requirements.contractFingerprint;
- const facets=['writer','transaction','idempotency','exception-identity','concurrency'],operation={...contract,facets,proofKinds:['unit']},changes=Object.entries(files).map(([file,bytes])=>({path:file,change:'added',operationId:operation.operationId,beforeHash:null,afterHash:sha(bytes)}));
+ const facets=['writer','transaction','idempotency','exception-identity','concurrency'],operation={...contract,facets,proofKinds:['unit']},changes=Object.entries(files).map(([file,bytes])=>({path:file,change:beforeBytes[file]?'modified':'added',operationId:operation.operationId,beforeHash:beforeBytes[file]?sha(beforeBytes[file]):null,afterHash:sha(bytes)}));
  f.write(path.join(dir,'response/artifacts/unit.log'),output);f.write(path.join(dir,'response/data/mutations.json'),{mode:'apply',contractFingerprint:fingerprint,base,branch,commit:head,operations:[operation],changes});
  const conformance=facets.map(facet=>{const ref=`response/data/conformance/${operation.operationId}.${facet}.json`;f.write(path.join(dir,ref),{operationId:operation.operationId,facet,verdict:'conforms',evidenceRef:'response/artifacts/unit.log',statement:'The actual stateless worker tests exercise repeated, concurrent and invalid inputs with no persistent mutation.',contractFingerprint:fingerprint});return ref;});
  const proof=`response/data/proofs/${operation.operationId}.unit.json`;f.write(path.join(dir,proof),{operationId:operation.operationId,proofKind:'unit',commandRef:'node --test src/worker.spec.mjs',exitCode:0,result:'passed',output,statement:'The real fixture source test ran before the single normal commit.',contractFingerprint:fingerprint});
- const md='# backend-source-application — fixture\n'+table('Binding',['Field','Value'],[['Outcome',r.requirements.outcome],['Feature','fixture'],['Mode','apply'],['Contract fingerprint',fingerprint],['Base',base],['Branch',branch],['Commit',head]])+table('Operations',['Operation','Transport','Writer','Transaction','Idempotency','Decisions'],[[operation.operationId,operation.transport,operation.writerRef,operation.transactionBoundary,operation.idempotencyKind,operation.authorityDimensionIds.join(', ')]])+table('Changes',['Path','Change','Operation','Before','After'],changes.map(c=>[c.path,c.change,c.operationId,'—',c.afterHash]))+table('Widened',['Path','Nearest boundary','Why'])+table('Findings',['Code','Operation','File','Statement'],[['`PATTERN_BOUND`',operation.operationId,operation.writerRef,'The fixture uses dependency-free ESM and Node tests.']])+table('Fallbacks taken',['Code','Action']);f.write(path.join(dir,'response/response.md'),md);
- f.write(path.join(dir,'response/changes.md'),`# changes — backend.generate step-${r.step}/parallel-1\n`+table('Binding',['Field','Value'],[['Operator','backend.generate'],['Step',`step-${r.step}/parallel-1`],['Checkout',`@workspaces/be at ${base} → ${head} on ${branch}`],['Predecessor',r.inputs['architecture-decision']],['Preflight',preflight],['Reflog before',`HEAD ${before} ${base}; stash 0`],['Reflog after',`HEAD ${reflogEntries(f.selected).length} ${head}; stash 0`]])+table('Files',['Path','Change','Why','Claims'],changes.map(c=>[c.path,'created','Implement and exercise stateless fixture behavior.','deterministic-value']))+'\n## What the next step must know\n\nRun the same real Node test at this head.\n');
+ const md='# backend-source-application — fixture\n'+table('Binding',['Field','Value'],[['Outcome',r.requirements.outcome],['Feature','fixture'],['Mode','apply'],['Contract fingerprint',fingerprint],['Base',base],['Branch',branch],['Commit',head]])+table('Operations',['Operation','Transport','Writer','Transaction','Idempotency','Decisions'],[[operation.operationId,operation.transport,operation.writerRef,operation.transactionBoundary,operation.idempotencyKind,operation.authorityDimensionIds.join(', ')]])+table('Changes',['Path','Change','Operation','Before','After'],changes.map(c=>[c.path,c.change,c.operationId,c.beforeHash??'—',c.afterHash]))+table('Widened',['Path','Nearest boundary','Why'])+table('Findings',['Code','Operation','File','Statement'],[['`PATTERN_BOUND`',operation.operationId,operation.writerRef,'The fixture uses dependency-free ESM and Node tests.']])+table('Fallbacks taken',['Code','Action']);f.write(path.join(dir,'response/response.md'),md);
+ f.write(path.join(dir,'response/changes.md'),`# changes — backend.generate step-${r.step}/parallel-1\n`+table('Binding',['Field','Value'],[['Operator','backend.generate'],['Step',`step-${r.step}/parallel-1`],['Checkout',`@workspaces/be at ${base} → ${head} on ${branch}`],['Predecessor',r.inputs['architecture-decision']],['Preflight',preflight],['Reflog before',`HEAD ${before} ${base}; stash 0`],['Reflog after',`HEAD ${reflogEntries(f.selected).length} ${head}; stash 0`]])+table('Files',['Path','Change','Why','Claims'],changes.map(c=>[c.path,c.change==='added'?'created':'modified','Implement and exercise stateless fixture behavior.','deterministic-value']))+'\n## What the next step must know\n\nRun the same real Node test at this head.\n');
  const response=f.response(r,'done',{'backend-source-application':'response/response.md',changes:'response/changes.md',mutations:'response/data/mutations.json',conformance,proof:[proof]});response.actual.observations[0].evidence=['response/changes.md',proof];response.comparison.criteria[0].evidence=['response/changes.md',proof];response.goalCheck.evidence=['response/changes.md',proof];response.boundProfile=response.ranProfile='sol-fresh';response.commits=[head];response.outcome.primary={kind:'code',label:'Fixture correction',ref:'response/changes.md'};
  assert.equal((await f.accept(r,response)).state,'matched');
 }

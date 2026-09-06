@@ -179,12 +179,22 @@ For the same confirmed goal, retain the current forecast and use `flags.edit` in
   protected ownership; current route, dirty paths and source authority are checked again. The retry
   waits for matched acceptance of that exact new binding. Historical binds verify their original
   request, invocation and complete evidence seals rather than observing later dirt as old input.
-  A blocked `INVALID_INPUT` has no general retry route. Only `correction: "source-history"` with
+  A blocked `INVALID_INPUT` has no general retry route. `correction: "source-history"` with
   `revision` equal to the measured current HEAD may reopen a source window whose retained changes
   binding and readable reflog prove the rejected operation. It freezes that HEAD as a fresh base;
   the old window supplies no implementation credit. Unanswered interactions and other caller or
   external stops keep their owning gates. The new source receipt still passes every source-write
   and expected/actual requirement, including its own commit policy.
+  `correction: "source-proof-review"` instead names a `criterionId` that was required and remained
+  nonpassing in the sealed observation and comparison over declared changes evidence. Its readable
+  source window must contain exactly one normal commit whose retained end is an ancestor of the
+  fresh actual HEAD named by `revision`. Intervening work supplies no proof for this failed outcome. The
+  `methodRef` names a canonical artifact under the new request's `request/` directory; that request
+  freezes its actual bytes in `frozenInputs`, with content different from every original frozen
+  input. Moving the base or renaming unchanged method bytes is insufficient. The new invocation
+  retains the same goal, unit, inputs, requirements, effects and required criteria, then produces
+  its own correction commit and complete source proof. Neither the retained blocked commit nor
+  the review selection earns implementation credit or bypasses an unanswered interaction.
 - `{"kind":"resume","cell":"N/M"}` re-enters an accepted blocked node. Restatements require their
   exact recorded user answer; other stops must route to that operator's resume. An optional `source`
   names an accepted current-version blocked reading for an unopened node with the same operator and

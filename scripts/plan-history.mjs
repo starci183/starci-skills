@@ -85,7 +85,14 @@ async function retryBinding(root, session, state, source, edit) {
   if (authority.length) throw Error(authority.join('\n'));
   const binding = { source, attempt: request.attempt.id, requestHash: state.requestHashes[source], fingerprint: state.attempts[source].evidenceManifest.fingerprint };
   if (status === 'blocked') {
-    if (response.stop !== 'INVALID_INPUT' || edit.correction !== 'source-history' || !request.environment?.workspace || !Array.isArray(request.requirements?.mutableFileRefs) || typeof response.fields?.changes !== 'string') throw Error('PLAN_RETRY_UNAUTHORIZED: blocked caller or external work has no generic retry route');
+    if (response.stop !== 'INVALID_INPUT' || !['source-history','source-proof-review'].includes(edit.correction) || !request.environment?.workspace || !Array.isArray(request.requirements?.mutableFileRefs) || typeof response.fields?.changes !== 'string') throw Error('PLAN_RETRY_UNAUTHORIZED: blocked caller or external work has no generic retry route');
+    if (edit.correction === 'source-proof-review') {
+      const criterion = request.expected?.criteria?.find(item => item.id === edit.criterionId && item.required === true);
+      const compared = response.comparison?.criteria?.find(item => item.criterionId === edit.criterionId);
+      const observed = response.actual?.observations?.find(item => item.criterionId === edit.criterionId);
+      if (!criterion || !['mismatched','inconclusive'].includes(compared?.verdict) || !compared.evidence?.includes(response.fields.changes) || !observed?.evidence?.includes(response.fields.changes)) throw Error('PLAN_RETRY_UNBOUND: proof review must name an original required nonpassing criterion observed and compared against its sealed declared source evidence');
+      if (typeof edit.methodRef !== 'string' || !/^request\/(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+$/.test(edit.methodRef) || edit.methodRef.split('/').some(part => part === '.' || part === '..') || edit.methodRef === 'request/request.json') throw Error('PLAN_RETRY_UNBOUND: proof review must name its fresh request-side verification method artifact');
+    }
     const { sourceCheckoutOf, reflogErrors, reflogWindow, REFLOG_MARK } = await import('./workspace-checkout.mjs');
     const { tableUnder } = await import('./validate-response.mjs');
     const text = readFileSync(path.join(branchPath(session, source), response.fields.changes), 'utf8');
@@ -97,11 +104,16 @@ async function retryBinding(root, session, state, source, edit) {
     const measured = reflogWindow(checkout, window);
     if (measured.errors.length || !measured.window?.length) throw Error('PLAN_RETRY_UNBOUND: the original source window must remain readable before it can justify a technical correction');
     const history = reflogErrors(checkout, window);
-    if (!history.length) throw Error('PLAN_RETRY_UNBOUND: recorded source history does not establish a failed technical window');
+    if (edit.correction === 'source-history' && !history.length) throw Error('PLAN_RETRY_UNBOUND: recorded source history does not establish a failed technical window');
+    if (edit.correction === 'source-proof-review' && (history.length || measured.window.length !== 1 || window.expected !== 1)) throw Error('PLAN_RETRY_UNBOUND: proof review requires an intact normal one-commit source window, not a history repair');
     const revision = execFileSync('git', ['-C', checkout, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true, stdio: ['ignore','pipe','pipe'], env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } }).trim();
-    if (!/^[a-f0-9]{40}$/.test(edit.revision ?? '') || revision !== edit.revision || revision !== after[2]) throw Error('PLAN_RETRY_STALE: technical correction must bind the observed current source head, not reuse the failed base');
-    Object.assign(binding, { correction: 'source-history', revision, workspace: request.environment.workspace });
-  } else if (edit.correction || edit.revision) throw Error('PLAN_RETRY_UNBOUND: technical correction metadata belongs only to its verified blocked source window');
+    if (!/^[a-f0-9]{40}$/.test(edit.revision ?? '') || revision !== edit.revision || edit.correction === 'source-history' && revision !== after[2]) throw Error('PLAN_RETRY_STALE: technical correction must bind the observed current source head, not reuse the failed base');
+    if (edit.correction === 'source-proof-review') try {
+      execFileSync('git', ['-C', checkout, 'merge-base', '--is-ancestor', after[2], revision], { windowsHide: true, stdio: ['ignore','pipe','pipe'], env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } });
+    } catch { throw Error('PLAN_RETRY_STALE: the fresh proof-review base must retain the original committed source by ancestry'); }
+    Object.assign(binding, { correction: edit.correction, revision, workspace: request.environment.workspace,
+      ...(edit.correction === 'source-proof-review' ? { criterionId: edit.criterionId, methodRef: edit.methodRef } : {}) });
+  } else if (edit.correction || edit.revision || edit.criterionId || edit.methodRef) throw Error('PLAN_RETRY_UNBOUND: technical correction metadata belongs only to its verified blocked source window');
   return { binding, request };
 }
 
@@ -439,7 +451,11 @@ export async function planAdmissionErrors(root, session, state, request) {
     for (const field of ['writes','exclusive','mode','outputRoot']) if (!isDeepStrictEqual(before[field], after[field])) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot expand effect or resource ownership');
     if (before.workspace && (after.workspace?.alias !== before.workspace.alias || !samePath(after.workspace?.worktree, before.workspace.worktree))) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot change its source role or checkout');
     if (!before.workspace && after.workspace) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot acquire a source checkout');
-    if (retry.correction === 'source-history' && (after.workspace.revision !== retry.revision || request.contexts?.find(context => context.alias === after.workspace.alias)?.head !== retry.revision)) throw Error('PLAN_RETRY_UNBOUND: source-history correction requires a freshly frozen current-HEAD base');
+    if (retry.correction && (after.workspace.revision !== retry.revision || request.contexts?.find(context => context.alias === after.workspace.alias)?.head !== retry.revision)) throw Error('PLAN_RETRY_UNBOUND: source correction requires a freshly frozen current-HEAD base');
+    if (retry.correction === 'source-proof-review') {
+      const method = request.frozenInputs?.find(item => item.ref === retry.methodRef);
+      if (!method || !/^sha256:[a-f0-9]{64}$/.test(method.sha256 ?? '') || method.sha256 === sha('') || (original.frozenInputs ?? []).some(item => item.sha256 === method.sha256)) throw Error('NO_PROGRESS: proof review requires a changed frozen verification method, not only a new source base or renamed old bytes');
+    }
     if (retry.rebind) {
       const rebind = forecast.rebinds?.[retry.rebind];
       if (!rebind || rebind.retry !== cell) throw Error('PLAN_REBIND_UNBOUND: retry has no exact prior binding repair');
