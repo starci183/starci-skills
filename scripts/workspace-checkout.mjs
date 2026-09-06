@@ -54,8 +54,7 @@ function rootsFor(checkout, roots) {
     return { root, target };
   });
 }
-function assertTree(checkout, roots, allowDirty) {
-  const parsedRoots = rootsFor(checkout, roots);
+export function changedPathsOf(checkout) {
   // NUL porcelain avoids quoted filenames; a rename has both destination and source paths.
   const records = git(checkout, 'status', '--porcelain=v1', '-z', '--untracked-files=all').split('\0');
   const dirty = [];
@@ -65,6 +64,10 @@ function assertTree(checkout, roots, allowDirty) {
     dirty.push(record.slice(3));
     if (/[RC]/.test(record.slice(0, 2))) dirty.push(records[++index]);
   }
+  return dirty;
+}
+function assertTree(checkout, roots, allowDirty) {
+  const parsedRoots = rootsFor(checkout, roots), dirty = changedPathsOf(checkout);
   requireThat(allowDirty || dirty.length === 0, 'CHECKOUT_DIRTY', 'the canonical mutation checkout must be clean');
   for (const dirtyPath of dirty) {
     requireThat(typeof dirtyPath === 'string' && dirtyPath.length > 0, 'CHECKOUT_DIRTY', 'Git returned an incomplete changed path');
@@ -130,19 +133,18 @@ export function reflogEntries(checkout, ref = 'HEAD') {
   if (out === null) return [];
   return out.split(/\r?\n/).filter(Boolean).map((line) => { const [sha, selector, ...rest] = line.split('\t'); return { sha, selector, subject: rest.join('\t') }; });
 }
-export function reflogErrors(checkout, { since, sessionBranch, until = null, expected = null, at = 'response/changes.md' }) {
-  if (!checkout) return [];
-  const errors = [];
+export function reflogWindow(checkout, { since, sessionBranch, until = null, at = 'response/changes.md' }) {
+  if (!checkout) return { window: null, errors: [`${at}: the source checkout is unavailable`] };
   const entries = reflogEntries(checkout, 'HEAD');
-  if (!entries.length) return [`${at}: the checkout of ${sessionBranch} keeps no HEAD reflog, so the entries the branch gained cannot be read; a source-writing receipt is judged against the history of the checkout it wrote in`];
+  if (!entries.length) return { window: null, errors: [`${at}: the checkout of ${sessionBranch} keeps no HEAD reflog, so the entries the branch gained cannot be read; a source-writing receipt is judged against the history of the checkout it wrote in`] };
   const end = until ? entries.findIndex((entry) => entry.sha === until) : 0;
-  if (end === -1) return [`${at}: no HEAD reflog entry of the checkout names the recorded commit ${until}; the commit this receipt claims was never made in this checkout`];
+  if (end === -1) return { window: null, errors: [`${at}: no HEAD reflog entry of the checkout names the recorded commit ${until}; the commit this receipt claims was never made in this checkout`] };
   // The oldest entry standing on the base, not the newest: a reset that puts HEAD back on the base
   // writes an entry carrying the base's own sha, and reading that as the start of the window would let
   // the reset itself close the window it belongs inside.
   let start = -1;
   for (let index = entries.length - 1; index >= end; index -= 1) if (entries[index].sha === since) { start = index; break; }
-  if (start === -1) return [`${at}: no HEAD reflog entry at or below the recorded commit names the base ${since}; the window between the base and the commit cannot be read`];
+  if (start === -1) return { window: null, errors: [`${at}: no HEAD reflog entry at or below the recorded commit names the base ${since}; the window between the base and the commit cannot be read`] };
   // `git worktree add` writes the worktree into being with an empty entry and a `reset: moving to HEAD`
   // at the very bottom of the new reflog, both standing on the base. Those two are the worktree
   // existing, not the branch doing anything, so they are outside the window the branch is judged on; a
@@ -150,6 +152,13 @@ export function reflogErrors(checkout, { since, sessionBranch, until = null, exp
   const bootstrap = (entry, index) => index >= entries.length - 2 && (entry.subject === '' || entry.subject === 'reset: moving to HEAD');
   const window = [];
   for (let index = end; index < start; index += 1) if (!bootstrap(entries[index], index)) window.push(entries[index]);
+  return { window, errors: [] };
+}
+export function reflogErrors(checkout, { since, sessionBranch, until = null, expected = null, at = 'response/changes.md' }) {
+  if (!checkout) return [];
+  const measured = reflogWindow(checkout, { since, sessionBranch, until, at });
+  if (measured.errors.length) return measured.errors;
+  const window = measured.window, errors = [];
   for (const entry of window) {
     if (LAWFUL_REFLOG_ENTRY.test(entry.subject)) continue;
     errors.push(`${at}: ${entry.selector} of the checkout is "${entry.subject}"; between the base ${since} and the recorded commit ${sessionBranch} gains only its own commits, and stash, reset, force, clean, a checkout of another branch, a rebase and an am are forbidden inside a routed checkout`);

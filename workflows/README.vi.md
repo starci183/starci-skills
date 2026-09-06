@@ -165,6 +165,20 @@ lưu context lúc acceptance thành công, ghi rõ thời điểm `acceptance`.
 
 Trong cùng goal đã xác nhận, giữ dự báo hiện tại và dùng `flags.edit` khi preview:
 
+- `{"kind":"retry","cell":"N/M"}` giữ attempt mismatch hoặc inconclusive đã chấp nhận và
+  lên lịch successor duy nhất cùng goal. Request mới giữ operator, requirements, inputs, unit và
+  giới hạn effects, ghi `attempt.previous`, đồng thời thay input đã kiểm chứng, phương pháp hoặc
+  revision checkout. Đổi số expected hay attempt không phải tiến bộ. Tùy chọn
+  `rebind: {source: "P/Q", writeRoots: [...]}` chèn lại chính session checkout đã bind trước retry.
+  Root thêm phải nằm trong mutable ownership của request thất bại và không đụng protected owner;
+  route hiện tại, dirty paths và source authority đều được kiểm lại. Retry chờ binding mới matched
+  đúng nội dung. Bind lịch sử kiểm request, invocation và toàn bộ evidence seal gốc, không xem dirt
+  phát sinh sau là input của lần cũ. `INVALID_INPUT` blocked không có đường retry tổng quát. Chỉ
+  `correction: "source-history"` với `revision` bằng HEAD hiện tại đã đo mới mở lại cửa sổ source
+  có changes binding được giữ và reflog còn đọc được chứng minh thao tác bị từ chối. HEAD đó làm
+  base mới; cửa sổ cũ không cấp proof implementation. Interaction chưa được trả lời và stop của
+  caller hay bên ngoài khác vẫn qua gate của owner. Receipt source mới phải qua toàn bộ luật ghi
+  source và expected/actual, gồm commit policy của chính invocation đó.
 - `{"kind":"resume","cell":"N/M"}` vào lại node blocked đã được chấp nhận. Restatement cần đáp
   án thật khớp nội dung; stop khác phải route tới resume của operator đó. `source` tùy chọn chỉ một
   reading blocked đã chấp nhận của phiên bản hiện tại cho node chưa mở cùng operator và goal logic.

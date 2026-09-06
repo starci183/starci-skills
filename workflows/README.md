@@ -170,6 +170,21 @@ without a context may retain one only during successful acceptance, explicitly m
 
 For the same confirmed goal, retain the current forecast and use `flags.edit` in the preview:
 
+- `{"kind":"retry","cell":"N/M"}` preserves an accepted mismatch or inconclusive attempt and
+  schedules its unique same-goal successor. The new request keeps the operator, requirements,
+  inputs, unit and effect bounds, names `attempt.previous`, and changes verified input, method or
+  checkout revision. Renumbering expected or an attempt is not progress. An optional
+  `rebind: {source: "P/Q", writeRoots: [...]}` inserts the exact earlier session checkout binding
+  before the retry. Additional roots must fit the failed request's mutable ownership and exclude
+  protected ownership; current route, dirty paths and source authority are checked again. The retry
+  waits for matched acceptance of that exact new binding. Historical binds verify their original
+  request, invocation and complete evidence seals rather than observing later dirt as old input.
+  A blocked `INVALID_INPUT` has no general retry route. Only `correction: "source-history"` with
+  `revision` equal to the measured current HEAD may reopen a source window whose retained changes
+  binding and readable reflog prove the rejected operation. It freezes that HEAD as a fresh base;
+  the old window supplies no implementation credit. Unanswered interactions and other caller or
+  external stops keep their owning gates. The new source receipt still passes every source-write
+  and expected/actual requirement, including its own commit policy.
 - `{"kind":"resume","cell":"N/M"}` re-enters an accepted blocked node. Restatements require their
   exact recorded user answer; other stops must route to that operator's resume. An optional `source`
   names an accepted current-version blocked reading for an unopened node with the same operator and

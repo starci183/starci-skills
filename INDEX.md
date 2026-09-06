@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.6
+# StarCi Skills 2.5.0-rc.7
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.5.0-rc.7 (2026-09-06): workflow retries retain sealed historical bindings while checking current write authority on fresh invocations; corrected technical inputs re-enter through explicit progress and preserved failure evidence.
 
 2.5.0-rc.6 (2026-09-06): unit-bound migration verification projects only the selected module from its accepted backend plan, retaining the complete architecture fingerprint and all unsplit-contract obligations.
 

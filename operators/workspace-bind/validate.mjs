@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { validateWorkspaceCheckoutBinding, gitPolicyErrors, installedTreeOf } from '../../scripts/workspace-checkout.mjs';
+import { sealedWorkspaceBindingErrors } from '../../scripts/validate-request.mjs';
+import { currentRequestPhase } from '../../scripts/validation-phase.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
@@ -38,7 +40,13 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
   }
 
   if (route) {
-    errors.push(...validateWorkspaceCheckoutBinding(root, base.request, route, branchDir));
+    let sealed = null;
+    if (currentRequestPhase() === 'accept') {
+      const session = path.resolve(branchDir, '../..');
+      try { sealed = await sealedWorkspaceBindingErrors(session, JSON.parse(await readFile(path.join(session, 'state.json'), 'utf8')), base.request); }
+      catch (error) { sealed = [error.message]; }
+    }
+    errors.push(...(sealed ?? validateWorkspaceCheckoutBinding(root, base.request, route, branchDir)));
     const { checkout, gitPolicy, mutationReadiness, runtime } = route;
     if (!empty(requirements.project) && route.project !== requirements.project) errors.push(`response/data/route.json: project ${route.project} differs from the request's ${requirements.project}`);
     if (!empty(requirements.role) && route.role !== requirements.role) errors.push(`response/data/route.json: role ${route.role} differs from the request's ${requirements.role}`);

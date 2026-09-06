@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.6
+# StarCi Skills 2.5.0-rc.7
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.5.0-rc.7 (2026-09-06): retry workflow giữ nguyên binding lịch sử đã niêm phong và kiểm tra quyền ghi hiện tại khi mở lần chạy mới; đầu vào kỹ thuật được sửa phải có tiến triển rõ ràng và giữ nguyên bằng chứng thất bại.
 
 2.5.0-rc.6 (2026-09-06): kiểm chứng migration theo unit chỉ lấy module đã chọn từ backend plan được chấp nhận, giữ fingerprint toàn bộ kiến trúc và mọi nghĩa vụ khi không chia unit.
 

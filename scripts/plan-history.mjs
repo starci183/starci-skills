@@ -5,6 +5,7 @@ import { existsSync, readFileSync, readdirSync, lstatSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
+import { execFileSync } from 'node:child_process';
 import { retainContext, readContext, retainMission, invocationState } from './mission-history.mjs';
 import { scopeHash } from './mission-scope.mjs';
 import { mutateSession } from './session-lock.mjs';
@@ -38,7 +39,7 @@ export function offsetForecast(plan, offset) {
   const cell = value => `${Number(value.split('/')[0]) + offset}/${value.split('/')[1]}`;
   const out = structuredClone(plan);
   out.chain = plan.chain.map(step => step.map(cell));
-  for (const field of ['steps', 'goals', 'reasons', 'dependencies', 'evidenceDependencies', 'handoffs', 'requestRefs', 'presets', 'fanout', 'imports', 'nodes', 'resumes', 'units', 'repairs', 'repairDependencies', 'reviewResumes']) out[field] = Object.fromEntries(Object.entries(plan[field] ?? {}).map(([key, value]) => [cell(key), structuredClone(value)]));
+  for (const field of ['steps', 'goals', 'reasons', 'dependencies', 'evidenceDependencies', 'handoffs', 'requestRefs', 'presets', 'fanout', 'imports', 'nodes', 'resumes', 'units', 'repairs', 'repairDependencies', 'reviewResumes', 'retries', 'rebinds']) out[field] = Object.fromEntries(Object.entries(plan[field] ?? {}).map(([key, value]) => [cell(key), structuredClone(value)]));
   for (const [key, goal] of Object.entries(out.goals)) if (goal.prerequisite) goal.prerequisite = cell(goal.prerequisite);
   for (const [key, deps] of Object.entries(out.dependencies)) out.dependencies[key] = deps.map(cell);
   for (const [key, deps] of Object.entries(out.evidenceDependencies)) out.evidenceDependencies[key] = deps.map(cell);
@@ -56,10 +57,74 @@ async function acceptedCurrent(root, session, state, cell, status = 'matched') {
   if (attempt?.status !== status || !attempt.context || attempt.expected?.goalVersion !== state.mission.version) throw Error(`PLAN_PROOF_UNAVAILABLE: ${cell} has no sealed ${status} invocation for this exact mission`);
   const sealed = await evidenceManifestErrors(branchPath(session, cell), attempt.evidenceManifest);
   if (sealed.length) throw Error(sealed.join('\n'));
+  const request = JSON.parse(readFileSync(path.join(branchPath(session, cell), 'request/request.json')));
+  invocationState(session, state, request);
+  const response = JSON.parse(readFileSync(path.join(branchPath(session, cell), 'response/response.json')));
+  const statuses = { matched: 'done', mismatched: 'mismatch', inconclusive: 'mismatch', blocked: 'blocked', waiting: 'waiting' };
+  if (!attempt.endedAt || response.status !== statuses[status] || response.operatorId !== attempt.operatorId || response.attempt?.id !== attempt.id || request.attempt?.id !== attempt.id || !isDeepStrictEqual(response.comparison, attempt.comparison)) throw Error(`PLAN_PROOF_UNAVAILABLE: retained receipt differs from the exact accepted ${status} attempt and comparison`);
   const { validateStep } = await import('./validate-step.mjs');
   const result = await validateStep(root, branchPath(session, cell), { operator: true, requestPhase: 'accept' });
   if (result.errors.length) throw Error(result.errors.join('\n'));
-  return JSON.parse(readFileSync(path.join(branchPath(session, cell), 'response/response.json')));
+  return response;
+}
+
+const requestAt = (session, cell) => JSON.parse(readFileSync(path.join(branchPath(session, cell), 'request/request.json')));
+const samePath = (a, b) => typeof a === 'string' && typeof b === 'string' && (process.platform === 'win32' ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b));
+const safeRoot = value => typeof value === 'string' && value.length && !path.isAbsolute(value) && !/[:\\*?]/.test(value) && value.split('/').every(part => part && part !== '.' && part !== '..');
+const coversRoot = (pattern, target) => pattern === target || pattern?.endsWith('/**') && (target === pattern.slice(0,-3) || target.startsWith(pattern.slice(0,-2)));
+
+// A retry changes execution, not goal authority. Existing request fields carry the new method and
+// checkout base; the forecast only records why this exact sealed attempt may be retried.
+async function retryBinding(root, session, state, source, edit) {
+  const status = state.attempts?.[source]?.status;
+  if (!['mismatched', 'inconclusive', 'blocked'].includes(status)) throw Error('PLAN_RETRY_UNBOUND: retry requires one sealed failed attempt');
+  const response = await acceptedCurrent(root, session, state, source, status), request = requestAt(session, source);
+  if (response.interaction || request.exchange) throw Error('PLAN_RETRY_UNAUTHORIZED: an unanswered interaction or nested exchange uses its owning resolution gate');
+  const { deliveryRequestErrors } = await import('./mission-scope.mjs');
+  const authority = deliveryRequestErrors(state, request, root);
+  if (authority.length) throw Error(authority.join('\n'));
+  const binding = { source, attempt: request.attempt.id, requestHash: state.requestHashes[source], fingerprint: state.attempts[source].evidenceManifest.fingerprint };
+  if (status === 'blocked') {
+    if (response.stop !== 'INVALID_INPUT' || edit.correction !== 'source-history' || !request.environment?.workspace || !Array.isArray(request.requirements?.mutableFileRefs) || typeof response.fields?.changes !== 'string') throw Error('PLAN_RETRY_UNAUTHORIZED: blocked caller or external work has no generic retry route');
+    const { sourceCheckoutOf, reflogErrors, reflogWindow, REFLOG_MARK } = await import('./workspace-checkout.mjs');
+    const { tableUnder } = await import('./validate-response.mjs');
+    const text = readFileSync(path.join(branchPath(session, source), response.fields.changes), 'utf8');
+    const marks = Object.fromEntries(tableUnder(text, '## Binding') ?? []);
+    const before = REFLOG_MARK.exec(marks['Reflog before'] ?? ''), after = REFLOG_MARK.exec(marks['Reflog after'] ?? '');
+    const checkout = sourceCheckoutOf(root, branchPath(session, source), request);
+    if (!checkout || !samePath(checkout, request.environment.workspace.worktree) || !before || !after || before[2] !== request.environment.workspace.revision || before[2] === after[2]) throw Error('PLAN_RETRY_UNBOUND: technical correction requires the exact recorded source history window and owned checkout');
+    const window = { since: before[2], until: after[2], sessionBranch: `session/${state.id}`, expected: Number(after[1]) - Number(before[1]) };
+    const measured = reflogWindow(checkout, window);
+    if (measured.errors.length || !measured.window?.length) throw Error('PLAN_RETRY_UNBOUND: the original source window must remain readable before it can justify a technical correction');
+    const history = reflogErrors(checkout, window);
+    if (!history.length) throw Error('PLAN_RETRY_UNBOUND: recorded source history does not establish a failed technical window');
+    const revision = execFileSync('git', ['-C', checkout, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true, stdio: ['ignore','pipe','pipe'], env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } }).trim();
+    if (!/^[a-f0-9]{40}$/.test(edit.revision ?? '') || revision !== edit.revision || revision !== after[2]) throw Error('PLAN_RETRY_STALE: technical correction must bind the observed current source head, not reuse the failed base');
+    Object.assign(binding, { correction: 'source-history', revision, workspace: request.environment.workspace });
+  } else if (edit.correction || edit.revision) throw Error('PLAN_RETRY_UNBOUND: technical correction metadata belongs only to its verified blocked source window');
+  return { binding, request };
+}
+
+async function rebindBinding(root, session, state, retryRequest, edit) {
+  if (!edit || state.steps?.[edit.source] !== 'workspace.bind') throw Error('PLAN_REBIND_UNBOUND: name the exact earlier accepted workspace binding');
+  const response = await acceptedCurrent(root, session, state, edit.source), request = requestAt(session, edit.source);
+  const route = JSON.parse(readFileSync(path.join(branchPath(session, edit.source), response.fields.route)));
+  const workspace = retryRequest.environment?.workspace, alias = `@workspaces/${request.requirements.role}`;
+  if (request.requirements.checkout !== 'session' || workspace?.alias !== alias || !samePath(route.checkout.diskPath, workspace.worktree) || request.requirements.project !== state.project) throw Error('PLAN_REBIND_UNBOUND: repair cannot change project, role or registered source checkout');
+  const roots = edit.writeRoots, priorRoots = request.requirements.declaredWriteRoots ?? [];
+  if (!Array.isArray(roots) || !roots.length || roots.some(root => !safeRoot(root)) || new Set(roots).size !== roots.length || priorRoots.some(root => !roots.includes(root))) throw Error('PLAN_REBIND_UNBOUND: retain prior roots and name exact safe additional roots');
+  const { refToRegExp } = await import('../operators/backend-generate/validate.mjs');
+  const protectedMatchers = (retryRequest.requirements.protectedRefs ?? []).map(refToRegExp);
+  for (const root of roots.filter(root => !priorRoots.includes(root))) {
+    const file = path.join(workspace.worktree,root), concreteFile = existsSync(file) && lstatSync(file).isFile();
+    if (!(retryRequest.requirements.mutableFileRefs ?? []).some(pattern => coversRoot(pattern, root) || concreteFile && refToRegExp(pattern).test(root)) || protectedMatchers.some(pattern => pattern.test(root) || pattern.test(root + '/'))) throw Error('PLAN_REBIND_UNAUTHORIZED: additional root exceeds the original mutable boundary or overlaps protected ownership');
+  }
+  const requirements = { ...request.requirements, declaredWriteRoots: roots };
+  const { resolveWorkspaceCheckout, changedPathsOf } = await import('./workspace-checkout.mjs');
+  const selected = resolveWorkspaceCheckout({ source: state.workflowOwner.sourceRoot, project: state.project, role: requirements.role, sessionId: state.id, checkout: 'session', declaredWriteRoots: roots, sharedInstall: requirements.sharedInstall ?? false });
+  if (!samePath(selected.checkout?.diskPath ?? selected.diskPath, workspace.worktree)) throw Error('PLAN_REBIND_UNBOUND: current route resolves a different worktree');
+  if (changedPathsOf(workspace.worktree).some(file => protectedMatchers.some(pattern => pattern.test(file)))) throw Error('PLAN_REBIND_UNAUTHORIZED: a protected dirty leaf cannot acquire ownership through a broader checkout root');
+  return { source: edit.source, requirements };
 }
 
 async function runtimeRepairSource(root, session, state, source, wall, requirements) {
@@ -87,10 +152,34 @@ async function runtimeRepairSource(root, session, state, source, wall, requireme
 // every request stay at their original coordinates; only unopened cells receive new coordinates.
 export async function editForecast(root, session, state, original, edit, top) {
   const forecast = structuredClone(original);
-  if (!edit || !['resume', 'expand', 'repair'].includes(edit.kind) || !forecast.steps[edit.cell]) throw Error('PLAN_EDIT_INVALID: name one current resume, unit expansion or typed repair');
+  if (!edit || !['resume', 'expand', 'repair', 'retry'].includes(edit.kind) || !forecast.steps[edit.cell]) throw Error('PLAN_EDIT_INVALID: name one current resume, retry, unit expansion or typed repair');
   for (const cell of forecast.chain.flat()) if (state.attempts?.[cell]) await acceptedCurrent(root, session, state, cell, state.attempts[cell].status);
   const cell = edit.cell, operator = forecast.steps[cell];
-  if (edit.kind === 'repair') {
+  if (edit.kind === 'retry') {
+    const { binding, request } = await retryBinding(root, session, state, cell, edit);
+    if (Object.values(forecast.retries ?? {}).some(value => value.source === cell)) throw Error('PLAN_RETRY_UNBOUND: the failed attempt already has its unique retry');
+    const next = `retry:${cell}`, rebind = edit.rebind ? `rebind:${cell}` : null;
+    for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes','units','imports']) if (forecast[field]?.[cell] !== undefined) (forecast[field] ??= {})[next] = structuredClone(forecast[field][cell]);
+    forecast.presets[next] = structuredClone(request.requirements);
+    forecast.nodes[next] = `${forecast.nodes[cell]}:retry:${cell}`;
+    (forecast.retries ??= {})[next] = { ...binding, ...(rebind ? { rebind } : {}) };
+    if (rebind) {
+      const bound = await rebindBinding(root, session, state, request, edit.rebind);
+      forecast.steps[rebind] = 'workspace.bind'; forecast.goals[rebind] = { prerequisite: next };
+      forecast.presets[rebind] = bound.requirements; forecast.nodes[rebind] = `${forecast.nodes[cell]}:rebind`;
+      forecast.dependencies[rebind] = []; forecast.evidenceDependencies[rebind] = [];
+      (forecast.rebinds ??= {})[rebind] = { source: bound.source, retry: next };
+      forecast.dependencies[next] = [...(forecast.dependencies[next] ?? []), rebind];
+      forecast.evidenceDependencies[next] = [...(forecast.evidenceDependencies[next] ?? []), rebind];
+    }
+    for (const target of Object.keys(forecast.dependencies)) if (![cell,next,rebind].includes(target) && !state.attempts?.[target]) {
+      forecast.dependencies[target] = forecast.dependencies[target].map(dep => dep === cell ? next : dep);
+      forecast.evidenceDependencies[target] = (forecast.evidenceDependencies[target] ?? []).map(dep => dep === cell ? next : dep);
+      if (forecast.handoffs?.[target] === cell) forecast.handoffs[target] = next;
+    }
+    const index = Math.max(...forecast.chain.map((step,index) => step.some(value => state.attempts?.[value]) ? index : -1));
+    forecast.chain.splice(index + 1, 0, ...(rebind ? [[rebind]] : []), [next]);
+  } else if (edit.kind === 'repair') {
     const binding = await runtimeRepairSource(root, session, state, cell, edit.wall, edit.requirements);
     const repair = `repair:${cell}`, resume = `pending:${cell}`;
     for (const target of [repair, resume]) {
@@ -212,12 +301,14 @@ export async function editForecast(root, session, state, original, edit, top) {
   const map = cell => mapping.get(cell) ?? cell;
   const result = structuredClone(forecast);
   result.chain = forecast.chain.map(step => step.map(map));
-  for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','handoffs','requestRefs','presets','fanout','imports','nodes','resumes','units','repairs','repairDependencies','reviewResumes']) result[field] = Object.fromEntries(Object.entries(forecast[field] ?? {}).filter(([cell]) => mapping.has(cell)).map(([cell,value]) => [map(cell),structuredClone(value)]));
+  for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','handoffs','requestRefs','presets','fanout','imports','nodes','resumes','units','repairs','repairDependencies','reviewResumes','retries','rebinds']) result[field] = Object.fromEntries(Object.entries(forecast[field] ?? {}).filter(([cell]) => mapping.has(cell)).map(([cell,value]) => [map(cell),structuredClone(value)]));
   for (const goal of Object.values(result.goals)) if (goal.prerequisite) goal.prerequisite = map(goal.prerequisite);
   for (const field of ['dependencies','evidenceDependencies']) for (const [cell,deps] of Object.entries(result[field])) result[field][cell] = deps.map(map);
   for (const [cell,owner] of Object.entries(result.handoffs)) result.handoffs[cell] = map(owner);
   for (const repair of Object.values(result.repairs ?? {})) { repair.source = map(repair.source); repair.resume = map(repair.resume); }
   for (const [cell, dependency] of Object.entries(result.repairDependencies ?? {})) result.repairDependencies[cell] = map(dependency);
+  for (const retry of Object.values(result.retries ?? {})) if (retry.rebind) retry.rebind = map(retry.rebind);
+  for (const rebind of Object.values(result.rebinds ?? {})) rebind.retry = map(rebind.retry);
   for (const unit of Object.values(result.units)) unit.dependsOn = (unit.dependsOn ?? []).map(map);
   for (const cell of Object.keys(result.steps)) result.requestRefs[cell] = `step-${cell.split('/')[0]}/parallel-${cell.split('/')[1]}/request/request.json`;
   return result;
@@ -335,6 +426,36 @@ export async function planAdmissionErrors(root, session, state, request) {
   if (resume) try {
     if (forecast.reviewResumes?.[cell]) errors.push(...await resolvedWaitingReplanErrors(root, session, state, request));
     else await acceptedCurrent(root, session, state, resume, 'blocked');
+  } catch (error) { errors.push(error.message); }
+  const retry = forecast.retries?.[cell];
+  if (retry) try {
+    const proved = await retryBinding(root, session, state, retry.source, retry);
+    const expected = { ...proved.binding, ...(retry.rebind ? { rebind: retry.rebind } : {}) };
+    if (!isDeepStrictEqual(retry, expected)) throw Error('PLAN_RETRY_UNBOUND: retry identity differs from its exact sealed failed invocation');
+    const original = proved.request;
+    if (request.operatorId !== original.operatorId || request.attempt?.previous !== original.attempt.id || request.attempt?.number !== original.attempt.number + 1 || !['retry','repair'].includes(request.attempt?.kind) || request.resume || !isDeepStrictEqual(request.requirements, original.requirements) || !isDeepStrictEqual(request.inputs, original.inputs) || request.unit !== original.unit) throw Error('PLAN_RETRY_UNAUTHORIZED: retry must retain the same operator, source unit, requirements and accepted inputs with exact prior attempt');
+    if (Object.entries(state.attempts ?? {}).some(([other, value]) => other !== cell && value.previous === original.attempt.id)) throw Error('PLAN_RETRY_UNBOUND: the failed attempt already owns another successor invocation');
+    const before = original.environment ?? {}, after = request.environment ?? {};
+    for (const field of ['writes','exclusive','mode','outputRoot']) if (!isDeepStrictEqual(before[field], after[field])) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot expand effect or resource ownership');
+    if (before.workspace && (after.workspace?.alias !== before.workspace.alias || !samePath(after.workspace?.worktree, before.workspace.worktree))) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot change its source role or checkout');
+    if (!before.workspace && after.workspace) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot acquire a source checkout');
+    if (retry.correction === 'source-history' && (after.workspace.revision !== retry.revision || request.contexts?.find(context => context.alias === after.workspace.alias)?.head !== retry.revision)) throw Error('PLAN_RETRY_UNBOUND: source-history correction requires a freshly frozen current-HEAD base');
+    if (retry.rebind) {
+      const rebind = forecast.rebinds?.[retry.rebind];
+      if (!rebind || rebind.retry !== cell) throw Error('PLAN_REBIND_UNBOUND: retry has no exact prior binding repair');
+      await rebindBinding(root, session, state, original, { source: rebind.source, writeRoots: forecast.presets[retry.rebind].declaredWriteRoots });
+      const response = await acceptedCurrent(root, session, state, retry.rebind);
+      const route = JSON.parse(readFileSync(path.join(branchPath(session, retry.rebind), response.fields.route)));
+      if (!samePath(route.checkout.diskPath, after.workspace?.worktree) || route.sourceHead !== after.workspace?.revision || !isDeepStrictEqual(route.writeRoots, forecast.presets[retry.rebind].declaredWriteRoots)) throw Error('PLAN_REBIND_UNBOUND: retry must bind the exact newly accepted checkout, head and write roots');
+    }
+  } catch (error) { errors.push(error.message); }
+  const rebind = forecast.rebinds?.[cell];
+  if (rebind) try {
+    const retry = forecast.retries?.[rebind.retry];
+    if (!retry || retry.rebind !== cell) throw Error('PLAN_REBIND_UNBOUND: a binding repair must enable its exact reviewed retry');
+    const proved = await retryBinding(root, session, state, retry.source, retry);
+    const expected = await rebindBinding(root, session, state, proved.request, { source: rebind.source, writeRoots: request.requirements?.declaredWriteRoots });
+    if (request.operatorId !== 'workspace.bind' || !isDeepStrictEqual(request.requirements, expected.requirements)) throw Error('PLAN_REBIND_UNBOUND: repair changes more than the approved exact checkout write roots');
   } catch (error) { errors.push(error.message); }
   const repair = forecast.repairs?.[cell];
   if (repair) try {

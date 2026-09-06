@@ -357,6 +357,25 @@ export async function localAcceptedInputErrors(sessionRoot, state, inputRef, kin
   return errors;
 }
 
+// Historical checkout observations retain authority through their original acceptance, not a
+// second observation of today's dirty tree. An unopened or running bind still probes the host.
+export async function sealedWorkspaceBindingErrors(session, state, request) {
+  const cell = `${request.step}/${request.parallel}`;
+  if (request.operatorId !== 'workspace.bind' || request.exchange || state.attempts?.[cell]?.status !== 'matched') return null;
+  const errors = [];
+  try {
+    if (!state.attempts[cell].context) throw Error('WORKSPACE_HISTORY_UNBOUND: accepted binding has no immutable invocation context');
+    invocationState(session, state, request);
+    const branch = path.join(session, `step-${request.step}/parallel-${request.parallel}`);
+    if (existsSync(path.join(branch, 'import.json'))) throw Error('WORKSPACE_HISTORY_UNBOUND: local accepted binding cannot become an imported slot');
+    errors.push(...await evidenceManifestErrors(branch, state.attempts[cell].evidenceManifest));
+    const response = JSON.parse(await readFile(path.join(branch, 'response/response.json'), 'utf8'));
+    if (response.fields?.route !== 'response/data/route.json') throw Error('WORKSPACE_HISTORY_UNBOUND: accepted binding must retain its canonical route output');
+    errors.push(...await localAcceptedInputErrors(session, state, `step-${request.step}/parallel-${request.parallel}/${response.fields.route}`, 'route'));
+  } catch (error) { errors.push(error.message); }
+  return errors;
+}
+
 const UI_BINDINGS = {
   'interface.plan': ['@knowledge/ui/composition'],
   'interface.generate': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof'],
@@ -483,10 +502,14 @@ export function v22RequestErrors(state, request, pkg, dir = null, phase = curren
 export async function attemptProgressErrors(sessionRoot, state, request) {
   if (request?.contractVersion !== V22_CONTRACT || request.attempt?.number === 1) return [];
   const previous = Object.values(state.attempts ?? {}).find((attempt) => attempt.id === request.attempt.previous);
-  if (!previous || !['mismatched', 'inconclusive'].includes(previous.status) || !previous.requestRef) return [];
+  if (!previous || !['mismatched', 'inconclusive', 'blocked'].includes(previous.status) || !previous.requestRef) return [];
   try {
     const before = JSON.parse(await readFile(path.join(sessionRoot, previous.requestRef), 'utf8'));
-    const fingerprint = (value) => canonicalJson({ expected: value.expected, requirements: value.requirements, inputs: value.inputs, contexts: value.contexts, workspace: value.environment?.workspace, reads: value.environment?.reads, writes: value.environment?.writes, exclusive: value.environment?.exclusive, frozenInputs: value.frozenInputs });
+    // Numbering a new attempt or expected version is not a changed method. A resolved question
+    // already has its own content-bound resume gate; ordinary blocked resumes retain that gate.
+    if (previous.status === 'blocked' && request.resume) return [];
+    const set = values => [...new Set((values ?? []).map(canonicalJson))].sort();
+    const fingerprint = (value) => canonicalJson({ criteria: set(value.expected?.criteria), requirements: value.requirements, inputs: value.inputs, contexts: set(value.contexts), workspace: value.environment?.workspace, reads: set(value.environment?.reads), writes: set(value.environment?.writes), exclusive: set(value.environment?.exclusive), frozenInputs: set(value.frozenInputs) });
     if (fingerprint(before) === fingerprint(request)) return [`request.json: retry ${request.attempt.id} repeats the same expected, inputs, frozen evidence, environment revision and resource ownership after ${previous.id} was ${previous.status} (NO_PROGRESS); repair the cause, change the verified method, or stay blocked`];
   } catch (error) { return [`state.json: previous attempt ${previous.id} cannot be read for progress comparison: ${error.message}`]; }
   return [];
@@ -785,7 +808,8 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   errors.push(...await uiKnowledgeRequestErrors(root, dir, request, { phase }));
   if (!errors.length && request.operatorId === 'workspace.bind' && !request.exchange) {
     const { validateWorkspaceCheckoutRequest } = await import('./workspace-checkout.mjs');
-    errors.push(...validateWorkspaceCheckoutRequest(root, request, dir, { phase }));
+    const sealed = phase === 'accept' && sessionRoot ? await sealedWorkspaceBindingErrors(sessionRoot, JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8')), request) : null;
+    errors.push(...(sealed ?? validateWorkspaceCheckoutRequest(root, request, dir, { phase })));
   }
   if (!errors.length && request.operatorId === 'quality.verify' && !request.exchange) {
     const { validateCoveragePolicyRequest } = await import('./coverage-policy.mjs');

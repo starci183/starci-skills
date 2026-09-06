@@ -200,7 +200,11 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
       const r = req(cell);
       const reentry = options.forecast?.resumes?.[cell];
       const resumedOwner = reentry && stepOf(reentry) < stepOf(cell) && (opOf(reentry) === id || options.resumeOwners?.[reentry] === id);
-      if (previous && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id)) && !resumedOwner && !validRepairs.has(cell) && (!options.forecast || dependencyHandoffErrors(graph, options.forecast, cell).length)) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
+      const retry = options.forecast?.retries?.[cell], rebind = options.forecast?.rebinds?.[cell];
+      const retriedOwner = retry && stepOf(retry.source) < stepOf(cell) && opOf(retry.source) === id;
+      const reboundOwner = rebind && id === BIND_OPERATOR && opOf(rebind.source) === BIND_OPERATOR && stepOf(rebind.source) < stepOf(cell) && options.forecast?.retries?.[rebind.retry]?.rebind === cell && options.forecast?.goals?.[cell]?.prerequisite === rebind.retry && stepOf(rebind.retry) > stepOf(cell);
+      if (retry && !retriedOwner || rebind && !reboundOwner) errors.push(`${cell}: PLAN_RETRY_UNBOUND: retry or binding repair has no exact earlier owner`);
+      if (previous && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id)) && !resumedOwner && !retriedOwner && !reboundOwner && !validRepairs.has(cell) && (!options.forecast || dependencyHandoffErrors(graph, options.forecast, cell).length)) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
       for (const input of node.required) if (!produced.has(input.kind) && !imported[cell]?.has(input.kind)) errors.push(`${cell}: ${id} requires input ${input.kind}, which no earlier step produces and no imported slot the request names supplies`);
       if (id !== BIND_OPERATOR) for (const role of node.roles) if (!boundRoles.has(role)) errors.push(`${cell}: ${id} requires @workspaces/${role}, which no earlier ${BIND_OPERATOR} (role ${role}) bound or is planned to bind`);
       if (r && planned[cell]) errors.push(...plannedRequirementErrors(planned[cell], r, `${cell}: request.json`));
