@@ -48,6 +48,8 @@ export async function resolvedWaitingReplanErrors(root, session, state, successo
   if (successorRequest.operatorId !== parent.operatorId || state.steps?.[successorKey] !== parent.operatorId) errors.push(`request.json: resolved waiting parent ${parentKey} and successor ${successorKey} must run the same recorded operator`);
   if (successorRequest.attempt?.previous !== parent.id || successorRequest.attempt?.number !== parent.number + 1) errors.push(`request.json: successor ${successorKey} does not directly follow waiting attempt ${parent.id}`);
   const resumeRecord = state.resumes?.[successorKey];
+  const claimedSuccessors = Object.entries(state.resumes ?? {}).filter(([, value]) => value?.resumes === parentKey).map(([key]) => key);
+  if (claimedSuccessors.length !== 1 || claimedSuccessors[0] !== successorKey) errors.push(`REVIEW_REENTRY_UNBOUND: waiting parent ${parentKey} requires exactly one recorded successor`);
   if (!reviewBinding && state.planHistory?.active) reviewBinding = readContext(session, state.planHistory.active, 'plans').forecast.reviewResumes?.[successorKey] ?? null;
   if (resumeRecord?.resumes !== parentKey) errors.push(`state.json: resumes[${successorKey}] does not bind waiting parent ${parentKey}`);
   const cells = (state.chain ?? []).flat();

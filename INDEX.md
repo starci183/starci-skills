@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.3
+# StarCi Skills 2.5.0-rc.4
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.5.0-rc.4 (2026-09-06): the shared mission busy gate recognizes sealed resolved waits, permitting subsequent authorized replanning while retaining unresolved obligations and unique successor ownership.
 
 2.5.0-rc.3 (2026-09-06): sealed nested return and disclosed review-integrity concerns re-enter through a fresh same-owner invocation and independent review, preserving original proof and current goal authority.
 

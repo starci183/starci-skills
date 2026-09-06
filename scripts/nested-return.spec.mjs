@@ -10,7 +10,7 @@ const sha = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex'
 const put = async (file, value) => { await mkdir(path.dirname(file), {recursive:true}); await writeFile(file, typeof value === 'string' ? value : JSON.stringify(value)); };
 const table = (heading, columns, rows) => `\n## ${heading}\n\n| ${columns.join(' | ')} |\n| ${columns.map(()=>'---').join(' | ')} |\n${rows.map(row=>`| ${row.join(' | ')} |`).join('\n')}\n`;
 
-async function fixture(t, { selection = 'return' } = {}) {
+async function fixture(t, { selection = 'return', followupReading = false } = {}) {
  const host = await mkdtemp(path.join(os.tmpdir(), 'starci-review-lifecycle-')), root = path.join(host,'.claude');
  t.after(()=>rm(host,{recursive:true,force:true}));
  const payload = JSON.parse(await readFile(path.join(source,'package.json')));
@@ -24,6 +24,7 @@ async function fixture(t, { selection = 'return' } = {}) {
  await confirmSession(opened.session,{selected:'as-stated',selectedBy:'user',sourceRef:'user:approved'});
  const session=opened.session,stateFile=path.join(session,'state.json'),read=async()=>JSON.parse(await readFile(stateFile)),save=state=>put(stateFile,state),branch=cell=>path.join(session,`step-${cell.split('/')[0]}/parallel-${cell.split('/')[1]}`);
  let state=await read();const head=state.mission.discovery.repositories[0].head;
+ if(followupReading){state.choices['budget:review-sequence']={selected:'continue',selectedBy:'user',sourceRef:'user:fixture-authorized-review-sequence'};state.budget.extensions=[{decisionId:'budget:review-sequence',maxSteps:24,maxSameOperator:6}];}
  const criteria=[{id:'decision',required:true,expected:'The architecture is independently reviewed.',verification:'Read the model and independent critique.'}];
  function current(request,step,{number=1,previous=null,resume=null,exchange=null}={}) {
   const id=`${step}/1${exchange?'/'+exchange:''}:a${number}`;
@@ -67,9 +68,10 @@ async function fixture(t, { selection = 'return' } = {}) {
  }
  await waiting(parent);await review(parent,selection);state=await read();
  const forecast={chain:state.chain,steps:state.steps,goals:{'1/1':bind.goal,'2/1':first.goal,'3/1':parent.goal},reasons:{},presets:{'1/1':bind.requirements,'2/1':first.requirements,'3/1':parent.requirements},dependencies:{'1/1':[],'2/1':['1/1'],'3/1':['1/1']},evidenceDependencies:{'1/1':[],'2/1':[],'3/1':[]},handoffs:{},nodes:{'1/1':'binding','2/1':'reading','3/1':'architecture'},resumes:{'3/1':'2/1'},imports:{},fanout:{}};
+ if(followupReading){forecast.chain.push(['4/1']);forecast.steps['4/1']='architecture.decide';forecast.goals['4/1']={doneWhen:0};forecast.presets['4/1']={...first.requirements,decisionId:'second-read-path'};forecast.dependencies['4/1']=['1/1'];forecast.evidenceDependencies['4/1']=[];forecast.nodes['4/1']='second-architecture';}
  state.planned=Object.fromEntries(Object.entries(forecast.presets).map(([cell,requirements])=>[cell,{requirements}]));
  const address=await retainContext(session,'plans',{version:1,sessionId:state.id,previous:null,missionVersion:state.mission.version,scopeHash:scopeHash(state.mission),forecast,planned:state.planned,retained:{choices:{},attempts:{},requestHashes:{},steps:{},inventoryCells:[],files:{}}});state.planHistory={active:address,revisions:[address]};await save(state);
- return {root,session,read,save,branch,parent,files,waiting,review,actual,plans,waitingReviewBinding,resolvedWaitingAttemptKeys,openAttempt,acceptAttempt,acquireWorkerSlot,releaseWorkerSlot};
+ return {root,session,read,save,branch,parent,files,first,text,waiting,review,actual,plans,waitingReviewBinding,resolvedWaitingAttemptKeys,openAttempt,acceptAttempt,acquireWorkerSlot,releaseWorkerSlot,restatementDecisionId,recordRestatementChoice,load};
 }
 
 async function replacementLifecycle(f, flags) {
@@ -113,8 +115,8 @@ test('accepted nested return creates a fresh parent and review without rewriting
  await replacementLifecycle(await fixture(t),{edit:{kind:'resume',cell:'3/1'}});
 });
 
-test('integrity disclosure preserves questioned proof but cannot approve or complete the replacement without fresh review',async t=>{
- const f=await fixture(t),state=await f.read();
+test('integrity disclosure preserves questioned proof and its completed replacement permits the next answered reading to replan',async t=>{
+ const f=await fixture(t,{followupReading:true}),state=await f.read();
  const binding=await f.waitingReviewBinding(f.root,f.session,state,'3/1');
  const disclosure={version:1,identity:binding.identity,disposition:'fresh-review-required',reason:'The owning reviewer disclosed an estimated observation timestamp. Preserve the admitted concern and collect a fresh independent review.',sourceRef:'owner:actual-integrity-admission'};
  const file=path.join(f.session,'support/integrity-disclosure.json');
@@ -133,6 +135,24 @@ test('integrity disclosure preserves questioned proof but cannot approve or comp
  assert.equal(active.forecast.reviewResumes['4/1'].disclosure.bytes,JSON.stringify(disclosure));
  assert.equal(active.forecast.reviewResumes['4/1'].mode,'integrity');
  assert.equal((await f.read()).mission.version,state.mission.version);
+ const {missionCorrectionBusy}=await f.load('scripts/session-open.mjs');
+ const completed=await f.read();
+ assert.equal(await missionCorrectionBusy(f.session,completed),false,'the preserved waiting parent is settled by its terminal accepted replacement');
+ const originalState=await readFile(path.join(f.session,'state.json'));
+ await assert.rejects(f.plans.previewRevision(f.root,f.session,{edit:{kind:'resume',cell:'3/1'}}),/exactly one recorded successor/);
+ assert.deepEqual(await readFile(path.join(f.session,'state.json')),originalState,'a duplicate successor is refused before any session mutation');
+ for(const change of [s=>{s.attempts['4/1'].id='forged';},s=>{delete s.attempts['4/1'].evidenceManifest;},s=>{s.attempts['4/1'].status='waiting';},s=>{s.attempts['4/1'].status='running';},s=>{s.workerSlots=[{attemptId:'active'}];},s=>{s.leases={active:{}};}]){const altered=structuredClone(completed);change(altered);assert.equal(await missionCorrectionBusy(f.session,altered),true);}
+ const terminalFile=path.join(f.branch('4/1'),'response/response.json'),terminalBytes=await readFile(terminalFile);
+ await put(terminalFile,{...JSON.parse(terminalBytes),status:'waiting'});assert.equal(await missionCorrectionBusy(f.session,completed),true);await writeFile(terminalFile,terminalBytes);
+ const reading={...structuredClone(f.first),step:5,requirements:active.forecast.presets['5/1'],attempt:{id:'5/1:a1',number:1,kind:'initial',previous:null}};reading.environment.isolationId=reading.attempt.id;
+ const dir=f.branch('5/1'),text=f.text.replace('restatement — entitlement-read-path','restatement — second-read-path');
+ const decisionId=f.restatementDecisionId(reading,'second-read-path',text);
+ await put(path.join(dir,'request/request.json'),reading);await f.openAttempt(dir);await put(path.join(dir,'response/restatement.md'),text);
+ await put(path.join(dir,'response/response.json'),f.actual(reading,{schemaVersion:9,operatorId:'architecture.decide',stop:'RESTATEMENT_UNCONFIRMED',fields:{restatement:'response/restatement.md'},fallbacks:[],commits:[],next:[],interaction:{kind:'restatement-confirm',decisionId,options:[{id:'as-stated',label:'As stated',tradeoff:'Use this reading'},{id:'corrected',label:'Corrected',tradeoff:'Correct this reading'}]}},'blocked',['response/restatement.md']));
+ await f.acceptAttempt(dir);await f.recordRestatementChoice(dir,{selected:'as-stated',selectedBy:'user',sourceRef:'user:second-current-reading'});
+ const nextFlags={edit:{kind:'resume',cell:'5/1'}},preview=await f.plans.previewRevision(f.root,f.session,nextFlags);
+ await f.plans.commitRevision(f.root,f.session,{previewHash:preview.previewHash,flags:nextFlags,reason:'The next current reading was answered; continue its declared architecture work.'});
+ const replanned=await f.read();assert.equal(replanned.current,'6/1');assert.deepEqual(replanned.attempts['3/1'],state.attempts['3/1']);assert.deepEqual(replanned.attempts['4/1'],completed.attempts['4/1']);assert.deepEqual(f.plans.planHistoryErrors(f.session,replanned),[]);
 });
 
 test('a keep verdict cannot impersonate a return and forged or stale review identities cannot authorize re-entry',async t=>{

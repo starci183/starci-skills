@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.3
+# StarCi Skills 2.5.0-rc.4
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.5.0-rc.4 (2026-09-06): busy gate chung nhận biết waiting đã được giải quyết bằng proof niêm phong, cho phép replan tiếp theo đúng quyền hạn và giữ nghĩa vụ chưa hoàn thành cùng duy nhất một successor.
 
 2.5.0-rc.3 (2026-09-06): nested return đã niêm phong và vấn đề toàn vẹn review đã khai báo vào lại qua invocation cùng owner và review độc lập mới, giữ nguyên proof gốc cùng quyền hạn goal hiện tại.
 
