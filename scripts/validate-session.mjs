@@ -429,7 +429,10 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   // The chain is lawful against the operator tables and each branch's request: reachable, fed (by an earlier step or an accepted imported slot), bound (by a written or a planned bind), capped, proved, ended, and on a mission every branch names its goal.
   const byBranch = await readBranchRequests(session, state.steps);
   const graph = await loadOperatorGraph(root, packages);
-  errors.push(...validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: state.planned ?? {} }), evidenceCells: (await readImportedSlots(session, graph, root)).map((s) => s.cell) }));
+  const activeFromStep = Math.max(1, ...(state.transitions ?? [])
+    .filter((entry) => entry.event === 'replanned' && entry.goalVersion === state.mission?.version)
+    .map((entry) => stepOf(entry.branch)));
+  errors.push(...validateChain(root, packages, state.chain, state.steps, byBranch, { graph, mission: state.mission ?? null, activeFromStep, maxParallel: await loadMaxParallel(root), planned: state.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: state.planned ?? {} }), evidenceCells: (await readImportedSlots(session, graph, root)).map((s) => s.cell) }));
   // On a mission: proven cites only evidenced done-when lines, three unevidenced done branches in a row stop the chain, every transition was logged.
   const ledger = await goalLedger(session, state);
   errors.push(...provenErrors(state, ledger, { root }));

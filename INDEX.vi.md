@@ -1,4 +1,4 @@
-# StarCi Skills 2.3.1
+# StarCi Skills 2.3.2
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.3.2 (2026-09-06): một lần lập lại kế hoạch đã được ghi nhận mở một đoạn kiểm định mới cho thứ tự bàn giao hiện tại và khả năng đi tới bước đầu, đồng thời mọi request và receipt lịch sử được giữ bất biến. Xem tests/evidence/20260906-replan-segment-validation.md.
 
 2.3.1 (2026-09-06): chuỗi sở hữu `runtime.serve` kiểm trước khai báo và năng lực máy mà không đòi generation runtime chỉ owner chạy sau mới được tạo; consumer không có owner ấy vẫn phải thấy generation có sẵn. Xem tests/evidence/20260906-runtime-bootstrap-preflight.md.
 

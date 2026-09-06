@@ -1,4 +1,4 @@
-# StarCi Skills 2.3.1
+# StarCi Skills 2.3.2
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.3.2 (2026-09-06): a recorded replan starts a fresh validation segment for current delivery ordering and first-step reachability while every preserved request and receipt remains immutable. See tests/evidence/20260906-replan-segment-validation.md.
 
 2.3.1 (2026-09-06): a chain that owns `runtime.serve` preflights declarations and host capabilities without requiring the runtime generation that only its later owner may create; consumers without that owner still require an existing generation. See tests/evidence/20260906-runtime-bootstrap-preflight.md.
 

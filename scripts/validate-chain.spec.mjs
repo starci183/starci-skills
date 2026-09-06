@@ -67,6 +67,31 @@ test('an unknown operator, a step no Next table reaches, and a same-operator re-
   assert.ok(check([['environment.preflight'], ['quality.verify']]).some((e) => e.includes('no Next table of step 1')));
   assert.deepEqual(check([['workspace.bind'], ['workspace.bind'], ['quality.verify']]), []);
 });
+test('a replan boundary starts a fresh reachability and delivery-order segment', () => {
+  const mission = fakeMission([line('business.decide'), line('architecture.decide')], {
+    discovery: {
+      stage: 'implement',
+      lanes: {
+        business: { status: 'planned', dependsOn: [] },
+        architecture: { status: 'planned', dependsOn: ['business'] },
+      },
+    },
+  });
+  const spec = [
+    ['architecture.decide'],
+    ['quality.verify'],
+    ['environment.preflight'],
+    ['business.decide'],
+    ['architecture.decide'],
+  ];
+  const { chain, steps, byBranch } = chainOf(spec);
+  const withoutBoundary = validateChain(root, packages, chain, steps, byBranch, { graph, mission });
+  assert.ok(withoutBoundary.some((e) => e.includes('architecture.decide must follow business.decide')));
+  assert.ok(withoutBoundary.some((e) => e.includes('step 3 runs environment.preflight')));
+  const withBoundary = validateChain(root, packages, chain, steps, byBranch, { graph, mission, activeFromStep: 3 });
+  assert.ok(!withBoundary.some((e) => e.includes('architecture.decide must follow business.decide')));
+  assert.ok(!withBoundary.some((e) => e.includes('step 3 runs environment.preflight')));
+});
 test('a required input needs an earlier producer; a required role needs an earlier bind of that role', () => {
   const noInput = check([['workspace.bind'], ['git.publish']]);
   assert.ok(noInput.some((e) => e.includes('git.publish requires input changes')));
