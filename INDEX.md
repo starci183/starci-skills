@@ -1,4 +1,4 @@
-# StarCi Skills 2.4.4
+# StarCi Skills 2.4.5
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.4.5 (2026-09-06): forecast commit shares the mission busy gate; sealed retired waits remain history rather than active completion obligations, and prior-reading resume preserves unopened parallel peers.
 
 2.4.4 (2026-09-06): the restatement answer CLI settles module initialization before recursive validation imports; scope correction distinguishes sealed prior-mission waits from live obligations, with subprocess and preservation regressions.
 

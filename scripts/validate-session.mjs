@@ -115,7 +115,7 @@ export async function v22SessionErrors(session, state, root = ROOT) {
   const waitingReplans = await resolvedWaitingAttemptKeys(root, session, state, { requireSuccessorTerminal: terminalSession });
   errors.push(...waitingReplans.errors);
   if (terminalSession) for (const [branch, attempt] of Object.entries(state.attempts ?? {})) {
-    if (attempt.status === 'waiting' && !waitingReplans.settled.has(branch)) errors.push(`state.json: waiting attempt ${attempt.id} has no fully accepted terminal resolved-by-replan successor`);
+    if (attempt.status === 'waiting' && !waitingReplans.settled.has(branch) && !waitingReplans.retired.has(branch)) errors.push(`state.json: waiting attempt ${attempt.id} has no fully accepted terminal resolved-by-replan successor`);
   }
   if (state.status === 'done' || phase === 'closed-success') {
     for (let index = 0; index < (mission.doneWhen ?? []).length; index += 1) {

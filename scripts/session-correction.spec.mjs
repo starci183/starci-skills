@@ -7,6 +7,8 @@ import { createHash } from 'node:crypto';
 import { openSession, confirmSession, cleanupFixtureOwners } from './v23-test-fixture.mjs';
 import { missionCorrectionBusy } from './session-open.mjs';
 import { buildEvidenceManifest } from './evidence-manifest.mjs';
+import { commitRevision } from './plan-history.mjs';
+import { fileURLToPath } from 'node:url';
 
 const sha = value => `sha256:${createHash('sha256').update(value).digest('hex')}`;
 async function fixture(t) {
@@ -63,4 +65,16 @@ test('changed historical receipt bytes cannot turn an unresolved wait into a ret
   await writeFile(path.join(f.branch, 'response/response.json'), '{}');
   await assert.rejects(confirmSession(f.session, f.correction), /MISSION_BUSY/);
   assert.equal(JSON.parse(await readFile(f.file)).mission.version, 2);
+});
+
+test('forecast commit shares correction busy classification and still checks the historical ledger', async t => {
+  const f = await fixture(t);
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const input = { previewHash: `sha256:${'0'.repeat(64)}`, reason: 'Review current scope without promoting historical proof.' };
+  // This minimal predicate fixture is intentionally not a complete operator receipt. It must
+  // reach the ledger/preview gate rather than mistake the sealed historical wait for live work.
+  await assert.rejects(commitRevision(root, f.session, input), error => !error.message.includes('PLAN_BUSY'));
+  f.state.attempts['1/1'].status = 'running';
+  await writeFile(f.file, JSON.stringify(f.state));
+  await assert.rejects(commitRevision(root, f.session, input), /PLAN_BUSY/);
 });

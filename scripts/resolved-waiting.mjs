@@ -167,10 +167,15 @@ export async function resolvedWaitingReplanErrors(root, session, state, successo
 
 export async function resolvedWaitingAttemptKeys(root, session, state, { requireSuccessorTerminal = false } = {}) {
   const settled = new Set();
+  const retired = new Set();
   const errors = [];
+  const { planHistoryErrors, retiredPlanCell } = await import('./plan-history.mjs');
+  errors.push(...planHistoryErrors(session, state).filter(error => !error.startsWith('PLAN_SCOPE_CHANGED:')));
+  if (errors.length) return { settled, retired, errors };
   const successors = new Map();
   for (const [parentKey, parent] of Object.entries(state.attempts ?? {})) {
     if (parent.status !== 'waiting' || parentKey.split('/').length !== 2) continue;
+    if (retiredPlanCell(state, parentKey)) { retired.add(parentKey); continue; }
     const successorKeys = Object.entries(state.resumes ?? {}).filter(([, value]) => value?.resumes === parentKey).map(([key]) => key);
     if (!successorKeys.length) continue;
     if (successorKeys.length !== 1) { errors.push(`state.json: waiting parent ${parentKey} has ${successorKeys.length} claimed replan successors; exactly one may resolve it`); continue; }
@@ -198,5 +203,5 @@ export async function resolvedWaitingAttemptKeys(root, session, state, { require
   if (requireSuccessorTerminal) {
     for (const [parentKey, successorKey] of successors) if (!settled.has(parentKey)) errors.push(`state.json: resolved waiting parent ${parentKey} has no terminal accepted successor chain through ${successorKey}`);
   }
-  return { settled, errors };
+  return { settled, retired, errors };
 }

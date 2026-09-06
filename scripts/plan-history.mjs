@@ -96,8 +96,9 @@ export async function editForecast(root, session, state, original, edit, top) {
     const index = sourceCell === cell ? Math.max(...forecast.chain.map((step,index)=>step.some(cell=>state.attempts?.[cell])?index:-1)) : forecast.chain.findIndex(step => step.includes(cell));
     if (sourceCell === cell) forecast.chain.splice(index + 1, 0, [next]);
     else {
-      if (forecast.chain[index].length !== 1) throw Error('PLAN_EDIT_INVALID: a prior reading replacement owns a complete planned step');
-      forecast.chain.splice(index,1,[next]);
+      // Replace the unopened logical node in place; its independent peers retain their work.
+      // The mapping below still refuses a partially dispatched parallel step.
+      forecast.chain[index] = forecast.chain[index].map(peer => peer === cell ? next : peer);
       for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes','fanout','handoffs']) delete forecast[field]?.[cell];
     }
   } else {
@@ -177,7 +178,8 @@ export async function previewRevision(root, session, flags = {}) {
 export async function commitRevision(root, session, input) {
   if (typeof input?.reason !== 'string' || !input.reason.trim() || !/^sha256:[a-f0-9]{64}$/.test(input.previewHash ?? '')) throw Error('PLAN_REVIEW_REQUIRED: retain the displayed full forecast digest and the concrete reason for replanning');
   return mutateSession(session, async state => {
-    if ((state.workerSlots ?? []).length || Object.keys(state.leases ?? {}).length || Object.values(state.attempts ?? {}).some(attempt => ['running', 'waiting'].includes(attempt.status))) throw Error('PLAN_BUSY: finish or truthfully seal active invocations before superseding the remaining forecast');
+    const { missionCorrectionBusy } = await import('./session-open.mjs');
+    if (await missionCorrectionBusy(session, state)) throw Error('PLAN_BUSY: finish or truthfully seal active invocations before superseding the remaining forecast');
     const beforeErrors = planHistoryErrors(session, state).filter(error => !error.startsWith('PLAN_SCOPE_CHANGED:'));
     if (beforeErrors.length) throw Error(beforeErrors.join('\n'));
     const { v22SessionErrors } = await import('./validate-session.mjs');

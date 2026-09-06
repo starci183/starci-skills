@@ -181,7 +181,7 @@ async function closeErrors(session, state) {
   if ((state.workerSlots ?? []).length || Object.keys(state.leases ?? {}).length) throw new Error('session still has active worker/resource leases');
   const waitingReplans = await resolvedWaitingAttemptKeys(root, session, state, { requireSuccessorTerminal: true });
   if (waitingReplans.errors.length) throw new Error(waitingReplans.errors.join('\n'));
-  if (Object.entries(state.attempts ?? {}).some(([key, attempt]) => attempt.status === 'running' || (attempt.status === 'waiting' && !waitingReplans.settled.has(key)))) throw new Error('session still has an active or unresolved waiting attempt');
+  if (Object.entries(state.attempts ?? {}).some(([key, attempt]) => attempt.status === 'running' || (attempt.status === 'waiting' && !waitingReplans.settled.has(key) && !waitingReplans.retired.has(key)))) throw new Error('session still has an active or unresolved waiting attempt');
   for (let i = 0; i < state.mission.doneWhen.length; i++) if (!(state.brief.proven ?? []).some(line => line.startsWith(`doneWhen:${i} `))) throw new Error(`session cannot close-success: doneWhen:${i} is not proven`);
 }
 
