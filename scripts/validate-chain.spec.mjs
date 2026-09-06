@@ -90,6 +90,7 @@ test('a replan boundary starts a fresh reachability and delivery-order segment',
   assert.ok(withoutBoundary.some((e) => e.includes('step 3 runs environment.preflight')));
   const withBoundary = validateChain(root, packages, chain, steps, byBranch, { graph, mission, activeFromStep: 3 });
   assert.ok(!withBoundary.some((e) => e.includes('architecture.decide must follow business.decide')));
+  assert.ok(!withBoundary.some((e) => e.includes('step 2 runs quality.verify')), 'historical Next mismatches stay immutable outside the active segment');
   assert.ok(!withBoundary.some((e) => e.includes('step 3 runs environment.preflight')));
 });
 test('a required input needs an earlier producer; a required role needs an earlier bind of that role', () => {

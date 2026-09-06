@@ -172,7 +172,7 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
       const node = graph.get(id);
       if (!node) { errors.push(`${cell}: unknown operator ${id}`); continue; }
       const r = req(cell);
-      if (previous && n + 1 !== activeFromStep && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id))) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
+      if (previous && n + 1 > activeFromStep && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id))) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
       for (const input of node.required) if (!produced.has(input.kind) && !imported[cell]?.has(input.kind)) errors.push(`${cell}: ${id} requires input ${input.kind}, which no earlier step produces and no imported slot the request names supplies`);
       if (id !== BIND_OPERATOR) for (const role of node.roles) if (!boundRoles.has(role)) errors.push(`${cell}: ${id} requires @workspaces/${role}, which no earlier ${BIND_OPERATOR} (role ${role}) bound or is planned to bind`);
       if (r && planned[cell]) errors.push(...plannedRequirementErrors(planned[cell], r, `${cell}: request.json`));

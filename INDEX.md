@@ -1,4 +1,4 @@
-# StarCi Skills 2.3.2
+# StarCi Skills 2.3.3
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.3.3 (2026-09-06): the replan boundary now excludes every historical `Next` mismatch, not only the edge entering the active segment; historical steps still contribute their accepted inputs and bindings without being rejudged under the current graph. See tests/evidence/20260906-replan-segment-validation.md.
 
 2.3.2 (2026-09-06): a recorded replan starts a fresh validation segment for current delivery ordering and first-step reachability while every preserved request and receipt remains immutable. See tests/evidence/20260906-replan-segment-validation.md.
 

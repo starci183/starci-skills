@@ -1,4 +1,4 @@
-# StarCi Skills 2.3.2
+# StarCi Skills 2.3.3
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.3.3 (2026-09-06): biên lập lại kế hoạch nay loại mọi mismatch `Next` lịch sử, không chỉ cạnh đi vào đoạn đang hoạt động; các bước lịch sử vẫn cung cấp input và binding đã được chấp nhận mà không bị chấm lại theo đồ thị hiện tại. Xem tests/evidence/20260906-replan-segment-validation.md.
 
 2.3.2 (2026-09-06): một lần lập lại kế hoạch đã được ghi nhận mở một đoạn kiểm định mới cho thứ tự bàn giao hiện tại và khả năng đi tới bước đầu, đồng thời mọi request và receipt lịch sử được giữ bất biến. Xem tests/evidence/20260906-replan-segment-validation.md.
 
