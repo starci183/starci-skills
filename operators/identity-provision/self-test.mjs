@@ -197,7 +197,18 @@ await expectError(provisioning({ 'response/response.json': responseJson({ accoun
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ identity: 'demo-product/be' }) }), 'belongs to registry entry', 'an account filed under another registry entry');
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ flow: 'other-flow' }) }), 'belongs to flow other-flow', 'an account filed under another flow');
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ env: 'staging' }) }), 'belongs to environment staging', 'an account of another environment');
-await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, action: 'reuse', provisionedBy: null } } }) }), 'names the run that provisioned it', 'an account this run created and left unattributed');
+await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, provisionedBy: null } } }) }), 'names the run that provisioned it', 'an account this run created and left unattributed');
+// A flow whose every alias already stands is reused without a mutation and its record is still published:
+// uat.verify reads the account of names from it, and the reuse is what the attempt flow's first row says.
+const reused = (over = {}) => provisioning({
+  'response/response.md': responseMd({ findings: [INVENTORIED], convergence: 'already-converged', effects: [] }),
+  'response/data/delta.json': delta({ convergence: 'already-converged', mutations: [], appliedEffects: [] }),
+  'response/data/checks.json': checksJson({ findings: [INVENTORIED] }),
+  'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, action: 'reuse', provisionedBy: null } } }),
+  ...over,
+});
+await expectValid(reused(), 'a flow whose account already stood: reused without a mutation and published as names');
+await expectError(reused({ 'response/data/account.json': accountRecord() }), 'a run that reused the cast publishes reused aliases only', 'a run that applied nothing and published a created alias');
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, loginProof: { ...accountRecord().accounts.learner.loginProof, method: 'token' } } } }) }), 'needs a passing real product login through browser evidence', 'a token check offered as real product login proof');
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, providerAccountRef: '' } } }) }), 'names no stable provider account reference', 'an account with no provider identity for safe reuse');
 await expectError(provisioning({ 'response/data/account.json': accountRecord({ accounts: { learner: { ...accountRecord().accounts.learner, memberships: [] } } }) }), 'records no observed provider membership', 'an account whose provider role was never observed');

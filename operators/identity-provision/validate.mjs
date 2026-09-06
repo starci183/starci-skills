@@ -219,7 +219,12 @@ export async function validateIdentityStep(branchDir, root = ROOT, { hostRoot = 
   if (provisioned && response.status === 'done' && !present.has('uat-account')) errors.push(`${accountFile}: provision-identity was applied, so the account record it wrote is published with it`);
   if (checks && provisioned && !checks.findings.some((f) => f.code === 'IDENTITY_PROVISIONED')) errors.push('response/data/checks.json: an identity that was provisioned records the IDENTITY_PROVISIONED finding, so the receipt names what this run created');
   if (present.has('uat-account')) {
-    if (!provisioned && delta) errors.push(`${accountFile}: an account record is published only by the run that provisioned it`);
+    // A record is published by the run that converged the flow's cast: the one that created or repaired
+    // an alias, or the one that found every alias standing and reused it (operator.md, the attempt flow's
+    // first row: reuse without mutation, publish action reuse). A run that applied nothing may publish only
+    // reused aliases, because a created alias with no applied effect is a mutation the delta never recorded.
+    const reusedOnly = !provisioned && delta?.convergence === 'already-converged';
+    if (!provisioned && delta && !reusedOnly) errors.push(`${accountFile}: an account record is published only by the run that provisioned it, or by a run that found every alias standing and reused it`);
     if (rotating) errors.push(`${accountFile}: a rotation creates no account and publishes no record`);
     if (has(accountFile)) {
       let account = null; try { account = JSON.parse(await read(accountFile)); } catch { account = null; }
@@ -234,7 +239,8 @@ export async function validateIdentityStep(branchDir, root = ROOT, { hostRoot = 
         // no second branch is coming for (resources/identity-plan.schema.json#accounts).
         errors.push(...await planCastErrors(branchDir, aliases, accountFile));
         for (const [alias, entry] of aliases) {
-          if (provisioned && entry.provisionedBy === null) errors.push(`${accountFile}: this run created ${alias}, so the record names the run that provisioned it`);
+          if (reusedOnly && entry.action !== 'reuse') errors.push(`${accountFile}: ${alias} records action ${entry.action} while the delta applied no effect; a run that reused the cast publishes reused aliases only`);
+          if (provisioned && entry.action !== 'reuse' && entry.provisionedBy === null) errors.push(`${accountFile}: this run created ${alias}, so the record names the run that provisioned it`);
           if (entry.provisionedBy === null && entry.action !== 'reuse') errors.push(`${accountFile}: existing account ${alias} must record action reuse`);
           if (entry.provisionedBy !== null && entry.action === 'reuse') errors.push(`${accountFile}: changed account ${alias} cannot record action reuse`);
           if (entry.loginProof?.method !== 'browser' || entry.loginProof?.outcome !== 'passed') errors.push(`${accountFile}: ${alias} needs a passing real product login through browser evidence`);
