@@ -1,9 +1,12 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 
+const mutations = new AsyncLocalStorage();
+export const currentSessionMutation = session => mutations.getStore()?.active && mutations.getStore().session === path.resolve(session) ? mutations.getStore().state : null;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function replaceFile(temp, file, { renameFile = rename, platform = process.platform, pause = wait } = {}) {
   // Windows readers or scanners may briefly deny replacement of an existing file. Keep the
@@ -82,7 +85,10 @@ export async function mutateSession(session, operation) {
     const file = path.join(session, 'state.json');
     const state = JSON.parse(await readFile(file, 'utf8'));
     if (state.upgrade || state.contractVersion === 'starci/v2.2' && state.runtimeRevision !== 3) throw Error('WORKFLOW_RESET_REQUIRED: old or migrated state is immutable; archive and open a fresh current session');
-    const result = await operation(state);
+    const context = { session, state, active: true };
+    let result;
+    try { result = await mutations.run(context, () => operation(state)); }
+    finally { context.active = false; }
     const temp = `${file}.${process.pid}.${randomUUID()}.tmp`;
     await writeFile(temp, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
     await replaceFile(temp, file);

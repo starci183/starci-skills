@@ -23,7 +23,7 @@ const branchKey = (branch) => {
 };
 const statePath = (branch) => path.join(sessionRootOf(branch) ?? '', 'state.json');
 
-export async function openAttempt(branch) {
+export async function openAttempt(branch, { runtimeRoot = root } = {}) {
   branch = path.resolve(branch);
   const session = sessionRootOf(branch);
   if (!session || !existsSync(statePath(branch))) throw new Error('SESSION_MISSING: open the owning user session before dispatch');
@@ -32,11 +32,11 @@ export async function openAttempt(branch) {
   let frozenRequest;
   let boundProfile;
   const result = await mutateSession(session, async (state) => {
-    const admission = workflowOwnerErrors(root, session, state, { dispatch: true });
-    admission.push(...deliveryRequestErrors(state, JSON.parse(await readFile(requestFile, 'utf8')), root));
+    const admission = workflowOwnerErrors(runtimeRoot, session, state, { dispatch: true });
+    admission.push(...deliveryRequestErrors(state, JSON.parse(await readFile(requestFile, 'utf8')), runtimeRoot));
     if (admission.length) throw Error(admission.join('\n'));
     const before = await readFile(requestFile);
-    const inside = await validateRequest(root, branch);
+    const inside = await validateRequest(runtimeRoot, branch, undefined, { phase: 'opening' });
     if (inside.errors.length) throw new Error(inside.errors.join('\n'));
     const after = await readFile(requestFile);
     if (sha(before) !== sha(after)) throw new Error('request/request.json changed while attempt-gate was freezing it');

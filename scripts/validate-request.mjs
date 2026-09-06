@@ -769,7 +769,7 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   errors.push(...await uiKnowledgeRequestErrors(root, dir, request, { phase }));
   if (!errors.length && request.operatorId === 'workspace.bind' && !request.exchange) {
     const { validateWorkspaceCheckoutRequest } = await import('./workspace-checkout.mjs');
-    errors.push(...validateWorkspaceCheckoutRequest(root, request, dir));
+    errors.push(...validateWorkspaceCheckoutRequest(root, request, dir, { phase }));
   }
   if (!errors.length && request.operatorId === 'quality.verify' && !request.exchange) {
     const { validateCoveragePolicyRequest } = await import('./coverage-policy.mjs');

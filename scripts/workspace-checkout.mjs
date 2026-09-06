@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { currentSessionMutation } from './session-lock.mjs';
 import { readSessionState, workflowRootOf, workflowOwnerErrors } from './workflow-root.mjs';
 // workspace.bind's read-only selection of a declared checkout or its own registered session worktree.
 import { execFileSync } from 'node:child_process';
@@ -295,7 +296,7 @@ export function gitPolicyErrors(asked, declared) {
   return names.filter((field) => asked[field] !== declared[field]).map((field) => `request.json: gitPolicy.${field} ${asked[field] === undefined ? 'is absent and' : `${JSON.stringify(asked[field])}`} differs from the declared route (${declared[field]}); gitPolicy is the object ${shape} the route declaration carries`);
 }
 
-function sessionIdentityErrors(root, request, branchDir) {
+function sessionIdentityErrors(root, request, branchDir, { phase = 'predispatch' } = {}) {
   try {
     requireThat(isSessionId(request?.sessionId) && Number.isSafeInteger(request?.step) && request.step > 0 && Number.isSafeInteger(request?.parallel) && request.parallel > 0, 'INVALID_INPUT', 'session identity and coordinates must be safe before resolving paths');
     requireThat(typeof branchDir === 'string', 'INVALID_INPUT', 'session checkout requires its containing request branch');
@@ -309,17 +310,19 @@ function sessionIdentityErrors(root, request, branchDir) {
     const bytes = readFileSync(path.join(branchDir, 'request', 'request.json'));
     const coordinate = `${request.step}/${request.parallel}`;
     requireThat(state.id === request.sessionId && state.steps?.[coordinate] === 'workspace.bind', 'INVALID_INPUT', 'containing session does not own this workspace.bind coordinate');
-    requireThat(isDeepStrictEqual(JSON.parse(bytes), request) && state.requestHashes?.[coordinate] === sha256(bytes), 'INVALID_INPUT', 'session checkout requires the unchanged frozen request hash');
+    const opening = phase === 'opening' && currentSessionMutation(owning.session);
+    const firstFreeze = opening && opening.id === state.id && !opening.attempts?.[coordinate] && !opening.requestHashes?.[coordinate] && !state.attempts?.[coordinate] && !state.requestHashes?.[coordinate];
+    requireThat(isDeepStrictEqual(JSON.parse(bytes), request) && (state.requestHashes?.[coordinate] === sha256(bytes) || firstFreeze), 'INVALID_INPUT', 'session checkout requires the unchanged frozen request hash or its first freeze inside the owning session mutation');
     return [];
   } catch (error) { return [`request.json: ${error.code ? error.message : 'INVALID_INPUT: session identity or frozen request cannot be verified'}`]; }
 }
 
-export function validateWorkspaceCheckoutRequest(root, request, branchDir) {
+export function validateWorkspaceCheckoutRequest(root, request, branchDir, options = {}) {
   const requirements = request.requirements ?? {};
   if (requirements.checkout === undefined) return [];
   if (!['routed', 'session'].includes(requirements.checkout)) return ['request.json: checkout must be routed or session'];
   if (requirements.checkout !== 'session') return [];
-  const identityErrors = sessionIdentityErrors(root, request, branchDir);
+  const identityErrors = sessionIdentityErrors(root, request, branchDir, options);
   if (identityErrors.length) return identityErrors;
   try {
     const result = resolveWorkspaceCheckout({ source: path.dirname(root), project: requirements.project, role: requirements.role, sessionId: request.sessionId, checkout: 'session', declaredWriteRoots: requirements.declaredWriteRoots ?? [], sharedInstall: requirements.sharedInstall });

@@ -156,7 +156,7 @@ Lệnh chọn chỉ đọc là `node scripts/workspace-checkout.mjs <project> <r
 dẫn checkout. JSON đó là quan sát checkout; operator vẫn phải ràng identity và gốc thẩm quyền
 đã yêu cầu để tạo biên nhận route đầy đủ. Bước 4 kiểm cây đã chọn; chọn phiên còn yêu cầu checkout mutation chuẩn sạch.
 Validator phản hồi tự chạy lại phép chọn và so các field route; gate request kiểm phép chọn phiên
-trước khi dispatch và ràng id phiên vào tọa độ chứa request, trạng thái phiên và hash request đã đóng băng.
+trước khi dispatch và ràng id phiên vào tọa độ chứa request, trạng thái phiên và hash request đã đóng băng. Lần `attempt-gate open` đầu kiểm đúng request trong mutation của phiên sở hữu, kiểm lại byte rồi ghi hash nguyên tử; pha mở này không có hiệu lực ngoài mutation đang giữ hoặc cho attempt đã tồn tại. Kiểm dispatch và biên nhận thông thường vẫn đòi hash đã lưu.
 
 ## Đầu ra
 

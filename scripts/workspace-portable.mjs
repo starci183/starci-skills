@@ -20,13 +20,12 @@ const scriptRoot = dirname(fileURLToPath(import.meta.url));
 const starciRoot = resolve(scriptRoot, '..');
 const defaultSource = resolve(starciRoot, '..');
 const portableSchemaPath = join(starciRoot, 'readiness', 'initialization', 'workspaces', 'portable-route.schema.json');
-const routeIdentifierSchema = JSON.parse(readFileSync(portableSchemaPath, 'utf8')).$defs.slug;
-export const isRouteIdentifier = value => validateAgainst(routeIdentifierSchema, value).length === 0;
+export const isRouteIdentifier = value => validateAgainst(JSON.parse(readFileSync(portableSchemaPath, 'utf8')).$defs.slug, value).length === 0;
 const localSchemaPath = join(starciRoot, 'readiness', 'initialization', 'workspaces', 'local-route.schema.json');
 const configSchemaPath = join(starciRoot, 'readiness', 'initialization', 'workspaces', 'config.schema.json');
-const validatePortableSchema = validatorFor(new URL('../readiness/initialization/workspaces/portable-route.schema.json', import.meta.url));
-const validateLocalSchema = validatorFor(new URL('../readiness/initialization/workspaces/local-route.schema.json', import.meta.url));
-const validateConfigSchema = validatorFor(new URL('../readiness/initialization/workspaces/config.schema.json', import.meta.url));
+const validatePortableSchema = value => validatorFor(portableSchemaPath)(value);
+const validateLocalSchema = value => validatorFor(localSchemaPath)(value);
+const validateConfigSchema = value => validatorFor(configSchemaPath)(value);
 const githubRemote = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/;
 
 const slash = (value) => value.split(sep).join('/');

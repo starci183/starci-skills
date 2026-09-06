@@ -181,7 +181,7 @@ checkout path. Its JSON is a checkout observation; the operator still binds iden
 roots to produce the complete route receipt. Step 4 checks the selected tree, and a session selection also requires the canonical
 mutation checkout to be clean. The response validator independently repeats the selection and
 compares the route fields; request validation checks session selection before dispatch and binds the
-session id to its containing coordinate, session state and frozen request hash.
+session id to its containing coordinate, session state and frozen request hash. The first `attempt-gate open` validates the exact request while holding the owning session mutation, checks its bytes again, and atomically records that hash; this opening phase is unavailable outside the held mutation or for an existing attempt. Ordinary dispatch and receipt validation still require the stored hash.
 
 ## Outputs
 

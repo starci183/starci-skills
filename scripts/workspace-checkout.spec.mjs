@@ -4,6 +4,13 @@ import path from 'node:path';
 import test from 'node:test';
 import { installedTreeOf, junctionErrors, reflogErrors, resolveWorkspaceCheckout, sourceWriteErrors, validateWorkspaceCheckoutBinding, validateWorkspaceCheckoutRequest } from './workspace-checkout.mjs';
 import { fixtureGit as git, workspaceCheckoutFixture } from './workspace-checkout-fixture.mjs';
+import { mutateSession, currentSessionMutation } from './session-lock.mjs';
+import { readOnlyPrerequisiteBinding, scopeBindingErrors } from './mission-scope.mjs';
+import { fileURLToPath } from 'node:url';
+import { openSession, confirmSession } from './session-open.mjs';
+import { discoveryFor, answerFor } from './v23-test-fixture.mjs';
+import { openAttempt } from './attempt-gate.mjs';
+import { createHash } from 'node:crypto';
 
 test('routed remains canonical; session selects only its registered worktree and current head', () => {
   const f = workspaceCheckoutFixture();
@@ -255,5 +262,81 @@ test('any declared application route role binds through the portable identifier 
     assert.throws(() => resolveWorkspaceCheckout({ ...f.options, project: '../fixture' }), /INVALID_INPUT/);
     f.local.role = 'other-app'; f.saveRoutes();
     assert.throws(() => resolveWorkspaceCheckout(f.options), /ROUTE_MISMATCH/);
+  } finally { f.dispose(); }
+});
+
+test('an initial session bind freezes only inside its owning mutation and keeps ordinary hash checks', async () => {
+  const f = workspaceCheckoutFixture();
+  try {
+    const request = { sessionId: f.sessionId, step: 1, parallel: 1, requirements: { project: f.project, role: f.role, checkout: 'session', declaredWriteRoots: ['src'] } };
+    const branch = f.freezeRequest(request), session = path.resolve(branch, '../..'), stateFile = path.join(session, 'state.json');
+    const state = JSON.parse(readFileSync(stateFile)); state.requestHashes = {}; f.write(stateFile, state);
+    assert.match(validateWorkspaceCheckoutRequest(f.runtime, request, branch).join('\n'), /frozen request hash/);
+    assert.match(validateWorkspaceCheckoutRequest(f.runtime, request, branch, { phase: 'opening' }).join('\n'), /frozen request hash/);
+    await mutateSession(session, async current => {
+      assert.equal(currentSessionMutation(session), current);
+      assert.deepEqual(validateWorkspaceCheckoutRequest(f.runtime, request, branch, { phase: 'opening' }), []);
+      assert.match(validateWorkspaceCheckoutRequest(f.runtime, { ...request, requirements: { ...request.requirements, declaredWriteRoots: [] } }, branch, { phase: 'opening' }).join('\n'), /frozen request hash/);
+      current.attempts = { '1/1': { status: 'running' } };
+      assert.match(validateWorkspaceCheckoutRequest(f.runtime, request, branch, { phase: 'opening' }).join('\n'), /frozen request hash/);
+      delete current.attempts;
+    });
+    assert.equal(currentSessionMutation(session), null);
+    assert.match(validateWorkspaceCheckoutRequest(f.runtime, request, branch, { phase: 'opening' }).join('\n'), /frozen request hash/);
+  } finally { f.dispose(); }
+});
+
+test('a planned read-only prerequisite may bind a declared context without granting product write scope', () => {
+  const f = workspaceCheckoutFixture();
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  try {
+    const state = { id: f.sessionId, project: f.project, workflowOwner: { sourceRoot: f.source }, mission: { doneWhen: [{ producedBy: 'business.decide' }], discovery: { repositories: [], lanes: {} } }, chain: [['1/1'], ['2/1']], steps: { '1/1': 'workspace.bind', '2/1': 'business.decide' }, planned: { '1/1': { requirements: { role: 'be' } }, '2/1': { requirements: {} } } };
+    const request = { operatorId: 'workspace.bind', step: 1, parallel: 1, requirements: { project: f.project, role: 'be', checkout: 'routed', declaredWriteRoots: [] }, goal: { prerequisite: '2/1' }, environment: { workspace: null, writes: [] } };
+    assert.equal(readOnlyPrerequisiteBinding(state, request, root), true);
+    assert.deepEqual(scopeBindingErrors(state, request, root), []);
+    for (const mutate of [
+      (s, r) => { r.requirements.checkout = 'session'; },
+      (s, r) => { r.requirements.declaredWriteRoots = ['src']; },
+      (s, r) => { r.environment.writes = ['@workspaces/be']; },
+      (s, r) => { r.goal.prerequisite = '9/1'; },
+      s => { s.steps['2/1'] = 'uat.plan'; s.mission.doneWhen = [{ producedBy: 'uat.plan' }]; },
+      s => { delete s.planned['1/1']; },
+      (s, r) => { r.requirements.role = 'undeclared'; s.planned['1/1'].requirements.role = 'undeclared'; },
+    ]) { const s = structuredClone(state), r = structuredClone(request); mutate(s, r); assert.equal(readOnlyPrerequisiteBinding(s, r, root), false); }
+    assert.ok(scopeBindingErrors(state, { operatorId: 'backend.generate' }, root).some(error => error.includes('prerequisite bind grants no write impact')));
+    assert.deepEqual(state.mission.discovery.repositories, [], 'read-only admission never rewrites discovery');
+  } finally { f.dispose(); }
+});
+
+test('the official opener atomically freezes a session checkout and a refused open leaves no attempt or hash', async () => {
+  const f = workspaceCheckoutFixture({ attachRuntime: true });
+  try {
+    f.write(path.join(f.source, '.workspaces/projects/fixture/workflow.json'), { version: 1, project: f.project, ownerRole: f.role });
+    const discovery = discoveryFor(f.project, { head: f.baseHead });
+    discovery.repositories[0].repository = f.origin;
+    const opened = await openSession(path.join(f.canonical, '.worktrees/sessions'), {
+      sessionId: f.sessionId, project: f.project, topology: { mode: 'solo' },
+      hostBinding: { kind: 'codex-task', hostId: 'checkout-opening-fixture', worktree: f.selected, sourcePromptRef: 'user-message:bind' },
+      mission: { language: 'en', goal: 'Bind the declared session checkout', target: 'declared checkout', includes: ['checkout identity'], excludes: ['product changes'], outputs: ['route'], doneWhen: [{ evidence: 'The checkout is bound', producedBy: 'workspace.bind' }], verification: 'Read exact Git identity and current head.', sourceRef: 'user-message:bind', discovery }
+    }, { sourceRoot: f.source });
+    const stateFile = path.join(opened.session, 'state.json');
+    await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:confirm', authority: answerFor(JSON.parse(readFileSync(stateFile)).mission, 'user-message:confirm') });
+    const branch = path.join(opened.session, 'step-1/parallel-1');
+    const contexts = [`@workspaces/projects/${f.project}/${f.role}`, `@workspaces/local/routes/${f.project}/${f.role}`, '@workspaces/device-state'].map(alias => ({ alias, head: null }));
+    const request = { contractVersion: 'starci/v2.2', schemaVersion: 9, operatorId: 'workspace.bind', step: 1, parallel: 1, sessionId: f.sessionId, contexts,
+      requirements: { project: f.project, role: f.role, checkout: 'session', declaredWriteRoots: [], sharedInstall: false, gitPolicy: { mutationBranch: 'wrong', worktreeBranches: 'session-only' } }, inputs: {}, resume: null, goal: { doneWhen: 0 },
+      attempt: { id: '1/1:a1', number: 1, kind: 'initial', previous: null }, expected: { version: 1, goalVersion: 1, sourceRef: 'state.json#mission:v1/doneWhen:0', criteria: [{ id: 'bound', required: true, expected: 'The session worktree and exact head are bound.', verification: 'Resolve the declared Git identity.' }] },
+      environment: { isolationId: '1/1:a1', mode: 'inline', workspace: null, reads: contexts.map(x => x.alias), writes: [], exclusive: [], outputRoot: 'response' }, frozenInputs: [] };
+    const state = JSON.parse(readFileSync(stateFile)); state.chain = [['1/1']]; state.steps = { '1/1': 'workspace.bind' }; state.planned = { '1/1': { requirements: { role: 'be' } } }; state.current = '1/1'; f.write(stateFile, state);
+    const requestFile = path.join(branch, 'request/request.json'); f.write(requestFile, request);
+    const before = readFileSync(stateFile);
+    await assert.rejects(() => openAttempt(branch, { runtimeRoot: f.runtime }), /gitPolicy|branch law/);
+    assert.deepEqual(readFileSync(stateFile), before, 'a refused freeze publishes no partial state');
+    request.requirements.gitPolicy.mutationBranch = 'main'; f.write(requestFile, request);
+    assert.equal((await openAttempt(branch, { runtimeRoot: f.runtime })).state, 'opened');
+    const after = JSON.parse(readFileSync(stateFile));
+    assert.equal(after.attempts['1/1'].status, 'running');
+    assert.equal(after.requestHashes['1/1'], `sha256:${createHash('sha256').update(readFileSync(requestFile)).digest('hex')}`);
+    assert.equal(JSON.parse(readFileSync(path.join(branch, 'response/response.json'))).status, 'running');
   } finally { f.dispose(); }
 });

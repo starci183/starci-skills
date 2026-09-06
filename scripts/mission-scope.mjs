@@ -4,6 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAgainst } from './json-schema.mjs';
 import { contentHash, RUNTIME_REVISION, sameRoot } from './workflow-root.mjs';
+import { parseOperatorMd, cellAliases } from './operator-md.mjs';
+import { requiredWhen, requirementValues } from './operator-conditions.mjs';
+import { resolveWorkspaceCheckout } from './workspace-checkout.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const deliveryPolicy = root => JSON.parse(readFileSync(path.join(root, 'resources', 'delivery.json'), 'utf8'));
@@ -112,10 +115,34 @@ export function deliveryRequestErrors(state, request, root = ROOT) {
   if (!policy.stages[stage]?.includes(request.operatorId) && stage === 'handoff') errors.push(`DELIVERY_STAGE: ${request.operatorId} is not a handoff planning operation`);
   if (request.operatorId === 'git.publish' && !['publish', 'deploy'].includes(stage)) errors.push('DELIVERY_STAGE: publication is outside this goal stage');
   if (['release.deploy', 'migration.release'].includes(request.operatorId) && stage !== 'deploy') errors.push('DELIVERY_STAGE: deployment is outside this goal stage');
-  if (request.requirements?.checkout === 'session' || request.environment?.workspace?.worktree || (request.contexts ?? []).some(context => context.alias?.startsWith('@workspaces/'))) errors.push(...scopeBindingErrors(state, request));
+  if (request.requirements?.checkout === 'session' || request.environment?.workspace?.worktree || (request.contexts ?? []).some(context => context.alias?.startsWith('@workspaces/'))) errors.push(...scopeBindingErrors(state, request, root));
   return errors;
 }
-export function scopeBindingErrors(state, request) {
+function authoredOperator(root, id) {
+  if (!/^[a-z]+(?:\.[a-z]+)+$/.test(id ?? '')) return null;
+  try {
+    const directory = path.join(root, 'operators', id.replaceAll('.', '-'));
+    if (JSON.parse(readFileSync(path.join(directory, 'operator.json'), 'utf8')).id !== id) return null;
+    return parseOperatorMd(readFileSync(path.join(directory, 'operator.md'), 'utf8'));
+  } catch { return null; }
+}
+export function readOnlyPrerequisiteBinding(state, request, root = ROOT) {
+  const requirements = request.requirements ?? {}, key = `${request.step}/${request.parallel}`, consumerKey = request.goal?.prerequisite;
+  if (request.operatorId !== 'workspace.bind' || requirements.project !== state.project || requirements.checkout !== 'routed' || (requirements.declaredWriteRoots ?? []).length || request.environment?.workspace || (request.environment?.writes ?? []).length) return false;
+  if (state.steps?.[key] !== request.operatorId || !state.chain?.[request.step - 1]?.includes(key) || state.planned?.[key]?.requirements?.role !== requirements.role) return false;
+  if (!/^\d+\/\d+$/.test(consumerKey ?? '') || Number(consumerKey.split('/')[0]) <= request.step || !state.chain?.flat().includes(consumerKey) || !state.planned?.[consumerKey]) return false;
+  const consumer = state.steps?.[consumerKey];
+  if (!(state.mission?.doneWhen ?? []).some(line => line.producedBy === consumer) && !deliveryTargets(state.mission, root).includes(consumer)) return false;
+  const op = authoredOperator(root, consumer);
+  if (!op) return false;
+  const values = requirementValues(op, state.planned[consumerKey].requirements ?? {});
+  if (!(op.tables.context?.rows ?? []).some(row => requiredWhen(row.required, values) && cellAliases(row.alias).some(alias => alias === `@workspaces/${requirements.role}` || alias.startsWith(`@workspaces/${requirements.role}/`)))) return false;
+  try {
+    resolveWorkspaceCheckout({ source: state.workflowOwner.sourceRoot, project: requirements.project, role: requirements.role, sessionId: state.id, checkout: 'routed', declaredWriteRoots: [], sharedInstall: requirements.sharedInstall ?? false });
+    return true;
+  } catch { return false; }
+}
+export function scopeBindingErrors(state, request, root = ROOT) {
   const errors = [];
   const discovery = state.mission?.discovery;
   if (!discovery) return ['GOAL_UNRESOLVED: source work requires discovered repository ownership'];
@@ -132,6 +159,10 @@ export function scopeBindingErrors(state, request) {
       execFileSync('git', ['-c', `safe.directory=${route.repository.diskPath}`, '-C', route.repository.diskPath, 'merge-base', '--is-ancestor', repository.head, 'HEAD'], { windowsHide: true, stdio: 'ignore', env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' } });
     } catch (error) { errors.push(`GOAL_SOURCE_UNBOUND: ${repository.role}: ${error.message}`); }
   }
-  if (request.requirements?.role && !discovery.repositories.some(repository => repository.role === request.requirements.role && repository.project === request.requirements.project)) errors.push('GOAL_SOURCE_UNBOUND: request project/role is outside the frozen discovery');
+  if (request.requirements?.role && !discovery.repositories.some(repository => repository.role === request.requirements.role && repository.project === request.requirements.project) && !readOnlyPrerequisiteBinding(state, request, root)) errors.push('GOAL_SOURCE_UNBOUND: request project/role is outside the frozen discovery');
+  // Binding a read-only context never adds a product write role to the confirmed mission.
+  const op = authoredOperator(root, request.operatorId);
+  const writeRoles = new Set((op?.tables.steps?.rows ?? []).flatMap(row => cellAliases(row.writes)).map(alias => /^@workspaces\/(fe|be)(?:\/|$)/.exec(alias)?.[1]).filter(Boolean));
+  for (const role of writeRoles) if (!discovery.repositories.some(repository => repository.role === role && repository.project === state.project)) errors.push(`GOAL_SOURCE_UNBOUND: product source writes to ${role} are outside the frozen discovery; a prerequisite bind grants no write impact`);
   return errors;
 }
