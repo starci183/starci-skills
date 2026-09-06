@@ -227,13 +227,14 @@ export async function waitingReviewBinding(root, session, state, parentKey, inte
   return binding;
 }
 
-export async function resolvedWaitingAttemptKeys(root, session, state, { requireSuccessorTerminal = false } = {}) {
+export async function resolvedWaitingAttemptKeys(root, session, state, { requireSuccessorTerminal = false, reentry = null } = {}) {
   const settled = new Set();
   const retired = new Set();
+  const reentering = new Set();
   const errors = [];
   const { planHistoryErrors, retiredPlanCell } = await import('./plan-history.mjs');
   errors.push(...planHistoryErrors(session, state).filter(error => !error.startsWith('PLAN_SCOPE_CHANGED:')));
-  if (errors.length) return { settled, retired, errors };
+  if (errors.length) return { settled, retired, reentering, errors };
   const successors = new Map();
   for (const [parentKey, parent] of Object.entries(state.attempts ?? {})) {
     if (parent.status !== 'waiting' || parentKey.split('/').length !== 2) continue;
@@ -271,8 +272,23 @@ export async function resolvedWaitingAttemptKeys(root, session, state, { require
     return closes;
   };
   for (const parentKey of successors.keys()) resolved(parentKey);
+  if (reentry && !errors.length) {
+    try {
+      await waitingReviewBinding(root, session, state, reentry.source, reentry.integrity);
+      reentering.add(reentry.source);
+      // This is transaction admission, not resolution: every ancestor remains waiting on disk.
+      // Only already validated, recorded successor edges may carry the exemption backwards.
+      let changed;
+      do {
+        changed = false;
+        for (const [parentKey, successorKey] of successors) if (reentering.has(successorKey) && !reentering.has(parentKey)) {
+          reentering.add(parentKey); changed = true;
+        }
+      } while (changed);
+    } catch (error) { errors.push(error.message); }
+  }
   if (requireSuccessorTerminal) {
     for (const [parentKey, successorKey] of successors) if (!settled.has(parentKey)) errors.push(`state.json: resolved waiting parent ${parentKey} has no terminal accepted successor chain through ${successorKey}`);
   }
-  return { settled, retired, errors };
+  return { settled, retired, reentering, errors };
 }

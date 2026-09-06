@@ -174,22 +174,24 @@ export async function openSession(sessionsRoot, input, { sourceRoot = path.dirna
   });
 }
 
-export async function missionCorrectionBusy(session, state) {
+export async function missionCorrectionBusy(session, state, { waitingReentry = null } = {}) {
   if ((state.workerSlots ?? []).length || Object.keys(state.leases ?? {}).length) return true;
   if (Object.values(state.attempts ?? {}).some(attempt => attempt.status === 'running')) return true;
   let settled = new Set();
+  let reentering = new Set();
   if (Object.values(state.attempts ?? {}).some(attempt => attempt.status === 'waiting')) {
     try {
       const { resolvedWaitingAttemptKeys } = await import('./resolved-waiting.mjs');
-      const resolved = await resolvedWaitingAttemptKeys(root, session, state);
+      const resolved = await resolvedWaitingAttemptKeys(root, session, state, { reentry: waitingReentry });
       if (resolved.errors.length) return true;
       settled = resolved.settled;
+      reentering = resolved.reentering;
     } catch { return true; }
   }
   for (const [key, attempt] of Object.entries(state.attempts ?? {})) {
     if (attempt.status === 'running') return true;
     if (attempt.status !== 'waiting') continue;
-    if (settled.has(key)) continue;
+    if (settled.has(key) || reentering.has(key)) continue;
     // A sealed prior-mission wait stays historical. It is neither a live obligation of this
     // corrected scope nor evidence that its old exchange or product goal was fulfilled.
     if (!Number.isInteger(attempt.expected?.goalVersion) || attempt.expected.goalVersion >= state.mission.version || attempt.expected.goalVersion < 1 || !Number.isFinite(Date.parse(attempt.endedAt)) || !(Date.parse(attempt.endedAt) >= Date.parse(attempt.startedAt))) return true;

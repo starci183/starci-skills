@@ -163,3 +163,56 @@ test('a keep verdict cannot impersonate a return and forged or stale review iden
   await assert.rejects(f.waitingReviewBinding(f.root,f.session,altered,'3/1'));
  }
 });
+
+test('successive returned reviews admit only their verified waiting ancestors and settle after a fresh keep',async t=>{
+ const f=await fixture(t,{followupReading:true});
+ const {missionCorrectionBusy}=await f.load('scripts/session-open.mjs');
+ const original=await f.read(),originalBytes=await readFile(path.join(f.branch('3/1'),'response/response.json'));
+ async function commitReturn(cell) {
+  const flags={edit:{kind:'resume',cell}},preview=await f.plans.previewRevision(f.root,f.session,flags);
+  return f.plans.commitRevision(f.root,f.session,{flags,previewHash:preview.previewHash,reason:'The exact fresh review returned this candidate; repair under its existing confirmed scope.'});
+ }
+ await commitReturn('3/1');
+ const second={...structuredClone(f.parent),step:4,resume:{step:3,parallel:1,token:'returned-review'},attempt:{id:'4/1:a3',number:3,kind:'repair',previous:f.parent.attempt.id}};second.environment.isolationId=second.attempt.id;
+ await f.waiting(second);await f.review(second,'return');
+ const waiting=await f.read(),waitingBytes=await readFile(path.join(f.branch('4/1'),'response/response.json'));
+ const transaction={waitingReentry:{source:'4/1'}};
+ const normal=await f.resolvedWaitingAttemptKeys(f.root,f.session,waiting);
+ assert.deepEqual(normal.errors,[]);assert.deepEqual([...normal.settled],[]);
+ assert.equal(await missionCorrectionBusy(f.session,waiting),true);
+ assert.equal(await missionCorrectionBusy(f.session,waiting,transaction),false);
+ const admission=await f.resolvedWaitingAttemptKeys(f.root,f.session,waiting,{reentry:{source:'4/1'}});
+ assert.deepEqual([...admission.reentering].sort(),['3/1','4/1']);assert.deepEqual([...admission.settled],[],'admission never credits completion');
+ for(const change of [s=>{s.attempts['3/1'].id='forged';},s=>{delete s.attempts['3/1'].evidenceManifest;},s=>{s.requestHashes['3/1/critique']=sha('wrong');},s=>{s.attempts['99/1']={...s.attempts['4/1'],id:'unrelated'};},s=>{s.workerSlots=[{attemptId:'active'}];},s=>{s.leases={active:{}};},s=>{s.resumes['99/1']={resumes:'3/1',stop:'CRITIQUE_UNRESOLVED'};}]) {
+  const changed=structuredClone(waiting);change(changed);assert.equal(await missionCorrectionBusy(f.session,changed,transaction),true);
+ }
+ await put(path.join(f.branch('3/1'),'response/response.json'),{...JSON.parse(originalBytes),operatorId:'business.decide'});
+ assert.equal(await missionCorrectionBusy(f.session,waiting,transaction),true);
+ await writeFile(path.join(f.branch('3/1'),'response/response.json'),originalBytes);
+ const before=await readFile(path.join(f.session,'state.json'));
+ await assert.rejects(commitReturn('3/1'),/exactly one recorded successor|PLAN_BUSY/);
+ assert.deepEqual(await readFile(path.join(f.session,'state.json')),before);
+ await commitReturn('4/1');
+ const third={...structuredClone(second),step:5,resume:{step:4,parallel:1,token:'returned-review'},attempt:{id:'5/1:a4',number:4,kind:'repair',previous:second.attempt.id}};third.environment.isolationId=third.attempt.id;
+ const dir=await f.waiting(third);await f.review(third,'keep');
+ assert.deepEqual([...(await f.resolvedWaitingAttemptKeys(f.root,f.session,await f.read())).settled],[]);
+ await f.acquireWorkerSlot(dir,'third-author',{resume:true,ranProfile:'sol-reviewer'});
+ await put(path.join(dir,'response/response.md'),f.files['response/response.md']);
+ await put(path.join(dir,'response/response.json'),f.actual(third,{...f.files['response/response.json'],fields:{...f.files['response/response.json'].fields,restatement:'response/restatement.md'}},'done',['response/response.md']));
+ assert.equal((await f.acceptAttempt(dir)).state,'matched');
+ const completed=await f.read(),resolved=await f.resolvedWaitingAttemptKeys(f.root,f.session,completed,{requireSuccessorTerminal:true});
+ assert.deepEqual(resolved.errors,[]);assert.deepEqual([...resolved.settled].sort(),['3/1','4/1']);
+ assert.equal(await missionCorrectionBusy(f.session,completed),false);
+ const active=JSON.parse(await readFile(path.join(f.session,completed.planHistory.active.ref)));
+ const reading={...structuredClone(f.first),step:6,requirements:active.forecast.presets['6/1'],attempt:{id:'6/1:a1',number:1,kind:'initial',previous:null}};reading.environment.isolationId=reading.attempt.id;
+ const readingDir=f.branch('6/1'),text=f.text.replace('restatement — entitlement-read-path','restatement — second-read-path'),decisionId=f.restatementDecisionId(reading,'second-read-path',text);
+ await put(path.join(readingDir,'request/request.json'),reading);await f.openAttempt(readingDir);await put(path.join(readingDir,'response/restatement.md'),text);
+ await put(path.join(readingDir,'response/response.json'),f.actual(reading,{schemaVersion:9,operatorId:'architecture.decide',stop:'RESTATEMENT_UNCONFIRMED',fields:{restatement:'response/restatement.md'},fallbacks:[],commits:[],next:[],interaction:{kind:'restatement-confirm',decisionId,options:[{id:'as-stated',label:'As stated',tradeoff:'Use this reading'},{id:'corrected',label:'Corrected',tradeoff:'Correct this reading'}]}},'blocked',['response/restatement.md']));
+ await f.acceptAttempt(readingDir);await f.recordRestatementChoice(readingDir,{selected:'as-stated',selectedBy:'user',sourceRef:'user:second-current-reading'});
+ const flags={edit:{kind:'resume',cell:'6/1'}},preview=await f.plans.previewRevision(f.root,f.session,flags);
+ await f.plans.commitRevision(f.root,f.session,{flags,previewHash:preview.previewHash,reason:'The unrelated later reading was answered; continue its own current work.'});
+ const final=await f.read();assert.equal(final.current,'7/1');
+ assert.deepEqual(final.attempts['3/1'],original.attempts['3/1']);assert.deepEqual(final.attempts['4/1'],waiting.attempts['4/1']);
+ assert.deepEqual(await readFile(path.join(f.branch('3/1'),'response/response.json')),originalBytes);assert.deepEqual(await readFile(path.join(f.branch('4/1'),'response/response.json')),waitingBytes);
+ assert.deepEqual(f.plans.planHistoryErrors(f.session,final),[]);
+});

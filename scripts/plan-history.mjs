@@ -238,12 +238,9 @@ export async function commitRevision(root, session, input) {
   if (typeof input?.reason !== 'string' || !input.reason.trim() || !/^sha256:[a-f0-9]{64}$/.test(input.previewHash ?? '')) throw Error('PLAN_REVIEW_REQUIRED: retain the displayed full forecast digest and the concrete reason for replanning');
   return mutateSession(session, async state => {
     const { missionCorrectionBusy } = await import('./session-open.mjs');
-    const busyState = structuredClone(state), edit = input.flags?.edit, source = edit?.source ?? edit?.cell;
-    if (edit?.kind === 'resume' && state.attempts?.[source]?.status === 'waiting') {
-      await waitingReviewBinding(root, session, state, source, edit.integrity);
-      delete busyState.attempts[source];
-    }
-    if (await missionCorrectionBusy(session, busyState)) throw Error('PLAN_BUSY: finish or truthfully seal active invocations before superseding the remaining forecast');
+    const edit = input.flags?.edit, source = edit?.source ?? edit?.cell;
+    const waitingReentry = edit?.kind === 'resume' && state.attempts?.[source]?.status === 'waiting' ? { source, integrity: edit.integrity } : null;
+    if (await missionCorrectionBusy(session, state, { waitingReentry })) throw Error('PLAN_BUSY: finish or truthfully seal active invocations before superseding the remaining forecast');
     const beforeErrors = planHistoryErrors(session, state).filter(error => !error.startsWith('PLAN_SCOPE_CHANGED:'));
     if (beforeErrors.length) throw Error(beforeErrors.join('\n'));
     const { v22SessionErrors } = await import('./validate-session.mjs');
