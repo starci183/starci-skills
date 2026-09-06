@@ -278,6 +278,23 @@ Khung: [`templates/kinds/independent-critique.skeleton.md`](https://github.com/s
 | `^## Attacks$` | `\| Adverse path \| Attack \| Resolution \| Verdict \|` | exactRows 8 | `Attack`: `\S`<br />`Resolution`: `\S`<br />`Verdict`: `^(holds\|fails)$` |
 | `^## Verdict$` | `\| Field \| Value \|` | `Selection` | `Value`: `^(keep\|return)$` |
 
+### `landing-composition`
+
+Tiêu đề: `^# landing-composition — [a-z0-9][a-z0-9-]*$`
+
+Khung: [`templates/kinds/landing-composition.skeleton.md`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/landing-composition.skeleton.md)
+
+| Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
+| --- | --- | --- | --- |
+| `^## Authority$` | `\| Field \| Value \|` | `Business promise`, `Grammar family`, `Visual identity` | `Value`: `\S` |
+| `^## Grammar adoption$` | `\| Section \| Element \| Owner \| Binding or reason \|` | minRows 5 | `Section`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Element`: `\S`<br />`Owner`: `^(grammar\|custom)$`<br />`Binding or reason`: `\S` |
+| `^## Visual storyboard$` | `\| Order \| Section \| Narrative job \| Visual event \| Proof \|` | minRows 3 | `Order`: `^[0-9]{2}$`<br />`Section`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Narrative job`: `\S`<br />`Visual event`: `\S`<br />`Proof`: `\S` |
+| `^## Asset strategy$` | `\| Slot \| Decision \| Identity evidence \| Brief \|` | minRows 1 | `Slot`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Decision`: `^(imagegen\|svg\|code-native\|existing)$`<br />`Identity evidence`: `\S`<br />`Brief`: `\S` |
+| `^## Motion choreography$` | `\| Section \| Trigger \| Choreography \| Reduced motion \| Performance budget \|` | minRows 1 | `Section`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Trigger`: `\S`<br />`Choreography`: `\S`<br />`Reduced motion`: `\S`<br />`Performance budget`: `\S` |
+| `^## Audit contract$` | `\| Concern \| Evidence \| Failure route \|` | `visual storytelling`, `motion`, `reduced motion`, `performance` | `Evidence`: `\S`<br />`Failure route`: `^(direction\|resolve\|grammar-gap)$` |
+| `^## Ownership handoff$` | `\| Operator \| Owns \| Must not \|` | `landing.compose`, `interface.generate`, `interface.audit` | `Owns`: `\S`<br />`Must not`: `\S` |
+| `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Action`: `\S` |
+
 ### `migration-release`
 
 Tiêu đề: `^# migration-release — release:[A-Za-z0-9._-]+$`

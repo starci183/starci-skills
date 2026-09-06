@@ -10,7 +10,7 @@ Primary output: `frontend-source-application`
 
 ## Inputs
 
-`business-promise-authority`?, `backend-source-application`?, `architecture-decision`?, `frontend-direction-decision`?, `frontend-surface-audit`?, `library-source-application`?, `units`?, `findings`?, `knowledge-repair-receipt`?
+`business-promise-authority`?, `backend-source-application`?, `architecture-decision`?, `frontend-direction-decision`?, `frontend-surface-audit`?, `library-source-application`?, `units`?, `landing-composition`?, `findings`?, `knowledge-repair-receipt`?
 
 ## Outputs
 
