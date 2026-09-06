@@ -109,7 +109,8 @@ can be judged.
     revision-3 ownership gate in `scripts/workflow-root.mjs#workflowOwnerErrors`), and `attempt-gate open`
     refused the session with `WORKFLOW_UPGRADE_REQUIRED`. A session opened under one contract cannot take
     a one-time goal migration mid-chain, so the tree was pinned: `.claude-pinned` is a file copy of the
-    live working tree at that moment (861 files, `knowledge/findings` a junction to the live ledger) with
+    live working tree at that moment (861 files, `knowledge/findings` meant to be a junction to the live
+    ledger — see wall 16) with
     that one gate relaxed to "a session on another runtime revision keeps dispatching under the contract
     it opened with"; every later gate ran from there. The findings ledger, the unchecked ledger and the
     runtime registry stayed shared with the live tree.
@@ -135,13 +136,30 @@ can be judged.
     step share write aliases and `validate-chain` refuses them side by side.
 14. At 00:53Z another session retired the origin sessions of this session's imports (20260905-074125,
     -130417, -170300) into `D:/Repositories/nivo-backend/.worktrees/retired/20260906-current-runtime-reset/
-    older-nivo-sessions/` with a `retirement.json` the import law does not read (`producer-import.mjs`
-    locates an origin live at `<owner>/.worktrees/sessions/<id>` or retained at `<owner>/.worktrees/done/
-    <id>/bundle` with `retention.json`). From that moment `validate-session` reports every import-fed cell
-    (8/1, 8/2) as fed by nothing, although both audits had been accepted at 00:38–00:46 with their origins
-    present and the imported copies still carry their manifests and bytes. Nothing here undoes another
-    session's move; the session ledger is otherwise clean.
-15. Three cells of the publication receipt are held by gates the dispatch text got wrong, all caught by the
+    older-nivo-sessions/` with a hand-written `retirement.json`. No script of this tree writes or reads that
+    file, and no supported command moves a ledger back out of it: `scripts/workflow-root.mjs:69-88`
+    (`locateWorkflowSession`) resolves an origin at exactly two coordinates — live
+    `<owner>/.worktrees/sessions/<id>` (owner from `.workspaces/local/workflows/<id>.json`, else Source) and
+    retained `<owner>/.worktrees/done/<id>/bundle` behind `verifyRetention` — plus a `relocation.json` that
+    may only point at the declared owner's live coordinate, and `session-migrate.mjs` refuses a source that is
+    not exactly one `.worktrees/sessions/<id>` directory. From that moment
+    `producer-import.mjs#validateImportedInput` cannot read the origin, so `validate-session` reports the two
+    audit cells as fed by nothing and `record-findings.mjs` refuses their receipts. The bytes are not in
+    question: with a read-only copy of each origin's `state.json` and its one producer branch put back at the
+    coordinate the gate looks in, `validate-session` prints **session valid** and the ledger records normally;
+    the copies were removed again and the other session's tree was never written to. Restoring those ledgers
+    permanently is that session's decision, not this one's.
+15. The pinned tree's `knowledge/findings` junction never formed (`mklink /J` was run with its output
+    discarded, so its failure was silent), so every `record-findings.mjs` run of walls 10-13 wrote into the
+    pinned copy's own ledger instead of the shared one. Nothing said so at the time: the branch files looked
+    right and the pinned `validate-session` was satisfied by the ledger it had just written to itself. Re-run
+    on the live tree, the same receipts appended the same seventeen lines to the real ledger **and closed
+    twelve open `OVERFLOW-3` findings on `module-setup`** that earlier sessions had left open and this
+    consume repaired — the closure is the part an isolated ledger silently loses. The re-materialized
+    `response/data/findings.json` of 8/1, 8/2 and 11/1 changed with it, so their frozen manifests were rebuilt
+    with `scripts/evidence-manifest.mjs` after checking that every receipt's own bytes were unchanged. A copy
+    of a tree that shares a ledger must fail loudly when the share does not form.
+16. Three cells of the publication receipt are held by gates the dispatch text got wrong, all caught by the
     validator before the receipt stood: `response.json.commits` must register the published head (not be
     empty), the step schema's evidence pattern admits `data/**.json` and `artifacts/**` but not
     `data/evidence/*.log` (the logs are cited from the receipt prose), and the git-publication title regex
@@ -163,8 +181,8 @@ Session folder `D:/Repositories/starci-academy-backend/.worktrees/sessions/20260
 - `step-8/parallel-1` and `step-8/parallel-2` — the two audits at 0.4.13: `response/data/verdicts.json`,
   `captures/*.json`, `walks/*/walk-result.json`, `artifacts/*.png|.measurements.json`,
   `artifacts/index.html` (served sheets recorded in `artifacts/host.json`), `knowledge-coverage.json`,
-  `findings.json` (materialized from `knowledge/findings/starci.jsonl`, 8 + 8 open findings appended,
-  all of them blocked-topic and taste findings, none a Grammar-owned or app-owned failure).
+  `findings.json` (materialized from the live `knowledge/findings/starci.jsonl`: 8 + 8 appended, 12
+  `OVERFLOW-3` findings closed by 8/1, 36 and 41 open lines carried for the two surfaces).
 - `step-9/parallel-1` — the quality verification: `response/data/gates/<gate>.json|.log`,
   `coverage.json`, `audit-scope.json`.
 - `step-10/parallel-1` — the walk's INVALID_INPUT stop (wall 13), kept as it stopped.
@@ -179,3 +197,8 @@ Session folder `D:/Repositories/starci-academy-backend/.worktrees/sessions/20260
 - The pinned runtime copy `D:/Repositories/starci-academy-backend/.claude-pinned` the gates ran from after
   wall 10 (kept, so the session can be re-validated by the tree that judged it; the live tree refuses it).
 - Runtime repairs in this tree: `b9b1469f`, `857a4512`, `58a115d6`, `f08b6724`, each with its spec.
+
+The session was re-checked against the live runtime at 2.3.2 (`e6deeccc`) after the chain closed: v2.3 reads
+v2.2 evidence as it stands and asks for `session-migrate.mjs migrate` only before new dispatch, which a closed
+chain does not need. Under that tree `validate-session` prints **session valid** whenever the two import
+origins are readable, and otherwise exactly the six lines of wall 14.
