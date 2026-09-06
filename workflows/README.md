@@ -157,7 +157,7 @@ Use `node scripts/plan-history.mjs preview <session> [flags.json]` to derive and
 mission forecast with its dependency and handoff lanes. It is labelled planned, not executed or
 verified. Then pass the returned `previewHash`, unchanged `flags` and a concrete `reason` to
 `node scripts/plan-history.mjs commit <session> <reviewed-plan.json>`. A changed scope, attempt or plan
-makes the preview stale. The owning lock refuses any running or waiting invocation and active lease.
+makes the preview stale. The owning lock refuses running invocations, active leases and waiting obligations not resolved by the exact review re-entry below.
 
 A forecast describes logical work; only dispatch freezes its concrete invocation. A revision may
 reassign a future coordinate that has no request directory or attempt. Dispatched coordinates and
@@ -197,3 +197,7 @@ A material goal correction uses `session-open.mjs confirm` with `corrected`, fol
 confirmation of its new version. Its complete new forecast retains prior execution as historical
 evidence that cannot dispatch, feed current inputs or close the new goal. The old inventory and
 answers remain checked. No arbitrary step boundary exempts history from its immutable commitments.
+
+A waiting node whose exact sealed nested review selects its kind contract's `reentry` verdict uses the same `resume` edit. The forecast retains the parent/child attempt identities, request hashes, evidence fingerprints and current scope. It opens a new same-owner invocation; neither accepted checkpoint is resumed or rewritten in place. The replacement must produce its own model and receive its own fresh matched nested review before it can conclude. A planned replacement remains an outstanding obligation and supplies no completion evidence.
+
+When the owning execution discloses a review-integrity concern, add `integrity: {ref, hash}` to that edit. The session-relative JSON disclosure has exactly `version: 1`, `identity`, `disposition: "fresh-review-required"`, a concrete `reason`, and the actual admission's `sourceRef`. Its identity binds `sessionId`, `missionVersion`, `scopeHash`, and `parent`/`child` records containing `cell`, `attemptId`, `requestHash`, and `evidenceFingerprint`. The hash covers the exact disclosure bytes, retained in the sealed forecast. This record authorizes only fresh review within the existing confirmed scope: it is neither a review verdict nor an approval or delivery input. Preserve the questioned evidence and its admitted limitation; no filesystem timestamp substitutes for execution provenance.

@@ -153,7 +153,7 @@ Chạy `node scripts/plan-history.mjs preview <session> [flags.json]` để suy 
 dự báo mục tiêu, các phụ thuộc và lane bàn giao. Nó ghi rõ planned, chưa thực thi hay kiểm chứng.
 Sau đó chuyển `previewHash`, `flags` giữ nguyên và `reason` cụ thể vào
 `node scripts/plan-history.mjs commit <session> <reviewed-plan.json>`. Scope, attempt hay plan đổi
-làm preview hết hiệu lực. Lock owner từ chối khi còn invocation chạy/chờ hoặc lease đang giữ.
+làm preview hết hiệu lực. Lock owner từ chối invocation đang chạy, lease đang giữ và nghĩa vụ waiting chưa được giải quyết qua review re-entry chính xác bên dưới.
 
 Dự báo mô tả công việc logic; chỉ dispatch mới đóng băng invocation cụ thể. Revision có thể đổi
 tọa độ tương lai chưa có thư mục request hay attempt. Tọa độ đã dispatch và mọi file nhánh hiện
@@ -193,3 +193,7 @@ Goal đổi đáng kể dùng `session-open.mjs confirm` với `corrected`, rồ
 bản mới. Dự báo mới đầy đủ giữ execution trước như evidence lịch sử, không dispatch, cấp input
 hiện tại hoặc đóng goal mới. Inventory và đáp án cũ vẫn được kiểm. Không có ranh giới step tùy ý
 bỏ kiểm các cam kết bất biến của lịch sử.
+
+Node waiting có nested review đã niêm phong chọn verdict `reentry` do kind contract khai báo dùng cùng edit `resume`. Dự báo giữ identity attempt cha/con, hash request, fingerprint evidence và scope hiện tại. Nó mở invocation mới cùng owner; không resume hay sửa checkpoint đã chấp nhận tại chỗ. Invocation thay thế phải tạo model của chính nó và có nested review mới matched trước khi kết luận. Nhánh thay thế mới được lên kế hoạch vẫn là nghĩa vụ chưa hoàn thành, không cấp proof hoàn tất.
+
+Khi execution sở hữu công việc khai báo vấn đề toàn vẹn review, thêm `integrity: {ref, hash}` vào edit đó. JSON disclosure tương đối với session có đúng `version: 1`, `identity`, `disposition: "fresh-review-required"`, `reason` cụ thể và `sourceRef` của lời thừa nhận thật. Identity bind `sessionId`, `missionVersion`, `scopeHash`, cùng bản ghi `parent`/`child` chứa `cell`, `attemptId`, `requestHash` và `evidenceFingerprint`. Hash bao phủ nguyên byte disclosure, được lưu trong dự báo niêm phong. Bản ghi chỉ cho phép review mới trong scope đã xác nhận: không phải verdict review, approval hay input delivery. Giữ evidence bị đặt nghi vấn và giới hạn đã thừa nhận; timestamp filesystem không thay thế provenance execution.

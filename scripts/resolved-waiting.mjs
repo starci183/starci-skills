@@ -4,6 +4,9 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { readContext, invocationState } from './mission-history.mjs';
+import { scopeHash } from './mission-scope.mjs';
 import { evidenceManifestErrors } from './evidence-manifest.mjs';
 import { loadErrorsRegistry } from './errors-registry.mjs';
 import { loadOperatorPackages } from './operator-md.mjs';
@@ -31,11 +34,12 @@ async function readJson(file, errors, label) {
   catch (error) { errors.push(`${label} is unreadable: ${error.message}`); return null; }
 }
 
-export async function resolvedWaitingReplanErrors(root, session, state, successorRequest, { requireSuccessorRecorded = false, requireSuccessorTerminal = false } = {}) {
+export async function resolvedWaitingReplanErrors(root, session, state, successorRequest, { requireSuccessorRecorded = false, requireSuccessorTerminal = false, reviewBinding = null } = {}) {
   const errors = [];
   const successorKey = `${successorRequest?.step}/${successorRequest?.parallel}`;
   const resume = successorRequest?.resume;
   const parentKey = resume ? `${resume.step}/${resume.parallel}` : null;
+  if (!/^[1-9][0-9]*\/[1-9][0-9]*$/.test(parentKey ?? '') || !/^[1-9][0-9]*\/[1-9][0-9]*$/.test(successorKey)) return ['REVIEW_REENTRY_UNBOUND: parent and successor must be positive execution coordinates'];
   const parent = parentKey ? state.attempts?.[parentKey] : null;
   if (!resume || parent?.status !== 'waiting') return [`request.json: ${successorKey} does not name an accepted waiting parent`];
   if (!state.id || successorRequest.sessionId !== state.id) errors.push(`request.json: successor ${successorKey} is not bound to session ${state.id ?? 'missing'}`);
@@ -44,6 +48,7 @@ export async function resolvedWaitingReplanErrors(root, session, state, successo
   if (successorRequest.operatorId !== parent.operatorId || state.steps?.[successorKey] !== parent.operatorId) errors.push(`request.json: resolved waiting parent ${parentKey} and successor ${successorKey} must run the same recorded operator`);
   if (successorRequest.attempt?.previous !== parent.id || successorRequest.attempt?.number !== parent.number + 1) errors.push(`request.json: successor ${successorKey} does not directly follow waiting attempt ${parent.id}`);
   const resumeRecord = state.resumes?.[successorKey];
+  if (!reviewBinding && state.planHistory?.active) reviewBinding = readContext(session, state.planHistory.active, 'plans').forecast.reviewResumes?.[successorKey] ?? null;
   if (resumeRecord?.resumes !== parentKey) errors.push(`state.json: resumes[${successorKey}] does not bind waiting parent ${parentKey}`);
   const cells = (state.chain ?? []).flat();
   if (cells.filter((cell) => cell === parentKey).length !== 1 || cells.filter((cell) => cell === successorKey).length !== 1 || cells.indexOf(parentKey) >= cells.indexOf(successorKey)) errors.push(`state.json: chain does not place exact waiting parent ${parentKey} before successor ${successorKey}`);
@@ -68,6 +73,7 @@ export async function resolvedWaitingReplanErrors(root, session, state, successo
     || parentRequest?.parallel !== Number(resume.parallel)) errors.push(`state.json: waiting parent ${parentKey} does not match its frozen request identity`);
   const exchange = parentResponse?.awaiting?.exchange;
   const awaitedKind = parentResponse?.awaiting?.kind;
+  if (!/^[a-z][a-z0-9-]*$/.test(exchange ?? '') || !/^[a-z][a-z0-9-]*$/.test(awaitedKind ?? '')) return [...errors, 'REVIEW_REENTRY_UNBOUND: accepted checkpoint has an invalid exchange or kind'];
   if (parentResponse?.contractVersion !== V22_CONTRACT
     || parentResponse?.status !== 'waiting'
     || parentResponse?.operatorId !== parent.operatorId
@@ -78,7 +84,7 @@ export async function resolvedWaitingReplanErrors(root, session, state, successo
 
   const childKey = exchange ? `${parentKey}/${exchange}` : null;
   const child = childKey ? state.attempts?.[childKey] : null;
-  if (!child || !['mismatched', 'inconclusive'].includes(child.status)) errors.push(`state.json: waiting parent ${parentKey} has no accepted mismatched or inconclusive ${exchange ?? 'missing'} exchange`);
+  if (!child || !['matched', 'mismatched', 'inconclusive'].includes(child.status)) errors.push(`state.json: waiting parent ${parentKey} has no accepted terminal ${exchange ?? 'missing'} exchange`);
   if (child) {
     const childDir = branchDir(session, childKey);
     const childBase = refBase(childKey);
@@ -112,14 +118,32 @@ export async function resolvedWaitingReplanErrors(root, session, state, successo
       || childResponse?.step !== Number(resume.step)
       || childResponse?.parallel !== Number(resume.parallel)
       || childResponse?.exchange !== exchange
-      || childResponse?.status !== 'mismatch'
+      || childResponse?.status !== (child.status === 'matched' ? 'done' : 'mismatch')
       || childResponse?.attempt?.id !== child.id
       || childResponse?.attempt?.expectedVersion !== child.expectedVersion
       || canonical(childResponse?.comparison) !== canonical(child.comparison)
       || childResponse?.comparison?.verdict !== child.status
-      || !CHILD_NEXT.has(childResponse?.comparison?.next)
+      || !(child.status === 'matched' ? childResponse?.comparison?.next === 'advance' : CHILD_NEXT.has(childResponse?.comparison?.next))
       || !refs.length) errors.push(`state.json: awaited exchange ${childKey} is not the accepted terminal review for ${awaitedKind ?? 'missing'}`);
     for (const ref of refs) if (!child.evidenceManifest?.files?.some((item) => item.ref === ref)) errors.push(`state.json: awaited exchange ${childKey} accepted manifest does not contain ${awaitedKind} output ${ref}`);
+    if (child.status === 'matched' || reviewBinding) {
+      try {
+        const contract = JSON.parse(await readFile(path.join(root, 'templates/kinds', `${awaitedKind}.contract.json`), 'utf8'));
+        if (!contract.reentry || resumeRecord?.stop !== contract.reentry.stop) throw Error('the awaited kind has no matching declared return route');
+        const expectedBinding = reviewIdentity(state, parentKey, childKey);
+        if (!reviewBinding || canonical(reviewBinding.identity) !== canonical(expectedBinding)) throw Error('the review recovery is not bound to this exact mission, parent and child proof');
+        if (reviewBinding.mode === 'integrity') {
+          const disclosure = reviewBinding.disclosure;
+          if (sha(disclosure?.bytes ?? '') !== disclosure?.hash) throw Error('the retained integrity disclosure digest changed');
+          const value = JSON.parse(disclosure.bytes);
+          if (canonical(value.identity) !== canonical(expectedBinding) || value.version !== 1 || value.disposition !== 'fresh-review-required' || typeof value.reason !== 'string' || !value.reason.trim() || typeof value.sourceRef !== 'string' || !value.sourceRef.trim() || Object.keys(value).some(key => !['version','identity','disposition','reason','sourceRef'].includes(key))) throw Error('integrity disclosure must identify the admitted concern, not authorize delivery');
+        } else if (reviewBinding.mode === 'return') {
+          const { tableUnder } = await import('./validate-response.mjs');
+          if (refs.length !== 1 || (tableUnder(await readFile(path.join(childDir, refs[0]), 'utf8'), contract.reentry.heading) ?? []).find(row => row[0] === contract.reentry.row)?.[1] !== contract.reentry.value) throw Error('the accepted review does not select the declared return verdict');
+        } else throw Error('unknown review recovery mode');
+        for (const input of Object.values(successorRequest.inputs ?? {}).flat()) if (typeof input === 'string' && (input.startsWith(`${childBase}/`) || input.startsWith(`${parentBase}/`))) throw Error('the replacement must use fresh review evidence, not the disputed or returned parent/child as delivery input');
+      } catch (error) { errors.push(`REVIEW_REENTRY_UNBOUND: ${error.message}`); }
+    }
   }
 
   const registry = await loadErrorsRegistry(root);
@@ -165,6 +189,42 @@ export async function resolvedWaitingReplanErrors(root, session, state, successo
   return errors;
 }
 
+function reviewIdentity(state, parent, child) {
+  const identity = cell => ({ cell, attemptId: state.attempts?.[cell]?.id, requestHash: state.requestHashes?.[cell], evidenceFingerprint: state.attempts?.[cell]?.evidenceManifest?.fingerprint });
+  return { sessionId: state.id, missionVersion: state.mission?.version, scopeHash: scopeHash(state.mission), parent: identity(parent), child: identity(child) };
+}
+
+// The disclosure is retained inside the sealed forecast; it is never a typed delivery output.
+export async function waitingReviewBinding(root, session, state, parentKey, integrity = null) {
+  if (!/^[1-9][0-9]*\/[1-9][0-9]*$/.test(parentKey)) throw Error('REVIEW_REENTRY_UNBOUND: invalid parent coordinate');
+  const parent = state.attempts?.[parentKey];
+  const response = JSON.parse(await readFile(path.join(branchDir(session, parentKey), 'response/response.json'), 'utf8'));
+  const exchange = response.awaiting?.exchange;
+  if (!/^[a-z][a-z0-9-]*$/.test(exchange ?? '') || !/^[a-z][a-z0-9-]*$/.test(response.awaiting?.kind ?? '')) throw Error('REVIEW_REENTRY_UNBOUND: parent has no declared review checkpoint');
+  const childKey = `${parentKey}/${exchange}`, child = state.attempts?.[childKey];
+  if (parent?.expected?.goalVersion !== state.mission?.version || child?.expected?.goalVersion !== state.mission?.version || !parent?.context || !child?.context) throw Error('REVIEW_REENTRY_UNBOUND: recovery requires current invocation contexts');
+  for (const cell of [parentKey, childKey]) {
+    const request = JSON.parse(await readFile(path.join(branchDir(session, cell), 'request/request.json'), 'utf8'));
+    if (scopeHash(invocationState(session, state, request).mission) !== scopeHash(state.mission)) throw Error('REVIEW_REENTRY_UNBOUND: retained invocation belongs to another confirmed scope');
+  }
+  const contract = JSON.parse(await readFile(path.join(root, 'templates/kinds', `${response.awaiting.kind}.contract.json`), 'utf8'));
+  if (!contract.reentry) throw Error('REVIEW_REENTRY_UNBOUND: the awaited kind does not declare review re-entry');
+  const binding = { mode: integrity ? 'integrity' : 'return', stop: contract.reentry.stop, identity: reviewIdentity(state, parentKey, childKey) };
+  if (integrity) {
+    if (typeof integrity.ref !== 'string' || path.isAbsolute(integrity.ref) || integrity.ref.includes('\\') || integrity.ref.split('/').some(part => !part || part === '.' || part === '..') || !/^sha256:[a-f0-9]{64}$/.test(integrity.hash ?? '') || Object.keys(integrity).some(key => !['ref','hash'].includes(key))) throw Error('REVIEW_REENTRY_UNBOUND: name the exact session-owned disclosure and digest');
+    const file = path.resolve(session, integrity.ref), relative = path.relative(realpathSync(session), realpathSync(file));
+    if (relative.startsWith('..') || path.isAbsolute(relative)) throw Error('REVIEW_REENTRY_UNBOUND: disclosure escaped the session');
+    binding.disclosure = { ref: integrity.ref, hash: integrity.hash, bytes: readFileSync(file, 'utf8') };
+  }
+  const next = `${Math.max(...Object.keys(state.steps).map(key => Number(key.split('/')[0]))) + 1}/1`;
+  const [step, parallel] = next.split('/').map(Number), [sourceStep, sourceParallel] = parentKey.split('/').map(Number);
+  const request = { sessionId: state.id, operatorId: parent.operatorId, step, parallel, resume: { step: sourceStep, parallel: sourceParallel }, attempt: { previous: parent.id, number: parent.number + 1 } };
+  const projected = { ...state, steps: { ...state.steps, [next]: parent.operatorId }, chain: [...state.chain, [next]], resumes: { ...state.resumes, [next]: { resumes: parentKey, stop: binding.stop } } };
+  const errors = await resolvedWaitingReplanErrors(root, session, projected, request, { reviewBinding: binding });
+  if (errors.length) throw Error(errors.join('\n'));
+  return binding;
+}
+
 export async function resolvedWaitingAttemptKeys(root, session, state, { requireSuccessorTerminal = false } = {}) {
   const settled = new Set();
   const retired = new Set();
@@ -180,6 +240,15 @@ export async function resolvedWaitingAttemptKeys(root, session, state, { require
     if (!successorKeys.length) continue;
     if (successorKeys.length !== 1) { errors.push(`state.json: waiting parent ${parentKey} has ${successorKeys.length} claimed replan successors; exactly one may resolve it`); continue; }
     const successorKey = successorKeys[0];
+    const forecast = state.planHistory?.active ? readContext(session, state.planHistory.active, 'plans').forecast : null;
+    if (!state.attempts?.[successorKey] && forecast?.reviewResumes?.[successorKey] && forecast.resumes?.[successorKey] === parentKey) {
+      // A sealed replacement forecast is an outstanding obligation, not an executed successor.
+      const [step, parallel] = successorKey.split('/').map(Number), [sourceStep, sourceParallel] = parentKey.split('/').map(Number);
+      const planned = { sessionId: state.id, operatorId: parent.operatorId, step, parallel, resume: { step: sourceStep, parallel: sourceParallel }, attempt: { previous: parent.id, number: parent.number + 1 } };
+      errors.push(...await resolvedWaitingReplanErrors(root, session, state, planned));
+      if (requireSuccessorTerminal) errors.push(`state.json: resolved waiting parent ${parentKey} has no terminal accepted successor ${successorKey}`);
+      continue;
+    }
     const requestFile = path.join(branchDir(session, successorKey), 'request', 'request.json');
     const local = [];
     const request = await readJson(requestFile, local, `resolved waiting successor ${successorKey} request`);

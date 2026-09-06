@@ -9,6 +9,7 @@ import { retainContext, readContext, retainMission, invocationState } from './mi
 import { scopeHash } from './mission-scope.mjs';
 import { mutateSession } from './session-lock.mjs';
 import { evidenceManifestErrors } from './evidence-manifest.mjs';
+import { waitingReviewBinding, resolvedWaitingReplanErrors } from './resolved-waiting.mjs';
 
 const sha = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const fingerprint = value => sha(JSON.stringify(value));
@@ -37,7 +38,7 @@ export function offsetForecast(plan, offset) {
   const cell = value => `${Number(value.split('/')[0]) + offset}/${value.split('/')[1]}`;
   const out = structuredClone(plan);
   out.chain = plan.chain.map(step => step.map(cell));
-  for (const field of ['steps', 'goals', 'reasons', 'dependencies', 'evidenceDependencies', 'handoffs', 'requestRefs', 'presets', 'fanout', 'imports', 'nodes', 'resumes', 'units', 'repairs', 'repairDependencies']) out[field] = Object.fromEntries(Object.entries(plan[field] ?? {}).map(([key, value]) => [cell(key), structuredClone(value)]));
+  for (const field of ['steps', 'goals', 'reasons', 'dependencies', 'evidenceDependencies', 'handoffs', 'requestRefs', 'presets', 'fanout', 'imports', 'nodes', 'resumes', 'units', 'repairs', 'repairDependencies', 'reviewResumes']) out[field] = Object.fromEntries(Object.entries(plan[field] ?? {}).map(([key, value]) => [cell(key), structuredClone(value)]));
   for (const [key, goal] of Object.entries(out.goals)) if (goal.prerequisite) goal.prerequisite = cell(goal.prerequisite);
   for (const [key, deps] of Object.entries(out.dependencies)) out.dependencies[key] = deps.map(cell);
   for (const [key, deps] of Object.entries(out.evidenceDependencies)) out.evidenceDependencies[key] = deps.map(cell);
@@ -116,7 +117,10 @@ export async function editForecast(root, session, state, original, edit, top) {
   } else if (edit.kind === 'resume') {
     const sourceCell = edit.source ?? cell;
     if (state.steps[sourceCell] !== operator || sourceCell !== cell && state.attempts?.[cell]) throw Error('PLAN_EDIT_INVALID: a prior reading can replace only an unopened node of the same operator');
-    const response = await acceptedCurrent(root, session, state, sourceCell, 'blocked');
+    const waiting = state.attempts?.[sourceCell]?.status === 'waiting';
+    const response = await acceptedCurrent(root, session, state, sourceCell, waiting ? 'waiting' : 'blocked');
+    const review = waiting ? await waitingReviewBinding(root, session, state, sourceCell, edit.integrity) : null;
+    if (!waiting && edit.integrity) throw Error('PLAN_EDIT_INVALID: integrity re-review must name an accepted waiting review');
     const originalRequest = JSON.parse(readFileSync(path.join(branchPath(session, sourceCell),'request/request.json')));
     if (sourceCell !== cell && !isDeepStrictEqual(originalRequest.goal, forecast.goals[cell])) throw Error('PLAN_EDIT_INVALID: the prior reading belongs to a different logical goal');
     const routing = JSON.parse(readFileSync(path.join(root, 'routing.json')));
@@ -126,7 +130,9 @@ export async function editForecast(root, session, state, original, edit, top) {
     const stop = pkg?.en.tables.stops?.rows.find(row => String(row.code).replaceAll('`','') === response.stop);
     // User-owned restatements require the exact content-bound answer. Other re-entries retain the
     // ordinary operator resume and typed stop gates at dispatch; an external stop cannot be edited.
-    if (response.stop === 'RESTATEMENT_UNCONFIRMED') {
+    if (review) {
+      // The awaited kind owns the return route; its sealed review binding is checked at admission.
+    } else if (response.stop === 'RESTATEMENT_UNCONFIRMED') {
       if (state.choices?.[response.interaction?.decisionId]?.selectedBy !== 'user') throw Error('PLAN_REENTRY_UNAUTHORIZED: the rendered reading has no actual user answer');
     } else {
       const shared = JSON.parse(readFileSync(path.join(root, 'operators/errors.json'))).codes;
@@ -138,6 +144,7 @@ export async function editForecast(root, session, state, original, edit, top) {
     for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes']) (forecast[field] ??= {})[next] = structuredClone(forecast[field]?.[cell] ?? (['dependencies','evidenceDependencies'].includes(field) ? [] : {}));
     forecast.nodes[next] = `${forecast.nodes[cell]}:resume:${sourceCell}`;
     forecast.resumes ??= {}; forecast.resumes[next] = sourceCell;
+    if (review) (forecast.reviewResumes ??= {})[next] = review;
     for (const target of Object.keys(forecast.dependencies)) if (target !== next && target !== cell) {
       forecast.dependencies[target] = forecast.dependencies[target].map(dep => dep === cell ? next : dep);
       forecast.evidenceDependencies[target] = (forecast.evidenceDependencies[target] ?? []).map(dep => dep === cell ? next : dep);
@@ -205,7 +212,7 @@ export async function editForecast(root, session, state, original, edit, top) {
   const map = cell => mapping.get(cell) ?? cell;
   const result = structuredClone(forecast);
   result.chain = forecast.chain.map(step => step.map(map));
-  for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','handoffs','requestRefs','presets','fanout','imports','nodes','resumes','units','repairs','repairDependencies']) result[field] = Object.fromEntries(Object.entries(forecast[field] ?? {}).filter(([cell]) => mapping.has(cell)).map(([cell,value]) => [map(cell),structuredClone(value)]));
+  for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','handoffs','requestRefs','presets','fanout','imports','nodes','resumes','units','repairs','repairDependencies','reviewResumes']) result[field] = Object.fromEntries(Object.entries(forecast[field] ?? {}).filter(([cell]) => mapping.has(cell)).map(([cell,value]) => [map(cell),structuredClone(value)]));
   for (const goal of Object.values(result.goals)) if (goal.prerequisite) goal.prerequisite = map(goal.prerequisite);
   for (const field of ['dependencies','evidenceDependencies']) for (const [cell,deps] of Object.entries(result[field])) result[field][cell] = deps.map(map);
   for (const [cell,owner] of Object.entries(result.handoffs)) result.handoffs[cell] = map(owner);
@@ -231,7 +238,12 @@ export async function commitRevision(root, session, input) {
   if (typeof input?.reason !== 'string' || !input.reason.trim() || !/^sha256:[a-f0-9]{64}$/.test(input.previewHash ?? '')) throw Error('PLAN_REVIEW_REQUIRED: retain the displayed full forecast digest and the concrete reason for replanning');
   return mutateSession(session, async state => {
     const { missionCorrectionBusy } = await import('./session-open.mjs');
-    if (await missionCorrectionBusy(session, state)) throw Error('PLAN_BUSY: finish or truthfully seal active invocations before superseding the remaining forecast');
+    const busyState = structuredClone(state), edit = input.flags?.edit, source = edit?.source ?? edit?.cell;
+    if (edit?.kind === 'resume' && state.attempts?.[source]?.status === 'waiting') {
+      await waitingReviewBinding(root, session, state, source, edit.integrity);
+      delete busyState.attempts[source];
+    }
+    if (await missionCorrectionBusy(session, busyState)) throw Error('PLAN_BUSY: finish or truthfully seal active invocations before superseding the remaining forecast');
     const beforeErrors = planHistoryErrors(session, state).filter(error => !error.startsWith('PLAN_SCOPE_CHANGED:'));
     if (beforeErrors.length) throw Error(beforeErrors.join('\n'));
     const { v22SessionErrors } = await import('./validate-session.mjs');
@@ -271,7 +283,7 @@ export async function commitRevision(root, session, input) {
     state.chain = forecast.chain;
     state.steps = { ...state.steps, ...forecast.steps };
     state.planned = { ...state.planned, ...planned };
-    for (const [cell, target] of Object.entries(forecast.resumes ?? {})) (state.resumes ??= {})[cell] = { resumes: target, stop: JSON.parse(readFileSync(path.join(branchPath(session, target), 'response/response.json'))).stop };
+    for (const [cell, target] of Object.entries(forecast.resumes ?? {})) (state.resumes ??= {})[cell] = { resumes: target, stop: forecast.reviewResumes?.[cell]?.stop ?? JSON.parse(readFileSync(path.join(branchPath(session, target), 'response/response.json'))).stop };
     state.current = forecast.chain.flat().find(cell => !state.attempts?.[cell]) ?? forecast.chain.at(-1)[0];
     state.brief = { ...state.brief, proven: [], blocked: [], next: `Forecast ${state.planHistory.revisions.length} is planned, not executed or verified. Open ${state.current} with its exact request before work.` };
     state.transitions ??= [];
@@ -323,7 +335,10 @@ export async function planAdmissionErrors(root, session, state, request) {
   if (!isDeepStrictEqual(request.goal, forecast.goals[cell])) errors.push('PLAN_GOAL_UNBOUND: the invocation must bind the current reviewed logical goal mapping');
   const resume = request.resume ? `${request.resume.step}/${request.resume.parallel}` : null;
   if (resume !== (forecast.resumes?.[cell] ?? null)) errors.push('PLAN_REENTRY_UNBOUND: invocation resume differs from the reviewed execution mapping');
-  if (resume) try { await acceptedCurrent(root, session, state, resume, 'blocked'); } catch (error) { errors.push(error.message); }
+  if (resume) try {
+    if (forecast.reviewResumes?.[cell]) errors.push(...await resolvedWaitingReplanErrors(root, session, state, request));
+    else await acceptedCurrent(root, session, state, resume, 'blocked');
+  } catch (error) { errors.push(error.message); }
   const repair = forecast.repairs?.[cell];
   if (repair) try {
     const { loadOperatorGraph, repairShapeErrors } = await import('./validate-chain.mjs');

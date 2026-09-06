@@ -90,6 +90,7 @@ export async function acquireWorkerSlot(branch, workerId, { resume = false, ranP
     const attempt = state.attempts?.[key];
     if (attempt?.status !== wantedStatus || attempt.id !== request.attempt.id) throw new Error(`state.json: attempt ${key}/${request.attempt.id} must be ${wantedStatus} before its worker ${resume ? 'resumes' : 'acquires'} a slot`);
     if (resume) {
+      if (Object.values(state.resumes ?? {}).some(value => value?.resumes === key)) throw new Error('PLAN_SUPERSEDED: this waiting checkpoint has an explicit replacement invocation; its accepted bytes cannot resume in place');
       const response = JSON.parse(await readFile(path.join(branch, 'response', 'response.json'), 'utf8'));
       const exchange = response.status === 'waiting' ? response.awaiting?.exchange : null;
       const exchangeAttempt = exchange ? state.attempts?.[`${key}/${exchange}`] : null;

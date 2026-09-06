@@ -4,6 +4,18 @@
   "additionalProperties": false,
   "required": ["kind", "title", "sections"],
   "properties": {
+    "reentry": {
+      "description": "A sealed nested review may select this typed same-owner return route; integrity re-review binds the same owner without crediting the questioned verdict.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stop", "heading", "row", "value"],
+      "properties": {
+        "stop": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" },
+        "heading": { "type": "string", "pattern": "^## .+" },
+        "row": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 1 }
+      }
+    },
     "kind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
     "example": { "type": "string", "pattern": "^templates/[A-Za-z0-9_./-]+\\.md$" },
     "title": { "type": "string", "minLength": 1 },
