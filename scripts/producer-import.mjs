@@ -147,7 +147,22 @@ function manifestShape(m){
   const seen=new Set();for(const f of m.files){if(!f||Object.keys(f).sort().join()!=='path,sha256'||!safeRelative(f.path)||!/^(request|response)\//.test(f.path)||!/^sha256:[a-f0-9]{64}$/.test(f.sha256)||seen.has(f.path))throw Error('invalid import file inventory');seen.add(f.path);}
 }
 
-export async function validateImportedInput(root,session,inputRef,kind,{hostRoot=path.dirname(root),receivingSessionId=path.basename(session),receivingContractVersion}={}){
+// Historical proof stays readable. A fresh delivery use separately observes the producer's current
+// review obligations, including a source that remains disputed after its original receipt matched.
+export async function assertCurrentProducerDelivery(root,sessionId,step,parallel,{hostRoot=path.dirname(root)}={}) {
+  const origin=locateWorkflowSession(hostRoot,sessionId),state=json(path.join(origin.session,'state.json'));
+  if(!['backend.generate','interface.generate'].includes(state.steps?.[`${step}/${parallel}`]) || !state.planHistory?.active) return;
+  const {readContext}=await import('./mission-history.mjs');
+  const record=readContext(origin.session,state.planHistory.active,'plans');
+  if(record.missionVersion!==state.mission.version || !Object.keys(record.forecast.sourceReviews ?? {}).length) return;
+  const {sourceReviewCoverage}=await import('./source-review.mjs');
+  const coverage=await sourceReviewCoverage(root,origin.session,state,record.forecast);
+  if(coverage.errors.length) throw Error(coverage.errors.join('; '));
+  const cell=`${step}/${parallel}`;
+  if(coverage.pending.some(item=>item.sourceCell===cell) || coverage.retiredSources.includes(cell)) throw Error('SOURCE_REVIEW_PENDING: fresh delivery must consume the verified source replacement');
+}
+
+export async function validateImportedInput(root,session,inputRef,kind,{hostRoot=path.dirname(root),receivingSessionId=path.basename(session),receivingContractVersion,freshDelivery=false}={}){
   const match=/^step-([1-9]\d*)\/parallel-([1-9]\d*)\/(?:[a-z][a-z-]*\/)?response\//.exec(inputRef);
   // Existing local inputs keep their existing contract; this gate only owns explicit foreign imports.
   if(!match)return [];
@@ -164,6 +179,7 @@ export async function validateImportedInput(root,session,inputRef,kind,{hostRoot
     evidenceOnly(r.targetSession,m.targetStep,m.targetParallel);
     const receiver=json(within(r.targetSession,'state.json'));
     const origin=await originAuthority(root,r,m,{requireCurrent:currentMarked(receiver,{contractVersion:receivingContractVersion})});metadata(r.target,m);
+    if(freshDelivery && currentMarked(receiver,{contractVersion:receivingContractVersion})) await assertCurrentProducerDelivery(root,m.sourceSessionId,m.sourceStep,m.sourceParallel,{hostRoot});
     const original=inventory(r.source),copied=inventory(r.target),normalize=v=>JSON.stringify([...v].sort((a,b)=>a.path.localeCompare(b.path)));
     if(normalize(original)!==normalize(m.files)||normalize(copied)!==normalize(m.files))throw Error('import bytes or origin inventory changed');
     const relative=path.relative(r.target,within(session,inputRef)).split(path.sep).join('/');
@@ -183,6 +199,7 @@ export async function importProducer({sourceSessionId,sourceStep,sourceParallel,
   let currentOrigin=false;
   const snapshot=async()=>{
     const origin=await originAuthority(root,r,m,{requireCurrent:currentMarked(json(within(r.targetSession,'state.json')))});
+    if(currentMarked(json(within(r.targetSession,'state.json')))) await assertCurrentProducerDelivery(root,sourceSessionId,sourceStep,sourceParallel,{hostRoot});
     currentOrigin=currentMarked(origin.request,origin.response,origin.state);m.files=inventory(r.source);manifestShape(m);
     const bytes=m.files.map(f=>[f.path,readFileSync(within(r.source,f.path))]);
     if(bytes.some(([p,b])=>hash(b)!==m.files.find(f=>f.path===p).sha256))throw Error('origin changed during import');

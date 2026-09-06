@@ -1,3 +1,4 @@
+import { goalPartitionCoverage } from './goal-partitions.mjs';
 import { activePlanView, retiredPlanCell, mappedPlanRequests } from './plan-history.mjs';
 import { missionHistorySnapshotErrors, missionChoiceSource } from './mission-history.mjs';
 import { coordinationStateErrors } from './workflow-coordination.mjs';
@@ -25,7 +26,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { validateAgainst } from './json-schema.mjs';
-import { effectiveBudget, missionGateErrors, goalDecisionId, V22_CONTRACT } from './validate-request.mjs';
+import { budgetSteps, effectiveBudget, missionGateErrors, goalDecisionId, V22_CONTRACT } from './validate-request.mjs';
 import { goalCheckErrors } from './validate-response.mjs';
 import { loadOperatorPackages } from './operator-md.mjs';
 import { loadInteractionPolicy } from './validate-interaction.mjs';
@@ -121,10 +122,13 @@ export async function v22SessionErrors(session, state, root = ROOT) {
     if (attempt.status === 'waiting' && !waitingReplans.settled.has(branch) && !waitingReplans.retired.has(branch)) errors.push(`state.json: waiting attempt ${attempt.id} has no fully accepted terminal resolved-by-replan successor`);
   }
   if (state.status === 'done' || phase === 'closed-success') {
+    const partitions = await goalPartitionCoverage(root, session, state);
+    errors.push(...partitions.errors);
+    for (const [index, coverage] of partitions.goals) if (!coverage.complete) errors.push(`state.json: doneWhen:${index} is missing required partition evidence (${coverage.proven.size}/${coverage.required.size}); one branch cannot close the complete goal`);
     for (let index = 0; index < (mission.doneWhen ?? []).length; index += 1) {
       let backed = false;
       for (const [branch, attempt] of Object.entries(state.attempts ?? {})) {
-        if (attempt.status !== 'matched' || retiredPlanCell(state, branch)) continue;
+        if (attempt.status !== 'matched' || retiredPlanCell(state, branch) || partitions.retiredSources?.includes(branch)) continue;
         try {
           const parts = branch.split('/');
           const base = path.join(session, `step-${parts[0]}`, `parallel-${parts[1]}`, ...(parts[2] ? [parts[2]] : []));
@@ -174,7 +178,7 @@ async function readJson(file) { if (!existsSync(file)) return null; try { return
 // The goal ledger of a mission session, read from each branch's request and response: which done-when
 // line the branch served, whether its receipt is done, and whether it carries a goalCheck the response
 // gate accepts with achieved true. Only that last kind of branch proves a line.
-export async function goalLedger(session, state) {
+export async function goalLedger(session, state, root = ROOT) {
   const out = [];
   for (const branch of Object.keys(state?.steps ?? {}).sort(byChainOrder)) {
     const dir = branchDir(session, branch);
@@ -185,6 +189,19 @@ export async function goalLedger(session, state) {
     const accepted = done && !retiredPlanCell(state, branch) && (!request?.expected || request.expected.goalVersion === state.mission?.version) && response.goalCheck !== undefined && goalCheckErrors(dir, response, goal).length === 0;
     out.push({ branch, operator: state.steps[branch], doneWhen: goal?.doneWhen ?? null, prerequisite: goal?.prerequisite ?? null, done, achieved: accepted && response.goalCheck.achieved === true });
   }
+  const coverage = await goalPartitionCoverage(root, session, state);
+  for (const row of out) {
+    if (coverage.retiredSources?.includes(row.branch)) { row.achieved = false; row.sourceReviewRetired = true; }
+    const goal = coverage.goals.get(row.doneWhen);
+    if (!goal && !coverage.errors.length) continue;
+    const member = coverage.branches.get(row.branch);
+    row.partitionAchieved = Boolean(member);
+    row.partition = member?.key ?? null;
+    row.achieved = Boolean(row.achieved && member && goal?.complete);
+    row.requiredPartitions = goal ? [...goal.required] : [];
+    row.provenPartitions = goal ? [...goal.proven] : [];
+  }
+  if (coverage.errors.length) out.partitionErrors = coverage.errors;
   return out;
 }
 // brief.proven on a mission session cites what a receipt evidenced and nothing else, in the two
@@ -226,7 +243,7 @@ export function threeBranchStopErrors(state, ledger) {
   if (!state?.mission) return errors;
   let run = [];
   for (const b of ledger.filter((x) => x.done && x.doneWhen !== null)) {
-    if (b.achieved) { run = []; continue; }
+    if (b.achieved || b.partitionAchieved) { run = []; continue; }
     run.push(b);
     if (run.length === 3) errors.push(`state.json: three consecutive done branches evidenced no done-when line — ${run.map((x) => `${x.branch} ${x.operator}`).join(', ')}; the chain stops here and the person is asked, never a fourth branch dispatched`);
   }
@@ -441,7 +458,8 @@ export async function validateSession(root, session, { packages = null, ledgerDi
     errors.push(...validateChain(root, packages, active.chain, active.steps, byBranch, { graph, forecast: view.forecast, resumeOwners: view.resumeOwners, coordinateOffset: view.coordinateOffset, mission: active.mission ?? null, maxParallel: await loadMaxParallel(root), planned: active.planned ?? {}, imported: await readImportedInputs(root, session, byBranch, { planned: active.planned ?? {} }), evidenceCells: (await readImportedSlots(session, graph, root)).map(s => s.cell) }));
   } catch (error) { errors.push(error.message); }
   // On a mission: proven cites only evidenced done-when lines, three unevidenced done branches in a row stop the chain, every transition was logged.
-  const ledger = await goalLedger(session, state);
+  const ledger = await goalLedger(session, state, root);
+  errors.push(...(ledger.partitionErrors ?? []));
   errors.push(...provenErrors(state, ledger, { root }));
   errors.push(...threeBranchStopErrors(state, ledger));
   errors.push(...loggedErrors(state));
@@ -472,11 +490,12 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   }
   const caps = effectiveBudget(state);
   if (caps) {
-    const steps = Object.keys(state.steps ?? {}).map(stepOf);
+    const projectedSteps = budgetSteps(state);
+    const steps = Object.keys(projectedSteps).map(stepOf);
     const top = steps.length ? Math.max(...steps) : 0;
     if (top > caps.maxSteps) errors.push(`state.json: the chain reaches step ${top}, past budget.maxSteps ${caps.maxSteps} (BUDGET_EXHAUSTED)`);
     const perOperator = new Map();
-    for (const [branch, op] of Object.entries(state.steps ?? {})) perOperator.set(op, (perOperator.get(op) ?? new Set()).add(stepOf(branch)));
+    for (const [branch, op] of Object.entries(projectedSteps)) perOperator.set(op, (perOperator.get(op) ?? new Set()).add(stepOf(branch)));
     for (const [op, set] of perOperator) if (caps.maxSameOperator !== null && set.size > caps.maxSameOperator) errors.push(`state.json: ${op} runs in ${set.size} steps, past budget.maxSameOperator ${caps.maxSameOperator} (BUDGET_EXHAUSTED)`);
   }
   if ((state.status === 'stopped' || state.status === 'blocked') && !state.stoppedAt) errors.push(`state.json: status ${state.status} names no stoppedAt`);

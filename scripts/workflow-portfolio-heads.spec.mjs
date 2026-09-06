@@ -129,6 +129,22 @@ test('multi-repository proof keeps frozen evidence on same-repository ancestry a
       { worktree: foreign, repositoryHash: 'repo-foreign' }
     ]]]);
     assert.throws(() => repositoryProof(peer, validRows, goals, ancestors, ambiguousHints), /resolves to multiple accepted repository identities/);
+
+    // Selection-only fixture: authentic admission/receipt coverage is exercised separately by the
+    // route and nineteen-unit lifecycles. Every required member reaches the repository report.
+    const splitPeer={heads:[{alias:'@workspaces/be',head:beHead,deliveryDoneWhen:[0]},{alias:'@workspaces/fe',head:feHead,deliveryDoneWhen:[0]}]};
+    const splitGoals=[{producedBy:'runtime.serve'}];
+    const beRoute={...proof(0,'step-8/parallel-1','@workspaces/be',be,beHead,'repo-be'),partition:'routes:be'};
+    const feRoute={...proof(0,'step-9/parallel-1','@workspaces/fe',fe,feHead,'repo-fe'),partition:'routes:fe'};
+    const splitRows=new Map([[0,{proofs:[beRoute,feRoute],refusals:[],requiredPartitions:['routes:be','routes:fe']}]]);
+    const split=repositoryProof(splitPeer,splitRows,splitGoals,[]);
+    assert.deepEqual(split.evidence.map(row=>row.ref),['step-8/parallel-1','step-9/parallel-1']);
+    for(const replacement of [[beRoute],[beRoute,{...beRoute,ref:'step-10/parallel-1'}],[beRoute,{...feRoute,bindings:[{...feRoute.bindings[0],revision:feBase}]}]]){
+      const missing=new Map([[0,{...splitRows.get(0),proofs:replacement}]]);
+      assert.throws(()=>repositoryProof(splitPeer,missing,splitGoals,[]),/no single accepted proving branch|omits|no accepted/);
+    }
+    const pairedUnits=new Map([[3,{proofs:[{...feNewBeOld,partition:'unit:one'},{...feOldBeNew,partition:'unit:one'},{...exactPair,partition:'unit:two'}],refusals:[],requiredPartitions:['unit:one','unit:two']}] ]);
+    assert.throws(()=>repositoryProof({heads:pairedPeer.heads.map(head=>({...head,deliveryDoneWhen:[3]}))},pairedUnits,pairedGoals,ancestors),/no single accepted proving branch/);
   } finally {
     rmSync(host, { recursive: true, force: true });
   }

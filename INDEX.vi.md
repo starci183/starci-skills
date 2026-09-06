@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.9
+# StarCi Skills 2.5.0-rc.10
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.5.0-rc.10 (2026-09-06): phân chia mục tiêu rõ ràng yêu cầu đủ mọi route hoặc đơn vị hành trình đã chọn; review source và lần sửa mới giữ nguyên lịch sử đã chấp nhận, đồng thời không tính hoàn thành hiện tại hoặc cho import mới từ source đang bị xem xét hay đã được thay thế. Candidate này cần kiểm chứng vòng tích hợp và bản phát hành trước khi công bố.
 
 2.5.0-rc.9 (2026-09-06): tách workflow chung giữa luồng chuyển đúng một quyền ghi đã niêm phong, chỉ chờ các bước phụ thuộc, giữ bằng chứng tích hợp source chính xác và chứng minh mọi kết quả gốc trên cùng runtime tích hợp đã đo. Xem tests/evidence/20260906-dynamic-coordination.md.
 

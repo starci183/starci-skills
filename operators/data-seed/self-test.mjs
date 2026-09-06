@@ -92,13 +92,25 @@ function writeBranch(files) {
   }
   return { branch, session };
 }
-async function expectValid(files, label, options = {}) {
+// Every baseline and mutation uses this declared disposable host, including the first case.
+const HOST = mkdtempSync(path.join(tmpdir(), 'seed-host-'));
+const declare = (env, body) => {
+  mkdirSync(path.join(HOST, '.stacks', env), { recursive: true });
+  const bytes = Buffer.from(JSON.stringify(body, null, 2));
+  writeFileSync(path.join(HOST, '.stacks', env, 'environment.json'), bytes);
+  return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+};
+const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
+const PROD_REF = declare('production', { schemaVersion: 9, env: 'production', production: true });
+const onHost = { hostRoot: HOST };
+
+async function expectValid(files, label, options = onHost) {
   const { branch, session } = writeBranch(files);
   const { errors } = await validateSeedStep(branch, undefined, options);
   rmSync(session, { recursive: true, force: true });
   assert.deepEqual(errors, [], `${label} should be valid`);
 }
-async function expectError(files, needle, label, options = {}) {
+async function expectError(files, needle, label, options = onHost) {
   const { branch, session } = writeBranch(files);
   const { errors } = await validateSeedStep(branch, undefined, options);
   rmSync(session, { recursive: true, force: true });
@@ -134,16 +146,7 @@ await expectError(applied({ 'request/request.json': requestJson({ extra: { desir
 await expectError(applied({ 'request/request.json': requestJson({ routeKey: 'demo-product' }) }), 'is not a <project>/<role> registry entry', 'a route key that names no route');
 await expectError(applied({ 'request/request.json': requestJson({ operation: 'purge' }) }), 'is neither apply nor rollback', 'an operation the seed does not know');
 // The host is the self-test's own: a stack lookup must not depend on where this checkout sits.
-const HOST = mkdtempSync(path.join(tmpdir(), 'seed-host-'));
-const declare = (env, body) => {
-  mkdirSync(path.join(HOST, '.stacks', env), { recursive: true });
-  const bytes = Buffer.from(JSON.stringify(body, null, 2));
-  writeFileSync(path.join(HOST, '.stacks', env, 'environment.json'), bytes);
-  return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
-};
-const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
-const PROD_REF = declare('production', { schemaVersion: 9, env: 'production', production: true });
-const onHost = { hostRoot: HOST };
+
 await expectError(applied({ 'request/request.json': requestJson({ env: 'no-such-stack' }) }), 'which this installation does not have', 'an env with no stack', onHost);
 await expectError(applied({ 'request/request.json': requestJson({ extra: { operation: 'apply', flow: `${FLOW}` }, approval: 'password: hunter2-hunter2' }) }), 'carries a credential-shaped value', 'a credential where a name belongs');
 

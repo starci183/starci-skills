@@ -737,18 +737,18 @@ export async function coordinationAdmissionErrors(root, session, state, request,
     else if (pinned) errors.push(...ownershipErrors(roots, state.id, [{ assignment: { value: pinned } }]));
     for (const dependency of dependencies) {
       check(dependency.proof, 'COORDINATION_WAIT', `${dependency.id} waits only its selected consumer nodes for accepted producer proof`);
-      await checkConsumerInput(root, state, request, dependency, { session });
+      await checkConsumerInput(root, state, request, dependency, { session, historical });
     }
   } catch (error) { errors.push(error.message); }
   return [...new Set(errors)];
 }
-async function checkConsumerInput(root, state, request, dependency, { session }) {
+async function checkConsumerInput(root, state, request, dependency, { session, historical = false }) {
   const { acceptedProducerProof, validateImportedInput } = await import('./producer-import.mjs');
   const proof = await acceptedProducerProof(root, dependency.producerSessionId, dependency.proof.step, dependency.proof.parallel, dependency.kind, { hostRoot: sourceOf(state) });
   check(proof.manifestFingerprint === dependency.proof.manifestFingerprint && proof.requestHash === dependency.proof.requestHash && equal(proof.bindings, dependency.proof.bindings), 'COORDINATION_PRODUCER', 'producer identity, head or accepted seal changed');
   const input = request.inputs?.[dependency.kind];
   check(typeof input === 'string', 'COORDINATION_INPUT', 'consumer must actually bind the typed imported producer output');
-  const imported = await validateImportedInput(root, session, input, dependency.kind, { hostRoot: sourceOf(state) });
+  const imported = await validateImportedInput(root, session, input, dependency.kind, { hostRoot: sourceOf(state), freshDelivery: !historical });
   check(!imported.length, 'COORDINATION_INPUT', imported.join('; '));
   // validateImportedInput validates bytes and original acceptance; bind its origin to this edge too.
   const parts = /^step-(\d+)\/parallel-(\d+)\//.exec(input);
@@ -790,7 +790,7 @@ export async function incorporateExtraction(root, session, dependencyId, { input
     check(dependency?.proof && ['backend-source-application', 'source-application'].includes(dependency.kind), 'COORDINATION_INCORPORATION', 'select a resolved source dependency owned by this consumer');
     check(/^@workspaces\/(be|fe)$/.test(alias ?? ''), 'COORDINATION_INCORPORATION', 'consumer needs its exact source role');
     const { acceptedProducerProof, validateImportedInput } = await import('./producer-import.mjs');
-    const errors = await validateImportedInput(root, session, input, dependency.kind, { hostRoot: source, receivingContractVersion: state.contractVersion });
+    const errors = await validateImportedInput(root, session, input, dependency.kind, { hostRoot: source, receivingContractVersion: state.contractVersion, freshDelivery: true });
     check(!errors.length, 'COORDINATION_INPUT', errors.join('; '));
     const slot = /^step-(\d+)\/parallel-(\d+)\//.exec(input ?? '');
     check(slot, 'COORDINATION_INPUT', 'incorporation requires the exact typed imported slot');
@@ -842,7 +842,8 @@ export async function resolveExtraction(root, session, dependencyId, { step, par
     check(matches.length === 1, 'COORDINATION_DEPENDENCY', 'resolve exactly one retained typed dependency');
     const dependency = matches[0];
     check(dependency, 'COORDINATION_DEPENDENCY', 'unknown shared producer dependency');
-    const { acceptedProducerProof } = await import('./producer-import.mjs');
+    const { acceptedProducerProof, assertCurrentProducerDelivery } = await import('./producer-import.mjs');
+    await assertCurrentProducerDelivery(root, dependency.producerSessionId, step, parallel, { hostRoot: source });
     const proof = await acceptedProducerProof(root, dependency.producerSessionId, step, parallel, dependency.kind, { hostRoot: source });
     check(proof.operatorId === dependency.operatorId, 'COORDINATION_PRODUCER', 'wrong producer operation');
     const frozen = { step, parallel, requestHash: proof.requestHash, manifestFingerprint: proof.manifestFingerprint, bindings: proof.bindings, artifacts: proof.artifacts };
@@ -881,7 +882,7 @@ export async function coordinationReadiness(root, session) {
         const response = read(path.join(consumer.session, step, parallel, 'response/response.json'));
         const declared = response.fields?.[dependency.kind], refs = Array.isArray(declared) ? declared : [declared];
         for (const ref of refs.filter(Boolean)) {
-          const input = `${step}/${parallel}/${ref}`, failures = await validateImportedInput(root, consumer.session, input, dependency.kind, { hostRoot: source });
+          const input = `${step}/${parallel}/${ref}`, failures = await validateImportedInput(root, consumer.session, input, dependency.kind, { hostRoot: source, freshDelivery: true });
           check(!failures.length, 'COORDINATION_INPUT', failures.join('; ')); inputs.push(input);
         }
       }

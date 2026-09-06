@@ -345,13 +345,27 @@ const blocked = () => ({
   'response/response.json': { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status: 'blocked', stop: 'ADMISSION_MISSING', fallbacks: [], fields: {}, commits: [], next: [] },
 });
 
-async function expectValid(files, label, history, options = {}) {
+// Every baseline and mutation uses this declared disposable host, including the first case.
+const HOST = mkdtempSync(path.join(tmpdir(), 'uat-host-'));
+const declare = (env, body) => {
+  mkdirSync(path.join(HOST, '.stacks', env), { recursive: true });
+  const bytes = Buffer.from(JSON.stringify(body, null, 2));
+  writeFileSync(path.join(HOST, '.stacks', env, 'environment.json'), bytes);
+  return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+};
+const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
+const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production: false, authorization: { 'identity-provisioning': 'person' } });
+assert.deepEqual(UAT_CLASSES, ['identity-provisioning']);
+const MOVED_REF = DEV_REF.replace(/[0-9a-f]{64}$/, '9'.repeat(64));
+const onHost = { hostRoot: HOST };
+
+async function expectValid(files, label, history, options = onHost) {
   const { branch, session } = writeBranch(files, history);
   const { errors } = await validateUatStep(branch, undefined, options);
   rmSync(session, { recursive: true, force: true });
   assert.deepEqual(errors, [], `${label} should be valid`);
 }
-async function expectError(files, needle, label, history, options = {}) {
+async function expectError(files, needle, label, history, options = onHost) {
   const { branch, session } = writeBranch(files, history);
   const { errors } = await validateUatStep(branch, undefined, options);
   rmSync(session, { recursive: true, force: true });
@@ -486,18 +500,7 @@ await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ run
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ golden: { state: 'candidate', ref: `${DIR}/snapshots/snapshot.json`, approvedBy: null, env: 'staging' } }) }, 'is not authority for another', 'a reference taken in another environment');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ cases: [{ ...frozenCase(CASES[0], 0), as: 'reviewer' }, frozenCase(CASES[1], 1)] }) }, 'which no frozen account carries', 'a case acting as an alias nobody provisioned');
 // The host is the self-test's own: a stack lookup must not depend on where this checkout sits.
-const HOST = mkdtempSync(path.join(tmpdir(), 'uat-host-'));
-const declare = (env, body) => {
-  mkdirSync(path.join(HOST, '.stacks', env), { recursive: true });
-  const bytes = Buffer.from(JSON.stringify(body, null, 2));
-  writeFileSync(path.join(HOST, '.stacks', env, 'environment.json'), bytes);
-  return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
-};
-const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
-const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production: false, authorization: { 'identity-provisioning': 'person' } });
-assert.deepEqual(UAT_CLASSES, ['identity-provisioning']);
-const MOVED_REF = DEV_REF.replace(/[0-9a-f]{64}$/, '9'.repeat(64));
-const onHost = { hostRoot: HOST };
+
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { env: 'nowhere' } }) }, 'which this installation does not have', 'a run pointed at a stack nobody installed', undefined, onHost);
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [account('learner'), account('learner')] }) }, 'is frozen twice', 'one alias with two accounts');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ accounts: [account('learner', { credentialRef: '.stacks/staging/secrets/uat.enc' })] }) }, 'resolves its credential in another environment', 'an account sealed in another environment than the run drove');
@@ -551,7 +554,7 @@ for (const variation of ['valid', 'missing-snapshot-scope', 'changed-quality-sco
     const qualityDir = path.dirname(path.join(session, QUALITY_IN));
     mkdirSync(path.join(qualityDir, 'data'), { recursive: true });
     writeFileSync(path.join(qualityDir, 'data/audit-scope.json'), JSON.stringify(variation === 'changed-quality-scope' ? { ...scopedAdmission, deferredStates: [] } : scopedAdmission));
-    const { errors } = await validateUatStep(branch);
+    const { errors } = await validateUatStep(branch, undefined, onHost);
     if (variation === 'valid') assert.deepEqual(errors, [], 'UAT preserves a limited UI audit without changing its frozen cases');
     else assert.ok(errors.some((error) => error.includes(variation === 'missing-snapshot-scope' ? 'frozen snapshot must retain' : 'quality admission must retain')), errors.join('\n'));
   } finally { rmSync(session, { recursive: true, force: true }); }
@@ -701,3 +704,4 @@ const driven=playwrightFiles({w:publicWalk});
 for(const key of [WALK_REF,RESULT_REF,...CASES.map(c=>'response/data/captures/'+c+'.json')])publicDriven[key]=driven[key];
 Object.assign(publicDriven['response/response.json'].fields,{'uat-walk':WALK_REF,'walk-result':RESULT_REF});
 await expectValid(publicDriven,'anonymous declarative browser walk uses null account and preserves runner evidence');
+rmSync(HOST, { recursive: true, force: true });

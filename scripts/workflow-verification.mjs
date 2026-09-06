@@ -187,11 +187,13 @@ async function acceptedProofs(root, session, child, ledger, doneWhen, legacy = n
           bindings.set('@legacy-host', { alias: '@legacy-host', worktree, revision: fullCommit(worktree, legacy.head), repositoryHash: repositoryHash(worktree) });
         }
       }
-      proofs.push({ doneWhen, operatorId: child.mission.doneWhen[doneWhen].producedBy, ref,
+      proofs.push({ doneWhen, operatorId: child.mission.doneWhen[doneWhen].producedBy, ref, ...(candidate.partition ? { partition: candidate.partition } : {}),
         fingerprint: attempt.evidenceManifest.fingerprint, bindings: [...bindings.values()].sort((a, b) => a.alias.localeCompare(b.alias)) });
     } catch (error) { refusals.push(error.message); }
   }
-  return { proofs, refusals };
+  const requiredPartitions = [...new Set(ledger.filter(row => row.doneWhen === doneWhen).flatMap(row => row.requiredPartitions ?? []))];
+  for (const member of requiredPartitions) if (!proofs.some(proof => proof.partition === member)) refusals.push(`required goal partition ${member} has no accepted original proof`);
+  return { proofs, refusals, requiredPartitions };
 }
 
 function legacyProof(peer, rows) {
@@ -236,15 +238,19 @@ export function repositoryProof(peer, proofRows, childGoals, ancestralEvidenceOp
     }
   }
 
-  // A child goal is one observation over one frozen set of role heads. Never assemble a synthetic
-  // pair by taking one alias from one accepted run and another alias from a different run.
+  // Each required partition is one observation over its own frozen role heads. No partition may
+  // manufacture a multi-role observation by joining aliases from different accepted invocations.
+  const proofGroups = rows => rows.requiredPartitions?.length
+    ? rows.requiredPartitions.map(member => rows.proofs.filter(proof => proof.partition === member)) : [rows.proofs];
   const selectedByGoal = new Map();
   for (const [doneWhen, rows] of proofRows) {
     const operatorId = childGoals[doneWhen]?.producedBy;
     if (ancestors.has(operatorId)) continue;
-    const aliases = aliasesByGoal.get(doneWhen);
+    const selections = [];
+    for (const group of proofGroups(rows)) {
+    const aliases = new Set(group.flatMap(row => row.bindings.map(binding => binding.alias)));
     let selected = null;
-    for (const row of rows.proofs) {
+    for (const row of group) {
       const bindings = new Map();
       let valid = true;
       for (const alias of aliases) {
@@ -257,7 +263,9 @@ export function repositoryProof(peer, proofRows, childGoals, ancestralEvidenceOp
       if (valid) { selected = { row, bindings }; break; }
     }
     if (!selected) throw Error(`child doneWhen:${doneWhen} has no single accepted proving branch at the exact delivered head of every bound repository`);
-    selectedByGoal.set(doneWhen, selected);
+    selections.push(selected);
+    }
+    selectedByGoal.set(doneWhen, selections);
   }
 
   const verifiedHeads = [];
@@ -267,12 +275,15 @@ export function repositoryProof(peer, proofRows, childGoals, ancestralEvidenceOp
     for (const doneWhen of boundary.deliveryDoneWhen) {
       if (!proofRows.has(doneWhen)) throw Error(`repository ${boundary.alias}: deliveryDoneWhen:${doneWhen} is outside the child mission`);
       if (ancestors.has(childGoals[doneWhen]?.producedBy)) throw Error(`repository ${boundary.alias}: ancestral child doneWhen:${doneWhen} cannot stand in for current delivery evidence`);
-      const exact = selectedByGoal.get(doneWhen);
+      const candidates = (selectedByGoal.get(doneWhen) ?? []).filter(exact => exact.bindings.has(boundary.alias));
+      if (!candidates.length) throw Error(`repository ${boundary.alias}: child doneWhen:${doneWhen} has no complete accepted delivery partitions`);
+      for (const exact of candidates) {
       const binding = exact?.bindings.get(boundary.alias);
       if (!exact || !binding) throw Error(`repository ${boundary.alias}: child doneWhen:${doneWhen} has no accepted delivery proof at exact current head ${boundary.head}`);
       if (identity && identity !== binding.repositoryHash) throw Error(`repository ${boundary.alias}: exact delivery proofs resolve to different repositories`);
       identity = binding.repositoryHash;
       deliveryEvidence.push({ doneWhen, ref: exact.row.ref, fingerprint: exact.row.fingerprint });
+      }
     }
     verifiedHeads.push({ alias: boundary.alias, head: boundary.head, repositoryHash: identity, deliveryEvidence });
   }
@@ -281,9 +292,11 @@ export function repositoryProof(peer, proofRows, childGoals, ancestralEvidenceOp
   for (const [doneWhen, rows] of proofRows) {
     const operatorId = childGoals[doneWhen]?.producedBy;
     if (!ancestors.has(operatorId)) continue;
-    const aliases = aliasesByGoal.get(doneWhen);
+    const selections = [];
+    for (const group of proofGroups(rows)) {
+    const aliases = new Set(group.flatMap(row => row.bindings.map(binding => binding.alias)));
     let selected = null;
-    for (const row of rows.proofs) {
+    for (const row of group) {
       const bindings = new Map();
       let valid = true;
       for (const alias of aliases) {
@@ -297,13 +310,14 @@ export function repositoryProof(peer, proofRows, childGoals, ancestralEvidenceOp
       if (valid) { selected = { row, bindings }; break; }
     }
     if (!selected) throw Error(`child doneWhen:${doneWhen} has no single accepted proving branch in the declared repository ancestry of every bound repository: ${rows.refusals.join('; ')}`);
-    selectedByGoal.set(doneWhen, selected);
+    selections.push(selected);
+    }
+    selectedByGoal.set(doneWhen, selections);
   }
 
   const evidence = [];
   for (const [doneWhen, rows] of [...proofRows.entries()].sort(([a], [b]) => a - b)) {
-    const selected = selectedByGoal.get(doneWhen);
-    for (const alias of aliasesByGoal.get(doneWhen)) {
+    for (const selected of selectedByGoal.get(doneWhen)) for (const alias of selected.bindings.keys()) {
       const boundary = boundaries.get(alias);
       const binding = selected.bindings.get(alias);
       evidence.push({ doneWhen, ref: selected.row.ref, fingerprint: selected.row.fingerprint,
@@ -339,13 +353,13 @@ export async function buildWorkflowVerification(root, branch, request, state, { 
       const checked = await validateSession(root, session, { uncheckedRoot: hostRoot });
       if (checked.errors.length) throw Error(`original session fails validation: ${checked.errors.join('; ')}`);
       const stateHash = sessionProofHash(child);
-      const ledger = await goalLedger(session, child);
+      const ledger = await goalLedger(session, child, root);
       const proofRows = new Map();
       for (let index = 0; index < child.mission.doneWhen.length; index++) {
         if (!(child.brief.proven ?? []).some(line => line.startsWith(`doneWhen:${index} `))) throw Error(`child doneWhen:${index} is not proven`);
         const legacy = snapshot.version === 1 ? { worktree: child.hostBinding?.worktree, head: peer.head } : null;
         const rows = await acceptedProofs(root, session, child, ledger, index, legacy);
-        if (!rows.proofs.length) throw Error(`child doneWhen:${index} has no validator-accepted original proof: ${rows.refusals.join('; ')}`);
+        if (!rows.proofs.length || rows.requiredPartitions.some(member => !rows.proofs.some(proof => proof.partition === member))) throw Error(`child doneWhen:${index} has no complete validator-accepted original proof: ${rows.refusals.join('; ')}`);
         proofRows.set(index, rows);
       }
       let peerReport;

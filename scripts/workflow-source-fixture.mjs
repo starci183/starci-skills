@@ -154,7 +154,7 @@ function reflogMark(f) {
   return `HEAD ${count(['HEAD'])} ${git(f.worktree, 'rev-parse', 'HEAD')}; stash ${count(['refs/stash'])}`;
 }
 
-export async function acceptBackend(f, architecture, { step = architecture.sourceStep, goal = { doneWhen: 0 }, coordination = null, inputs = {}, files = null, testRef = architecture.operation.writerRef.replace(/\.mjs$/, '.spec.mjs'), testArgs = ['--test', testRef], afterOpen = null } = {}) {
+export async function acceptBackend(f, architecture, { step = architecture.sourceStep, goal = { doneWhen: 0 }, coordination = null, inputs = {}, files = null, testRef = architecture.operation.writerRef.replace(/\.mjs$/, '.spec.mjs'), testArgs = ['--test', testRef], beforeRequest = null, afterOpen = null } = {}) {
   const writer = architecture.operation.writerRef, directory = path.posix.dirname(writer), fileName = path.posix.basename(writer);
   files ??= {
     [writer]: "export function runFixtureWorker(input) { if (typeof input !== 'string') throw new TypeError('input must be a string'); return input.toUpperCase(); }\n",
@@ -169,6 +169,7 @@ export async function acceptBackend(f, architecture, { step = architecture.sourc
   planCells(f, [[step, 'backend.generate']]);
   const request = current(f, { operatorId: 'backend.generate', contexts, requirements: { featureId: 'fixture', outcome: 'Implement the declared stateless worker contract.', mutableFileRefs: Object.keys(files), protectedRefs: [], contractFingerprint: architecture.fingerprint, mode: 'apply', scope: 'full', resume: null }, inputs: { 'architecture-decision': architecture.ref, ...inputs } }, step, { goal, coordination });
   request.environment.writes = Object.keys(files).map(file => `@workspaces/be/${file}`); request.environment.exclusive = [path.join(f.worktree, directory)];
+  if (beforeRequest) await beforeRequest({ request, dir: branch(f, step) });
   const dir = await open(f, request);
   if (afterOpen) await afterOpen({ request, dir });
   const { acquireWorkerSlot } = await moduleAt(f, 'scripts/worker-slots.mjs');

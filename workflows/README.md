@@ -212,6 +212,15 @@ For the same confirmed goal, retain the current forecast and use `flags.edit` in
   This prerequisite attestation grants no source write or future delivery credit; the original
   delivery runtime node, dispatched coordinates and independent planned peers remain in the forecast.
 
+For an unopened runtime delivery goal, `{"kind":"partition","cell":"N/M","env":"<environment>","routes":["<project>/<role>"]}`
+records its complete goal-specific route mapping and schedules one single-route invocation per member.
+The mapping names only exact repository routes from the confirmed discovery. A mission with several
+repositories explicitly maps each runtime delivery goal before dispatch; a goal naming one route does
+not acquire every repository. The existing goal and scope remain unchanged. Each invocation freezes
+its route, environment and target commit, binds that commit as its source-role context head, and binds
+its accepted source changes when it consumes them. Runtime repairs that merely enable another branch
+do not earn delivery partition credit.
+
 The active forecast passes Input, Context, Next, goal, long-flow and finite budget gates. A declared
 dependency handoff can continue from an earlier input or context owner whose authored Next names
 the consumer; it cannot search unrelated history. The preview records that edge. Dispatch requires
@@ -226,6 +235,61 @@ answers remain checked. No arbitrary step boundary exempts history from its immu
 A waiting node whose exact sealed nested review selects its kind contract's `reentry` verdict uses the same `resume` edit. The forecast retains the parent/child attempt identities, request hashes, evidence fingerprints and current scope. It opens a new same-owner invocation; neither accepted checkpoint is resumed or rewritten in place. The replacement must produce its own model and receive its own fresh matched nested review before it can conclude. A planned replacement remains an outstanding obligation and supplies no completion evidence.
 
 When the owning execution discloses a review-integrity concern, add `integrity: {ref, hash}` to that edit. The session-relative JSON disclosure has exactly `version: 1`, `identity`, `disposition: "fresh-review-required"`, a concrete `reason`, and the actual admission's `sourceRef`. Its identity binds `sessionId`, `missionVersion`, `scopeHash`, and `parent`/`child` records containing `cell`, `attemptId`, `requestHash`, and `evidenceFingerprint`. The hash covers the exact disclosure bytes, retained in the sealed forecast. This record authorizes only fresh review within the existing confirmed scope: it is neither a review verdict nor an approval or delivery input. Preserve the questioned evidence and its admitted limitation; no filesystem timestamp substitutes for execution provenance.
+
+
+## Review accepted source
+
+An accepted source receipt remains immutable when a later check questions its implementation. Use
+the existing forecast edit with `kind: "review"`, the source `cell`, an original required
+`criterionId`, the new request-side `method: {ref, sha256}`, the actual `gates` plan, and any exact
+accepted source `counterparts`. This schedules a read-only `quality.verify` invocation against the
+bound source. The diagnostic measures the source criterion; API or browser output alone does not
+establish that a different source owner must change. A source-only review claims no runtime or
+unmeasured interface verdict.
+
+A matched review whose sealed required gate actually failed in-boundary, without debt, permits
+`kind: "source-repair"` with the original source `cell`, its `review` cell and exact `gateRef`.
+The fresh invocation keeps the source owner, unit, requirements, required expected criteria and
+effect boundaries. It consumes the changed frozen verification method, preserves source ancestry
+and produces its own normal source commit and proof. The original accepted request, response and
+commit are retained. When repairing an already accepted source consumer, `replacements` maps only
+its original input kind to the exact accepted producer repair that its own review measured as a
+counterpart; it grants no unrelated input or write authority.
+
+`scripts/source-review.mjs` owns the review relationship and current same-session consumer barrier.
+The complete-goal reader below uses its pending and retired-source result. Expected pending review
+is a valid outstanding obligation, not an invalid session; only affected goals and dependent
+consumers wait. A verified red review prevents the old source from earning delivery credit again,
+including after its replacement succeeds. A green exact review preserves the original source
+credit. Producer-import and coordination also check this current delivery barrier before creating
+an import, opening a fresh imported-input consumer, resolving a producer or incorporating its source.
+Pending or retired source cannot become new delivery evidence. Historical accepted imports and
+invocations retain their original sealed proof; the barrier does not rewrite those receipts.
+
+## Complete goal evidence
+
+A sealed forecast records one closed obligation set for each declared route partition or accepted
+unit plan. Its immutable members retain the original goal index and their exact route declaration or
+accepted plan output, request hash and evidence fingerprint. A same-goal replan preserves every
+required member. Retried or resumed invocations keep their member identity; their original receipts
+and invocation contexts remain unchanged. An existing sealed single-route preset already supplies
+that goal-specific mapping. An existing unit forecast derives the same complete set from its accepted
+producer, including required units whose execute requests have not been written.
+
+For a partitioned branch, response.goalCheck describes only its own member. Partial accepted evidence
+is progress, so it does not trigger the consecutive-no-progress stop. The original done-when line is
+proven only when every required current member has independently matched, its complete declared
+evidence and request remain sealed, and its own validator still accepts that proof. A plan, an unopened
+cell, a duplicate member, a different unit producer, a runtime prerequisite repair, a stale mission or
+a mismatched result cannot substitute. Verification uses the journey tier from scripts/unchecked.mjs;
+secondary units remain unchecked and do not replace required journey evidence. Generation retains
+every planned unit.
+
+Scripts/goal-partitions.mjs owns this aggregation. The goal ledger, brief.proven gate, session terminal
+gate, dependent invocation admission and coordinator original-proof reader consume the same result.
+A consumer waiting on the complete obligation opens only after all its required members are accepted.
+The coordinator retains every required proving branch and checks each partition's repository bindings;
+it never constructs one multi-role observation from unrelated partial runs.
 
 ## Extract shared work during execution
 

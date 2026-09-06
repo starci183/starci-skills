@@ -206,6 +206,14 @@ Trong cùng goal đã xác nhận, giữ dự báo hiện tại và dùng `flags
   công nhận delivery tương lai; node runtime delivery gốc, tọa độ đã dispatch và các peer độc lập
   chưa mở vẫn được giữ trong dự báo.
 
+Với goal runtime delivery chưa mở, `{"kind":"partition","cell":"N/M","env":"<environment>","routes":["<project>/<role>"]}`
+ghi ánh xạ đầy đủ các route của riêng goal đó, rồi xếp một invocation một route cho mỗi thành viên.
+Ánh xạ chỉ được dùng đúng route repository trong discovery đã xác nhận. Mission có nhiều repository
+phải ánh xạ từng goal runtime trước dispatch; goal chỉ cần một route không nhận thêm mọi repository.
+Goal và scope gốc không đổi. Mỗi invocation đóng băng route, môi trường và commit đích, bind commit
+đó làm head của context role source, và bind changes nguồn đã được chấp nhận khi sử dụng input đó.
+Runtime repair chỉ làm prerequisite cho nhánh khác không được tính thành delivery partition.
+
 Dự báo active qua đủ gate Input, Context, Next, goal, luồng dài và budget hữu hạn. Handoff phụ
 thuộc đã khai có thể tiếp tục từ owner input hoặc context trước đó khi Next của owner gọi tên
 consumer; không tìm lịch sử không liên quan. Preview ghi cạnh này. Dispatch yêu cầu owner có
@@ -220,6 +228,57 @@ bỏ kiểm các cam kết bất biến của lịch sử.
 Node waiting có nested review đã niêm phong chọn verdict `reentry` do kind contract khai báo dùng cùng edit `resume`. Dự báo giữ identity attempt cha/con, hash request, fingerprint evidence và scope hiện tại. Nó mở invocation mới cùng owner; không resume hay sửa checkpoint đã chấp nhận tại chỗ. Invocation thay thế phải tạo model của chính nó và có nested review mới matched trước khi kết luận. Nhánh thay thế mới được lên kế hoạch vẫn là nghĩa vụ chưa hoàn thành, không cấp proof hoàn tất.
 
 Khi execution sở hữu công việc khai báo vấn đề toàn vẹn review, thêm `integrity: {ref, hash}` vào edit đó. JSON disclosure tương đối với session có đúng `version: 1`, `identity`, `disposition: "fresh-review-required"`, `reason` cụ thể và `sourceRef` của lời thừa nhận thật. Identity bind `sessionId`, `missionVersion`, `scopeHash`, cùng bản ghi `parent`/`child` chứa `cell`, `attemptId`, `requestHash` và `evidenceFingerprint`. Hash bao phủ nguyên byte disclosure, được lưu trong dự báo niêm phong. Bản ghi chỉ cho phép review mới trong scope đã xác nhận: không phải verdict review, approval hay input delivery. Giữ evidence bị đặt nghi vấn và giới hạn đã thừa nhận; timestamp filesystem không thay thế provenance execution.
+
+
+## Review source đã được chấp nhận
+
+Receipt source đã chấp nhận vẫn bất biến khi kiểm tra sau đó đặt nghi vấn về implementation. Dùng
+edit dự báo hiện hữu với `kind: "review"`, `cell` source, một `criterionId` bắt buộc của bản gốc,
+`method: {ref, sha256}` mới phía request, plan `gates` thực tế và các `counterparts` source đã chấp
+nhận chính xác nếu cần. Edit lên lịch invocation `quality.verify` chỉ đọc trên source đã bind.
+Diagnostic đo criterion của source; output API hoặc browser không tự chứng minh một owner source
+khác phải sửa. Review chỉ source không tuyên bố runtime hay verdict giao diện chưa đo.
+
+Review matched có gate bắt buộc đã niêm phong thực sự fail trong boundary, không có debt, cho phép
+`kind: "source-repair"` với `cell` source gốc, cell `review` và `gateRef` chính xác. Invocation mới
+giữ owner source, unit, requirements, các expected criterion bắt buộc và ranh giới effects. Nó dùng
+method kiểm chứng mới đã đóng băng, giữ ancestry source và tạo normal source commit cùng proof của
+chính nó. Request, response và commit gốc được giữ nguyên. Khi sửa consumer source đã chấp nhận,
+`replacements` chỉ ánh xạ input kind gốc sang đúng producer repair đã chấp nhận mà review của
+consumer đo như counterpart; không cấp input hoặc quyền ghi không liên quan.
+
+`scripts/source-review.mjs` sở hữu quan hệ review và barrier consumer hiện hành trong cùng session.
+Bộ đọc complete-goal bên dưới dùng kết quả pending và retired-source của nó. Review pending là nghĩa
+vụ còn mở hợp lệ, không làm session sai; chỉ goal bị ảnh hưởng và consumer phụ thuộc chờ. Review red
+đã kiểm chứng ngăn source cũ nhận lại credit delivery, kể cả khi bản thay thế thành công. Review green
+chính xác giữ credit source gốc. Producer-import và coordination còn kiểm barrier delivery hiện
+hành trước khi tạo import, mở consumer mới dùng input import, resolve producer hoặc incorporate
+source. Source pending hoặc retired không trở thành bằng chứng delivery mới. Import và invocation
+đã chấp nhận trong lịch sử giữ nguyên proof niêm phong; barrier không viết lại các receipt đó.
+
+## Bằng chứng đầy đủ của goal
+
+Dự báo niêm phong ghi một tập nghĩa vụ đóng cho từng phân hoạch route hoặc plan unit đã được chấp
+nhận. Thành viên bất biến giữ chỉ số goal gốc và đúng khai báo route hoặc output plan, hash request
+và fingerprint bằng chứng. Replan cùng goal giữ mọi thành viên bắt buộc. Invocation retry hoặc resume
+giữ định danh thành viên; receipt và context invocation gốc không đổi. Preset một route đã niêm phong
+đã là ánh xạ riêng của goal đó. Dự báo unit hiện có suy ra cùng tập đầy đủ từ producer đã chấp nhận,
+kể cả unit bắt buộc chưa viết request thực thi.
+
+Ở nhánh phân hoạch, response.goalCheck chỉ mô tả thành viên của nhánh. Bằng chứng từng phần đã chấp
+nhận là tiến triển, không kích hoạt stop do liên tiếp không tiến triển. Dòng done-when gốc chỉ được
+chứng minh khi mọi thành viên hiện tại bắt buộc đều matched độc lập, toàn bộ bằng chứng đã khai và
+request vẫn niêm phong, và validator riêng còn chấp nhận bằng chứng đó. Plan, cell chưa mở, thành viên
+lặp, producer unit khác, runtime repair prerequisite, mission cũ hoặc kết quả mismatch không thay thế
+được. Verification dùng tier journey từ scripts/unchecked.mjs; unit secondary vẫn unchecked và không
+thay bằng chứng journey bắt buộc. Generation giữ mọi unit của plan.
+
+Scripts/goal-partitions.mjs sở hữu phép tổng hợp này. Goal ledger, gate brief.proven, gate kết thúc
+session, admission invocation phụ thuộc và bộ đọc bằng chứng gốc của coordinator dùng cùng kết quả.
+Consumer cần toàn bộ nghĩa vụ chỉ mở khi mọi thành viên bắt buộc đã được chấp nhận. Coordinator giữ
+mọi nhánh chứng minh bắt buộc và kiểm binding repository của từng phân hoạch; không ghép những lượt
+đo từng phần không liên quan thành một quan sát nhiều role.
+
 ## Tách phần việc chung khi đang thực thi
 
 Thẩm quyền sở hữu nằm tại `resources/orchestrator.json#workflowTopologies.coordination`; `scripts/workflow-coordination.mjs` thực thi luật đó. Lệnh nhận `<command> <own-session> <input.json>`. Mỗi peer tự gọi `enrol` với session coordinator. Coordinator gọi `assign` cho các claim không giao nhau theo đường dẫn tương đối của repository, rồi `prepare` với đúng phần impact của donor, draft producer chưa chạy, operator tạo kết quả và tọa độ consumer phụ thuộc chưa mở. Producer mới tự enrol bằng địa chỉ preparation; `activate` chuyển các root đã chọn một cách nguyên tử. Claim cha có thể giữ các exclusion chuẩn cho subtree đã chuyển. Chỉ reservation đang ghi giao với phần chuyển mới phải chờ; phần độc lập giữ thẩm quyền cũ. Thay đổi scope hiện hành làm preparation chưa kích hoạt mất hiệu lực.

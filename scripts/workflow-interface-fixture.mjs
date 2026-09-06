@@ -374,11 +374,11 @@ function tasteFrom(measurements) {
 
 
 
-export async function acceptInterface(f, runtime, route, { step = 11, goal = { doneWhen: 2 }, browserHostRoot, coordination = null } = {}) {
+export async function acceptInterface(f, runtime, route, { step = 11, goal = { doneWhen: 2 }, browserHostRoot, coordination = null, beforeRequest = null, transform = source => source.replace('>Run</button>', '>Transform</button>'), description = 'Name the existing fixture action Transform', beforeButton = null } = {}) {
 
-  const worktree = f.feWorktree ?? f.worktree, base = git(worktree, 'rev-parse', 'HEAD'), sessionBranch = git(worktree, 'branch', '--show-current'), before = readFileSync(path.join(worktree, INTERFACE_PAGE), 'utf8'), after = before.replace('>Run</button>', '>Transform</button>');
+  const worktree = f.feWorktree ?? f.worktree, base = git(worktree, 'rev-parse', 'HEAD'), sessionBranch = git(worktree, 'branch', '--show-current'), before = readFileSync(path.join(worktree, INTERFACE_PAGE), 'utf8'), after = transform(before);
 
-  assert.notEqual(before, after); assert.equal(after.replace('>Transform</button>', '>Run</button>'), before);
+  assert.notEqual(before, after);
 
   planCells(f, [[step, 'interface.generate']]);
 
@@ -391,6 +391,7 @@ export async function acceptInterface(f, runtime, route, { step = 11, goal = { d
   const dir = branch(f, step); put(path.join(dir, 'request/before.html'), before); const frozen = await freezeKnowledge(f, dir, UI_BINDINGS);
 
   request.frozenInputs = ['request/knowledge-manifest.json', 'request/family-understanding.json', 'request/before.html'].map(ref => ({ ref, sha256: sha(readFileSync(path.join(dir, ref))) }));
+  if (beforeRequest) await beforeRequest({ request, dir });
 
   await open(f, request);
 
@@ -400,7 +401,7 @@ export async function acceptInterface(f, runtime, route, { step = 11, goal = { d
 
   const preflight = `passed at ${new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')}`, beforeLog = reflog();
 
-  await captureInterface(f, dir, runtime, { name: 'before', button: 'Run', browserHostRoot });
+  await captureInterface(f, dir, runtime, { name: 'before', button: beforeButton ?? (before.includes('>Run</button>') ? 'Run' : 'Transform'), browserHostRoot });
 
   put(path.join(worktree, INTERFACE_PAGE), after); put(path.join(dir, 'response/artifacts/form.html'), after); const tree = 'export const resolvedDocument = ' + JSON.stringify(after) + ';\n'; put(path.join(dir, 'response/artifacts/form.resolved.tsx'), tree);
 
@@ -416,7 +417,7 @@ export async function acceptInterface(f, runtime, route, { step = 11, goal = { d
 
   const output = execFileSync(process.execPath, [path.join(f.root, 'scripts/sweep-presentation.mjs'), worktree, '--write-set', path.join(dir, 'response/data/write-set.txt'), '--json'], { encoding: 'utf8', windowsHide: true }); const sweep = JSON.parse(output); assert.deepEqual(sweep.findings, []);
 
-  const head = commit(worktree, 'Name the existing fixture action Transform', [INTERFACE_PAGE]), afterLog = reflog();
+  const head = commit(worktree, description, [INTERFACE_PAGE]), afterLog = reflog();
 
   const files = [{ path: INTERFACE_PAGE, change: 'modified', before: sha(before), after: sha(after), classes: [] }];
 
@@ -432,9 +433,9 @@ export async function acceptInterface(f, runtime, route, { step = 11, goal = { d
 
   put(path.join(dir, 'response/direction.md'), '# frontend-direction-decision — fixture-form\n' + table('Decision', ['Field', 'Value'], [['Direction id', q('fixture-form')], ['Target', q('/fixture')], ['Intent', q('modify')], ['Change level', q('refine')], ['Owner ceiling', q('surface-only')], ['Classification', q('locked-refine')], ['Presentation delta', q('none')], ['Selection policy', q('automatic')], ['Selected candidate', q('form')]]) + table('Surface class', ['Class', 'Why'], [[q('form'), 'One native input and action produce an editable result.']]) + table('Observed', ['Item', 'Evidence'], [['Existing source and styles', q(INTERFACE_PAGE + '@' + base)]]) + table('UI contract', ['Element', 'Kind', 'Responsibility'], [['input', 'region', 'Input and Transform action'], ['result', 'region', 'Actual API result'], ['Transform', 'action', 'Submit the editable input'], ['Reload', 'action', 'Navigate to the current URL and restore its input/result'], ['loaded', 'state', 'Ready input and result region'], ['pending', 'state', 'Busy disabled button and pending text'], ['error', 'state', 'Observed request failure and available retry'], ['settled', 'state', 'Output and editable input'], ['narrow', 'responsive', 'Single-column bounded page']]) + table('Coverage', ['Concern', 'Enumerated'], [['Actions', 'Transform and Reload with pointer and keyboard routes'], ['Regions', 'input and result'], ['States', 'loaded, pending, error and settled'], ['Responsive', 'narrow native form']]) + table('References', ['Standard', 'Class', 'URL', 'What is borrowed', 'Limitation']) + table('Images', ['Slot', 'Why', 'Claim', 'File']) + table('Falsification', ['Attack', 'Candidate', 'Verdict', 'Evidence'], [['narrow overflow', q('form'), 'holds', 'Actual 390px browser capture keeps every visible element inside its viewport.']]) + table('Candidate limits', ['Candidate', 'Criterion', 'Candidate says']) + table('Scores', ['Candidate', 'Viewport', 'Criterion', 'Score', 'Verdict'], scoreRows) + table('Why not the others', ['Candidate', 'Rejected because']) + table('Selected capture', ['Candidate', 'Source', 'Viewport', 'Screenshot'], [[q('form'), runtime.origin + '/form.html?viewport=wide', 'wide', q('response/artifacts/form.wide.png')]]) + table('Findings answered', ['Finding', 'How']) + table('Printed', ['Artifact', 'Why'], captures.flatMap(capture => [[runtime.origin + '/form.html?viewport=' + (capture.name.endsWith('wide') ? 'wide' : 'narrow'), 'Actual served fixture'], [q(`response/artifacts/form.${capture.name.endsWith('wide') ? 'wide' : 'narrow'}.png`), 'Actual runner capture']])) + table('Fallbacks taken', ['Code', 'Action']));
 
-  put(path.join(dir, 'response/response.md'), '# frontend-source-application — fixture-form\n' + table('Binding', ['Field', 'Value'], [['Target', q('fixture-form')], ['Mode', q('apply')], ['Branch', q(sessionBranch)], ['Base', q(base)], ['Commit', q(head)]]) + table('Projection', ['Path', 'Change', 'Classes', 'Claims', 'Why'], [[q(INTERFACE_PAGE), 'modified', '—', '—', 'Name the existing action Transform.']]) + table('Rejections', ['Path', 'Value', 'Because']) + table('Fallbacks taken', ['Code', 'Action']));
+  put(path.join(dir, 'response/response.md'), '# frontend-source-application — fixture-form\n' + table('Binding', ['Field', 'Value'], [['Target', q('fixture-form')], ['Mode', q('apply')], ['Branch', q(sessionBranch)], ['Base', q(base)], ['Commit', q(head)]]) + table('Projection', ['Path', 'Change', 'Classes', 'Claims', 'Why'], [[q(INTERFACE_PAGE), 'modified', '—', '—', description]]) + table('Rejections', ['Path', 'Value', 'Because']) + table('Fallbacks taken', ['Code', 'Action']));
 
-  put(path.join(dir, 'response/changes.md'), '# changes — interface.generate ' + ref(step) + '\n' + table('Binding', ['Field', 'Value'], [['Operator', q('interface.generate')], ['Step', q(ref(step))], ['Checkout', `${q('@workspaces/fe')} at ${q(base)} → ${q(head)} on ${q(sessionBranch)}`], ['Predecessor', q(route.ref)], ['Preflight', preflight], ['Reflog before', beforeLog], ['Reflog after', afterLog]]) + table('Files', ['Path', 'Change', 'Why', 'Claims'], [[q(INTERFACE_PAGE), 'modified', 'Make the existing action label explicit.', '—']]) + '\n## What the next step must know\n\nAudit the actual served source at wide and narrow viewports; all presentation values and behavior are unchanged.\n');
+  put(path.join(dir, 'response/changes.md'), '# changes — interface.generate ' + ref(step) + '\n' + table('Binding', ['Field', 'Value'], [['Operator', q('interface.generate')], ['Step', q(ref(step))], ['Checkout', `${q('@workspaces/fe')} at ${q(base)} → ${q(head)} on ${q(sessionBranch)}`], ['Predecessor', q(route.ref)], ['Preflight', preflight], ['Reflog before', beforeLog], ['Reflog after', afterLog]]) + table('Files', ['Path', 'Change', 'Why', 'Claims'], [[q(INTERFACE_PAGE), 'modified', description, '—']]) + '\n## What the next step must know\n\nAudit the actual served source at wide and narrow viewports; verify the source change recorded above.\n');
 
   await finishKnowledge(f, dir, frozen, 'response/artifacts/form-wide.measurements.json');
 
@@ -631,4 +632,3 @@ export async function acceptInterfaceQuality(f, source, audit, { step = 13, goal
   return { step, head, ref: `${ref(step)}/response/response.md`, request, results };
 
 }
-

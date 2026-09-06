@@ -328,7 +328,8 @@ export function previewChain(plan, mission) {
     const expectedSource = goal.doneWhen !== undefined ? `state.json#mission:v${goalVersion}/doneWhen:${goal.doneWhen}` : `state.json#mission:v${goalVersion}/prerequisite:${goal.prerequisite}`;
     const dependencies = plan.dependencies?.[c]?.length ? plan.dependencies[c].join(', ') : 'none';
     const requestRef = plan.requestRefs?.[c] ?? `step-${stepOf(c)}/parallel-${parallelOf(c)}/request/request.json`;
-    const extras = [plan.reasons[c], plan.presets[c] ? Object.entries(plan.presets[c]).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ') : null, plan.fanout[c] ? `fanout: ${plan.fanout[c]}` : null].filter(Boolean);
+    const partition = plan.partitions?.[c];
+    const extras = [partition ? `partition: ${partition.member} (this member only; complete goal requires all declared members)` : null, plan.reasons[c], plan.presets[c] ? Object.entries(plan.presets[c]).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ') : null, plan.fanout[c] ? `fanout: ${plan.fanout[c]}` : null].filter(Boolean);
     out.push(`[${c} ${op}] planned (not executed or verified): ${line} · source: ${expectedSource}`);
     out.push(`[${c} ${op}] ${extras.join(' · ')} · dependencies: ${dependencies} · request: ${requestRef} (pending expected.criteria and environment isolationId/mode/workspace/reads/writes/exclusive/outputRoot; freeze before dispatch)`);
     for (const [kind, from] of Object.entries(plan.imports?.[c] ?? {})) out.push(`[${c} ${op}] ${kind} imported from ${from.sourceSessionId} step ${from.sourceStep} (${from.input})`);

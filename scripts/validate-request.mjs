@@ -106,6 +106,12 @@ export function effectiveBudget(state, perUnit = PER_UNIT) {
 }
 // A live session (one with a transition) carries brief and budget; a request that would pass a cap is
 // BUDGET_EXHAUSTED for the orchestrator to write, and the gate names the cap it would pass.
+export function budgetSteps(state, forecast = null) {
+  if (!forecast && !state.planHistory?.active) return state.steps ?? {};
+  const retained = Object.fromEntries(Object.entries(state.steps ?? {}).filter(([cell]) => state.attempts?.[cell] || state.requestHashes?.[cell]));
+  const current = forecast?.steps ?? Object.fromEntries((state.chain ?? []).flat().map(cell => [cell, state.steps?.[cell]]));
+  return { ...retained, ...current };
+}
 export function sessionBudgetErrors(state, request) {
   const errors = [];
   const live = (state?.transitions ?? []).length > 0;
@@ -114,7 +120,7 @@ export function sessionBudgetErrors(state, request) {
   const caps = effectiveBudget(state);
   if (!caps || request.exchange) return errors;
   if (request.step > caps.maxSteps) errors.push(`state.json: step ${request.step} passes budget.maxSteps ${caps.maxSteps} (BUDGET_EXHAUSTED); a recorded user choice of continue on a budget:<id> decision extends it`);
-  const same = Object.entries(state.steps ?? {}).filter(([branch, op]) => op === request.operatorId && Number(branch.split('/')[0]) !== request.step).length;
+  const same = Object.entries(budgetSteps(state)).filter(([branch, op]) => op === request.operatorId && Number(branch.split('/')[0]) !== request.step).length;
   if (caps.maxSameOperator !== null && same + 1 > caps.maxSameOperator) errors.push(`state.json: ${request.operatorId} would run for the ${same + 1}th time, past budget.maxSameOperator ${caps.maxSameOperator} (BUDGET_EXHAUSTED); the same operator re-entered this often is the loop NO_PROGRESS exists to end`);
   return errors;
 }
@@ -738,7 +744,7 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   for (const [kind, p] of Object.entries(request.inputs ?? {})) {
     if (!sessionRoot) { errors.push(`request.json: inputs.${kind} cannot be resolved; the branch is not under a session`); continue; }
     if (!existsSync(path.join(sessionRoot, p))) errors.push(`request.json: inputs.${kind} = ${p} does not exist in the session`);
-    errors.push(...await validateImportedInput(root,sessionRoot,p,kind,{receivingSessionId:request.sessionId,receivingContractVersion:request.contractVersion}));
+    errors.push(...await validateImportedInput(root,sessionRoot,p,kind,{receivingSessionId:request.sessionId,receivingContractVersion:request.contractVersion,freshDelivery:phase!=='accept'}));
   }
   // The orchestrator hashes every request into state.json; a request that changed since is tampering.
   if (sessionRoot && existsSync(path.join(sessionRoot, 'state.json'))) {

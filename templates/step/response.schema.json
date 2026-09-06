@@ -200,7 +200,7 @@
       "description": "The profile that actually ran the branch"
     },
     "goalCheck": {
-      "description": "The agent's own check against the branch goal (request.json.goal.doneWhen): whether the done-when line is now evidenced, and by which of this response's declared files. Required on a done response whose request carried goal.doneWhen; every evidence path is one the fields list and exists on disk; achieved true needs at least one (scripts/validate-response.mjs#goalCheckErrors). Only a validator-accepted goalCheck reaches state.json.brief.proven.",
+      "description": "The agent's own check against the branch goal (request.json.goal.doneWhen): whether the done-when line is now evidenced, and by which of this response's declared files. Required on a done response whose request carried goal.doneWhen; every evidence path is one the fields list and exists on disk; achieved true needs at least one (scripts/validate-response.mjs#goalCheckErrors). For a partitioned goal this is the branch member check; complete goal credit follows workflows/README.md#complete-goal-evidence through scripts/goal-partitions.mjs.",
       "type": "object",
       "additionalProperties": false,
       "required": ["achieved", "evidence"],

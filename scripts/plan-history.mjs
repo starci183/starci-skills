@@ -11,6 +11,8 @@ import { scopeHash } from './mission-scope.mjs';
 import { mutateSession } from './session-lock.mjs';
 import { evidenceManifestErrors } from './evidence-manifest.mjs';
 import { waitingReviewBinding, resolvedWaitingReplanErrors } from './resolved-waiting.mjs';
+import { routeObligation, unitObligation, obligationId, forecastObligations, partitionAdmissionErrors } from './goal-partitions.mjs';
+import { editSourceReview, remapSourceReviews, carrySourceReviews, sourceReviewCoverage, sourceReviewAdmissionErrors } from './source-review.mjs';
 
 const sha = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const fingerprint = value => sha(JSON.stringify(value));
@@ -39,7 +41,7 @@ export function offsetForecast(plan, offset) {
   const cell = value => `${Number(value.split('/')[0]) + offset}/${value.split('/')[1]}`;
   const out = structuredClone(plan);
   out.chain = plan.chain.map(step => step.map(cell));
-  for (const field of ['steps', 'goals', 'reasons', 'dependencies', 'evidenceDependencies', 'handoffs', 'requestRefs', 'presets', 'fanout', 'imports', 'nodes', 'resumes', 'units', 'repairs', 'repairDependencies', 'reviewResumes', 'retries', 'rebinds']) out[field] = Object.fromEntries(Object.entries(plan[field] ?? {}).map(([key, value]) => [cell(key), structuredClone(value)]));
+  for (const field of ['steps', 'goals', 'reasons', 'dependencies', 'evidenceDependencies', 'handoffs', 'requestRefs', 'presets', 'fanout', 'imports', 'nodes', 'resumes', 'units', 'repairs', 'repairDependencies', 'reviewResumes', 'retries', 'rebinds', 'partitions']) out[field] = Object.fromEntries(Object.entries(plan[field] ?? {}).map(([key, value]) => [cell(key), structuredClone(value)]));
   for (const [key, goal] of Object.entries(out.goals)) if (goal.prerequisite) goal.prerequisite = cell(goal.prerequisite);
   for (const [key, deps] of Object.entries(out.dependencies)) out.dependencies[key] = deps.map(cell);
   for (const [key, deps] of Object.entries(out.evidenceDependencies)) out.evidenceDependencies[key] = deps.map(cell);
@@ -164,14 +166,16 @@ async function runtimeRepairSource(root, session, state, source, wall, requireme
 // every request stay at their original coordinates; only unopened cells receive new coordinates.
 export async function editForecast(root, session, state, original, edit, top) {
   const forecast = structuredClone(original);
-  if (!edit || !['resume', 'expand', 'repair', 'retry'].includes(edit.kind) || !forecast.steps[edit.cell]) throw Error('PLAN_EDIT_INVALID: name one current resume, retry, unit expansion or typed repair');
+  if (!edit || !['resume', 'expand', 'repair', 'retry', 'partition', 'review', 'source-repair'].includes(edit.kind) || !forecast.steps[edit.cell]) throw Error('PLAN_EDIT_INVALID: name one current resume, retry, unit expansion, route partition, source review or typed repair');
   for (const cell of forecast.chain.flat()) if (state.attempts?.[cell]) await acceptedCurrent(root, session, state, cell, state.attempts[cell].status);
   const cell = edit.cell, operator = forecast.steps[cell];
-  if (edit.kind === 'retry') {
+  if (['review','source-repair'].includes(edit.kind)) {
+    await editSourceReview(root,session,state,forecast,edit);
+  } else if (edit.kind === 'retry') {
     const { binding, request } = await retryBinding(root, session, state, cell, edit);
     if (Object.values(forecast.retries ?? {}).some(value => value.source === cell)) throw Error('PLAN_RETRY_UNBOUND: the failed attempt already has its unique retry');
     const next = `retry:${cell}`, rebind = edit.rebind ? `rebind:${cell}` : null;
-    for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes','units','imports']) if (forecast[field]?.[cell] !== undefined) (forecast[field] ??= {})[next] = structuredClone(forecast[field][cell]);
+    for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes','units','imports','partitions']) if (forecast[field]?.[cell] !== undefined) (forecast[field] ??= {})[next] = structuredClone(forecast[field][cell]);
     forecast.presets[next] = structuredClone(request.requirements);
     forecast.nodes[next] = `${forecast.nodes[cell]}:retry:${cell}`;
     (forecast.retries ??= {})[next] = { ...binding, ...(rebind ? { rebind } : {}) };
@@ -243,6 +247,7 @@ export async function editForecast(root, session, state, original, edit, top) {
     }
     const next = `pending:${cell}`;
     for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes']) (forecast[field] ??= {})[next] = structuredClone(forecast[field]?.[cell] ?? (['dependencies','evidenceDependencies'].includes(field) ? [] : {}));
+    for (const field of ['units','partitions']) if (forecast[field]?.[cell]) (forecast[field] ??= {})[next] = structuredClone(forecast[field][cell]);
     forecast.nodes[next] = `${forecast.nodes[cell]}:resume:${sourceCell}`;
     forecast.resumes ??= {}; forecast.resumes[next] = sourceCell;
     if (review) (forecast.reviewResumes ??= {})[next] = review;
@@ -259,6 +264,35 @@ export async function editForecast(root, session, state, original, edit, top) {
       forecast.chain[index] = forecast.chain[index].map(peer => peer === cell ? next : peer);
       for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes','fanout','handoffs']) delete forecast[field]?.[cell];
     }
+  } else if (edit.kind === 'partition') {
+    if (state.attempts?.[cell] || state.requestHashes?.[cell] || forecast.partitions?.[cell] || !Number.isInteger(forecast.goals[cell]?.doneWhen)) throw Error('PLAN_EDIT_INVALID: partition only an unopened, unsplit runtime delivery goal');
+    const set = routeObligation(state, operator, edit.env, edit.routes, forecast.goals[cell].doneWhen), id = obligationId(set);
+    if (Object.values(forecast.obligations ?? {}).some(prior => prior.kind === 'routes' && prior.goal === set.goal)) throw Error('GOAL_PARTITION_UNBOUND: the goal already has its immutable explicit route mapping');
+    const selected = set.members.filter(member => member.goal === forecast.goals[cell].doneWhen);
+    if (!selected.length) throw Error('PLAN_EDIT_INVALID: route partition must name the required routes of the unchanged goal');
+    (forecast.obligations ??= {})[id] = set;
+    const expanded = selected.map(member => `route:${cell}:${member.id}`);
+    selected.forEach((member,index) => {
+      const target = expanded[index];
+      for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes','imports']) if (forecast[field]?.[cell] !== undefined) (forecast[field] ??= {})[target] = structuredClone(forecast[field][cell]);
+      forecast.nodes[target] = `${forecast.nodes[cell]}:route:${member.id}`;
+      // Route-local mutation plans, commits and approvals are frozen by each real invocation; never
+      // copy a different route's desiredState or target head into its sibling.
+      forecast.presets[target] = { routeKey: member.id, env: set.env, operation: 'serve' };
+      (forecast.partitions ??= {})[target] = { set: id, member: member.id };
+      if (forecast.handoffs?.[cell]) forecast.handoffs[target] = forecast.handoffs[cell];
+    });
+    for (const target of Object.keys(forecast.dependencies)) if (!expanded.includes(target)) {
+      forecast.dependencies[target] = forecast.dependencies[target].flatMap(dep => dep === cell ? expanded : [dep]);
+      forecast.evidenceDependencies[target] = (forecast.evidenceDependencies[target] ?? []).flatMap(dep => dep === cell ? expanded : [dep]);
+      if (forecast.handoffs?.[target] === cell) forecast.handoffs[target] = expanded.at(-1);
+    }
+    for (const goal of Object.values(forecast.goals)) if (goal.prerequisite === cell) goal.prerequisite = expanded[0];
+    const index = forecast.chain.findIndex(step => step.includes(cell));
+    const peers = forecast.chain[index].filter(peer => peer !== cell);
+    if (peers.some(peer => state.attempts?.[peer])) throw Error('PLAN_EDIT_BUSY: a dispatched parallel peer keeps its frozen coordinate');
+    forecast.chain.splice(index, 1, ...(peers.length ? [peers] : []), ...expanded.map(target => [target]));
+    for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes','fanout','handoffs','imports']) delete forecast[field]?.[cell];
   } else {
     if (state.attempts?.[cell] || forecast.fanout?.[cell] !== 'units') throw Error('PLAN_EDIT_INVALID: expand only an unopened declared unit fanout');
     const response = await acceptedCurrent(root, session, state, edit.producer);
@@ -274,7 +308,11 @@ export async function editForecast(root, session, state, original, edit, top) {
     const targets = (state.mission.doneWhen ?? []).map((line,index)=>line.producedBy === operator ? index : null).filter(index=>index !== null);
     if (targets.length > 1 && loaded.units.units.some(unit=>!targets.includes(edit.goals?.[unit.id]))) throw Error('PLAN_UNIT_GOALS_REQUIRED: map every accepted unit to the exact confirmed done-when line this operator evidences');
     if (Object.keys(edit.goals ?? {}).some(id=>!loaded.units.units.some(unit=>unit.id === id)) || Object.values(edit.goals ?? {}).some(index=>!targets.includes(index))) throw Error('PLAN_UNIT_GOALS_INVALID: unit goal mapping must name accepted units and confirmed lines owned by this operator');
-    const ordered = [], pending = [...loaded.units.units];
+    const input = `step-${edit.producer.split('/')[0]}/parallel-${edit.producer.split('/')[1]}/${ref}`;
+    const set = await unitObligation(root, session, state, operator, input, edit.goals ?? {}), id = obligationId(set);
+    (forecast.obligations ??= {})[id] = set;
+    const requiredIds = new Set(set.members.map(member => member.id));
+    const ordered = [], pending = loaded.units.units.filter(unit => requiredIds.has(unit.id));
     while (pending.length) {
       const index = pending.findIndex(unit => unit.dependsOn.every(id => ordered.some(prior => prior.id === id)));
       if (index < 0) throw Error('PLAN_UNIT_CYCLE: accepted units cannot be scheduled in dependency order');
@@ -287,6 +325,7 @@ export async function editForecast(root, session, state, original, edit, top) {
       forecast.nodes[target] = `${forecast.nodes[cell]}:unit:${unit.id}`;
       if (edit.goals?.[unit.id] !== undefined) forecast.goals[target] = { doneWhen: edit.goals[unit.id] };
       forecast.units ??= {}; forecast.units[target] = { id: unit.id, input: `step-${edit.producer.split('/')[0]}/parallel-${edit.producer.split('/')[1]}/${ref}` };
+      (forecast.partitions ??= {})[target] = { set: id, member: unit.id };
       forecast.units[target].dependsOn = unit.dependsOn.map(id => expanded[ordered.findIndex(unit => unit.id === id)]);
       forecast.dependencies[target].push(...forecast.units[target].dependsOn);
       if (forecast.handoffs?.[cell]) forecast.handoffs[target] = forecast.handoffs[cell];
@@ -342,7 +381,9 @@ export async function editForecast(root, session, state, original, edit, top) {
   const map = cell => mapping.get(cell) ?? cell;
   const result = structuredClone(forecast);
   result.chain = forecast.chain.map(step => step.map(map));
-  for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','handoffs','requestRefs','presets','fanout','imports','nodes','resumes','units','repairs','repairDependencies','reviewResumes','retries','rebinds']) result[field] = Object.fromEntries(Object.entries(forecast[field] ?? {}).filter(([cell]) => mapping.has(cell)).map(([cell,value]) => [map(cell),structuredClone(value)]));
+  for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','handoffs','requestRefs','presets','fanout','imports','nodes','resumes','units','repairs','repairDependencies','reviewResumes','retries','rebinds','partitions']) result[field] = Object.fromEntries(Object.entries(forecast[field] ?? {}).filter(([cell]) => mapping.has(cell)).map(([cell,value]) => [map(cell),structuredClone(value)]));
+  for (const field of ['sourceReviews','sourceRepairs']) result[field] = Object.fromEntries(Object.entries(forecast[field] ?? {}).map(([cell,value]) => [map(cell),structuredClone(value)]));
+  remapSourceReviews(result,map);
   for (const goal of Object.values(result.goals)) if (goal.prerequisite) goal.prerequisite = map(goal.prerequisite);
   for (const field of ['dependencies','evidenceDependencies']) for (const [cell,deps] of Object.entries(result[field])) result[field][cell] = deps.map(map);
   for (const [cell,owner] of Object.entries(result.handoffs)) result.handoffs[cell] = map(owner);
@@ -362,6 +403,22 @@ export async function previewRevision(root, session, flags = {}) {
   const active = state.planHistory?.active ? readContext(session, state.planHistory.active, 'plans') : null;
   if (active?.missionVersion === state.mission.version && !flags.edit && !Object.keys(flags.requirements ?? {}).length && !flags.roles?.length) throw Error('PLAN_EDIT_REQUIRED: the unchanged goal keeps its current forecast; use an explicit resume or accepted unit expansion instead of restarting it');
   const forecast = flags.edit && active?.missionVersion === state.mission.version ? await editForecast(root, session, state, active.forecast, flags.edit, top) : offsetForecast(plan, top);
+  if (active?.missionVersion === state.mission.version) {
+    const previous = await forecastObligations(root, session, state, active.forecast);
+    if (previous.errors.length) throw Error(previous.errors.join('\n'));
+    for (const [id,set] of previous.sets) if (!isDeepStrictEqual(forecast.obligations?.[id], set)) {
+      if (!active.forecast.obligations?.[id] && set.kind === 'routes') continue;
+      // A pre-existing unit forecast derives the same obligation without changing its accepted
+      // invocations. A new remaining-work forecast still owes every required member.
+      (forecast.obligations ??= {})[id] = set;
+    }
+  }
+  if(!flags.edit && active?.missionVersion === state.mission.version) {
+    const review=await sourceReviewCoverage(root,session,state,active.forecast);
+    if(review.errors.length) throw Error(review.errors.join('\n'));
+    if(review.pending.length) throw Error('SOURCE_REVIEW_PENDING: resolve the exact source review before replacing its remaining forecast');
+    carrySourceReviews(forecast,active.forecast);
+  }
   const errors = await forecastErrors(root, session, state, forecast);
   if (errors.length) throw Error(errors.join('\n'));
   const basis = { mission: scopeHash(state.mission), active: state.planHistory?.active ?? null, chain: state.chain, steps: state.steps, planned: state.planned, choices: state.choices, attempts: state.attempts, requestHashes: state.requestHashes, forecast };
@@ -375,8 +432,11 @@ async function forecastErrors(root, session, state, forecast) {
   const offset = Number(forecast.chain[0][0].split('/')[0]) - 1;
   const plannedRequests = Object.fromEntries(Object.keys(forecast.steps).map(cell => [cell, { operatorId: forecast.steps[cell], goal: forecast.goals[cell], requirements: planned[cell].requirements }]));
   const errors = validateChain(root, packages, forecast.chain, forecast.steps, plannedRequests, { graph, forecast, resumeOwners: state.steps, mission: state.mission, maxParallel: await loadMaxParallel(root), planned, coordinateOffset: offset, imported: await readImportedInputs(root, session, {}, { planned }) });
-  const { effectiveBudget } = await import('./validate-request.mjs');
-  const budget = effectiveBudget(state), combinedSteps = { ...state.steps, ...forecast.steps };
+  errors.push(...(await forecastObligations(root, session, state, forecast)).errors);
+  const { effectiveBudget, budgetSteps } = await import('./validate-request.mjs');
+  // A revision replaces unopened coordinates. Count retained dispatched history and the current
+  // forecast, never the obsolete operator labels of displaced, still-unopened cells.
+  const budget = effectiveBudget(state), combinedSteps = budgetSteps(state, forecast);
   if (budget && Math.max(...Object.keys(combinedSteps).map(cell => Number(cell.split('/')[0]))) > budget.maxSteps) errors.push('BUDGET_EXHAUSTED: the reviewed forecast exceeds the retained finite step budget');
   if (budget && budget.maxSameOperator !== null) for (const op of new Set(Object.values(combinedSteps))) if (new Set(Object.entries(combinedSteps).filter(([, value]) => value === op).map(([cell]) => cell.split('/')[0])).size > budget.maxSameOperator) errors.push(`BUDGET_EXHAUSTED: the forecast exceeds the retained same-operator budget for ${op}`);
   return errors;
@@ -465,6 +525,8 @@ export async function planAdmissionErrors(root, session, state, request) {
   if (!view.forecast) return [];
   if (request.exchange) return nestedPlanAdmissionErrors(root, session, state, request, view.forecast);
   const forecast = view.forecast, cell = `${request.step}/${request.parallel}`, errors = [];
+  errors.push(...await partitionAdmissionErrors(root, session, state, request, forecast));
+  errors.push(...await sourceReviewAdmissionErrors(root,session,state,request,forecast));
   if (!isDeepStrictEqual(request.goal, forecast.goals[cell])) errors.push('PLAN_GOAL_UNBOUND: the invocation must bind the current reviewed logical goal mapping');
   const resume = request.resume ? `${request.resume.step}/${request.resume.parallel}` : null;
   if (resume !== (forecast.resumes?.[cell] ?? null)) errors.push('PLAN_REENTRY_UNBOUND: invocation resume differs from the reviewed execution mapping');

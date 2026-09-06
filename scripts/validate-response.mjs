@@ -111,8 +111,8 @@ export function effectiveDisposition(entry, requirements) {
 // The agent's own check against its branch goal (request.json.goal). A done response whose request
 // serves a mission done-when line carries goalCheck { achieved, evidence }; every evidence path is a
 // file this response's fields declare and that exists on disk; achieved true rests on at least one. A
-// goalCheck that passes here is what validate-session counts as validator-accepted, and only those
-// reach state.json.brief.proven. A nested exchange belongs to its branch and carries none.
+// goalCheck that passes here proves its branch member. Complete goal credit is owned by
+// workflows/README.md#complete-goal-evidence. A nested exchange belongs to its branch and carries none.
 export function goalCheckErrors(dir, response, goal, { rel = (f) => f, exchange = null } = {}) {
   const errors = [];
   const check = response?.goalCheck;
