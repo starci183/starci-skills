@@ -192,25 +192,8 @@ export async function missionCorrectionBusy(session, state, { waitingReentry = n
     if (attempt.status === 'running') return true;
     if (attempt.status !== 'waiting') continue;
     if (settled.has(key) || reentering.has(key)) continue;
-    // A sealed prior-mission wait stays historical. It is neither a live obligation of this
-    // corrected scope nor evidence that its old exchange or product goal was fulfilled.
-    if (!Number.isInteger(attempt.expected?.goalVersion) || attempt.expected.goalVersion >= state.mission.version || attempt.expected.goalVersion < 1 || !Number.isFinite(Date.parse(attempt.endedAt)) || !(Date.parse(attempt.endedAt) >= Date.parse(attempt.startedAt))) return true;
-    if (!/^[1-9][0-9]*\/[1-9][0-9]*(?:\/[a-z][a-z-]*)?$/.test(key)) return true;
-    const [step, parallel, exchange] = key.split('/');
-    const ref = `step-${step}/parallel-${parallel}${exchange ? `/${exchange}` : ''}`;
-    if (attempt.requestRef !== `${ref}/request/request.json` || attempt.responseRef !== `${ref}/response/response.json`) return true;
-    const branch = path.join(session, ref);
-    try {
-      const relative = path.relative(await realpath(session), await realpath(branch));
-      if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return true;
-      if ((await evidenceManifestErrors(branch, attempt.evidenceManifest)).length) return true;
-      const bytes = await readFile(path.join(branch, 'request/request.json'));
-      const request = JSON.parse(bytes), response = JSON.parse(await readFile(path.join(branch, 'response/response.json'), 'utf8'));
-      const digest = value => `sha256:${createHash('sha256').update(value).digest('hex')}`;
-      if (state.requestHashes?.[key] !== digest(bytes) || attempt.expectedHash !== digest(JSON.stringify(request.expected)) || JSON.stringify(request.expected) !== JSON.stringify(attempt.expected)) return true;
-      if (request.contractVersion !== V22_CONTRACT || request.sessionId !== state.id || request.attempt?.id !== attempt.id || response.attempt?.id !== attempt.id || request.operatorId !== attempt.operatorId || response.operatorId !== attempt.operatorId || response.status !== 'waiting') return true;
-      if ([request, response].some(value => value.step !== Number(step) || value.parallel !== Number(parallel) || (value.exchange ?? null) !== (exchange ?? null))) return true;
-    } catch { return true; }
+    const { isSealedPriorMissionWait } = await import('./resolved-waiting.mjs');
+    if (!await isSealedPriorMissionWait(session, state, key, attempt)) return true;
   }
   return false;
 }

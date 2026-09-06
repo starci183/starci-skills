@@ -227,6 +227,31 @@ export async function waitingReviewBinding(root, session, state, parentKey, inte
   return binding;
 }
 
+
+// A historical wait is retained evidence, never credit for the corrected mission.
+export async function isSealedPriorMissionWait(session, state, key, attempt) {
+  if (attempt?.status !== 'waiting') return false;
+    // A sealed prior-mission wait stays historical. It is neither a live obligation of this
+    // corrected scope nor evidence that its old exchange or product goal was fulfilled.
+    if (!Number.isInteger(attempt.expected?.goalVersion) || attempt.expected.goalVersion >= state.mission.version || attempt.expected.goalVersion < 1 || !Number.isFinite(Date.parse(attempt.endedAt)) || !(Date.parse(attempt.endedAt) >= Date.parse(attempt.startedAt))) return false;
+    if (!/^[1-9][0-9]*\/[1-9][0-9]*(?:\/[a-z][a-z-]*)?$/.test(key)) return false;
+    const [step, parallel, exchange] = key.split('/');
+    const ref = `step-${step}/parallel-${parallel}${exchange ? `/${exchange}` : ''}`;
+    if (attempt.requestRef !== `${ref}/request/request.json` || attempt.responseRef !== `${ref}/response/response.json`) return false;
+    const branch = path.join(session, ref);
+    try {
+      const relative = path.relative(realpathSync(session), realpathSync(branch));
+      if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return false;
+      if ((await evidenceManifestErrors(branch, attempt.evidenceManifest)).length) return false;
+      const bytes = await readFile(path.join(branch, 'request/request.json'));
+      const request = JSON.parse(bytes), response = JSON.parse(await readFile(path.join(branch, 'response/response.json'), 'utf8'));
+      if (state.requestHashes?.[key] !== sha(bytes) || attempt.expectedHash !== sha(JSON.stringify(request.expected)) || JSON.stringify(request.expected) !== JSON.stringify(attempt.expected)) return false;
+      if (request.contractVersion !== V22_CONTRACT || request.sessionId !== state.id || request.attempt?.id !== attempt.id || response.attempt?.id !== attempt.id || request.operatorId !== attempt.operatorId || response.operatorId !== attempt.operatorId || response.status !== 'waiting') return false;
+      if ([request, response].some(value => value.step !== Number(step) || value.parallel !== Number(parallel) || (value.exchange ?? null) !== (exchange ?? null))) return false;
+    } catch { return false; }
+  return true;
+}
+
 export async function resolvedWaitingAttemptKeys(root, session, state, { requireSuccessorTerminal = false, reentry = null } = {}) {
   const settled = new Set();
   const retired = new Set();
@@ -238,6 +263,11 @@ export async function resolvedWaitingAttemptKeys(root, session, state, { require
   const successors = new Map();
   for (const [parentKey, parent] of Object.entries(state.attempts ?? {})) {
     if (parent.status !== 'waiting' || parentKey.split('/').length !== 2) continue;
+    if (Number.isInteger(parent.expected?.goalVersion) && parent.expected.goalVersion < state.mission.version) {
+      if (await isSealedPriorMissionWait(session, state, parentKey, parent)) retired.add(parentKey);
+      else errors.push(`REVIEW_REENTRY_UNBOUND: prior-mission wait ${parentKey} lacks intact sealed evidence`);
+      continue;
+    }
     if (retiredPlanCell(state, parentKey)) { retired.add(parentKey); continue; }
     const successorKeys = Object.entries(state.resumes ?? {}).filter(([, value]) => value?.resumes === parentKey).map(([key]) => key);
     if (!successorKeys.length) continue;

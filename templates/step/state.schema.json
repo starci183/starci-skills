@@ -1435,6 +1435,141 @@
                   }
                 }
               }
+            },
+            "architecture": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "nodes",
+                "edges"
+              ],
+              "properties": {
+                "nodes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "kind",
+                      "label",
+                      "owner",
+                      "role",
+                      "status",
+                      "evidence"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$",
+                        "maxLength": 64
+                      },
+                      "kind": {
+                        "enum": [
+                          "ui",
+                          "api",
+                          "service",
+                          "data",
+                          "external"
+                        ]
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      },
+                      "owner": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "role": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "discovered",
+                          "proposed",
+                          "unverified"
+                        ]
+                      },
+                      "evidence": {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        }
+                      }
+                    }
+                  }
+                },
+                "edges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "from",
+                      "to",
+                      "label",
+                      "status",
+                      "evidence"
+                    ],
+                    "properties": {
+                      "from": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$",
+                        "maxLength": 64
+                      },
+                      "to": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]*$",
+                        "maxLength": 64
+                      },
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      },
+                      "status": {
+                        "enum": [
+                          "discovered",
+                          "proposed",
+                          "unverified"
+                        ]
+                      },
+                      "evidence": {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }

@@ -78,3 +78,19 @@ test('forecast commit shares correction busy classification and still checks the
   await writeFile(f.file, JSON.stringify(f.state));
   await assert.rejects(commitRevision(root, f.session, input), /PLAN_BUSY/);
 });
+
+test('prior-mission waiting resume links do not block the first corrected forecast or claim completion', async t => {
+  const f = await fixture(t);
+  f.state.resumes = { '2/1': { resumes: '1/1' } };
+  const before = JSON.stringify(f.state);
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const { resolvedWaitingAttemptKeys } = await import('./resolved-waiting.mjs');
+  const result = await resolvedWaitingAttemptKeys(root, f.session, f.state);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.retired.has('1/1'), true);
+  assert.equal(result.settled.has('1/1'), false);
+  assert.equal(await missionCorrectionBusy(f.session, f.state), false);
+  assert.equal(JSON.stringify(f.state), before);
+  await writeFile(path.join(f.branch, 'response/response.json'), '{}');
+  assert.equal(await missionCorrectionBusy(f.session, f.state), true);
+});

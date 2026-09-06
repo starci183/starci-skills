@@ -75,6 +75,20 @@ const samePath = (a, b) => typeof a === 'string' && typeof b === 'string' && (pr
 const safeRoot = value => typeof value === 'string' && value.length && !path.isAbsolute(value) && !/[:\\*?]/.test(value) && value.split('/').every(part => part && part !== '.' && part !== '..');
 const coversRoot = (pattern, target) => pattern === target || pattern?.endsWith('/**') && (target === pattern.slice(0,-3) || target.startsWith(pattern.slice(0,-2)));
 
+function assertRetryRequest(state, cell, original, request, retry) {
+  if (request.operatorId !== original.operatorId || request.attempt?.previous !== original.attempt.id || request.attempt?.number !== original.attempt.number + 1 || !['retry','repair'].includes(request.attempt?.kind) || request.resume || !isDeepStrictEqual(request.requirements, original.requirements) || !isDeepStrictEqual(request.inputs, original.inputs) || request.unit !== original.unit) throw Error('PLAN_RETRY_UNAUTHORIZED: retry must retain the same operator, source unit, requirements and accepted inputs with exact prior attempt');
+  if (Object.entries(state.attempts ?? {}).some(([other, value]) => other !== cell && value.previous === original.attempt.id)) throw Error('PLAN_RETRY_UNBOUND: the failed attempt already owns another successor invocation');
+  const before = original.environment ?? {}, after = request.environment ?? {};
+  for (const field of ['writes','exclusive','mode','outputRoot']) if (!isDeepStrictEqual(before[field], after[field])) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot expand effect or resource ownership');
+  if (before.workspace && (after.workspace?.alias !== before.workspace.alias || !samePath(after.workspace?.worktree, before.workspace.worktree))) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot change its source role or checkout');
+  if (!before.workspace && after.workspace) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot acquire a source checkout');
+  if (retry.correction && (after.workspace.revision !== retry.revision || request.contexts?.find(context => context.alias === after.workspace.alias)?.head !== retry.revision)) throw Error('PLAN_RETRY_UNBOUND: source correction requires a freshly frozen current-HEAD base');
+  if (retry.correction === 'source-proof-review') {
+    const method = request.frozenInputs?.find(item => item.ref === retry.methodRef);
+    if (!method || !/^sha256:[a-f0-9]{64}$/.test(method.sha256 ?? '') || method.sha256 === sha('') || (original.frozenInputs ?? []).some(item => item.sha256 === method.sha256)) throw Error('NO_PROGRESS: proof review requires a changed frozen verification method, not only a new source base or renamed old bytes');
+  }
+}
+
 // A retry changes execution, not goal authority. Existing request fields carry the new method and
 // checkout base; the forecast only records why this exact sealed attempt may be retried.
 async function retryBinding(root, session, state, source, edit) {
@@ -179,6 +193,12 @@ export async function editForecast(root, session, state, original, edit, top) {
     forecast.presets[next] = structuredClone(request.requirements);
     forecast.nodes[next] = `${forecast.nodes[cell]}:retry:${cell}`;
     (forecast.retries ??= {})[next] = { ...binding, ...(rebind ? { rebind } : {}) };
+    const retryAncestors = new Set([cell]); let ancestor = cell;
+    while (forecast.retries[ancestor]) {
+      ancestor = forecast.retries[ancestor].source;
+      if (retryAncestors.has(ancestor)) throw Error('PLAN_RETRY_UNBOUND: retry lineage contains a cycle');
+      retryAncestors.add(ancestor);
+    }
     if (rebind) {
       const bound = await rebindBinding(root, session, state, request, edit.rebind);
       forecast.steps[rebind] = 'workspace.bind'; forecast.goals[rebind] = { prerequisite: next };
@@ -192,6 +212,7 @@ export async function editForecast(root, session, state, original, edit, top) {
       forecast.dependencies[target] = forecast.dependencies[target].map(dep => dep === cell ? next : dep);
       forecast.evidenceDependencies[target] = (forecast.evidenceDependencies[target] ?? []).map(dep => dep === cell ? next : dep);
       if (forecast.handoffs?.[target] === cell) forecast.handoffs[target] = next;
+      if (forecast.units?.[target]) forecast.units[target].dependsOn = (forecast.units[target].dependsOn ?? []).map(dep => retryAncestors.has(dep) ? next : dep);
     }
     const index = Math.max(...forecast.chain.map((step,index) => step.some(value => state.attempts?.[value]) ? index : -1));
     forecast.chain.splice(index + 1, 0, ...(rebind ? [[rebind]] : []), [next]);
@@ -520,13 +541,78 @@ export function activePlanView(session, state) {
   return { state: { ...state, steps: Object.fromEntries(Object.entries(state.steps).filter(([cell]) => cells.has(cell))), planned: active.planned }, forecast: active.forecast, resumeOwners: state.steps, coordinateOffset: Number(state.chain[0][0].split('/')[0]) - 1 };
 }
 
+// A unit dependency names logical work. Old sealed forecasts can still name a failed execution;
+// only its unique recorded retry lineage, opened under that exact authority, can replace its proof.
+export async function acceptedUnitDependency(root, session, state, dependency) {
+  const { forecast } = activePlanView(session, state);
+  const unit = forecast?.units?.[dependency], operator = forecast?.steps?.[dependency];
+  if (!unit || !operator) throw Error('PLAN_UNIT_UNBOUND: dependency must name one declared logical unit');
+  const seen = new Set(), proved = new Set(); let cell = dependency;
+  const ancestors = new Set([cell]);
+  while (forecast.retries?.[cell]) {
+    cell = forecast.retries[cell].source;
+    if (ancestors.has(cell)) throw Error('PLAN_UNIT_UNBOUND: retry dependency lineage contains a cycle');
+    ancestors.add(cell);
+  }
+  const proof = async target => {
+    if (proved.has(target)) return;
+    const status = state.attempts?.[target]?.status;
+    if (!['matched','mismatched','inconclusive','blocked'].includes(status)) throw Error(`PLAN_PROOF_UNAVAILABLE: latest unit successor ${target} has no terminal accepted invocation`);
+    await acceptedCurrent(root, session, state, target, status); proved.add(target);
+  };
+  while (true) {
+    if (seen.has(cell)) throw Error('PLAN_UNIT_UNBOUND: retry dependency lineage contains a cycle');
+    seen.add(cell);
+    const currentUnit = forecast.units?.[cell];
+    if (forecast.steps?.[cell] !== operator || currentUnit?.id !== unit.id || currentUnit?.input !== unit.input) throw Error('PLAN_UNIT_UNBOUND: retry dependency changes operator, logical unit or accepted plan input');
+    if (state.attempts?.[cell]) {
+      const actual = requestAt(session, cell);
+      if (actual.operatorId !== operator || actual.unit !== unit.id || actual.inputs?.units !== unit.input) throw Error('PLAN_UNIT_UNBOUND: dependency differs from its actual operator, logical unit or accepted plan input');
+    }
+    const successors = Object.entries(forecast.retries ?? {}).filter(([,retry]) => retry.source === cell);
+    if (successors.length > 1) throw Error('PLAN_UNIT_UNBOUND: logical unit has ambiguous retry successors');
+    if (!successors.length) {
+      if (state.attempts?.[cell]?.status !== 'matched') throw Error(`PLAN_PROOF_UNAVAILABLE: latest unit successor ${cell} has no sealed matched invocation`);
+      await proof(cell);
+      const { assertCurrentProducerDelivery } = await import('./producer-import.mjs');
+      const [step, parallel] = cell.split('/').map(Number);
+      await assertCurrentProducerDelivery(root, state.id, step, parallel, { hostRoot: state.workflowOwner.sourceRoot });
+      return cell;
+    }
+    const [next, retry] = successors[0];
+    if (seen.has(next)) throw Error('PLAN_UNIT_UNBOUND: retry dependency lineage contains a cycle');
+    if (!['mismatched','inconclusive','blocked'].includes(state.attempts?.[cell]?.status)) throw Error('PLAN_RETRY_UNBOUND: a retry dependency must replace its exact failed invocation');
+    await proof(cell); await proof(next);
+    const original = requestAt(session, cell), request = requestAt(session, next);
+    const context = readContext(session, state.attempts[next].context, 'invocations');
+    if (context.phase !== 'opening' || !context.planRevision) throw Error('PLAN_RETRY_UNBOUND: unit successor needs its original admitted forecast authority');
+    const opening = readContext(session, context.planRevision, 'plans');
+    if (opening.sessionId !== state.id || opening.missionVersion !== state.mission.version || opening.scopeHash !== scopeHash(state.mission) || !isDeepStrictEqual(opening.forecast?.retries?.[next], retry)) throw Error('PLAN_RETRY_UNBOUND: successor differs from its exact invocation forecast retry authority');
+    if (retry.attempt !== original.attempt.id || retry.requestHash !== state.requestHashes[cell] || retry.fingerprint !== state.attempts[cell].evidenceManifest.fingerprint) throw Error('PLAN_RETRY_UNBOUND: successor does not bind its original failed request and evidence');
+    for (const target of [cell,next]) {
+      const plannedUnit = opening.forecast?.units?.[target], actual = requestAt(session, target);
+      if (opening.forecast?.steps?.[target] !== operator || plannedUnit?.id !== unit.id || plannedUnit?.input !== unit.input || actual.operatorId !== operator || actual.unit !== unit.id || actual.inputs?.units !== unit.input) throw Error('PLAN_UNIT_UNBOUND: admitted successor changes operator, logical unit or accepted plan input');
+    }
+    if (!isDeepStrictEqual(request.goal, original.goal) || !isDeepStrictEqual(opening.forecast.goals?.[next], request.goal)) throw Error('PLAN_RETRY_UNAUTHORIZED: unit successor must retain the original source goal');
+    assertRetryRequest(state, next, original, request, retry);
+    if (retry.rebind) {
+      const rebind = opening.forecast.rebinds?.[retry.rebind];
+      if (rebind?.retry !== next || !isDeepStrictEqual(forecast.rebinds?.[retry.rebind], rebind)) throw Error('PLAN_REBIND_UNBOUND: successor lost its exact prior binding repair');
+      const response = await acceptedCurrent(root, session, state, retry.rebind);
+      const route = JSON.parse(readFileSync(path.join(branchPath(session, retry.rebind), response.fields.route)));
+      if (!samePath(route.checkout.diskPath, request.environment?.workspace?.worktree) || route.sourceHead !== request.environment.workspace.revision || !isDeepStrictEqual(route.writeRoots, opening.forecast.presets[retry.rebind].declaredWriteRoots)) throw Error('PLAN_REBIND_UNBOUND: unit successor differs from its accepted repaired checkout');
+    }
+    cell = next;
+  }
+}
+
 export async function planAdmissionErrors(root, session, state, request) {
   const view = activePlanView(session, state);
   if (!view.forecast) return [];
   if (request.exchange) return nestedPlanAdmissionErrors(root, session, state, request, view.forecast);
   const forecast = view.forecast, cell = `${request.step}/${request.parallel}`, errors = [];
   errors.push(...await partitionAdmissionErrors(root, session, state, request, forecast));
-  errors.push(...await sourceReviewAdmissionErrors(root,session,state,request,forecast));
+  if (!forecast.sourceReviews?.[cell]) errors.push(...await sourceReviewAdmissionErrors(root,session,state,request,forecast));
   if (!isDeepStrictEqual(request.goal, forecast.goals[cell])) errors.push('PLAN_GOAL_UNBOUND: the invocation must bind the current reviewed logical goal mapping');
   const resume = request.resume ? `${request.resume.step}/${request.resume.parallel}` : null;
   if (resume !== (forecast.resumes?.[cell] ?? null)) errors.push('PLAN_REENTRY_UNBOUND: invocation resume differs from the reviewed execution mapping');
@@ -540,17 +626,8 @@ export async function planAdmissionErrors(root, session, state, request) {
     const expected = { ...proved.binding, ...(retry.rebind ? { rebind: retry.rebind } : {}) };
     if (!isDeepStrictEqual(retry, expected)) throw Error('PLAN_RETRY_UNBOUND: retry identity differs from its exact sealed failed invocation');
     const original = proved.request;
-    if (request.operatorId !== original.operatorId || request.attempt?.previous !== original.attempt.id || request.attempt?.number !== original.attempt.number + 1 || !['retry','repair'].includes(request.attempt?.kind) || request.resume || !isDeepStrictEqual(request.requirements, original.requirements) || !isDeepStrictEqual(request.inputs, original.inputs) || request.unit !== original.unit) throw Error('PLAN_RETRY_UNAUTHORIZED: retry must retain the same operator, source unit, requirements and accepted inputs with exact prior attempt');
-    if (Object.entries(state.attempts ?? {}).some(([other, value]) => other !== cell && value.previous === original.attempt.id)) throw Error('PLAN_RETRY_UNBOUND: the failed attempt already owns another successor invocation');
-    const before = original.environment ?? {}, after = request.environment ?? {};
-    for (const field of ['writes','exclusive','mode','outputRoot']) if (!isDeepStrictEqual(before[field], after[field])) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot expand effect or resource ownership');
-    if (before.workspace && (after.workspace?.alias !== before.workspace.alias || !samePath(after.workspace?.worktree, before.workspace.worktree))) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot change its source role or checkout');
-    if (!before.workspace && after.workspace) throw Error('PLAN_RETRY_UNAUTHORIZED: a retry cannot acquire a source checkout');
-    if (retry.correction && (after.workspace.revision !== retry.revision || request.contexts?.find(context => context.alias === after.workspace.alias)?.head !== retry.revision)) throw Error('PLAN_RETRY_UNBOUND: source correction requires a freshly frozen current-HEAD base');
-    if (retry.correction === 'source-proof-review') {
-      const method = request.frozenInputs?.find(item => item.ref === retry.methodRef);
-      if (!method || !/^sha256:[a-f0-9]{64}$/.test(method.sha256 ?? '') || method.sha256 === sha('') || (original.frozenInputs ?? []).some(item => item.sha256 === method.sha256)) throw Error('NO_PROGRESS: proof review requires a changed frozen verification method, not only a new source base or renamed old bytes');
-    }
+    assertRetryRequest(state, cell, original, request, retry);
+    const after = request.environment ?? {};
     if (retry.rebind) {
       const rebind = forecast.rebinds?.[retry.rebind];
       if (!rebind || rebind.retry !== cell) throw Error('PLAN_REBIND_UNBOUND: retry has no exact prior binding repair');
@@ -586,7 +663,7 @@ export async function planAdmissionErrors(root, session, state, request) {
   } catch (error) { errors.push(error.message); }
   const unit = forecast.units?.[cell];
   if (unit && (request.unit !== unit.id || request.inputs?.units !== unit.input)) errors.push('PLAN_UNIT_UNBOUND: invocation must bind the exact accepted unit and plan output');
-  if (unit) for (const dependency of unit.dependsOn ?? []) try { await acceptedCurrent(root, session, state, dependency); } catch (error) { errors.push(error.message); }
+  if (unit) for (const dependency of unit.dependsOn ?? []) try { await acceptedUnitDependency(root, session, state, dependency); } catch (error) { errors.push(error.message); }
   if (forecast.handoffs?.[cell]) {
     const { loadOperatorGraph, dependencyHandoffErrors } = await import('./validate-chain.mjs');
     const graph = await loadOperatorGraph(root);

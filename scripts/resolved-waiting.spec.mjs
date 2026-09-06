@@ -47,6 +47,7 @@ async function fixture({ childStatus = 'mismatched', successorStatus = 'matched'
   const successorDir = path.join(session, 'step-3', 'parallel-1');
   const state = {
     id: sessionId, contractVersion: 'starci/v2.2', chain: [['1/1'], [parentKey], [successorKey]],
+    mission: { version: 1 },
     steps: { '1/1': 'workspace.bind', [parentKey]: 'architecture.decide', [successorKey]: 'architecture.decide' },
     resumes: { [successorKey]: { resumes: parentKey, stop: 'CRITIQUE_UNRESOLVED' } },
     requestHashes: {

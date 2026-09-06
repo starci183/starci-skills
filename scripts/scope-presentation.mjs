@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { missionAt } from './mission-history.mjs';
+import { renderArchitecture } from './scope-architecture.mjs';
 
 const policy = JSON.parse(readFileSync(new URL('../resources/interaction.json', import.meta.url), 'utf8'));
 const printable = value => value == null || value === '' ? 'Not established' : typeof value === 'string' ? value : JSON.stringify(value);
@@ -36,6 +37,7 @@ export function renderScope(mission, previous) {
     `Confirm Goal — v${mission.version ?? '?'}${before ? ' (changes)' : ''}`,
     '', '| Item | Scope |', '| --- | --- |',
     ...labels.map(label => `| ${escape(label)} | ${escape(current[label])} |`),
+    '', renderArchitecture(mission.discovery, mission.language),
     '', 'Workflow forecast: planned, not executed or verified. Missing values remain unresolved; this preview grants no authority.',
   ].join('\n');
 }

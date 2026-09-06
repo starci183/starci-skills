@@ -203,6 +203,12 @@ For the same confirmed goal, retain the current forecast and use `flags.edit` in
   matched plan's sealed `units` output, preserving already executed nodes. Unit dependencies run
   first. When the operator owns several done-when lines, `goals` maps each unit id to its confirmed
   line index. The resulting request binds the returned unit id and exact `inputs.units` reference.
+  `scripts/plan-history.mjs#acceptedUnitDependency` resolves a retained dependency through its unique
+  sealed retry lineage. Every link retains the operator, logical unit and accepted plan input, with
+  its original invocation forecast authority. Only the latest matched proof can satisfy current
+  consumption; pending, failed, ambiguous or altered successors cannot fall back to older credit.
+  The current producer-delivery gate still rejects disputed or retired source. Historical plans and
+  receipts remain unchanged; new retry forecasts update the unopened unit edges.
 - `{"kind":"repair","cell":"N/M","wall":"runtime.<role>.head","requirements":{...}}` follows
   an accepted current preflight's declared runtime Next for its sole runtime-head wall. Requirements
   bind that project's role, environment, frozen commit and current environment approval, with only

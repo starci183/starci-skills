@@ -201,6 +201,14 @@ export async function partitionAdmissionErrors(root, session, state, request, fo
       if (config.project !== member.repository.project || config.role !== member.repository.role || config.repository?.gitRepository !== member.repository.repository) fail('current runtime route differs from its confirmed repository identity');
     } catch (error) { errors.push(error.message); }
   }
+  if (forecast.sourceReviews?.[cell]) {
+    // A source-only diagnostic measures an accepted member without claiming delivery of its set.
+    // Its exact read-only proof and method gate owns this exception; a marker alone grants none.
+    const { sourceReviewAdmissionErrors } = await import('./source-review.mjs');
+    const diagnosticErrors = await sourceReviewAdmissionErrors(root, session, state, request, forecast);
+    errors.push(...diagnosticErrors);
+    if (!diagnosticErrors.length) return errors;
+  }
   const dependencies = forecast.dependencies?.[cell] ?? [];
   const required = new Set(dependencies.map(dependency => derived.partitions[dependency]?.set).filter(id => id && id !== partition?.set));
   if (required.size) {

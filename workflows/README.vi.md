@@ -196,6 +196,12 @@ Trong cùng goal đã xác nhận, giữ dự báo hiện tại và dùng `flags
   được niêm phong của plan matched thật, giữ node đã chạy. Phụ thuộc unit chạy trước. Khi operator
   sở hữu nhiều dòng done-when, `goals` ánh xạ mỗi id unit tới chỉ số dòng đã xác nhận. Request mới
   bind đúng id unit và `inputs.units` trả về.
+  `scripts/plan-history.mjs#acceptedUnitDependency` giải phụ thuộc được giữ qua chuỗi retry duy nhất
+  đã niêm phong. Mỗi liên kết giữ operator, unit logic và input plan được chấp nhận, cùng quyền từ
+  forecast gốc của invocation. Chỉ proof matched mới nhất thỏa việc tiêu thụ hiện tại; successor
+  đang chờ, thất bại, không duy nhất hoặc bị sửa không thể quay về lấy công của bản cũ. Gate giao
+  source hiện tại vẫn từ chối source đang bị xem xét hoặc đã bị thay thế. Plan và receipt lịch sử
+  không đổi; forecast retry mới cập nhật cạnh unit chưa mở.
 - `{"kind":"repair","cell":"N/M","wall":"runtime.<role>.head","requirements":{...}}` theo
   Next runtime đã khai của preflight được chấp nhận ở phiên bản hiện tại khi chỉ còn một wall về
   head runtime. Requirements bind đúng project, role, môi trường, commit đã đóng băng và phê duyệt

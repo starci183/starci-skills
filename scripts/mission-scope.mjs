@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { architectureErrors } from './scope-architecture.mjs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +26,7 @@ export function scopeErrors(mission, { root = ROOT, complete = false } = {}) {
   const errors = validateAgainst(schema, mission?.discovery, 'mission.discovery');
   if (errors.length) return errors;
   const discovery = mission.discovery;
+  errors.push(...architectureErrors(discovery, root));
   const policy = deliveryPolicy(root);
   const roles = new Set(discovery.repositories.map(repo => repo.role));
   if (complete) for (const target of deliveryTargets(mission, root)) if (!mission.doneWhen?.some(line => line.producedBy === target)) errors.push(`GOAL_DELIVERY_INCOMPLETE: handoff or delivery requires observable evidence from ${target}`);

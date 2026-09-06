@@ -26,7 +26,7 @@
   ],
   "scopePresentation": {
     "renderer": "node scripts/session-open.mjs preview <session>",
-    "rule": "Before confirmation, print scopeTable in its declared order from the current mission and reviewed discovery. Show concrete route patterns and repository/generalized code impact without inventing missing values. The discovery lanes and their dependencies form the initial forecast, labelled planned rather than executed or verified. For a corrected mission print changed scope rows and the new forecast against the retained prior mission. This presentation grants no authority and does not ask again for an already explicit authorized correction. The complete operator forecast remains owned by plan-history."
+    "rule": "Before confirmation, print scopeTable in its declared order from the current mission and reviewed discovery. Show concrete route patterns and repository/generalized code impact without inventing missing values. The discovery lanes and their dependencies form the initial forecast, labelled planned rather than executed or verified. For a corrected mission print changed scope rows and the new forecast against the retained prior mission. This presentation grants no authority and does not ask again for an already explicit authorized correction. The complete operator forecast remains owned by plan-history. Render the architecture sketch from discovery.architecture beside this table on initial confirmation and material feedback, following workflows/discovery.md. Absent architecture is visibly unresolved, not inferred from repository roles."
   },
   "language": {
     "source": "resources/settings.json#language, over resources/settings.example.json (default vi)",

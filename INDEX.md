@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.10
+# StarCi Skills 2.5.0-rc.11
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.5.0-rc.11 (2026-09-07): unit dependencies resolve exact accepted retry lineages without rewriting retained plans or failed receipts; fresh consumption still rejects disputed or retired source. See tests/evidence/20260907-unit-successor-reentry.md. Initial goal previews carry evidence-labelled architecture; sealed prior-mission waits remain historical during corrected forecast admission. See tests/evidence/20260907-goal-presentation-and-prior-waits.md.
 
 2.5.0-rc.10 (2026-09-06): explicit goal partitions require every selected route or journey unit; source-only review and fresh repair preserve accepted history while withholding current delivery credit and fresh imports from disputed or replaced source. This candidate requires integrated lifecycle and release verification before publication.
 
