@@ -183,6 +183,10 @@ export async function validateTree(root) {
   const templates = await loadTemplates(root);
   const files = (await walk(root)).map((f) => path.relative(root, f).split(path.sep).join('/'));
   const errors = [];
+  if (files.includes('templates/business-head/projection.json')) {
+    const { businessHeadContractErrors } = await import('./business-head.mjs');
+    errors.push(...businessHeadContractErrors(root));
+  }
   let checked = 0;
   const claimed = new Map();
   for (const contract of templates) {

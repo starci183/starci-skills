@@ -2,9 +2,11 @@
 // name the same checkout and head; a source checkout carries no directory and a sibling one
 // does; the hydrated route belongs to this Source and to the requested project and role; the observed
 // checkout is the one the route resolved to; mutation is ready only on the mutation branch and a
-// forbidden worktree policy binds nowhere else; the businesses root is derived from the checkout, never
-// typed; the route binds no runtime, because the runtime owner serves and binds the entry a caller
+// forbidden worktree policy grants no write elsewhere; the businesses root is resolved from Workflow
+// and its project alias; the route binds no runtime, because the runtime owner serves and binds the entry a caller
 // consumes; no hint survives the gate; and a blocked branch records no hydration.
+import { businessesRootFor } from '../../scripts/business-head.mjs';
+import { readSessionState, workflowRootOf } from '../../scripts/workflow-root.mjs';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -47,24 +49,30 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
     if (checkout.repositoryKind === 'source' && checkout.directory !== null) errors.push('response/data/route.json: a source checkout must report a null directory');
     if (checkout.repositoryKind === 'sibling' && checkout.directory === null) errors.push('response/data/route.json: a sibling checkout must report its relative directory');
 
-    // The businesses root is derived from the checkout, never typed by a caller: on a source checkout it
-    // is <gitRoot>/.worktrees/businesses when that worktree exists, otherwise null; a sibling checkout
-    // carries no business authority. business.decide copies this value.
-    const derivedBusinesses = `${String(checkout.gitRoot).replace(/[\\/]+$/, '')}/.worktrees/businesses`;
+    // The Workflow alias owns the project partition, independently of the checkout being read.
+    const state = readSessionState(branchDir)?.state;
     const { businesses } = route.authorityRoots;
-    if (checkout.repositoryKind === 'sibling' && businesses !== null) errors.push('response/data/route.json: a sibling checkout carries no business authority root');
-    if (businesses !== null && businesses !== derivedBusinesses) errors.push(`response/data/route.json: authorityRoots.businesses must be derived from the checkout as ${derivedBusinesses}`);
+    if (state?.project !== requirements.project || state?.project !== route.project) errors.push('response/data/route.json: business authority project differs from the owning Workflow');
+    if (businesses !== null) {
+      try {
+        const derivedBusinesses = businessesRootFor(root, state);
+        const resolved = path.isAbsolute(businesses) ? businesses : path.resolve(workflowRootOf(root, state), businesses);
+        if (comparablePath(resolved) !== comparablePath(derivedBusinesses)) errors.push(`response/data/route.json: authorityRoots.businesses must resolve through Workflow for this project as ${derivedBusinesses}`);
+      } catch (error) { errors.push(`response/data/route.json: ${error.message}`); }
+    }
 
     // The request's policy is the declared route's, in the declared shape (scripts/workspace-checkout.mjs#gitPolicyErrors).
     // Mutation is ready only on the declared mutation branch. Reporting readiness anywhere else is how a
     // task branch acquires permission it was never routed.
     errors.push(...gitPolicyErrors(requirements.gitPolicy, gitPolicy));
     const declaredRoots = Array.isArray(requirements.declaredWriteRoots) ? requirements.declaredWriteRoots : [];
-    for (const root of declaredRoots) if (!route.writeRoots.includes(root)) errors.push(`response/data/route.json: the request declared the write root ${root}, which the binding does not carry`);
-    const sessionBranch = gitPolicy.worktreeBranches === 'session-only' && /^session\/[A-Za-z0-9._-]+$/.test(checkout.branch);
-    if (mutationReadiness === 'ready' && checkout.branch !== gitPolicy.mutationBranch && !sessionBranch) errors.push(`response/data/route.json: mutation is ready only on ${gitPolicy.mutationBranch} or a declared session branch, not on ${checkout.branch}`);
-    if (gitPolicy.worktreeBranches === 'session-only' && checkout.branch !== gitPolicy.mutationBranch && !/^session\//.test(checkout.branch)) errors.push(`response/data/route.json: a session-only worktree policy binds only on ${gitPolicy.mutationBranch} or on a session/<sessionId> branch, not on ${checkout.branch}`);
-    if (gitPolicy.worktreeBranches === 'forbidden' && checkout.branch !== gitPolicy.mutationBranch) errors.push('response/data/route.json: a forbidden worktree policy cannot bind a route on another branch');
+    if (declaredRoots.length !== route.writeRoots.length || declaredRoots.some(root => !route.writeRoots.includes(root))) errors.push('response/data/route.json: write roots must equal the request declared write roots; a read-only context grants none');
+    if (!gitPolicy && (mutationReadiness !== 'read-only' || route.writeRoots.length || requirements.checkout === 'session')) errors.push('response/data/route.json: a missing Git policy binds only a routed read-only checkout with no write roots');
+    if (!declaredRoots.length && mutationReadiness !== 'read-only') errors.push('response/data/route.json: no declared write roots requires read-only mutation readiness');
+    const sessionBranch = gitPolicy?.worktreeBranches === 'session-only' && /^session\/[A-Za-z0-9._-]+$/.test(checkout.branch);
+    if (mutationReadiness === 'ready' && checkout.branch !== gitPolicy?.mutationBranch && !sessionBranch) errors.push(`response/data/route.json: mutation is ready only on ${gitPolicy?.mutationBranch} or a declared session branch, not on ${checkout.branch}`);
+    if (mutationReadiness === 'ready' && gitPolicy?.worktreeBranches === 'session-only' && checkout.branch !== gitPolicy?.mutationBranch && !/^session\//.test(checkout.branch)) errors.push(`response/data/route.json: a session-only worktree policy binds only on ${gitPolicy?.mutationBranch} or on a session/<sessionId> branch, not on ${checkout.branch}`);
+    if (mutationReadiness === 'ready' && gitPolicy?.worktreeBranches === 'forbidden' && checkout.branch !== gitPolicy?.mutationBranch) errors.push('response/data/route.json: a forbidden worktree policy cannot bind a route on another branch');
 
     // The route binds no runtime: the runtime owner serves and binds the entry a caller consumes, so a
     // receipt that carries one has consumed a shared resource on its own initiative.
@@ -112,17 +120,17 @@ export async function validateWorkspaceStep(branchDir, root = ROOT) {
         if (observed && installed !== observed.label) errors.push(`response/response.md: Installed tree ${installed} differs from the observed ${observed.label}`);
         const target = /^junction to (.+)$/.exec(installed)?.[1] ?? null;
         const shared = target !== null && target !== 'an unresolvable target' && comparablePath(target) !== comparablePath(route.checkout.diskPath) && !comparablePath(target).startsWith(`${comparablePath(route.checkout.diskPath)}/`);
-        if (shared && requirements.sharedInstall !== true && String(requirements.sharedInstall) !== 'true') errors.push(`response/response.md: Installed tree is a junction to ${target}, outside the checkout; a binding takes a shared installed tree only when the request declares sharedInstall: true`);
+        if (shared && (route.writeRoots.length || requirements.checkout === 'session') && requirements.sharedInstall !== true && String(requirements.sharedInstall) !== 'true') errors.push(`response/response.md: Installed tree is a junction to ${target}, outside the checkout; a binding takes a shared installed tree only when the request declares sharedInstall: true`);
       }
-      if (policy['Worktree branches'] !== route.gitPolicy.worktreeBranches) errors.push('response/response.md: Worktree branches differs from the route binding');
-      if (policy['Mutation branch'] !== route.gitPolicy.mutationBranch) errors.push('response/response.md: Mutation branch differs from the route binding');
+      if ((empty(policy['Worktree branches']) ? null : policy['Worktree branches']) !== (route.gitPolicy?.worktreeBranches ?? null)) errors.push('response/response.md: Worktree branches differs from the route binding');
+      if ((empty(policy['Mutation branch']) ? null : policy['Mutation branch']) !== (route.gitPolicy?.mutationBranch ?? null)) errors.push('response/response.md: Mutation branch differs from the route binding');
       if (writeRoots.length !== route.writeRoots.length || writeRoots.some((p) => !route.writeRoots.includes(p))) errors.push('response/response.md: Write roots differ from the route binding');
 
       // The portable-to-hydrated resolution is the whole authority of this receipt, so it is stated
       // rather than assumed.
       if (!findingKeys.has(`ROUTE_HYDRATED_FROM_PORTABLE|${route.hydratedRouteRef}`)) errors.push('response/response.md: a bound route must record the hydrated route it resolved from');
-      if (route.gitPolicy.worktreeBranches === 'forbidden' && !findingKeys.has(`WORKTREE_BRANCH_FORBIDDEN|${route.gitPolicy.mutationBranch}`)) errors.push('response/response.md: a forbidden worktree policy must be recorded on the bound route');
-      if (route.gitPolicy.worktreeBranches === 'session-only' && !findingKeys.has(`WORKTREE_BRANCH_SESSION_ONLY|${route.gitPolicy.mutationBranch}`)) errors.push('response/response.md: a session-only worktree policy must be recorded on the bound route');
+      if (route.gitPolicy?.worktreeBranches === 'forbidden' && !findingKeys.has(`WORKTREE_BRANCH_FORBIDDEN|${route.gitPolicy?.mutationBranch}`)) errors.push('response/response.md: a forbidden worktree policy must be recorded on the bound route');
+      if (route.gitPolicy?.worktreeBranches === 'session-only' && !findingKeys.has(`WORKTREE_BRANCH_SESSION_ONLY|${route.gitPolicy?.mutationBranch}`)) errors.push('response/response.md: a session-only worktree policy must be recorded on the bound route');
       if (route.provenanceHeadRef !== null && !findingKeys.has(`PROVENANCE_HEAD_BOUND|${route.provenanceHeadRef}`)) errors.push('response/response.md: a bound provenance head must be recorded');
       if (Object.keys(runtimeRows).length) errors.push('response/response.md: the Runtime section carries rows; the route binds no runtime');
       for (const key of findingKeys) if (key.startsWith('RUNTIME_')) errors.push(`response/response.md: finding ${key.split('|')[0]} records a runtime this route never bound`);

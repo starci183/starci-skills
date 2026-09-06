@@ -166,3 +166,30 @@ export function scopeBindingErrors(state, request, root = ROOT) {
   for (const role of writeRoles) if (!discovery.repositories.some(repository => repository.role === role && repository.project === state.project)) errors.push(`GOAL_SOURCE_UNBOUND: product source writes to ${role} are outside the frozen discovery; a prerequisite bind grants no write impact`);
   return errors;
 }
+
+// Readiness questions follow the frozen delivery stage and authored operator requirements.
+// Document work remains document work when its artifact is executed. The existing handoff
+// operator vocabulary bounds the active chain; a caller cannot obtain skips with a flag.
+export function documentationReadinessSkips(state, request, checkIds, root = ROOT) {
+  const requirements = request?.requirements ?? {};
+  if (state?.runtimeRevision !== RUNTIME_REVISION || state.lifecycle?.phase === 'draft' || !['handoff', 'implement'].includes(state.mission?.discovery?.stage) || frozenScopeErrors(state, { root }).length) return new Set();
+  if (request.operatorId !== 'environment.preflight' || request.sessionId !== state.id || requirements.project !== state.project || requirements.flow || (requirements.runtimeRoles ?? []).length) return new Set();
+  const keys = state.chain?.flat() ?? [];
+  if (!keys.length || !keys.includes(`${request.step}/${request.parallel}`) || state.steps?.[`${request.step}/${request.parallel}`] !== request.operatorId) return new Set();
+  const allowed = new Set(deliveryPolicy(root).stages.handoff);
+  const bindings = new Set();
+  for (const key of keys) {
+    const id = state.steps?.[key], planned = state.planned?.[key];
+    if (!allowed.has(id) || !planned) return new Set();
+    const op = authoredOperator(root, id);
+    if (!op) return new Set();
+    const values = requirementValues(op, planned.requirements ?? {});
+    if ((planned.requirements?.runtimeRoles ?? []).length || planned.requirements?.flow || values.checkout === 'session' || (planned.requirements?.declaredWriteRoots ?? []).length) return new Set();
+    if ((op.tables.steps?.rows ?? []).some(row => cellAliases(row.writes).some(alias => /^@workspaces\/(fe|be)(?:\/|$)/.test(alias)))) return new Set();
+    if (id === 'workspace.bind') bindings.add(values.role);
+  }
+  const roles = requirements.roles ?? [];
+  if (!roles.length || roles.some(role => !bindings.has(role))) return new Set();
+  const patterns = JSON.parse(readFileSync(path.join(root, 'templates/kinds/readiness-report.schema.json'), 'utf8')).$defs.checkIds.documentationSkippedPatterns.map(pattern => new RegExp(pattern));
+  return new Set(checkIds.filter(id => patterns.some(pattern => pattern.test(id))));
+}

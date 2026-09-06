@@ -28,6 +28,13 @@ trong kind dữ liệu `readiness-report`, khai triển theo các role được 
 schema môi trường công bố, nên một phép kiểm không chạy sẽ lộ ra như một id thiếu, không bao giờ như
 sự im lặng.
 
+Tính áp dụng theo [hợp đồng readiness-report](../../templates/kinds/readiness-report.schema.json)
+và `scripts/mission-scope.mjs#documentationReadinessSkips`. Chạy predicate với mission đã đóng băng của
+phiên sở hữu và requirements trong kế hoạch trước khi probe. Predicate cũng áp dụng khi tạo
+artifact tài liệu ở stage implement, với mọi operator đang hoạt động vẫn thuộc bộ operator
+handoff hiện có. Mọi hàng bỏ qua vẫn nằm trong báo cáo,
+với bằng chứng nêu phạm vi đóng băng; nó không cấp phê duyệt thao tác.
+
 ## Khai báo là thẩm quyền route duy nhất
 
 Một route tồn tại vì một khai báo portable trong `@workspaces/projects/<project>/<role>` nói vậy, và
@@ -38,7 +45,7 @@ duyệt không thiết lập gì cả, và operator này không có field nào �
 nối, một hậu tố hay chữ hoa chữ thường, phép kiểm khai báo là một bức tường mà phần sửa nêu khai báo
 ấy dưới dạng suggested `<id>`, và `ROUTE_NAME_NEAR_MATCH` ghi cùng gợi ý ấy dưới
 `## Fallbacks taken`. Bức tường vẫn đứng và tên được yêu cầu không bao giờ bị đổi, vì một cái tên được
-sửa âm thầm là một route không ai khai. Các phép kiểm checkout sau đó đọc chính sách mà khai báo mang
+sửa âm thầm là một route không ai khai. Các phép kiểm checkout áp dụng sau đó đọc chính sách mà khai báo mang
 — một route không có chính sách là một bức tường, không bao giờ là một chính sách đoán — và quan sát
 nhánh cùng cây làm việc của checkout đã phân giải qua `@tools/git`: nhánh phải là một nhánh chính sách
 cho phép, và bất kỳ vết bẩn nào trên nhánh mutation đều là một bức tường, vì nhánh ấy không có trạng
@@ -46,7 +53,7 @@ thái dở dang của riêng nó để chịu trách nhiệm.
 
 ## Custody danh tính được chứng minh, không bao giờ in ra
 
-Credential admin đã niêm phong của nhà cung cấp danh tính trong môi trường được kiểm qua chính
+Khi áp dụng, credential admin đã niêm phong của nhà cung cấp danh tính trong môi trường được kiểm qua chính
 preflight của cây, `scripts/identity-custody.mjs`, thứ ràng nhà cung cấp, realm, container và custody
 đã mount trước khi bất kỳ giá trị nào được phân giải, rồi trả về một mã kết cục cố định. Bằng chứng
 của phép kiểm ấy là kết cục, tên của credential và độ dài hay digest của nó; không bao giờ là giá trị,
@@ -77,7 +84,7 @@ không gì được khởi động, dừng, cài đặt hay giết.
 
 ## Dịch vụ được hỏi tới, không bao giờ được vận hành
 
-Môi trường khai các dịch vụ phụ trợ nó chạy bên cạnh các route sản phẩm, và readiness hỏi mỗi cái
+Môi trường khai các dịch vụ phụ trợ nó chạy bên cạnh các route sản phẩm, và readiness áp dụng hỏi mỗi cái
 hai câu: bản khai báo có gọi tên nó đầy đủ không — kind, lệnh đã khai, probe, và môi trường có giữ
 nó với một người không — và nó có trả lời chính probe của mình không khi bản khai báo muốn nó lên.
 Một dịch vụ bản khai báo muốn xuống thì probe của nó là `skipped`, vì không có gì trả lời chính là
@@ -90,11 +97,11 @@ họ này, và đó là một sự thật mà các id vắng mặt nói ra chứ
 
 Khai báo môi trường `.stacks/<env>/environment.json`, theo hình dạng
 `readiness/initialization/stacks/environment.schema.json` đưa ra, nói ai phê duyệt từng lớp thao tác
-trong môi trường này. Một phép kiểm phê duyệt cho mỗi lớp mà schema công bố ghi `declared` hay
+trong môi trường này. Mỗi phép kiểm phê duyệt áp dụng cho lớp mà schema công bố ghi `declared` hay
 `person`; một lớp mà khai báo bỏ qua nhận mặc định mà schema đưa ra theo giá trị `production` của nó,
 nên một chuỗi biết trước khi bắt đầu rung nào của nó được khai báo trả lời và rung nào sẽ chờ một
 người. Hàng Declaration của biên nhận và `declarationRef` của báo cáo mang đường dẫn của khai báo cùng
-hash của các byte của nó; một khai báo thiếu hoặc không khớp schema làm mọi phép kiểm phê duyệt thành
+hash của các byte của nó; một khai báo thiếu hoặc không khớp schema làm mọi phép kiểm phê duyệt áp dụng thành
 bức tường thuộc chủ `approval`.
 
 ## Luồng attempt cụ thể
@@ -106,6 +113,8 @@ Các row của operator này được gate bởi hợp đồng attempt expected/
 | prerequisite đã khai hợp lệ | tái dùng fingerprint và chạy probe thật | readiness item ghi value và evidence quan sát | chỉ advance khi mọi mục bắt buộc ready |
 | prerequisite thiếu | ghi mọi mục thiếu; không tạo gì | mục nêu owner domain và delta cần trả | typed owner handoff, rồi vào lại khi fingerprint đổi |
 | prerequisite stale, gần tên hoặc sai | từ chối readiness cache | ghi declared/observed mismatch | owner sửa; attempt mới xác minh |
+
+Bằng chứng: [scoped handoff observations](../../tests/evidence/20260906-scoped-handoff-readiness.md).
 
 ## Ranh giới
 

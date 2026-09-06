@@ -49,6 +49,13 @@ action. The vocabulary of checks is closed and lives in the data kind `readiness
 over the requested roles and the operation classes the environment schema publishes, so a check that
 did not run is visible as a missing id and never as silence.
 
+Applicability follows [the readiness-report contract](../../templates/kinds/readiness-report.schema.json)
+and `scripts/mission-scope.mjs#documentationReadinessSkips`. Run that predicate against the owning frozen
+mission and planned requirements before probing. The same predicate applies while executing a
+document artifact at the implement stage, with every active operator still confined to the existing
+handoff operator vocabulary. Every skipped row stays in the report with evidence
+naming the frozen scope; it never grants an operation approval.
+
 ## Declaration is the only route authority
 
 A route exists because a portable declaration in `@workspaces/projects/<project>/<role>` says so and
@@ -59,7 +66,7 @@ project or role is declared by nothing and exactly one declaration differs from 
 a hyphen, a suffix or letter case, the declaration check is a wall whose repair names the declaration
 as suggested `<id>`, and `ROUTE_NAME_NEAR_MATCH` records the same suggestion under
 `## Fallbacks taken`. The wall stands and the requested name is never switched, because a name
-corrected silently is a route nobody declared. The checkout checks then read the policy the
+corrected silently is a route nobody declared. The applicable checkout checks then read the policy the
 declaration carries — a route with no policy is a wall, never a guessed policy — and observe the
 resolved checkout's branch and working tree through `@tools/git`: the branch must be one the policy
 permits, and any dirt on the mutation branch is a wall, since that branch has no in-progress state of
@@ -67,7 +74,7 @@ its own to account for it.
 
 ## Identity custody is proved, never printed
 
-The sealed admin credential of the environment's identity provider is checked through the tree's own
+When applicable, the sealed admin credential of the environment's identity provider is checked through the tree's own
 preflight, `scripts/identity-custody.mjs`, which binds the provider, its realm, its container and the
 mounted custody before any value resolves and returns a fixed outcome code. The evidence of that
 check is the outcome, the credential's name and its length or digest; it is never the value, and a
@@ -98,7 +105,7 @@ kept as evidence; nothing is started, stopped, installed or killed.
 
 ## Services are asked about, never operated
 
-The environment declares the auxiliary services it runs beside its product routes, and readiness
+The environment declares the auxiliary services it runs beside its product routes, and applicable readiness
 asks two questions of each: whether the declaration names it completely — its kind, its declared
 command, its probe and whether the environment keeps it with a person — and whether it answers its
 own probe when the declaration wants it up. A service the declaration wants down has its probe
@@ -111,12 +118,12 @@ service has no check of this family, which is a fact the missing ids state and n
 
 The environment declaration `.stacks/<env>/environment.json`, in the shape
 `readiness/initialization/stacks/environment.schema.json` gives, says who authorises each operation
-class in this environment. One approval check per class the schema publishes states `declared` or
+class in this environment. Each applicable approval check for a class the schema publishes states `declared` or
 `person`; a class the declaration omits takes the default the schema gives for its `production`
 value, so a chain knows before it starts which of its rungs the declaration answers and which will
 wait for a person. The receipt's Declaration row and the report's `declarationRef` carry the
 declaration's path and the hash of its bytes; a declaration that is missing or does not match its
-schema makes every approval check a wall owned by `approval`.
+schema makes every applicable approval check a wall owned by `approval`.
 
 ## Concrete attempt flow
 
@@ -127,6 +134,8 @@ This operator's rows are gated by the shared expected/actual attempt contract in
 | valid declared prerequisite | reuse its fingerprint and run the real probe | readiness item records observed value and evidence | advance only when every required item is ready |
 | missing prerequisite | record every missing item; create nothing | item names owner domain and required delta | typed owner handoff, then re-enter on changed fingerprint |
 | stale, near-named or invalid prerequisite | refuse cached readiness | record declared/observed mismatch | owner repairs; new attempt verifies it |
+
+Evidence: [scoped handoff observations](../../tests/evidence/20260906-scoped-handoff-readiness.md).
 
 ## Boundary
 
@@ -173,7 +182,7 @@ replace. It makes no product decision and carries no verdict about the source.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Validate the gate and resume | `resume` | `request/request.json`, its requirements and the blocked report when resuming | — | `INVALID_INPUT`, `NO_PROGRESS` |
 | 2 | Check the declarations: every requested role is declared and its hydrated route projects it, with a near match reported as a suggestion and never adopted | `project`, `roles` | @workspaces/projects/&lt;project>/&lt;role>, @workspaces/local/routes/&lt;project>/&lt;role> | — | `ROUTE_NAME_NEAR_MATCH` |
-| 3 | Check each checkout: the route carries a git policy, the tree is clean and the branch is one the policy permits | — | @workspaces/local/routes/&lt;project>/&lt;role>, the resolved checkout, its branch and its working tree, @tools/git | — | — |
+| 3 | Apply the frozen applicability predicate and check each checkout: the route carries a git policy, the tree is clean and the branch is one the policy permits | — | @workspaces/local/routes/&lt;project>/&lt;role>, the resolved checkout, its branch and its working tree, @tools/git | — | — |
 | 4 | Check identity custody: the sealed admin credential preflight through `scripts/identity-custody.mjs`, and when a flow is named its account record and a sign-in probe | `flow`, `env` | @workspaces/device-state, @worktrees/uat/&lt;flow> for the account record of `env`, @worktrees/sessions/central-runtime for the identity provider of each route's entry, @tools/secrets, @tools/http | — | — |
 | 5 | Check the runtime: the registry entry of each route, whether the served head contains the checkout's head, whether the projected ports answer, and any port a foreign process holds | `runtimeRoles` | @worktrees/sessions/central-runtime, @workspaces/ports/&lt;project>, @tools/http, @tools/shell | — | — |
 | 6 | Check the host: a browser binary for the audit profile, the Playwright install the walk runner loads (`host.playwright`, a wall in the runner's own wording when absent), a reachable container daemon, installed dependencies per checkout and ancestor type isolation | — | the resolved checkouts and their lockfiles, the install place `resources/tools.json` names for the browser tool, @tools/shell, @tools/container | — | — |
@@ -181,7 +190,7 @@ replace. It makes no product decision and carries no verdict about the source.
 | 8 | Check the declared services: each service the declaration names under `services` is complete, and its probe answers when the declaration wants it up | `env` | the environment declaration of `env` for its services, @tools/http, @tools/shell | — | — |
 | 9 | Compare every prerequisite with observations, emit one report containing all ready, missing and invalid items plus owner deltas, and block when any required criterion is not ready | — | everything above | `response/response.md`, `response/data/readiness-report.json`, `response/response.json` | `ENVIRONMENT_NOT_READY` |
 
-Step 9 is the only step that stops on a wall: a wall found at steps 2 to 8 is recorded and the next
+Steps 2 to 8 follow the contract applicability predicate above. Step 9 is the only step that stops on a wall: a wall found at steps 2 to 8 is recorded and the next
 step runs, so the report the person reads is complete whichever check failed first. A role whose
 declaration is a wall has every other check of that role `skipped`, because there is no checkout to
 inspect; a flow that was not named has both flow checks `skipped`. A resume begins again at step 1

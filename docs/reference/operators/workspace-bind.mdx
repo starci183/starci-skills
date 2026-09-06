@@ -31,8 +31,7 @@ bind.
 ## Done when
 
 Done when the `workspace-route-binding` and its `route` name one checkout resolved from the
-declaration and its hydrated projection alone, on a branch the routed policy permits with a working
-tree carrying nothing the policy refuses, at its observed source head with its derived mutation
+declaration and its hydrated projection alone, with the policy and cleanliness checks required by its write scope, at its observed source head with its derived mutation
 readiness, and with no runtime bound.
 
 ## Declaration is the only authority
@@ -60,6 +59,13 @@ the common directory and the current session identity. The canonical head is an 
 session's original base; source-writing receipts own that base. A missing, foreign, ambiguous or
 unavailable registration is refused. Existing route receipts are never silently rebound.
 
+A routed binding with no `declaredWriteRoots` observes repository identity, declared branch and head
+without requesting mutation readiness. Its absent Git policy is recorded as null; its Policy rows
+record an em dash, and existing user-owned working changes are left alone. A declared policy still
+must agree between route halves. Session selection and any declared write root retain all policy,
+cleanliness and installed-tree permission gates. `scripts/workspace-checkout.mjs` owns that predicate
+and independently verifies routed read-only receipts as well as session receipts.
+
 ## The route binds no runtime
 
 A route is a checkout and a head, nothing that listens. The shared local frontend, api and identity
@@ -78,9 +84,10 @@ No credential is read, copied, or recorded; only the sealed roster reference is 
 owner, never by this operator, so `ROUTE_UNDECLARED` and `ROUTE_UNHYDRATED` are expected outcomes of
 an unprepared workspace rather than defects in the request. `CHECKOUT_DIRTY` never falls back to
 anything: this operator does not stash, clean, or reset a working tree to make a binding possible.
-The businesses authority root is derived as `<git root>/.worktrees/businesses` when that worktree
-exists on a source checkout and is absent otherwise; it is never accepted from the person, because a
-typed authority root is how a second business tree is born. Provenance and freshness are not a step
+The businesses authority root is resolved by `scripts/business-head.mjs#businessesRootFor` from
+`@worktrees/businesses`, the owning Workflow and its project partition; a present binding must match
+that exact authority regardless of the checkout being read. It is null when no authority is bound.
+The person never selects another root or project partition. Provenance and freshness are not a step
 of their own: they are written inside the emit, next to the binding they describe. The head a hydrated
 route recorded is a record of the hydration and never route authority: the observed head wins, and a
 hydration head two commits behind the checkout is not a stop.
@@ -97,6 +104,8 @@ This operator's rows are gated by the shared expected/actual attempt contract in
 | valid declared checkout | reuse exact disk path, head and policy | read back Git root, installed tree and write roots | emit the binding |
 | missing declaration or hydration | guess no similar path and create nothing | record missing declaration/hydration evidence | workspace owner handoff |
 | invalid identity, head or policy | refuse cached binding | record the conflicting root, revision or policy | owner repair, then a new read-only attempt |
+
+Evidence: [scoped handoff observations](../../tests/evidence/20260906-scoped-handoff-readiness.md).
 
 ## Boundary
 
@@ -131,8 +140,8 @@ workspace, or provisions an account. It makes no product decision and carries no
 | `project` | id | — | The project to bind |
 | `role` | id | — | The declared project route role, using the identifier shape in `readiness/initialization/workspaces/portable-route.schema.json#/$defs/slug`; application route identities do not change source context roles |
 | `checkout` | choice | routed | `routed` selects the canonical checkout; `session` selects only this request session's registered worktree under the declared policy |
-| `gitPolicy` | object `{worktreeBranches, mutationBranch}`, the two fields of the declared route's `repository.gitPolicy` the binding is checked against | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | The branch law this binding is verified against; `forbidden` keeps every write on the mutation branch |
-| `declaredWriteRoots` | list | empty | The only paths later work may write; anything dirty outside them is `CHECKOUT_DIRTY`, and so is anything dirty at all when the checkout sits on the mutation branch rather than a `session/<sessionId>` branch |
+| `gitPolicy` | object `{worktreeBranches, mutationBranch}`, the two fields of the declared route's `repository.gitPolicy` the binding is checked against | the declared policy, or null for a routed read-only binding; writes and session selection require it | The branch law this binding is verified against; `forbidden` keeps every write on the mutation branch |
+| `declaredWriteRoots` | list | empty | The write ceiling; empty selects routed read-only observation. For writes or session selection, dirt outside these roots is `CHECKOUT_DIRTY`, and the canonical mutation checkout must be clean |
 | `sharedInstall` | choice | false | The installed tree is shared through a junction on purpose; deleting inside it is forbidden |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
@@ -143,10 +152,10 @@ workspace, or provisions an account. It makes no product decision and carries no
 | 1 | Validate the gate and resume, and refuse every hint it carries | `resume` | `request/request.json`, its requirements and its frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Bind bootstrap and identity | — | @workspaces/device-state, the machine identity and the sealed credential roster, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
 | 3 | Inspect the exact declaration and checkout, classify it reusable, missing or invalid by identity and head, and resolve only a reusable declared route | `project`, `role`, `checkout` | @workspaces/projects/&lt;project>/&lt;role> for exactly this project and role, @workspaces/local/routes/&lt;project>/&lt;role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
-| 4 | Verify branch policy, clean tree, write roots and installed tree; record the exact owner delta for every invalid check and repair nothing here | `gitPolicy`, `declaredWriteRoots`, `sharedInstall` | @workspaces/local/routes/&lt;project>/&lt;role>, the resolved checkout, its branch, its head, its working tree and its `node_modules`, @tools/git, @tools/shell | — | `<br />ANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
+| 4 | Verify identity and the policy, clean tree, write roots and installed tree checks applicable to the selection; record the exact owner delta for every invalid check and repair nothing here | `gitPolicy`, `declaredWriteRoots`, `sharedInstall` | @workspaces/local/routes/&lt;project>/&lt;role>, the resolved checkout, its branch, its head, its working tree and its `node_modules`, @tools/git, @tools/shell | — | `<br />ANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
 | 5 | Bind provenance and freshness, then emit | — | everything above, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
 
-Under `worktreeBranches` set to forbidden, a route binds only on the mutation branch and
+For a source-writing binding, under `worktreeBranches` set to forbidden, a route binds only on the mutation branch and
 records `WORKTREE_<br />ANCH_FORBIDDEN`; under `session-only` it binds on the mutation branch or on a
 `session/<sessionId>` worktree branch, the only shape a source-writing operator may commit to, and
 records `WORKTREE_<br />ANCH_SESSION_ONLY`, because a policy that opens a write path is exactly the
@@ -155,7 +164,7 @@ a cached receipt matching the same identity tuple and fingerprints records `CACH
 `ready` when the observed branch is one the routed policy permits a write on — the mutation branch, or
 a `session/<sessionId>` branch under `session-only` — and the working tree carries nothing this step
 must refuse; it is `read-only` in every other case, including a route bound with no declared write
-roots. The declared write roots exempt dirt only on a `session/<sessionId>` branch, where it is a
+roots. For writes or session selection, the declared write roots exempt dirt only on a `session/<sessionId>` branch, where it is a
 session's expected work in progress; the mutation branch has no in-progress state of its own to
 exempt, so any dirt observed there — inside a declared write root or outside it — is source that was
 written with no session to account for it, and step 4 stops with `CHECKOUT_DIRTY` rather than
@@ -170,7 +179,7 @@ The installed tree is part of what a checkout is, and step 4 observes it: `## Ch
 `Installed tree` row reading `own directory`, `absent`, or `junction to <target>` with the resolved
 target. A `node_modules` junction whose target lies outside the checkout is one installed tree several
 checkouts share, so a recursive delete inside such a checkout travels through the link and empties the
-tree every other checkout is using; the binding is refused with `INVALID_INPUT` unless the request
+tree every other checkout is using; a write or session binding is refused with `INVALID_INPUT` unless the request
 declared `sharedInstall`, and a checkout that holds one is never deleted from by hand — a temporary
 worktree is removed with `git worktree remove --force` and nothing else. The row is observed, never
 asserted: the response validator reads the same link and compares.
@@ -178,7 +187,7 @@ asserted: the response validator reads the same link and compares.
 The read-only selection command is `node scripts/workspace-checkout.mjs <project> <role> <sessionId>
 &lt;routed|session> [declaredWriteRoot ...] [--shared-install]`. It accepts repository-relative write ceilings, never a
 checkout path. Its JSON is a checkout observation; the operator still binds identity and authority
-roots to produce the complete route receipt. Step 4 checks the selected tree, and a session selection also requires the canonical
+roots to produce the complete route receipt. Step 4 applies the selection predicate above, and a session selection also requires the canonical
 mutation checkout to be clean. The response validator independently repeats the selection and
 compares the route fields; request validation checks session selection before dispatch and binds the
 session id to its containing coordinate, session state and frozen request hash. The first `attempt-gate open` validates the exact request while holding the owning session mutation, checks its bytes again, and atomically records that hash; this opening phase is unavailable outside the held mutation or for an existing attempt. Ordinary dispatch and receipt validation still require the stored hash.

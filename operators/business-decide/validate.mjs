@@ -11,6 +11,9 @@ import { restatementDecisionId, restatementChoiceSource } from '../../scripts/re
 // promise the request supplies is restated in the person's words and confirmed by them before it is
 // modelled (RESTATEMENT_UNCONFIRMED until the request carries the recorded choice).
 import { existsSync } from 'node:fs';
+import { businessesRootFor, headDirectory, businessDocumentErrors } from '../../scripts/business-head.mjs';
+import { readSessionState, sameRoot } from '../../scripts/workflow-root.mjs';
+import { openStore, verifyHeadPublication, businessesRootOf } from '../../scripts/business-registry.mjs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -38,7 +41,6 @@ const LEGAL_TRANSITIONS = {
   'implemented->rejected': { from: 'implemented', to: 'rejected' },
   'rejected->pending': { from: 'rejected', to: 'pending' },
 };
-const BUSINESSES_ROOT = /\.worktrees\/businesses$/;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const fields = (rows) => Object.fromEntries((rows ?? []).map(([k, v]) => [k, v]));
 
@@ -129,7 +131,7 @@ export async function restatementErrors({ branchDir, request, response, requirem
   return errors;
 }
 
-export async function validateBusinessStep(branchDir, root = ROOT) {
+export async function validateBusinessStep(branchDir, root = ROOT, { publication = 'published' } = {}) {
   const base = await validateStep(root, branchDir);
   const errors = [...base.errors];
   const { request, response, requirements = {}, present = new Set() } = base;
@@ -267,7 +269,7 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
     const cut = headRef.lastIndexOf('/features/');
     if (cut === -1) errors.push(`response/data/model.json: head ${headRef} must be exactly <businesses root>/features/${model.featureId}: the feature directory, with no project segment below the businesses root`);
     else {
-      if (!BUSINESSES_ROOT.test(headRef.slice(0, cut))) errors.push(`response/data/model.json: head ${headRef} is not under a .worktrees/businesses root`);
+      if (!businessesRootOf(headRef)) errors.push(`response/data/model.json: head ${headRef} is not under a project-partitioned businesses root`);
       if (headRef.slice(cut + '/features/'.length) !== model.featureId) errors.push(`response/data/model.json: head ${headRef} must name the feature ${model.featureId}, with no project segment below the businesses root`);
     }
 
@@ -286,6 +288,20 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
     if (model.reconciliation !== null) errors.push('response/data/model.json: modelling reconciles nothing, so reconciliation must be null');
     // implemented is never published on the strength of a plan.
     if (model.state === 'implemented') errors.push('response/data/model.json: implemented is published by business.reconcile after delivered source is compared with the frozen matrix, never on the strength of a plan');
+  }
+
+  if (response.status === 'done' && model) {
+    if (!model.documentation) errors.push('model.documentation: a decided head requires the complete business documentation');
+    if (claimsDoc && matrix) {
+      errors.push(...businessDocumentErrors({ model, claims: claimsDoc, coverage: matrix }, root));
+      try {
+        const authorityRoot = businessesRootFor(root, readSessionState(branchDir)?.state);
+        const published = businessesRootOf(model.headRef);
+        if (path.isAbsolute(model.headRef) && (!published || !sameRoot(published, authorityRoot))) throw Error('model.headRef differs from the Workflow businesses alias');
+        headDirectory(authorityRoot, model, root);
+        if (publication === 'published') errors.push(...verifyHeadPublication({ store: openStore(authorityRoot), featureId: model.featureId, model, claims: claimsDoc, coverage: matrix }));
+      } catch (error) { errors.push(error.message); }
+    }
   }
 
   if (present.has('business-promise-authority') && has('response/response.md')) {

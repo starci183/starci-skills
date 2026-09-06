@@ -56,15 +56,23 @@ export async function migrationReleaseFixture(t, { mode = 'valid', sealed = fals
     [writer]: 'export class AddScope {}\n', [spec]: '// Measured fixture migration replay.\n',
   })) write(path.join(checkout, name), value);
   execFileSync(process.execPath, ['--check', path.join(checkout, 'runner.mjs')], { stdio: 'pipe' });
-  git('init', '-b', 'session/s-test'); git('add', '.');
+  git('init', '-b', 'session/s-test');
+  git('remote', 'add', 'origin', 'https://github.com/example/migration-fixture.git');
+  git('add', '.gitignore', 'config.json', 'package.json', 'package-lock.json');
+  git('-c', 'user.name=Migration Fixture', '-c', 'user.email=migration-fixture@example.invalid', 'commit', '-m', 'fixture: source base');
+  const baseHead = git('rev-parse', 'HEAD');
+  const reflogBefore = git('reflog', '--format=%H').split(/\r?\n/).length;
+  git('add', 'runner.mjs', writer, spec);
   git('-c', 'user.name=Migration Fixture', '-c', 'user.email=migration-fixture@example.invalid', 'commit', '-m', 'fixture: pinned migration runner');
+  const reflogAfter = git('reflog', '--format=%H').split(/\r?\n/).length;
   const head = git('rev-parse', 'HEAD');
   const fileHash = (name) => hash(fs.readFileSync(path.join(checkout, name)));
   for (const [name, content] of Object.entries(files)) {
     if (name === 'producer') continue;
-    const replaced = JSON.stringify(content).replaceAll('a1b2'.repeat(10), head).replaceAll(`sha256:${'1'.repeat(64)}`, fileHash(writer)).replaceAll(`sha256:${'2'.repeat(64)}`, fileHash(spec));
+    const replaced = JSON.stringify(content).replaceAll('a1b2'.repeat(10), head).replaceAll(/(?<![a-f0-9])f{40}(?![a-f0-9])/g, baseHead).replaceAll(`sha256:${'1'.repeat(64)}`, fileHash(writer)).replaceAll(`sha256:${'2'.repeat(64)}`, fileHash(spec));
     files[name] = JSON.parse(replaced);
   }
+  files['response/changes.md'] = files['response/changes.md'].replace(/(\| Reflog before \| HEAD )\d+/, `$1${reflogBefore}`).replace(/(\| Reflog after \| HEAD )\d+/, `$1${reflogAfter}`);
   files['request/request.json'].requirements.mutableFileRefs.push('runner.mjs');
   files['response/data/mutations.json'].changes.push({ path: 'runner.mjs', change: 'added', operationId: mutation.operations[0].operationId, beforeHash: null, afterHash: fileHash('runner.mjs') });
   // The runner row belongs to the Changes table, which the Widened section follows when the receipt carries one.
@@ -88,6 +96,15 @@ export async function migrationReleaseFixture(t, { mode = 'valid', sealed = fals
   for (const [name, content] of Object.entries(files)) if (name !== 'producer' && content !== null) write(path.join(backend, name), content);
   const state = { id: 's-test', project: 'migration-fixture', startedAt: '2026-09-04T00:00:00Z', status: 'running', chain: [['1/1','1/2','1/3'],['2/1'],['3/1'],['4/1']], steps: {}, requestHashes: {}, current: '4/1', resumes: { '1/2': { resumes: '1/3', stop: 'RESTATEMENT_UNCONFIRMED' } }, choices: patch.state.choices };
   write(path.join(session, 'state.json'), state);
+  // The release reads this committed source; it owns no source write roots or branch mutation.
+  // Hydrate an actual portable declaration instead of inventing a writable route receipt.
+  write(path.join(host, '.workspaces/config.json'), { $schema: '../.claude/readiness/initialization/workspaces/config.schema.json', schemaVersion: 6, defaultLang: 'en' });
+  write(path.join(host, `.workspaces/projects/${state.project}/be.json`), {
+    $schema: '../../../.claude/readiness/initialization/workspaces/portable-route.schema.json', schemaVersion: 6, schemaRevision: 2, project: state.project, role: 'be',
+    repository: { kind: 'sibling', directory: path.relative(path.dirname(host), checkout).replaceAll('\\', '/'), gitRepository: git('remote', 'get-url', 'origin'), branch: git('branch', '--show-current') },
+    context: { instructions: [], contract: null, contractSource: null, manifests: [], grammarId: null },
+  });
+  execFileSync(process.execPath, [path.join(runtime, 'scripts/workspace-portable.mjs'), 'hydrate', '--source', host, '--apply'], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   const { routeRef, qualityRef } = await writeMigrationReleaseProducers({ root, session, checkout, head, backendRef: 'step-1/parallel-1/response/response.md' });
   const connectionFingerprint = migrationConnectionFingerprint(fixtureConnection), connectionRef = 'secret-ref://fixture/primary';
   const connection = sealed ? { ...fixtureConnection, usernameRef: 'secret-ref://fixture/primary/username' } : { ...fixtureConnection };

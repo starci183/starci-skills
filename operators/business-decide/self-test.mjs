@@ -7,11 +7,12 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { validateBusinessStep } from './validate.mjs';
+import { openStore, planHeadPublication, applyHeadPublication, selfFingerprint, REGISTRY_FILE } from '../../scripts/business-registry.mjs';
 
 const head = 'c'.repeat(40);
 const claimsFingerprint = `sha256:${'a'.repeat(64)}`;
 const coverageFingerprint = `sha256:${'b'.repeat(64)}`;
-const ROOT_REF = '.worktrees/businesses';
+const ROOT_REF = '.worktrees/starci-academy/businesses';
 const FEATURE = 'paid-access';
 const CONSUMER = { consumerId: 'course-guard', dimension: 'entitlement-consumer', sourceRef: 'src/course/guard.ts' };
 const DELIVERED = 'step-1/parallel-2/response/response.md';
@@ -61,6 +62,7 @@ function modelDoc({ mode = 'model', state = 'pending', transition = 'absent->pen
     promise: { statement: 'a paying learner reads every course in the plan', actorStatement: 'a learner with a settled purchase', eligibilityStatement: 'the purchase settled and has not expired' },
     lineage: { previousHeadRef, previousState, transition },
     claimsFingerprint, coverageFingerprint: coverage, reconciliation,
+    documentation: { version: 1, sections: Object.fromEntries(['overview', 'actors', 'contracts', 'rules', 'states', 'acceptance'].map(name => [name, { markdown: `Detailed ${name} of the promised behavior.`, claimIds: ['c-fact'], dimensions: [] }])) },
   };
 }
 
@@ -145,10 +147,25 @@ function responseJson({ status = 'done', stop, fallbacks = [], fields = null, ne
 function writeBranch(files, { branch: branchRel = 'step-1/parallel-1', state = {}, session: sessionFiles = {} } = {}) {
   const session = mkdtempSync(path.join(tmpdir(), 'business-session-'));
   const branch = path.join(session, ...branchRel.split('/'));
+  files = structuredClone(files);
+  const businessRoot = path.join(session, '.worktrees/starci-academy/businesses');
+  mkdirSync(businessRoot, { recursive: true });
+  writeFileSync(path.join(businessRoot, REGISTRY_FILE), JSON.stringify({ project: 'starci-academy', featureHeads: {}, objects: { immutable: true, byHash: {} } }));
+  const model = files['response/data/model.json'], claims = files['response/data/claims.json'], coverage = files['response/data/coverage-matrix.json'];
+  if (model && claims && coverage && typeof model === 'object') {
+    const oldClaims = claims.fingerprint, oldCoverage = coverage.fingerprint;
+    claims.fingerprint = selfFingerprint(claims, 'fingerprint');
+    coverage.fingerprint = selfFingerprint(coverage, 'fingerprint');
+    if (model.claimsFingerprint === oldClaims) model.claimsFingerprint = claims.fingerprint;
+    if (model.coverageFingerprint === oldCoverage) model.coverageFingerprint = coverage.fingerprint;
+    model.headFingerprint = selfFingerprint(model, 'headFingerprint');
+    if (files['response/response.md']) files['response/response.md'] = files['response/response.md'].replaceAll(oldClaims, claims.fingerprint).replaceAll(oldCoverage, coverage.fingerprint);
+    try { const store = openStore(businessRoot); applyHeadPublication(store, planHeadPublication({ store, featureId: FEATURE, model, claims, coverage })); } catch { /* Invalid fixtures remain invalid and unpublished. */ }
+  }
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   mkdirSync(path.join(session, 'step-1', 'parallel-2', 'response'), { recursive: true });
   writeFileSync(path.join(session, DELIVERED), '# backend-source-application — delivered source\n');
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'business.decide' }, current: '1/1', status: 'running', ...state }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'business.decide' }, current: '1/1', status: 'running', workflowOwner: { version: 1, project: 'starci-academy', ownerRoot: session, sourceRoot: session, ownerRole: 'be', declarationRef: '.workspaces/projects/starci-academy/workflow.json', declarationHash: claimsFingerprint, routeRef: '.workspaces/local/routes/starci-academy/be/config.json', routeHash: claimsFingerprint, repository: 'https://example.org/repo.git', gitPolicy: null }, ...state }));
   for (const [name, content] of Object.entries(sessionFiles)) {
     mkdirSync(path.dirname(path.join(session, name)), { recursive: true });
     writeFileSync(path.join(session, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -256,7 +273,7 @@ await expectError({ ...baseline(), 'request/request.json': requestJson({ inputs:
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { featureId: '' } }) }, 'required field featureId has no value', 'missing required featureId');
 await expectError({ ...baseline(), 'response/data/model.json': modelDoc({ headRef: `${ROOT_REF}/features/starci/${FEATURE}` }) }, 'no project segment below the businesses root', 'a project segment below the businesses root');
-await expectError({ ...baseline(), 'response/data/model.json': modelDoc({ headRef: `.worktrees/authority/features/${FEATURE}` }) }, 'is not under a .worktrees/businesses root', 'head outside the businesses root');
+await expectError({ ...baseline(), 'response/data/model.json': modelDoc({ headRef: `.worktrees/authority/features/${FEATURE}` }) }, 'is not under a project-partitioned businesses root', 'head outside the businesses root');
 await expectError({ ...baseline(), 'response/data/model.json': modelDoc({ coverage: `sha256:${'e'.repeat(64)}` }) }, 'must equal the frozen matrix fingerprint', 'model and matrix disagree on the fingerprint');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ coverage: `sha256:${'e'.repeat(64)}` }) }, 'must equal the coverage matrix fingerprint', 'response and matrix disagree on the fingerprint');
 await expectError({ ...baseline(), 'response/data/model.json': modelDoc({ transition: 'pending->in-progress' }) }, 'contradicts previous state null', 'transition contradicts the previous state');

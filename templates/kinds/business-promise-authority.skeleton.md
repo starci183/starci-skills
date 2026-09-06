@@ -11,7 +11,7 @@ One paragraph: which promise was decided, for which feature, and against which e
 | Feature | `feature-id` |
 | Mode | model |
 | Target state | pending |
-| Head | `.worktrees/businesses/features/feature-id` |
+| Head | `.worktrees/project-id/businesses/features/feature-id` |
 | Claims fingerprint | `sha256:0000000000000000000000000000000000000000000000000000000000000000` |
 | Coverage fingerprint | `sha256:0000000000000000000000000000000000000000000000000000000000000000` |
 

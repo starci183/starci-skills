@@ -118,6 +118,7 @@ test('request and response gates reject forged selection and changed actual head
     assert.match(validateWorkspaceCheckoutBinding(f.runtime, request, unmarked, branchDir).join('\n'), /requires a sessionCheckout/);
     assert.match(validateWorkspaceCheckoutBinding(f.runtime, { ...request, requirements: { ...request.requirements, checkout: 'routed' } }, bound).join('\n'), /requires checkout=session/);
     assert.deepEqual(validateWorkspaceCheckoutBinding(f.runtime, { requirements: {} }, unmarked), []);
+    assert.ok(validateWorkspaceCheckoutBinding(f.runtime, { schemaVersion: 9, requirements: {} }, unmarked).some(error => error.includes('project and role')), 'current request identity cannot use historical observation compatibility');
     assert.match(validateWorkspaceCheckoutRequest(f.runtime, { ...request, requirements: { ...request.requirements, checkout: f.selected } }, branchDir).join('\n'), /routed or session/);
     assert.match(validateWorkspaceCheckoutRequest(f.runtime, { ...request, sessionId: 'other-session' }, branchDir).join('\n'), /outside its own session coordinate/);
     assert.match(validateWorkspaceCheckoutRequest(f.runtime, { ...request, sessionId: '../other-session' }, branchDir).join('\n'), /safe before resolving paths/);
@@ -338,5 +339,45 @@ test('the official opener atomically freezes a session checkout and a refused op
     assert.equal(after.attempts['1/1'].status, 'running');
     assert.equal(after.requestHashes['1/1'], `sha256:${createHash('sha256').update(readFileSync(requestFile)).digest('hex')}`);
     assert.equal(JSON.parse(readFileSync(path.join(branch, 'response/response.json'))).status, 'running');
+  } finally { f.dispose(); }
+});
+
+
+test('routed read-only binding observes dirty policy-free source without granting write readiness', () => {
+  const f = workspaceCheckoutFixture({ repositoryKind: 'source' });
+  try {
+    delete f.portable.repository.gitPolicy; delete f.local.repository.gitPolicy; f.saveRoutes();
+    f.write(path.join(f.canonical, 'user-metadata.json'), '{"unfinished":true}\n');
+    f.write(path.join(f.canonical, 'src/model.txt'), 'uncommitted user source\n');
+    const before = git(f.canonical, 'status', '--porcelain');
+    const reflog = git(f.canonical, 'reflog', '--format=%H %gs');
+    const observation = resolveWorkspaceCheckout({ ...f.options, checkout: 'routed', declaredWriteRoots: [] });
+    assert.equal(observation.gitPolicy, null);
+    assert.equal(observation.mutationReadiness, 'read-only');
+    assert.equal(observation.sourceHead, f.baseHead);
+    assert.deepEqual(observation.writeRoots, []);
+    assert.equal(git(f.canonical, 'status', '--porcelain'), before);
+    assert.equal(git(f.canonical, 'reflog', '--format=%H %gs'), reflog);
+    assert.throws(() => resolveWorkspaceCheckout({ ...f.options, checkout: 'routed' }), /both route halves must declare gitPolicy/);
+    assert.throws(() => resolveWorkspaceCheckout({ ...f.options, declaredWriteRoots: [] }), /both route halves must declare gitPolicy/);
+    git(f.canonical, 'remote', 'set-url', 'origin', 'https://github.com/example/foreign.git');
+    assert.throws(() => resolveWorkspaceCheckout({ ...f.options, checkout: 'routed', declaredWriteRoots: [] }), /canonical origin differs/);
+  } finally { f.dispose(); }
+});
+
+test('routed read-only receipts independently verify real Git identity and cannot invent readiness', () => {
+  const f = workspaceCheckoutFixture();
+  try {
+    const request = { sessionId: f.sessionId, requirements: { project: f.project, role: f.role, checkout: 'routed', declaredWriteRoots: [] } };
+    const observed = resolveWorkspaceCheckout({ ...f.options, checkout: 'routed', declaredWriteRoots: [] });
+    assert.deepEqual(validateWorkspaceCheckoutBinding(f.runtime, request, observed), []);
+    for (const edit of [r => { r.mutationReadiness = 'ready'; }, r => { r.sourceHead = 'f'.repeat(40); }, r => { r.checkout.branch = 'foreign'; }, r => { r.gitPolicy = null; }]) {
+      const forged = structuredClone(observed); edit(forged);
+      assert.ok(validateWorkspaceCheckoutBinding(f.runtime, request, forged).length);
+    }
+    f.write(path.join(f.canonical, 'user-metadata.json'), 'user work\n');
+    assert.deepEqual(validateWorkspaceCheckoutBinding(f.runtime, request, observed), []);
+    assert.throws(() => resolveWorkspaceCheckout({ ...f.options, checkout: 'routed' }), /canonical mutation checkout must be clean/);
+    assert.throws(() => resolveWorkspaceCheckout(f.options), /canonical mutation checkout must be clean/);
   } finally { f.dispose(); }
 });

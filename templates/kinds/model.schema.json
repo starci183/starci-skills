@@ -62,9 +62,90 @@
     },
     "reconciliation": {
       "oneOf": [{ "$ref": "#/$defs/reconciliation" }, { "type": "null" }]
-    }
+    },
+    "documentation": { "$ref": "#/$defs/documentation" }
   },
   "$defs": {
+    "documentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "sections"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "sections": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "overview",
+            "actors",
+            "contracts",
+            "rules",
+            "states",
+            "acceptance"
+          ],
+          "properties": {
+            "overview": {
+              "$ref": "#/$defs/businessSection"
+            },
+            "actors": {
+              "$ref": "#/$defs/businessSection"
+            },
+            "contracts": {
+              "$ref": "#/$defs/businessSection"
+            },
+            "rules": {
+              "$ref": "#/$defs/businessSection"
+            },
+            "states": {
+              "$ref": "#/$defs/businessSection"
+            },
+            "acceptance": {
+              "$ref": "#/$defs/businessSection"
+            }
+          }
+        }
+      }
+    },
+    "businessSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "markdown",
+        "claimIds",
+        "dimensions"
+      ],
+      "properties": {
+        "markdown": {
+          "oneOf": [
+            { "type": "string", "minLength": 1, "maxLength": 8192 },
+            { "type": "array", "minItems": 1, "maxItems": 128,
+              "items": { "type": "string", "minLength": 1, "maxLength": 8192 } }
+          ]
+        },
+        "claimIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "dimensions": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      }
+    },
     "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "authorityState": { "enum": ["pending", "in-progress", "implemented", "rejected"] },

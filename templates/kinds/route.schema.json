@@ -109,7 +109,10 @@
       }
     },
     "gitPolicy": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
       "required": [
         "worktreeBranches",
@@ -126,7 +129,8 @@
           "type": "string",
           "minLength": 1
         }
-      }
+      },
+      "description": "The declared policy, or null only for a routed read-only binding with no write roots. A session selection or any source write requires the declared policy."
     },
     "mutationReadiness": {
       "enum": [
@@ -155,7 +159,7 @@
           "oneOf": [
             {
               "type": "string",
-              "pattern": "\\.worktrees/businesses$"
+              "pattern": "\\.worktrees/[a-z0-9]+(?:-[a-z0-9]+)*/businesses$"
             },
             {
               "type": "null"
@@ -422,5 +426,29 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "gitPolicy": {
+            "type": "null"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "mutationReadiness": {
+            "const": "read-only"
+          },
+          "writeRoots": {
+            "maxItems": 0
+          },
+          "sessionCheckout": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
 }

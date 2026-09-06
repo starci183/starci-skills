@@ -159,7 +159,7 @@
       "businesses": {
         "params": [],
         "kind": "dir",
-        "resolvesTo": "<Workflow>/.worktrees/businesses/  (features/<featureId>/model.json; business-registry-v1.json is the head index; objects/sha256/ the content store)",
+        "resolvesTo": "<Workflow>/.worktrees/<project>/businesses/  (features/<featureId>/model.json and its generated bundle (templates/business-head/projection.json); business-registry-v1.json is the head index; objects/sha256/ the content store)",
         "scheme": "business://<featureId>",
         "bind": "content address from business-registry-v1.json featureHeads.<featureId>.head, with authorityStatus",
         "writers": [
@@ -276,11 +276,11 @@
       "_templates": {
         "params": [],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/_templates/  (businesses/, debts/, sessions/); uat/ resolves to <Source>/.claude/templates/uat/",
+        "resolvesTo": "<Source>/.worktrees/_templates/  (debts/, sessions/); businesses/ resolves to <Source>/.claude/templates/business-head/; uat/ resolves to <Source>/.claude/templates/uat/",
         "scheme": "template://<kind>",
         "bind": "fingerprint per file",
         "writers": [],
-        "purpose": "Authority templates for new heads, debts, sessions, and UAT flows. The UAT flow template ships with the tree at templates/uat/ (README.md as the folder contract, flow.md, accounts.json.example, run.md, seed/), so a fresh install has one without provisioning a worktree, and a flow folder that does not exist yet is drafted from it. Consumed, never modified."
+        "purpose": "Authority templates for new heads, debts, sessions, and UAT flows. Business head projection ships at templates/business-head/ and its authored model schema at templates/kinds/model.schema.json. The UAT flow template ships with the tree at templates/uat/ (README.md as the folder contract, flow.md, accounts.json.example, run.md, seed/), so a fresh install has one without provisioning a worktree, and a flow folder that does not exist yet is drafted from it. Consumed, never modified."
       },
       "done": {
         "params": [],

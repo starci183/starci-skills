@@ -1,4 +1,5 @@
-import { workflowRootOf, readSessionState } from '../../scripts/workflow-root.mjs';
+import { workflowRootOf, readSessionState, sameRoot } from '../../scripts/workflow-root.mjs';
+import { businessesRootFor, headDirectory } from '../../scripts/business-head.mjs';
 // business.reconcile's own law over one branch, on top of the shared step check: the delivered source
 // input is bound; the head is exactly one feature directory below the businesses root; the model, the
 // receipt and the frozen matrix's fingerprint are the same reconciliation read three ways; the lineage
@@ -40,7 +41,6 @@ const LEGAL_TRANSITIONS = {
 // A reconciliation republishes an existing head: the transitions that start from nothing or end in a
 // rejection are decisions about the promise, and belong to business.decide.
 const RECONCILE_STATES = new Set(['implemented', 'in-progress']);
-const BUSINESSES_ROOT = /\.worktrees\/businesses$/;
 const empty = (v) => v === undefined || v === null || v === '' || v === '—';
 const fields = (rows) => Object.fromEntries((rows ?? []).map(([k, v]) => [k, v]));
 
@@ -111,7 +111,7 @@ export async function validateReconcileStep(branchDir, root = ROOT, { uncheckedR
     const cut = headRef.lastIndexOf('/features/');
     if (cut === -1) errors.push(`response/data/model.json: head ${headRef} must be exactly <businesses root>/features/${model.featureId}: the feature directory, with no project segment below the businesses root`);
     else {
-      if (!BUSINESSES_ROOT.test(headRef.slice(0, cut))) errors.push(`response/data/model.json: head ${headRef} is not under a .worktrees/businesses root`);
+      if (!businessesRootOf(headRef)) errors.push(`response/data/model.json: head ${headRef} is not under a project-partitioned businesses root`);
       if (headRef.slice(cut + '/features/'.length) !== model.featureId) errors.push(`response/data/model.json: head ${headRef} must name the feature ${model.featureId}, with no project segment below the businesses root`);
     }
     const transition = LEGAL_TRANSITIONS[model.lineage.transition];
@@ -133,7 +133,14 @@ export async function validateReconcileStep(branchDir, root = ROOT, { uncheckedR
   // whole law lives in scripts/business-registry.mjs, so the operator that writes it and the validator
   // that reads it back cannot drift apart.
   const publishedRoot = model && response.status === 'done' ? businessesRootOf(String(model.headRef ?? '')) : null;
-  if (publishedRoot && claimsDoc) errors.push(...verifyHeadPublication({ store: openStore(publishedRoot), featureId: model.featureId, model, claims: claimsDoc }));
+  if (publishedRoot && claimsDoc) {
+    try {
+      const authorityRoot = businessesRootFor(root, readSessionState(branchDir)?.state);
+      if (path.isAbsolute(model.headRef) && !sameRoot(publishedRoot, authorityRoot)) throw Error('model.headRef differs from the Workflow businesses alias');
+      headDirectory(authorityRoot, model, root);
+      errors.push(...verifyHeadPublication({ store: openStore(authorityRoot), featureId: model.featureId, model, claims: claimsDoc }));
+    } catch (error) { errors.push(error.message); }
+  }
 
   if (present.has('business-reconciliation') && has('response/response.md')) {
     const text = await read('response/response.md');

@@ -120,6 +120,8 @@ This operator's rows are gated by the shared expected/actual attempt contract in
 | delivery discrepancy | record every mismatch | each row names promise, actual and evidence | handoff `backend.generate`; retry on new head |
 | incomplete evidence | publish no implemented claim | comparison is inconclusive with unchecked coverage | emit typed replan/repair evidence |
 
+Documented heads retain their authored sections and regenerate every projection through the [business head contract](../../templates/business-head/README.md) when `applyHeadPublication` publishes the reconciled model and evidence. Historical models without documentation remain readable; reconciliation cannot discard documentation that the previous head carried.
+
 ## Boundary
 
 Context is read-only apart from the one head it publishes. The operator writes only `response/` of

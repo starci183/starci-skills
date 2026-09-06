@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { validateWorkspaceStep } from '../operators/workspace-bind/validate.mjs';
-import { installedTreeOf } from './workspace-checkout.mjs';
+import { installedTreeOf, resolveWorkspaceCheckout } from './workspace-checkout.mjs';
 import { validateQualityStep, SCORECARD_TOPICS } from '../operators/quality-verify/validate.mjs';
 
 const digest = (value) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
@@ -22,19 +22,12 @@ export async function writeMigrationReleaseProducers({ root, session, checkout, 
   const disk = path.resolve(checkout).replaceAll('\\', '/');
   const routeBranch = path.join(session, 'step-2/parallel-1');
   const qualityBranch = path.join(session, 'step-3/parallel-1');
-  const route = {
-    project, role: 'be', portableRouteRef: `.workspaces/projects/${project}/be.json`,
-    hydratedRouteRef: `.workspaces/local/routes/${project}/be/config.json`,
-    routeFingerprint: digest('synthetic portable and hydrated route'), identityFingerprint: digest('synthetic sealed roster'),
-    sourceHead: head,
-    checkout: { diskPath: disk, gitRoot: disk, gitRepository: 'https://example.invalid/migration-fixture.git',
-      branch: branchName, repositoryKind: 'source', directory: null, sourceHead: head },
-    gitPolicy: { worktreeBranches: 'session-only', mutationBranch: 'main' },
-    mutationReadiness: 'ready', writeRoots: [], authorityRoots: { businesses: null }, runtime: null, provenanceHeadRef: null,
-  };
+  const observed = resolveWorkspaceCheckout({ source: path.dirname(root), project, role: 'be', sessionId, checkout: 'routed', declaredWriteRoots: [] });
+  if (observed.sourceHead !== head || path.resolve(observed.checkout.diskPath) !== path.resolve(checkout)) throw new Error('migration fixture route does not match the pinned source');
+  const route = { ...observed, identityFingerprint: digest('synthetic sealed roster'), authorityRoots: { businesses: null }, runtime: null, provenanceHeadRef: null };
   const routeRequest = { schemaVersion: 9, operatorId: 'workspace.bind', step: 2, parallel: 1, sessionId,
     contexts: [{ alias: `@workspaces/projects/${project}/be`, head: null }, { alias: `@workspaces/local/routes/${project}/be`, head }, { alias: '@workspaces/device-state', head: null }],
-    requirements: { project, role: 'be', gitPolicy: route.gitPolicy, declaredWriteRoots: [], resume: null },
+    requirements: { project, role: 'be', checkout: 'routed', gitPolicy: route.gitPolicy, declaredWriteRoots: [], resume: null },
     inputs: {}, resume: null };
   const routeRequestFile = write(routeBranch, 'request/request.json', routeRequest);
   write(routeBranch, 'response/data/route.json', route);
@@ -43,13 +36,12 @@ export async function writeMigrationReleaseProducers({ root, session, checkout, 
     fields: { 'workspace-route-binding': 'response/response.md', route: 'response/data/route.json' } });
   write(routeBranch, 'response/response.md', `# workspace-route-binding — ${project}/be\n\nSynthetic source binding for the migration release regression.\n\n`
     + table('## Binding', ['Field', 'Value'], [['Project', project], ['Role', 'be'], ['Portable route', route.portableRouteRef], ['Hydrated route', route.hydratedRouteRef], ['Source head', head]])
-    + table('## Checkout', ['Field', 'Value'], [['Disk path', disk], ['Git root', disk], ['Git repository', route.checkout.gitRepository], ['Branch', branchName], ['Repository kind', 'source'], ['Directory', '—'], ['Source head', head], ['Mutation readiness', 'ready'], ['Businesses root', '—'], ['Installed tree', installedTreeOf(disk).label]])
-    + table('## Policy', ['Field', 'Value'], [['Worktree branches', 'session-only'], ['Mutation branch', 'main']])
+    + table('## Checkout', ['Field', 'Value'], [['Disk path', disk], ['Git root', disk], ['Git repository', route.checkout.gitRepository], ['Branch', branchName], ['Repository kind', route.checkout.repositoryKind], ['Directory', route.checkout.directory ?? '—'], ['Source head', head], ['Mutation readiness', route.mutationReadiness], ['Businesses root', '—'], ['Installed tree', installedTreeOf(disk).label]])
+    + table('## Policy', ['Field', 'Value'], [['Worktree branches', route.gitPolicy?.worktreeBranches ?? '—'], ['Mutation branch', route.gitPolicy?.mutationBranch ?? '—']])
     + table('## Write roots', ['Path', 'Why']) + table('## Runtime', ['Field', 'Value'])
     + table('## Findings', ['Code', 'Subject', 'Statement'], [
       [code('ROUTE_HYDRATED_FROM_PORTABLE'), route.hydratedRouteRef, 'the synthetic portable declaration resolves this test checkout'],
       [code('IDENTITY_ROSTER_SEALED'), 'fixture-roster', 'the synthetic roster is named only'],
-      [code('WORKTREE_BRANCH_SESSION_ONLY'), 'main', 'the test checkout is on the declared session branch'],
     ]));
 
   const gate = { gate: 'integration', commandRef: 'package.json#scripts.test', configRef: 'package.json', required: true };

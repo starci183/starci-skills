@@ -40,7 +40,7 @@
       ]
     },
     "declarationRef": {
-      "description": "The environment declaration the approval checks were read from, as its path from the host repository root and the sha256 of its bytes; null when the environment declares nothing, in which case every approval check is a wall.",
+      "description": "The environment declaration path and sha256, or null when absent or inapplicable. Missing authority is a wall only for checks required by the frozen mission; scripts/mission-scope.mjs derives document readiness applicability.",
       "oneOf": [
         {
           "type": "string",
@@ -160,7 +160,7 @@
       ]
     },
     "checkIds": {
-      "description": "The closed vocabulary of checks, one template per readiness question. `<role>` expands over the requested roles, `<class>` over the operation classes the environment schema publishes under authorization, and `<service>` over the auxiliary services the environment declaration names under `services` — none where it names none. service: the declaration names the service completely, and its probe answers when the declaration wants it up; a wall of this family is cleared by the service operator, never here. declaration: the portable declaration exists and its hydrated route projects it. checkout: the route carries a git policy, the tree is clean, the branch is one the policy permits. identity: the sealed admin credential preflight, and the flow's account record and sign-in probe when a flow is named. runtime: the registry entry of the route, the served head containing the bound head, the projected port answering, and no foreign process holding it. host: a browser binary for the audit profile, the host's Playwright install for @tools/browsercontrol mode playwright (present where resources/tools.json → browsercontrol.install says, with a Chromium under its browsers path), a reachable container daemon, installed dependencies per checkout, and no ancestor node_modules leaking types into the checkout's typecheck. approval: who authorises each operation class.",
+      "description": "The closed vocabulary of checks, one template per readiness question. `<role>` expands over the requested roles, `<class>` over the operation classes the environment schema publishes under authorization, and `<service>` over the auxiliary services the environment declaration names under `services` — none where it names none. service: the declaration names the service completely, and its probe answers when the declaration wants it up; a wall of this family is cleared by the service operator, never here. declaration: the portable declaration exists and its hydrated route projects it. checkout: the route carries a git policy, the tree is clean, the branch is one the policy permits. identity: the sealed admin credential preflight, and the flow's account record and sign-in probe when a flow is named. runtime: the registry entry of the route, the served head containing the bound head, the projected port answering, and no foreign process holding it. host: a browser binary for the audit profile, the host's Playwright install for @tools/browsercontrol mode playwright (present where resources/tools.json → browsercontrol.install says, with a Chromium under its browsers path), a reachable container daemon, installed dependencies per checkout, and no ancestor node_modules leaking types into the checkout's typecheck. approval: who authorises each operation class. For confirmed document work admitted by scripts/mission-scope.mjs, documentationSkippedPatterns identifies checks that must remain visible as skipped; declarations and Git branch identity remain inspected.",
       "templates": [
         "declaration.<role>",
         "checkout.<role>.policy",
@@ -181,6 +181,10 @@
         "host.deps.<role>",
         "host.types.<role>",
         "approval.<class>"
+      ],
+      "documentationSkippedPatterns": [
+        "^(approval|identity|runtime|host|service)\\.",
+        "^checkout\\.[^.]+\\.(policy|clean)$"
       ]
     }
   }

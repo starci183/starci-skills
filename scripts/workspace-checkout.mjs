@@ -248,7 +248,8 @@ export function resolveWorkspaceCheckout({ source = path.dirname(ROOT), project,
   const declaration = portable.value, local = hydrated.value, repo = declaration.repository;
   requireThat(declaration.project === project && local.project === project && declaration.role === role && local.role === role, 'ROUTE_MISMATCH', 'route identity differs from its declaration location');
   requireThat(samePath(real(local.source.path), source) && samePath(real(local.source.workspaceRoot), path.join(source, '.workspaces')) && samePath(real(local.source.trust), path.join(source, '.claude')) && samePath(local.source.skills, path.join(source, '.claude', 'skills')), 'ROUTE_MISMATCH', 'hydrated route belongs to another Source');
-  requireThat(repo.gitPolicy && local.repository.gitPolicy, 'INVALID_INPUT', 'both route halves must declare gitPolicy');
+  const readOnly = checkout === 'routed' && declaredWriteRoots.length === 0;
+  if (!readOnly) requireThat(repo.gitPolicy && local.repository.gitPolicy, 'INVALID_INPUT', 'both route halves must declare gitPolicy');
   requireThat(isDeepStrictEqual(repo.gitPolicy, local.repository.gitPolicy), 'ROUTE_MISMATCH', 'route halves disagree on Git policy');
   requireThat(remoteIdentity(repo.gitRepository) && remoteIdentity(repo.gitRepository) === remoteIdentity(local.repository.gitRepository) && repo.branch === local.repository.branch, 'ROUTE_MISMATCH', 'route halves disagree on repository or branch');
   const canonical = real(repo.kind === 'source' ? source : path.resolve(source, '..', repo.directory));
@@ -274,10 +275,10 @@ export function resolveWorkspaceCheckout({ source = path.dirname(ROOT), project,
     assertTree(canonical, [], false);
     sessionCheckout = { sessionId, canonicalDiskPath: slash(canonical), canonicalSourceHead: canonicalHead, canonicalBranch: repo.branch, gitCommonDir: slash(canonicalCommon) };
   }
-  assertTree(selected, declaredWriteRoots, checkout === 'session');
+  if (!readOnly) assertTree(selected, declaredWriteRoots, checkout === 'session');
   const junction = junctionErrors(selected, { sharedInstall });
-  requireThat(junction.length === 0, 'INVALID_INPUT', junction[0] ?? '');
-  const gitPolicy = { worktreeBranches: repo.gitPolicy.worktreeBranches, mutationBranch: repo.gitPolicy.mutationBranch };
+  if (!readOnly) requireThat(junction.length === 0, 'INVALID_INPUT', junction[0] ?? '');
+  const gitPolicy = repo.gitPolicy ? { worktreeBranches: repo.gitPolicy.worktreeBranches, mutationBranch: repo.gitPolicy.mutationBranch } : null;
   return { project, role, portableRouteRef, hydratedRouteRef, routeFingerprint: sha256(Buffer.concat([portable.bytes, hydrated.bytes])), sourceHead: head,
     checkout: { diskPath: slash(selected), gitRoot: slash(selected), gitRepository: repo.gitRepository, branch, repositoryKind: repo.kind, directory: repo.directory ?? null, sourceHead: head },
     gitPolicy, writeRoots: declaredWriteRoots, mutationReadiness: declaredWriteRoots.length ? 'ready' : 'read-only', ...(sessionCheckout ? { sessionCheckout } : {}) };
@@ -290,6 +291,7 @@ export function resolveWorkspaceCheckout({ source = path.dirname(ROOT), project,
 // the shape it wanted; the request gate and the operator's own validator both read this one check.
 export function gitPolicyErrors(asked, declared) {
   if (asked === undefined || asked === null) return [];
+  if (!declared) return ['request.json: gitPolicy was supplied but the route declares no Git policy'];
   const names = Object.keys(declared);
   const shape = `{${names.join(', ')}}`;
   if (typeof asked !== 'object' || Array.isArray(asked)) return names.map((field) => `request.json: gitPolicy.${field} is absent because gitPolicy is ${Array.isArray(asked) ? 'a list' : `a ${typeof asked}`}, not the object ${shape} the route declaration carries; it differs from the declared route (${declared[field]})`);
@@ -363,7 +365,17 @@ function selectionErrors(route, observed, canonical) {
 
 export function validateWorkspaceCheckoutBinding(root, request, route, branchDir) {
   const mode = request?.requirements?.checkout ?? 'routed';
-  if (mode !== 'session') return route.sessionCheckout !== undefined ? ['response/data/route.json: sessionCheckout requires checkout=session'] : [];
+  if (mode !== 'session') {
+    if (route.sessionCheckout !== undefined) return ['response/data/route.json: sessionCheckout requires checkout=session'];
+    // An unversioned historical observation has no request identity to rebind. Current requests
+    // still resolve the declared checkout independently, including the default routed selection.
+    if (request.schemaVersion === undefined && request.sessionId === undefined) return [];
+    if ((request.requirements?.declaredWriteRoots ?? []).length) return [];
+    try {
+      const observed = resolveWorkspaceCheckout({ source: path.dirname(root), project: request.requirements.project, role: request.requirements.role, sessionId: request.sessionId, checkout: 'routed', declaredWriteRoots: [], sharedInstall: request.requirements.sharedInstall });
+      return selectionErrors(route, observed, observed.checkout.diskPath);
+    } catch (error) { return [`response/data/route.json: ${error.message}`]; }
+  }
   if (!route.sessionCheckout) return ['response/data/route.json: checkout=session requires a sessionCheckout binding'];
   const identityErrors = sessionIdentityErrors(root, request, branchDir);
   if (identityErrors.length) return identityErrors;

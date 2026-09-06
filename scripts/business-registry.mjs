@@ -22,13 +22,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { projectBusinessHead, headDirectory, writeBusinessHead, verifyBusinessHead, businessRootProject, assertNoLinkedAncestors, writeBusinessFile } from './business-head.mjs';
 
 export const REGISTRY_FILE = 'business-registry-v1.json';
 export const OBJECT_SEGMENT = 'objects/sha256';
 export const HASH_ALGORITHM = 'sha256';
 export const CANONICALIZATION = 'RFC8785-JCS';
 export const FEATURE_SEGMENT = '/features/';
-const BUSINESSES_ROOT = /\.worktrees\/businesses$/;
 const HEX64 = /^[0-9a-f]{64}$/;
 const OBJECT_REF = /(?:^|\/)objects\/sha256\/([0-9a-f]{64})\.json$/;
 const fail = (message) => { throw new Error(message); };
@@ -74,7 +74,7 @@ export function businessesRootOf(headRef) {
   const cut = text.lastIndexOf(FEATURE_SEGMENT);
   if (cut === -1) return null;
   const root = text.slice(0, cut);
-  return BUSINESSES_ROOT.test(root) ? root : null;
+  return businessRootProject(root) ? root : null;
 }
 
 export const objectRelPath = (hash) => `${OBJECT_SEGMENT}/${hash}.json`;
@@ -119,10 +119,16 @@ export function boundSourceHeads(claims) {
 // it, diff it, or apply it. `sources` is the roles a caller resolved for the bound heads: a head with
 // no role named falls back to `defaultRole`, because the index names heads and the role is a label.
 export function planHeadPublication({ store, featureId, model, claims, coverage = null, sources = null, defaultRole = 'be' }) {
+  if (!businessRootProject(store.root) || store.registry?.project !== businessRootProject(store.root)) fail('SOURCE_DRIFT: businesses publication requires the matching project-partitioned authority registry');
   if (!featureId) fail('planHeadPublication needs the featureId whose head is published');
   if (!model) fail('planHeadPublication needs the model that is the head');
   if (!claims) fail('planHeadPublication needs the claims the head is frozen behind');
+  for (const value of [model, claims, coverage].filter(Boolean)) if (value.featureId !== featureId) fail('publication featureId differs from model or evidence');
   const previous = store.entry(featureId);
+  const previousModel = previous ? store.readObject(previous.head) : null;
+  if (previousModel?.documentation && !model.documentation) fail('a publication cannot discard the previous head documentation');
+  if (model.documentation && !coverage && previous?.coverageHead) coverage = store.readObject(previous.coverageHead);
+  const bundle = model.documentation ? { directory: headDirectory(store.root, model), files: projectBusinessHead({ model, claims, coverage }) } : null;
   const head = contentAddress(model);
   const claimsHead = contentAddress(claims);
   const coverageHead = coverage ? contentAddress(coverage) : previous?.coverageHead ?? null;
@@ -142,7 +148,7 @@ export function planHeadPublication({ store, featureId, model, claims, coverage 
     if (!document || !hash) continue;
     objects.push({ role, hash, document, path: objectRelPath(hash), ref: objectRef(store.root, hash), archived: store.hasObject(hash) });
   }
-  return { featureId, entry, previous, objects, headObjectRef: objectRef(store.root, head) };
+  return { featureId, entry, previous, registryFingerprint: contentAddress(store.registry), objects, headObjectRef: objectRef(store.root, head), ...(bundle ? { bundle } : {}) };
 }
 
 // Archive one document under its own address. Idempotent: an object store is immutable, so a document
@@ -150,10 +156,13 @@ export function planHeadPublication({ store, featureId, model, claims, coverage 
 export function archiveObject(store, document, { dryRun = false } = {}) {
   const hash = contentAddress(document);
   const file = store.objectFile(hash);
+  assertNoLinkedAncestors(file);
   const archived = store.hasObject(hash);
+  if (archived && contentAddress(store.readObject(hash)) !== hash) fail(`${file}: immutable object bytes differ from their content address`);
   if (!archived && !dryRun) {
     mkdirSync(path.dirname(file), { recursive: true });
-    writeFileSync(file, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
+    try { writeFileSync(file, `${JSON.stringify(document, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' }); }
+    catch (error) { if (error.code !== 'EEXIST' || contentAddress(store.readObject(hash)) !== hash) throw error; }
   }
   return { hash, file, ref: objectRef(store.root, hash), created: !archived };
 }
@@ -163,6 +172,11 @@ export function archiveObject(store, document, { dryRun = false } = {}) {
 // three different commits.
 export function applyHeadPublication(store, plan, { dryRun = false } = {}) {
   if (!store.present) fail(`${store.registryFile}: no head index to publish into`);
+  if (!businessRootProject(store.root) || store.registry.project !== businessRootProject(store.root)) fail('SOURCE_DRIFT: businesses publication requires the matching project-partitioned authority registry');
+  assertNoLinkedAncestors(store.registryFile);
+  for (const object of plan.objects) assertNoLinkedAncestors(store.objectFile(object.hash));
+  if (canonicalize(readJson(store.registryFile)) !== canonicalize(store.registry)) fail('SOURCE_DRIFT: businesses registry changed after planning');
+  if (contentAddress(store.registry) !== plan.registryFingerprint) fail('SOURCE_DRIFT: businesses registry changed since this plan');
   const registry = JSON.parse(JSON.stringify(store.registry));
   const archived = [];
   for (const object of plan.objects) {
@@ -173,17 +187,21 @@ export function applyHeadPublication(store, plan, { dryRun = false } = {}) {
   }
   registry.featureHeads ??= {};
   registry.featureHeads[plan.featureId] = plan.entry;
-  if (!dryRun) writeFileSync(store.registryFile, `${JSON.stringify(registry, null, 2)}\n`, 'utf8');
+  if (!dryRun) {
+    if (plan.bundle) writeBusinessHead(plan.bundle.directory, plan.bundle.files);
+    writeBusinessFile(store.registryFile, `${JSON.stringify(registry, null, 2)}\n`);
+  }
   return { registry, archived };
 }
 
 // The law a published head is read back by: the feature directory, the object store and the index say
 // the same thing, and the lineage is a chain of objects rather than of session files. Every message
 // names the file it refuses and the two values that disagree.
-export function verifyHeadPublication({ store, featureId, model, claims }) {
+export function verifyHeadPublication({ store, featureId, model, claims, coverage = null }) {
   const errors = [];
   const at = `${REGISTRY_FILE}#featureHeads[${featureId}]`;
   if (!store.present) return [`${REGISTRY_FILE}: no head index under ${store.root}; a head published to a feature directory alone is a head no reader finds`];
+  if (store.registry.project !== businessRootProject(store.root)) errors.push(`${REGISTRY_FILE}: registry project differs from its authority root`);
   const head = contentAddress(model);
   const expected = selfFingerprint(model, 'headFingerprint');
   if (model.headFingerprint !== expected) errors.push(`model.json: headFingerprint ${model.headFingerprint} is not this document's fingerprint ${expected}; the fingerprint is the model without that field, and the index names the address of the model with it (${head})`);
@@ -201,9 +219,13 @@ export function verifyHeadPublication({ store, featureId, model, claims }) {
   }
   const previousRef = model.lineage?.previousHeadRef ?? null;
   const previousHash = archivedHashOf(previousRef);
-  if (previousRef === null) errors.push('model.json: lineage.previousHeadRef is null; a reconciliation replaces a head and names the object it replaced');
+  if (previousRef === null) {
+    if (model.mode !== 'model' || model.state !== 'pending' || model.lineage?.previousState !== null || model.lineage?.transition !== 'absent->pending') errors.push('model.json: lineage.previousHeadRef is null; only a first pending decision starts without a previous head');
+    if (entry?.previousHead !== null) errors.push(`${at}.previousHead must be null for a first decision`);
+  }
   else if (previousHash === null) errors.push(`model.json: lineage.previousHeadRef ${previousRef} is not an archived object under ${OBJECT_SEGMENT}/<hash>.json; a lineage is a chain of objects, and a session file is gone the moment the session is`);
   else {
+    if (String(previousRef).replaceAll('\\', '/') !== objectRef(store.root, previousHash).replaceAll('\\', '/')) errors.push('model.json: lineage previous head must reference the archived object in this project store');
     if (!store.hasObject(previousHash)) errors.push(`${objectRelPath(previousHash)}: lineage.previousHeadRef names an object the store does not hold; the head it replaced is archived first, from the feature directory as it stood`);
     if (entry && entry.previousHead !== previousHash) errors.push(`${at}.previousHead is ${entry.previousHead}, the lineage replaced ${previousHash}`);
   }
@@ -211,6 +233,7 @@ export function verifyHeadPublication({ store, featureId, model, claims }) {
     const claimsHead = contentAddress(claims);
     if (entry.claimsHead !== claimsHead) errors.push(`${at}.claimsHead is ${entry.claimsHead}, the published claims are addressed ${claimsHead}`);
     else if (!store.hasObject(claimsHead)) errors.push(`${objectRelPath(claimsHead)}: the index names these claims and the store does not hold them`);
+    else if (contentAddress(store.readObject(claimsHead)) !== claimsHead) errors.push('claims archived object does not hash to its address');
     const bound = boundSourceHeads(claims);
     for (const source of entry.sources ?? []) {
       if (!bound.includes(source.head)) errors.push(`${at}.sources names source head ${source.head}, which no fact claim of claims.json binds; the index would rest the promise on evidence nobody read`);
@@ -219,13 +242,22 @@ export function verifyHeadPublication({ store, featureId, model, claims }) {
       if (!(entry.sources ?? []).some((s) => s.head === source)) errors.push(`${at}.sources omits source head ${source}, which the claims bind; the index under-names the delivery the promise rests on`);
     }
   }
+  const previousModel = previousHash ? store.readObject(previousHash) : null;
+  if (previousModel && contentAddress(previousModel) !== previousHash) errors.push('model.json: previous archived object does not hash to its lineage address');
+  if (previousModel && previousModel.state !== model.lineage.previousState) errors.push('model.json: previousState differs from the archived previous head');
+  if (previousModel?.documentation && !model.documentation) errors.push('model.json: a publication cannot discard the previous head documentation');
+  if (model.documentation) {
+    const archivedCoverage = entry?.coverageHead ? store.readObject(entry.coverageHead) : null;
+    if (!archivedCoverage || contentAddress(archivedCoverage) !== entry.coverageHead) errors.push('coverage archived object does not hash to its address');
+    if (coverage && contentAddress(coverage) !== entry?.coverageHead) errors.push('coverage differs from the indexed coverage object');
+    errors.push(...verifyBusinessHead(store.root, { model, claims, coverage: coverage ?? archivedCoverage }));
+  }
   return errors;
 }
 
 // `node scripts/business-registry.mjs plan <businesses root> <featureId> [--role <role>]`
 // Prints the entry and the object filenames publishing that feature's head would write, and writes
-// nothing at all: a person can publish a head by hand from this output, and a reader can see what an
-// operator's step 5 is about to do before it does it.
+// nothing at all: a reader can inspect the publication the operator's publisher will apply.
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [command, root, featureId, ...rest] = process.argv.slice(2);
   if (command !== 'plan' || !root || !featureId) {
@@ -239,7 +271,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const model = load('model.json');
   if (!model) { process.stderr.write(`${dir}/model.json: no head to publish\n`); process.exit(2); }
   const store = openStore(path.resolve(root).split(path.sep).join('/'));
-  const plan = planHeadPublication({ store, featureId, model, claims: load('claims.json'), coverage: load('coverage-matrix.json'), defaultRole });
+  const evidence = model.documentation ? load('evidence.json') : null;
+  const plan = planHeadPublication({ store, featureId, model, claims: evidence?.claims ?? load('claims.json'), coverage: evidence?.coverage ?? load('coverage-matrix.json'), defaultRole });
   const lines = [
     `plan (dry, nothing written): ${featureId} in ${store.root}`,
     '',

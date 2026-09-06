@@ -10,6 +10,9 @@
 // id, and the wall still stands; the approval checks say what the declaration on disk says, at the
 // hash the report pinned; the receipt's Binding rows restate the report and the request; and nothing
 // written looks like a credential.
+import { documentationReadinessSkips } from '../../scripts/mission-scope.mjs';
+import { readSessionState } from '../../scripts/workflow-root.mjs';
+import { resolveWorkspaceCheckout } from '../../scripts/workspace-checkout.mjs';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -85,8 +88,11 @@ export async function validateEnvironmentStep(branchDir, root = ROOT, hostRoot =
     if (text && credentialShaped(text)) errors.push(`${label}: carries a credential-shaped value; the evidence of a custody check is its outcome, the credential's name and a length or digest, never the value`);
   }
 
+  const owning = readSessionState(branchDir);
+  const scopedSkips = documentationReadinessSkips(owning?.state, base.request, report?.checks?.map(check => check.id) ?? [], root);
+  const documentationOnly = scopedSkips.size > 0;
   const env = report?.env ?? requirements.env;
-  if (!empty(env)) { const missing = missingStack(root, env, hostRoot); if (missing) errors.push(`request.json: env ${env} names no stack; ${missing} does not exist`); }
+  if (!documentationOnly && !empty(env)) { const missing = missingStack(root, env, hostRoot); if (missing) errors.push(`request.json: env ${env} names no stack; ${missing} does not exist`); }
 
   if (report) {
     // The report answers the request it was written for.
@@ -117,6 +123,13 @@ export async function validateEnvironmentStep(branchDir, root = ROOT, hostRoot =
     for (const id of expected) if (!byId.has(id)) errors.push(`${REPORT}: check ${id} was not run; every readiness question runs once and a missing id is a check that stayed silent`);
     const expectedSet = new Set(expected);
     for (const id of byId.keys()) if (!expectedSet.has(id)) errors.push(`${REPORT}: check ${id} is not in the vocabulary readiness-report.schema.json publishes for roles ${report.roles.join(', ')}`);
+
+    for (const id of scopedSkips) if (byId.get(id)?.status !== 'skipped') errors.push(`${REPORT}: check ${id} must be skipped for the frozen document work; its prerequisite is outside this mission`);
+    // Read-only still proves real route, repository, branch and head identity.
+    if (documentationOnly) for (const role of report.roles) if (byId.get(`declaration.${role}`)?.status === 'ok') {
+      try { resolveWorkspaceCheckout({ source: owning.state.workflowOwner.sourceRoot, project: report.project, role, sessionId: owning.state.id, checkout: 'routed', declaredWriteRoots: [] }); }
+      catch (error) { errors.push(`${REPORT}: declaration.${role} claims readiness over an invalid read-only route: ${error.message}`); }
+    }
 
     // Walls: one entry per wall check, owned by its family or a person, and nothing else.
     const wallIds = new Set([...byId.values()].filter((c) => c.status === 'wall').map((c) => c.id));
@@ -152,7 +165,7 @@ export async function validateEnvironmentStep(branchDir, root = ROOT, hostRoot =
       if (!decl) continue;
       const others = [...byId.values()].filter((c) => c.id !== decl.id && roleScoped(c.id, role));
       if (decl.status === 'wall') for (const c of others) if (c.status !== 'skipped') errors.push(`${REPORT}: check ${c.id} is ${c.status} while declaration.${role} is a wall; a role with no declared route has nothing to inspect and its other checks are skipped`);
-      if (decl.status === 'ok') for (const c of others.filter((x) => x.family === 'checkout')) if (c.status === 'skipped') errors.push(`${REPORT}: check ${c.id} is skipped while declaration.${role} is ok; a declared route has a checkout to inspect`);
+      if (decl.status === 'ok') for (const c of others.filter((x) => x.family === 'checkout' && !scopedSkips.has(x.id))) if (c.status === 'skipped') errors.push(`${REPORT}: check ${c.id} is skipped while declaration.${role} is ok; a declared route has a checkout to inspect`);
     }
     // The runtime family follows the request: a role the chain serves, observes or walks has its runtime
     // checked; a role that is merely bound has it skipped, so a package repair never inherits the readiness
@@ -189,7 +202,7 @@ export async function validateEnvironmentStep(branchDir, root = ROOT, hostRoot =
     // declaration check is ok exactly where the declaration carries that service completely, and the
     // probe check is skipped exactly where the declaration wants the service down, because nothing
     // answering is then the state that was asked for. Nothing here starts, stops or moves a service.
-    for (const s of services) {
+    for (const s of documentationOnly ? [] : services) {
       const declared = byId.get(`service.${s.id}.declared`);
       if (declared && declared.status === 'wall') errors.push(`${REPORT}: check service.${s.id}.declared is a wall while ${declaration.rel} carries the service with its kind, command, probe and holder; the declaration answered this one`);
       const probe = byId.get(`service.${s.id}.probe`);
@@ -202,16 +215,16 @@ export async function validateEnvironmentStep(branchDir, root = ROOT, hostRoot =
     const decl = declaration;
     const valid = declarationValid;
     if (valid) {
-      if (report.declarationRef !== decl.reference) errors.push(`${REPORT}: declarationRef ${report.declarationRef} is not the declaration on disk (${decl.reference}); a moved declaration is authority drift, not a quieter approval`);
+      if (report.declarationRef !== decl.reference && !(documentationOnly && report.declarationRef === null)) errors.push(`${REPORT}: declarationRef ${report.declarationRef} is not the declaration on disk (${decl.reference}); a moved declaration is authority drift, not a quieter approval`);
       for (const cls of classes) {
         const c = byId.get(`approval.${cls}`);
-        if (!c) continue;
+        if (!c || scopedSkips.has(c.id)) continue;
         if (c.status !== 'ok') errors.push(`${REPORT}: approval.${cls} is ${c.status} while the declaration is valid; a valid declaration answers every class, declared or person`);
         else if (!new RegExp(`^${decl.authorization[cls]}\\b`).test(c.evidence)) errors.push(`${REPORT}: approval.${cls} evidence "${c.evidence}" does not open with ${decl.authorization[cls]}, which the declaration gives the class`);
       }
     } else {
-      if (report.declarationRef !== null) errors.push(`${REPORT}: declarationRef names a declaration that ${decl.exists ? 'fails its schema' : 'does not exist'}; the report records null and every approval check as a wall`);
-      for (const cls of classes) { const c = byId.get(`approval.${cls}`); if (c && c.status !== 'wall') errors.push(`${REPORT}: approval.${cls} is ${c.status} while the environment declares nothing valid; every approval check is a wall owned by approval`); }
+      if (report.declarationRef !== null) errors.push(`${REPORT}: declarationRef names a declaration that ${decl.exists ? 'fails its schema' : 'does not exist'}; the report records null and every applicable approval check as a wall`);
+      for (const cls of classes) { const c = byId.get(`approval.${cls}`); if (c && !scopedSkips.has(c.id) && c.status !== 'wall') errors.push(`${REPORT}: approval.${cls} is ${c.status} while the environment declares nothing valid; every applicable approval check is a wall owned by approval`); }
     }
 
     // The walk runner's install is read back from the host the way the declaration is: the check says

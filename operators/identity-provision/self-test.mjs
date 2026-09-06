@@ -17,6 +17,21 @@ const APPROVAL = '@worktrees/debts/be.md#identity-approval';
 const ENTRY = 'demo-product/fe';
 const FLOW = 'paid-enrolment';
 const ENV = 'dev';
+// Every case uses its own declared host, including plain approval-id cases.
+const HOST = mkdtempSync(path.join(tmpdir(), 'identity-host-'));
+const declare = (env, body) => {
+  mkdirSync(path.join(HOST, '.stacks', env), { recursive: true });
+  const bytes = Buffer.from(JSON.stringify(body, null, 2));
+  writeFileSync(path.join(HOST, '.stacks', env, 'environment.json'), bytes);
+  return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+};
+const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
+const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production: false, authorization: { 'identity-provisioning': 'person' } });
+const PROD_REF = declare('production', { schemaVersion: 9, env: 'production', production: true });
+const LOOSE_REF = declare('loose', { schemaVersion: 9, env: 'loose', production: true, authorization: { release: 'declared', 'identity-provisioning': 'declared' } });
+const onHost = { hostRoot: HOST };
+assert.equal(path.dirname(path.resolve(HOST)), path.resolve(tmpdir()));
+process.once('exit', () => rmSync(HOST, { recursive: true, force: true }));
 const PROVISION = ['provision-identity'];
 const ROTATE = ['rotate-admin-credential'];
 
@@ -125,13 +140,13 @@ function writeBranch(files) {
 }
 async function expectValid(files, label, options = {}) {
   const { branch, session } = writeBranch(files);
-  const { errors } = await validateIdentityStep(branch, undefined, options);
+  const { errors } = await validateIdentityStep(branch, undefined, { hostRoot: HOST, ...options });
   rmSync(session, { recursive: true, force: true });
   assert.deepEqual(errors, [], `${label} should be valid`);
 }
 async function expectError(files, needle, label, options = {}) {
   const { branch, session } = writeBranch(files);
-  const { errors } = await validateIdentityStep(branch, undefined, options);
+  const { errors } = await validateIdentityStep(branch, undefined, { hostRoot: HOST, ...options });
   rmSync(session, { recursive: true, force: true });
   assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
 }
@@ -244,18 +259,7 @@ assert.ok(identityRotationErrors({ desiredState: { effects: PROVISION }, identit
 
 // Authority from the environment's own declaration. A synthetic host holds one declaration per case;
 // the reference a request carries is the declaration's path and the hash of its bytes.
-const HOST = mkdtempSync(path.join(tmpdir(), 'identity-host-'));
-const declare = (env, body) => {
-  mkdirSync(path.join(HOST, '.stacks', env), { recursive: true });
-  const bytes = Buffer.from(JSON.stringify(body, null, 2));
-  writeFileSync(path.join(HOST, '.stacks', env, 'environment.json'), bytes);
-  return `.stacks/${env}/environment.json#sha256:${createHash('sha256').update(bytes).digest('hex')}`;
-};
-const DEV_REF = declare('dev', { schemaVersion: 9, env: 'dev', production: false });
-const TIGHT_REF = declare('tight', { schemaVersion: 9, env: 'tight', production: false, authorization: { 'identity-provisioning': 'person' } });
-const PROD_REF = declare('production', { schemaVersion: 9, env: 'production', production: true });
-const LOOSE_REF = declare('loose', { schemaVersion: 9, env: 'loose', production: true, authorization: { release: 'declared', 'identity-provisioning': 'declared' } });
-const onHost = { hostRoot: HOST };
+
 await expectError(provisioning({ 'request/request.json': requestJson({ env: 'no-such-stack' }) }), 'which this installation does not have', 'an env with no stack', onHost);
 const provisioningDeclared = ({ approval = DEV_REF, env = 'dev', effects = PROVISION } = {}) => provisioning({
   'request/request.json': requestJson({ effects, env, approval }),

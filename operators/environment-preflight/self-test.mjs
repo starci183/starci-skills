@@ -10,6 +10,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateEnvironmentStep, expectedCheckIds, authorizationClasses } from './validate.mjs';
+import { workspaceCheckoutFixture } from '../../scripts/workspace-checkout-fixture.mjs';
+import { withEvidenceOrigin } from '../../scripts/validation-phase.mjs';
+import { RUNTIME_REVISION } from '../../scripts/workflow-root.mjs';
+import { documentationReadinessSkips, scopeHash } from '../../scripts/mission-scope.mjs';
+import { discoveryFor, answerFor } from '../../scripts/v23-test-fixture.mjs';
 import { loadEnvironmentSchema, stackDeclaration } from '../../scripts/validate-request.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -265,6 +270,47 @@ const playwrightWall = () => {
 };
 await expectValid(playwrightWall(), 'blocked on the absent walk runner install, in the runner\'s wording');
 await expectError(mutateBoth(playwrightWall(), (r) => { r.walls[0].repair = 'install a browser somewhere'; }), 'does not name the install place', 'a playwright wall whose repair names no place');
+
+// A frozen handoff receipt remains valid without any environment declaration or host runtime.
+// Read it as immutable origin evidence so this case exercises the operator law independently of
+// the live attempt admission already covered by the session and requirement predicate tests.
+{
+  const fixture = workspaceCheckoutFixture({ attachRuntime: true });
+  try {
+    delete fixture.portable.repository.gitPolicy; delete fixture.local.repository.gitPolicy; fixture.saveRoutes();
+    fixture.write(path.join(fixture.canonical, 'unfinished-user-metadata.json'), '{}\n');
+    const mission = { goal: 'Publish documented business authority', verification: 'Review the documentation', sourceRef: 'user:handoff', doneWhen: [{ producedBy: 'business.decide', evidence: 'The authority is reviewable' }], discovery: discoveryFor(fixture.project, { stage: 'handoff', tags: ['business', 'documentation'], head: fixture.baseHead }) };
+    mission.confirmation = { scopeHash: scopeHash(mission), sourceRef: 'user:scope-answer', authority: answerFor(mission) };
+    const state = { id: fixture.sessionId, runtimeRevision: RUNTIME_REVISION, project: fixture.project, lifecycle: { phase: 'confirmed' }, workflowOwner: { sourceRoot: fixture.source }, mission, chain: [['1/1'], ['2/1'], ['3/1']], steps: { '1/1': OPERATOR, '2/1': 'workspace.bind', '3/1': 'business.decide' }, planned: { '1/1': { requirements: { runtimeRoles: [], flow: null } }, '2/1': { requirements: { role: 'be', checkout: 'routed', declaredWriteRoots: [] } }, '3/1': { requirements: {} } } };
+    const request = requestJson({ project: fixture.project, roles: ['be'], extra: { runtimeRoles: [] } });
+    const report = buildReport({ project: fixture.project, roles: ['be'], declarationRef: null });
+    report.checks = report.checks.filter(check => check.family !== 'service');
+    const skips = documentationReadinessSkips(state, request, report.checks.map(check => check.id), fixture.runtime);
+    assert.ok(skips.size);
+    for (const check of report.checks) if (skips.has(check.id)) { check.status = 'skipped'; check.evidence = 'The frozen handoff runs no product operation; only declared Git identity is observed.'; }
+    const branch = path.join(fixture.source, '.worktrees/sessions', fixture.sessionId, 'step-1/parallel-1');
+    fixture.write(path.join(branch, '../../state.json'), state);
+    fixture.write(path.join(branch, 'request/request.json'), request);
+    fixture.write(path.join(branch, 'response/response.json'), responseJson());
+    const inspect = async () => {
+      fixture.write(path.join(branch, 'response/data/readiness-report.json'), report);
+      fixture.write(path.join(branch, 'response/response.md'), receiptOf(report));
+      return withEvidenceOrigin(true, () => validateEnvironmentStep(branch, fixture.runtime, fixture.source));
+    };
+    assert.deepEqual((await inspect()).errors, [], 'policy-free dirty read-only route with no stack, Docker, identity or browser is a valid handoff');
+    mission.discovery = discoveryFor(fixture.project, { stage: 'implement', tags: ['documentation'], head: fixture.baseHead });
+    mission.confirmation = { scopeHash: scopeHash(mission), sourceRef: 'user:scope-answer', authority: answerFor(mission) };
+    fixture.write(path.join(branch, '../../state.json'), state);
+    assert.deepEqual((await inspect()).errors, [], 'executing only the documented artifact owes no product runtime or operation approval');
+    const approval = report.checks.find(check => check.family === 'approval');
+    approval.status = 'ok';
+    assert.ok((await inspect()).errors.some(error => error.includes('must be skipped for the frozen document work')), 'a skipped class cannot claim approval');
+    approval.status = 'skipped';
+    const branchCheck = report.checks.find(check => check.id === 'checkout.be.branch');
+    branchCheck.status = 'skipped';
+    assert.ok((await inspect()).errors.some(error => error.includes('a declared route has a checkout to inspect')), 'read-only must inspect real branch identity');
+  } finally { fixture.dispose(); }
+}
 
 rmSync(host, { recursive: true, force: true });
 process.stdout.write('environment.preflight self-test: two lawful branches, one gate stop and every mutation refused\n');

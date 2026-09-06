@@ -31,7 +31,7 @@ async function fixture(t) {
   await writeFile(path.join(branch, 'request/request.json'), bytes);
   await writeFile(path.join(branch, 'response/response.json'), JSON.stringify(response));
   state.requestHashes['1/1'] = sha(bytes);
-  state.attempts['1/1'] = { id: request.attempt.id, operatorId: request.operatorId, expected, expectedHash: sha(JSON.stringify(expected)), requestRef: 'step-1/parallel-1/request/request.json', responseRef: 'step-1/parallel-1/response/response.json', status: 'waiting', startedAt: '2026-09-01T00:00:00Z', endedAt: '2026-09-01T00:01:00Z', evidenceManifest: await buildEvidenceManifest(branch) };
+  state.attempts['1/1'] = { id: request.attempt.id, operatorId: request.operatorId, number: 1, kind: 'initial', expectedVersion: expected.version, frozenInputs: [], expected, expectedHash: sha(JSON.stringify(expected)), requestRef: 'step-1/parallel-1/request/request.json', responseRef: 'step-1/parallel-1/response/response.json', status: 'waiting', startedAt: '2026-09-01T00:00:00Z', endedAt: '2026-09-01T00:01:00Z', evidenceManifest: await buildEvidenceManifest(branch) };
   await writeFile(file, JSON.stringify(state));
   return { session: opened.session, state, file, branch, correction: { selected: 'corrected', selectedBy: 'user', sourceRef: 'user:third', mission: { ...state.mission, goal: 'Inspect final readiness.' } } };
 }

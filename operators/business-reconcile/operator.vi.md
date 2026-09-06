@@ -97,6 +97,8 @@ Các row của operator này được gate bởi hợp đồng attempt expected/
 | delivery lệch | ghi mọi mismatch | mỗi row nêu promise, actual, evidence | handoff `backend.generate`; retry trên head mới |
 | evidence thiếu | không publish claim implemented | comparison inconclusive và unchecked coverage | phát typed replan/repair evidence |
 
+Head đã có documentation giữ các phần biên soạn và sinh lại mọi projection theo [contract business head](../../templates/business-head/README.md) khi `applyHeadPublication` publish model reconcile cùng evidence. Model lịch sử chưa có documentation vẫn đọc được; reconciliation không được bỏ documentation của head trước.
+
 ## Ranh giới
 
 Context chỉ đọc, trừ đúng một head nó publish. Operator chỉ ghi `response/` của nhánh mình —

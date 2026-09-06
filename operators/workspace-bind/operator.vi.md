@@ -37,6 +37,13 @@ hiện tại. Head chuẩn là quan sát, không phải base gốc của phiên;
 Đăng ký thiếu, thuộc kho khác, không duy nhất hoặc không khả dụng đều bị từ chối. Biên nhận route
 hiện có không bao giờ được âm thầm ràng lại.
 
+Binding `routed` không có `declaredWriteRoots` chỉ quan sát định danh kho, nhánh đã khai và head,
+không cấp quyền ghi. Chính sách Git vắng mặt được ghi null và hai hàng Policy ghi dấu gạch dài;
+thay đổi dở dang thuộc người dùng được giữ nguyên. Chính sách có khai vẫn phải khớp giữa hai bản
+route. Chọn `session` hoặc khai bất kỳ gốc ghi nào giữ đầy đủ gate chính sách, cây sạch và quyền
+cây cài dùng chung. `scripts/workspace-checkout.mjs` sở hữu predicate này và tự xác minh lại cả
+biên nhận routed chỉ đọc lẫn biên nhận phiên.
+
 ## Route không ràng runtime nào
 
 Một route là một checkout và một head, không phải thứ gì đang lắng nghe. Các tiến trình frontend, api
@@ -54,10 +61,10 @@ Không credential nào được đọc, chép hay ghi lại; chỉ tham chiếu 
 `IDENTITY_ROSTER_SEALED` nói đúng điều đó. Một khai báo không tồn tại thì do chủ workspace sửa, không
 bao giờ do operator này, nên `ROUTE_UNDECLARED` và `ROUTE_UNHYDRATED` là kết cục dự kiến của một
 workspace chưa chuẩn bị chứ không phải lỗi của request. `CHECKOUT_DIRTY` không bao giờ có fallback:
-operator này không stash, không clean, không reset cây làm việc để một binding trở nên khả thi. Gốc
-thẩm quyền businesses được suy ra là `<gốc git>/.worktrees/businesses` khi worktree ấy tồn tại trên
-một checkout source và vắng mặt nếu không; nó không bao giờ được nhận từ người, vì một gốc thẩm quyền
-do người gõ vào chính là cách cây business thứ hai ra đời. Provenance và độ tươi không phải một bước
+operator này không stash, không clean, không reset cây làm việc để một binding trở nên khả thi. Gốc thẩm quyền businesses được `scripts/business-head.mjs#businessesRootFor` phân giải từ
+`@worktrees/businesses`, Workflow sở hữu và phân vùng project. Binding có giá trị phải khớp đúng
+thẩm quyền ấy bất kể checkout đang đọc. Giá trị là null khi không ràng thẩm quyền. Người không
+chọn gốc hay phân vùng project khác. Provenance và độ tươi không phải một bước
 riêng: chúng được ghi ngay trong bước phát, cạnh binding mà chúng mô tả. Head mà một route đã hydrate
 ghi lại chỉ là hồ sơ của lần hydrate ấy chứ không bao giờ là thẩm quyền của route: head quan sát được
 mới thắng, và một head hydrate chậm hơn checkout hai commit không phải một mã dừng.
@@ -74,6 +81,8 @@ Các row của operator này được gate bởi hợp đồng attempt expected/
 | checkout đã khai hợp lệ | tái dùng đúng disk path, head, policy | đọc lại Git root, installed tree, write roots | phát binding |
 | thiếu declaration hoặc hydration | không đoán path gần giống và không tạo | ghi evidence thiếu | handoff workspace owner |
 | identity, head hoặc policy sai | từ chối binding cache | ghi root, revision hoặc policy xung đột | owner sửa, rồi attempt chỉ đọc mới |
+
+Bằng chứng: [scoped handoff observations](../../tests/evidence/20260906-scoped-handoff-readiness.md).
 
 ## Ranh giới
 
@@ -109,8 +118,8 @@ và không mang phán quyết nào.
 | `project` | id | — | Project cần ràng |
 | `role` | id | — | Vai route đã khai của project, theo định dạng định danh tại `readiness/initialization/workspaces/portable-route.schema.json#/$defs/slug`; định danh route ứng dụng không thay đổi vai context source |
 | `checkout` | choice | routed | `routed` chọn checkout chuẩn; `session` chỉ chọn worktree đã đăng ký của chính phiên trong request theo chính sách đã khai |
-| `gitPolicy` | object `{worktreeBranches, mutationBranch}`, hai trường của `repository.gitPolicy` trong khai báo route mà binding được kiểm theo | the policy the route declaration carries; a declaration that carries none is `INVALID_INPUT` at step 1, never a guessed policy | Luật nhánh mà binding này được kiểm theo; `forbidden` giữ mọi lần ghi trên nhánh mutation |
-| `declaredWriteRoots` | list | empty | Những đường dẫn duy nhất mà việc sau được ghi; bẩn ngoài chúng là `CHECKOUT_DIRTY`, và bẩn bất kỳ khi checkout đang ở nhánh mutation thay vì nhánh `session/<sessionId>` cũng vậy |
+| `gitPolicy` | object `{worktreeBranches, mutationBranch}`, hai trường của `repository.gitPolicy` trong khai báo route mà binding được kiểm theo | the declared policy, or null for a routed read-only binding; writes and session selection require it | Luật nhánh mà binding này được kiểm theo; `forbidden` giữ mọi lần ghi trên nhánh mutation |
+| `declaredWriteRoots` | list | empty | Trần ghi; rỗng chọn quan sát routed chỉ đọc. Khi ghi hoặc chọn phiên, bẩn ngoài gốc là `CHECKOUT_DIRTY` và checkout mutation chuẩn phải sạch |
 | `sharedInstall` | choice | false | Cây đã cài được chia sẻ qua junction một cách có chủ đích; xoá bên trong nó là bị cấm |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
@@ -121,10 +130,10 @@ và không mang phán quyết nào.
 | 1 | Kiểm gate và chạy lại, và từ chối mọi hint nó mang | `resume` | `request/request.json`, phần requirements và head đóng băng của nó | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Ràng bootstrap và identity | — | @workspaces/device-state, định danh máy và roster credential đã niêm phong, @tools/secrets | — | `IDENTITY_UNVERIFIED` |
 | 3 | Kiểm exact declaration và checkout, phân loại reusable, missing hoặc invalid theo identity và head, và chỉ resolve route đã khai reusable | `project`, `role`, `checkout` | @workspaces/projects/<project>/<role> đúng project và role này, @workspaces/local/routes/<project>/<role>, @tools/git | — | `ROUTE_UNDECLARED`, `ROUTE_UNHYDRATED`, `ROUTE_MISMATCH` |
-| 4 | Xác minh branch policy, clean tree, write roots và installed tree; ghi exact owner delta cho check sai và không sửa ở đây | `gitPolicy`, `declaredWriteRoots`, `sharedInstall` | @workspaces/local/routes/<project>/<role>, checkout đã phân giải, nhánh, head, cây làm việc và `node_modules` của nó, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
+| 4 | Xác minh identity cùng các check policy, clean tree, write roots và installed tree áp dụng cho phép chọn; ghi exact owner delta cho check sai và không sửa ở đây | `gitPolicy`, `declaredWriteRoots`, `sharedInstall` | @workspaces/local/routes/<project>/<role>, checkout đã phân giải, nhánh, head, cây làm việc và `node_modules` của nó, @tools/git, @tools/shell | — | `BRANCH_POLICY_VIOLATION`, `CHECKOUT_DIRTY` |
 | 5 | Ràng provenance và độ tươi, rồi phát | — | mọi thứ ở trên, @workspaces/device-state | `response/response.md`, `response/data/route.json`, `response/response.json` | — |
 
-Dưới
+Với binding ghi source, dưới
 `worktreeBranches` đặt là forbidden, một route chỉ ràng trên nhánh mutation và ghi
 `WORKTREE_BRANCH_FORBIDDEN`, và khi đặt là `session-only` thì ghi `WORKTREE_BRANCH_SESSION_ONLY`, bởi
 một chính sách mở ra đường ghi đúng là phát hiện mà người đọc sau đi tìm; một head hội thoại đã che ghi `PROVENANCE_HEAD_BOUND`, và một biên nhận Đặt là `session-only` thì route ràng trên nhánh mutation hoặc trên nhánh worktree
@@ -132,7 +141,7 @@ một chính sách mở ra đường ghi đúng là phát hiện mà người đ
 cache khớp cùng bộ định danh và fingerprint ghi `CACHED_ROUTE_REUSED`. `mutationReadiness` là `ready` khi nhánh quan sát được là nhánh mà chính sách được route cho phép ghi
 lên — nhánh mutation, hoặc một nhánh `session/<sessionId>` dưới `session-only` — và cây làm việc không
 mang thứ gì bước này phải từ chối; mọi trường hợp khác là `read-only`, kể cả một route ràng mà không
-khai gốc ghi nào. Các gốc ghi đã khai chỉ miễn trừ vết bẩn trên một nhánh `session/<sessionId>`, nơi
+khai gốc ghi nào. Khi ghi hoặc chọn phiên, các gốc ghi đã khai chỉ miễn trừ vết bẩn trên một nhánh `session/<sessionId>`, nơi
 đó là việc dở dang mà một phiên vốn phải có; nhánh mutation không có trạng thái dở dang nào của riêng
 nó để miễn trừ, nên bất kỳ vết bẩn nào thấy ở đó — trong một gốc ghi đã khai hay ngoài nó — đều là
 source được ghi mà không có phiên nào chịu trách nhiệm, và bước 4 dừng với `CHECKOUT_DIRTY` thay vì
@@ -146,7 +155,7 @@ Cây đã cài là một phần của việc checkout là gì, và bước 4 qua
 `Installed tree` đọc là `own directory`, `absent`, hay `junction to <target>` với đích đã phân giải. Một
 junction `node_modules` có đích nằm ngoài checkout là một cây đã cài mà nhiều checkout dùng chung, nên
 một lệnh xoá đệ quy bên trong checkout ấy đi xuyên qua liên kết và làm rỗng cây mà mọi checkout khác
-đang dùng; binding bị từ chối với `INVALID_INPUT` trừ khi request đã khai `sharedInstall`, và một
+đang dùng; binding ghi hoặc chọn phiên bị từ chối với `INVALID_INPUT` trừ khi request đã khai `sharedInstall`, và một
 checkout giữ junction thì không bao giờ bị xoá bằng tay — một worktree tạm được gỡ bằng
 `git worktree remove --force` và không gì khác. Hàng ấy là quan sát, không phải khẳng định: validator
 phản hồi đọc chính liên kết đó và so.
@@ -154,7 +163,7 @@ phản hồi đọc chính liên kết đó và so.
 Lệnh chọn chỉ đọc là `node scripts/workspace-checkout.mjs <project> <role> <sessionId>
 <routed|session> [declaredWriteRoot ...] [--shared-install]`. Lệnh nhận trần ghi tương đối trong kho, không nhận đường
 dẫn checkout. JSON đó là quan sát checkout; operator vẫn phải ràng identity và gốc thẩm quyền
-đã yêu cầu để tạo biên nhận route đầy đủ. Bước 4 kiểm cây đã chọn; chọn phiên còn yêu cầu checkout mutation chuẩn sạch.
+đã yêu cầu để tạo biên nhận route đầy đủ. Bước 4 áp dụng predicate chọn ở trên; chọn phiên còn yêu cầu checkout mutation chuẩn sạch.
 Validator phản hồi tự chạy lại phép chọn và so các field route; gate request kiểm phép chọn phiên
 trước khi dispatch và ràng id phiên vào tọa độ chứa request, trạng thái phiên và hash request đã đóng băng. Lần `attempt-gate open` đầu kiểm đúng request trong mutation của phiên sở hữu, kiểm lại byte rồi ghi hash nguyên tử; pha mở này không có hiệu lực ngoài mutation đang giữ hoặc cho attempt đã tồn tại. Kiểm dispatch và biên nhận thông thường vẫn đòi hash đã lưu.
 

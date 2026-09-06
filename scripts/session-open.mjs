@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { V22_CONTRACT, goalDecisionId } from './validate-request.mjs';
 import { mutateSession, withOwnedFileLock, replaceFile } from './session-lock.mjs';
 import { selectWorkflowTopology, sessionWorkflowTopologyErrors, setWorkflowTopologyMode, setWorkflowTopologyPeers, workflowTopologyMode } from './workflow-topology.mjs';
+import { validateAgainst } from './json-schema.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const orchestrator = JSON.parse(await readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8'));
@@ -19,6 +20,11 @@ const stateSchema = JSON.parse(await readFile(path.join(root, 'templates', 'step
 const hostKinds = new Set(stateSchema.properties.hostBinding.properties.kind.enum);
 const now = () => new Date().toISOString();
 const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'mission';
+
+function assertStateSchema(state) {
+  const errors = validateAgainst(stateSchema, state, 'state.json');
+  if (errors.length) throw new Error(errors.join('\n'));
+}
 
 async function writeJsonAtomic(file, value) {
   const temp = `${file}.${process.pid}.${randomUUID()}.tmp`;
@@ -107,10 +113,12 @@ export async function openSession(sessionsRoot, input, { sourceRoot = path.dirna
     const reused = await findReusable(sessionsRoot, input.hostBinding);
     if (reused) {
       if (reused.state.runtimeRevision !== RUNTIME_REVISION) throw Error('WORKFLOW_RESET_REQUIRED: archive the old host ledger before opening a fresh current session');
-      const ownerErrors = workflowOwnerErrors(path.join(sourceRoot, '.claude'), reused.session, reused.state, { dispatch: true });
-      if (ownerErrors.length) throw Error(ownerErrors.join('\n'));
       const existingMode = workflowTopologyMode(topologyPolicy, reused.state);
       if (existingMode === undefined) throw Error('WORKFLOW_RESET_REQUIRED: missing current topology; archive the old ledger and open a fresh session');
+      assertStateSchema(reused.state);
+      const authorityRoot = sameRoot(sourceRoot, path.dirname(root)) ? root : path.join(sourceRoot, '.claude');
+      const ownerErrors = workflowOwnerErrors(authorityRoot, reused.session, reused.state, { dispatch: true });
+      if (ownerErrors.length) throw Error(ownerErrors.join('\n'));
       if (existingMode !== undefined) {
         const existingErrors = sessionWorkflowTopologyErrors(topologyPolicy, reused.state);
         if (existingErrors.length) throw new Error(existingErrors.join('\n'));
@@ -130,6 +138,7 @@ export async function openSession(sessionsRoot, input, { sourceRoot = path.dirna
             const topologyErrors = sessionWorkflowTopologyErrors(topologyPolicy, state, { dispatch: true });
             if (topologyErrors.length) throw new Error(topologyErrors.join('\n'));
           }
+          assertStateSchema(state);
         });
       }
       return { status: 'reused', session: reused.session, sessionId: reused.state.id, phase: reused.state.lifecycle.phase, topology: topology.mode };
@@ -138,8 +147,6 @@ export async function openSession(sessionsRoot, input, { sourceRoot = path.dirna
     const openedAt = now();
     const sessionId = input.sessionId ?? `${openedAt.replace(/[-:TZ.]/g, '').slice(0, 14)}-${slug(input.project)}-${hostKey.slice(0, 8)}`;
     const session = path.join(sessionsRoot, sessionId);
-    await mkdir(sessionsRoot, { recursive: true });
-    await mkdir(session, { recursive: false });
     const mission = normalizeMission(sessionId, input.mission);
     const state = {
     contractVersion: V22_CONTRACT,
@@ -167,6 +174,9 @@ export async function openSession(sessionsRoot, input, { sourceRoot = path.dirna
     };
     setWorkflowTopologyMode(topologyPolicy, state, topology.mode);
     setWorkflowTopologyPeers(topologyPolicy, state, {});
+    assertStateSchema(state);
+    await mkdir(sessionsRoot, { recursive: true });
+    await mkdir(session, { recursive: false });
     await writeJsonAtomic(path.join(session, 'state.json'), state);
     await writeJsonAtomic(path.join(session, 'scope-draft.json'), { contractVersion: V22_CONTRACT, sessionId, mission });
     await writeJsonAtomic(path.join(locatorRoot, `${sessionId}.json`), { version: 1, project: input.project, sessionId, ownerRoot: workflowOwner.ownerRoot });
@@ -210,13 +220,15 @@ export async function confirmSession(session, decision) {
     if (state.contractVersion !== V22_CONTRACT) throw new Error(`state.json: confirm requires ${V22_CONTRACT}`);
     const current = state.mission;
     const decisionId = current.confirmation.decisionId;
-    if (current.confirmation.status === 'confirmed' && decision.selected === 'as-stated') return { status: 'already-confirmed', sessionId: state.id, version: current.version };
-    if (current.confirmation.status === 'confirmed' && decision.selected === 'corrected') {
-      if (await missionCorrectionBusy(session, state)) throw Error('MISSION_BUSY: seal active attempts before correcting their mission');
-      await retainMission(session, state, { root });
-      state.lifecycle.phase = 'draft';
+    if (current.confirmation.status === 'confirmed' && decision.selected === 'as-stated') {
+      assertStateSchema(state);
+      return { status: 'already-confirmed', sessionId: state.id, version: current.version };
     }
-    if (state.lifecycle.phase !== 'draft') throw new Error(`state.json: lifecycle ${state.lifecycle.phase} cannot confirm another draft`);
+    const correctsConfirmed = current.confirmation.status === 'confirmed' && decision.selected === 'corrected';
+    if (correctsConfirmed) {
+      if (await missionCorrectionBusy(session, state)) throw Error('MISSION_BUSY: seal active attempts before correcting their mission');
+    }
+    if (state.lifecycle.phase !== 'draft' && !correctsConfirmed) throw new Error(`state.json: lifecycle ${state.lifecycle.phase} cannot confirm another draft`);
     if (current.confirmation.status !== 'confirmed') state.choices[decisionId] = { selected: decision.selected, selectedBy: 'user', sourceRef: decision.sourceRef };
     if (decision.selected === 'as-stated') {
       if (state.runtimeRevision !== RUNTIME_REVISION) throw Error('WORKFLOW_RESET_REQUIRED: old scope cannot be confirmed for current dispatch');
@@ -229,9 +241,10 @@ export async function confirmSession(session, decision) {
       if (decision.authority?.sourceRef !== decision.sourceRef) authorizationErrors.push('GOAL_AUTHORITY_REQUIRED: decision source must match the retained authority');
       if (authorizationErrors.length) throw Error(authorizationErrors.join('\n'));
       current.confirmation = { status: 'confirmed', decisionId, sourceRef: decision.sourceRef, confirmedAt: now(), scopeHash: scopeHash(current), authority: decision.authority };
-      await retainMission(session, state, { root });
       state.lifecycle.phase = 'active';
       state.brief.next = 'Plan the chain dynamically from the confirmed done-when evidence, then open the first attempt.';
+      assertStateSchema(state);
+      await retainMission(session, state, { root });
       return { status: 'confirmed', sessionId: state.id, version: current.version };
     }
     if (decision.selected === 'corrected') {
@@ -241,16 +254,26 @@ export async function confirmSession(session, decision) {
       const topology = selectWorkflowTopology(topologyPolicy, decision.topology ?? (currentMode === undefined ? undefined : { mode: currentMode }));
       const validation = draftErrors({ project: state.project, hostBinding: state.hostBinding, mission: corrected, topology });
       if (validation.length) throw new Error(validation.join('\n'));
-      state.mission = normalizeMission(state.id, corrected, current.version + 1);
-      state.transitions ??= [];
-      state.transitions.push({ branch: state.current ?? '1/1', event: 'replanned', at: new Date().toISOString(), goalVersion: state.mission.version, note: 'The user supplied a corrected scope; its new version is draft until confirmed.', logged: true });
-      setWorkflowTopologyMode(topologyPolicy, state, topology.mode);
-      if (topologyPolicy.modes[topology.mode].maximumPeers === 0) setWorkflowTopologyPeers(topologyPolicy, state, {});
-      state.brief.next = `Present corrected scope version ${state.mission.version} for explicit confirmation.`;
+      const candidate = structuredClone(state);
+      candidate.mission = normalizeMission(state.id, corrected, current.version + 1);
+      candidate.lifecycle.phase = 'draft';
+      candidate.transitions ??= [];
+      candidate.transitions.push({ branch: candidate.current ?? '1/1', event: 'replanned', at: new Date().toISOString(), goalVersion: candidate.mission.version, note: 'The user supplied a corrected scope; its new version is draft until confirmed.', logged: true });
+      setWorkflowTopologyMode(topologyPolicy, candidate, topology.mode);
+      if (topologyPolicy.modes[topology.mode].maximumPeers === 0) setWorkflowTopologyPeers(topologyPolicy, candidate, {});
+      candidate.brief.next = `Present corrected scope version ${candidate.mission.version} for explicit confirmation.`;
+      assertStateSchema(candidate);
+      if (correctsConfirmed) {
+        assertStateSchema(state);
+        await retainMission(session, state, { root });
+        candidate.missionSnapshots = state.missionSnapshots;
+      }
+      Object.assign(state, candidate);
       return { status: 'corrected', sessionId: state.id, version: state.mission.version, decisionId: state.mission.confirmation.decisionId, topology: topology.mode, mission: state.mission };
     }
     current.confirmation = { status: 'rejected', decisionId, sourceRef: decision.sourceRef };
     state.brief.next = 'The draft was rejected. Preserve it until the user supplies a replacement goal or closes the session.';
+    assertStateSchema(state);
     return { status: 'rejected', sessionId: state.id, version: current.version };
   });
   if (result.mission) {
@@ -267,6 +290,7 @@ export async function discoverSession(session, mission) {
     errors.push(...scopeErrors(mission, { root }));
     if (errors.length) throw Error(errors.join('\n'));
     state.mission = normalizeMission(state.id, mission, state.mission.version);
+    assertStateSchema(state);
     return { status: 'discovered', scopeHash: scopeHash(state.mission), mission: state.mission };
   });
 }

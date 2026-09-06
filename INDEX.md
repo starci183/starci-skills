@@ -1,4 +1,4 @@
-# StarCi Skills 2.4.6
+# StarCi Skills 2.5.0
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.5.0 (2026-09-06): documented business models generate validated multi-file heads through leased publication into project-partitioned Workflow authority; scoped documentation readiness preserves source-write walls, and complete metadata admission validates before immutable history. See tests/evidence/20260906-business-head-bundle.md, tests/evidence/20260906-scoped-handoff-readiness.md and tests/evidence/20260906-session-metadata-admission.md.
 
 2.4.6 (2026-09-06): typed attestation repair routes accepted runtime readiness walls through verified repair and complete preflight re-entry; coordinated ownership includes active shared-blocker resolution while peers retain execution autonomy.
 

@@ -37,7 +37,7 @@ const claimsDoc = (overrides = {}) => fingerprinted({ featureId: FEATURE, source
 // One businesses root with the head this branch is about to replace already archived and indexed, the
 // way business.decide left it.
 function businesses({ previousState = 'in-progress' } = {}) {
-  const root = posix(path.join(mkdtempSync(path.join(tmpdir(), 'reconcile-businesses-')), '.worktrees', 'businesses'));
+  const root = posix(path.join(mkdtempSync(path.join(tmpdir(), 'reconcile-businesses-')), '.worktrees', 'starci-academy', 'businesses'));
   mkdirSync(path.join(root, 'objects', 'sha256'), { recursive: true });
   mkdirSync(path.join(root, 'features', FEATURE), { recursive: true });
   writeFileSync(path.join(root, REGISTRY_FILE), JSON.stringify(EMPTY_REGISTRY, null, 2));
@@ -141,10 +141,13 @@ const responseJson = ({ status = 'done', stop, fields = null, next = ['git.publi
 function writeBranch(files) {
   const session = mkdtempSync(path.join(tmpdir(), 'reconcile-session-'));
   const branch = path.join(session, 'step-1', 'parallel-1');
+  const headRef = files['response/data/model.json']?.headRef;
+  const ownerRoot = headRef && path.isAbsolute(headRef) ? path.resolve(headRef, '../../../../..') : session;
+  const workflowOwner = { version: 1, project: 'starci-academy', ownerRoot, sourceRoot: ownerRoot, ownerRole: 'be', declarationRef: '.workspaces/projects/starci-academy/workflow.json', declarationHash: coverageFingerprint, routeRef: '.workspaces/local/routes/starci-academy/be/config.json', routeHash: coverageFingerprint, repository: 'https://example.org/repo.git', gitPolicy: null };
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
   mkdirSync(path.join(session, 'step-1', 'parallel-2', 'response'), { recursive: true });
   writeFileSync(path.join(session, DELIVERED), '# backend-source-application — delivered source\n');
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': OPERATOR }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': OPERATOR }, current: '1/1', status: 'running', workflowOwner }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     mkdirSync(path.dirname(path.join(branch,name)),{recursive:true});
@@ -230,8 +233,8 @@ await expectError(reconciled({ response: responseJson({ fields: { ...ALL_FIELDS,
 
 // The head, the model and the lineage.
 await expectError(reconciled({ model: { mode: 'model' } }), 'is not reconcile', 'a model that claims to have modelled');
-await expectError(reconciled({ model: { headRef: `.worktrees/businesses/features/starci/${FEATURE}` } }), 'no project segment below the businesses root', 'a project segment below the businesses root');
-await expectError(reconciled({ model: { headRef: `.worktrees/authority/features/${FEATURE}` } }), 'is not under a .worktrees/businesses root', 'head outside the businesses root');
+await expectError(reconciled({ model: { headRef: `.worktrees/starci-academy/businesses/features/starci/${FEATURE}` } }), 'no project segment below the businesses root', 'a project segment below the businesses root');
+await expectError(reconciled({ model: { headRef: `.worktrees/authority/features/${FEATURE}` } }), 'is not under a project-partitioned businesses root', 'head outside the businesses root');
 await expectError(reconciled({ model: { transition: 'pending->in-progress' } }), 'contradicts previous state in-progress', 'transition contradicts the previous state');
 await expectError(reconciled({ targetState: 'in-progress', model: { transition: 'absent->pending', previousHeadRef: null, previousState: null, state: 'pending' } }), 'republishes an existing head', 'a first publication by a reconciliation');
 await expectError(reconciled({ model: { coverage: null } }), 'carries the coverage fingerprint of the matrix it was compared against', 'a reconciled head with no matrix behind it');
@@ -252,8 +255,8 @@ await expectError(reconciled({ store: (store) => { const r = store.registry; r.f
 await expectError(reconciled({ store: (store) => { const r = store.registry; r.featureHeads[FEATURE].sources = []; writeFileSync(store.registryFile, JSON.stringify(r, null, 2)); } }), 'the index under-names the delivery', 'an index naming no source at all');
 await expectError(reconciled({ store: (store) => rmSync(store.registryFile, { force: true }) }), 'no head index under', 'a head published where no index exists');
 await expectError(reconciled({ model: { headFingerprint: `sha256:${'d'.repeat(64)}` } }), "is not this document's fingerprint", 'a head carrying a fingerprint of some other document');
-await expectError(reconciled({ md: { headObject: '.worktrees/businesses/objects/sha256/0000000000000000000000000000000000000000000000000000000000000000.json' } }), 'is not the archived object of the published head', 'a receipt naming another object as the head');
-await expectError(reconciled({ md: { previousHead: '.worktrees/businesses/features/paid-access' } }), 'Previous head .worktrees/businesses/features/paid-access differs from the model', 'a receipt naming a previous head the model does not');
+await expectError(reconciled({ md: { headObject: '.worktrees/starci-academy/businesses/objects/sha256/0000000000000000000000000000000000000000000000000000000000000000.json' } }), 'is not the archived object of the published head', 'a receipt naming another object as the head');
+await expectError(reconciled({ md: { previousHead: '.worktrees/starci-academy/businesses/features/paid-access' } }), 'Previous head .worktrees/starci-academy/businesses/features/paid-access differs from the model', 'a receipt naming a previous head the model does not');
 
 // The claims and the receipt.
 await expectError(reconciled({ claims: { claims: [{ ...CLAIMS[0], kind: 'intent', sourceHead: null }] }, md: { claims: [['c-fact', 'intent']] } }), 'carries at least one fact claim', 'a reconciliation resting on intent alone');

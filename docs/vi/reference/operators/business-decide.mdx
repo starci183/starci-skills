@@ -118,6 +118,10 @@ trạng thái nào hợp lệ. Từ chối vẫn giữ dòng dõi bằng cách n
 `implemented` không bao giờ được publish dựa trên một kế hoạch: source đã giao phải được đối chiếu
 với ma trận đóng băng trước, bởi `business.reconcile`.
 
+Bundle được publish theo [contract projection business head](../../templates/business-head/README.md).
+Documentation biên soạn thuộc `model`; publication gồm model và evidence object bất biến đã index.
+Validator resolve alias Workflow và đọc lại từng file được sinh.
+
 ## Luồng attempt cụ thể
 
 Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
@@ -133,7 +137,7 @@ Các row của operator này được gate bởi hợp đồng attempt expected/
 Context chỉ đọc, trừ đúng một head feature. Operator chỉ ghi `response/` của nhánh mình, gồm
 `response.md`, `response/restatement.md` khi request cung cấp `promise`, `response/data/claims.json`,
 `response/data/coverage-matrix.json`, `response/data/model.json` và `response.json`, cùng một head
-feature dưới `@worktrees/businesses/<featureId>`. Nó không bao giờ publish một lời hứa khi còn một
+feature dưới `@worktrees/businesses/<featureId>` cùng registry/object publication qua projection contract. Nó không bao giờ publish một lời hứa khi còn một
 consumer hay nhánh vòng đời đã phát hiện chưa có disposition, không nâng một ví dụ, một ảnh chụp hay
 một claim ý định thành sự thật sản phẩm, không bịa hành vi actor, entitlement, quota, thanh toán, tất
 toán hay vòng đời mà bằng chứng không nói, không đẩy head qua một chuyển trạng thái vòng đời không
@@ -177,8 +181,8 @@ lượt UAT đã qua.
 | 5 | Tái dùng promise row hợp lệ, tạo row được yêu cầu còn thiếu và chỉ update row sai; giữ decision không bị ảnh hưởng | `promise` | `response/data/claims.json`, @workspaces/be ở head đóng băng, @tools/websearch | — | `EVIDENCE_MISSING` |
 | 6 | Đóng băng ma trận phủ | `dimensions` | `response/data/claims.json`, @workspaces/be và bề mặt nó phát hiện | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
 | 7 | Xử lý phần chung sống với legacy | — | `response/data/coverage-matrix.json`: các hàng legacy create, read, settle và bằng chứng của chúng | — | `CONTRADICTION_UNRESOLVED` |
-| 8 | Publish một head dưới lease độc quyền | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> ở head trước | @worktrees/businesses/&lt;featureId> thành model.json head mới, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
-| 9 | Phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json` | — |
+| 8 | Chuẩn bị model có documentation và candidate receipt đầy đủ | — | `response/data/claims.json`, `response/data/coverage-matrix.json`, @worktrees/businesses/&lt;featureId> ở head trước; contract projection business head | `response/data/model.json`, `response/response.md`, `response/response.json` | `INVALID_INPUT` |
+| 9 | Publish qua scripts/publish-business-head.mjs dưới lease cụ thể của feature và phát sau readback | — | candidate response và frozen request | bundle @worktrees/businesses/&lt;featureId> cùng registry/object publication, @tools/sourcewrite | `INVALID_INPUT`, `SOURCE_DRIFT` |
 
 Legacy create, read và settle mỗi thứ giữ một hàng riêng khi chúng được khai: một đường bán mới chỉ
 được retire phần tạo legacy khi quyền đã mua vẫn đọc được và phần tất toán legacy còn treo vẫn hoàn

@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "files": {
+    "CONTEXT.md": {
+      "render": "context",
+      "title": "Business context"
+    },
+    "overview.md": {
+      "render": "section",
+      "section": "overview",
+      "title": "Overview"
+    },
+    "actors.md": {
+      "render": "section",
+      "section": "actors",
+      "title": "Actors"
+    },
+    "contracts.md": {
+      "render": "section",
+      "section": "contracts",
+      "title": "Contracts"
+    },
+    "rules.md": {
+      "render": "section",
+      "section": "rules",
+      "title": "Rules"
+    },
+    "states.md": {
+      "render": "section",
+      "section": "states",
+      "title": "States"
+    },
+    "spec.md": {
+      "render": "spec",
+      "title": "Business specification"
+    },
+    "acceptance.md": {
+      "render": "section",
+      "section": "acceptance",
+      "title": "Acceptance"
+    },
+    "evidence.json": {
+      "render": "json",
+      "source": "evidence"
+    },
+    "model.json": {
+      "render": "json",
+      "source": "model"
+    }
+  }
+}

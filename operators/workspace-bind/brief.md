@@ -4,7 +4,7 @@ Follow operator.md; write its declared paths and your branch response/; replace 
 
 ## Done when
 
-Done when the `workspace-route-binding` and its `route` name one checkout resolved from the declaration and its hydrated projection alone, on a branch the routed policy permits with a working tree carrying nothing the policy refuses, at its observed source head with its derived mutation readiness, and with no runtime bound.
+Done when the `workspace-route-binding` and its `route` name one checkout resolved from the declaration and its hydrated projection alone, with the policy and cleanliness checks required by its write scope, at its observed source head with its derived mutation readiness, and with no runtime bound.
 
 Primary output: `workspace-route-binding`
 

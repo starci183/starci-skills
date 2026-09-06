@@ -44,7 +44,7 @@ function routeBinding(overrides = {}) {
     gitPolicy: { worktreeBranches: 'forbidden', mutationBranch: 'mtp' },
     mutationReadiness: 'ready',
     writeRoots: ['src', 'test'],
-    authorityRoots: { businesses: `${SOURCE}/.worktrees/businesses` },
+    authorityRoots: { businesses: `${SOURCE}/.worktrees/starci-academy/businesses` },
     runtime: null,
     provenanceHeadRef: null,
     ...overrides,
@@ -57,8 +57,8 @@ function responseMd({ binding = routeBinding(), findings = null, runtimeRows = n
   const defaultFindings = [
     ['ROUTE_HYDRATED_FROM_PORTABLE', binding.hydratedRouteRef, 'the portable declaration resolved to this local route'],
     ['IDENTITY_ROSTER_SEALED', 'the credential roster reference', 'the roster was bound by name and never read'],
-    ...(binding.gitPolicy.worktreeBranches === 'forbidden' ? [['WORKTREE_BRANCH_FORBIDDEN', binding.gitPolicy.mutationBranch, 'the routed policy forbids task and worktree branches']] : []),
-    ...(binding.gitPolicy.worktreeBranches === 'session-only' ? [['WORKTREE_BRANCH_SESSION_ONLY', binding.gitPolicy.mutationBranch, 'the routed policy permits a session worktree branch']] : []),
+    ...(binding.gitPolicy?.worktreeBranches === 'forbidden' ? [['WORKTREE_BRANCH_FORBIDDEN', binding.gitPolicy?.mutationBranch, 'the routed policy forbids task and worktree branches']] : []),
+    ...(binding.gitPolicy?.worktreeBranches === 'session-only' ? [['WORKTREE_BRANCH_SESSION_ONLY', binding.gitPolicy?.mutationBranch, 'the routed policy permits a session worktree branch']] : []),
     ...(binding.provenanceHeadRef ? [['PROVENANCE_HEAD_BOUND', binding.provenanceHeadRef, 'a redacted conversation head was attached']] : []),
     ...(binding.runtime ? [['RUNTIME_CONSUMED_NOT_OWNED', binding.runtime.ownerTaskId, 'the caller consumes the owner endpoints and owns no lifecycle']] : []),
     ...(binding.runtime ? [['RUNTIME_HEAD_CONTAINS_BOUND_COMMIT', binding.sourceHead, 'the served head contains the head this route bound']] : []),
@@ -102,8 +102,8 @@ The routed backend checkout of this project, bound at the frozen head with its d
 
 | Field | Value |
 | --- | --- |
-| Worktree branches | ${binding.gitPolicy.worktreeBranches} |
-| Mutation branch | ${binding.gitPolicy.mutationBranch} |
+| Worktree branches | ${binding.gitPolicy?.worktreeBranches ?? '—'} |
+| Mutation branch | ${binding.gitPolicy?.mutationBranch ?? '—'} |
 
 ## Write roots
 
@@ -142,7 +142,7 @@ function writeBranch(files) {
   const session = mkdtempSync(path.join(tmpdir(), 'workspace-session-'));
   const branch = path.join(session, 'step-1', 'parallel-1');
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'workspace.bind' }, current: '1/1', status: 'running' }));
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', workflowOwner: { version: 1, project: 'starci-academy', sourceRoot: SOURCE, ownerRole: 'be', ownerRoot: SOURCE, declarationRef: '.workspaces/projects/starci-academy/workflow.json', declarationHash: fp('a'), routeRef: HYDRATED, routeHash: fp('b'), repository: routeBinding().checkout.gitRepository, gitPolicy: routeBinding().gitPolicy }, startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': 'workspace.bind' }, current: '1/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
@@ -185,7 +185,7 @@ await expectError({ ...baseline(), 'response/response.md': responseMd().replace(
   const absent = `${SOURCE}/a-checkout-this-machine-does-not-have`;
   const shared = routeBinding({
     checkout: { ...routeBinding().checkout, diskPath: absent, gitRoot: absent },
-    authorityRoots: { businesses: `${absent}/.worktrees/businesses` },
+    authorityRoots: { businesses: `${SOURCE}/.worktrees/starci-academy/businesses` },
   });
   const label = 'junction to D:/Repositories/another-session/node_modules';
   await expectError({ ...baseline(), 'response/data/route.json': shared, 'response/response.md': responseMd({ binding: shared, installedTree: label }) }, 'only when the request declares sharedInstall: true', 'a shared installed tree nobody declared');
@@ -203,8 +203,10 @@ await expectError({ ...baseline(), 'response/response.json': responseJson({ stat
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { project: '' } }) }, 'required field project has no value', 'missing required project');
 await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, directory: 'academy' } })), 'a source checkout must report a null directory', 'a source checkout carrying a directory');
-await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, repositoryKind: 'sibling' } })), 'a sibling checkout carries no business authority root', 'a sibling checkout claiming business authority');
-await expectError(withBinding(routeBinding({ authorityRoots: { businesses: '.worktrees/businesses' } })), 'must be derived from the checkout as', 'a typed businesses root');
+await expectValid(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, repositoryKind: 'sibling', directory: 'declared-repository' } })), 'a routed sibling reads the owning Workflow business authority');
+await expectError(withBinding(routeBinding({ authorityRoots: { businesses: '.worktrees/businesses' } })), 'must resolve through Workflow for this project', 'an unpartitioned businesses root');
+await expectError(withBinding(routeBinding({ authorityRoots: { businesses: `${SOURCE}/.worktrees/other-project/businesses` } })), 'must resolve through Workflow for this project', 'another project cannot lend its business authority');
+await expectValid(withBinding(routeBinding({ authorityRoots: { businesses: '.worktrees/starci-academy/businesses' } })), 'the same project partition may be recorded relative to Workflow');
 await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, branch: 'feature/x' } })), 'a forbidden worktree policy cannot bind a route on another branch', 'a forbidden policy on a task branch');
 await expectError(withBinding(routeBinding({ gitPolicy: { worktreeBranches: 'allowed', mutationBranch: 'mtp' }, checkout: { ...routeBinding().checkout, branch: 'feature/x' } }), { extra: { gitPolicy: { worktreeBranches: 'allowed', mutationBranch: 'mtp' } } }), 'mutation is ready only on mtp or a declared session branch, not on feature/x', 'mutation ready off the mutation branch');
 // gitPolicy is the object {worktreeBranches, mutationBranch} the declaration carries: a list, or an object
@@ -216,7 +218,7 @@ await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().check
 await expectError(withBinding(routeBinding({ checkout: { ...routeBinding().checkout, gitRoot: `${SOURCE}/api` } })), 'the checkout disk path and Git root must be the same checkout', 'the checkout and its Git root disagree');
 await expectError(withBinding(routeBinding({ sourceHead: 'e'.repeat(40) })), 'must name the same source head', 'the binding and the checkout disagree on the head');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { runtimeNeed: 'consume' } }) }, 'requirements.runtimeNeed is not a field', 'the retired runtime half asked for by name');
-await expectError(withBinding(routeBinding({ writeRoots: ['src'] })), 'which the binding does not carry', 'a declared write root the binding drops');
+await expectError(withBinding(routeBinding({ writeRoots: ['src'] })), 'write roots must equal the request declared write roots', 'a declared write root the binding drops');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'must record the hydrated route it resolved from', 'a bound route with no hydration finding');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['IDENTITY_ROSTER_SEALED', 'roster', 'sealed'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden'], ['HINT_REJECTED', 'D:/Repositories/starci-academy', 'a similar directory name']] }) }, 'a hint is INVALID_INPUT at the gate', 'a receipt that weighs a hint');
 await expectError({ ...baseline(), 'response/response.md': responseMd({ findings: [['ROUTE_HYDRATED_FROM_PORTABLE', HYDRATED, 'resolved'], ['WORKTREE_BRANCH_FORBIDDEN', 'mtp', 'forbidden']] }) }, 'the credential roster was sealed and never read', 'no sealed roster finding');
@@ -247,6 +249,25 @@ await expectError({ ...baseline(), 'response/response.json': (() => { const o = 
     fixture.write(path.join(branch, 'response/data/route.json'), binding);
     fixture.write(path.join(branch, 'response/response.md'), responseMd({ binding }).replace(`| Disk path | ${binding.checkout.diskPath} |`, `| Disk path | ${fixture.canonical} |`));
     assert.ok((await validateWorkspaceStep(branch, fixture.runtime)).errors.some(error => error.includes('Disk path differs from the selected checkout')), 'receipt cannot describe canonical path while route selects session worktree');
+  } finally { fixture.dispose(); }
+}
+
+{
+  const fixture = workspaceCheckoutFixture({ attachRuntime: true });
+  try {
+    delete fixture.portable.repository.gitPolicy; delete fixture.local.repository.gitPolicy; fixture.saveRoutes();
+    fixture.write(path.join(fixture.canonical, 'unfinished-user-metadata.json'), '{}\n');
+    const request = requestJson({ extra: { project: fixture.project, checkout: 'routed', gitPolicy: null, declaredWriteRoots: [] } });
+    const branch = fixture.freezeRequest(request);
+    const binding = { ...resolveWorkspaceCheckout({ ...fixture.options, checkout: 'routed', declaredWriteRoots: [] }), identityFingerprint: fp('c'), authorityRoots: { businesses: null }, runtime: null, provenanceHeadRef: null };
+    fixture.write(path.join(branch, 'response/response.json'), responseJson());
+    fixture.write(path.join(branch, 'response/response.md'), responseMd({ binding }));
+    fixture.write(path.join(branch, 'response/data/route.json'), binding);
+    assert.deepEqual((await validateWorkspaceStep(branch, fixture.runtime)).errors, [], 'routed policy-free dirty context is a parent-valid read-only binding');
+    fixture.write(path.join(branch, 'response/data/route.json'), { ...binding, mutationReadiness: 'ready' });
+    assert.ok((await validateWorkspaceStep(branch, fixture.runtime)).errors.some(error => error.includes('read-only')), 'null policy cannot grant mutation readiness');
+    fixture.write(path.join(branch, 'response/data/route.json'), { ...binding, writeRoots: ['src'] });
+    assert.ok((await validateWorkspaceStep(branch, fixture.runtime)).errors.some(error => error.includes('write roots') || error.includes('array is too long')), 'null policy cannot carry source write roots');
   } finally { fixture.dispose(); }
 }
 

@@ -10,7 +10,7 @@ read by `git.publish`, which publishes a delivery only once the head it carries 
 | --- | --- |
 | Feature | `feature-id` |
 | Target state | implemented |
-| Head | `.worktrees/businesses/features/feature-id` |
+| Head | `.worktrees/project-id/businesses/features/feature-id` |
 | Claims fingerprint | `sha256:0000000000000000000000000000000000000000000000000000000000000000` |
 | Coverage fingerprint | `sha256:0000000000000000000000000000000000000000000000000000000000000000` |
 | Delivered source | `step-1/parallel-2/response/response.md` |
@@ -19,11 +19,11 @@ read by `git.publish`, which publishes a delivery only once the head it carries 
 
 | Field | Value |
 | --- | --- |
-| Previous head | `.worktrees/businesses/objects/sha256/0000000000000000000000000000000000000000000000000000000000000000.json` |
+| Previous head | `.worktrees/project-id/businesses/objects/sha256/0000000000000000000000000000000000000000000000000000000000000000.json` |
 | Previous head archived | before this branch |
 | Previous state | in-progress |
 | Transition | in-progress->implemented |
-| Head object | `.worktrees/businesses/objects/sha256/1111111111111111111111111111111111111111111111111111111111111111.json` |
+| Head object | `.worktrees/project-id/businesses/objects/sha256/1111111111111111111111111111111111111111111111111111111111111111.json` |
 
 ## Cited claims
 

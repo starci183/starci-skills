@@ -90,7 +90,7 @@ blocks publication is silence.
 ## One flat authority root
 
 One feature owns exactly one head directory, `<businesses root>/features/<featureId>`, whose
-`model.json` is the head, and step 9 takes an exclusive lease on that alias before it writes. Two
+`model.json` is the head, and publication takes an exclusive lease on that alias before it writes. Two
 branches of the same step may not publish the same feature. `features/` is the only segment between
 the root and a feature: a project segment inserted below the root starts a second authority tree that
 later readers never find, so any head that is not exactly `features/<featureId>` is refused. The head
@@ -98,6 +98,10 @@ is classified absent, fresh, or stale against the frozen evidence and the frozen
 that classification decides which lifecycle transition is legal. Rejection preserves lineage by
 naming the previous head rather than erasing it, and `implemented` is never published on the strength
 of a plan: delivered source is compared against the frozen matrix first, by `business.reconcile`.
+
+The published bundle follows [the business head projection contract](../../templates/business-head/README.md).
+Its authored documentation is part of `model`; the publication includes the indexed immutable model
+and evidence objects. The validator reads the Workflow alias and every generated file back.
 
 ## Concrete attempt flow
 
@@ -114,7 +118,7 @@ This operator's rows are gated by the shared expected/actual attempt contract in
 Context is read-only apart from the one feature head. The operator writes only `response/` of its own
 branch, `response.md`, `response/restatement.md` when the request supplies `promise`,
 `response/data/claims.json`, `response/data/coverage-matrix.json`, `response/data/model.json` and
-`response.json`, plus the one feature head under `@worktrees/businesses/<featureId>`. It never
+`response.json`, plus the one feature bundle under `@worktrees/businesses/<featureId>` and its registry/object publication through the projection contract. It never
 publishes a promise while a discovered consumer or lifecycle branch carries no disposition, promotes
 an example, a screenshot, or an intent claim into product truth, invents an actor, entitlement,
 quota, payment, settlement, or lifecycle behaviour the evidence does not state, advances a head
@@ -158,8 +162,8 @@ that an implementation, a quality gate, or a UAT run has passed.
 | 5 | Reuse valid promise rows, create missing requested rows and update only invalid requested rows; keep unaffected decisions unchanged | `promise` | `response/data/claims.json`, @workspaces/be at the frozen head, @tools/websearch | — | `EVIDENCE_MISSING` |
 | 6 | Freeze the coverage matrix | `dimensions` | `response/data/claims.json`, @workspaces/be and the surface it discovers | `response/data/coverage-matrix.json` | `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
 | 7 | Dispose legacy coexistence | — | `response/data/coverage-matrix.json`: the legacy create, read and settle rows and their proof | — | `CONTRADICTION_UNRESOLVED` |
-| 8 | Publish one head under an exclusive lease | — | `response/data/claims.json`, @worktrees/businesses/<featureId> at the previous head | @worktrees/businesses/<featureId> as the new model.json head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
-| 9 | Emit | — | everything above | `response/response.md`, `response/response.json` | — |
+| 8 | Prepare the documented model and complete candidate receipt | — | `response/data/claims.json`, `response/data/coverage-matrix.json`, @worktrees/businesses/<featureId> at the previous head; business head projection contract | `response/data/model.json`, `response/response.md`, `response/response.json` | `INVALID_INPUT` |
+| 9 | Publish with scripts/publish-business-head.mjs under the concrete feature lease and emit after readback | — | the candidate response and frozen request | @worktrees/businesses/<featureId> bundle and registry/object publication, @tools/sourcewrite | `INVALID_INPUT`, `SOURCE_DRIFT` |
 
 Legacy create, read, and settle each take their own row when they are declared: a new sale path may
 retire legacy creation only while already-purchased rights stay readable and pending legacy

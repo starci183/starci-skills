@@ -22,7 +22,7 @@ const CLAIMS = fingerprinted({
 }, 'fingerprint');
 
 function root() {
-  const dir = posix(path.join(mkdtempSync(path.join(tmpdir(), 'business-registry-')), '.worktrees', 'businesses'));
+  const dir = posix(path.join(mkdtempSync(path.join(tmpdir(), 'business-registry-')), '.worktrees', 'p', 'businesses'));
   mkdirSync(path.join(dir, 'objects', 'sha256'), { recursive: true });
   writeFileSync(path.join(dir, REGISTRY_FILE), JSON.stringify({ schemaVersion: 1, project: 'p', hashAlgorithm: 'sha256', canonicalization: 'RFC8785-JCS', featureHeads: {}, objects: { immutable: true, byHash: {} } }, null, 2));
   return dir;
@@ -54,11 +54,11 @@ test('a document has two addresses and they are never the same number', () => {
 });
 
 test('a head reference resolves its businesses root, and only under one', () => {
-  assert.equal(businessesRootOf('/x/.worktrees/businesses/features/paid-access'), '/x/.worktrees/businesses');
-  assert.equal(businessesRootOf('/x/.worktrees/businesses/features/starci/paid-access'), '/x/.worktrees/businesses');
+  assert.equal(businessesRootOf('/x/.worktrees/p/businesses/features/paid-access'), '/x/.worktrees/p/businesses');
+  assert.equal(businessesRootOf('/x/.worktrees/p/businesses/features/starci/paid-access'), '/x/.worktrees/p/businesses');
   assert.equal(businessesRootOf('/x/.worktrees/authority/features/paid-access'), null);
-  assert.equal(businessesRootOf('/x/.worktrees/businesses/paid-access'), null);
-  assert.equal(archivedHashOf(`/x/.worktrees/businesses/${objectRelPath('a'.repeat(64))}`), 'a'.repeat(64));
+  assert.equal(businessesRootOf('/x/.worktrees/p/businesses/paid-access'), null);
+  assert.equal(archivedHashOf(`/x/.worktrees/p/businesses/${objectRelPath('a'.repeat(64))}`), 'a'.repeat(64));
   assert.equal(archivedHashOf('/x/sessions/s/step-5/parallel-1/response/data/model.json'), null);
 });
 

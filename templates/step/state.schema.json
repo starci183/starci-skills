@@ -906,7 +906,7 @@
               "evidence": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 200
+                "maxLength": 2000
               },
               "producedBy": {
                 "type": "string",
@@ -1003,7 +1003,7 @@
                 "statement": {
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 1000
+                  "maxLength": 8192
                 },
                 "scopeHash": {
                   "type": "string",
@@ -1015,7 +1015,7 @@
                   "additionalProperties": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 1000
+                    "maxLength": 8192
                   }
                 },
                 "presentedScopeHash": {
