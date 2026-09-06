@@ -36,7 +36,9 @@ export class PlanError extends Error { constructor(errors) { super(errors.join('
 const bindKey = (role) => `${BIND_OPERATOR}#${role}`;
 const byKey = (a, b) => a.localeCompare(b);
 
-// The operators that touch a runtime: their presence makes the preflight check the runtime family of every bound role.
+// Operators that consume an already-served runtime. When the chain also owns runtime.serve, that
+// operator inventories, creates and attests the generation after binding; requiring the generation
+// in the opening preflight would make its own producer unreachable.
 const RUNTIME_OPERATORS = new Set(['runtime.serve', 'interface.audit', 'uat.verify']);
 
 export function planChain({ packages, mission, options = {} }) {
@@ -194,9 +196,13 @@ export function planChain({ packages, mission, options = {} }) {
   if (effectful.length && graph.has(PREFLIGHT_OPERATOR)) {
     const roles = [...new Set([...nodes.values()].filter((n) => n.operator === BIND_OPERATOR).map((n) => n.presets.role))].sort();
     const tools = [...new Set(effectful.flatMap((id) => operatorEffects(graph.get(id).pkg).map((t) => t.id)))].sort();
-    // A runtime is owed only by a chain that serves, observes or walks one: then every bound role's runtime is checked, else none.
+    // Preflight checks an existing runtime only when the chain consumes one without producing it.
+    // A chain containing runtime.serve preflights the host/declarations, then that sole owner
+    // inventories, bootstraps and attests the runtime before any consumer can observe it.
     const touchesRuntime = [...nodes.values()].some((n) => RUNTIME_OPERATORS.has(n.operator));
-    const pre = add(PREFLIGHT_OPERATOR, PREFLIGHT_OPERATOR, roles.length ? { roles, runtimeRoles: touchesRuntime ? roles : [] } : {}, `opens the chain: ${effectful.join(', ')} hold ${tools.join(', ')}`);
+    const ownsRuntimeBootstrap = [...nodes.values()].some((n) => n.operator === 'runtime.serve');
+    const runtimeRoles = touchesRuntime && !ownsRuntimeBootstrap ? roles : [];
+    const pre = add(PREFLIGHT_OPERATOR, PREFLIGHT_OPERATOR, roles.length ? { roles, runtimeRoles } : {}, `opens the chain: ${effectful.join(', ')} hold ${tools.join(', ')}`);
     for (const n of nodes.values()) if (n.key !== pre.key) depend(n, pre.key);
     closure();
   }

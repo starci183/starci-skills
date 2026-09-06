@@ -142,7 +142,7 @@ replace. It makes no product decision and carries no verdict about the source.
 | `roles` | list | `fe, be` | The roles of that project the chain will bind; each gets its own declaration, checkout, runtime and host checks |
 | `env` | id | dev | The environment whose declaration, secrets and flow accounts are read |
 | `flow` | id | null | The flow whose account record and sign-in are probed; null skips both flow checks |
-| `runtimeRoles` | list | `[]` | The roles whose runtime the chain serves, observes or walks — the planner presets every bound role when the chain holds `runtime.serve`, `interface.audit` or `uat.verify`, and none otherwise; the runtime family is checked for these roles and skipped for the rest, because a runtime is owed by a chain that touches it, not by a checkout that is merely bound |
+| `runtimeRoles` | list | `[]` | The roles whose already-served runtime the chain consumes without owning `runtime.serve` — the planner presets every bound role when the chain observes or walks an existing runtime, but none when `runtime.serve` is in the chain because that sole owner inventories, bootstraps and attests it after binding; the runtime family is checked for these roles and skipped for the rest |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps

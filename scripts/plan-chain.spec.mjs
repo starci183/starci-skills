@@ -50,6 +50,13 @@ test('required inputs and context roles are walked back to their producers; an e
   assert.match(p.reasons['4/1'], /produces frontend-surface-audit, which uat.verify requires/);
   assert.deepEqual(accepted(p, mission), []);
 });
+test('a chain that owns runtime.serve can bootstrap an absent runtime after preflight and binding', () => {
+  const mission = fakeMission([line('interface.generate'), line('runtime.serve')]);
+  const p = planChain({ packages, mission, options: { graph, roles: ['fe'] } });
+  assert.deepEqual(ops(p), [['environment.preflight'], ['workspace.bind#fe'], ['interface.generate'], ['runtime.serve']]);
+  assert.deepEqual(p.presets['1/1'], { roles: ['fe'], runtimeRoles: [] });
+  assert.deepEqual(accepted(p, mission), []);
+});
 test('more than one done-when line for an operator with a plan: the plan runs first, the execute branch fans out by units and stands alone in its step', () => {
   const one = plan([line('interface.generate')]);
   assert.ok(!ops(one).flat().includes('interface.plan'), 'one unit needs no map');

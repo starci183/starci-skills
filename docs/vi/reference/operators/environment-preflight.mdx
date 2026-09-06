@@ -165,7 +165,7 @@ bức tường đầu tiên chính là chuỗi các bức tường mà operator 
 | `roles` | list | `fe, be` | Các role của project ấy mà chuỗi sẽ ràng; mỗi role có phép kiểm khai báo, checkout, runtime và máy chủ riêng |
 | `env` | id | dev | Môi trường có khai báo, secret và tài khoản luồng được đọc |
 | `flow` | id | null | Luồng có hồ sơ tài khoản và đăng nhập được dò; null bỏ qua cả hai phép kiểm luồng |
-| `runtimeRoles` | list | `[]` | Các vai mà chuỗi phục vụ, quan sát hay đi thử runtime của chúng — planner đặt sẵn mọi vai đã bind khi chuỗi có `runtime.serve`, `interface.audit` hay `uat.verify`, và không vai nào khi không có; họ runtime được kiểm cho các vai này và bỏ qua cho các vai còn lại, vì runtime là thứ một chuỗi chạm vào nó nợ, không phải thứ một checkout chỉ được bind nợ |
+| `runtimeRoles` | list | `[]` | Các vai có runtime đã được phục vụ mà chuỗi tiêu thụ nhưng không sở hữu `runtime.serve` — planner đặt sẵn mọi vai đã bind khi chuỗi quan sát hay đi thử một runtime có sẵn, nhưng không đặt vai nào khi chuỗi có `runtime.serve` vì đúng owner ấy kiểm kê, bootstrap và chứng thực runtime sau khi bind; họ runtime được kiểm cho các vai này và bỏ qua cho các vai còn lại |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
 ## Các bước

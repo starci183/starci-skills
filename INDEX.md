@@ -1,4 +1,4 @@
-# StarCi Skills 2.3.0
+# StarCi Skills 2.3.1
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.3.1 (2026-09-06): a chain that owns `runtime.serve` preflights declarations and host capabilities without requiring the runtime generation that only its later owner may create; consumers without that owner still require an existing generation. See tests/evidence/20260906-runtime-bootstrap-preflight.md.
 
 2.3.0 (2026-09-06): executable route/code impact discovery and exact scope authority, impact-derived handoff coverage with stage boundaries, and project-owned workflow evidence separated from shared runtime authority; legacy evidence migrates by verified copy with one active owner. See tests/evidence/20260906-goal-impact-workflow-owner.md.
 
