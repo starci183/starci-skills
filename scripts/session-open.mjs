@@ -1,9 +1,10 @@
 import { retainMission } from './mission-history.mjs';
+import { evidenceManifestErrors } from './evidence-manifest.mjs';
 import { resolveWorkflowOwner, workflowOwnerErrors, sameRoot, RUNTIME_REVISION } from './workflow-root.mjs';
 import { scopeErrors, authorityErrors, scopeHash, scopeBindingErrors, completeDeliveryMission } from './mission-scope.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, realpath, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -173,6 +174,34 @@ export async function openSession(sessionsRoot, input, { sourceRoot = path.dirna
   });
 }
 
+export async function missionCorrectionBusy(session, state) {
+  if ((state.workerSlots ?? []).length || Object.keys(state.leases ?? {}).length) return true;
+  for (const [key, attempt] of Object.entries(state.attempts ?? {})) {
+    if (attempt.status === 'running') return true;
+    if (attempt.status !== 'waiting') continue;
+    // A sealed prior-mission wait stays historical. It is neither a live obligation of this
+    // corrected scope nor evidence that its old exchange or product goal was fulfilled.
+    if (!Number.isInteger(attempt.expected?.goalVersion) || attempt.expected.goalVersion >= state.mission.version || attempt.expected.goalVersion < 1 || !Number.isFinite(Date.parse(attempt.endedAt)) || !(Date.parse(attempt.endedAt) >= Date.parse(attempt.startedAt))) return true;
+    if (!/^[1-9][0-9]*\/[1-9][0-9]*(?:\/[a-z][a-z-]*)?$/.test(key)) return true;
+    const [step, parallel, exchange] = key.split('/');
+    const ref = `step-${step}/parallel-${parallel}${exchange ? `/${exchange}` : ''}`;
+    if (attempt.requestRef !== `${ref}/request/request.json` || attempt.responseRef !== `${ref}/response/response.json`) return true;
+    const branch = path.join(session, ref);
+    try {
+      const relative = path.relative(await realpath(session), await realpath(branch));
+      if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return true;
+      if ((await evidenceManifestErrors(branch, attempt.evidenceManifest)).length) return true;
+      const bytes = await readFile(path.join(branch, 'request/request.json'));
+      const request = JSON.parse(bytes), response = JSON.parse(await readFile(path.join(branch, 'response/response.json'), 'utf8'));
+      const digest = value => `sha256:${createHash('sha256').update(value).digest('hex')}`;
+      if (state.requestHashes?.[key] !== digest(bytes) || attempt.expectedHash !== digest(JSON.stringify(request.expected)) || JSON.stringify(request.expected) !== JSON.stringify(attempt.expected)) return true;
+      if (request.contractVersion !== V22_CONTRACT || request.sessionId !== state.id || request.attempt?.id !== attempt.id || response.attempt?.id !== attempt.id || request.operatorId !== attempt.operatorId || response.operatorId !== attempt.operatorId || response.status !== 'waiting') return true;
+      if ([request, response].some(value => value.step !== Number(step) || value.parallel !== Number(parallel) || (value.exchange ?? null) !== (exchange ?? null))) return true;
+    } catch { return true; }
+  }
+  return false;
+}
+
 export async function confirmSession(session, decision) {
   session = path.resolve(session);
   if (!['as-stated', 'corrected', 'rejected'].includes(decision.selected)) throw new Error('decision.selected must be as-stated, corrected or rejected');
@@ -183,7 +212,7 @@ export async function confirmSession(session, decision) {
     const decisionId = current.confirmation.decisionId;
     if (current.confirmation.status === 'confirmed' && decision.selected === 'as-stated') return { status: 'already-confirmed', sessionId: state.id, version: current.version };
     if (current.confirmation.status === 'confirmed' && decision.selected === 'corrected') {
-      if ((state.workerSlots ?? []).length || Object.keys(state.leases ?? {}).length || Object.values(state.attempts ?? {}).some(attempt => ['running', 'waiting'].includes(attempt.status))) throw Error('MISSION_BUSY: seal active attempts before correcting their mission');
+      if (await missionCorrectionBusy(session, state)) throw Error('MISSION_BUSY: seal active attempts before correcting their mission');
       await retainMission(session, state, { root });
       state.lifecycle.phase = 'draft';
     }

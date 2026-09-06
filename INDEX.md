@@ -1,4 +1,4 @@
-# StarCi Skills 2.4.3
+# StarCi Skills 2.4.4
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.4.4 (2026-09-06): the restatement answer CLI settles module initialization before recursive validation imports; scope correction distinguishes sealed prior-mission waits from live obligations, with subprocess and preservation regressions.
 
 2.4.3 (2026-09-06): mission-bound restatement choices and immutable forecast revisions preserve prior evidence while routing corrected work through explicit dependencies; confirmation previews expose business goals, routes and code impact. See tests/evidence/20260906-coherent-revisions.md.
 

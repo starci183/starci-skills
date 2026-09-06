@@ -4,6 +4,8 @@ import { mkdtemp, mkdir, readFile, writeFile, rm, symlink, readdir } from 'node:
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { openSession, confirmSession, cleanupFixtureOwners } from './v23-test-fixture.mjs';
 import { retainInvocation, invocationState, missionAt, retainMission, retainContext, missionHistorySnapshotErrors } from './mission-history.mjs';
@@ -110,7 +112,11 @@ test('official open and accept preserve a blocked v1 reading after its answer an
   const first = await blockedReading(1, 1, 'One installation belongs to the workspace.');
   const originalPlan = { chain: [['1/1'],['2/1']], steps: {'1/1':'business.decide','2/1':'architecture.decide'}, goals: {'1/1':{doneWhen:0},'2/1':{doneWhen:0}}, reasons:{}, presets:{}, dependencies:{'1/1':[],'2/1':['1/1']}, evidenceDependencies:{'1/1':[],'2/1':['1/1']}, handoffs:{}, nodes:{'1/1':'business.decide','2/1':'architecture.decide'}, imports:{}, fanout:{} };
   await assert.rejects(editForecast(root, session, JSON.parse(await readFile(stateFile)), originalPlan, {kind:'resume',cell:'1/1'},2), /actual user answer/);
-  await recordRestatementChoice(first.branch, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user:first-reading' });
+  const answerFile = path.join(first.branch, 'actual-answer.json');
+  await writeFile(answerFile, JSON.stringify({ selected: 'as-stated', selectedBy: 'user', sourceRef: 'user:first-reading' }));
+  const answered = await promisify(execFile)(process.execPath, [path.join(root, 'scripts/restatement-choice.mjs'), 'answer', first.branch, answerFile], { timeout: 15000 });
+  assert.equal(JSON.parse(answered.stdout).selected, 'as-stated');
+  assert.doesNotMatch(answered.stderr, /unsettled top-level await/);
   const amended = await editForecast(root, session, JSON.parse(await readFile(stateFile)), originalPlan, {kind:'resume',cell:'1/1'},2);
   assert.deepEqual(amended.chain, [['1/1'],['2/1'],['3/1']]);
   assert.equal(amended.resumes['2/1'], '1/1'); assert.deepEqual(amended.dependencies['3/1'], ['2/1']);

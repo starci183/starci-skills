@@ -48,7 +48,7 @@ export async function recordRestatementChoice(branch, answer, { root = path.reso
   });
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+async function main() {
   try {
     const answering = process.argv[2] === 'answer';
     const branch = path.resolve(process.argv[answering ? 3 : 2]);
@@ -63,4 +63,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       process.stdout.write(`${restatementDecisionId(source.request, id, source.text)}\n`);
     }
   } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; }
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  // Validation imports this module again; let module evaluation finish before awaiting it.
+  main().catch(error => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
 }
