@@ -219,12 +219,33 @@ const reentry = ({ selected = 'as-stated', promise = PROMISE, blockedPromise = P
   state: { chain: [['1/1'], ['2/1']], steps: { '1/1': 'business.decide', '2/1': 'business.decide' }, current: '2/1', resumes: { '2/1': { resumes: '1/1', stop: 'RESTATEMENT_UNCONFIRMED' } }, choices: { [RESTATEMENT_ID]: { selected, selectedBy: 'user', sourceRef: 'message:42' } } },
   session: { 'step-1/parallel-1/request/request.json': requestJson({ extra: { promise: blockedPromise } }) },
 }];
+// A malformed request that was already admitted with the recorded choice but no resume may retain
+// only its truthful restatement while terminating INVALID_INPUT. The files from any attempted design
+// remain on disk in this fixture but are not declared as typed outputs.
+const selectedWithoutResume = ({ selected = 'as-stated', decisionId = RESTATEMENT_ID, restatement = restatementMd(), response = null } = {}) => [{
+  ...baseline(),
+  'request/request.json': { ...requestJson({ extra: { promise: PROMISE } }), decisionId, selectedOption: selected },
+  'response/response.json': response ?? responseJson({ status: 'blocked', stop: 'INVALID_INPUT', fields: { restatement: 'response/restatement.md' }, next: [] }),
+  'response/restatement.md': restatement,
+}, {
+  state: { choices: { [decisionId]: { selected, selectedBy: 'user', sourceRef: 'message:42' } } },
+}];
+const malformedSelectedLineage = ({ selected = 'as-stated', promise = `${PROMISE} for one year`, blockedPromise = PROMISE, response = null } = {}) => reentry({
+  selected,
+  promise,
+  blockedPromise,
+  response: response ?? responseJson({ step: 2, status: 'blocked', stop: 'INVALID_INPUT', fields: { restatement: 'response/restatement.md' }, next: [] }),
+});
 
 await expectValid(baseline(), 'a first publication of one feature head, reusing the previous head\'s promise and owing no restatement');
 await expectValid(firstRunBlocked(), 'a first run restates the supplied promise and holds for the person');
 await expectValid(reentry(), 'a re-entry carrying the recorded as-stated choice proceeds to a done head that still carries the restatement');
 await expectValid(reentry({ selected: 'corrected', promise: 'a paying learner reads every course in the plan for one year' }), 'a re-entry carrying the recorded corrected choice with a changed promise');
 await expectValid({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'CONSUMER_UNPROVEN', fields: {}, next: [] }), 'response/response.md': null, 'response/data/claims.json': null, 'response/data/coverage-matrix.json': null, 'response/data/model.json': null }, 'blocked on an undisposed consumer');
+await expectValid(selectedWithoutResume(), 'an admitted as-stated choice without resume terminates INVALID_INPUT with only the restatement typed');
+await expectValid(selectedWithoutResume({ selected: 'corrected' }), 'an admitted corrected choice without resume terminates INVALID_INPUT with only the restatement typed');
+await expectValid(malformedSelectedLineage(), 'an admitted changed as-stated promise terminates INVALID_INPUT with only its truthful restatement typed');
+await expectValid(malformedSelectedLineage({ selected: 'corrected', promise: PROMISE }), 'an admitted unchanged corrected promise terminates INVALID_INPUT with only its truthful restatement typed');
 
 await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'CONSUMER_UNPROVEN' } }, 'only a blocked response carries a stop', 'done with a stop');
 await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', fields: {}, next: [] }), 'response/response.md': null, 'response/data/claims.json': null, 'response/data/coverage-matrix.json': null, 'response/data/model.json': null }, 'not a registered code', 'unknown stop code');
@@ -278,6 +299,17 @@ await expectError({ ...firstRunBlocked(), 'response/restatement.md': null, 'resp
 await expectError({ ...baseline(), 'response/response.json': responseJson({ fields: { ...ALL_FIELDS, restatement: 'response/restatement.md' } }), 'response/restatement.md': restatementMd() }, 'nothing to restate', 'a restatement when the request supplies no promise');
 await expectError(reentry({ selected: 'corrected' }), 'carries the same promise as the blocked branch', 'corrected with the promise unchanged');
 await expectError(reentry({ selected: 'as-stated', promise: 'a paying learner reads every course in the plan for one year' }), 'differs from the blocked branch', 'as-stated with the promise changed');
+await expectError(malformedSelectedLineage({ response: responseJson({ step: 2, fields: { restatement: 'response/restatement.md' } }) }), 'ends blocked with INVALID_INPUT', 'changed as-stated lineage ending done');
+await expectError(malformedSelectedLineage({ selected: 'corrected', promise: PROMISE, response: responseJson({ step: 2, status: 'waiting', fields: { restatement: 'response/restatement.md' }, next: [] }) }), 'ends blocked with INVALID_INPUT', 'unchanged corrected lineage ending waiting');
+await expectError(malformedSelectedLineage({ response: responseJson({ step: 2, status: 'blocked', stop: 'INVALID_INPUT', fields: { restatement: 'response/restatement.md', claims: 'response/data/claims.json' }, next: [] }) }), 'only restatement may be retained', 'changed as-stated lineage declaring a modelled kind');
+await expectError(malformedSelectedLineage({ selected: 'corrected', promise: PROMISE, response: responseJson({ step: 2, status: 'blocked', stop: 'CONSUMER_UNPROVEN', fields: { restatement: 'response/restatement.md' }, next: [] }) }), 'ends blocked with INVALID_INPUT', 'unchanged corrected lineage ending on another stop');
 await expectError(reentry({ response: { ...responseJson({ step: 2, status: 'blocked', stop: 'RESTATEMENT_UNCONFIRMED', fields: { restatement: 'response/restatement.md' }, next: [] }), interaction: restatementQuestion() } }), 'does not ask again', 'a re-entry asking the recorded question again');
+await expectError(selectedWithoutResume({ selected: 'maybe' }), 'is neither as-stated nor corrected', 'an invalid selected option without resume');
+await expectError(selectedWithoutResume({ decisionId: 'restatement:other-feature' }), 'records no choice on restatement:paid-access', 'a selected choice keyed to the wrong restatement');
+await expectError(selectedWithoutResume({ restatement: restatementMd({ quoted: 'a paying learner reads some courses' }) }), 'quoted verbatim', 'malformed selected input with an altered source quote');
+await expectError(selectedWithoutResume({ response: responseJson({ status: 'blocked', stop: 'INVALID_INPUT', fields: { restatement: 'response/restatement.md', claims: 'response/data/claims.json' }, next: [] }) }), 'only restatement may be retained', 'malformed selected input declaring a modelled kind');
+await expectError(selectedWithoutResume({ response: responseJson({ status: 'done', fields: { restatement: 'response/restatement.md' } }) }), 'ends blocked with INVALID_INPUT', 'malformed selected input ending done');
+await expectError(selectedWithoutResume({ response: responseJson({ status: 'waiting', fields: { restatement: 'response/restatement.md' }, next: [] }) }), 'ends blocked with INVALID_INPUT', 'malformed selected input ending waiting');
+await expectError(selectedWithoutResume({ response: responseJson({ status: 'blocked', stop: 'CONSUMER_UNPROVEN', fields: { restatement: 'response/restatement.md' }, next: [] }) }), 'ends blocked with INVALID_INPUT', 'malformed selected input ending on another stop');
 
-process.stdout.write('business.decide self-test: 5 valid branches, 48 rejected mutations\n');
+process.stdout.write('business.decide self-test: 9 valid branches, 59 rejected mutations\n');

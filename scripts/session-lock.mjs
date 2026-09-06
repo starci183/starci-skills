@@ -5,6 +5,17 @@ import path from 'node:path';
 import process from 'node:process';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+export async function replaceFile(temp, file, { renameFile = rename, platform = process.platform, pause = wait } = {}) {
+  // Windows readers or scanners may briefly deny replacement of an existing file. Keep the
+  // owner's lock and both files intact; retry only the atomic rename, never unlink the old state.
+  for (let tries = 0; ; tries += 1) {
+    try { return await renameFile(temp, file); }
+    catch (error) {
+      if (platform !== 'win32' || !['EPERM', 'EACCES', 'EBUSY'].includes(error.code) || tries >= 19) throw error;
+      await pause(25);
+    }
+  }
+}
 const processLives = (pid) => {
   if (!Number.isInteger(pid) || pid < 1) return false;
   try { process.kill(pid, 0); return true; }
@@ -62,12 +73,13 @@ export async function withSessionLock(session, operation) {
 export async function mutateSession(session, operation) {
   session = path.resolve(session);
   return withSessionLock(session, async () => {
+    if (existsSync(path.join(session, 'relocation.json'))) throw Error('WORKFLOW_RELOCATED: retained source ledger is read-only; use its verified destination');
     const file = path.join(session, 'state.json');
     const state = JSON.parse(await readFile(file, 'utf8'));
     const result = await operation(state);
     const temp = `${file}.${process.pid}.${randomUUID()}.tmp`;
     await writeFile(temp, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
-    await rename(temp, file);
+    await replaceFile(temp, file);
     return result;
   });
 }

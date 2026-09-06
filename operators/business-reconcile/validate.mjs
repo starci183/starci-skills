@@ -1,3 +1,4 @@
+import { workflowRootOf, readSessionState } from '../../scripts/workflow-root.mjs';
 // business.reconcile's own law over one branch, on top of the shared step check: the delivered source
 // input is bound; the head is exactly one feature directory below the businesses root; the model, the
 // receipt and the frozen matrix's fingerprint are the same reconciliation read three ways; the lineage
@@ -167,7 +168,7 @@ export async function validateReconcileStep(branchDir, root = ROOT, { uncheckedR
     // lifecycle already has for a promise carried as far as it has been carried.
     const { product, featureId } = await ledgerKeyOf(branchDir);
     if (product && featureId) {
-      const open = await openUnchecked(uncheckedRoot ?? hostRootOf(root), product, featureId);
+      const open = await openUnchecked(uncheckedRoot ?? workflowRootOf(root, readSessionState(branchDir)?.state), product, featureId);
       const listed = new Set((tableUnder(text, '## Unchecked') ?? []).map(([unit, state]) => `${unit}|${state}`));
       for (const d of open) {
         const key = `${d.unit}|${d.state === null ? '—' : d.state}`;

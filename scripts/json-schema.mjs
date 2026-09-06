@@ -15,19 +15,24 @@ function resolveLocalRef(schema, ref) {
   if (!ref.startsWith('#/')) throw new Error(`unsupported non-local schema reference ${ref}`);
   return ref.slice(2).split('/').reduce((current, key) => current?.[key.replaceAll('~1', '/').replaceAll('~0', '~')], schema);
 }
-function inspect(schema, rule, value, at, errors) {
-  if (rule.$ref) return inspect(schema, resolveLocalRef(schema, rule.$ref), value, at, errors);
-  for (const item of rule.allOf ?? []) inspect(schema, item, value, at, errors);
+function inspect(schema, rule, value, at, errors, arrayLimits = new Map(), location = []) {
+  if (rule.$ref) return inspect(schema, resolveLocalRef(schema, rule.$ref), value, at, errors, arrayLimits, location);
+  for (const item of rule.allOf ?? []) inspect(schema, item, value, at, errors, arrayLimits, location);
   if (rule.oneOf || rule.anyOf) {
     const branches = rule.oneOf ?? rule.anyOf;
-    const matches = branches.filter((branch) => { const e = []; inspect(schema, branch, value, at, e); return e.length === 0; }).length;
-    if ((rule.oneOf && matches !== 1) || (rule.anyOf && matches === 0)) errors.push(`${at}: no unique allowed schema branch`);
+    const matches = branches.map((branch) => { const e = []; const limits = new Map(); inspect(schema, branch, value, at, e, limits, location); return { e, limits }; }).filter(({ e }) => e.length === 0);
+    if ((rule.oneOf && matches.length !== 1) || (rule.anyOf && matches.length === 0)) errors.push(`${at}: no unique allowed schema branch`);
+    else {
+      const alternatives = new Map();
+      for (const { limits } of matches) for (const [array, limit] of limits) alternatives.set(array, Math.max(alternatives.get(array) ?? 0, limit));
+      for (const [array, limit] of alternatives) arrayLimits.set(array, Math.min(arrayLimits.get(array) ?? Infinity, limit));
+    }
     return;
   }
   if (rule.if) {
     const c = []; inspect(schema, rule.if, value, at, c);
-    if (c.length === 0 && rule.then) inspect(schema, rule.then, value, at, errors);
-    if (c.length > 0 && rule.else) inspect(schema, rule.else, value, at, errors);
+    if (c.length === 0 && rule.then) inspect(schema, rule.then, value, at, errors, arrayLimits, location);
+    if (c.length > 0 && rule.else) inspect(schema, rule.else, value, at, errors, arrayLimits, location);
   }
   if (Object.hasOwn(rule, 'const') && value !== rule.const) errors.push(`${at}: expected ${JSON.stringify(rule.const)}`);
   if (rule.enum && !rule.enum.includes(value)) errors.push(`${at}: value is outside the allowed enum`);
@@ -47,38 +52,44 @@ function inspect(schema, rule, value, at, errors) {
     if (rule.maximum !== undefined && value > rule.maximum) errors.push(`${at}: value exceeds maximum`);
   }
   if (Array.isArray(value)) {
+    if (Number.isSafeInteger(rule.maxItems) && rule.maxItems >= 0) arrayLimits.set(JSON.stringify(location), Math.min(arrayLimits.get(JSON.stringify(location)) ?? Infinity, rule.maxItems));
     if (rule.minItems !== undefined && value.length < rule.minItems) errors.push(`${at}: array is too short`);
     if (rule.maxItems !== undefined && value.length > rule.maxItems) errors.push(`${at}: array is too long`);
     if (rule.uniqueItems && new Set(value.map((item) => JSON.stringify(item))).size !== value.length) errors.push(`${at}: duplicate items are forbidden`);
-    if (rule.items) value.forEach((item, index) => inspect(schema, rule.items, item, `${at}[${index}]`, errors));
+    if (rule.items) value.forEach((item, index) => inspect(schema, rule.items, item, `${at}[${index}]`, errors, arrayLimits, [...location, index]));
   }
   if (isObject(value)) {
     for (const key of rule.required ?? []) if (!Object.hasOwn(value, key)) errors.push(`${at}.${key}: required`);
     const properties = rule.properties ?? {};
-    if (rule.additionalProperties === false) for (const key of Object.keys(value)) if (!Object.hasOwn(properties, key)) errors.push(`${at}.${key}: unexpected property`);
-    else if (isObject(rule.additionalProperties)) for (const [key, child] of Object.entries(value)) if (!Object.hasOwn(properties, key)) inspect(schema, rule.additionalProperties, child, `${at}.${key}`, errors);
-    for (const [key, child] of Object.entries(properties)) if (Object.hasOwn(value, key)) inspect(schema, child, value[key], `${at}.${key}`, errors);
+    if (rule.propertyNames) for (const key of Object.keys(value)) inspect(schema, rule.propertyNames, key, `${at} property ${JSON.stringify(key)}`, errors);
+    if (rule.additionalProperties === false) {
+      for (const key of Object.keys(value)) if (!Object.hasOwn(properties, key)) errors.push(`${at}.${key}: unexpected property`);
+    } else if (isObject(rule.additionalProperties)) {
+      for (const [key, child] of Object.entries(value)) if (!Object.hasOwn(properties, key)) inspect(schema, rule.additionalProperties, child, `${at}.${key}`, errors, arrayLimits, [...location, key]);
+    }
+    for (const [key, child] of Object.entries(properties)) if (Object.hasOwn(value, key)) inspect(schema, child, value[key], `${at}.${key}`, errors, arrayLimits, [...location, key]);
   }
 }
 // Path traversal and unbounded strings are refused everywhere, whatever the schema says.
-function hygiene(value) {
+function hygiene(value, arrayLimits, rootAt) {
   const errors = [];
-  const visit = (current, at) => {
+  const visit = (current, at, location = []) => {
     if (typeof current === 'string') {
       if (current.length > 8192) errors.push(`${at}: string exceeds the contract limit`);
       if (!at.endsWith('.$schema') && /(^|[\\/])\.\.([\\/]|$)/.test(current) && !/^\.\.\/step-\d+-\d+\//.test(current)) errors.push(`${at}: path traversal is forbidden`);
       return;
     }
-    if (Array.isArray(current)) { if (current.length > 512) errors.push(`${at}: array exceeds the contract limit`); current.forEach((item, i) => visit(item, `${at}[${i}]`)); return; }
-    if (isObject(current)) for (const [key, child] of Object.entries(current)) visit(child, `${at}.${key}`);
+    if (Array.isArray(current)) { if (current.length > (arrayLimits.get(JSON.stringify(location)) ?? 512)) errors.push(`${at}: array exceeds the contract limit`); current.forEach((item, i) => visit(item, `${at}[${i}]`, [...location, i])); return; }
+    if (isObject(current)) for (const [key, child] of Object.entries(current)) visit(child, `${at}.${key}`, [...location, key]);
   };
-  visit(value, '$');
+  visit(value, rootAt);
   return errors;
 }
 export function validateAgainst(schema, value, at = '$') {
   const errors = [];
-  inspect(schema, schema, value, at, errors);
-  if (errors.length === 0) errors.push(...hygiene(value));
+  const arrayLimits = new Map();
+  inspect(schema, schema, value, at, errors, arrayLimits);
+  if (errors.length === 0) errors.push(...hygiene(value, arrayLimits, at));
   return errors;
 }
 

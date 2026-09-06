@@ -1,3 +1,4 @@
+import { workflowRootOf, readSessionState } from '../../scripts/workflow-root.mjs';
 // release.deploy's own law over one branch, on top of the shared step check: the receipt names the
 // release, target, approval and rollback identity the request bound; no credential value appears
 // anywhere; the two fallbacks are taken in order and recorded, and a branch nobody entered is `none`;
@@ -93,7 +94,7 @@ export async function validateReleaseStep(branchDir, root = ROOT, { uncheckedRoo
   const feature = empty(requirements.feature) ? null : requirements.feature;
   const product = empty(binding.Project) ? null : String(binding.Project).replace(/`/g, '');
   if (feature && product && String(binding.Environment) === PRODUCTION) {
-    const open = await openUnchecked(uncheckedRoot ?? hostRootOf(root), product, feature);
+    const open = await openUnchecked(uncheckedRoot ?? workflowRootOf(root, readSessionState(branchDir)?.state), product, feature);
     const blocking = open.filter((d) => d.tier === 'journey');
     for (const d of blocking) errors.push(`response/response.md: ${product}/${feature} carries an open ${d.lane} entry on ${d.unit}/${d.state} (${d.reason}), which sits inside the journey this release delivers, and Binding names environment ${PRODUCTION}; a journey the run left partly unproved is not deployed to production on the assumption that it holds (UNCHECKED_OPEN)`);
   }

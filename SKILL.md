@@ -15,16 +15,20 @@ Before communicating a question, apply [the interaction policy](resources/intera
 This changes communication only: all routing transitions, operator boundaries and required
 authorizations below remain in force. An Ask column or diagnostic reason is not a prompt to forward.
 
-Every user prompt first runs `scripts/session-open.mjs open`: it creates or reuses the one StarCi
+Before `session-open`, read and apply `resources/orchestrator.json#workflowTopologies`; pass its
+selected mode as `topology.mode` in the draft. Do not copy its vocabulary, thresholds or peer law
+into this entry.
+
+Every workflow-owning native task first runs `scripts/session-open.mjs open`: it creates or reuses the one StarCi
 ledger bound to the native Codex task or Claude session and its user worktree. This happens before
 scope confirmation, planning, operator dispatch, helper dispatch, design or mutation. Agents, helpers,
 nested exchanges and retries bind to that host session; none creates another user session.
 
-1. Freeze one mission scope: the unit, the target, inclusions and exclusions, write roots, external
+1. Resolve and freeze scope through [goal discovery](workflows/discovery.md), including actual repository and route impact, generalized code ownership, all applicable handoff lanes, verification, destination and execution stage. The displayed scope hash and retained authority are required by the executable gate. Freeze one mission scope: the unit, the target, inclusions and exclusions, write roots, external
    effects, and what will count as proof. Two readings that would change any of those is one focused
    question, not a guess. Freezing is not silent: the already-open draft is printed as one table in
    the display language with Goal, Target, In scope, Out of scope, Outputs, Done when, Verification
-   reach and Example, and its version is confirmed before step 2. If the prompt already stated and
+   reach and Example, plus the complete discovery contract, and its version is confirmed before step 2. If the prompt already stated and
    authorized exactly that table, record that prompt as `as-stated` instead of asking routinely.
    Correction creates the next draft version; rejection or silence leaves it non-executable. The scope
    line is the one place the narrowing is put
@@ -51,10 +55,9 @@ nested exchanges and retries bind to that host session; none creates another use
    checkout, a sign-in that fails, a served head that does not contain the bound one, a held port, a
    missing browser or container, an approval the environment keeps with a person — is reported at
    once, as one typed readiness report, rather than one per hour as the chain runs into them. Then
-   run `workspace.bind` for any mission that reads or writes routed source. Nothing else may resolve
-   a checkout, and a similar directory name is never route authority.
+   run `workspace.bind` for any mission that reads or writes routed source. Read-only discovery may inspect the declared checkout; only this operator binds an execution checkout, and a similar directory name is never route authority.
 3. Plan the chain from the confirmed mission, never from an example: there is no `when` to look up.
-   `scripts/plan-chain.mjs` walks backwards from the operators the "done when" lines name through
+   `scripts/plan-chain.mjs` derives delivery targets from `resources/delivery.json`, then walks backwards from the operators the complete "done when" lines name through
    the operators' Inputs, Context and Next tables (`workflows/README.md` states the derivation and
    the rules), opens the chain with `environment.preflight` whenever an operator in it holds an
    effect tool, binds every role the mission declares or a Context table requires, runs an operator
@@ -86,13 +89,14 @@ nested exchanges and retries bind to that host session; none creates another use
    only the grants it lists. An operator has no other model, no inherited turn beyond what its
    `resources.mode` and the profile's `forkTurns` allow, and no grant the assignment omits.
 
-Cross-session evidence uses scripts/producer-import.mjs. Copy a completed producer request/response bundle into an unused receiving step-N/parallel-M coordinate, preserving every byte and original session/step metadata. import.json binds the source and target coordinates and every file digest. The input gate verifies the original frozen request, its declared completed outputs, origin and copied bytes; imported slots are evidence only and never enter the receiving chain, steps, request hashes or leases. Use the normal step-N/parallel-M/response input path. No operator is rerun, and no source-write authority is imported. The kinds an imported slot declares count as already produced for the chain, in the plan and at the gate (`workflows/README.md`, How a chain is derived).
+A typed producer output consumed as an input by another StarCi session uses scripts/producer-import.mjs. Ordinary coordinated task messages and evidence references are not typed operator inputs and need no import. When an operator does consume the output, copy the completed producer request/response bundle into an unused receiving step-N/parallel-M coordinate, preserving every byte and original session/step metadata. import.json binds the source and target coordinates and every file digest. The input gate verifies the original frozen request, its declared completed outputs, origin and copied bytes; imported slots are evidence only and never enter the receiving chain, steps, request hashes or leases. Use the normal step-N/parallel-M/response input path. No operator is rerun, and no source-write authority is imported. The kinds an imported slot declares count as already produced for the chain, in the plan and at the gate (`workflows/README.md`, How a chain is derived).
 
 ## Entry
 
 | The request is about | First operator |
 | --- | --- |
 | Whether this machine, its routes, identities, runtimes and approvals are ready for the mission | `environment.preflight` |
+| Whether every frozen peer outcome supports the conclusion of a coordinated portfolio | `workflow.verify` |
 | Which project, checkout, or runtime binding applies | `workspace.bind` |
 | What the product promises, who may have it, what happens when it fails | `business.decide` |
 | System boundaries, data ownership, or the tech stack | `architecture.decide` |
@@ -199,7 +203,7 @@ The session runs under a budget (`state.json.budget`, from `resources/orchestrat
 step cap and a same-operator cap. A request that would pass either is `BUDGET_EXHAUSTED`, and the
 person answers one typed `budget-choice` — narrow, continue, stop — recorded in `state.json.choices`;
 continue extends the cap on record. The orchestrator's own memory is `state.json.brief` — what is
-proven, what is blocked and on whom, what is next, which peer session owns which head, and the last
+proven, what is blocked and on whom, what is next, which peer task or session owns which head, and the last
 report the person received — rewritten after every transition and read back after a compaction; no
 note file beside it is recognised. `scripts/validate-session.mjs` checks the whole ledger after every
 transition.
@@ -230,7 +234,7 @@ person's language and stop with `RESTATEMENT_UNCONFIRMED` until the person selec
 `corrected` on a `restatement-confirm` choice; a corrected reading arrives as the corrected
 requirement and the same branch runs again. Every turn the orchestrator ends with a person is one of
 the report shapes `resources/interaction.json` declares — delivered, blocked on you, working — in the
-person's language; a hand-off to a peer session is a waiting branch with a wake condition, never the
+person's language; a hand-off to a peer task or session is a waiting branch with a wake condition, never the
 end of a turn.
 
 ## Authority
@@ -270,6 +274,11 @@ English `.md` files are the only runtime authority. Same-stem `.vi.md` files are
 never enter a context manifest, a dependency list, a validator input, or an operator binding.
 
 ## Orchestration
+
+The selected user topology sits above operator execution mode. Execute the selected record in
+`resources/orchestrator.json#workflowTopologies` directly; that record alone defines ownership, peer
+limits, communication, tracking and completion, while `scripts/workflow-topology.mjs` enforces its
+state boundary. This entry does not restate those rules.
 
 One invocation of one operator is one run, in the mode its `operator.json` declares under
 `resources.mode` (`resources/orchestrator.json#modes`): `inline`, where the orchestrator performs the

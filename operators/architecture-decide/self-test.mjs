@@ -309,11 +309,35 @@ const blockedOnRestatement = ({ interaction = restatementQuestion(), restatement
   'response/response.json': { ...responseJson({ status: 'blocked', stop: 'RESTATEMENT_UNCONFIRMED', next: [] }), fields: { restatement: 'response/restatement.md' }, ...(interaction ? { interaction } : {}) },
   'response/restatement.md': restatement,
 });
+// Use firstRun explicitly: bare architecture fixtures are otherwise converted by placed() into a
+// lawful re-entry with a resume, which would hide the malformed admitted-input case under test.
+const selectedWithoutResume = ({ selected = 'as-stated', decisionId = `restatement:${ID}`, restatement = restatementMd(), response = null } = {}) => firstRun({
+  ...baseline(),
+  'request/request.json': { ...requestJson(), decisionId, selectedOption: selected },
+  'response/response.json': response ?? { ...responseJson({ status: 'blocked', stop: 'INVALID_INPUT', next: [] }), fields: { restatement: 'response/restatement.md' } },
+  'response/restatement.md': restatement,
+  'critique/request/request.json': null,
+  'critique/response/response.json': null,
+  'critique/response/critique.md': null,
+}, {
+  state: { choices: { [decisionId]: { selected, selectedBy: 'user', sourceRef: 'message:42' } } },
+});
+const malformedSelectedLineage = ({ selected = 'as-stated', objective = `${OBJECTIVE} served by one boundary`, blockedObjective = OBJECTIVE, response = null } = {}) => confirmed({
+  ...baseline(),
+  'response/response.json': response ?? { ...responseJson({ status: 'blocked', stop: 'INVALID_INPUT', next: [] }), fields: { restatement: 'response/restatement.md' } },
+  'critique/request/request.json': null,
+  'critique/response/response.json': null,
+  'critique/response/critique.md': null,
+}, { selected, objective, blockedObjective });
 const MODEL_INPUT = { model: 'step-1/parallel-2/response/data/model.json' };
 const modelFile = { 'step-1/parallel-2/response/data/model.json': { featureId: 'pro-subscription' } };
 await expectValid(firstRun(blockedOnRestatement()), 'a first run restates the objective and holds for the person');
 await expectValid(confirmed(baseline(), { selected: 'corrected', objective: 'one entitlement read path served by one boundary' }), 'a re-entry carrying the recorded corrected choice with a changed objective');
 await expectValid(confirmed({ ...baseline(), 'request/request.json': requestJson({ extra: { decisionId: null } }) }, { id: 'one-entitlement-read-path' }), 'the choice keyed by the slug of the objective when decisionId is left to its default');
+await expectValid(selectedWithoutResume(), 'an admitted as-stated choice without resume terminates INVALID_INPUT with only the restatement typed');
+await expectValid(selectedWithoutResume({ selected: 'corrected' }), 'an admitted corrected choice without resume terminates INVALID_INPUT with only the restatement typed');
+await expectValid(malformedSelectedLineage(), 'an admitted changed as-stated objective terminates INVALID_INPUT with only its truthful restatement typed');
+await expectValid(malformedSelectedLineage({ selected: 'corrected', objective: OBJECTIVE }), 'an admitted unchanged corrected objective terminates INVALID_INPUT with only its truthful restatement typed');
 await expectError(firstRun(baseline()), 'ends blocked with RESTATEMENT_UNCONFIRMED', 'a first run designing on an objective nobody confirmed');
 await expectError(firstRun({ ...baseline(), 'request/request.json': { ...requestJson(), inputs: MODEL_INPUT } }, { session: modelFile }), 'ends blocked with RESTATEMENT_UNCONFIRMED', 'a first run carrying a confirmed promise as the model input still owes its own restatement');
 await expectError(firstRun(blockedOnRestatement({ interaction: null })), 'carries interaction', 'blocked on the restatement without the typed question');
@@ -324,8 +348,19 @@ await expectError(firstRun(blockedOnRestatement({ restatement: restatementMd({ i
 await expectError(firstRun({ ...blockedOnRestatement(), 'response/response.json': { ...blockedOnRestatement()['response/response.json'], fields: { restatement: 'response/restatement.md', 'current-state': 'response/data/current-state.json' } }, 'response/data/current-state.json': currentState() }), 'written before the restatement is confirmed', 'the current state observed on an unconfirmed reading');
 await expectError(confirmed(baseline(), { selected: 'corrected' }), 'carries the same objective as the blocked branch', 'corrected with the objective unchanged');
 await expectError(confirmed(baseline(), { selected: 'as-stated', objective: 'one entitlement read path served by one boundary' }), 'differs from the blocked branch', 'as-stated with the objective changed');
+await expectError(malformedSelectedLineage({ response: { ...responseJson(), fields: { restatement: 'response/restatement.md' } } }), 'ends blocked with INVALID_INPUT', 'changed as-stated lineage ending done');
+await expectError(malformedSelectedLineage({ selected: 'corrected', objective: OBJECTIVE, response: { ...responseJson({ status: 'waiting', next: [] }), awaiting: { exchange: 'critique', kind: 'independent-critique' }, fields: { restatement: 'response/restatement.md' } } }), 'ends blocked with INVALID_INPUT', 'unchanged corrected lineage ending waiting');
+await expectError(malformedSelectedLineage({ response: { ...responseJson({ status: 'blocked', stop: 'INVALID_INPUT', next: [] }), fields: { restatement: 'response/restatement.md', 'current-state': 'response/data/current-state.json' } } }), 'only restatement may be retained', 'changed as-stated lineage declaring an observed kind');
+await expectError(malformedSelectedLineage({ selected: 'corrected', objective: OBJECTIVE, response: { ...responseJson({ status: 'blocked', stop: 'CURRENT_STATE_UNOBSERVED', next: [] }), fields: { restatement: 'response/restatement.md' } } }), 'ends blocked with INVALID_INPUT', 'unchanged corrected lineage ending on another stop');
 await expectError(confirmed(blockedOnRestatement()), 'does not ask again', 'a re-entry asking the recorded question again');
+await expectError(selectedWithoutResume({ selected: 'maybe' }), 'is neither as-stated nor corrected', 'an invalid selected option without resume');
+await expectError(selectedWithoutResume({ decisionId: 'restatement:another-decision' }), 'records no choice on restatement:entitlement-read-path', 'a selected choice keyed to the wrong restatement');
+await expectError(selectedWithoutResume({ restatement: restatementMd({ quoted: 'one entitlement write path' }) }), 'quoted verbatim', 'malformed selected input with an altered source quote');
+await expectError(selectedWithoutResume({ response: { ...responseJson({ status: 'blocked', stop: 'INVALID_INPUT', next: [] }), fields: { restatement: 'response/restatement.md', 'current-state': 'response/data/current-state.json' } } }), 'only restatement may be retained', 'malformed selected input declaring an observed kind');
+await expectError(selectedWithoutResume({ response: { ...responseJson(), fields: { restatement: 'response/restatement.md' } } }), 'ends blocked with INVALID_INPUT', 'malformed selected input ending done');
+await expectError(selectedWithoutResume({ response: { ...responseJson({ status: 'waiting', next: [] }), awaiting: { exchange: 'critique', kind: 'independent-critique' }, fields: { restatement: 'response/restatement.md', 'current-state': 'response/data/current-state.json', 'stack-model': 'response/data/stack-model.json' } } }), 'ends blocked with INVALID_INPUT', 'malformed selected input ending waiting');
+await expectError(selectedWithoutResume({ response: { ...responseJson({ status: 'blocked', stop: 'CURRENT_STATE_UNOBSERVED', next: [] }), fields: { restatement: 'response/restatement.md' } } }), 'ends blocked with INVALID_INPUT', 'malformed selected input ending on another stop');
 
-process.stdout.write('architecture.decide self-test: 10 valid branches, 42 rejected mutations\n');
+process.stdout.write('architecture.decide self-test: 14 valid branches, 53 rejected mutations\n');
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await runSelfTests();

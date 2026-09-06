@@ -1,13 +1,16 @@
+import { workflowOwnerErrors, readSessionState } from './workflow-root.mjs';
+import { deliveryRequestErrors } from './mission-scope.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { sessionRootOf, V22_CONTRACT, validateRequest } from './validate-request.mjs';
+import { localAcceptedInputErrors, sessionRootOf, V22_CONTRACT, validateRequest } from './validate-request.mjs';
 import { mutateSession } from './session-lock.mjs';
 import { effectiveExclusiveResources, normalizeResource, resourcesOverlap } from './resource-locks.mjs';
 import { validateAgainst } from './json-schema.mjs';
+import { evidenceManifestErrors } from './evidence-manifest.mjs';
 
 export { effectiveExclusiveResources, normalizeResource, resourcesOverlap } from './resource-locks.mjs';
 
@@ -67,7 +70,12 @@ export async function acquireWorkerSlot(branch, workerId, { resume = false, ranP
   const requestFile = path.join(branch, 'request', 'request.json');
   return mutateSession(session, async (state) => {
     const before = await readFile(requestFile);
+    const owner = readSessionState(branch);
+    const admission = workflowOwnerErrors(root, owner.session, state, { dispatch: true });
+    if (admission.length) throw Error(admission.join('\n'));
     const checked = await validateRequest(root, branch);
+    const stageErrors = deliveryRequestErrors(state, checked.request, root);
+    if (stageErrors.length) throw Error(stageErrors.join('\n'));
     if (checked.errors.length) throw new Error(checked.errors.join('\n'));
     const after = await readFile(requestFile);
     if (sha(before) !== sha(after)) throw new Error('request.json changed while worker slot acquisition was validating it');
@@ -81,6 +89,31 @@ export async function acquireWorkerSlot(branch, workerId, { resume = false, ranP
     const wantedStatus = resume ? 'waiting' : 'running';
     const attempt = state.attempts?.[key];
     if (attempt?.status !== wantedStatus || attempt.id !== request.attempt.id) throw new Error(`state.json: attempt ${key}/${request.attempt.id} must be ${wantedStatus} before its worker ${resume ? 'resumes' : 'acquires'} a slot`);
+    if (resume) {
+      const response = JSON.parse(await readFile(path.join(branch, 'response', 'response.json'), 'utf8'));
+      const exchange = response.status === 'waiting' ? response.awaiting?.exchange : null;
+      const exchangeAttempt = exchange ? state.attempts?.[`${key}/${exchange}`] : null;
+      if (!attempt.responseRef || !attempt.endedAt || !attempt.evidenceManifest) throw new Error(`state.json: attempt ${key}/${request.attempt.id} cannot resume until its accepted waiting receipt and awaited exchange are matched`);
+      const checkpointErrors = await evidenceManifestErrors(branch, attempt.evidenceManifest);
+      if (checkpointErrors.length) throw new Error(`state.json: attempt ${key}/${request.attempt.id} cannot resume from changed waiting evidence: ${checkpointErrors.join('; ')}`);
+      if (!exchange || exchangeAttempt?.status !== 'matched') throw new Error(`state.json: attempt ${key}/${request.attempt.id} cannot resume until its accepted waiting receipt and awaited exchange are matched`);
+      const exchangeDir = path.join(branch, exchange);
+      let exchangeRequest;
+      let exchangeResponse;
+      try { exchangeRequest = JSON.parse(await readFile(path.join(exchangeDir, 'request', 'request.json'), 'utf8')); }
+      catch (error) { throw new Error(`state.json: awaited exchange ${key}/${exchange} request is unreadable: ${error.message}`); }
+      try { exchangeResponse = JSON.parse(await readFile(path.join(exchangeDir, 'response', 'response.json'), 'utf8')); }
+      catch (error) { throw new Error(`state.json: awaited exchange ${key}/${exchange} response is unreadable: ${error.message}`); }
+      const awaitedKind = response.awaiting?.kind;
+      const declared = exchangeResponse.fields?.[awaitedKind];
+      const refs = Array.isArray(declared) ? declared : declared ? [declared] : [];
+      if (exchangeRequest.exchange !== exchange || exchangeResponse.exchange !== exchange || exchangeRequest.step !== request.step || exchangeResponse.step !== request.step || exchangeRequest.parallel !== request.parallel || exchangeResponse.parallel !== request.parallel || exchangeRequest.operatorId !== request.operatorId || exchangeResponse.operatorId !== request.operatorId || exchangeRequest.attempt?.id !== exchangeAttempt.id || !refs.length) throw new Error(`state.json: awaited exchange ${key}/${exchange} is not bound to the parent identity and kind ${awaitedKind ?? 'missing'}`);
+      for (const ref of refs) {
+        const inputRef = `step-${request.step}/parallel-${request.parallel}/${exchange}/${ref}`;
+        const proofErrors = await localAcceptedInputErrors(session, state, inputRef, awaitedKind);
+        if (proofErrors.length) throw new Error(`state.json: awaited exchange ${key}/${exchange} is not intact accepted proof: ${proofErrors.join('; ')}`);
+      }
+    }
     if (state.requestHashes?.[key] !== sha(after)) throw new Error(`request.json: frozen request hash for ${key} changed after attempt-gate open`);
     if (attempt.expectedHash !== sha(Buffer.from(JSON.stringify(request.expected)))) throw new Error(`request.json: expected changed after attempt ${attempt.id} opened`);
     if (JSON.stringify(attempt.frozenInputs) !== JSON.stringify(request.frozenInputs)) throw new Error(`request.json: frozenInputs changed after attempt ${attempt.id} opened`);
@@ -99,10 +132,10 @@ function helperWriteErrors(state, request, requestFile) {
   if (state.lifecycle?.phase !== 'active' || state.status !== 'running') errors.push('helper request: owning session must be active and running');
   const binding = request.hostBinding ?? {};
   if (binding.starciSessionId !== state.id || binding.kind !== state.hostBinding?.kind || binding.hostId !== state.hostBinding?.hostId || normalizeResource(binding.worktree) !== normalizeResource(state.hostBinding?.worktree)) errors.push('helper request: hostBinding does not match the existing owning user session');
-  const runDir = path.join(path.resolve(binding.worktree ?? '.'), '.worktrees', 'helpers', request.helperId ?? '', 'runs', request.runId ?? '');
+  const runDir = path.join(path.resolve(state.workflowOwner?.ownerRoot ?? binding.worktree ?? '.'), '.worktrees', 'helpers', request.helperId ?? '', 'runs', request.runId ?? '');
   if (normalizeResource(requestFile) !== normalizeResource(path.join(runDir, 'request.json'))) errors.push(`helper request: request.json must be ${path.join(runDir, 'request.json')}`);
   if (normalizeResource(request.environment?.outputRoot ?? '.') !== normalizeResource(runDir)) errors.push('helper request: environment.outputRoot is not this helper run directory');
-  const supportRoot = normalizeResource(path.join(path.resolve(binding.worktree ?? '.'), '.worktrees'));
+  const supportRoot = normalizeResource(path.join(path.resolve(state.workflowOwner?.ownerRoot ?? binding.worktree ?? '.'), '.worktrees'));
   const insideSupport = (value) => { const normalized = normalizeResource(value); return normalized.startsWith(`${supportRoot}/`); };
   const ownerCovers = (owner, value) => { const normalizedOwner = normalizeResource(owner); const normalizedValue = normalizeResource(value); return normalizedValue === normalizedOwner || normalizedValue.startsWith(`${normalizedOwner}/`); };
   for (const item of request.environment?.writes ?? []) {
@@ -118,6 +151,8 @@ export async function acquireHelperSlot(session, requestFile, workerId) {
   session = path.resolve(session);
   requestFile = path.resolve(requestFile);
   return mutateSession(session, async (state) => {
+    const admission = workflowOwnerErrors(root, session, state, { dispatch: true });
+    if (admission.length) throw Error(admission.join('\n'));
     const before = await readFile(requestFile);
     let request;
     try { request = JSON.parse(before); } catch (error) { throw new Error(`helper request: ${error.message}`); }

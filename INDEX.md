@@ -1,4 +1,4 @@
-# StarCi Skills 2.2.0
+# StarCi Skills 2.3.0
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -30,8 +30,8 @@ Load operator-specific context. UI/Grammar work freezes the full applicable cano
 SKILL.md                 one entry, operators listed in operators/INDEX.md, one routing map
 routing.json             closed operator routes, seven kinds: operator | resume | chain | user | external | helper | bank (helper and bank are user entries, never stop destinations)
 alias/                   alias.json (machine registry: location, scheme, binding, writers, zone) + INDEX.md (generated map by zone); every operator reads by alias only
-resources/               settings.example.json (the person's settings: the display language, default vi; copy to settings.json to override, untracked) + tools.json (the closed tool registry: modes and per-runtime support, addressed as @tools/<id>) + agents/profiles/{openai,claude}.json (active reasoning/working profiles and retired receipt profiles, permits per tool) + orchestrator.json (dispatch modes inline | dispatch | isolated, max 3 agents, completion waits, the running skeleton, the brief, the budget, profile equivalents) + interaction.json (question kinds and report shapes); validated
-workflows/               README.md only: how scripts/plan-chain.mjs derives the chain from the mission's done-when lines and what scripts/validate-chain.mjs refuses; no example is read at runtime — the 2.0.0 examples live on as planner fixtures under scripts/fixtures/chains/
+resources/               settings.example.json (the person's settings: the display language, default vi; copy to settings.json to override, untracked) + tools.json (the closed tool registry: modes and per-runtime support, addressed as @tools/<id>) + agents/profiles/{openai,claude}.json (active reasoning/working profiles and retired receipt profiles, permits per tool) + orchestrator.json (user workflow topology policy above operator execution mode, max 3 same-session agents, completion waits, the running skeleton, the brief, the budget, profile equivalents) + interaction.json (question kinds and report shapes); validated
+workflows/               discovery.md: goal impact, delivery scope and project owner; README.md: how scripts/plan-chain.mjs derives the chain from the mission's done-when lines and what scripts/validate-chain.mjs refuses; no example is read at runtime — the 2.0.0 examples live on as planner fixtures under scripts/fixtures/chains/
 operators/INDEX.md       generated: what each operator reads, which kinds it consumes and produces, its steps, and every stop code with its disposition; operators/errors.json holds the codes several operators share
 operators/<id>/          operator.md (+vi) one authored file per operator, operator.json (id, domain, primaryOutput, resources incl. mode), errors.json (its own codes), validate.mjs, self-test.mjs, brief.md (generated: the dispatch prompt of one fresh agent, at most orchestrator.json#briefBytes)
 helpers/INDEX.md         generated: the support layer beside the operators — what each helper reads, where it may write, its steps and its stop codes
@@ -45,7 +45,7 @@ knowledge/
   grammars/<family>/     one visual family's realization of Common
 templates/               one template per document kind; each carries the json template-contract the tree is checked against;
                          kinds/ types every file that crosses between steps (<kind>.contract.json + <kind>.skeleton.md for markdown, <kind>.schema.json for data); step/ holds the request.json and response.json gates
-scripts/                 session-open.mjs (host-bound open/confirm), attempt-gate.mjs (freeze expected and accept actual), worker-slots.mjs (slot/lease ownership), session-cleanup.mjs (compact, hashed bundle, exact-session cleanup);
+scripts/                 session-open.mjs (host-bound open/confirm with user topology), workflow-topology.mjs (the executable topology selector and state gate), attempt-gate.mjs (freeze expected and accept actual), worker-slots.mjs (slot/lease ownership), session-cleanup.mjs (compact, hashed bundle, exact-session cleanup);
                          validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, plan-chain.mjs (the chain from the mission; imported slots count as produced), validate-chain.mjs (the chain against the tables, the plan and the requests), validate-walk.mjs (the walk gate and its sweep), browser-walk.mjs (@tools/browsercontrol mode playwright: the runner of a declarative walk), record-findings.mjs, promote-findings.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, validate-session.mjs (the whole ledger: brief, budget, abandoned branches, the chain), sweep-secrets.mjs (the one home of secret-shaped patterns, run by the response gate), merge-resolution.mjs (+ spec: the closed rule set a merge conflict is resolved under, shared by the serve and the publish, its rule names read from the delta kind), generate-operator-briefs.mjs, run-operator-self-tests.mjs (every package family: the operators and the helpers), validate-helper.mjs, generate-helpers-index.mjs, generate-helper-briefs.mjs, bank.mjs (+ spec: the queue, its hash and the next mission of a product’s bank);
                          unchecked.mjs and record-unchecked.mjs (+ spec), the unchecked ledger read and written;
                          device-state.mjs and workspace-portable.mjs (+ specs), which the backend package.json calls
@@ -53,7 +53,7 @@ readiness/               workspaces/ schemas that the portable and hydrated rout
 ```
 
 The unchecked ledger lives outside the tree, under its own alias `@worktrees/unchecked`
-(`<Source>/.worktrees/unchecked/<product>/<featureId>.jsonl`, one append-only line per entry against
+(`<Workflow>/.worktrees/unchecked/<product>/<featureId>.jsonl`, one append-only line per entry against
 `templates/kinds/unchecked.schema.json`; the older `@worktrees/debts` is a different concept and keeps
 its own home, the owner-approved gate debts `quality.verify` reads). A mission's verification covers
 the units its done-when journey passes through: the plan tiers every other unit `secondary` with its
@@ -62,7 +62,7 @@ writes it down instead — so a run narrows its coverage on record and the next 
 still unchecked (`scripts/unchecked.mjs`, `scripts/validate-session.mjs#uncheckedLedgerErrors`).
 
 The bank of missions lives outside the tree as well, under `@worktrees/banked`
-(`<Source>/.worktrees/banked/<product>/`: `queue.json` the order, `<missionId>/mission.json` and
+(`<Workflow>/.worktrees/banked/<product>/`: `queue.json` the order, `<missionId>/mission.json` and
 `mission.md` the content, `approvals.json` the person's one answer over the whole queue). It is what a
 helper drafts and the harness takes from: one approval counts as the goal-confirm of every mission the
 queue lists, one mission of a product runs at a time, `dependsOn` is waited for, and the approval's
@@ -90,6 +90,12 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.3.0 (2026-09-06): executable route/code impact discovery and exact scope authority, impact-derived handoff coverage with stage boundaries, and project-owned workflow evidence separated from shared runtime authority; legacy evidence migrates by verified copy with one active owner. See tests/evidence/20260906-goal-impact-workflow-owner.md.
+
+
+
+2.2.1 (2026-09-06): user demand selects `solo` for one independently owned workflow or `coordinated` for a coordinator tracking independent peer workflows through ordinary two-way task messages. The new read-only `workflow.verify` closes the portfolio through a normal matched local receipt: frozen peer assignments bind original goals, actual Git heads and complete validator-accepted evidence, with no message envelope or receipt import. The selector reads one policy home, drafts can follow corrected demand, host reuse includes host kind, legacy v2.2.0 states are read-only until migrated, and operator modes remain unchanged. Original operator law can replay retained proof without dispatching; archived compact references remain inside the archive namespace; schema-valued map entries are now actually validated. See tests/evidence/20260906-workflow-topologies-public.md for sanitized observations and tests/evidence/20260905-starci-2.2.1-workflow-topologies.md for local release evidence.
 
 2.2.0 (2026-09-05): user host sessions, confirmed goal-derived workflows, frozen expected/actual attempts, three isolated worker slots and verified compact retention become executable gates. Every operator/helper has a concrete procedure; UAT separates account and seed owners, UI/Grammar carries exhaustive knowledge and family evidence, and knowledge.repair closes the canonical repair loop. Active reasoning uses Sol/Fable and execution uses Sol/Opus. See tests/evidence/20260905-starci-2.2-release.md for validation and limits.
 

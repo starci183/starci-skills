@@ -1,12 +1,15 @@
 # Workflows
 
-There are no workflow files. A chain is never chosen from an example: it is derived from the
-mission, by `scripts/plan-chain.mjs`, from the operator tables alone, and it is checked by
+There are no fixed workflow chain files. A chain is never chosen from an example: it is derived from the
+mission, by `scripts/plan-chain.mjs`, from discovered delivery impacts and the operator tables, and it is checked by
 `scripts/validate-chain.mjs` every time it is drawn. The example chains this folder used to hold are
 planner fixtures now, under `scripts/fixtures/chains/`, and `scripts/plan-chain.spec.mjs` proves the planner
 still derives each of them from the outcome its mission names.
 
-## Executable v2.2 lifecycle
+User topology is selected above this chain by `resources/orchestrator.json#workflowTopologies`;
+this folder defines no second topology or peer semantics.
+
+## Executable workflow lifecycle
 
 The first prompt opens or reuses the host-bound draft with `scripts/session-open.mjs` before scope
 confirmation. Confirmation activates one version. The planner remains the only chain owner: it derives
@@ -139,3 +142,5 @@ failed and waiting ledgers stay in place for resume; user worktrees and branches
 ids, each with the mission whose done-when lines name its outcomes, the operator order it expects,
 and a note on how it was rewritten. They are inputs to the planner's spec, not to the runtime: the
 entry never reads them.
+
+Goal discovery, handoff scope and project workflow ownership follow [discovery.md](discovery.md).

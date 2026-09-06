@@ -140,3 +140,5 @@ On `done`, print **The best outcome** as the executable module table in `respons
 | --- | --- |
 | every operation has its module: each module is filled on its own branch by the generator under scope full, carrying its unit id | `backend.generate` |
 | an operation the contract carries is one the person may not want filled in this mission, so the person says whether it belongs | `user` |
+| the backend handoff is bounded and the same feature needs its surface map | `interface.plan` |
+| the backend handoff is bounded and its user journeys need a verification plan | `uat.plan` |

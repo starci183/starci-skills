@@ -1,4 +1,4 @@
-# StarCi Skills 2.2.0
+# StarCi Skills 2.3.0
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -29,8 +29,8 @@ Nạp context theo operator. Việc UI/Grammar khóa manifest canonical đầy �
 SKILL.md                 một cửa vào, operator được liệt kê ở operators/INDEX.md, một bảng định tuyến
 routing.json             route operator đóng, bảy loại: operator | resume | chain | user | external | helper | bank (helper và bank vào từ người dùng, không là đích của stop)
 alias/                   alias.json (sổ cho máy: vị trí, scheme, bind, ai ghi, vùng) + INDEX.md (bản đồ sinh theo vùng); operator chỉ đọc qua alias
-resources/               settings.example.json (cài đặt của người: ngôn ngữ hiển thị, mặc định vi; chép thành settings.json để đè, không track) + tools.json (sổ tool đóng: mode và hỗ trợ theo runtime, gọi bằng @tools/<id>) + agents/profiles/{openai,claude}.json (các profile reasoning/working và profile đọc receipt cũ, quyền theo tool) + orchestrator.json (chế độ dispatch inline | dispatch | isolated, tối đa 3 agent, chờ theo hoàn tất, khung running, brief, budget, profile tương đương) + interaction.json (loại câu hỏi và dạng báo cáo); có kiểm
-workflows/               chỉ còn README.md: cách scripts/plan-chain.mjs suy chuỗi từ các dòng "xong khi" của nhiệm vụ và scripts/validate-chain.mjs từ chối gì; runtime không đọc ví dụ nào — các ví dụ 2.0.0 sống tiếp làm fixture của planner trong scripts/fixtures/chains/
+resources/               settings.example.json (cài đặt của người: ngôn ngữ hiển thị, mặc định vi; chép thành settings.json để đè, không track) + tools.json (sổ tool đóng: mode và hỗ trợ theo runtime, gọi bằng @tools/<id>) + agents/profiles/{openai,claude}.json (các profile reasoning/working và profile đọc receipt cũ, quyền theo tool) + orchestrator.json (policy topology workflow người dùng nằm trên mode thực thi operator, tối đa 3 agent cùng session, chờ theo hoàn tất, khung running, brief, budget, profile tương đương) + interaction.json (loại câu hỏi và dạng báo cáo); có kiểm
+workflows/               discovery.md: impact, phạm vi bàn giao và owner dự án; README.md: cách scripts/plan-chain.mjs suy chuỗi từ các dòng "xong khi" của nhiệm vụ và scripts/validate-chain.mjs từ chối gì; runtime không đọc ví dụ nào — các ví dụ 2.0.0 sống tiếp làm fixture của planner trong scripts/fixtures/chains/
 operators/INDEX.md       sinh tự động: mỗi operator đọc gì, tiêu thụ và sinh kind nào, số bước, và mọi mã dừng kèm cách xử lý; operators/errors.json giữ mã dùng chung
 operators/<id>/          operator.md (+vi) một file viết tay cho mỗi operator, operator.json (id, domain, resources gồm mode), errors.json (mã riêng), validate.mjs, self-test.mjs, brief.md (sinh tự động: prompt dispatch cho một agent mới, tối đa orchestrator.json#briefBytes)
 helpers/INDEX.md         sinh tự động: tầng hỗ trợ bên cạnh các operator — mỗi helper đọc gì, được ghi ở đâu, các bước và mã dừng của nó
@@ -44,7 +44,7 @@ knowledge/
   grammars/<họ>/         cách một họ hình ảnh hiện thực Common
 templates/               mỗi loại tài liệu một template; mỗi template mang khối json template-contract dùng để kiểm cả cây;
                          kinds/ định kiểu mọi file đi qua giữa các bước (<kind>.contract.json + <kind>.skeleton.md cho markdown, <kind>.schema.json cho dữ liệu); step/ giữ hai gate request.json và response.json
-scripts/                 session-open.mjs (open/confirm gắn host), attempt-gate.mjs (khóa expected và nhận actual), worker-slots.mjs (cấp/thu slot và lease), session-cleanup.mjs (compact, bundle hash, dọn đúng session);
+scripts/                 session-open.mjs (open/confirm gắn host kèm topology người dùng), workflow-topology.mjs (bộ chọn topology và gate state thực thi), attempt-gate.mjs (khóa expected và nhận actual), worker-slots.mjs (cấp/thu slot và lease), session-cleanup.mjs (compact, bundle hash, dọn đúng session);
                          validate-routing.mjs, validate-resources.mjs, validate-knowledge-citations.mjs, validate-alias.mjs, validate-templates.mjs, validate-operator.mjs, plan-chain.mjs (chuỗi từ nhiệm vụ; slot import tính là đã sinh), validate-chain.mjs (chuỗi đối chiếu bảng, kế hoạch và request), validate-walk.mjs (cổng của lượt đi thử và sweep của nó), browser-walk.mjs (@tools/browsercontrol chế độ playwright: runner của một lượt đi khai báo), record-findings.mjs, promote-findings.mjs, validate-request.mjs, validate-response.mjs, validate-step.mjs, validate-session.mjs (cả sổ: brief, budget, nhánh bị bỏ rơi, chuỗi), sweep-secrets.mjs (nhà duy nhất của các mẫu hình dạng bí mật, gate response chạy), merge-resolution.mjs (+ spec: bộ luật đóng để giải một xung đột merge, dùng chung bởi lần serve và lần publish, tên luật đọc từ kind delta), generate-operator-briefs.mjs, run-operator-self-tests.mjs (mọi họ gói: operator và helper), validate-helper.mjs, generate-helpers-index.mjs, generate-helper-briefs.mjs, bank.mjs (+ spec: hàng đợi, hash của nó và nhiệm vụ kế tiếp của kho một sản phẩm);
                          unchecked.mjs và record-unchecked.mjs (+ spec), sổ chưa kiểm được đọc và được ghi;
                          device-state.mjs và workspace-portable.mjs (+ spec), thứ package.json của backend gọi tới
@@ -52,7 +52,7 @@ readiness/               các schema workspaces/ mà khai báo route portable v�
 ```
 
 Sổ chưa kiểm sống ngoài cây, dưới alias riêng của nó `@worktrees/unchecked`
-(`<Source>/.worktrees/unchecked/<product>/<featureId>.jsonl`, mỗi mục một dòng chỉ nối thêm, đối chiếu
+(`<Workflow>/.worktrees/unchecked/<product>/<featureId>.jsonl`, mỗi mục một dòng chỉ nối thêm, đối chiếu
 với `templates/kinds/unchecked.schema.json`; `@worktrees/debts` cũ là một khái niệm khác và giữ nhà
 riêng của mình, nơi các khoản nợ gate đã được chủ duyệt mà `quality.verify` đọc). Việc kiểm chứng của
 một nhiệm vụ phủ những đơn vị mà hành trình "xong khi" của nó đi qua: bản kế hoạch xếp mọi đơn vị còn
@@ -61,7 +61,7 @@ chứng, và `scripts/record-unchecked.mjs` ghi nó xuống thay vào đó — �
 của mình trên giấy trắng mực đen và bản kế hoạch kế tiếp đọc lại được thứ vẫn còn chưa kiểm
 (`scripts/unchecked.mjs`, `scripts/validate-session.mjs#uncheckedLedgerErrors`).
 
-Kho nhiệm vụ cũng nằm ngoài cây, dưới `@worktrees/banked` (`<Source>/.worktrees/banked/<product>/`:
+Kho nhiệm vụ cũng nằm ngoài cây, dưới `@worktrees/banked` (`<Workflow>/.worktrees/banked/<product>/`:
 `queue.json` là thứ tự, `<missionId>/mission.json` và `mission.md` là nội dung, `approvals.json` là câu
 trả lời duy nhất của người trên cả hàng đợi). Đó là thứ một helper phác ra và harness nhận việc từ đó:
 một phê duyệt tính là goal-confirm của mọi nhiệm vụ hàng đợi liệt kê, mỗi sản phẩm chỉ chạy một nhiệm
@@ -91,6 +91,10 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.3.0 (2026-09-06): khám phá route và code impact, xác nhận đúng hash phạm vi, kế hoạch bàn giao theo impact và stage thực thi, nơi lưu workflow thuộc dự án tách khỏi runtime chung; migration giữ nguyên bằng chứng cũ và đúng một owner hoạt động. Xem tests/evidence/20260906-goal-impact-workflow-owner.md.
+
+2.2.1 (2026-09-06): nhu cầu người dùng chọn `solo` cho một workflow sở hữu độc lập hoặc `coordinated` cho coordinator theo dõi các workflow peer bằng message hai chiều bình thường. Operator chỉ đọc mới `workflow.verify` nghiệm thu danh mục qua receipt local matched thông thường: phân công peer đã khóa gắn với goal gốc, Git head thật và toàn bộ bằng chứng đã qua validator, không có envelope message hay import receipt. Bộ chọn đọc một nơi policy, draft theo được nhu cầu đã sửa, dùng lại host gồm cả loại host, state v2.2.0 cũ chỉ đọc tới khi migrate, còn mode operator giữ nguyên. Luật operator gốc có thể kiểm lại bằng chứng lưu trữ mà không dispatch; compact reference nằm trong namespace archive; giá trị map có schema nay được kiểm thực sự. Xem tests/evidence/20260906-workflow-topologies-public.md cho quan sát đã lược định danh và tests/evidence/20260905-starci-2.2.1-workflow-topologies.md cho bằng chứng release local.
 
 2.2.0 (2026-09-05): session gắn với host của người dùng, workflow từ goal đã xác nhận, attempt khóa expected rồi đối chiếu actual, tối đa ba worker cô lập và đóng phiên bằng compact cùng bundle đã kiểm chứng. Mỗi operator/helper có quy trình cụ thể; UAT tách owner account và seed, UI/Grammar kiểm manifest knowledge và mindset family, knowledge.repair khép vòng sửa luật. Suy luận dùng Sol/Fable; thực thi dùng Sol/Opus. Mỗi operator khai The best outcome, hiển thị bằng chứng đã niêm phong theo contract và mode. Bằng chứng và giới hạn: tests/evidence/20260905-starci-2.2-release.md.
 

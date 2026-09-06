@@ -8,6 +8,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { settingsErrors } from './settings.mjs';
+import { workflowTopologyPolicyErrors } from './workflow-topology.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const errors = [];
@@ -16,6 +17,15 @@ const toolsDoc = JSON.parse(await readFile(path.join(root, 'resources', 'tools.j
 if (toolsDoc.schemaVersion !== 9) errors.push('resources/tools.json: schemaVersion must be 9');
 const TOOLS = toolsDoc.tools ?? {};
 const orchestrator = JSON.parse(await readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8'));
+errors.push(...workflowTopologyPolicyErrors(orchestrator.workflowTopologies));
+for (const source of orchestrator.workflowTopologies?.sources ?? []) {
+  const evidence = path.resolve(root, source);
+  if (!evidence.startsWith(`${path.join(root, 'tests', 'evidence')}${path.sep}`)) errors.push(`orchestrator.json: workflowTopologies source ${source} must resolve under tests/evidence`);
+  else {
+    try { await readFile(evidence, 'utf8'); }
+    catch { errors.push(`orchestrator.json: workflowTopologies source ${source} does not resolve`); }
+  }
+}
 // The three ways an operator runs (resources/orchestrator.json#modes): inline, the orchestrator itself;
 // dispatch, a new agent that inherits the orchestrator's transcript; isolated, a new agent with an empty
 // context that sees only what request.json names. The list is closed here because every gate that
@@ -23,6 +33,7 @@ const orchestrator = JSON.parse(await readFile(path.join(root, 'resources', 'orc
 const MODES = new Set(Object.keys(orchestrator.modes ?? {}));
 for (const mode of ['inline', 'dispatch', 'isolated']) if (!MODES.has(mode)) errors.push(`orchestrator.json: modes must declare ${mode}`);
 for (const mode of MODES) if (!['inline', 'dispatch', 'isolated'].includes(mode)) errors.push(`orchestrator.json: modes declares ${mode}, which no gate knows; the modes are inline, dispatch and isolated`);
+for (const topology of Object.keys(orchestrator.workflowTopologies?.modes ?? {})) if (MODES.has(topology)) errors.push(`orchestrator.json: workflow topology ${topology} collides with an operator execution mode`);
 if (orchestrator.dispatchModes !== undefined) errors.push('orchestrator.json: dispatchModes is retired; the three modes live under modes');
 const RUNTIMES = Object.keys(toolsDoc.runtimes ?? {});
 for (const [id, tool] of Object.entries(TOOLS)) {
@@ -108,6 +119,10 @@ for (const entry of await readdir(path.join(root, 'helpers'), { withFileTypes: t
   const profileId = helper.resources?.profile;
   if (!profiles[profileId]) errors.push(`helper ${helper.id}: unknown profile ${profileId}`);
   else if (profiles[profileId].retired === true) errors.push(`helper ${helper.id}: profile ${profileId} is retired; select an active support profile`);
+}
+
+for (const [name, mode] of Object.entries(orchestrator.workflowTopologies?.modes ?? {})) {
+  if (mode.completionOperator !== undefined && !operators.has(mode.completionOperator)) errors.push(`orchestrator.json: workflowTopologies.modes.${name}.completionOperator names an unknown operator`);
 }
 
 // resources/INDEX.md repeats the bindings: | Operator | Profile | Grammar | Tools | Mode | Why |. The

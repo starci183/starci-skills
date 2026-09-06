@@ -1,3 +1,4 @@
+import { workflowRootOf, readSessionState } from '../../scripts/workflow-root.mjs';
 // uat.plan's own law over one branch, on top of the shared step check: the Flows table and the unit
 // list are one list — every Flows row has a units.json entry with the same id and every entry has its
 // row; a unit of a UAT plan is a flow; the file names this operator as its producer; ids are unique and
@@ -84,7 +85,7 @@ export async function validateUatPlanStep(branchDir, root = ROOT, { uncheckedRoo
     // secondary one; a plan that simply drops it re-defers a journey nobody agreed to stop walking.
     const { product, featureId } = await ledgerKeyOf(branchDir);
     if (product && featureId) {
-      const open = await openUnchecked(uncheckedRoot ?? hostRootOf(root), product, featureId);
+      const open = await openUnchecked(uncheckedRoot ?? workflowRootOf(root, readSessionState(branchDir)?.state), product, featureId);
       errors.push(...planUncheckedErrors(open, units, laneOfPlan(OPERATOR), UNITS));
     }
     for (const id of byId.keys()) if (!flowIds.has(id)) errors.push(`${UNITS}: unit ${id} has no Flows row; a flow nobody can read in the plan is a flow nobody planned`);

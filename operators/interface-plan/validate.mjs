@@ -1,3 +1,4 @@
+import { workflowRootOf, readSessionState } from '../../scripts/workflow-root.mjs';
 // interface.plan's own law over one branch, on top of the shared step check: the Map and the unit list
 // are one list — every Map row has a units.json entry with the same id, kind and goal, and every entry
 // has its row; a unit of a surface map is a page or a modal; the file names this operator as its
@@ -84,7 +85,7 @@ export async function validateInterfacePlanStep(branchDir, root = ROOT, { unchec
     // by a secondary one; a plan that simply drops it re-defers coverage nobody agreed to drop again.
     const { product, featureId } = await ledgerKeyOf(branchDir);
     if (product && featureId) {
-      const open = await openUnchecked(uncheckedRoot ?? hostRootOf(root), product, featureId);
+      const open = await openUnchecked(uncheckedRoot ?? workflowRootOf(root, readSessionState(branchDir)?.state), product, featureId);
       errors.push(...planUncheckedErrors(open, units, laneOfPlan(OPERATOR), UNITS));
     }
     for (const id of byId.keys()) if (!mapIds.has(id)) errors.push(`${UNITS}: unit ${id} has no Map row; a unit nobody can read in the map is a unit nobody planned`);

@@ -1,3 +1,4 @@
+import { locateWorkflowSession, readSessionState, workflowRootOf } from './workflow-root.mjs';
 import { existsSync, lstatSync, realpathSync, readdirSync, readFileSync, mkdirSync, writeFileSync, renameSync, rmSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -26,9 +27,9 @@ function within(base,relative,{missing=false}={}){
 }
 function roots(hostRoot,sourceSessionId,targetSessionId,sourceStep,sourceParallel,targetStep,targetParallel){
   if(!ID.test(sourceSessionId)||!ID.test(targetSessionId)||sourceSessionId===targetSessionId||![sourceStep,sourceParallel,targetStep,targetParallel].every(positive))throw Error('import session IDs and coordinates must be strict and distinct');
-  const sessions=within(hostRoot,'.worktrees/sessions');
-  const archive=existsSync(path.join(sessions,sourceSessionId))?null:within(hostRoot,`.worktrees/done/${sourceSessionId}`);
-  const sourceSession=archive?within(archive,'bundle'):within(sessions,sourceSessionId),targetSession=within(sessions,targetSessionId);
+  const origin=locateWorkflowSession(hostRoot,sourceSessionId),destination=locateWorkflowSession(hostRoot,targetSessionId);
+  const archive=origin.archive;
+  const sourceSession=origin.session,targetSession=destination.session;
   const source=within(sourceSession,`step-${sourceStep}/parallel-${sourceParallel}`);
   const target=within(targetSession,`step-${targetStep}/parallel-${targetParallel}`,{missing:true});
   return {sourceSession,targetSession,source,target,archive};

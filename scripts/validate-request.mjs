@@ -1,3 +1,5 @@
+import { deliveryRequestErrors } from './mission-scope.mjs';
+import { legacyBranchOf, legacyMissionState } from './workflow-root.mjs';
 // The request half of one branch (step-N/parallel-M/request/request.json), checked before any agent
 // runs: the gate schema; the operator exists and is an operator.md package; every requirement key is
 // one the operator declares and every required one (Default —) has a value; every declared input is
@@ -21,6 +23,8 @@ import { evidenceManifestErrors } from './evidence-manifest.mjs';
 import { isJourney, journeyUnits, tierOf, verifiesUnits, laneOf } from './unchecked.mjs';
 import { normalizeResource, resourcesOverlap } from './resource-locks.mjs';
 import { currentRequestPhase } from './validation-phase.mjs';
+import { sessionWorkflowTopologyErrors } from './workflow-topology.mjs';
+import { resolvedWaitingReplanErrors } from './resolved-waiting.mjs';
 
 // Only a fully quoted cell is unquoted: a sentence that opens with a code span keeps its backticks.
 const unquote = (s) => { const t = String(s ?? '').trim(); return /^`[^`]*`$/.test(t) ? t.slice(1, -1) : t; };
@@ -230,7 +234,7 @@ export async function frozenInputErrors(dir, request) {
 // finding bytes under response/ is not a handoff: agents write those bytes before the acceptance
 // gate runs, and a dependent worker must not observe an unaccepted or subsequently changed draft.
 // Explicit producer imports keep their own compatibility gate and are deliberately excluded here.
-export async function localAcceptedInputErrors(sessionRoot, state, inputRef, kind) {
+export async function localAcceptedInputErrors(sessionRoot, state, inputRef, kind, consumerRequest = null) {
   const match = /^step-([1-9]\d*)\/parallel-([1-9]\d*)\/(?:([a-z][a-z-]*)\/)?response\/(.+)$/.exec(String(inputRef));
   if (!match || state?.contractVersion !== V22_CONTRACT) return [];
   const [, step, parallel, exchange, tail] = match;
@@ -239,12 +243,84 @@ export async function localAcceptedInputErrors(sessionRoot, state, inputRef, kin
   const key = `${step}/${parallel}${exchange ? `/${exchange}` : ''}`;
   const branch = path.join(topBranch, ...(exchange ? [exchange] : []));
   const attempt = state.attempts?.[key];
-  if (!attempt || attempt.status !== 'matched') return [`request.json: inputs.${kind} names local producer ${key}, whose attempt is ${attempt?.status ?? 'missing'}; a dependent worker waits for matched acceptance`];
   const expectedRequestRef = `step-${step}/parallel-${parallel}${exchange ? `/${exchange}` : ''}/request/request.json`;
   const expectedResponseRef = `step-${step}/parallel-${parallel}${exchange ? `/${exchange}` : ''}/response/response.json`;
+  const ownWaitingParent = Boolean(consumerRequest?.exchange)
+    && !exchange
+    && Number(step) === consumerRequest.step
+    && Number(parallel) === consumerRequest.parallel
+    && attempt?.status === 'waiting';
+  const resumedExchangeAttempt = consumerRequest?.exchange ? state.attempts?.[`${step}/${parallel}/${consumerRequest.exchange}`] : null;
+  const ownResumedParent = Boolean(consumerRequest?.exchange)
+    && !exchange
+    && Number(step) === consumerRequest.step
+    && Number(parallel) === consumerRequest.parallel
+    && attempt?.status === 'running'
+    && resumedExchangeAttempt?.status === 'matched';
+  // A nested request remains replayable after its parent truthfully seals a blocked response, but
+  // only as the exact already-accepted child of that parent. This is not an admission path for a new
+  // exchange: the child request hash, attempt identity and complete accepted evidence must all exist.
+  const ownTerminalBlockedParent = Boolean(consumerRequest?.exchange)
+    && !exchange
+    && Number(step) === consumerRequest.step
+    && Number(parallel) === consumerRequest.parallel
+    && attempt?.status === 'blocked'
+    && resumedExchangeAttempt?.status === 'matched';
+  const acceptedParentCheckpoint = ownWaitingParent || ownResumedParent || ownTerminalBlockedParent;
+  if (!attempt || (attempt.status !== 'matched' && !acceptedParentCheckpoint)) return [`request.json: inputs.${kind} names local producer ${key}, whose attempt is ${attempt?.status ?? 'missing'}; a dependent worker waits for matched acceptance`];
   const errors = [];
   if (attempt.requestRef !== expectedRequestRef || attempt.responseRef !== expectedResponseRef) errors.push(`request.json: inputs.${kind} producer ${key} is not linked to its accepted request/response refs`);
-  for (const error of await evidenceManifestErrors(branch, attempt.evidenceManifest)) errors.push(`request.json: inputs.${kind} producer ${key} ${error}`);
+  if (attempt.status === 'matched' || ownWaitingParent || ownTerminalBlockedParent) {
+    for (const error of await evidenceManifestErrors(branch, attempt.evidenceManifest)) errors.push(`request.json: inputs.${kind} producer ${key} ${error}`);
+  } else {
+    const manifest = attempt.evidenceManifest;
+    const manifestFingerprint = manifest?.version === 1 && Array.isArray(manifest.files)
+      ? `sha256:${createHash('sha256').update(Buffer.from(JSON.stringify({ version: 1, files: manifest.files }))).digest('hex')}`
+      : null;
+    const responseEntry = manifest?.files?.find((item) => item.ref === 'response/response.json');
+    if (!manifest || manifest.responseHash !== responseEntry?.sha256 || manifest.fingerprint !== manifestFingerprint) errors.push(`request.json: inputs.${kind} producer ${key} has no intact accepted waiting checkpoint`);
+    const exchangeBranch = path.join(topBranch, consumerRequest.exchange);
+    for (const error of await evidenceManifestErrors(exchangeBranch, resumedExchangeAttempt?.evidenceManifest)) errors.push(`request.json: inputs.${kind} accepted exchange ${key}/${consumerRequest.exchange} ${error}`);
+  }
+  if (ownTerminalBlockedParent) {
+    const exchangeKey = `${step}/${parallel}/${consumerRequest.exchange}`;
+    const exchangeBranch = path.join(topBranch, consumerRequest.exchange);
+    const expectedExchangeRequestRef = `step-${step}/parallel-${parallel}/${consumerRequest.exchange}/request/request.json`;
+    const expectedExchangeResponseRef = `step-${step}/parallel-${parallel}/${consumerRequest.exchange}/response/response.json`;
+    let exchangeRequest;
+    let exchangeResponse;
+    let exchangeRequestHash = null;
+    try {
+      const bytes = await readFile(path.join(exchangeBranch, 'request', 'request.json'));
+      exchangeRequestHash = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+      exchangeRequest = JSON.parse(bytes.toString('utf8'));
+    } catch {}
+    try { exchangeResponse = JSON.parse(await readFile(path.join(exchangeBranch, 'response', 'response.json'), 'utf8')); } catch {}
+    if (resumedExchangeAttempt.id !== consumerRequest.attempt?.id
+      || resumedExchangeAttempt.operatorId !== consumerRequest.operatorId
+      || resumedExchangeAttempt.expectedVersion !== consumerRequest.expected?.version
+      || resumedExchangeAttempt.requestRef !== expectedExchangeRequestRef
+      || resumedExchangeAttempt.responseRef !== expectedExchangeResponseRef
+      || state.requestHashes?.[exchangeKey] !== exchangeRequestHash
+      || canonicalJson(exchangeRequest) !== canonicalJson(consumerRequest)) {
+      errors.push(`request.json: inputs.${kind} accepted exchange ${exchangeKey} is not the exact frozen attempt consuming this parent`);
+    }
+    if (!resumedExchangeAttempt.endedAt
+      || canonicalJson(resumedExchangeAttempt.comparison) !== canonicalJson(exchangeResponse?.comparison)
+      || exchangeResponse?.contractVersion !== V22_CONTRACT
+      || exchangeResponse?.operatorId !== resumedExchangeAttempt.operatorId
+      || exchangeResponse?.step !== Number(step)
+      || exchangeResponse?.parallel !== Number(parallel)
+      || exchangeResponse?.exchange !== consumerRequest.exchange
+      || exchangeResponse?.status !== 'done'
+      || exchangeResponse?.attempt?.id !== resumedExchangeAttempt.id
+      || exchangeResponse?.attempt?.expectedVersion !== resumedExchangeAttempt.expectedVersion
+      || exchangeResponse?.comparison?.verdict !== 'matched'
+      || exchangeResponse?.comparison?.next !== 'advance') {
+      errors.push(`request.json: inputs.${kind} accepted exchange ${exchangeKey} is not the matched response accepted for attempt ${resumedExchangeAttempt.id}`);
+    }
+    for (const error of await evidenceManifestErrors(exchangeBranch, resumedExchangeAttempt.evidenceManifest)) errors.push(`request.json: inputs.${kind} accepted exchange ${exchangeKey} ${error}`);
+  }
   let producerRequest;
   let producerResponse;
   try { producerRequest = JSON.parse(await readFile(path.join(branch, 'request', 'request.json'), 'utf8')); }
@@ -258,13 +334,23 @@ export async function localAcceptedInputErrors(sessionRoot, state, inputRef, kin
   }
   if (producerResponse) {
     const expectedAttemptId = attempt.id;
-    if (!attempt.endedAt || canonicalJson(attempt.comparison) !== canonicalJson(producerResponse.comparison) || producerResponse.contractVersion !== V22_CONTRACT || producerResponse.status !== 'done' || producerResponse.operatorId !== attempt.operatorId || producerResponse.attempt?.id !== expectedAttemptId || producerResponse.attempt?.expectedVersion !== attempt.expectedVersion || producerResponse.comparison?.verdict !== 'matched' || producerResponse.comparison?.next !== 'advance') errors.push(`request.json: inputs.${kind} producer ${key} is not the matched response accepted for attempt ${expectedAttemptId}`);
+    if (attempt.status === 'matched') {
+      if (!attempt.endedAt || canonicalJson(attempt.comparison) !== canonicalJson(producerResponse.comparison) || producerResponse.contractVersion !== V22_CONTRACT || producerResponse.status !== 'done' || producerResponse.operatorId !== attempt.operatorId || producerResponse.attempt?.id !== expectedAttemptId || producerResponse.attempt?.expectedVersion !== attempt.expectedVersion || producerResponse.comparison?.verdict !== 'matched' || producerResponse.comparison?.next !== 'advance') errors.push(`request.json: inputs.${kind} producer ${key} is not the matched response accepted for attempt ${expectedAttemptId}`);
+    } else {
+      if (!attempt.endedAt || producerResponse.contractVersion !== V22_CONTRACT || producerResponse.operatorId !== attempt.operatorId || producerResponse.attempt?.id !== expectedAttemptId || producerResponse.attempt?.expectedVersion !== attempt.expectedVersion) errors.push(`request.json: inputs.${kind} producer ${key} is not linked to its accepted waiting checkpoint for attempt ${expectedAttemptId}`);
+      if (ownWaitingParent && (producerResponse.status !== 'waiting' || producerResponse.awaiting?.exchange !== consumerRequest.exchange)) errors.push(`request.json: inputs.${kind} producer ${key} is not waiting on its ${consumerRequest.exchange} exchange`);
+      if (ownTerminalBlockedParent && (producerResponse.status !== 'blocked' || canonicalJson(attempt.comparison) !== canonicalJson(producerResponse.comparison))) errors.push(`request.json: inputs.${kind} producer ${key} is not the blocked response accepted for attempt ${expectedAttemptId}`);
+      const wantedEntry = attempt.evidenceManifest?.files?.find((item) => item.ref === `response/${tail}`);
+      let actualInputHash = null;
+      try { actualInputHash = `sha256:${createHash('sha256').update(await readFile(path.join(branch, 'response', tail))).digest('hex')}`; } catch {}
+      if (!wantedEntry || wantedEntry.sha256 !== actualInputHash) errors.push(`request.json: inputs.${kind} producer ${key} changed response/${tail} after its accepted waiting checkpoint`);
+    }
     const declared = producerResponse.fields?.[kind];
     const refs = Array.isArray(declared) ? declared : [declared];
     const wanted = `response/${tail}`;
     if (!refs.includes(wanted)) errors.push(`request.json: inputs.${kind} = ${inputRef} is not emitted by producer ${key} as fields.${kind}`);
   }
-  for (const error of await evidenceManifestErrors(branch, attempt.evidenceManifest)) if (!errors.some((item) => item.endsWith(error))) errors.push(`request.json: inputs.${kind} producer ${key} ${error}`);
+  if (attempt.status === 'matched' || ownWaitingParent || ownTerminalBlockedParent) for (const error of await evidenceManifestErrors(branch, attempt.evidenceManifest)) if (!errors.some((item) => item.endsWith(error))) errors.push(`request.json: inputs.${kind} producer ${key} ${error}`);
   return errors;
 }
 
@@ -325,13 +411,14 @@ export function expectedNotWeakenedErrors(previous, current, at = 'request.json'
   return errors;
 }
 
-export function v22RequestErrors(state, request, pkg, dir = null) {
+export function v22RequestErrors(state, request, pkg, dir = null, phase = currentRequestPhase()) {
   const errors = [];
   const stateV22 = state?.contractVersion === V22_CONTRACT;
   const requestV22 = request?.contractVersion === V22_CONTRACT;
   if (stateV22 && !requestV22) errors.push(`request.json: contractVersion ${V22_CONTRACT} is required by this v2.2 session; legacy compatibility is not an execution bypass`);
   if (requestV22 && !stateV22) errors.push(`request.json: a v2.2 attempt cannot run under a legacy or unmarked state.json`);
   if (!stateV22 || !requestV22) return errors;
+  if (phase !== 'accept') errors.push(...deliveryRequestErrors(state, request));
   if (request.sessionId !== state.id) errors.push(`request.json: sessionId ${request.sessionId} does not match the owning session ${state.id}`);
   if (state.lifecycle?.phase !== 'active') errors.push(`state.json: lifecycle.phase is ${state.lifecycle?.phase ?? 'missing'}; only an active, confirmed user session dispatches attempts`);
   if (state.mission?.confirmation?.status !== 'confirmed') errors.push(`state.json: mission version ${state.mission?.version ?? 'missing'} is not explicitly confirmed`);
@@ -344,7 +431,8 @@ export function v22RequestErrors(state, request, pkg, dir = null) {
   if (dir && request.environment?.outputRoot) {
     const output = path.resolve(dir, request.environment.outputRoot);
     const owned = path.resolve(dir, 'response');
-    if (output !== owned) errors.push(`request.json: environment.outputRoot resolves to ${output}; an attempt owns only ${owned}`);
+    const legacy = phase === 'accept' ? legacyBranchOf(state, dir, request) : null;
+    if (output !== owned && (!legacy || output !== path.resolve(legacy, 'response'))) errors.push(`request.json: environment.outputRoot resolves to ${output}; an attempt owns only ${owned}`);
   }
   if (request.environment?.workspace?.worktree && !path.isAbsolute(request.environment.workspace.worktree)) errors.push(`request.json: environment.workspace.worktree is not absolute; isolation names the exact worktree`);
   const writes = request.environment?.writes ?? [];
@@ -623,13 +711,22 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   // The orchestrator hashes every request into state.json; a request that changed since is tampering.
   if (sessionRoot && existsSync(path.join(sessionRoot, 'state.json'))) {
     try {
-      const state = JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8'));
+      let state = JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8'));
+      if (phase === 'accept' && state.upgrade) state = legacyMissionState(state, dir, request);
       recordedChoices = state.choices ?? {};
       errors.push(...validateAgainst(JSON.parse(await readFile(path.join(root, 'templates', 'step', 'state.schema.json'), 'utf8')), state, 'state.json'));
-      errors.push(...v22RequestErrors(state, request, pkg, dir));
+      const topologyPolicy = JSON.parse(await readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8')).workflowTopologies;
+      errors.push(...sessionWorkflowTopologyErrors(topologyPolicy, state, { dispatch: request.contractVersion === V22_CONTRACT }));
+      if (request.operatorId === 'workflow.verify') {
+        const { workflowPeerSnapshotErrors } = await import('./workflow-verification.mjs');
+        errors.push(...workflowPeerSnapshotErrors(root, dir, request, state));
+      }
+      errors.push(...v22RequestErrors(state, request, pkg, dir, phase));
       errors.push(...await attemptProgressErrors(sessionRoot, state, request));
-      if (request.contractVersion === V22_CONTRACT) for (const [kind, inputRef] of Object.entries(request.inputs ?? {})) errors.push(...await localAcceptedInputErrors(sessionRoot, state, inputRef, kind));
+      if (request.contractVersion === V22_CONTRACT) for (const [kind, inputRef] of Object.entries(request.inputs ?? {})) errors.push(...await localAcceptedInputErrors(sessionRoot, state, inputRef, kind, request));
       // A resume re-enters the same operator and names a branch state.json knows; a re-entry state.json does not record is unrecorded evidence.
+      const previousAttempt = Object.values(state.attempts ?? {}).find((attempt) => attempt.id === request.attempt?.previous);
+      if (previousAttempt?.status === 'waiting' && !request.resume) errors.push(`request.json: successor ${request.attempt?.id} names waiting attempt ${previousAttempt.id} but carries no resume binding`);
       if (request.resume) {
         const target = `${request.resume.step}/${request.resume.parallel}`;
         if (state.steps?.[target] === undefined) errors.push(`request.json: resume names ${target}, which state.json does not record`);
@@ -637,6 +734,9 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
         const mine = `${request.step}/${request.parallel}`;
         if (state.resumes && !state.resumes[mine]) errors.push(`request.json: state.json records no resumes[${mine}] for this re-entry`);
         else if (state.resumes?.[mine] && state.resumes[mine].resumes !== target) errors.push(`request.json: state.json resumes[${mine}] names ${state.resumes[mine].resumes}, the request names ${target}`);
+        const targetAttempt = state.attempts?.[target];
+        if (targetAttempt?.status === 'waiting') errors.push(...await resolvedWaitingReplanErrors(root, sessionRoot, state, request));
+        else if (targetAttempt && targetAttempt.status !== 'blocked') errors.push(`request.json: resume target ${target} is ${targetAttempt.status}; only a blocked attempt or an accepted waiting parent resolved by its terminal review may re-enter`);
       }
       // From the first transition on, the session carries the orchestrator's brief and its budget, and a
       // request past a cap is refused unless a recorded user choice of continue extended it.

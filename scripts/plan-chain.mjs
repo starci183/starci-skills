@@ -1,3 +1,5 @@
+import { deliveryTargets, deliveryPolicy, scopeErrors, frozenScopeErrors } from './mission-scope.mjs';
+import { workflowOwnerErrors } from './workflow-root.mjs';
 // The chain is derived from the goal, never chosen from an example. planChain starts from the
 // operators the mission's done-when lines name (state.json.mission.doneWhen[i].producedBy) and walks
 // backwards through the operator tables scripts/validate-chain.mjs reads: a required Input pulls in
@@ -38,6 +40,7 @@ const byKey = (a, b) => a.localeCompare(b);
 const RUNTIME_OPERATORS = new Set(['runtime.serve', 'interface.audit', 'uat.verify']);
 
 export function planChain({ packages, mission, options = {} }) {
+  if (mission?.discovery) { const invalid = scopeErrors(mission, { complete: true }); if (invalid.length) throw new PlanError(invalid); }
   const graph = options.graph ?? operatorGraph(packages, options.aliases ?? {});
   const maxParallel = options.maxParallel ?? 3;
   const presetsOf = (id) => ({ ...(options.requirements?.[id] ?? {}) });
@@ -104,6 +107,7 @@ export function planChain({ packages, mission, options = {} }) {
   });
   if (errors.length) throw new PlanError(errors);
 
+  for (const id of deliveryTargets(mission)) if (!inChain(id).length) add(id, id, {}, `required by the frozen impact-derived delivery lane`);
   // 2. Closure: every node's required inputs, context roles and plan sibling, until nothing is added.
   const resolved = new Set();
   const producerFor = (consumer, input) => {
@@ -198,6 +202,15 @@ export function planChain({ packages, mission, options = {} }) {
   }
   if (errors.length) throw new PlanError(errors);
   // 6. Soft edges: an optional input orders its consumer after an in-chain producer, unless that closes a cycle.
+  if (mission.discovery) {
+    const policy = deliveryPolicy(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
+    const mode = mission.discovery.stage === 'handoff' ? 'plan' : 'execute';
+    for (const [laneId, lane] of Object.entries(mission.discovery.lanes)) if (lane.status === 'planned') {
+      for (const operator of policy.lanes[laneId][mode]) for (const consumer of inChain(operator)) {
+        for (const dependency of lane.dependsOn ?? []) for (const producer of policy.lanes[dependency][mode].flatMap(inChain)) depend(nodes.get(consumer), producer);
+      }
+    }
+  }
   const reaches = (from, to, edges) => { const seen = new Set(); const stack = [from]; while (stack.length) { const k = stack.pop(); if (k === to) return true; if (seen.has(k)) continue; seen.add(k); for (const d of edges.get(k) ?? []) stack.push(d); } return false; };
   const edges = new Map([...nodes.values()].map((n) => [n.key, new Set(n.deps)]));
   const sorted = [...nodes.values()].sort((a, b) => byKey(a.key, b.key));
@@ -304,6 +317,10 @@ export function previewChain(plan, mission) {
     out.push(`[${c} ${op}] ${extras.join(' · ')} · dependencies: ${dependencies} · request: ${requestRef} (pending expected.criteria and environment isolationId/mode/workspace/reads/writes/exclusive/outputRoot; freeze before dispatch)`);
     for (const [kind, from] of Object.entries(plan.imports?.[c] ?? {})) out.push(`[${c} ${op}] ${kind} imported from ${from.sourceSessionId} step ${from.sourceStep} (${from.input})`);
   }
+  if (mission?.discovery) {
+    out.push(`delivery stage: ${mission.discovery.stage}`);
+    for (const [lane, detail] of Object.entries(mission.discovery.lanes)) out.push(`handoff ${lane}: ${detail.status} · ${detail.reason} · owner: ${detail.owner ?? 'n/a'} · inputs: ${(detail.inputs ?? []).join('; ')} · outputs: ${(detail.outputs ?? []).join('; ')} · verification: ${(detail.verification ?? []).join('; ')} · depends on: ${(detail.dependsOn ?? []).join(', ')}`);
+  }
   out.push(`ends: ${plan.ends}`);
   return out.join('\n');
 }
@@ -312,6 +329,8 @@ export function planningStateErrors(state) {
   if (state?.contractVersion !== V22_CONTRACT) return [];
   const errors = [];
   if (state.lifecycle?.phase !== 'active') errors.push(`state.json: lifecycle.phase is ${state.lifecycle?.phase ?? 'missing'}; ${V22_CONTRACT} planning requires an active, confirmed session`);
+  if (state.runtimeRevision !== 3) errors.push('WORKFLOW_UPGRADE_REQUIRED: legacy evidence may be read; upgrade owner and scope before planning new work');
+  errors.push(...frozenScopeErrors(state));
   const mission = state.mission;
   if (!mission) {
     errors.push(`state.json: ${V22_CONTRACT} planning requires the confirmed mission`);
@@ -330,6 +349,7 @@ export async function planSession(root, session, flags = {}) {
   const state = JSON.parse(await readFile(path.join(session, 'state.json'), 'utf8'));
   if (!state.mission) throw new PlanError(['state.json carries no mission; the chain is planned from mission.doneWhen']);
   const stateErrors = planningStateErrors(state);
+  if (state.runtimeRevision === 3) stateErrors.push(...workflowOwnerErrors(root, session, state, { dispatch: true }));
   if (stateErrors.length) throw new PlanError(stateErrors);
   const packages = await loadOperatorPackages(root);
   const graph = await loadOperatorGraph(root, packages);

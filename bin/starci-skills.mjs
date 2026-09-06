@@ -22,11 +22,14 @@ const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
 
 // What an installed tree is made of. Only these paths are copied, hashed and updated; anything else
-// a person adds beside them (a tests/ folder, notes) is theirs and is never touched.
+// a person adds beside them (other tests, notes) is theirs and is never touched. Public evidence
+// explicitly allowlisted by package.json is copied file-by-file, never as the whole tests tree.
+const publicEvidence = (pkg.files ?? []).filter(ref => /^tests\/evidence\/[A-Za-z0-9._-]+\.md$/.test(ref));
 export const PAYLOAD = [
   'UPDATE.md', 'UPDATE.vi.md',
   'INDEX.md', 'INDEX.vi.md', 'SKILL.md', 'SKILL.vi.md', 'routing.json',
   'alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'workflows',
+  ...publicEvidence,
 ];
 const MANIFEST = '.starci-skills.json';
 const SESSIONS_IGNORE = '.worktrees/sessions/';

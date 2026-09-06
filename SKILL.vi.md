@@ -10,12 +10,15 @@ Trước khi đặt câu hỏi, áp dụng [chính sách tương tác](resources
 Điều này chỉ thay đổi giao tiếp: mọi chuyển bước định tuyến, ranh giới operator và thẩm quyền bắt
 buộc bên dưới vẫn giữ nguyên. Cột Ask hay reason chẩn đoán không phải câu hỏi tự động đem chuyển.
 
-Mỗi prompt người dùng trước hết chạy `scripts/session-open.mjs open`: tạo hoặc dùng lại đúng một
+Trước `session-open`, đọc và áp dụng `resources/orchestrator.json#workflowTopologies`; truyền mode đã
+chọn vào draft tại `topology.mode`. Không chép bộ từ vựng, ngưỡng hay luật peer của nó vào entry này.
+
+Mỗi task native sở hữu workflow trước hết chạy `scripts/session-open.mjs open`: tạo hoặc dùng lại đúng một
 ledger StarCi đã bind với task Codex hay session Claude gốc và worktree người dùng. Việc này xảy ra
 trước xác nhận scope, plan, dispatch, design hay mutation. Agent, helper, exchange lồng nhau và retry
 bind về host session đó; không mục nào tạo thêm một user session.
 
-Trong v2.2, draft scope được trình bằng bảng Goal, Target, Trong scope, Ngoài scope, Đầu ra, Đạt khi,
+Trong v2.3, draft scope được trình bằng bảng Goal, Target, Trong scope, Ngoài scope, Đầu ra, Đạt khi,
 Phạm vi kiểm và Ví dụ. Prompt đã nêu rõ và cấp quyền đúng bảng đó được ghi làm `as-stated`, không hỏi
 lặp thường lệ. Sửa tạo version kế tiếp; từ chối hoặc im lặng giữ draft và chặn dispatch. Trước mỗi
 invocation, `attempt-gate open` đóng băng expected, input sidecar và environment; `worker-slots`
@@ -31,11 +34,11 @@ hiệu close-success riêng mới compact và kiểm bundle dưới
 `@worktrees/done` rồi xóa đúng folder session tạm; publish không đóng session, không xóa worktree hay
 branch người dùng.
 
-1. Đóng băng một phạm vi nhiệm vụ: đơn vị, đích, phần bao gồm và phần loại trừ, các gốc được ghi,
+1. Áp dụng [khám phá mục tiêu](workflows/discovery.md): repo và route thực tế, ownership code tổng quát, mọi lane bàn giao áp dụng, kiểm chứng, nơi giao và stage thực thi. Gate yêu cầu hash phạm vi đã hiển thị và nguồn ủy quyền được giữ lại. Đóng băng một phạm vi nhiệm vụ: đơn vị, đích, phần bao gồm và phần loại trừ, các gốc được ghi,
    hiệu ứng ra bên ngoài, và thứ sẽ được tính là bằng chứng. Hai cách đọc làm đổi bất kỳ điểm nào
    trong số đó là một câu hỏi tập trung, không phải một phỏng đoán. Đóng băng không diễn ra trong im
-   lặng: với nhiệm vụ sẽ ghi source đã route hay chạm tới một runtime, phạm vi đã đóng băng được in
-   cho người thành một khối tối đa năm dòng bằng ngôn ngữ hiển thị (`resources/settings.json#language`
+   lặng: với nhiệm vụ sẽ ghi source đã route hay chạm tới một runtime, phạm vi cùng hợp đồng discovery đầy đủ được in
+   cho người thành một bảng có thể xem xét bằng ngôn ngữ hiển thị (`resources/settings.json#language`
    đè lên `settings.example.json`, mặc định `vi`; người viết bằng ngôn ngữ khác thì được trả lời bằng
    ngôn ngữ đó) — mục tiêu, cái gì trong và cái gì ngoài, các dòng "xong khi", việc kiểm chứng với
    tới đâu, một câu hỏi — và được xác nhận một lần qua lựa chọn `goal-confirm` trước bước 2. Dòng
@@ -83,7 +86,7 @@ branch người dùng.
    `request.json` đã hợp lệ — không bao giờ là một câu hỏi đặt ra cho người, hỏi có nên mở phiên hay
    nên làm cái nào trong số đó, vì cây đã trả lời sẵn cả hai, và không bao giờ là việc làm sau khi đã
    ghi lần đầu. Trước khi bất kỳ file nào ngoài thư mục phiên bị đọc để sửa, và trước khi bất kỳ file
-   nào ngoài thư mục phiên bị ghi, `<Source>/.worktrees/sessions/<sessionId>/state.json` và
+   nào ngoài thư mục phiên bị ghi, `<Workflow>/.worktrees/sessions/<sessionId>/state.json` và
    `step-1/parallel-1/request/request.json` đã có trên đĩa và `scripts/validate-request.mjs` xanh
    trên nhánh đó. Một agent phát hiện mình đang sửa hay công bố nguồn được route mà không có
    `step-N/parallel-M` nào dưới một phiên thì dừng và báo `SESSION_MISSING`. Cách sửa của nó là cố
@@ -100,13 +103,14 @@ branch người dùng.
    `resources`, với đúng những quyền nó liệt kê. Một operator không có model khác, không thừa hưởng lượt nào,
    và không có quyền nào mà assignment bỏ sót.
 
-Bằng chứng giữa các phiên dùng scripts/producer-import.mjs. Chép bundle request/response của producer đã hoàn tất vào tọa độ step-N/parallel-M chưa dùng của phiên nhận, giữ nguyên từng byte và metadata session/step gốc. import.json bind tọa độ nguồn, đích và digest từng file. Gate input kiểm request gốc đã đóng băng, output hoàn tất đã khai, byte nguồn và bản chép; slot nhập chỉ là bằng chứng, không được đưa vào chain, steps, request hashes hay lease của phiên nhận. Dùng đường input step-N/parallel-M/response thông thường. Không chạy lại operator và không nhập quyền ghi source. Các kind mà một slot nhập khai được tính là đã sinh đối với chuỗi, cả trong plan lẫn ở gate (`workflows/README.md`, Chuỗi được suy ra thế nào).
+Một output producer có kiểu được session StarCi khác dùng làm input thì dùng scripts/producer-import.mjs. Message task coordinated bình thường và tham chiếu bằng chứng không phải input operator có kiểu nên không cần import. Khi operator thật sự tiêu thụ output, chép bundle request/response của producer đã hoàn tất vào tọa độ step-N/parallel-M chưa dùng của phiên nhận, giữ nguyên từng byte và metadata session/step gốc. import.json bind tọa độ nguồn, đích và digest từng file. Gate input kiểm request gốc đã đóng băng, output hoàn tất đã khai, byte nguồn và bản chép; slot nhập chỉ là bằng chứng, không được đưa vào chain, steps, request hashes hay lease của phiên nhận. Dùng đường input step-N/parallel-M/response thông thường. Không chạy lại operator và không nhập quyền ghi source. Các kind mà một slot nhập khai được tính là đã sinh đối với chuỗi, cả trong plan lẫn ở gate (`workflows/README.md`, Chuỗi được suy ra thế nào).
 
 ## Cửa vào
 
 | Yêu cầu nói về | Operator đầu tiên |
 | --- | --- |
 | Máy này, route, danh tính, runtime và phê duyệt của nó đã sẵn sàng cho nhiệm vụ chưa | `environment.preflight` |
+| Mọi outcome peer đã đóng băng có chống đỡ kết luận của một portfolio coordinated không | `workflow.verify` |
 | Dự án nào, checkout nào, hay binding runtime nào | `workspace.bind` |
 | Sản phẩm hứa gì, ai được hưởng, hỏng thì ra sao | `business.decide` |
 | Ranh giới hệ thống, quyền sở hữu dữ liệu, hay tech stack | `architecture.decide` |
@@ -204,7 +208,7 @@ Phiên chạy dưới một budget (`state.json.budget`, lấy từ `resources/o
 số bậc và trần cùng-operator. Request nào vượt một trong hai là `BUDGET_EXHAUSTED`, và người trả lời
 một `budget-choice` có kiểu — thu hẹp, tiếp tục, dừng — được ghi vào `state.json.choices`; tiếp tục
 nới trần có ghi nhận. Trí nhớ của chính orchestrator là `state.json.brief` — đã chứng minh gì, đang
-kẹt ở đâu và chờ ai, tiếp theo là gì, phiên anh em nào giữ head nào, và bản báo cáo cuối người đã
+kẹt ở đâu và chờ ai, tiếp theo là gì, task hay phiên anh em nào giữ head nào, và bản báo cáo cuối người đã
 nhận — viết lại sau mỗi chuyển bước và đọc lại sau mỗi lần nén ngữ cảnh; không file ghi chú nào bên
 cạnh được công nhận. `scripts/validate-session.mjs` kiểm cả sổ sau mỗi chuyển bước.
 
@@ -233,7 +237,7 @@ người và dừng với `RESTATEMENT_UNCONFIRMED` cho tới khi người chọ
 một lựa chọn `restatement-confirm`; cách đọc đã sửa đến dưới dạng yêu cầu đã sửa và cùng nhánh đó
 chạy lại. Mỗi lượt orchestrator kết thúc với người là một trong các dạng báo cáo mà
 `resources/interaction.json` khai — đã giao, đang chờ anh quyết, đang làm — bằng ngôn ngữ của người;
-bàn giao cho phiên anh em là một nhánh `waiting` có điều kiện đánh thức, không bao giờ là kết thúc
+bàn giao cho task hay phiên anh em là một nhánh `waiting` có điều kiện đánh thức, không bao giờ là kết thúc
 lượt.
 
 ## Thẩm quyền
@@ -274,6 +278,11 @@ operator.
 
 ## Điều phối
 
+Topology người dùng đã chọn nằm phía trên mode thực thi của operator. Thực thi trực tiếp bản ghi đã
+chọn trong `resources/orchestrator.json#workflowTopologies`; chỉ bản ghi đó định nghĩa quyền sở hữu,
+giới hạn peer, giao tiếp, theo dõi và hoàn tất, còn `scripts/workflow-topology.mjs` thi hành ranh giới
+state của nó. Entry này không phát biểu lại các luật ấy.
+
 Một lần gọi một operator là một lần chạy, theo chế độ mà `operator.json` khai dưới `resources.mode`
 (`resources/orchestrator.json#modes`): `inline`, orchestrator tự thực hiện các bước của operator ngay
 trong chat như một checklist dưới chính validator của operator đó (bind route, chạy gate, công bố);
@@ -293,3 +302,5 @@ orchestrator tạo cho nhánh đang `waiting`. Mọi file agent ghi dưới `res
 giá trị hình dạng bí mật (`scripts/sweep-secrets.mjs`) trước khi nhánh được định tuyến. `alias/alias.json` là nơi duy nhất một alias phân giải ra vị
 trí, và `alias/INDEX.md` là bản đồ đọc được của nó theo vùng (workspaces, grammar, knowledge, worktrees,
 remote, dynamic); operator chỉ đọc những gì bảng Context của nó gọi tên.
+
+Hợp đồng khám phá mục tiêu, phạm vi bàn giao và owner của workflow: [discovery.md](workflows/discovery.md).

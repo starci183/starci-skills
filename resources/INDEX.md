@@ -21,6 +21,9 @@ Standing web, Grammar and image behavior is declared by each operator's tool mod
 An image must serve the declared content or task; a blank area alone is not evidence that artwork is needed.
 Grammar owners and reference interpretation are published under [the family knowledge](../knowledge/grammars).
 
+User workflow topology is distinct from operator mode. Its complete executable policy has one home at
+`orchestrator.json#workflowTopologies`; other documents cite that record rather than restating it.
+
 ## Process matrix
 
 This table mirrors operator.json and is checked by validate-resources. The scheduler and isolation
@@ -53,6 +56,7 @@ law live in orchestrator.json; a mode does not create a second user session or a
 | `service.operate` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `container:operate`, `http:probe`, `secrets:resolve-by-name` | inline | Execution within the assigned write and effect boundary |
 | `uat.plan` | sol-reviewer | no | `fileread:context-aliases` | isolated | Reasoning and evidence review within the operator boundary |
 | `uat.verify` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `print:decision-points` | isolated | Reasoning and evidence review within the operator boundary |
+| `workflow.verify` | sol-reviewer | no | `fileread:context-aliases`, `git:read` | isolated | Reasoning and evidence review within the operator boundary |
 | `workspace.bind` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Execution within the assigned write and effect boundary |
 
 ## Changes

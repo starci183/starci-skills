@@ -240,6 +240,12 @@
       ],
       "guidance": "Show the whole run case summary and the most diagnostic actual evidence. Choose a readable result table, sheet or case screenshot according to the finding, with per-case proof as secondary. Include failed and unrun cases; never use one passing capture to imply the whole journey passed."
     },
+    "workflow.verify": {
+      "primaryKinds": [
+        "table"
+      ],
+      "guidance": "Show every frozen peer with its exact child goal, owned scope, recorded full Git head, coordinator done-when lines, original solo session state hash and accepted evidence fingerprints. Task messages are transport only; missing or rejected peer proof cannot appear as a partial success."
+    },
     "workspace.bind": {
       "primaryKinds": [
         "table",

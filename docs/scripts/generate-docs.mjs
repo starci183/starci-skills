@@ -158,7 +158,7 @@ const L = {
   en: {
     opIndexTitle: 'Operators',
     opIndexDesc: 'Every operator of the tree, its profile, and its single job.',
-    opIndexIntro: 'Fourteen operators. Each one performs one job in one linear pass and never calls another; the parent maps a validated output to the next transition. The page for an operator is its own `operator.md`, the file the runtime reads.',
+    opIndexIntro: 'Each operator performs one job in one linear pass and never calls another; the parent maps a validated output to the next transition. The page for an operator is its own `operator.md`, the file the runtime reads.',
     opTable: ['Operator', 'Profile', 'Domain', 'Single job'],
     opDesc: (id) => `The operator package for ${id}, as the runtime reads it.`,
     opBinding: 'Binding',
@@ -194,7 +194,7 @@ const L = {
   vi: {
     opIndexTitle: 'Các operator',
     opIndexDesc: 'Mọi operator của cây, profile của nó và việc duy nhất nó làm.',
-    opIndexIntro: 'Mười bốn operator. Mỗi operator làm đúng một việc trong một lượt tuyến tính và không bao giờ gọi operator khác; chỉ nhánh cha mới ánh xạ một đầu ra đã qua kiểm sang bước kế tiếp. Trang của một operator chính là `operator.vi.md` của nó, bản đối chiếu của tệp mà runtime đọc.',
+    opIndexIntro: 'Mỗi operator làm đúng một việc trong một lượt tuyến tính và không bao giờ gọi operator khác; chỉ nhánh cha mới ánh xạ một đầu ra đã qua kiểm sang bước kế tiếp. Trang của một operator chính là `operator.vi.md` của nó, bản đối chiếu của tệp mà runtime đọc.',
     opTable: ['Operator', 'Profile', 'Vùng', 'Việc duy nhất'],
     opDesc: (id) => `Gói operator ${id}, bản tiếng Việt đối chiếu.`,
     opBinding: 'Ràng buộc',

@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 9,
+  "note": "workflow.verify adds no private stop code. INVALID_INPUT and EVIDENCE_MISSING come from operators/errors.json; routing.json hands both back to the user so the coordinator may correct the frozen snapshot or keep waiting and re-enter a new attempt under the same authorized goal.",
+  "codes": {}
+}

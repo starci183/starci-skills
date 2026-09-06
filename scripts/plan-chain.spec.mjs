@@ -175,9 +175,9 @@ test('v2.2 session planning refuses drafts and accepts only the matching confirm
     await assert.rejects(planSession(root, session), (error) => error instanceof PlanError && /matching explicit user as-stated choice/.test(error.message));
 
     state.choices[decisionId] = { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:confirm' };
-    assert.deepEqual(planningStateErrors(state), []);
+    assert.match(planningStateErrors(state).join('\n'), /WORKFLOW_UPGRADE_REQUIRED/);
     await writeFile(path.join(session, 'state.json'), `${JSON.stringify(state)}\n`);
-    assert.deepEqual(Object.values((await planSession(root, session)).plan.steps), ['content.generate']);
+    await assert.rejects(planSession(root, session), /WORKFLOW_UPGRADE_REQUIRED/);
 
     delete state.contractVersion;
     delete state.lifecycle;

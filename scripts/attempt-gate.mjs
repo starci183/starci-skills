@@ -1,3 +1,5 @@
+import { workflowOwnerErrors, readSessionState } from './workflow-root.mjs';
+import { deliveryRequestErrors } from './mission-scope.mjs';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -30,6 +32,9 @@ export async function openAttempt(branch) {
   let frozenRequest;
   let boundProfile;
   const result = await mutateSession(session, async (state) => {
+    const admission = workflowOwnerErrors(root, session, state, { dispatch: true });
+    admission.push(...deliveryRequestErrors(state, JSON.parse(await readFile(requestFile, 'utf8')), root));
+    if (admission.length) throw Error(admission.join('\n'));
     const before = await readFile(requestFile);
     const inside = await validateRequest(root, branch);
     if (inside.errors.length) throw new Error(inside.errors.join('\n'));

@@ -46,6 +46,10 @@ Code, paired in `resources/orchestrator.json`), and each operator may call only 
 ## Sessions in 2.2
 
 A session belongs to the Codex task/worktree or Claude host session. Child agents are workers within it.
+User workflow topology is selected and gated before this session starts. Its names, demand selector,
+peer limits, communication channel, tracking address and close rule have one executable home:
+[workflowTopologies](resources/orchestrator.json). This layer is separate from operator execution mode.
+
 [SKILL.md](SKILL.md) takes the prompt through a scope draft with a goal, expected results and examples;
 it asks only for confirmation that is still missing. Workflows are derived from that goal and typed outcomes.
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 9,
-  "note": "How operators become agents. A user prompt first opens or reuses the host-bound v2.2 session with scripts/session-open.mjs, before scope confirmation. One invocation of one operator is one attempt in the mode its operator.json declares. The orchestrator freezes request.expected, request.frozenInputs and request.environment, calls scripts/attempt-gate.mjs open, acquires the one session-wide scheduler through scripts/worker-slots.mjs, then starts the agent. Acceptance calls scripts/attempt-gate.mjs accept, which reruns the frozen request, the shared response contract and the operator validator. A matched receipt may advance; mismatch is retained and chooses repair, retry or blocked. Nested exchanges and retries use the same host session, attempt ledger and three worker slots. A chain route adds prerequisite work to the same dynamic chain rather than opening another user session. The orchestrator's memory is state.json.brief and nothing else.",
+  "note": "How user workflows and operators become executable. User demand first selects workflowTopologies, then each workflow-owning native task opens or reuses its host-bound v2.2 session with scripts/session-open.mjs, before scope confirmation. One invocation of one operator is one attempt in the mode its operator.json declares. The orchestrator freezes request.expected, request.frozenInputs and request.environment, calls scripts/attempt-gate.mjs open, acquires the one session-wide scheduler through scripts/worker-slots.mjs, then starts the agent. Acceptance calls scripts/attempt-gate.mjs accept, which reruns the frozen request, the shared response contract and the operator validator. A matched receipt may advance; mismatch is retained and chooses repair, retry or blocked. Nested exchanges and retries use the same host session, attempt ledger and three worker slots. A chain route adds prerequisite work to the same dynamic chain rather than opening another user session. The orchestrator's memory is state.json.brief and nothing else.",
   "agentPerOperator": true,
   "maxConcurrentAgents": 3,
   "dispatch": "routing.json",
@@ -8,6 +8,44 @@
     "inline": "the orchestrator runs the operator's Steps itself, in the chat, in order, with the operator's own grants, and runs both validators on what it wrote; no agent is created; the profile recorded is the orchestrator's own",
     "dispatch": "one new agent that inherits the orchestrator's transcript (the profile's forkTurns.dispatch turns), on the operator's profile, with the brief (operators/<id>/brief.md) and request.json as its instruction; at most concurrency.maxDispatch such agents at a time; awaited on its completion event, never on a timer",
     "isolated": "one new agent with an empty context (forkTurns.isolated is none), on the operator's profile, that sees only brief.md, request.json and the files request.inputs and request.contexts name, in its own worktree and browser profile; awaited on its completion event, never on a timer"
+  },
+  "workflowTopologies": {
+    "default": "solo",
+    "state": "state.json#topology.mode",
+    "tracking": "state.json#brief.peers",
+    "sources": [
+      "tests/evidence/20260906-workflow-topologies-public.md"
+    ],
+    "rule": "Select before session-open from the user's demand. Use solo for one independently confirmable outcome. Use coordinated only when the demand authorizes at least two independent native task/worktree workflows or explicitly asks for one task to track the others. Several operators, units, branches, nested exchanges or same-session workers inside one outcome remain solo. Never select coordinated to evade a budget, slot cap, route, gate or authority boundary.",
+    "modes": {
+      "solo": {
+        "owner": "one native Codex task or Claude session",
+        "minimumPeers": 0,
+        "maximumPeers": 0,
+        "terminalPeerHeads": "optional",
+        "distinctPeerOwnership": false,
+        "boundary": "the native task owns one host-bound StarCi session and one complete goal-derived workflow; inline, dispatch, isolated, nested exchanges and up to three same-session workers are internal execution details",
+        "completion": "the task concludes only from its own validator-accepted receipts and goal evidence"
+      },
+      "coordinated": {
+        "owner": "one native coordinator task owns portfolio decomposition, peer ownership, shared-resource conflict resolution, tracking, feedback and the portfolio conclusion; it never edits a peer ledger or worktree",
+        "minimumPeers": 2,
+        "maximumPeers": null,
+        "terminalPeerHeads": "required",
+        "distinctPeerOwnership": true,
+        "peerTopology": "solo",
+        "completionOperator": "workflow.verify",
+        "ancestralEvidenceOperators": [
+          "business.decide"
+        ],
+        "communication": "ordinary-two-way-task-messages",
+        "communicationRule": "ordinary two-way task messages are sufficient for assignments, status, evidence references, feedback, shared-resource ownership and wake conditions; message prose grants nothing, routes nothing and proves nothing",
+        "lifecycle": "freeze the portfolio and independent peer goals; create or adopt the peer tasks; record each task id with owns, its legacy head or routed repository heads, and wake; exchange messages and wait on task events; read evidence and return gaps or conflicts to the owning peer; then conclude the portfolio",
+        "wait": "wait for completion, needs-attention or a meaningful message; a timeout or no update is no evidence",
+        "failure": "a required blocked or failed peer keeps the portfolio working or blocked and resumable while independent peers may continue; one owner is named for every shared runtime, contract or write boundary",
+        "completion": "ordinary messages are sufficient for all coordinator-to-peer work; the completionOperator reads original accepted peer outcomes and emits a matched local receipt under the unchanged local mission receipt gate, with no cross-session message envelope or receipt import required; its frozen request maps every peer's owned scope and legacy single outcome head or exact per-repository outcome heads to coordinator doneWhen evidence, validates every original child goal independently, and requires one accepted proving row to bind the complete exact current repository-head tuple for that goal; a missing, unfinished, changed or unproven peer prevents portfolio close"
+      }
+    }
   },
   "wait": "completion: a dispatched or isolated agent is awaited on its completion event and a chain route on its same-session prerequisite branch's accepted completion; a timed poll is not a step of any chain, and a wait that returns nothing is not evidence of anything",
   "receiptSkeleton": true,
@@ -104,9 +142,9 @@
     "skeleton": "at dispatch the orchestrator writes response/response.json with status running and the branch's identity fields; the agent's first act on finishing is replacing it; an exit that leaves it in place is followed up once, then recorded as blocked with RECEIPT_MISSING and event abandoned"
   },
   "session": {
-    "root": "<Source>/.worktrees/sessions/<sessionId>/",
+    "root": "<Workflow>/.worktrees/sessions/<sessionId>/",
     "id": "<yyyymmdd-HHMMss>-<project>-<first operator>, e.g. 20260903-142200-project-interface.generate",
-    "manifest": "Every new state.json carries contractVersion starci/v2.2, hostBinding { kind, hostId, worktree, sourcePromptRef }, lifecycle, a versioned mission with the eight-row scope data and explicit confirmation, attempts, workerSlots, leases, chain, steps, planned, requestHashes, choices, transitions, brief and budget. Every accepted attempt stores evidenceManifest with the accepted response hash and the exact request/response file inventory. scripts/session-open.mjs writes the draft before confirmation and reuses it by hostId plus absolute worktree. Legacy unmarked state remains readable evidence but cannot dispatch through the v2.2 gates.",
+    "manifest": "Every new state.json carries contractVersion starci/v2.2, hostBinding { kind, hostId, worktree, sourcePromptRef }, the selected workflow topology, lifecycle, a versioned mission with the eight-row scope data and explicit confirmation, attempts, workerSlots, leases, chain, steps, planned, requestHashes, choices, transitions, brief and budget. Every accepted attempt stores evidenceManifest with the accepted response hash and the exact request/response file inventory. scripts/session-open.mjs writes the draft before confirmation and reuses it by host kind, host id and absolute worktree. A v2.2.0 state without topology remains readable as evidence but cannot dispatch or close until session-open migrates it; legacy unmarked state remains readable evidence but cannot dispatch through the v2.2 gates.",
     "branch": "step-<N>/parallel-<M>/ — N is the position in the chain, M the parallel branch; parallel-1 always exists",
     "branchLayout": [
       "request/request.json",
@@ -123,15 +161,17 @@
       "note": "imported producer slots (scripts/producer-import.mjs) live at step numbers from stepBase upward, a range no chain reaches: a chain is numbered from 1 and a slot below stepBase is refused at import, so a chain that grows past its planned length never collides with the evidence it was planned on; a chain cell that names an evidence slot's coordinate is refused by validate-chain"
     },
     "lifecycle": [
-      "open: node scripts/session-open.mjs open <sessionsRoot> <draft.json> creates or reuses the host user session before asking. The draft mission stores Goal, Target, In scope, Out of scope, Outputs, Done when, Verification reach and Example. The same authorized user prompt may be recorded as the versioned as-stated answer; corrected or rejected never activates it.",
+      "open: select workflowTopologies from user demand, then node scripts/session-open.mjs open <sessionsRoot> <draft.json> creates or reuses the host user session before asking and records topology.mode. A changed explicit topology may replace only an unconfirmed draft; after activation, finish or close that mission before opening a different topology. The draft mission stores Goal, Target, In scope, Out of scope, Outputs, Done when, Verification reach and Example. Resolve impact, handoff coverage and exact authority through workflows/discovery.md and the executable delivery contract before activation; corrected or rejected never activates it.",
       "branch: write request.json with contractVersion, attempt, expected, environment and frozenInputs; node scripts/attempt-gate.mjs open <branch> freezes it and writes the running skeleton; node scripts/worker-slots.mjs acquire <branch> <workerId> <ranProfile> must return acquired before execution.",
       "advance: node scripts/attempt-gate.mjs accept <branch> reruns validate-request, validate-response and the operator validator, then seals evidenceManifest over every request/response file while holding the session lock. status done advances only with a matched comparison for every required expected criterion and resolvable evidence. status mismatch preserves the receipt and chooses repair, retry or blocked; the next attempt points at it and cannot weaken required expected under the same goal version.",
       "abandon: an agent exited with the running skeleton in place; one followup_task to the same agent naming the skeleton; a second exit writes status blocked with stop RECEIPT_MISSING, event abandoned, and the chain routes it as caller",
       "wait: status waiting releases the worker slot. The nested exchange opens its own attempt under the same session and cap; worker-slots resume reacquires a slot before the parent continues.",
       "block: status blocked keeps the session on disk. When routing.json answers the stop's domain with kind resume, the orchestrator asks the person for the field the stop names and re-enters the operator in step-(N+1)/parallel-1 with resume set and state.json.resumes recorded. When it answers operator, the named operator runs next and the blocked branch is re-entered the same way once that operator is done. When it answers user or external, the branch stays blocked and the chain continues only after the person or the outside party has changed something the stop names; that continuation is also a step-(N+1)/parallel-1 re-entry with resume set, and request.json must carry the changed requirement or input, because a re-entry with no delta is NO_PROGRESS",
       "close-success: goal achieved, operator done and git.publish do not close the user session. Only an explicit successful session-close signal calls scripts/session-cleanup.mjs. It writes and verifies @worktrees/done/<id>.md and @worktrees/done/<id>/bundle first, then deletes exactly sessions/<id>. Blocked, failed, waiting and active sessions remain resumable; no user worktree or branch is removed.",
-      "report: every turn the orchestrator ends with a person is one of resources/interaction.json#reportShapes in the display language (resources/settings.json#language over settings.example.json, default vi; interaction.json#language), recorded in brief.report; a hand-off to a peer session is a waiting branch with a wake condition in brief.peers, never the end of a turn"
-    ]
+      "report: every turn the orchestrator ends with a person is one of resources/interaction.json#reportShapes in the display language (resources/settings.json#language over settings.example.json, default vi; interaction.json#language), recorded in brief.report; a hand-off to a peer task or session is a waiting branch with a wake condition in brief.peers, never the end of a turn"
+    ],
+    "owner": "scripts/workflow-root.mjs resolves .workspaces/projects/<project>/workflow.json ownerRole against the hydrated canonical route. One project declaration owns requests and evidence across all routed roles; .claude, .workspaces, .stacks and the central runtime remain Source-owned. scripts/session-migrate.mjs preserves original evidence and disables the old ledger before activating its verified copy.",
+    "discovery": "resources/delivery.json and templates/kinds/goal-discovery.schema.json define impact-derived handoff coverage. scripts/mission-scope.mjs freezes the reviewed scope digest and provenance; stage bounds execution independently of planning reach."
   },
   "sourceWrites": {
     "rule": "an operator that writes source (interface.generate, interface.fix, backend.generate, library.update, knowledge.repair on its owner source) writes only on the session branch session/<sessionId> of the routed checkout, in a git worktree the orchestrator prepared from the frozen head; it commits the declared write set once and records the sha in response.json.commits; the person's checked-out branch is never touched",

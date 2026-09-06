@@ -1,12 +1,16 @@
 # Workflow
 
-Không còn file workflow nào. Một chuỗi không bao giờ được chọn từ ví dụ: nó được suy ra từ nhiệm
-vụ, bởi `scripts/plan-chain.mjs`, chỉ từ các bảng của operator, và được `scripts/validate-chain.mjs`
+Không còn file chuỗi workflow cố định. Một chuỗi không bao giờ được chọn từ ví dụ: nó được suy ra từ nhiệm
+vụ, bởi `scripts/plan-chain.mjs`, từ impact bàn giao đã khám phá cùng các bảng của operator, và được `scripts/validate-chain.mjs`
 kiểm mỗi lần vẽ. Các chuỗi mẫu thư mục này từng giữ giờ là fixture của planner, nằm ở
 `scripts/fixtures/chains/`, và `scripts/plan-chain.spec.mjs` chứng minh planner vẫn suy ra được từng chuỗi ấy
 từ kết quả mà nhiệm vụ của nó gọi tên.
 
-## Vòng đời v2.2 thực thi được
+Topology người dùng được chọn phía trên chain này bởi
+`resources/orchestrator.json#workflowTopologies`; thư mục này không định nghĩa topology hay ngữ nghĩa
+peer thứ hai.
+
+## Vòng đời workflow thực thi được
 
 Prompt đầu mở hoặc dùng lại draft đã bind với host bằng `scripts/session-open.mjs` trước khi xác nhận
 scope. Xác nhận kích hoạt đúng một phiên bản. Planner vẫn là owner duy nhất của chain: nó suy ra các
@@ -134,3 +138,5 @@ khi chính goal được sửa; không bao giờ viết lại trong im lặng
 chuỗi kèm nhiệm vụ mà các dòng "xong khi" gọi tên kết quả của nó, thứ tự operator nó chờ đợi, và
 ghi chú về cách viết lại. Chúng là đầu vào cho spec của planner, không phải cho runtime: cửa vào
 không bao giờ đọc chúng.
+
+Hợp đồng khám phá mục tiêu, phạm vi bàn giao và owner của workflow: [discovery.md](discovery.md).

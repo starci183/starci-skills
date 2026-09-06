@@ -196,4 +196,5 @@ In **Kết quả tốt nhất** là bảng readiness đầy đủ render từ `r
 | một bức tường runtime phải được dọn trước | `runtime.serve` |
 | nhiệm vụ không route source nào và một đơn vị giáo trình theo sau | `content.generate` |
 | một bức tường dịch vụ phải được dọn trước, hoặc một dịch vụ nhiệm vụ cần phải được đưa lên | `service.operate` |
+| portfolio coordinated không đổi môi trường sản phẩm và các outcome peer đã đóng băng của nó phải được kiểm trước khi kết luận | `workflow.verify` |
 | một bức tường chỉ một người mới dọn được đang đứng | `user` |

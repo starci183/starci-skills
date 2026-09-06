@@ -20,65 +20,211 @@
     "requestHashes"
   ],
   "properties": {
-    "contractVersion": { "const": "starci/v2.2", "description": "Marks a session created by the v2.2 runtime. A missing marker is legacy read compatibility only." },
+    "contractVersion": {
+      "const": "starci/v2.2",
+      "description": "Marks a session created by the v2.2 runtime. A missing marker is legacy read compatibility only."
+    },
     "hostBinding": {
-      "type": "object", "additionalProperties": false,
-      "required": ["kind", "hostId", "worktree", "sourcePromptRef"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "hostId",
+        "worktree",
+        "sourcePromptRef"
+      ],
       "properties": {
-        "kind": { "enum": ["codex-task", "claude-session"] },
-        "hostId": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "worktree": { "type": "string", "minLength": 1, "maxLength": 500 },
-        "sourcePromptRef": { "type": "string", "minLength": 1, "maxLength": 400 }
+        "kind": {
+          "enum": [
+            "codex-task",
+            "claude-session"
+          ]
+        },
+        "hostId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "worktree": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "sourcePromptRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        }
       }
     },
     "lifecycle": {
-      "type": "object", "additionalProperties": false,
-      "required": ["phase", "openedAt"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "openedAt"
+      ],
       "properties": {
-        "phase": { "enum": ["draft", "active", "blocked", "failed", "closing", "closed-success"] },
-        "openedAt": { "type": "string", "minLength": 1 },
-        "closedAt": { "type": "string", "minLength": 1 },
-        "closeReason": { "type": "string", "minLength": 1, "maxLength": 500 },
-        "compactRef": { "type": "string", "minLength": 1, "maxLength": 500 }
+        "phase": {
+          "enum": [
+            "draft",
+            "active",
+            "blocked",
+            "failed",
+            "closing",
+            "closed-success"
+          ]
+        },
+        "openedAt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "closedAt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "closeReason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "compactRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "The archived compact document relative to .worktrees/done; no parent traversal."
+        }
       }
     },
     "attempts": {
       "description": "Immutable per-invocation history. A retry or repair uses another branch and points request.attempt.previous at the latest attempt id.",
       "type": "object",
       "additionalProperties": {
-        "type": "object", "additionalProperties": false,
-        "required": ["id", "operatorId", "number", "kind", "expectedVersion", "expectedHash", "expected", "frozenInputs", "status", "requestRef", "startedAt"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operatorId",
+          "number",
+          "kind",
+          "expectedVersion",
+          "expectedHash",
+          "expected",
+          "frozenInputs",
+          "status",
+          "requestRef",
+          "startedAt"
+        ],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "operatorId": { "type": "string", "pattern": "^[a-z]+(?:\\.[a-z]+)+$" },
-          "number": { "type": "integer", "minimum": 1 },
-          "kind": { "enum": ["initial", "repair", "retry", "resume"] },
-          "previous": { "type": ["string", "null"] },
-          "expectedVersion": { "type": "integer", "minimum": 1 },
-          "expectedHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-          "expected": { "type": "object" },
-          "frozenInputs": { "type": "array" },
-          "status": { "enum": ["running", "matched", "mismatched", "inconclusive", "blocked", "waiting"] },
-          "requestRef": { "type": "string", "minLength": 1 },
-          "responseRef": { "type": "string", "minLength": 1 },
-          "startedAt": { "type": "string", "minLength": 1 },
-          "endedAt": { "type": "string", "minLength": 1 },
-          "comparison": { "type": "object" },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operatorId": {
+            "type": "string",
+            "pattern": "^[a-z]+(?:\\.[a-z]+)+$"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "enum": [
+              "initial",
+              "repair",
+              "retry",
+              "resume"
+            ]
+          },
+          "previous": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expectedHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "expected": {
+            "type": "object"
+          },
+          "frozenInputs": {
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "matched",
+              "mismatched",
+              "inconclusive",
+              "blocked",
+              "waiting"
+            ]
+          },
+          "requestRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "responseRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "startedAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "endedAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "comparison": {
+            "type": "object"
+          },
           "evidenceManifest": {
-            "type": "object", "additionalProperties": false,
-            "required": ["version", "responseHash", "fingerprint", "files"],
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "version",
+              "responseHash",
+              "fingerprint",
+              "files"
+            ],
             "properties": {
-              "version": { "const": 1 },
-              "responseHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-              "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+              "version": {
+                "const": 1
+              },
+              "responseHash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "fingerprint": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
               "files": {
-                "type": "array", "minItems": 2,
+                "type": "array",
+                "minItems": 2,
                 "items": {
-                  "type": "object", "additionalProperties": false,
-                  "required": ["ref", "sha256"],
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ref",
+                    "sha256"
+                  ],
                   "properties": {
-                    "ref": { "type": "string", "pattern": "^(?:request|response)/[A-Za-z0-9_./-]+$" },
-                    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+                    "ref": {
+                      "type": "string",
+                      "pattern": "^(?:request|response)/[A-Za-z0-9_./-]+$"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^sha256:[0-9a-f]{64}$"
+                    }
                   }
                 }
               }
@@ -89,30 +235,101 @@
     },
     "workerSlots": {
       "description": "The single session-wide scheduler ledger. Nested exchanges, repairs, retries and mission-owned helpers acquire from these same three slots.",
-      "type": "array", "maxItems": 3,
+      "type": "array",
+      "maxItems": 3,
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["slot", "token", "attemptId", "workerId", "branch", "exclusive", "environment", "acquiredAt"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slot",
+          "token",
+          "attemptId",
+          "workerId",
+          "branch",
+          "exclusive",
+          "environment",
+          "acquiredAt"
+        ],
         "properties": {
-          "slot": { "type": "integer", "minimum": 1, "maximum": 3 },
-          "token": { "type": "string", "minLength": 1 },
-          "attemptId": { "type": "string", "minLength": 1 },
-          "workerId": { "type": "string", "minLength": 1 },
-          "branch": { "type": "string", "pattern": "^(?:[0-9]+/[0-9]+(?:/[a-z][a-z-]*)?|helper/[a-z][a-z0-9-]*/[0-9]{8}-[0-9]{6}(?:-[A-Za-z0-9._-]+)?)$" },
-          "exclusive": { "type": "array", "items": { "type": "string" } },
-          "environment": { "type": "object" },
-          "acquiredAt": { "type": "string", "minLength": 1 },
-          "workerKind": { "const": "helper" },
-          "helperId": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-          "runId": { "type": "string", "pattern": "^[0-9]{8}-[0-9]{6}(?:-[A-Za-z0-9._-]+)?$" },
-          "requestHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-          "boundProfile": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-          "ranProfile": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+          "slot": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "attemptId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workerId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "branch": {
+            "type": "string",
+            "pattern": "^(?:[0-9]+/[0-9]+(?:/[a-z][a-z-]*)?|helper/[a-z][a-z0-9-]*/[0-9]{8}-[0-9]{6}(?:-[A-Za-z0-9._-]+)?)$"
+          },
+          "exclusive": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment": {
+            "type": "object"
+          },
+          "acquiredAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workerKind": {
+            "const": "helper"
+          },
+          "helperId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "runId": {
+            "type": "string",
+            "pattern": "^[0-9]{8}-[0-9]{6}(?:-[A-Za-z0-9._-]+)?$"
+          },
+          "requestHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "boundProfile": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "ranProfile": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
         },
         "allOf": [
           {
-            "if": { "required": ["workerKind"], "properties": { "workerKind": { "const": "helper" } } },
-            "then": { "required": ["helperId", "runId", "requestHash", "boundProfile", "ranProfile"] }
+            "if": {
+              "required": [
+                "workerKind"
+              ],
+              "properties": {
+                "workerKind": {
+                  "const": "helper"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "helperId",
+                "runId",
+                "requestHash",
+                "boundProfile",
+                "ranProfile"
+              ]
+            }
           }
         ]
       }
@@ -156,7 +373,22 @@
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "description": "Legacy workflow label retained for readable earlier ledgers; user-level workflow selection lives at topology."
+    },
+    "topology": {
+      "description": "The user-demand workflow topology selected before session-open. The vocabulary and selection law live in resources/orchestrator.json#workflowTopologies. Absence keeps v2.2.0 evidence readable, but dispatch and successful close refuse it until session-open migrates the state.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "startedAt": {
       "type": "string",
@@ -383,7 +615,7 @@
       }
     },
     "brief": {
-      "description": "the orchestrator's own memory of the mission, rewritten after every transition and read back after a context compaction: what is proven, what is blocked and on whom, what comes next, which peer session owns which head, and the last report the person received; the only orchestrator memory the tree recognises — a note file beside it is a second home",
+      "description": "the orchestrator's own memory of the mission, rewritten after every transition and read back after a context compaction: what is proven, what is blocked and on whom, what comes next, which peer task or session owns which head, and the last report the person received; the only orchestrator memory the tree recognises — a note file beside it is a second home",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -425,7 +657,7 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 120,
-                "description": "who clears it: a domain of routing.json, a peer session id, a person, or an outside party"
+                "description": "who clears it: a domain of routing.json, a peer task or session id, a person, or an outside party"
               },
               "since": {
                 "type": "string",
@@ -444,7 +676,13 @@
           "maxLength": 400
         },
         "peers": {
+          "description": "Native peer task id -> its owned scope, either the legacy single current head or one exact current head per routed repository boundary, and an optional wake condition. Workflow semantics live only at resources/orchestrator.json#workflowTopologies; the field remains readable for legacy cross-session hand-offs.",
           "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
           "additionalProperties": {
             "type": "object",
             "additionalProperties": false,
@@ -465,10 +703,33 @@
                 ],
                 "pattern": "^[0-9a-f]{7,40}$"
               },
+              "heads": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "alias",
+                    "head"
+                  ],
+                  "properties": {
+                    "alias": {
+                      "type": "string",
+                      "pattern": "^@workspaces/[A-Za-z0-9_.@#:-]+$"
+                    },
+                    "head": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{40}$"
+                    }
+                  }
+                }
+              },
               "wake": {
                 "type": "string",
                 "maxLength": 240,
-                "description": "the condition on which this session resumes waiting on that peer"
+                "description": "the condition on which this coordinator or session resumes waiting on that peer task"
               }
             }
           }
@@ -608,7 +869,7 @@
         "doneWhen": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 8,
+          "maxItems": 32,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -631,25 +892,139 @@
           }
         },
         "outputs": {
-          "type": "array", "minItems": 1, "maxItems": 12,
-          "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
         },
         "verification": {
-          "type": "string", "minLength": 1, "maxLength": 500,
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
           "description": "Evidence reach and the limits of the conclusion, shown before confirmation."
         },
         "example": {
-          "type": ["string", "null"], "maxLength": 500,
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 500,
           "description": "An example only when one materially disambiguates the draft scope."
         },
         "confirmation": {
-          "type": "object", "additionalProperties": false,
-          "required": ["status", "decisionId", "sourceRef"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "decisionId",
+            "sourceRef"
+          ],
           "properties": {
-            "status": { "enum": ["draft", "confirmed", "corrected", "rejected"] },
-            "decisionId": { "type": "string", "minLength": 1 },
-            "sourceRef": { "type": ["string", "null"], "maxLength": 400 },
-            "confirmedAt": { "type": "string", "minLength": 1 }
+            "status": {
+              "enum": [
+                "draft",
+                "confirmed",
+                "corrected",
+                "rejected"
+              ]
+            },
+            "decisionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sourceRef": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 400
+            },
+            "confirmedAt": {
+              "type": "string",
+              "minLength": 1
+            },
+            "scopeHash": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "authority": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "sourceRef",
+                "statement",
+                "scopeHash",
+                "coverage"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "opening-scope",
+                    "scope-answer",
+                    "bank-approval"
+                  ]
+                },
+                "sourceRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "statement": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "scopeHash": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "coverage": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "presentedScopeHash": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "normalizations": {
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "value": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "excerpt": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "excerpt",
+                      "value",
+                      "reason"
+                    ]
+                  },
+                  "type": "object"
+                }
+              }
+            }
           }
         },
         "sourceRef": {
@@ -699,14 +1074,406 @@
               "pattern": "^bank:[a-z0-9][a-z0-9-]*:v[1-9][0-9]*$"
             }
           }
+        },
+        "discovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "stage",
+            "repositories",
+            "impacts",
+            "destinations",
+            "unresolved",
+            "lanes"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "stage": {
+              "enum": [
+                "handoff",
+                "implement",
+                "publish",
+                "deploy"
+              ]
+            },
+            "repositories": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "project",
+                  "repository",
+                  "routeRef",
+                  "head"
+                ],
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "project": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "repository": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "routeRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "head": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                }
+              }
+            },
+            "impacts": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "role",
+                  "routes",
+                  "code",
+                  "behavior",
+                  "tags",
+                  "evidence"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "role": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "routes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    }
+                  },
+                  "code": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "minItems": 1
+                  },
+                  "behavior": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "tags": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "feature",
+                        "business",
+                        "architecture",
+                        "backend",
+                        "data",
+                        "api",
+                        "interface",
+                        "browser",
+                        "runtime",
+                        "tooling",
+                        "documentation"
+                      ]
+                    }
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "minItems": 1
+                  }
+                }
+              }
+            },
+            "destinations": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "kind",
+                  "target"
+                ],
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "kind": {
+                    "enum": [
+                      "artifact",
+                      "branch",
+                      "environment"
+                    ]
+                  },
+                  "target": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                }
+              }
+            },
+            "unresolved": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "lanes": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "status",
+                  "reason"
+                ],
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "planned",
+                      "not-applicable"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "owner": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "inputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    }
+                  },
+                  "outputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    }
+                  },
+                  "verification": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    }
+                  },
+                  "dependsOn": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "runtimeRevision": {
+      "const": 3,
+      "description": "Additive discovery and project workflow ownership capability. Legacy receipts retain contractVersion starci/v2.2."
+    },
+    "workflowOwner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "project",
+        "sourceRoot",
+        "ownerRole",
+        "ownerRoot",
+        "declarationRef",
+        "declarationHash",
+        "routeRef",
+        "routeHash",
+        "repository",
+        "gitPolicy"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "sourceRoot": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "ownerRole": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "ownerRoot": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "declarationRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "declarationHash": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "routeRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "routeHash": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "repository": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "gitPolicy": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
+    },
+    "upgrade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "migratedAt",
+        "legacyInventory",
+        "legacyState",
+        "legacyStateHash",
+        "legacyRequestRefs",
+        "legacyInventoryHash"
+      ],
+      "properties": {
+        "from": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "migratedAt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "legacyInventory": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "legacyState": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "legacyStateHash": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "legacyRequestRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "legacyInventoryHash": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
   },
   "allOf": [
     {
-      "if": { "required": ["contractVersion"] },
-      "then": { "required": ["hostBinding", "lifecycle", "attempts", "workerSlots", "mission", "choices", "brief", "budget"] }
+      "if": {
+        "required": [
+          "contractVersion"
+        ]
+      },
+      "then": {
+        "required": [
+          "hostBinding",
+          "lifecycle",
+          "attempts",
+          "workerSlots",
+          "mission",
+          "choices",
+          "brief",
+          "budget"
+        ]
+      }
     }
   ]
 }

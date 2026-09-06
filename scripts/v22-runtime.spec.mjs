@@ -1,14 +1,16 @@
+import { answerFor } from './v23-test-fixture.mjs';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { openSession, confirmSession } from './session-open.mjs';
+import { openSession, confirmSession } from './v23-test-fixture.mjs';
 import { openAttempt } from './attempt-gate.mjs';
-import { attemptContractErrors } from './validate-response.mjs';
-import { uiKnowledgeRequestErrors, validateRequest, V22_CONTRACT } from './validate-request.mjs';
+import { attemptContractErrors, validateResponse } from './validate-response.mjs';
+import { localAcceptedInputErrors, uiKnowledgeRequestErrors, validateRequest, V22_CONTRACT } from './validate-request.mjs';
 import { v22SessionErrors } from './validate-session.mjs';
 import { acquireHelperSlot, acquireWorkerSlot, normalizeResource, releaseWorkerSlot, resourcesOverlap } from './worker-slots.mjs';
 import { mutateSession, withSessionLock } from './session-lock.mjs';
@@ -42,9 +44,11 @@ async function fixture(run) {
 
 test('session opens before confirmation, reuses the host binding, and only explicit as-stated activates it', async () => fixture(async ({ sessions, worktree }) => {
   const opened = await openSession(sessions, draft(worktree));
+  assert.equal(opened.topology, 'solo');
   const stateFile = path.join(opened.session, 'state.json');
   let state = JSON.parse(readFileSync(stateFile, 'utf8'));
   assert.equal(state.contractVersion, V22_CONTRACT);
+  assert.deepEqual(state.topology, { mode: 'solo' });
   assert.equal(state.lifecycle.phase, 'draft');
   assert.equal(state.mission.confirmation.status, 'draft');
   assert.deepEqual(state.chain, []);
@@ -52,6 +56,13 @@ test('session opens before confirmation, reuses the host binding, and only expli
   const reused = await openSession(sessions, draft(worktree));
   assert.equal(reused.status, 'reused');
   assert.equal(reused.sessionId, opened.sessionId);
+  assert.equal(reused.topology, 'solo');
+  delete state.topology;
+  writeFileSync(stateFile, JSON.stringify(state));
+  const migrated = await openSession(sessions, draft(worktree));
+  assert.equal(migrated.sessionId, opened.sessionId);
+  assert.equal(migrated.topology, 'solo');
+  assert.deepEqual(JSON.parse(readFileSync(stateFile, 'utf8')).topology, { mode: 'solo' });
   await assert.rejects(() => confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'agent', sourceRef: 'agent' }), /selectedBy:user/);
   const confirmed = await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:1' });
   assert.equal(confirmed.status, 'confirmed');
@@ -60,10 +71,57 @@ test('session opens before confirmation, reuses the host binding, and only expli
   assert.equal(state.mission.confirmation.sourceRef, 'user-message:1');
 }));
 
+test('session-open follows corrected draft demand but freezes topology after activation', async () => fixture(async ({ sessions, worktree }) => {
+  const coordinatedDraft = { ...draft(worktree), topology: { mode: 'coordinated' } };
+  const opened = await openSession(sessions, coordinatedDraft);
+  assert.equal(opened.topology, 'coordinated');
+  assert.deepEqual(JSON.parse(readFileSync(path.join(opened.session, 'state.json'), 'utf8')).topology, { mode: 'coordinated' });
+  const reused = await openSession(sessions, coordinatedDraft);
+  assert.equal(reused.topology, 'coordinated');
+  const changed = await openSession(sessions, { ...coordinatedDraft, topology: { mode: 'solo' } });
+  assert.equal(changed.topology, 'solo');
+  const corrected = await confirmSession(opened.session, {
+    selected: 'corrected', selectedBy: 'user', sourceRef: 'user-message:2', topology: { mode: 'coordinated' },
+    mission: { ...coordinatedDraft.mission, goal: 'coordinate two independently owned readiness workflows' }
+  });
+  assert.equal(corrected.topology, 'coordinated');
+  await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:3' });
+  await assert.rejects(() => openSession(sessions, { ...coordinatedDraft, topology: { mode: 'solo' } }), /SESSION_TOPOLOGY_MISMATCH/);
+  await assert.rejects(() => openSession(sessions, { ...coordinatedDraft, topology: { mode: 'controller' } }), /unknown/);
+}));
+
+test('active v2.2.0 migration requires explicit compatible demand and preserves peer tracking', async () => fixture(async ({ sessions, worktree }) => {
+  const coordinatedDraft = { ...draft(worktree), topology: { mode: 'coordinated' } };
+  const opened = await openSession(sessions, coordinatedDraft);
+  await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:1' });
+  const stateFile = path.join(opened.session, 'state.json');
+  const state = JSON.parse(readFileSync(stateFile, 'utf8'));
+  state.brief.peers = {
+    'peer-accounting': { owns: 'accounting', head: null },
+    'peer-chatbot': { owns: 'chatbot', head: null }
+  };
+  delete state.topology;
+  writeFileSync(stateFile, JSON.stringify(state));
+  await assert.rejects(() => openSession(sessions, draft(worktree)), /SESSION_TOPOLOGY_MIGRATION_REQUIRED/);
+  await assert.rejects(() => openSession(sessions, { ...draft(worktree), topology: { mode: 'solo' } }), /at most 0 peer tasks/);
+  let preserved = JSON.parse(readFileSync(stateFile, 'utf8'));
+  assert.equal(preserved.topology, undefined);
+  assert.equal(Object.keys(preserved.brief.peers).length, 2);
+  const migrated = await openSession(sessions, coordinatedDraft);
+  assert.equal(migrated.topology, 'coordinated');
+  preserved = JSON.parse(readFileSync(stateFile, 'utf8'));
+  assert.deepEqual(preserved.topology, { mode: 'coordinated' });
+  assert.equal(Object.keys(preserved.brief.peers).length, 2);
+}));
+
 test('concurrent first prompts create one host session and unsafe explicit ids cannot escape sessions root', async () => fixture(async ({ sessions, worktree }) => {
   const results = await Promise.all([openSession(sessions, draft(worktree)), openSession(sessions, draft(worktree))]);
   assert.equal(new Set(results.map((result) => result.sessionId)).size, 1);
   assert.deepEqual(results.map((result) => result.status).sort(), ['opened', 'reused']);
+  const claudeDraft = { ...draft(worktree), hostBinding: { ...draft(worktree).hostBinding, kind: 'claude-session' } };
+  const claude = await openSession(sessions, claudeDraft);
+  assert.notEqual(claude.sessionId, results[0].sessionId);
+  await assert.rejects(() => openSession(sessions, { ...draft(worktree, 'invalid-host'), hostBinding: { ...draft(worktree, 'invalid-host').hostBinding, kind: 'bogus' } }), /hostBinding.kind/);
   await assert.rejects(() => openSession(sessions, { ...draft(worktree, 'another-host'), sessionId: '../escape' }), /safe direct-child/);
 }));
 
@@ -198,6 +256,74 @@ test('one atomic session gate caps concurrent workers at three, prevents duplica
   assert.equal(JSON.parse(readFileSync(stateFile, 'utf8')).budget.units, 20);
 }));
 
+test('a waiting parent reacquires a worker only after its accepted nested exchange is matched', async () => fixture(async ({ sessions, worktree }) => {
+  const opened = await openSession(sessions, draft(worktree));
+  await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:1' });
+  const branch = path.join(opened.session, 'step-1', 'parallel-1');
+  mkdirSync(path.join(branch, 'request'), { recursive: true });
+  const request = {
+    contractVersion: V22_CONTRACT, schemaVersion: 9, operatorId: 'environment.preflight', step: 1, parallel: 1, sessionId: opened.sessionId,
+    contexts: [], requirements: { project: 'sample' }, inputs: {}, resume: null, goal: { doneWhen: 0 },
+    attempt: { id: 'waiting-parent-a1', number: 1, kind: 'initial', previous: null },
+    expected: { version: 1, goalVersion: 1, sourceRef: 'state.json#mission:v1/doneWhen:0', criteria: [{ id: 'ready', required: true, expected: 'ready', verification: 'receipt' }] },
+    environment: { isolationId: 'waiting-parent-a1', mode: 'inline', workspace: null, reads: [], writes: [], exclusive: [], outputRoot: 'response' }, frozenInputs: []
+  };
+  writeFileSync(path.join(branch, 'request', 'request.json'), JSON.stringify(request));
+  const stateFile = path.join(opened.session, 'state.json');
+  let state = JSON.parse(readFileSync(stateFile, 'utf8'));
+  state.chain = [['1/1']]; state.steps = { '1/1': 'environment.preflight' }; state.current = '1/1';
+  writeFileSync(stateFile, JSON.stringify(state));
+  await openAttempt(branch);
+  const waiting = {
+    contractVersion: V22_CONTRACT, schemaVersion: 9, operatorId: 'environment.preflight', step: 1, parallel: 1,
+    status: 'waiting', awaiting: { exchange: 'check', kind: 'readiness-report' }, fields: {}, fallbacks: [], commits: [], next: [],
+    boundProfile: 'sol-reviewer', ranProfile: 'sol-reviewer', attempt: { id: 'waiting-parent-a1', number: 1, expectedVersion: 1 }
+  };
+  writeFileSync(path.join(branch, 'response', 'response.json'), JSON.stringify(waiting));
+  mkdirSync(path.join(branch, 'response', 'data'), { recursive: true });
+  const parentModelFile = path.join(branch, 'response', 'data', 'stack-model.json');
+  writeFileSync(parentModelFile, '{"selected":"one"}\n');
+  const manifest = await buildEvidenceManifest(branch);
+  await mutateSession(opened.session, async (fresh) => Object.assign(fresh.attempts['1/1'], {
+    status: 'waiting', responseRef: 'step-1/parallel-1/response/response.json', endedAt: new Date().toISOString(), evidenceManifest: manifest
+  }));
+  await assert.rejects(() => acquireWorkerSlot(branch, 'parent-worker', { resume: true, ranProfile: 'sol-reviewer' }), /accepted waiting receipt and awaited exchange are matched/);
+  const child = path.join(branch, 'check');
+  mkdirSync(path.join(child, 'request'), { recursive: true });
+  mkdirSync(path.join(child, 'response'), { recursive: true });
+  const childRequest = { contractVersion: V22_CONTRACT, operatorId: 'environment.preflight', step: 1, parallel: 1, exchange: 'check', attempt: { id: 'check-a1' } };
+  const childComparison = { expectedVersion: 1, verdict: 'matched', criteria: [], next: 'advance' };
+  const childResponse = { contractVersion: V22_CONTRACT, operatorId: 'environment.preflight', step: 1, parallel: 1, exchange: 'check', status: 'done', fields: { 'readiness-report': 'response/response.md' }, attempt: { id: 'check-a1', expectedVersion: 1 }, comparison: childComparison };
+  writeFileSync(path.join(child, 'request', 'request.json'), JSON.stringify(childRequest));
+  writeFileSync(path.join(child, 'response', 'response.json'), JSON.stringify(childResponse));
+  writeFileSync(path.join(child, 'response', 'response.md'), '# accepted check\n');
+  const childManifest = await buildEvidenceManifest(child);
+  await mutateSession(opened.session, async (fresh) => {
+    fresh.requestHashes['1/1/check'] = sha(readFileSync(path.join(child, 'request', 'request.json')));
+    fresh.attempts['1/1/check'] = {
+      ...fresh.attempts['1/1'], id: 'check-a1', status: 'matched', requestRef: 'step-1/parallel-1/check/request/request.json',
+      responseRef: 'step-1/parallel-1/check/response/response.json', comparison: childComparison, evidenceManifest: childManifest
+    };
+  });
+  await mutateSession(opened.session, async (fresh) => { fresh.attempts['1/1/check'].status = 'mismatched'; });
+  await assert.rejects(() => acquireWorkerSlot(branch, 'parent-worker', { resume: true, ranProfile: 'sol-reviewer' }), /accepted waiting receipt and awaited exchange are matched/);
+  await mutateSession(opened.session, async (fresh) => { fresh.attempts['1/1/check'].status = 'matched'; });
+  const waitingBytes = readFileSync(path.join(branch, 'response', 'response.json'));
+  const changedWaiting = { ...waiting, awaiting: { exchange: 'other', kind: 'readiness-report' } };
+  writeFileSync(path.join(branch, 'response', 'response.json'), JSON.stringify(changedWaiting));
+  await assert.rejects(() => acquireWorkerSlot(branch, 'parent-worker', { resume: true, ranProfile: 'sol-reviewer' }), /changed waiting evidence/);
+  writeFileSync(path.join(branch, 'response', 'response.json'), waitingBytes);
+  const modelBytes = readFileSync(parentModelFile);
+  writeFileSync(parentModelFile, `${modelBytes.toString('utf8')} `);
+  await assert.rejects(() => acquireWorkerSlot(branch, 'parent-worker', { resume: true, ranProfile: 'sol-reviewer' }), /changed waiting evidence/);
+  writeFileSync(parentModelFile, modelBytes);
+  const childProof = readFileSync(path.join(child, 'response', 'response.md'));
+  writeFileSync(path.join(child, 'response', 'response.md'), `${childProof.toString('utf8')} `);
+  await assert.rejects(() => acquireWorkerSlot(branch, 'parent-worker', { resume: true, ranProfile: 'sol-reviewer' }), /not intact accepted proof/);
+  writeFileSync(path.join(child, 'response', 'response.md'), childProof);
+  assert.equal((await acquireWorkerSlot(branch, 'parent-worker', { resume: true, ranProfile: 'sol-reviewer' })).status, 'acquired');
+}));
+
 test('a source-writing attempt automatically leases the real workspace behind a junction alias', async () => fixture(async ({ sessions, worktree }) => {
   const opened = await openSession(sessions, draft(worktree));
   await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:1' });
@@ -259,6 +385,8 @@ test('a same-session input cannot dispatch until its exact producer is matched a
   const producerRequestBytes = readFileSync(path.join(producer, 'request', 'request.json'));
   const state = JSON.parse(readFileSync(stateFile, 'utf8'));
   state.mission.doneWhen = [{ evidence: 'an architecture decision is accepted', producedBy: 'architecture.decide' }];
+  state.mission.confirmation.authority = answerFor(state.mission, state.mission.confirmation.sourceRef);
+  state.mission.confirmation.scopeHash = state.mission.confirmation.authority.scopeHash;
   state.chain = [['1/1'], ['2/1'], ['3/1']];
   state.steps = { '1/1': 'business.decide', '2/1': 'architecture.decide', '3/1': 'architecture.decide' };
   state.requestHashes['1/1'] = sha(producerRequestBytes);
@@ -302,13 +430,161 @@ test('a same-session input cannot dispatch until its exact producer is matched a
   await assert.rejects(() => openAttempt(secondConsumer), /evidence inventory changed after acceptance/);
 }));
 
+test('a nested exchange consumes only its own accepted waiting checkpoint and preserves the input hash through parent resume', async () => fixture(async ({ base }) => {
+  const session = path.join(base, 'session');
+  const parent = path.join(session, 'step-1', 'parallel-1');
+  mkdirSync(path.join(parent, 'request'), { recursive: true });
+  mkdirSync(path.join(parent, 'response', 'data'), { recursive: true });
+  const parentRequest = { contractVersion: V22_CONTRACT, operatorId: 'architecture.decide', step: 1, parallel: 1, attempt: { id: 'parent-a1' } };
+  const waitingResponse = {
+    contractVersion: V22_CONTRACT, operatorId: 'architecture.decide', step: 1, parallel: 1,
+    status: 'waiting', awaiting: { exchange: 'critique', kind: 'independent-critique' },
+    fields: { 'stack-model': 'response/data/stack-model.json' }, attempt: { id: 'parent-a1', expectedVersion: 1 }
+  };
+  writeFileSync(path.join(parent, 'request', 'request.json'), JSON.stringify(parentRequest));
+  writeFileSync(path.join(parent, 'response', 'response.json'), JSON.stringify(waitingResponse));
+  writeFileSync(path.join(parent, 'response', 'data', 'stack-model.json'), '{"selected":"one"}\n');
+  const state = {
+    contractVersion: V22_CONTRACT,
+    steps: { '1/1': 'architecture.decide', '2/1': 'architecture.decide' },
+    requestHashes: { '1/1': sha(readFileSync(path.join(parent, 'request', 'request.json'))) },
+    attempts: {
+      '1/1': {
+        id: 'parent-a1', operatorId: 'architecture.decide', expectedVersion: 1, status: 'waiting',
+        requestRef: 'step-1/parallel-1/request/request.json', responseRef: 'step-1/parallel-1/response/response.json',
+        endedAt: new Date().toISOString(), evidenceManifest: await buildEvidenceManifest(parent)
+      }
+    }
+  };
+  const ownCritique = {
+    contractVersion: V22_CONTRACT, operatorId: 'architecture.decide', step: 1, parallel: 1, exchange: 'critique',
+    attempt: { id: 'critique-a1' }, expected: { version: 1 }
+  };
+  const input = 'step-1/parallel-1/response/data/stack-model.json';
+  assert.deepEqual(await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique), []);
+
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', { ...ownCritique, step: 2 })).join('\n'), /waits for matched acceptance/);
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', { ...ownCritique, exchange: 'review' })).join('\n'), /not waiting on its review exchange/);
+  assert.match((await localAcceptedInputErrors(session, state, input, 'current-state', ownCritique)).join('\n'), /is not emitted/);
+
+  state.attempts['1/1'].status = 'running';
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique)).join('\n'), /waits for matched acceptance/);
+  const child = path.join(parent, 'critique');
+  mkdirSync(path.join(child, 'request'), { recursive: true });
+  mkdirSync(path.join(child, 'response'), { recursive: true });
+  writeFileSync(path.join(child, 'request', 'request.json'), JSON.stringify(ownCritique));
+  const childComparison = { expectedVersion: 1, verdict: 'matched', criteria: [], next: 'advance' };
+  const childResponse = {
+    contractVersion: V22_CONTRACT, operatorId: 'architecture.decide', step: 1, parallel: 1, exchange: 'critique',
+    status: 'done', fields: {}, attempt: { id: 'critique-a1', expectedVersion: 1 }, comparison: childComparison
+  };
+  writeFileSync(path.join(child, 'response', 'response.json'), JSON.stringify(childResponse));
+  state.requestHashes['1/1/critique'] = sha(readFileSync(path.join(child, 'request', 'request.json')));
+  state.attempts['1/1/critique'] = {
+    id: 'critique-a1', operatorId: 'architecture.decide', expectedVersion: 1, status: 'matched',
+    requestRef: 'step-1/parallel-1/critique/request/request.json', responseRef: 'step-1/parallel-1/critique/response/response.json',
+    endedAt: new Date().toISOString(), comparison: childComparison,
+    evidenceManifest: await buildEvidenceManifest(child)
+  };
+  assert.deepEqual(await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique), []);
+  const childResponseBytes = readFileSync(path.join(child, 'response', 'response.json'));
+  writeFileSync(path.join(child, 'response', 'response.json'), '{} ');
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique)).join('\n'), /accepted exchange .* changed after acceptance/);
+  writeFileSync(path.join(child, 'response', 'response.json'), childResponseBytes);
+
+  const finalResponse = {
+    ...waitingResponse, status: 'done', fields: { 'stack-model': 'response/data/stack-model.json' },
+    comparison: { expectedVersion: 1, verdict: 'matched', criteria: [], next: 'advance' }
+  };
+  delete finalResponse.awaiting;
+  writeFileSync(path.join(parent, 'response', 'response.json'), JSON.stringify(finalResponse));
+  assert.deepEqual(await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique), []);
+  writeFileSync(path.join(parent, 'response', 'data', 'stack-model.json'), '{"selected":"changed-after-critique"}\n');
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique)).join('\n'), /changed .* after its accepted waiting checkpoint/);
+
+  writeFileSync(path.join(parent, 'response', 'data', 'stack-model.json'), '{"selected":"one"}\n');
+  state.attempts['1/1'].status = 'matched';
+  state.attempts['1/1'].comparison = finalResponse.comparison;
+  state.attempts['1/1'].evidenceManifest = await buildEvidenceManifest(parent);
+  assert.deepEqual(await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique), []);
+
+  const blockedResponse = {
+    ...finalResponse, status: 'blocked', stop: 'NO_VIABLE_ALTERNATIVE',
+    comparison: { expectedVersion: 1, verdict: 'mismatched', criteria: [], next: 'blocked' }
+  };
+  writeFileSync(path.join(parent, 'response', 'response.json'), JSON.stringify(blockedResponse));
+  state.attempts['1/1'].status = 'blocked';
+  state.attempts['1/1'].comparison = blockedResponse.comparison;
+  state.attempts['1/1'].evidenceManifest = await buildEvidenceManifest(parent);
+  assert.deepEqual(await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique), []);
+
+  writeFileSync(path.join(parent, 'response', 'data', 'stack-model.json'), '{"selected":"tampered-terminal"}\n');
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique)).join('\n'), /producer 1\/1 .*changed after acceptance|changed .* after its accepted waiting checkpoint/);
+  writeFileSync(path.join(parent, 'response', 'data', 'stack-model.json'), '{"selected":"one"}\n');
+
+  writeFileSync(path.join(child, 'response', 'response.json'), '{} ');
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique)).join('\n'), /accepted exchange 1\/1\/critique .*changed after acceptance/);
+  writeFileSync(path.join(child, 'response', 'response.json'), childResponseBytes);
+
+  state.attempts['1/1/critique'].comparison = { ...childComparison, next: 'blocked' };
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique)).join('\n'), /not the matched response accepted/);
+  state.attempts['1/1/critique'].comparison = childComparison;
+
+  const parentManifest = structuredClone(state.attempts['1/1'].evidenceManifest);
+  state.attempts['1/1'].evidenceManifest.files.find((item) => item.ref === 'response/data/stack-model.json').sha256 = sha('altered manifest');
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique)).join('\n'), /producer 1\/1 .*changed after acceptance|changed .* after its accepted waiting checkpoint/);
+  state.attempts['1/1'].evidenceManifest = parentManifest;
+
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', { ...ownCritique, step: 2 })).join('\n'), /waits for matched acceptance/);
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', { ...ownCritique, attempt: { id: 'new-critique-a2' } })).join('\n'), /not the exact frozen attempt/);
+  state.requestHashes['1/1/critique'] = sha('different request');
+  assert.match((await localAcceptedInputErrors(session, state, input, 'stack-model', ownCritique)).join('\n'), /not the exact frozen attempt/);
+}));
+
+test('a nested response binds its own attempt and criteria without inheriting the parent goal', async () => fixture(async ({ base }) => {
+  const parent = path.join(base, 'session', 'step-1', 'parallel-1');
+  const nested = path.join(parent, 'critique');
+  mkdirSync(path.join(parent, 'request'), { recursive: true });
+  mkdirSync(path.join(nested, 'request'), { recursive: true });
+  mkdirSync(path.join(nested, 'response'), { recursive: true });
+  writeFileSync(path.join(parent, 'request', 'request.json'), JSON.stringify({
+    requirements: { selectionPolicy: 'automatic' }, goal: { doneWhen: 0 }
+  }));
+  writeFileSync(path.join(nested, 'request', 'request.json'), JSON.stringify({
+    contractVersion: V22_CONTRACT, schemaVersion: 9, operatorId: 'architecture.decide', step: 1, parallel: 1,
+    sessionId: 'nested-test', exchange: 'critique', contexts: [], requirements: {},
+    inputs: { 'stack-model': 'step-1/parallel-1/response/data/stack-model.json' }, resume: null,
+    attempt: { id: 'critique-a1', number: 1, kind: 'initial', previous: null },
+    expected: { version: 1, goalVersion: 1, sourceRef: 'parent waiting checkpoint', criteria: [{ id: 'independent-critique', required: true, expected: 'attack all paths', verification: 'read critique' }] },
+    environment: { isolationId: 'critique-a1', mode: 'isolated', workspace: null, reads: ['step-1/parallel-1/response/data/stack-model.json'], writes: ['response/critique.md', 'response/response.json'], exclusive: ['response'], outputRoot: 'response' },
+    frozenInputs: []
+  }));
+  const paths = ['partial-failure', 'retry-idempotency', 'concurrency', 'stale-state', 'deletion', 'recovery', 'dependency-outage', 'rollback'];
+  writeFileSync(path.join(nested, 'response', 'critique.md'), `# independent-critique — nested-test\n\n## Execution\n\n| Field | Value |\n| --- | --- |\n| Reviewer execution | exec://fresh |\n| Inherited turns | none |\n| Given | response/data/stack-model.json |\n\n## Attacks\n\n| Adverse path | Attack | Resolution | Verdict |\n| --- | --- | --- | --- |\n${paths.map((item) => `| ${item} | attack | resolved | holds |`).join('\n')}\n\n## Verdict\n\n| Field | Value |\n| --- | --- |\n| Selection | keep |\n`);
+  const response = {
+    contractVersion: V22_CONTRACT, schemaVersion: 9, operatorId: 'architecture.decide', step: 1, parallel: 1, exchange: 'critique', status: 'done',
+    fields: { 'independent-critique': 'response/critique.md' }, fallbacks: [], commits: [], next: [], boundProfile: 'sol-reviewer', ranProfile: 'sol-reviewer',
+    attempt: { id: 'critique-a1', number: 1, expectedVersion: 1 },
+    actual: { expectedVersion: 1, observedAt: new Date().toISOString(), observations: [{ criterionId: 'independent-critique', observed: 'all paths hold', evidence: ['response/critique.md'] }] },
+    comparison: { expectedVersion: 1, verdict: 'matched', criteria: [{ criterionId: 'independent-critique', verdict: 'matched', evidence: ['response/critique.md'], note: 'fresh critique held' }], next: 'advance' },
+    outcome: { summary: 'All attacks held.', primary: { kind: 'document', label: 'Independent critique', ref: 'response/critique.md' }, selectionReason: 'No material attack remained.' }
+  };
+  writeFileSync(path.join(nested, 'response', 'response.json'), JSON.stringify(response));
+  assert.deepEqual((await validateResponse(root, nested, { requirements: { selectionPolicy: 'automatic' }, exchange: 'critique' })).errors, []);
+  const direct = spawnSync(process.execPath, [path.join(root, 'scripts', 'validate-response.mjs'), nested], { encoding: 'utf8' });
+  assert.equal(direct.status, 0, `${direct.stdout}\n${direct.stderr}`);
+  response.attempt = { id: 'parent-a1', number: 2, expectedVersion: 1 };
+  writeFileSync(path.join(nested, 'response', 'response.json'), JSON.stringify(response));
+  assert.match((await validateResponse(root, nested, { requirements: {}, exchange: 'critique' })).errors.join('\n'), /attempt.id does not match request.attempt.id critique-a1/);
+}));
+
 test('mission-owned helpers acquire and release the same three slots with concrete support owners', async () => fixture(async ({ sessions, worktree }) => {
   const opened = await openSession(sessions, draft(worktree));
   await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:1' });
   const makeRequest = (suffix, product = `product-${suffix}`) => {
     const runId = `20260905-12000${suffix}-run`;
-    const runDir = path.join(worktree, '.worktrees', 'helpers', 'generate-banks', 'runs', runId);
-    const bankDir = path.join(worktree, '.worktrees', 'banked', product);
+    const runDir = path.join(path.dirname(path.dirname(sessions)), '.worktrees', 'helpers', 'generate-banks', 'runs', runId);
+    const bankDir = path.join(path.dirname(path.dirname(sessions)), '.worktrees', 'banked', product);
     mkdirSync(runDir, { recursive: true });
     const requestFile = path.join(runDir, 'request.json');
     const request = {

@@ -154,6 +154,12 @@ function loadDeclarations(source) {
   const declarations = [];
   for (const project of directories(projectsRoot)) {
     for (const file of jsonFiles(join(projectsRoot, project))) {
+      if (file === 'workflow.json') {
+        const owner = readJson(join(projectsRoot, project, file));
+        if (owner.version !== 1 || owner.project !== project || !/^[a-z0-9][a-z0-9.-]*$/.test(owner.ownerRole) || !existsSync(join(projectsRoot, project, `${owner.ownerRole}.json`))) fail('workflow owner must name one declared project role');
+        assertPublicationSafe(owner, 'workflow owner');
+        continue;
+      }
       const path = join(projectsRoot, project, file);
       const route = readJson(path);
       assertSchemaLink(path, route.$schema);

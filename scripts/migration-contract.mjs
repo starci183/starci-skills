@@ -111,7 +111,8 @@ export async function validateMigrationContract(root, branchDir, request, mutati
     let parallel = Number(match[3]);
     if (existsSync(path.join(copied, 'import.json'))) {
       const manifest = json(within(copied, 'import.json'));
-      originalSession = within(path.dirname(root), `.worktrees/sessions/${manifest.sourceSessionId}`);
+      const { locateWorkflowSession } = await import('./workflow-root.mjs');
+      originalSession = locateWorkflowSession(path.dirname(root), manifest.sourceSessionId).session;
       relative = `step-${manifest.sourceStep}/parallel-${manifest.sourceParallel}`;
       sessionId = manifest.sourceSessionId;
       step = manifest.sourceStep;

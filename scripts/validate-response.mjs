@@ -360,7 +360,7 @@ export async function outcomeErrors(root, dir, response, pkg, { exchange = null,
 }
 // The goal the branch's request carried, read from disk when the caller did not pass it.
 async function requestOf(dir, exchange) {
-  const file = path.join(exchange ? path.dirname(dir) : dir, 'request', 'request.json');
+  const file = path.join(dir, 'request', 'request.json');
   if (!existsSync(file)) return null;
   try { return JSON.parse(await readFile(file, 'utf8')); } catch { return null; }
 }
@@ -504,7 +504,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     let requirements = {};
     let goal = null;
     const reqFile = path.join(exchange ? path.dirname(dir) : dir, 'request', 'request.json');
-    if (existsSync(reqFile)) { const request = JSON.parse(await readFile(reqFile, 'utf8')); requirements = request.requirements ?? {}; goal = request.goal ?? null; }
+    if (existsSync(reqFile)) { const request = JSON.parse(await readFile(reqFile, 'utf8')); requirements = request.requirements ?? {}; if (!exchange) goal = request.goal ?? null; }
     return validateResponse(root, dir, { requirements, exchange, goal });
   };
   run().then(({ errors }) => {

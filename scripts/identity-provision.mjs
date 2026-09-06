@@ -119,7 +119,10 @@ export async function provisionIdentity(sourceRoot, branchDir) {
     return filename;
   };
   try {
-    requireThat(normalized(branch).startsWith(normalized(path.join(source, '.worktrees/sessions')) + '/'), 'SESSION_SCOPE');
+    const { readSessionState, workflowRootOf, workflowOwnerErrors } = await import('./workflow-root.mjs');
+    const owning = readSessionState(branch);
+    requireThat(owning && !workflowOwnerErrors(path.join(source, '.claude'), owning.session, owning.state, { dispatch: true }).length, 'SESSION_SCOPE');
+    requireThat(normalized(branch).startsWith(normalized(path.join(workflowRootOf(path.join(source, '.claude'), owning.state), '.worktrees/sessions')) + '/'), 'SESSION_SCOPE');
     const gate = await validateRequest(path.join(source, '.claude'), branch);
     requireThat(gate.errors.length === 0, 'REQUEST_INVALID');
     const request = json(path.join(branch, 'request/request.json'));

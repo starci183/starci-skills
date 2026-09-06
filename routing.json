@@ -175,6 +175,14 @@
         "kind": "user"
       }
     },
+    "workflow.verify": {
+      "workflow": {
+        "kind": "user"
+      },
+      "caller": {
+        "kind": "user"
+      }
+    },
     "backend.generate": {
       "backend": {
         "kind": "resume"

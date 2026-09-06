@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { retainSessionBundle, verifyRetention, closeSuccessfulSession } from './session-cleanup.mjs';
-import { openSession, confirmSession } from './session-open.mjs';
+import { openSession, confirmSession } from './v23-test-fixture.mjs';
 import { openAttempt } from './attempt-gate.mjs';
 import { buildEvidenceManifest } from './evidence-manifest.mjs';
 
@@ -129,4 +129,58 @@ test('closing an accepted goal retains its proof and deletes only its exact sess
   assert.ok(!existsSync(opened.session));assert.ok(existsSync(central));assert.ok(existsSync(worktree));
   assert.equal(readFileSync(path.join(result.bundle,'step-1/parallel-1/response/response.md'),'utf8'),'# Synthetic accepted readiness evidence\n');
   assert.ok(existsSync(result.compact));
+}));
+
+test('close-success retains an accepted waiting parent resolved by a sealed failed review and terminal replan', async () => fixture(async ({base}) => {
+  const sessions=path.join(base,'.worktrees','sessions');
+  const worktree=path.join(base,'checkout');mkdirSync(worktree);
+  const opened=await openSession(sessions,{project:'proof',hostBinding:{kind:'codex-task',hostId:'resolved-wait',worktree,sourcePromptRef:'user:resolved'},mission:{language:'en',goal:'accept the repaired architecture',target:'fixture',includes:['architecture'],outputs:['architecture decision'],doneWhen:[{evidence:'the repaired architecture is accepted',producedBy:'architecture.decide'}],verification:'sealed waiting review and replan fixture',sourceRef:'user:resolved'}});
+  await confirmSession(opened.session,{selected:'as-stated',selectedBy:'user',sourceRef:'user:resolved'});
+  const put=(ref,value)=>{const file=path.join(opened.session,ref);mkdirSync(path.dirname(file),{recursive:true});writeFileSync(file,typeof value==='string'?value:JSON.stringify(value));};
+  const digest=(bytes)=>`sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+  const expectedHash=(value)=>digest(Buffer.from(JSON.stringify(value)));
+  const requestHash=(ref)=>digest(readFileSync(path.join(opened.session,ref)));
+  const expected=(version,sourceRef,id)=>({version,goalVersion:1,sourceRef,criteria:[{id,required:true,expected:id,verification:'sealed fixture evidence'}]});
+  const request=(operatorId,step,attempt,goal,exp,extra={})=>({contractVersion:'starci/v2.2',schemaVersion:9,operatorId,step,parallel:1,sessionId:opened.sessionId,contexts:[],requirements:extra.requirements??{},inputs:{},resume:extra.resume??null,goal,attempt,expected:exp,environment:{isolationId:attempt.id,mode:operatorId==='workspace.bind'?'inline':'isolated',workspace:null,reads:[],writes:[],exclusive:[],outputRoot:'response'},frozenInputs:[]});
+  const bindExpected=expected(1,'state.json#mission:v1/prerequisite:2/1','bound');
+  const parentExpected=expected(1,'state.json#mission:v1/prerequisite:3/1','accepted');
+  const childExpected=expected(1,'step-2/parallel-1/response/data/stack-model.json','review');
+  const successorExpected=expected(2,'state.json#mission:v1/doneWhen:0','accepted');
+  const bindRequest=request('workspace.bind',1,{id:'bind-a1',number:1,kind:'initial',previous:null},{prerequisite:'2/1'},bindExpected,{requirements:{project:'proof',role:'be'}});
+  const parentRequest=request('architecture.decide',2,{id:'parent-a1',number:1,kind:'initial',previous:null},{prerequisite:'3/1'},parentExpected);
+  const childRequest={...request('architecture.decide',2,{id:'child-a1',number:1,kind:'initial',previous:null},null,childExpected),exchange:'critique',inputs:{'stack-model':'step-2/parallel-1/response/data/stack-model.json'}};
+  const successorRequest=request('architecture.decide',3,{id:'successor-a2',number:2,kind:'repair',previous:'parent-a1'},{doneWhen:0},successorExpected,{resume:{step:2,parallel:1,token:'repair-review'}});
+  put('step-1/parallel-1/request/request.json',bindRequest);
+  put('step-1/parallel-1/response/response.json',{status:'done'});
+  put('step-2/parallel-1/request/request.json',parentRequest);
+  put('step-2/parallel-1/response/response.json',{contractVersion:'starci/v2.2',operatorId:'architecture.decide',step:2,parallel:1,status:'waiting',fields:{'stack-model':'response/data/stack-model.json'},awaiting:{exchange:'critique',kind:'independent-critique'},attempt:{id:'parent-a1',number:1,expectedVersion:1}});
+  put('step-2/parallel-1/response/data/stack-model.json','{"selected":"candidate"}\n');
+  put('step-2/parallel-1/critique/request/request.json',childRequest);
+  put('step-2/parallel-1/critique/response/critique.md','# faithful review returned one failure\n');
+  const childComparison={expectedVersion:1,verdict:'mismatched',criteria:[],next:'repair'};
+  put('step-2/parallel-1/critique/response/response.json',{contractVersion:'starci/v2.2',operatorId:'architecture.decide',step:2,parallel:1,exchange:'critique',status:'mismatch',fields:{'independent-critique':'response/critique.md'},attempt:{id:'child-a1',number:1,expectedVersion:1},comparison:childComparison});
+  put('step-3/parallel-1/request/request.json',successorRequest);
+  put('step-3/parallel-1/response/response.md','# accepted repaired architecture\n');
+  const successorEvidence=['response/response.md'];
+  const successorComparison={expectedVersion:2,verdict:'matched',criteria:[{criterionId:'accepted',verdict:'matched',note:'accepted',evidence:successorEvidence}],next:'advance'};
+  put('step-3/parallel-1/response/response.json',{contractVersion:'starci/v2.2',operatorId:'architecture.decide',step:3,parallel:1,status:'done',fields:{'architecture-decision':'response/response.md'},attempt:{id:'successor-a2',number:2,expectedVersion:2},goalCheck:{achieved:true,evidence:successorEvidence},actual:{expectedVersion:2,observedAt:new Date().toISOString(),observations:[{criterionId:'accepted',observed:'accepted',evidence:successorEvidence}]},comparison:successorComparison});
+  const stateFile=path.join(opened.session,'state.json');
+  const state=JSON.parse(readFileSync(stateFile,'utf8'));
+  state.chain=[['1/1'],['2/1'],['3/1']];state.steps={'1/1':'workspace.bind','2/1':'architecture.decide','3/1':'architecture.decide'};state.current='3/1';state.resumes={'3/1':{resumes:'2/1',stop:'CRITIQUE_UNRESOLVED'}};state.status='done';state.brief.proven=['doneWhen:0 repaired architecture accepted'];
+  state.requestHashes={'1/1':requestHash('step-1/parallel-1/request/request.json'),'2/1':requestHash('step-2/parallel-1/request/request.json'),'2/1/critique':requestHash('step-2/parallel-1/critique/request/request.json'),'3/1':requestHash('step-3/parallel-1/request/request.json')};
+  const attempt=(id,operatorId,number,kind,previous,exp,status,requestRef,responseRef,manifest,comparison)=>({id,operatorId,number,kind,previous,expectedVersion:exp.version,expectedHash:expectedHash(exp),expected:exp,frozenInputs:[],status,requestRef,responseRef,startedAt:'now',endedAt:'later',...(comparison?{comparison}:{}),evidenceManifest:manifest});
+  state.attempts={
+    '1/1':attempt('bind-a1','workspace.bind',1,'initial',null,bindExpected,'matched','step-1/parallel-1/request/request.json','step-1/parallel-1/response/response.json',await buildEvidenceManifest(path.join(opened.session,'step-1/parallel-1'))),
+    '2/1':attempt('parent-a1','architecture.decide',1,'initial',null,parentExpected,'waiting','step-2/parallel-1/request/request.json','step-2/parallel-1/response/response.json',await buildEvidenceManifest(path.join(opened.session,'step-2/parallel-1'))),
+    '2/1/critique':attempt('child-a1','architecture.decide',1,'initial',null,childExpected,'mismatched','step-2/parallel-1/critique/request/request.json','step-2/parallel-1/critique/response/response.json',await buildEvidenceManifest(path.join(opened.session,'step-2/parallel-1/critique')),childComparison),
+    '3/1':attempt('successor-a2','architecture.decide',2,'repair','parent-a1',successorExpected,'matched','step-3/parallel-1/request/request.json','step-3/parallel-1/response/response.json',await buildEvidenceManifest(path.join(opened.session,'step-3/parallel-1')),successorComparison)
+  };
+  writeFileSync(stateFile,JSON.stringify(state));
+  const result=await closeSuccessfulSession(opened.session,'Resolved review retained with the accepted repair.');
+  assert.ok(!existsSync(opened.session));
+  assert.ok(existsSync(path.join(result.bundle,'step-2/parallel-1/response/response.json')));
+  assert.ok(existsSync(path.join(result.bundle,'step-2/parallel-1/critique/response/response.json')));
+  const archived=JSON.parse(readFileSync(path.join(result.bundle,'state.json'),'utf8'));
+  assert.equal(archived.attempts['2/1'].status,'waiting');
+  assert.equal(archived.attempts['2/1/critique'].status,'mismatched');
 }));

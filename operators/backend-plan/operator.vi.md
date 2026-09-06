@@ -140,3 +140,5 @@ Khi `done`, in **Kết quả tốt nhất** là bảng module thực thi đượ
 | --- | --- |
 | mọi thao tác đã có module: mỗi module được generator điền trên nhánh riêng dưới scope full, mang id đơn vị của nó | `backend.generate` |
 | một thao tác contract mang là thứ người có thể không muốn điền trong nhiệm vụ này, nên người nói nó có thuộc nhiệm vụ hay không | `user` |
+| bàn giao backend đã có phạm vi và cùng tính năng cần sơ đồ bề mặt | `interface.plan` |
+| bàn giao backend đã có phạm vi và hành trình người dùng cần kế hoạch kiểm chứng | `uat.plan` |

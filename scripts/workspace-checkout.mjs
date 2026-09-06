@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readSessionState, workflowRootOf, workflowOwnerErrors } from './workflow-root.mjs';
 // workspace.bind's read-only selection of a declared checkout or its own registered session worktree.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -298,7 +299,11 @@ function sessionIdentityErrors(root, request, branchDir) {
   try {
     requireThat(isSessionId(request?.sessionId) && Number.isSafeInteger(request?.step) && request.step > 0 && Number.isSafeInteger(request?.parallel) && request.parallel > 0, 'INVALID_INPUT', 'session identity and coordinates must be safe before resolving paths');
     requireThat(typeof branchDir === 'string', 'INVALID_INPUT', 'session checkout requires its containing request branch');
-    const expected = path.resolve(path.dirname(root), '.worktrees', 'sessions', request.sessionId, `step-${request.step}`, `parallel-${request.parallel}`);
+    const owning = readSessionState(branchDir);
+    requireThat(owning, 'INVALID_INPUT', 'session checkout has no owning ledger');
+    const ownerErrors = workflowOwnerErrors(root, owning.session, owning.state);
+    requireThat(!ownerErrors.length, 'INVALID_INPUT', ownerErrors.join('; '));
+    const expected = path.resolve(workflowRootOf(root, owning.state), '.worktrees', 'sessions', request.sessionId, `step-${request.step}`, `parallel-${request.parallel}`);
     requireThat(samePath(path.resolve(branchDir), expected) && samePath(real(branchDir), expected), 'INVALID_INPUT', 'session checkout request is outside its own session coordinate');
     const state = JSON.parse(readFileSync(path.join(branchDir, '..', '..', 'state.json'), 'utf8'));
     const bytes = readFileSync(path.join(branchDir, 'request', 'request.json'));

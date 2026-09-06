@@ -7,13 +7,15 @@ import { fileURLToPath } from 'node:url';
 import { V22_CONTRACT } from './validate-request.mjs';
 import { validateSession } from './validate-session.mjs';
 import { withSessionLock } from './session-lock.mjs';
+import { resolvedWaitingAttemptKeys } from './resolved-waiting.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hash = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const digest = async file => hash(await readFile(file));
 const slash = value => value.replaceAll('\\', '/');
 const within = (parent, child) => { const rel = path.relative(parent, child); return rel !== '' && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
-const stateHash = state => { const { lifecycle, ...proof } = state; return hash(JSON.stringify(proof)); };
+export const sessionProofHash = state => { const { lifecycle, ...proof } = state; return hash(JSON.stringify(proof)); };
+const stateHash = sessionProofHash;
 const json = async file => JSON.parse(await readFile(file, 'utf8'));
 async function atomicWrite(file, bytes) { const temp = `${file}.${randomUUID()}.tmp`; await writeFile(temp, bytes); await rename(temp, file); }
 
@@ -57,6 +59,10 @@ async function retainedFiles(session, state) {
     }
   };
   const inputRefs = new Set();
+  if (state.upgrade) {
+    await add(state.upgrade.legacyState);
+    await add(state.upgrade.legacyInventory);
+  }
   for (const attempt of Object.values(state.attempts ?? {})) {
     await add(attempt.requestRef);
     const requestFile = await confinedFile(session, attempt.requestRef);
@@ -122,7 +128,7 @@ export async function retainSessionBundle(session, state, reason) {
     const partial = path.join(doneRoot, `.${state.id}.${randomUUID()}.partial`);
     await mkdir(path.join(partial, 'bundle'), { recursive: true });
     const closedAt = new Date().toISOString();
-    const closed = { ...state, lifecycle: { ...state.lifecycle, phase: 'closed-success', closedAt, closeReason: reason, compactRef: `../${state.id}.md` } };
+    const closed = { ...state, lifecycle: { ...state.lifecycle, phase: 'closed-success', closedAt, closeReason: reason, compactRef: `${state.id}/compact.md` } };
     const files = [];
     for (const ref of await retainedFiles(session, state)) {
       const source = await confinedFile(session, ref);
@@ -148,12 +154,14 @@ export async function retainSessionBundle(session, state, reason) {
   return { doneDir, compact, bundle: path.join(doneDir, 'bundle'), manifest };
 }
 
-function closeErrors(session, state) {
+async function closeErrors(session, state) {
   if (state.id !== path.basename(session) || state.contractVersion !== V22_CONTRACT) throw new Error('cleanup target id/contract must match its active session');
   if (state.status !== 'done') throw new Error(`session status is ${state.status}; blocked or failed sessions remain resumable`);
   if (!['active','closing'].includes(state.lifecycle?.phase)) throw new Error(`session lifecycle ${state.lifecycle?.phase} cannot close-success`);
   if ((state.workerSlots ?? []).length || Object.keys(state.leases ?? {}).length) throw new Error('session still has active worker/resource leases');
-  if (Object.values(state.attempts ?? {}).some(attempt => ['running','waiting'].includes(attempt.status))) throw new Error('session still has an active or waiting attempt');
+  const waitingReplans = await resolvedWaitingAttemptKeys(root, session, state, { requireSuccessorTerminal: true });
+  if (waitingReplans.errors.length) throw new Error(waitingReplans.errors.join('\n'));
+  if (Object.entries(state.attempts ?? {}).some(([key, attempt]) => attempt.status === 'running' || (attempt.status === 'waiting' && !waitingReplans.settled.has(key)))) throw new Error('session still has an active or unresolved waiting attempt');
   for (let i = 0; i < state.mission.doneWhen.length; i++) if (!(state.brief.proven ?? []).some(line => line.startsWith(`doneWhen:${i} `))) throw new Error(`session cannot close-success: doneWhen:${i} is not proven`);
 }
 
@@ -166,7 +174,7 @@ export async function closeSuccessfulSession(session, reason) {
   if ((await lstat(session)).isSymbolicLink() || path.dirname(await realpath(session)) !== await realpath(sessionsRoot)) throw new Error('cleanup target must be a real directory inside the named sessions root');
   return withSessionLock(session, async () => {
     const state = await json(path.join(session, 'state.json'));
-    closeErrors(session, state);
+    await closeErrors(session, state);
     const checked = await validateSession(root, session);
     if (checked.errors.length) throw new Error(checked.errors.join('\n'));
     state.lifecycle = { ...state.lifecycle, phase: 'closing', closeReason: reason };

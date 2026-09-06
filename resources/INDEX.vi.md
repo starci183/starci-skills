@@ -19,6 +19,9 @@ không âm thầm đổi model. `astra` và `fable-legacy` đã ngừng dùng ch
 Chế độ web, Grammar và ảnh nằm trong khai báo tool và knowledge của từng operator. Ảnh phải phục vụ nội dung
 hoặc tác vụ; một vùng trống chưa đủ lý do tạo artwork. Owner và cách đọc reference nằm trong knowledge family.
 
+Topology workflow người dùng khác với mode operator. Policy thực thi đầy đủ của nó có đúng một nơi tại
+`orchestrator.json#workflowTopologies`; tài liệu khác chỉ dẫn tới bản ghi đó thay vì phát biểu lại.
+
 ## Ma trận thực thi
 
 Các giá trị bên dưới đối chiếu trực tiếp operator.json. Scheduler/isolation có một nơi định nghĩa tại
@@ -51,6 +54,7 @@ orchestrator.json; mode không tạo thêm user session hoặc hạn mức paral
 | `service.operate` | sol-fresh | no | `fileread:context-aliases`, `shell:declared-commands`, `container:operate`, `http:probe`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
 | `uat.plan` | sol-reviewer | no | `fileread:context-aliases` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
 | `uat.verify` | sol-reviewer | no | `fileread:context-aliases`, `sourcewrite:declared-write-set`, `git:read`, `websearch:bounded`, `visualize:html`, `browsercontrol:required`, `http:probe`, `secrets:resolve-by-name`, `print:decision-points` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
+| `workflow.verify` | sol-reviewer | no | `fileread:context-aliases`, `git:read` | isolated | Suy luận và kiểm bằng chứng trong ranh giới operator |
 | `workspace.bind` | sol-fresh | no | `fileread:context-aliases`, `git:read`, `shell:declared-commands`, `secrets:resolve-by-name` | inline | Thực thi trong phạm vi ghi và tác động được giao |
 
 ## Thay đổi

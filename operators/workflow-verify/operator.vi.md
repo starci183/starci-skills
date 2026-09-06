@@ -1,0 +1,112 @@
+# workflow.verify
+
+## Việc
+
+Kiểm một portfolio peer đã đóng băng của coordinator từ receipt và bằng chứng nguyên gốc của các
+session solo đã kết thúc, chứng minh riêng mọi child goal và ghim mọi biên repository đã giao mà
+không thay đổi session, worktree, source hay ledger nào của peer.
+
+## Xong khi
+
+Xong khi `workflow-verification-report` ánh xạ mọi dòng done-when đã đóng băng của coordinator tới peer được giao, chứng minh mỗi peer hoàn tất mọi dòng của đúng child goal đã đóng băng, ràng full head đã giao của từng repository được route với bằng chứng delivery được chấp nhận và Git HEAD hiện tại chính xác, chỉ giữ bằng chứng source cũ hơn khi revision ấy là tổ tiên trong cùng repository, và giữ fingerprint state cùng nhánh có thể đọc lại cho mọi khẳng định.
+
+## Message định vị bằng chứng, không trở thành bằng chứng
+
+Coordinator có thể dùng message task hai chiều bình thường để giao việc, nhận session id, báo trạng
+thái, trả feedback và chọn lúc đọc lại. Các message ấy chỉ là vận chuyển: chúng không cấp quyền,
+không route bước operator nào và không chứng minh outcome. Trước khi operator này chạy, coordinator
+đóng băng các định danh đã nhận cùng mission goal chính xác của child trong `request/peers.json`; operator này đọc tệp đó cùng bằng chứng
+gốc của peer, và không import receipt nào của peer.
+
+Coordinator không mạo nhận profile đã bind của operator này. Orchestrator dispatch một worker
+`sol-reviewer` isolated, không thừa hưởng transcript task, bên trong chính StarCi session đang có của
+coordinator. Worker ấy không mở native task hay user workflow nào: request, attempt, receipt, lease
+và worker slot của nó vẫn nằm trong cùng chain, ledger và ngân sách slot dùng chung của coordinator.
+Coordinator vẫn sở hữu decomposition, message, việc chờ, feedback và kết luận portfolio cuối; worker
+isolated chỉ sở hữu attempt kiểm chỉ-đọc này và ghi đúng profile thật sự đã chạy nó.
+
+Trước khi dispatch, caller phải bung inventory peer đã đóng băng vào danh sách Context của request.
+Với mỗi peer, caller gọi tên ít nhất một alias bằng chứng gốc cụ thể —
+`@worktrees/sessions/<sessionId>` khi còn sống, `@worktrees/done/<sessionId>` sau close-success, hoặc
+cả hai trong retention bình thường — với cùng session id trong `request/peers.json`. Chỉ những vị
+trí đã bind tường minh ấy được đọc. Root sessions hay done trần, quét sibling, alias không có trong
+inventory đóng băng, và discovery từ lời message đều bị cấm.
+
+Mỗi peer vẫn là chủ duy nhất của workflow solo, session ledger và worktree của chính nó. Peer chỉ
+được tính khi session gốc của nó thành công cuối cùng, không còn attempt, blocker, worker hay lease
+dở dang, có đúng mission goal đã đóng băng cho nó, và qua gate session cùng response từ chính byte
+của nó. Với snapshot version 2, mọi dòng done-when gốc được chứng minh riêng. Bằng chứng có bind
+source phải phân giải trong repository được workspace alias đã route gọi tên và là tổ tiên của head
+đã giao của repository ấy. Mỗi head đã giao còn phải có bằng chứng done-when gốc mà snapshot gọi tên
+được chấp nhận tại đúng revision đó, phân giải thành commit trong cùng repository và bằng HEAD hiện
+tại của worktree chứng minh. Version 1 giữ luật bằng một head cũ cho peer một repository đã đóng
+băng cùng fallback sang worktree đã bind với host. Một lời nhắc head riêng trong context không bao giờ
+ràng peer. Version 2 chỉ được phân giải binding chỉ có context từ bằng chứng đã qua validator ánh xạ
+rõ alias đó vào đúng một Git repository. Session còn sống được đọc tại chỗ; session đã đóng
+tường minh chỉ được đọc sau khi bundle giữ lại qua kiểm retention bình thường.
+
+`ancestralEvidenceOperators` của topology coordinated là danh sách ngoại lệ đóng duy nhất. Với mọi
+producer done-when gốc khác, từng workspace alias đã route trong bằng chứng được chấp nhận là một
+nghĩa vụ exact-head bắt buộc. `deliveryDoneWhen` ghi lại nghĩa vụ được suy ra ấy; nó không thể bỏ hay
+làm yếu một nghĩa vụ. Vì thế bằng chứng được chấp nhận mang cả context frontend và backend ràng cả
+hai biên, kể cả khi hai repository tình cờ chứa commit có cùng object id. Một hàng chứng minh được
+chấp nhận phải đồng thời khớp mọi repository head đã route cho done-when đó; không được ghép các hàng
+từ nhiều lần chạy thành một bộ repository-head chưa từng được quan sát.
+
+Bằng chứng peer thiếu, thay đổi hay bị từ chối không tạo report một phần. Session coordinated có thể
+tiếp tục chờ, gửi feedback cho peer sở hữu, rồi vào một verifier attempt cục bộ mới dưới cùng goal đã
+được cho phép khi bằng chứng đổi; operator này không bao giờ sửa peer để bịa delta ấy.
+
+## Context
+
+| Alias | Bind | Bắt buộc |
+| --- | --- | --- |
+| `@worktrees/sessions/<sessionId>` | một session peer gốc còn sống cụ thể có session id đã đóng băng trong `request/peers.json`; chỉ vị trí đã bind tường minh được đọc, không bao giờ là root sessions hay sibling được dò ra | không |
+| `@worktrees/done/<sessionId>` | một peer cụ thể trong inventory đóng băng sau close-success tường minh, chỉ đọc tại vị trí đã bind tường minh qua retention manifest đã kiểm cùng bundle giữ lại; có thể bind cạnh alias live trong retention bình thường, không bao giờ là root done | không |
+
+## Đầu vào
+
+| Kind | Từ đâu | Bắt buộc |
+| --- | --- | --- |
+| `—` | operator này không dùng output producer có kiểu; outcome peer ở nguyên trong session gốc và message task bình thường không bao giờ được import | không |
+
+## Yêu cầu
+
+| Field | Kiểu | Mặc định | Hỏi |
+| --- | --- | --- | --- |
+| `peers` | file | — | Orchestrator cấp đúng `request/peers.json`, snapshot đã đóng băng bằng digest mà hình dạng duy nhất nằm ở `templates/kinds/workflow-peers.schema.json` |
+
+## Các bước
+
+| # | Bước | Tham số | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Gate request coordinated cùng inventory peer bất biến, buộc tập task, scope sở hữu và head cũ hoặc tập head repository của snapshot bằng `brief.peers`, đóng băng mission goal chính xác của từng child, phủ mọi done-when của coordinator do operator này sinh, và bind ít nhất một alias Context live hay done cụ thể cho mỗi peer đã đóng băng; có thể bind cả hai và chỉ đọc vị trí tường minh | `peers` | `request/request.json`, `request/peers.json`, `state.json` của coordinator | — | `INVALID_INPUT` |
+| 2 | Phân giải từng session peer riêng biệt đang sống hoặc từ bundle close-success đã kiểm, rồi kiểm goal đóng băng chính xác, topology solo, local state cuối, từng goal ledger gốc, response được chấp nhận và evidence manifest; với version 2 chỉ phân giải bằng chứng source trong ancestry của repository đã route và buộc bằng chứng delivery được gọi tên ở đúng HEAD hiện tại của từng repository; version 1 giữ kiểm một head | — | @worktrees/sessions/<sessionId>, @worktrees/done/<sessionId>, @tools/git | — | `EVIDENCE_MISSING` |
+| 3 | Đọc lại snapshot đóng băng cùng byte peer, ràng hash của chúng, rồi phát ánh xạ peer-tới-done-when chính xác, một bằng chứng gốc có index cho từng child goal và một bằng chứng head đã giao chính xác cho từng biên repository | — | `request/peers.json`, state peer cùng các nhánh chứng minh đã kiểm ở trên | `workflow-verification-report`, `response/response.json` | `EVIDENCE_MISSING` |
+
+## Đầu ra
+
+| Kind | File | Kiểu | Bắt buộc |
+| --- | --- | --- | --- |
+| `workflow-verification-report` | `response/data/workflow-verification-report.json` | data | có |
+
+## Kết quả tốt nhất
+
+Khi `done`, `response/data/workflow-verification-report.json` là toàn bộ bằng chứng portfolio: tập
+peer, child goal chính xác, ownership và repository head của nó bằng snapshot coordinator đã đóng băng; mọi dòng done-when của
+coordinator đều có chủ; và mỗi hàng peer gọi tên state hash của session solo gốc, từng bằng chứng goal gốc cùng bằng chứng head đã giao chính xác và fingerprint
+bằng chứng nhánh được chấp nhận. Nó không chứa transcript message, receipt sao chép, thành công suy
+diễn hay verdict một phần.
+
+## Dừng
+
+| Code | Xử lý |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `EVIDENCE_MISSING` | terminate |
+
+## Kế tiếp
+
+| Khi | Operator |
+| --- | --- |
+| portfolio đã đóng băng được kiểm và coordinator có thể kết luận từ receipt matched cục bộ | `user` |

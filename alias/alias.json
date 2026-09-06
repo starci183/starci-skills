@@ -1,6 +1,6 @@
 {
   "schemaVersion": 8,
-  "note": "Closed registry of reference aliases. An alias reads like the place it names. Static: @workspaces/fe and @workspaces/be (the bound project's routed checkouts), @workspaces/<project>/<role>, @workspaces/{projects,local/routes,ports,device-state}, @grammar/<family>, @knowledge/{ui,grammars,findings,patterns}, @worktrees/{businesses,uat,e2e,debts,unchecked,helpers,banked,done,_templates,sessions/central-runtime}, @remote/{npm,git,ghcr,github-actions,minio}. Dynamic: @dynamic, the current session branch, typed by kind. `<Source>` is the host repository that owns this .claude. A sub-path after a registered alias narrows it; a segment in angle brackets is supplied by the invocation. The registry is a tree: one root per zone, children by path segment, a node with resolvesTo is a definition. Resolution picks the longest registered prefix.",
+  "note": "Closed registry of reference aliases. An alias reads like the place it names. Static: @workspaces/fe and @workspaces/be (the bound project's routed checkouts), @workspaces/<project>/<role>, @workspaces/{projects,local/routes,ports,device-state}, @grammar/<family>, @knowledge/{ui,grammars,findings,patterns}, @worktrees/{businesses,uat,e2e,debts,unchecked,helpers,banked,done,_templates,sessions}, @remote/{npm,git,ghcr,github-actions,minio}. Dynamic: @dynamic, the current session branch, typed by kind. `<Source>` is the host repository that owns this .claude. A sub-path after a registered alias narrows it; a segment in angle brackets is supplied by the invocation. The registry is a tree: one root per zone, children by path segment, a node with resolvesTo is a definition. Resolution picks the longest registered prefix. <Workflow> is the declared project workflow owner resolved by scripts/workflow-root.mjs; Source remains the shared runtime and route authority. Central runtime and installed templates remain Source-owned.",
   "zones": {
     "remote": {
       "en": "Internet. Registries, git remotes, image registries, CI runs, object storage. Read through a network; bound by version, digest, or observed head.",
@@ -19,8 +19,8 @@
       "vi": "Vùng làm việc: các checkout đã route của project đang bind, và khai báo, route, port, danh tính để tìm ra chúng."
     },
     "worktrees": {
-      "en": "Machine-local authority and evidence outside any checkout: business heads, UAT pairs, debts, unchecked coverage, banked missions, helper runs, templates, the shared runtime owner.",
-      "vi": "Thẩm quyền và bằng chứng máy-cục-bộ ngoài mọi checkout: head nghiệp vụ, UAT pair, nợ, phần chưa kiểm, kho nhiệm vụ, lần chạy helper, khuôn, runtime owner dùng chung."
+      "en": "Machine-local authority and evidence outside any checkout: business heads, UAT pairs, debts, unchecked coverage, banked missions, helper runs, user-session evidence, templates, and the shared runtime owner.",
+      "vi": "Thẩm quyền và bằng chứng máy-cục-bộ ngoài mọi checkout: head nghiệp vụ, UAT pair, nợ, phần chưa kiểm, kho nhiệm vụ, lần chạy helper, bằng chứng user-session, khuôn và runtime owner dùng chung."
     },
     "dynamic": {
       "en": "Produced inside the current host session. Successful close retains declared fields and evidence in the done bundle before removing the active folder; blocked or failed work remains resumable.",
@@ -159,7 +159,7 @@
       "businesses": {
         "params": [],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/businesses/  (features/<featureId>/model.json; business-registry-v1.json is the head index; objects/sha256/ the content store)",
+        "resolvesTo": "<Workflow>/.worktrees/businesses/  (features/<featureId>/model.json; business-registry-v1.json is the head index; objects/sha256/ the content store)",
         "scheme": "business://<featureId>",
         "bind": "content address from business-registry-v1.json featureHeads.<featureId>.head, with authorityStatus",
         "writers": [
@@ -171,13 +171,13 @@
       "sessions": {
         "params": [],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/  (state.json; step-<N>/parallel-<M>/ branches, each with request/ and response/ — see @dynamic; central-runtime/ is the shared runtime owner registry outside any session)",
+        "resolvesTo": "<Workflow>/.worktrees/sessions/<sessionId>/  (state.json; step-<N>/parallel-<M>/ branches, each with request/ and response/ — see @dynamic; central-runtime/ is the shared runtime owner registry outside any session)",
         "scheme": "session://<sessionId>",
         "bind": "fingerprint per file read",
         "writers": [
           "*"
         ],
-        "purpose": "The session container. Operators do not read it directly; they read @dynamic.",
+        "purpose": "The session container. workflow.verify alone may read an original peer session here, read only, to verify its terminal solo state and accepted evidence at the recorded head; every other operator reads its own session through @dynamic.",
         "central-runtime": {
           "params": [],
           "kind": "file",
@@ -196,7 +196,7 @@
       "uat": {
         "params": [],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/uat/<flow>/  (flow.md: goal, role, preconditions, budget and the step table; accounts.<env>.json: one account per alias the steps act as, each a username, a role, a credential name, the sealed file and the registry entry, never a secret; seed/: README.md, records.json and fixtures/; snapshots/: the approved reference a person promotes, with its captures and data/after.json; runs/<runId>/ append-only, runId = <yyyymmdd-HHMMss>-<commit7>: snapshot.json, steps/<NN-slug>/, db/, diff/, verdicts.json, run.md; latest.json names the newest run and history.md keeps one line per run). <case> narrows to one case of the flow",
+        "resolvesTo": "<Workflow>/.worktrees/uat/<flow>/  (flow.md: goal, role, preconditions, budget and the step table; accounts.<env>.json: one account per alias the steps act as, each a username, a role, a credential name, the sealed file and the registry entry, never a secret; seed/: README.md, records.json and fixtures/; snapshots/: the approved reference a person promotes, with its captures and data/after.json; runs/<runId>/ append-only, runId = <yyyymmdd-HHMMss>-<commit7>: snapshot.json, steps/<NN-slug>/, db/, diff/, verdicts.json, run.md; latest.json names the newest run and history.md keeps one line per run). <case> narrows to one case of the flow",
         "scheme": "uat://<flow>/<case>",
         "bind": "fingerprint of snapshot.json and result.json",
         "writers": [
@@ -210,7 +210,7 @@
       "e2e": {
         "params": [],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/e2e/<flow>/  (flow.md: the API journey, the suite files it runs, the served route and the namespace it walks on; runs/<runId>/ append-only, runId = <yyyymmdd-HHMMss>-<commit7>: result.json (the run record: every case the repository's own e2e runner reported with its status, assertion and evidence ref; the three lanes contract, data and lifecycle judged apart; the namespace and its cleanup), the runner's own output; latest.json names the newest run and history.md keeps one line per run). <case> narrows to one case",
+        "resolvesTo": "<Workflow>/.worktrees/e2e/<flow>/  (flow.md: the API journey, the suite files it runs, the served route and the namespace it walks on; runs/<runId>/ append-only, runId = <yyyymmdd-HHMMss>-<commit7>: result.json (the run record: every case the repository's own e2e runner reported with its status, assertion and evidence ref; the three lanes contract, data and lifecycle judged apart; the namespace and its cleanup), the runner's own output; latest.json names the newest run and history.md keeps one line per run). <case> narrows to one case",
         "scheme": "e2e://<flow>/<case>",
         "bind": "fingerprint of cases.json and verdicts.json",
         "writers": [
@@ -221,7 +221,7 @@
       "debts": {
         "params": [],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/debts/  (be.md, fe.md, per-item files)",
+        "resolvesTo": "<Workflow>/.worktrees/debts/  (be.md, fe.md, per-item files)",
         "scheme": "debt://<file>",
         "bind": "fingerprint per file",
         "writers": [],
@@ -233,7 +233,7 @@
           "featureId"
         ],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/unchecked/<product>/<featureId>.jsonl  (append-only, one line per unchecked entry against templates/kinds/unchecked.schema.json). A sub-path narrows to one product or one feature: @worktrees/unchecked/<product>",
+        "resolvesTo": "<Workflow>/.worktrees/unchecked/<product>/<featureId>.jsonl  (append-only, one line per unchecked entry against templates/kinds/unchecked.schema.json). A sub-path narrows to one product or one feature: @worktrees/unchecked/<product>",
         "scheme": "unchecked://<product>/<featureId>",
         "bind": "an entry binds by its id, whose newest line is its state",
         "writers": [
@@ -250,7 +250,7 @@
           "id"
         ],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/helpers/<id>/runs/<runId>/  (run.json against templates/kinds/helper-run.schema.json: the helper, its arguments, every input it read with the head it read at, every output it wrote, the instants it ran between and the profile it ran on)",
+        "resolvesTo": "<Workflow>/.worktrees/helpers/<id>/runs/<runId>/  (run.json against templates/kinds/helper-run.schema.json: the helper, its arguments, every input it read with the head it read at, every output it wrote, the instants it ran between and the profile it ran on)",
         "scheme": "helper://<id>/<runId>",
         "bind": "fingerprint of run.json; a run binds by its runId",
         "writers": [
@@ -264,7 +264,7 @@
           "product"
         ],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/banked/<product>/  (queue.json against templates/kinds/bank-queue.schema.json: the ordered entries with their status, dependsOn and priority; approvals.json against bank-approvals.schema.json: the person's approval of one queue hash; <missionId>/mission.json against banked-mission.schema.json and <missionId>/mission.md the person reads)",
+        "resolvesTo": "<Workflow>/.worktrees/banked/<product>/  (queue.json against templates/kinds/bank-queue.schema.json: the ordered entries with their status, dependsOn and priority; approvals.json against bank-approvals.schema.json: the person's approval of one queue hash; <missionId>/mission.json against banked-mission.schema.json and <missionId>/mission.md the person reads)",
         "scheme": "bank://<product>/<missionId>",
         "bind": "the queue hash of queue.json; a mission binds by its missionId inside it",
         "writers": [
@@ -285,11 +285,11 @@
       "done": {
         "params": [],
         "kind": "dir",
-        "resolvesTo": "<Source>/.worktrees/done/  (<sessionId>.md compact; <sessionId>/bundle/ retained state and branch request/response artifacts; retention.json hashes and import references)",
+        "resolvesTo": "<Workflow>/.worktrees/done/  (<sessionId>.md compact; <sessionId>/bundle/ retained state and branch request/response artifacts; retention.json hashes and import references)",
         "scheme": "session-archive://<sessionId>",
         "bind": "retention manifest and content hashes",
         "writers": [],
-        "purpose": "Owned by scripts/session-cleanup.mjs close-success, not an operator write target. Verify every retained reference before removing only the corresponding active session; keep central-runtime and user source worktrees."
+        "purpose": "Owned by scripts/session-cleanup.mjs close-success, never an operator write target. workflow.verify may read a peer bundle here only after its retention manifest verifies, and imports or changes nothing. Verify every retained reference before removing only the corresponding active session; keep central-runtime and user source worktrees."
       }
     },
     "@grammar": {
@@ -373,7 +373,7 @@
         "kind"
       ],
       "kind": "dir",
-      "resolvesTo": "<Source>/.worktrees/sessions/<sessionId>/step-<N>/parallel-<M>/ — one branch of one step. request/request.json is the gate in (orchestrator writes it); response/ is the agent's: response.json (gate out), response.md and other markdown kinds, data/<name>.json, artifacts/<file>; a nested exchange adds <exchange>/request/ and <exchange>/response/. A kind is passed by explicit path in request.json inputs, from the session root. Dynamic files are passed as kinds (templates/kinds/<kind>), never as aliases. The orchestrator creates the session folder. scripts/session-cleanup.mjs close-success retains required artifacts in @worktrees/done and verifies them before removing only this folder; git.publish does not delete the session or user worktree. Blocked or failed work is kept for resume",
+      "resolvesTo": "<Workflow>/.worktrees/sessions/<sessionId>/step-<N>/parallel-<M>/ — one branch of one step. request/request.json is the gate in (orchestrator writes it); response/ is the agent's: response.json (gate out), response.md and other markdown kinds, data/<name>.json, artifacts/<file>; a nested exchange adds <exchange>/request/ and <exchange>/response/. A kind is passed by explicit path in request.json inputs, from the session root. Dynamic files are passed as kinds (templates/kinds/<kind>), never as aliases. The orchestrator creates the session folder. scripts/session-cleanup.mjs close-success retains required artifacts in @worktrees/done and verifies them before removing only this folder; git.publish does not delete the session or user worktree. Blocked or failed work is kept for resume",
       "scheme": "step://<sessionId>/<N>/<M>/<path>",
       "bind": "kind contract or schema under templates/kinds; response.json fields is the registry of what a branch produced",
       "writers": [

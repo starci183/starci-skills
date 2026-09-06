@@ -201,3 +201,4 @@ On `done`, print **The best outcome** as the case and lane verdict table from `r
 | all three lanes pass and the promise must be reconciled against the journey a client actually took | `business.reconcile` |
 | a case the runner named did not hold | `backend.generate` |
 | the attested entry stopped answering, so the route is served again before the suite is run again | `runtime.serve` |
+| the API journey is proven and the same delivery needs its browser journey checked | `uat.verify` |

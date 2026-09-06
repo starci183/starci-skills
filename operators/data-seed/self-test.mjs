@@ -17,6 +17,8 @@ const APPROVAL = '@worktrees/debts/be.md#seed-approval';
 const NS = `uat-${FLOW}`;
 const ACCOUNT = `uat-${FLOW}-learner`;
 const FINGERPRINT = `sha256:${'5'.repeat(64)}`;
+const PLAN_REF = 'step-1/parallel-1/response/response.md';
+const SEED_STEP = 2;
 const PLAN = `# seed-plan — paid-enrolment\n\n## Fixtures\n\n| Unit | State | Action | JSON | SQL | Expected | Creates outcome |\n| --- | --- | --- | --- | --- | --- | --- |\n| \`${FLOW}\` | valid | reuse | \`fixtures/${FLOW}.json\` | — | prerequisites read back | false |\n`;
 
 const RECORDS = [
@@ -36,7 +38,7 @@ the rollback set names exactly the rows placed.
 | Field | Value |
 | --- | --- |
 | Operator | \`${operator}\` |
-| Step | \`step-1/parallel-1\` |
+| Step | \`step-${SEED_STEP}/parallel-1\` |
 | Flow | \`${flow}\` |
 | Environment | \`${env}\` |
 | Route | \`${route}\` |
@@ -67,22 +69,23 @@ ${findings.map(([code, statement]) => `| \`${code}\` | ${statement} |`).join('\n
 `;
 }
 const requestJson = ({ flow = FLOW, routeKey = ENTRY, env = ENV, approval = APPROVAL, operation = 'apply', extra = {} } = {}) => ({
-  schemaVersion: 9, operatorId: OPERATOR, step: 1, parallel: 1, sessionId: 's-test',
+  schemaVersion: 9, operatorId: OPERATOR, step: SEED_STEP, parallel: 1, sessionId: 's-test',
   contexts: [{ alias: `@worktrees/uat/${flow}`, head: null }, { alias: '@worktrees/sessions/central-runtime', head: null }, { alias: '@workspaces/device-state', head: null }],
   requirements: { flow, routeKey, env, approval, operation, resume: null, ...extra },
-  inputs: { 'seed-plan': 'seed-plan.md' }, resume: null,
+  inputs: { 'seed-plan': PLAN_REF }, resume: null,
 });
 const responseJson = ({ status = 'done', stop, next = ['uat.verify'], withReceipt = status === 'done' } = {}) => ({
-  schemaVersion: 9, operatorId: OPERATOR, step: 1, parallel: 1, status, ...(stop ? { stop } : {}),
+  schemaVersion: 9, operatorId: OPERATOR, step: SEED_STEP, parallel: 1, status, ...(stop ? { stop } : {}),
   fallbacks: [], fields: withReceipt ? { 'seed-receipt': 'response/response.md' } : {}, commits: [], next,
 });
 
 function writeBranch(files) {
   const session = mkdtempSync(path.join(tmpdir(), 'seed-session-'));
-  const branch = path.join(session, 'step-1', 'parallel-1');
+  const branch = path.join(session, `step-${SEED_STEP}`, 'parallel-1');
   for (const d of ['request', 'response/data', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
-  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'demo-product', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': OPERATOR }, current: '1/1', status: 'running' }));
-  writeFileSync(path.join(session, 'seed-plan.md'), PLAN);
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'demo-product', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1'], [`${SEED_STEP}/1`]], steps: { '1/1': 'data.plan', [`${SEED_STEP}/1`]: OPERATOR }, current: `${SEED_STEP}/1`, status: 'running' }));
+  mkdirSync(path.dirname(path.join(session, PLAN_REF)), { recursive: true });
+  writeFileSync(path.join(session, PLAN_REF), PLAN);
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));

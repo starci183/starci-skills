@@ -87,14 +87,34 @@ export async function restatementErrors({ branchDir, request, response, requirem
   }
   if (asked) errors.push(`response/response.json: the request carries the recorded choice ${request.selectedOption} on ${decisionId}, so the branch does not ask again with ${RESTATEMENT_STOP}`);
   if (!RESTATEMENT_OPTIONS.includes(request.selectedOption)) { errors.push(`request.json: selectedOption ${request.selectedOption} on ${decisionId} is neither ${RESTATEMENT_OPTIONS.join(' nor ')}`); return errors; }
-  if (!request.resume) { errors.push(`request.json: a re-entry that answers ${decisionId} names the blocked branch in resume, so its ${field} can be compared against that branch's request`); return errors; }
+  const refusalErrors = (reason) => {
+    const refused = [];
+    if (response.status !== 'blocked' || response.stop !== 'INVALID_INPUT') refused.push(`response/response.json: ${reason} ends blocked with INVALID_INPUT, not ${response.status}${response.stop ? ` ${response.stop}` : ''}`);
+    for (const kind of present) if (kind !== 'restatement') refused.push(`response/response.json: fields.${kind} is declared from ${reason}; only restatement may be retained as diagnostic evidence`);
+    return refused;
+  };
+  // An already-admitted request can carry a valid recorded choice yet omit the branch whose
+  // restatement that choice answers. Such a request cannot design or observe anything, but it must
+  // be able to terminate truthfully without rewriting its frozen input. Keep the restatement as
+  // diagnostic evidence and leave every other file undeclared as a typed output.
+  if (!request.resume) {
+    errors.push(...refusalErrors(`the request carries ${request.selectedOption} on ${decisionId} without resume; malformed selected restatement input`));
+    return errors;
+  }
   const resumed = `step-${request.resume.step}/parallel-${request.resume.parallel}`;
   const target = path.join(sessionRootOf(branchDir) ?? branchDir, resumed, 'request', 'request.json');
   if (!existsSync(target)) { errors.push(`request.json: resume names ${resumed}, whose request/request.json is missing, so the ${field} cannot be compared`); return errors; }
   let previous; try { previous = JSON.parse(await readFile(target, 'utf8')).requirements?.[field]; } catch { previous = undefined; }
   const same = collapse(previous) === collapse(requirements[field]);
-  if (request.selectedOption === 'corrected' && same) errors.push(`request.json: selectedOption corrected carries the same ${field} as the blocked branch ${resumed}; a correction arrives as a changed ${field}`);
-  if (request.selectedOption === 'as-stated' && !same) errors.push(`request.json: selectedOption as-stated carries a ${field} that differs from the blocked branch ${resumed}; a changed ${field} is a corrected reading`);
+  const lineageError = request.selectedOption === 'corrected' && same
+    ? `request.json: selectedOption corrected carries the same ${field} as the blocked branch ${resumed}; a correction arrives as a changed ${field}`
+    : request.selectedOption === 'as-stated' && !same
+      ? `request.json: selectedOption as-stated carries a ${field} that differs from the blocked branch ${resumed}; a changed ${field} is a corrected reading`
+      : null;
+  if (lineageError) {
+    const refusal = refusalErrors(`selectedOption ${request.selectedOption} contradicts the resumed ${field} lineage`);
+    if (refusal.length) errors.push(lineageError, ...refusal);
+  }
   return errors;
 }
 

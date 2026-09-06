@@ -5,7 +5,7 @@ description: "Every operator of the tree, its profile, and its single job."
 
 # Operators
 
-Fourteen operators. Each one performs one job in one linear pass and never calls another; the parent maps a validated output to the next transition. The page for an operator is its own `operator.md`, the file the runtime reads.
+Each operator performs one job in one linear pass and never calls another; the parent maps a validated output to the next transition. The page for an operator is its own `operator.md`, the file the runtime reads.
 
 | Operator | Profile | Domain | Single job |
 | --- | --- | --- | --- |
@@ -34,4 +34,5 @@ Fourteen operators. Each one performs one job in one linear pass and never calls
 | [`service.operate`](/reference/operators/service-operate) | `sol-fresh` | `service` | Bring one auxiliary service the environment declares — an observability stack, a code-quality service, a tunnel beside a served runtime — to the state that declaration asks for, prove from its own probe that it is in that state, and record the holder that answers, under the lease that orders sessions. |
 | [`uat.plan`](/reference/operators/uat-plan) | `sol-reviewer` | `uat` | Enumerate the user journeys the mission goal names, one flow per journey with its entry route, its step budget, its own account alias and its own seed namespace, so that the blind walkers that follow each walk one flow and no two of them ever share a row. |
 | [`uat.verify`](/reference/operators/uat-verify) | `sol-reviewer` | `test` | Verify one product flow end to end on the running product at the pinned commit, and publish one append-only run record with three independently judged lanes, or stop at the exact unavailability instead of manufacturing a verdict. |
+| [`workflow.verify`](/reference/operators/workflow-verify) | `sol-reviewer` | `workflow` | Verify one coordinator's frozen peer portfolio from the original terminal solo session receipts and evidence, independently proving every child goal and pinning every delivered repository boundary without changing any peer session, worktree, source, or ledger. |
 | [`workspace.bind`](/reference/operators/workspace-bind) | `sol-fresh` | `workspace` | Resolve one project and role into a verified checkout identity and its exact source head, and return that as one typed route receipt; the runtime a caller consumes is the runtime owner's to serve and bind. |

@@ -56,7 +56,8 @@ async function producer(root, session, reference, kind, operatorId, sessionId) {
   let originSession = session, relative = match[1], step = Number(match[2]), parallel = Number(match[3]);
   if (fs.existsSync(path.join(copied, 'import.json'))) {
     const manifest = json(migrationPath(copied, 'import.json'));
-    originSession = migrationPath(path.dirname(root), `.worktrees/sessions/${manifest.sourceSessionId}`);
+    const { locateWorkflowSession } = await import('./workflow-root.mjs');
+    originSession = locateWorkflowSession(path.dirname(root), manifest.sourceSessionId).session;
     sessionId = manifest.sourceSessionId; step = manifest.sourceStep; parallel = manifest.sourceParallel;
     relative = `step-${step}/parallel-${parallel}`;
   }

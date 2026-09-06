@@ -1,3 +1,4 @@
+import { deliveryTargets, deliveryPolicy } from './mission-scope.mjs';
 // A chain is never chosen from an example: scripts/plan-chain.mjs derives it from the mission's
 // done-when lines, and this file is the gate every planned or replanned chain passes before a branch
 // of it is dispatched. It reads the state.json shape (chain: [["1/1"], ["2/1", "2/2"]], steps:
@@ -123,6 +124,7 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
   const graph = options.graph ?? operatorGraph(packages, options.aliases ?? {});
   const maxParallel = options.maxParallel ?? 3;
   const mission = options.mission ?? null;
+  for (const target of deliveryTargets(mission)) if (!Object.values(steps ?? {}).includes(target)) errors.push(`state.json: frozen delivery impact requires ${target}; shallow doneWhen cannot omit its lane`);
   const planned = options.planned ?? {};
   const imported = options.imported ?? {};
   if (!Array.isArray(chain) || !chain.length) { errors.push('state.json: chain must be a non-empty array of steps'); return errors; }
@@ -147,6 +149,12 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
   const boundRoles = new Set(); // roles bound by earlier workspace.bind branches
   const position = new Map(); // operator -> first step index it runs in, over the whole chain
   chain.forEach((step, n) => { if (Array.isArray(step)) for (const cell of step) { const id = opOf(cell); if (id !== undefined && !position.has(id)) position.set(id, n); } });
+  if (mission?.discovery) {
+    const policy = deliveryPolicy(root); const mode = mission.discovery.stage === 'handoff' ? 'plan' : 'execute';
+    for (const [laneId, lane] of Object.entries(mission.discovery.lanes)) if (lane.status === 'planned') for (const consumer of policy.lanes[laneId]?.[mode] ?? []) for (const dependency of lane.dependsOn ?? []) for (const producer of policy.lanes[dependency]?.[mode] ?? []) {
+      if (producer !== consumer && position.has(producer) && position.has(consumer) && position.get(producer) >= position.get(consumer)) errors.push(`state.json: ${consumer} must follow ${producer}, the frozen ${laneId} handoff dependency`);
+    }
+  }
   let previous = null;
   chain.forEach((step, n) => {
     if (!Array.isArray(step) || !step.length) return;

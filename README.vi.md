@@ -45,6 +45,10 @@ dành cho người đọc.
 ## Phiên làm việc 2.2
 
 Session thuộc task/worktree của Codex hoặc session của Claude. Agent con là worker trong phiên đó.
+Topology workflow người dùng được chọn và qua gate trước khi session này bắt đầu. Tên, bộ chọn theo
+nhu cầu, giới hạn peer, kênh giao tiếp, địa chỉ theo dõi và luật đóng có đúng một nơi thực thi:
+[workflowTopologies](resources/orchestrator.json). Tầng này tách biệt với mode thực thi của operator.
+
 [SKILL.md](SKILL.md) dẫn prompt qua bản nháp scope có bảng goal, kết quả mong đợi và ví dụ;
 chỉ xác nhận còn thiếu mới cần hỏi. Workflow được dựng lại từ goal và kết quả có kiểu.
 

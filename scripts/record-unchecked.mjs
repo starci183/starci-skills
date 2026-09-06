@@ -1,3 +1,4 @@
+import { workflowRootOf, readSessionState } from './workflow-root.mjs';
 // The unchecked ledger, written: `node scripts/record-unchecked.mjs <session>/step-N/parallel-M` reads
 // the validated receipt of a done branch and brings @worktrees/unchecked/<product>/<featureId>.jsonl
 // into agreement with it. From a plan branch it appends one entry per secondary unit, in the lane that
@@ -45,7 +46,7 @@ export async function ledgerKeyOf(branchDir, { request = null, state = null } = 
 
 // What one done branch leaves unchecked and what it covers: `append` are the entries it records,
 // `resolve` the ids it closes. Returns null when the branch is not one the ledger listens to.
-export async function extractUnchecked(branchDir, { root = ROOT, hostRoot = hostRootOf(root), now = new Date().toISOString() } = {}) {
+export async function extractUnchecked(branchDir, { root = ROOT, hostRoot = workflowRootOf(root, readSessionState(branchDir)?.state), now = new Date().toISOString() } = {}) {
   const request = await readJson(path.join(branchDir, 'request', 'request.json'));
   const response = await readJson(path.join(branchDir, 'response', 'response.json'));
   if (!request || !response) return null;
@@ -97,7 +98,7 @@ export async function extractUnchecked(branchDir, { root = ROOT, hostRoot = host
   return { ...nothing, append, resolve };
 }
 
-export async function recordUnchecked(branchDir, { root = ROOT, hostRoot = hostRootOf(root), now = new Date().toISOString(), validate = true } = {}) {
+export async function recordUnchecked(branchDir, { root = ROOT, hostRoot = workflowRootOf(root, readSessionState(branchDir)?.state), now = new Date().toISOString(), validate = true } = {}) {
   branchDir = path.resolve(branchDir);
   const response = await readJson(path.join(branchDir, 'response', 'response.json'));
   if (!response) throw new Error(`${branchDir}: no response.json; the ledger records accepted receipts only`);

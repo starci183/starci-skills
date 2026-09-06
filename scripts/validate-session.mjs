@@ -1,3 +1,5 @@
+import { workflowOwnerErrors, workflowRootOf } from './workflow-root.mjs';
+import { frozenScopeErrors } from './mission-scope.mjs';
 // One session as a whole, checked by the orchestrator after every transition and by a person reading
 // a session folder: state.json against its schema; from the first transition on, the brief and the
 // budget are present and the brief's report is one of the declared shapes; no branch the chain moved
@@ -31,6 +33,8 @@ import { budgetUnitsOf, hostRootOf, loadUnits } from './validate-request.mjs';
 import { readUnchecked } from './unchecked.mjs';
 import { readBank, currentApproval, sessionOf, isDone, canonical } from './bank.mjs';
 import { evidenceManifestErrors } from './evidence-manifest.mjs';
+import { sessionWorkflowTopologyErrors } from './workflow-topology.mjs';
+import { resolvedWaitingAttemptKeys } from './resolved-waiting.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const STATE_SCHEMA = path.join('templates', 'step', 'state.schema.json');
@@ -38,14 +42,23 @@ const stateSchemas = new Map();
 
 const expectedHash = (expected) => `sha256:${createHash('sha256').update(JSON.stringify(expected)).digest('hex')}`;
 
-export async function v22SessionErrors(session, state) {
+export async function v22SessionErrors(session, state, root = ROOT) {
   const errors = [];
   if (state?.contractVersion !== V22_CONTRACT) return errors;
+  errors.push(...workflowOwnerErrors(root, session, state));
+  if (state.runtimeRevision === 3 && state.mission?.discovery) errors.push(...frozenScopeErrors(state, { root }));
+  const phase = state.lifecycle?.phase;
+  const terminalSession = state.status === 'done' || ['closing', 'closed-success'].includes(phase);
+  const workflowTopologyPolicy = JSON.parse(readFileSync(path.join(root, 'resources', 'orchestrator.json'), 'utf8')).workflowTopologies;
+  errors.push(...sessionWorkflowTopologyErrors(workflowTopologyPolicy, state, { terminal: state.status === 'done' || phase === 'closed-success' }));
+  if (state.status === 'done' || phase === 'closed-success') {
+    const { workflowCompletionErrors } = await import('./workflow-verification.mjs');
+    errors.push(...await workflowCompletionErrors(root, session, state));
+  }
   const mission = state.mission ?? {};
   for (const field of ['target', 'outputs', 'verification', 'confirmation']) if (mission[field] === undefined) errors.push(`state.json: v2.2 mission.${field} is required by the scope table`);
   if (!path.isAbsolute(state.hostBinding?.worktree ?? '')) errors.push('state.json: hostBinding.worktree is not an absolute user worktree binding');
   if (state.hostBinding?.hostId === state.id) errors.push('state.json: hostBinding.hostId is the native Codex task or Claude session id, not the StarCi session id');
-  const phase = state.lifecycle?.phase;
   if (phase === 'draft') {
     if ((state.chain ?? []).length || Object.keys(state.steps ?? {}).length || Object.keys(state.attempts ?? {}).length) errors.push('state.json: a draft session has no planned or dispatched operator work');
     if (Object.keys(state.leases ?? {}).length) errors.push('state.json: a draft session holds no worker or resource lease');
@@ -58,9 +71,11 @@ export async function v22SessionErrors(session, state) {
     if (!choice || choice.selected !== 'as-stated' || choice.selectedBy !== 'user' || choice.sourceRef !== confirmation?.sourceRef) errors.push('state.json: mission.confirmation does not bind the matching explicit user goal-confirm choice');
   }
   if (phase === 'closed-success') {
+    if (state.status !== 'done') errors.push('state.json: closed-success requires status done');
     for (const field of ['closedAt', 'closeReason', 'compactRef']) if (!state.lifecycle?.[field]) errors.push(`state.json: lifecycle.${field} is required for closed-success`);
     if (Object.keys(state.leases ?? {}).length) errors.push('state.json: a closed-success session still holds worker leases');
   }
+  if (state.status === 'done' && state.stoppedAt) errors.push('state.json: a done session carries no stoppedAt');
   const ids = new Set();
   for (const [branch, attempt] of Object.entries(state.attempts ?? {})) {
     if (ids.has(attempt.id)) errors.push(`state.json: attempt id ${attempt.id} is duplicated`);
@@ -93,6 +108,11 @@ export async function v22SessionErrors(session, state) {
       const branchDir = path.join(session, `step-${parts[0]}`, `parallel-${parts[1]}`, ...(parts[2] ? [parts[2]] : []));
       for (const error of await evidenceManifestErrors(branchDir, attempt.evidenceManifest)) errors.push(`state.json: attempts[${branch}] ${error}`);
     }
+  }
+  const waitingReplans = await resolvedWaitingAttemptKeys(root, session, state, { requireSuccessorTerminal: terminalSession });
+  errors.push(...waitingReplans.errors);
+  if (terminalSession) for (const [branch, attempt] of Object.entries(state.attempts ?? {})) {
+    if (attempt.status === 'waiting' && !waitingReplans.settled.has(branch)) errors.push(`state.json: waiting attempt ${attempt.id} has no fully accepted terminal resolved-by-replan successor`);
   }
   if (state.status === 'done' || phase === 'closed-success') {
     for (let index = 0; index < (mission.doneWhen ?? []).length; index += 1) {
@@ -269,7 +289,7 @@ export async function findingsLedgerErrors(root, session, state, { ledgerDir = p
 // `secondary`, or a verification whose receipt deferred a state, and a ledger that does not hold the
 // matching lines, is a run that narrowed itself and left no trace of the narrowing — which is the one
 // outcome the tiering exists to prevent. A branch that deferred nothing records nothing.
-export async function uncheckedLedgerErrors(root, session, state, { hostRoot = hostRootOf(root) } = {}) {
+export async function uncheckedLedgerErrors(root, session, state, { hostRoot = workflowRootOf(root, state) } = {}) {
   const errors = [];
   for (const branch of Object.keys(state?.steps ?? {}).sort(byChainOrder)) {
     const operator = state.steps[branch];
@@ -393,7 +413,7 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   if (!existsSync(stateFile)) return { errors: ['state.json: missing'], state: null };
   let state; try { state = JSON.parse(await readFile(stateFile, 'utf8')); } catch (e) { return { errors: [`state.json: ${e.message}`], state: null }; }
   errors.push(...validateAgainst(loadStateSchema(root), state, 'state.json'));
-  errors.push(...await v22SessionErrors(session, state));
+  errors.push(...await v22SessionErrors(session, state, root));
   if (state.contractVersion === V22_CONTRACT && state.lifecycle?.phase === 'draft') return { errors, state };
   if (state.contractVersion === V22_CONTRACT && state.lifecycle?.phase === 'active' && state.status === 'running' && !(state.chain ?? []).length && !Object.keys(state.attempts ?? {}).length) return { errors, state };
   const live = (state.transitions ?? []).length > 0;
@@ -423,7 +443,7 @@ export async function validateSession(root, session, { packages = null, ledgerDi
   errors.push(...await unitBudgetErrors(root, session, state));
   errors.push(...await missionScopeErrors(root, session, state));
   // A mission opened from an approved bank names an entry that is there, is its own, and is still covered.
-  errors.push(...await bankRefErrors(state, { hostRoot: uncheckedRoot ?? hostRootOf(root) }));
+  errors.push(...await bankRefErrors(state, { hostRoot: uncheckedRoot ?? workflowRootOf(root, state) }));
   if (state.brief?.report) {
     const shapes = Object.keys(policy.reportShapes ?? {});
     if (!shapes.includes(state.brief.report.shape)) errors.push(`state.json: brief.report.shape ${state.brief.report.shape} is not one of ${shapes.join(', ')}`);

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { validateAgainst } from './json-schema.mjs';
 import { buildKnowledgeManifest, frozenKnowledgeManifestErrors, knowledgeCoverageErrors, manifestEntities } from './knowledge-manifest.mjs';
 
 const root = mkdtempSync(path.join(tmpdir(), 'knowledge-manifest-'));
@@ -26,6 +27,12 @@ assert.deepEqual(manifest.files.map((file) => file.path), ['knowledge/grammars/I
 assert.ok(manifestEntities(manifest).some(({ key }) => key === 'case:LAYOUT-1/Case 1'));
 writeFileSync(path.join(branch, 'request/knowledge-manifest.json'), JSON.stringify(manifest));
 const coverage = () => ({ schemaVersion: 10, manifestFingerprint: manifest.fingerprint, items: manifestEntities(manifest).map(({ key, source, kind }) => ({ key, applicability: 'applicable', actual: `evaluated ${key}`, evidence: [kind === 'file' ? source : 'response/data/proof.json'] })) });
+const coverageSchema = JSON.parse(readFileSync(path.resolve('templates/kinds/knowledge-coverage.schema.json'), 'utf8'));
+assert.deepEqual(validateAgainst(coverageSchema, coverage()), [], 'canonical manifest keys must pass the coverage schema');
+for (const key of ['case:', 'case: Case 1', 'case:Case 1 ', 'case:Case\n1', 'case:Case 1\n', 'case:Case\t1', 'unknown:Case 1']) {
+  const invalid = coverage(); invalid.items[0].key = key;
+  assert.ok(validateAgainst(coverageSchema, invalid).length, `malformed coverage key must refuse: ${JSON.stringify(key)}`);
+}
 writeFileSync(path.join(branch, 'response/data/proof.json'), '{}');
 writeFileSync(path.join(branch, 'response/data/knowledge-coverage.json'), JSON.stringify(coverage()));
 assert.deepEqual(knowledgeCoverageErrors({ root, branchDir: branch, bindings, family: 'starci' }), []);

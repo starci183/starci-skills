@@ -25,5 +25,6 @@ export default {
   "service-operate": "service.operate",
   "uat-plan": "uat.plan",
   "uat-verify": "uat.verify",
+  "workflow-verify": "workflow.verify",
   "workspace-bind": "workspace.bind"
 }
