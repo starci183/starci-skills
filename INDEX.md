@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.1
+# StarCi Skills 2.5.0-rc.2
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.5.0-rc.2 (2026-09-06): nested forecast admission binds the declared exchange to its exact accepted parent instead of assigning it a second delivery goal; read-only runtime probes retain a fixed non-secret operation header. Candidate verification does not imply publication.
 
 2.5.0-rc.1 (2026-09-06): candidate read-only runtime reuse proves unchanged registry bytes, live endpoints, socket ownership and Git ancestry through paired response artifacts; it takes no write lease and preserves the mutation proof path. This entry records a release candidate, not publication.
 

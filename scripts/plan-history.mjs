@@ -318,6 +318,7 @@ export function activePlanView(session, state) {
 export async function planAdmissionErrors(root, session, state, request) {
   const view = activePlanView(session, state);
   if (!view.forecast) return [];
+  if (request.exchange) return nestedPlanAdmissionErrors(root, session, state, request, view.forecast);
   const forecast = view.forecast, cell = `${request.step}/${request.parallel}`, errors = [];
   if (!isDeepStrictEqual(request.goal, forecast.goals[cell])) errors.push('PLAN_GOAL_UNBOUND: the invocation must bind the current reviewed logical goal mapping');
   const resume = request.resume ? `${request.resume.step}/${request.resume.parallel}` : null;
@@ -356,6 +357,46 @@ export async function planAdmissionErrors(root, session, state, request) {
       }
     } catch (error) { errors.push(error.message); }
   }
+  return errors;
+}
+
+// A nested exchange executes its parent's declared review, not another forecast delivery node.
+// Reuse the accepted-input gate for waiting checkpoints and sealed-child replay after parent resume.
+async function nestedPlanAdmissionErrors(root, session, state, request, forecast) {
+  const errors = [], say = message => errors.push('PLAN_EXCHANGE_UNBOUND: ' + message);
+  try {
+    const cell = `${request.step}/${request.parallel}`, branch = branchPath(session, cell);
+    if (!/^[a-z][a-z-]*$/.test(request.exchange)) throw Error('PLAN_EXCHANGE_UNBOUND: exchange must be a declared nested name');
+    const parent = JSON.parse(readFileSync(path.join(branch, 'request/request.json')));
+    const response = JSON.parse(readFileSync(path.join(branch, 'response/response.json')));
+    const attempt = state.attempts?.[cell], child = state.attempts?.[`${cell}/${request.exchange}`];
+    if (request.goal !== undefined || request.resume != null || Object.keys(request.requirements ?? {}).length) say('the parent owns the goal, re-entry and requirements');
+    if (request.sessionId !== state.id || parent.sessionId !== state.id || parent.exchange || parent.step !== request.step || parent.parallel !== request.parallel || parent.operatorId !== request.operatorId || forecast.steps[cell] !== request.operatorId) say('the exchange must belong to the current same-cell operator and session');
+    if (!attempt?.context || parent.expected?.goalVersion !== state.mission?.version || request.expected?.goalVersion !== parent.expected?.goalVersion) say('the parent must retain its current mission invocation and the child must share that version');
+    invocationState(session, state, parent);
+    const parentResume = parent.resume ? `${parent.resume.step}/${parent.resume.parallel}` : null;
+    if (!isDeepStrictEqual(parent.goal, forecast.goals[cell]) || parentResume !== (forecast.resumes?.[cell] ?? null)) say('the accepted parent must retain its reviewed goal and re-entry mapping');
+    const { loadOperatorPackages, exchangeOf, kindOf } = await import('./operator-md.mjs');
+    const op = (await loadOperatorPackages(root)).find(pkg => pkg.manifest.id === request.operatorId)?.en;
+    const outputs = (op?.tables.outputs?.rows ?? []).filter(row => exchangeOf(kindOf(row.file)) === request.exchange);
+    if (!outputs.length) say('the owning operator must declare this exchange output');
+    const { localAcceptedInputErrors } = await import('./validate-request.mjs');
+    if (child?.status === 'matched') {
+      const childRequest = JSON.parse(readFileSync(path.join(branch, request.exchange, 'request/request.json')));
+      if (!isDeepStrictEqual(childRequest, request) || child.id !== request.attempt?.id) say('replay must retain the exact accepted child request and attempt');
+      const childResponse = JSON.parse(readFileSync(path.join(branch, request.exchange, 'response/response.json')));
+      const kind = outputs.map(row => kindOf(row.kind)).find(kind => typeof childResponse.fields?.[kind] === 'string');
+      if (!kind) say('accepted child must retain its declared exchange output');
+      else errors.push(...await localAcceptedInputErrors(session, state, `step-${request.step}/parallel-${request.parallel}/${request.exchange}/${childResponse.fields[kind]}`, kind));
+    } else if (attempt?.status !== 'waiting' || response.status !== 'waiting' || response.awaiting?.exchange !== request.exchange || !outputs.some(row => kindOf(row.kind) === response.awaiting?.kind)) say('a new exchange requires its exact accepted waiting parent and declared awaited kind');
+    const prefix = `step-${request.step}/parallel-${request.parallel}/`;
+    const inputs = Object.entries(request.inputs ?? {});
+    if (!inputs.length) say('the exchange must consume its own parent checkpoint');
+    for (const [kind, ref] of inputs) {
+      if (typeof ref !== 'string' || !ref.startsWith(prefix + 'response/')) say('every exchange input must name an output of its own parent');
+      else errors.push(...await localAcceptedInputErrors(session, state, ref, kind, request));
+    }
+  } catch (error) { errors.push(error.message); }
   return errors;
 }
 

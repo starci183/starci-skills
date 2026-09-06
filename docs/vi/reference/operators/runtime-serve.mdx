@@ -170,6 +170,9 @@ invocation đang mở. Mỗi lần collector giữ nguyên byte registry và obs
 `response/artifacts/`; đặt hai địa chỉ trả về vào `delta.noOpProof.before` và `.after`. Probe mọi origin
 endpoint đã khai bằng GET an toàn trả lời thành công (GraphQL có thể cần query chỉ đọc cụ thể).
 URL và artifact không chứa credential.
+Collector luôn gửi và ghi `x-apollo-operation-name: StarCiRuntimeObservation` để GET chỉ đọc đáp ứng
+kiểm tra operation header của server. Không nhận header do caller tự đặt; gate proof yêu cầu đúng
+request intent không chứa secret này.
 
 Hai lần thu phải giữ cùng toàn bộ byte registry, generation, head và bản ghi process; bảng socket của
 OS phải chỉ đúng listener đã ghi. Registry phải có `server.worktree`; Git HEAD thực tế tại đó phải

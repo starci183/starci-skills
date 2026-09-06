@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.1
+# StarCi Skills 2.5.0-rc.2
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.5.0-rc.2 (2026-09-06): admission forecast gắn exchange đã khai với đúng parent accepted thay vì giao thêm goal delivery; probe runtime chỉ đọc giữ operation header cố định không chứa secret. Kiểm chứng ứng viên chưa phải publication.
 
 2.5.0-rc.1 (2026-09-06): bản ứng viên chứng minh runtime tái dùng chỉ đọc bằng cặp artifact response giữ nguyên registry, endpoint đang sống, chủ socket và Git ancestry; không lấy write lease và giữ gate mutation. Đây là ứng viên phát hành, chưa phải publication.
 
