@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.5
+# StarCi Skills 2.5.0-rc.6
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.5.0-rc.6 (2026-09-06): kiểm chứng migration theo unit chỉ lấy module đã chọn từ backend plan được chấp nhận, giữ fingerprint toàn bộ kiến trúc và mọi nghĩa vụ khi không chia unit.
 
 2.5.0-rc.5 (2026-09-06): các review trả lại liên tiếp cho phép admission theo đúng chuỗi waiting đã xác minh trong giao dịch resume, giữ nguyên từng checkpoint và chỉ hoàn tất nghĩa vụ bằng bằng chứng kết thúc mới.
 

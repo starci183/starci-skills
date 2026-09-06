@@ -37,6 +37,12 @@ const idsOf = (cell) => {
   const quoted = [...s.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
   return quoted.length ? quoted : s.split(/,\s*/);
 };
+// Consumers use the same Modules-table projection as the plan's own validator.
+export function backendPlanUnitOperations(receipt, unit) {
+  const rows = (tableUnder(receipt, '## Modules') ?? []).filter(row => row[0] === unit);
+  if (rows.length !== 1) throw Error('backend plan must contain exactly one selected module');
+  return idsOf(rows[0][2]);
+}
 // The proof kinds the tree publishes: the enum of the proof kind's schema, read where it lives.
 async function loadProofKinds(root) {
   try { return new Set(JSON.parse(await readFile(path.join(root, PROOF_SCHEMA), 'utf8')).properties.proofKind.enum); } catch { return null; }
@@ -50,8 +56,8 @@ async function loadContractOperations(branchDir, request) {
   try { const model = JSON.parse(await readFile(file, 'utf8')); return (model.operations ?? []).map((o) => o.operationId).filter(Boolean); } catch { return null; }
 }
 
-export async function validateBackendPlanStep(branchDir, root = ROOT) {
-  const base = await validateStep(root, branchDir);
+export async function validateBackendPlanStep(branchDir, root = ROOT, options = {}) {
+  const base = await validateStep(root, branchDir, options);
   const errors = [...base.errors];
   const { response, request, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== OPERATOR) return { errors };

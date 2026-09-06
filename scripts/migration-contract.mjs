@@ -6,6 +6,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'node:path';
 import { validateAgainst } from './json-schema.mjs';
 import { validateImportedInput } from './producer-import.mjs';
+import { RUNTIME_REVISION } from './workflow-root.mjs';
 
 const validationScope = new AsyncLocalStorage();
 const digest = (bytes) => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -74,6 +75,44 @@ function metadata(session, relative, sessionId, step, parallel) {
   return producer;
 }
 
+async function unitOperations(root, session, request, operations, fingerprint) {
+  if (request.unit === undefined) return operations;
+  const input = request.inputs?.units;
+  const match = /^(step-([1-9]\d*)\/parallel-([1-9]\d*))\/response\/data\/units\.json$/.exec(input ?? '');
+  if (!match || typeof request.unit !== 'string' || !request.unit) throw Error('unit requires an exact backend-plan units input');
+  const importErrors = await validateImportedInput(root, session, input, 'units', { receivingSessionId: request.sessionId });
+  if (importErrors.length) throw Error(importErrors.join('; '));
+  const copied = within(session, match[1]);
+  let originSession = session, relative = match[1];
+  if (existsSync(path.join(copied, 'import.json'))) {
+    const imported = json(within(copied, 'import.json'));
+    const { locateWorkflowSession } = await import('./workflow-root.mjs');
+    originSession = locateWorkflowSession(path.dirname(root), imported.sourceSessionId).session;
+    relative = `step-${imported.sourceStep}/parallel-${imported.sourceParallel}`;
+  }
+  const producer = within(originSession, relative), state = json(within(originSession, 'state.json'));
+  const { localAcceptedInputErrors, V22_CONTRACT } = await import('./validate-request.mjs');
+  if (state.contractVersion !== V22_CONTRACT || state.runtimeRevision !== RUNTIME_REVISION || state.upgrade) throw Error('unit plan requires current accepted authority');
+  const accepted = await localAcceptedInputErrors(originSession, state, `${relative}/response/data/units.json`, 'units');
+  if (accepted.length) throw Error(accepted.join('; '));
+  const planRequest = json(within(producer, 'request/request.json'));
+  const planResponse = json(within(producer, 'response/response.json'));
+  if (planRequest.operatorId !== 'backend.plan' || planResponse.operatorId !== 'backend.plan'
+    || planResponse.status !== 'done' || planResponse.fields?.units !== 'response/data/units.json'
+    || planResponse.fields?.['backend-plan'] !== 'response/response.md') throw Error('unit producer is not the accepted backend plan');
+  const architecture = producerPattern.exec(planRequest.inputs?.['architecture-decision'] ?? '');
+  if (!architecture || digest(readFileSync(within(originSession, `${architecture[1]}/response/data/stack-model.json`))) !== fingerprint)
+    throw Error('unit plan does not partition the same frozen architecture');
+  const { validateBackendPlanStep, backendPlanUnitOperations } = await import('../operators/backend-plan/validate.mjs');
+  const verified = await validateBackendPlanStep(producer, root, { origin: true, requestPhase: 'accept' });
+  if (verified.errors.length) throw Error(`unit plan: ${verified.errors.join('; ')}`);
+  const units = json(within(producer, 'response/data/units.json'));
+  if (units.producedBy !== 'backend.plan' || !units.units.some(unit => unit.id === request.unit && unit.kind === 'module')) throw Error('selected unit is not a planned backend module');
+  const ids = backendPlanUnitOperations(readFileSync(within(producer, 'response/response.md'), 'utf8'), request.unit);
+  if (!ids.length || ids.some(id => !operations.some(operation => operation.operationId === id))) throw Error('unit operations are absent from the frozen architecture');
+  return operations.filter(operation => ids.includes(operation.operationId));
+}
+
 export async function validateMigrationContract(root, branchDir, request, mutations = null) {
   if (!validationScope.getStore()) {
     return validationScope.run(new Set(), () => validateMigrationContract(root, branchDir, request, mutations));
@@ -131,11 +170,11 @@ export async function validateMigrationContract(root, branchDir, request, mutati
     const { validateArchitectureStep } = await import('../operators/architecture-decide/validate.mjs');
     const verified = await validateArchitectureStep(producer, root, { origin: existsSync(path.join(copied, 'import.json')) });
     if (verified.errors.length) { result.errors.push(...verified.errors.map((error) => `migration producer: ${error}`)); return result; }
-    result.operations = model.operations;
+    result.operations = await unitOperations(root, session, request, model.operations, result.fingerprint);
     // The owner boundary is a list of exact refs or globs; the one matcher lives with the backend operator's law.
     const { refToRegExp } = await import('../operators/backend-generate/validate.mjs');
     const boundaries = (Array.isArray(requirements.mutableFileRefs) ? requirements.mutableFileRefs : []).map(refToRegExp);
-    for (const operation of model.operations.filter((item) => item.transport === 'migration')) {
+    for (const operation of result.operations.filter((item) => item.transport === 'migration')) {
       for (const ref of new Set([operation.writerRef, ...operation.migrationRefs])) {
         if (!boundaries.some((re) => re.test(ref))) result.errors.push(`migration operation ${operation.operationId}: ${ref} lies outside mutableFileRefs`);
       }
@@ -143,7 +182,7 @@ export async function validateMigrationContract(root, branchDir, request, mutati
     if (mutations !== null) {
       if (mutations.contractFingerprint !== requirements.contractFingerprint) result.errors.push('mutations contractFingerprint differs from the frozen request');
       const attempted = Array.isArray(mutations.operations) ? mutations.operations : [];
-      const original = new Map(model.operations.map((operation) => [operation.operationId, operation]));
+      const original = new Map(result.operations.map((operation) => [operation.operationId, operation]));
       const seen = new Set();
       const keys = schema.properties.operations.items.required;
       for (const operation of attempted) {
