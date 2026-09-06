@@ -1,4 +1,4 @@
-# StarCi Skills 2.4.5
+# StarCi Skills 2.4.6
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,8 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.4.6 (2026-09-06): sửa attestation có kiểu đưa lỗi readiness runtime đã accepted qua repair được kiểm chứng rồi chạy lại preflight đầy đủ; điều phối chịu trách nhiệm gỡ blocker chung và giữ quyền tự chủ triển khai của từng task.
 
 2.4.5 (2026-09-06): commit forecast dùng chung gate mission bận; lần chờ đã sealed và nghỉ thuộc lịch sử thay vì nghĩa vụ hoàn tất hiện tại; resume lời đọc trước giữ nguyên các nhánh song song chưa mở.
 

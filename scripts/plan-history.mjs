@@ -8,6 +8,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { retainContext, readContext, retainMission, invocationState } from './mission-history.mjs';
 import { scopeHash } from './mission-scope.mjs';
 import { mutateSession } from './session-lock.mjs';
+import { evidenceManifestErrors } from './evidence-manifest.mjs';
 
 const sha = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const fingerprint = value => sha(JSON.stringify(value));
@@ -36,12 +37,14 @@ export function offsetForecast(plan, offset) {
   const cell = value => `${Number(value.split('/')[0]) + offset}/${value.split('/')[1]}`;
   const out = structuredClone(plan);
   out.chain = plan.chain.map(step => step.map(cell));
-  for (const field of ['steps', 'goals', 'reasons', 'dependencies', 'evidenceDependencies', 'handoffs', 'requestRefs', 'presets', 'fanout', 'imports', 'nodes', 'resumes', 'units']) out[field] = Object.fromEntries(Object.entries(plan[field] ?? {}).map(([key, value]) => [cell(key), structuredClone(value)]));
+  for (const field of ['steps', 'goals', 'reasons', 'dependencies', 'evidenceDependencies', 'handoffs', 'requestRefs', 'presets', 'fanout', 'imports', 'nodes', 'resumes', 'units', 'repairs', 'repairDependencies']) out[field] = Object.fromEntries(Object.entries(plan[field] ?? {}).map(([key, value]) => [cell(key), structuredClone(value)]));
   for (const [key, goal] of Object.entries(out.goals)) if (goal.prerequisite) goal.prerequisite = cell(goal.prerequisite);
   for (const [key, deps] of Object.entries(out.dependencies)) out.dependencies[key] = deps.map(cell);
   for (const [key, deps] of Object.entries(out.evidenceDependencies)) out.evidenceDependencies[key] = deps.map(cell);
   for (const [key, owner] of Object.entries(out.handoffs)) out.handoffs[key] = cell(owner);
   for (const key of Object.keys(out.steps)) { const [n, m] = key.split('/'); out.requestRefs[key] = `step-${n}/parallel-${m}/request/request.json`; }
+  for (const repair of Object.values(out.repairs ?? {})) { repair.source = cell(repair.source); repair.resume = cell(repair.resume); }
+  for (const [key, dependency] of Object.entries(out.repairDependencies ?? {})) out.repairDependencies[key] = cell(dependency);
   return out;
 }
 
@@ -50,20 +53,67 @@ const plannedOf = plan => Object.fromEntries(Object.keys(plan.steps).map(cell =>
 async function acceptedCurrent(root, session, state, cell, status = 'matched') {
   const attempt = state.attempts?.[cell];
   if (attempt?.status !== status || !attempt.context || attempt.expected?.goalVersion !== state.mission.version) throw Error(`PLAN_PROOF_UNAVAILABLE: ${cell} has no sealed ${status} invocation for this exact mission`);
+  const sealed = await evidenceManifestErrors(branchPath(session, cell), attempt.evidenceManifest);
+  if (sealed.length) throw Error(sealed.join('\n'));
   const { validateStep } = await import('./validate-step.mjs');
   const result = await validateStep(root, branchPath(session, cell), { operator: true, requestPhase: 'accept' });
   if (result.errors.length) throw Error(result.errors.join('\n'));
   return JSON.parse(readFileSync(path.join(branchPath(session, cell), 'response/response.json')));
 }
 
+async function runtimeRepairSource(root, session, state, source, wall, requirements) {
+  if (state.steps[source] !== 'environment.preflight') throw Error('PLAN_REPAIR_UNBOUND: repair source must be the current preflight');
+  const response = await acceptedCurrent(root, session, state, source, 'blocked');
+  if (response.stop !== 'ENVIRONMENT_NOT_READY' || !response.next?.includes('runtime.serve')) throw Error('PLAN_REPAIR_UNBOUND: the accepted readiness stop must route to runtime.serve');
+  const request = JSON.parse(readFileSync(path.join(branchPath(session, source), 'request/request.json')));
+  const report = JSON.parse(readFileSync(path.join(branchPath(session, source), response.fields['readiness-report'])));
+  const role = /^runtime\.(.+)\.head$/.exec(wall)?.[1];
+  if (!role || report.walls.length !== 1 || report.walls[0].checkId !== wall || report.walls[0].owner !== 'runtime' || !report.checks.some(check => check.id === wall && check.status === 'wall' && check.owner === 'runtime')) throw Error('PLAN_REPAIR_UNBOUND: this attestation repair requires the exact sole runtime head wall');
+  const repository = state.mission.discovery.repositories.find(repo => repo.project === report.project && repo.role === role);
+  if (!repository || report.project !== state.project || report.project !== request.requirements.project || report.env !== request.requirements.env || !request.requirements.roles.includes(role) || !request.requirements.runtimeRoles.includes(role)) throw Error('PLAN_REPAIR_UNBOUND: runtime wall must bind the confirmed project, role and environment');
+  const desired = requirements?.desiredState;
+  if (requirements?.routeKey !== `${report.project}/${role}` || requirements.env !== report.env || requirements.operation !== 'serve' || requirements.commit !== repository.head || !isDeepStrictEqual(desired?.effects, ['attest-runtime-entry']) || desired.serviceKind !== 'runtime' || !isDeepStrictEqual(desired.resourceRefs, [requirements.routeKey]) || (desired.mutableResourceRefs ?? []).some(ref => ref !== requirements.routeKey) || (desired.observationOnlyResourceRefs ?? []).some(ref => ref !== requirements.routeKey) || (requirements.portClaims ?? []).length) throw Error('PLAN_REPAIR_UNBOUND: repair may only attest the exact approved route and frozen commit');
+  const { platformAuthorityErrors } = await import('./platform-authority.mjs');
+  const { loadEnvironmentSchema, parseDeclarationReference } = await import('./validate-request.mjs');
+  if (!parseDeclarationReference(await loadEnvironmentSchema(root), requirements.approval)) throw Error('PLAN_REPAIR_AUTHORITY_REQUIRED: bind the current environment declaration for this attestation');
+  const { operationClasses } = await import('../operators/runtime-serve/validate.mjs');
+  const authority = await platformAuthorityErrors({ root, requirements, kind: 'runtime', desiredEffects: desired.effects, operationClasses, hostRoot: state.workflowOwner.sourceRoot });
+  if (authority.length) throw Error(authority.join('\n'));
+  return { source, wall, role, project: report.project, env: report.env, commit: repository.head, request };
+}
+
 // Re-entry edits the remaining execution mapping of the same forecast. The dispatched prefix and
 // every request stay at their original coordinates; only unopened cells receive new coordinates.
 export async function editForecast(root, session, state, original, edit, top) {
   const forecast = structuredClone(original);
-  if (!edit || !['resume', 'expand'].includes(edit.kind) || !forecast.steps[edit.cell]) throw Error('PLAN_EDIT_INVALID: name one current resume or unit expansion');
+  if (!edit || !['resume', 'expand', 'repair'].includes(edit.kind) || !forecast.steps[edit.cell]) throw Error('PLAN_EDIT_INVALID: name one current resume, unit expansion or typed repair');
   for (const cell of forecast.chain.flat()) if (state.attempts?.[cell]) await acceptedCurrent(root, session, state, cell, state.attempts[cell].status);
   const cell = edit.cell, operator = forecast.steps[cell];
-  if (edit.kind === 'resume') {
+  if (edit.kind === 'repair') {
+    const binding = await runtimeRepairSource(root, session, state, cell, edit.wall, edit.requirements);
+    const repair = `repair:${cell}`, resume = `pending:${cell}`;
+    for (const target of [repair, resume]) {
+      for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','presets','nodes']) (forecast[field] ??= {})[target] = structuredClone(forecast[field]?.[cell] ?? (['dependencies','evidenceDependencies'].includes(field) ? [] : {}));
+    }
+    forecast.steps[repair] = 'runtime.serve'; forecast.goals[repair] = { prerequisite: resume };
+    forecast.presets[repair] = structuredClone(edit.requirements);
+    forecast.dependencies[repair] = [cell]; forecast.evidenceDependencies[repair] = [cell];
+    forecast.nodes[repair] = `${forecast.nodes[cell]}:repair:${edit.wall}`;
+    forecast.nodes[resume] = `${forecast.nodes[cell]}:resume:${cell}`;
+    forecast.dependencies[resume] = [repair]; forecast.evidenceDependencies[resume] = [repair];
+    forecast.presets[resume] = structuredClone(binding.request.requirements);
+    (forecast.resumes ??= {})[resume] = cell;
+    const { request: ignored, ...retained } = binding;
+    (forecast.repairs ??= {})[repair] = { ...retained, resume };
+    (forecast.repairDependencies ??= {})[resume] = repair;
+    for (const target of Object.keys(forecast.dependencies)) if (![cell, repair, resume].includes(target)) {
+      forecast.dependencies[target] = forecast.dependencies[target].map(dep => dep === cell ? resume : dep);
+      forecast.evidenceDependencies[target] = (forecast.evidenceDependencies[target] ?? []).map(dep => dep === cell ? resume : dep);
+      if (forecast.handoffs?.[target] === cell) forecast.handoffs[target] = resume;
+    }
+    const index = Math.max(...forecast.chain.map((step,index) => step.some(value => state.attempts?.[value]) ? index : -1));
+    forecast.chain.splice(index + 1, 0, [repair], [resume]);
+  } else if (edit.kind === 'resume') {
     const sourceCell = edit.source ?? cell;
     if (state.steps[sourceCell] !== operator || sourceCell !== cell && state.attempts?.[cell]) throw Error('PLAN_EDIT_INVALID: a prior reading can replace only an unopened node of the same operator');
     const response = await acceptedCurrent(root, session, state, sourceCell, 'blocked');
@@ -155,10 +205,12 @@ export async function editForecast(root, session, state, original, edit, top) {
   const map = cell => mapping.get(cell) ?? cell;
   const result = structuredClone(forecast);
   result.chain = forecast.chain.map(step => step.map(map));
-  for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','handoffs','requestRefs','presets','fanout','imports','nodes','resumes','units']) result[field] = Object.fromEntries(Object.entries(forecast[field] ?? {}).filter(([cell]) => mapping.has(cell)).map(([cell,value]) => [map(cell),structuredClone(value)]));
+  for (const field of ['steps','goals','reasons','dependencies','evidenceDependencies','handoffs','requestRefs','presets','fanout','imports','nodes','resumes','units','repairs','repairDependencies']) result[field] = Object.fromEntries(Object.entries(forecast[field] ?? {}).filter(([cell]) => mapping.has(cell)).map(([cell,value]) => [map(cell),structuredClone(value)]));
   for (const goal of Object.values(result.goals)) if (goal.prerequisite) goal.prerequisite = map(goal.prerequisite);
   for (const field of ['dependencies','evidenceDependencies']) for (const [cell,deps] of Object.entries(result[field])) result[field][cell] = deps.map(map);
   for (const [cell,owner] of Object.entries(result.handoffs)) result.handoffs[cell] = map(owner);
+  for (const repair of Object.values(result.repairs ?? {})) { repair.source = map(repair.source); repair.resume = map(repair.resume); }
+  for (const [cell, dependency] of Object.entries(result.repairDependencies ?? {})) result.repairDependencies[cell] = map(dependency);
   for (const unit of Object.values(result.units)) unit.dependsOn = (unit.dependsOn ?? []).map(map);
   for (const cell of Object.keys(result.steps)) result.requestRefs[cell] = `step-${cell.split('/')[0]}/parallel-${cell.split('/')[1]}/request/request.json`;
   return result;
@@ -271,6 +323,22 @@ export async function planAdmissionErrors(root, session, state, request) {
   const resume = request.resume ? `${request.resume.step}/${request.resume.parallel}` : null;
   if (resume !== (forecast.resumes?.[cell] ?? null)) errors.push('PLAN_REENTRY_UNBOUND: invocation resume differs from the reviewed execution mapping');
   if (resume) try { await acceptedCurrent(root, session, state, resume, 'blocked'); } catch (error) { errors.push(error.message); }
+  const repair = forecast.repairs?.[cell];
+  if (repair) try {
+    const { loadOperatorGraph, repairShapeErrors } = await import('./validate-chain.mjs');
+    errors.push(...repairShapeErrors(await loadOperatorGraph(root), forecast, cell));
+    await runtimeRepairSource(root, session, state, repair.source, repair.wall, request.requirements);
+    if (request.operatorId !== 'runtime.serve' || Object.keys(request.inputs ?? {}).length || request.environment?.workspace || (request.environment?.writes ?? []).some(alias => alias !== '@worktrees/sessions/central-runtime')) errors.push('PLAN_REPAIR_UNBOUND: attestation repair carries no product input or source write authority');
+  } catch (error) { errors.push(error.message); }
+  const repairedBy = forecast.repairDependencies?.[cell];
+  if (repairedBy) try {
+    const response = await acceptedCurrent(root, session, state, repairedBy);
+    const binding = forecast.repairs?.[repairedBy];
+    const delta = JSON.parse(readFileSync(path.join(branchPath(session, repairedBy), response.fields.delta)));
+    if (!binding || binding.resume !== cell || binding.source !== resume || !delta.runtimeLadder?.reused || delta.runtimeLadder.integration !== null || delta.runtimeLadder.wantedCommit !== binding.commit || !delta.runtimeLadder.contains?.includes(binding.commit) || response.fields.changes) errors.push('PLAN_REPAIR_UNPROVED: preflight re-entry needs the matched exact runtime attestation, without integration changes');
+    const source = JSON.parse(readFileSync(path.join(branchPath(session, binding.source), 'request/request.json')));
+    if (!isDeepStrictEqual(request.requirements, source.requirements)) errors.push('PLAN_REPAIR_UNBOUND: preflight re-entry reruns the same complete requirements');
+  } catch (error) { errors.push(error.message); }
   const unit = forecast.units?.[cell];
   if (unit && (request.unit !== unit.id || request.inputs?.units !== unit.input)) errors.push('PLAN_UNIT_UNBOUND: invocation must bind the exact accepted unit and plan output');
   if (unit) for (const dependency of unit.dependsOn ?? []) try { await acceptedCurrent(root, session, state, dependency); } catch (error) { errors.push(error.message); }

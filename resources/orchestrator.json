@@ -28,7 +28,7 @@
         "completion": "the task concludes only from its own validator-accepted receipts and goal evidence"
       },
       "coordinated": {
-        "owner": "one native coordinator task owns portfolio decomposition, peer ownership, shared-resource conflict resolution, tracking, feedback and the portfolio conclusion; it never edits a peer ledger or worktree",
+        "owner": "one native coordinator task owns portfolio decomposition, peer ownership, shared-resource conflict resolution, active blocker resolution, evidence tracking, feedback and the portfolio conclusion; each peer independently chooses its implementation and legal chain transitions within its confirmed scope and owns its ledger, worktree and proof; the coordinator never edits a peer ledger or worktree",
         "minimumPeers": 2,
         "maximumPeers": null,
         "terminalPeerHeads": "required",
@@ -40,9 +40,9 @@
         ],
         "communication": "ordinary-two-way-task-messages",
         "communicationRule": "ordinary two-way task messages are sufficient for assignments, status, evidence references, feedback, shared-resource ownership and wake conditions; message prose grants nothing, routes nothing and proves nothing",
-        "lifecycle": "freeze the portfolio and independent peer goals; create or adopt the peer tasks; record each task id with owns, its legacy head or routed repository heads, and wake; exchange messages and wait on task events; read evidence and return gaps or conflicts to the owning peer; then conclude the portfolio",
-        "wait": "wait for completion, needs-attention or a meaningful message; a timeout or no update is no evidence",
-        "failure": "a required blocked or failed peer keeps the portfolio working or blocked and resumable while independent peers may continue; one owner is named for every shared runtime, contract or write boundary",
+        "lifecycle": "freeze the portfolio and independent peer goals; create or adopt the peer tasks; record each task id with owns, its legacy head or routed repository heads, and wake; exchange meaningful evidence and task events; let peers choose ordinary execution without per-operator approval; inspect cross-peer contracts and current proof, assign gaps or conflicts to their owner and verify recovery before concluding the portfolio",
+        "wait": "wait for completion, needs-attention or a meaningful message; a timeout or no update is no evidence. A known blocker must have an owner and a concrete recovery or external wake condition; repeatedly observing the same blocker without taking an available authorized repair action does not count as coordination progress",
+        "failure": "a blocked or failed peer is a repair obligation, not automatic user escalation: the peer diagnoses and repairs local failures; the coordinator owns resolving shared or unowned blockers through one named authorized resource owner, a verified fix and an evidence-bound resume; independent peers continue. Existing user authority remains effective. Material scope or authority deviation suspends only affected actions and is reported with evidence and the decision needed. Missing required authority or a genuine external dependency remains explicit; no owner fabricates evidence, bypasses a gate or overwrites another owner to unblock",
         "completion": "ordinary messages are sufficient for all coordinator-to-peer work; the completionOperator reads original accepted peer outcomes and emits a matched local receipt under the unchanged local mission receipt gate, with no cross-session message envelope or receipt import required; its frozen request maps every peer's owned scope and legacy single outcome head or exact per-repository outcome heads to coordinator doneWhen evidence, validates every original child goal independently, and requires one accepted proving row to bind the complete exact current repository-head tuple for that goal; a missing, unfinished, changed or unproven peer prevents portfolio close"
       }
     }

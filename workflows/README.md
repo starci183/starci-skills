@@ -178,6 +178,14 @@ For the same confirmed goal, retain the current forecast and use `flags.edit` in
   matched plan's sealed `units` output, preserving already executed nodes. Unit dependencies run
   first. When the operator owns several done-when lines, `goals` maps each unit id to its confirmed
   line index. The resulting request binds the returned unit id and exact `inputs.units` reference.
+- `{"kind":"repair","cell":"N/M","wall":"runtime.<role>.head","requirements":{...}}` follows
+  an accepted current preflight's declared runtime Next for its sole runtime-head wall. Requirements
+  bind that project's role, environment, frozen commit and current environment approval, with only
+  `attest-runtime-entry` effects. The edit inserts a separate attestation and then the complete
+  same-requirements preflight re-entry. The re-entry opens only after the repair has a matched,
+  sealed reused-head receipt without integration changes. A failed or unproved repair stays blocked.
+  This prerequisite attestation grants no source write or future delivery credit; the original
+  delivery runtime node, dispatched coordinates and independent planned peers remain in the forecast.
 
 The active forecast passes Input, Context, Next, goal, long-flow and finite budget gates. A declared
 dependency handoff can continue from an earlier input or context owner whose authored Next names

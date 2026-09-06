@@ -117,6 +117,15 @@ export function planOf(graph, id) {
 }
 
 // A forecast handoff is an actual declared dependency, never a search through arbitrary history.
+export function repairShapeErrors(graph, forecast, cell) {
+  const repair = forecast?.repairs?.[cell], requirements = forecast?.presets?.[cell];
+  if (!repair || forecast.steps[cell] !== 'runtime.serve' || forecast.steps[repair.source] !== 'environment.preflight' || forecast.steps[repair.resume] !== 'environment.preflight' || !graph.get('environment.preflight')?.next.has('runtime.serve')) return ['PLAN_REPAIR_UNBOUND: repair must follow the authored preflight/runtime route'];
+  const position = target => forecast.chain.findIndex(step => step.includes(target));
+  if (!(position(repair.source) >= 0 && position(repair.source) < position(cell) && position(cell) < position(repair.resume)) || forecast.goals[cell]?.prerequisite !== repair.resume || forecast.resumes?.[repair.resume] !== repair.source || forecast.repairDependencies?.[repair.resume] !== cell || !forecast.dependencies[cell]?.includes(repair.source) || !forecast.evidenceDependencies[cell]?.includes(repair.source)) return ['PLAN_REPAIR_UNBOUND: repair must enable its exact later preflight re-entry'];
+  if (repair.wall !== `runtime.${repair.role}.head` || requirements?.routeKey !== `${repair.project}/${repair.role}` || requirements?.env !== repair.env || requirements?.commit !== repair.commit || requirements?.operation !== 'serve' || JSON.stringify(requirements?.desiredState?.effects) !== JSON.stringify(['attest-runtime-entry'])) return ['PLAN_REPAIR_UNBOUND: repair is only the bound runtime head attestation'];
+  return [];
+}
+
 export function dependencyHandoffErrors(graph, forecast, consumer) {
   const owner = forecast?.handoffs?.[consumer];
   if (!owner) return ['PLAN_HANDOFF_UNBOUND: no declared dependency handoff'];
@@ -164,7 +173,13 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
   const produced = new Set(); // kinds produced by earlier steps
   const boundRoles = new Set(); // roles bound by earlier workspace.bind branches
   const position = new Map(); // operator -> first step index it runs in, over the whole chain
-  chain.forEach((step, n) => { if (Array.isArray(step)) for (const cell of step) { const id = opOf(cell); if (id !== undefined && !position.has(id)) position.set(id, n); } });
+  const validRepairs = new Set();
+  for (const cell of Object.keys(options.forecast?.repairs ?? {})) {
+    const repairErrors = repairShapeErrors(graph, options.forecast, cell);
+    errors.push(...repairErrors);
+    if (!repairErrors.length) validRepairs.add(cell);
+  }
+  chain.forEach((step, n) => { if (Array.isArray(step)) for (const cell of step) { const id = opOf(cell); if (id !== undefined && !position.has(id) && !validRepairs.has(cell)) position.set(id, n); } });
   if (mission?.discovery) {
     const policy = deliveryPolicy(root); const mode = mission.discovery.stage === 'handoff' ? 'plan' : 'execute';
     for (const [laneId, lane] of Object.entries(mission.discovery.lanes)) if (lane.status === 'planned') for (const consumer of policy.lanes[laneId]?.[mode] ?? []) for (const dependency of lane.dependsOn ?? []) for (const producer of policy.lanes[dependency]?.[mode] ?? []) {
@@ -185,7 +200,7 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
       const r = req(cell);
       const reentry = options.forecast?.resumes?.[cell];
       const resumedOwner = reentry && stepOf(reentry) < stepOf(cell) && (opOf(reentry) === id || options.resumeOwners?.[reentry] === id);
-      if (previous && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id)) && !resumedOwner && (!options.forecast || dependencyHandoffErrors(graph, options.forecast, cell).length)) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
+      if (previous && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id)) && !resumedOwner && !validRepairs.has(cell) && (!options.forecast || dependencyHandoffErrors(graph, options.forecast, cell).length)) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
       for (const input of node.required) if (!produced.has(input.kind) && !imported[cell]?.has(input.kind)) errors.push(`${cell}: ${id} requires input ${input.kind}, which no earlier step produces and no imported slot the request names supplies`);
       if (id !== BIND_OPERATOR) for (const role of node.roles) if (!boundRoles.has(role)) errors.push(`${cell}: ${id} requires @workspaces/${role}, which no earlier ${BIND_OPERATOR} (role ${role}) bound or is planned to bind`);
       if (r && planned[cell]) errors.push(...plannedRequirementErrors(planned[cell], r, `${cell}: request.json`));

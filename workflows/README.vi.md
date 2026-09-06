@@ -173,6 +173,15 @@ Trong cùng goal đã xác nhận, giữ dự báo hiện tại và dùng `flags
   được niêm phong của plan matched thật, giữ node đã chạy. Phụ thuộc unit chạy trước. Khi operator
   sở hữu nhiều dòng done-when, `goals` ánh xạ mỗi id unit tới chỉ số dòng đã xác nhận. Request mới
   bind đúng id unit và `inputs.units` trả về.
+- `{"kind":"repair","cell":"N/M","wall":"runtime.<role>.head","requirements":{...}}` theo
+  Next runtime đã khai của preflight được chấp nhận ở phiên bản hiện tại khi chỉ còn một wall về
+  head runtime. Requirements bind đúng project, role, môi trường, commit đã đóng băng và phê duyệt
+  hiện tại từ khai báo môi trường; effects chỉ có `attest-runtime-entry`. Edit chèn một attestation
+  riêng rồi vào lại preflight với toàn bộ requirements không đổi. Nhánh vào lại chỉ mở khi repair
+  có receipt matched còn niêm phong, dùng lại head và không tạo thay đổi integration. Repair lỗi
+  hoặc chưa được chứng minh vẫn blocked. Attestation prerequisite không cấp quyền sửa source hay
+  công nhận delivery tương lai; node runtime delivery gốc, tọa độ đã dispatch và các peer độc lập
+  chưa mở vẫn được giữ trong dự báo.
 
 Dự báo active qua đủ gate Input, Context, Next, goal, luồng dài và budget hữu hạn. Handoff phụ
 thuộc đã khai có thể tiếp tục từ owner input hoặc context trước đó khi Next của owner gọi tên
