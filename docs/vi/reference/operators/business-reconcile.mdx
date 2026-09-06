@@ -39,9 +39,7 @@ mục head gọi tên cùng trạng thái nó đang mang.
 ## Đối chiếu đọc source đã giao, không bao giờ đọc kế hoạch
 
 Ở đây không mô hình hoá gì. Head đã được quyết và ma trận phủ của nó đã được `business.decide` đóng
-băng; operator này lấy ma trận đúng như đang có và hỏi, với từng hàng, liệu source mà một lượt
-backend đã giao có thực thi điều hàng ấy hứa không. Vì thế Đầu vào `backend-source-application` là
-bắt buộc, vì một cuộc đối chiếu không có source đã giao chỉ là ý kiến về đoạn code chưa ai đọc, và
+băng; operator này lấy ma trận đúng như đang có và hỏi, với từng hàng, liệu source đã giao có thực thi điều hàng ấy hứa không. sourceRole chọn receipt và checkout phải ghim: be nhận `backend-source-application`, fe nhận `frontend-source-application`, vì một cuộc đối chiếu không có source đã giao chỉ là ý kiến về đoạn code chưa ai đọc, và
 `implemented` không bao giờ được publish dựa trên một kế hoạch: nó được publish ở đây, sau khi đối
 chiếu, hoặc không bao giờ. Một feature chưa có head publish thì không có gì để đối chiếu, và một head
 mà trạng thái không cho phép chuyển sang đích thì không thể đi; cả hai đều là
@@ -139,14 +137,16 @@ vòng đời không cho phép, sửa source sản phẩm, hay tuyên bố rằng
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
 | `@worktrees/businesses/<featureId>` | head đã publish, trạng thái và ma trận phủ đã đóng băng của nó, theo địa chỉ nội dung từ chỉ mục head; nơi duy nhất operator này ghi ngoài nhánh của mình, gồm thư mục feature, các object đã lưu trữ và mục chỉ mục của feature đi cùng nhau | có |
-| `@workspaces/be` | checkout backend được route, đọc ở head đã đóng băng; mọi fact claim dẫn nó theo path, khoảng dòng và head | có |
+| `@workspaces/be` | checkout backend được route, đọc ở head đã đóng băng; mọi fact claim dẫn nó theo path, khoảng dòng và head | when sourceRole=be |
+| `@workspaces/fe` | checkout frontend đã giao tại head đóng băng | when sourceRole=fe |
 | `@worktrees/unchecked/<product>` | phần chưa kiểm còn mở của feature: những đơn vị và state mà chính lần kiểm chứng của bản giao đã không lấy, được liệt kê trong receipt cạnh các claim | không |
 
 ## Đầu vào
 
 | Kind | Từ đâu | Bắt buộc |
 | --- | --- | --- |
-| `backend-source-application` | `backend.generate`; source đã giao mà cuộc đối chiếu đọc | có |
+| `backend-source-application` | `backend.generate`; source đã giao mà cuộc đối chiếu đọc | when sourceRole=be |
+| `frontend-source-application` | `interface.generate`; source frontend đã giao | when sourceRole=fe |
 | `quality-verification` | `quality.verify`; các gate đã đạt trên head đã giao, chỉ đọc như bằng chứng | không |
 | `uat-flow-verification` | `uat.verify`; hành trình đã đi trên head đã giao, chỉ đọc như bằng chứng | không |
 | `api-verification` | `api.verify`; bộ kiểm end-to-end chạy như một client đối với head đã giao, chỉ đọc như bằng chứng | không |
@@ -158,15 +158,16 @@ vòng đời không cho phép, sửa source sản phẩm, hay tuyên bố rằng
 | `featureId` | id | — | Một feature duy nhất có lời hứa đã publish được đối chiếu |
 | `targetState` | choice | — | `implemented` khi source đã giao thực thi mọi hàng, hay `in-progress` khi head được publish lại với những gì đã giao tới lúc này |
 | `approval` | id | null | Phê duyệt của chủ mà chuyển trạng thái cần, nhập khi chạy lại sau `APPROVAL_REQUIRED` |
+| `sourceRole` | enum:be,fe | be | Vai trò source đã giao; bắt buộc receipt và checkout đã ghim tương ứng. |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
 ## Các bước
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate, đầu vào source đã giao và resume | `resume` | `request/request.json`, đầu vào `backend-source-application`, @workspaces/be ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Kiểm gate, đầu vào source đã giao và resume | `resume`, `sourceRole` | `request/request.json`, đầu vào theo sourceRole `backend-source-application` hoặc `frontend-source-application`, @workspaces/be hoặc @workspaces/fe ở head đóng băng | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Kiểm promise và phân loại reusable, missing hoặc invalid trước transition check; handoff promise thiếu/sai cho business.decide và không tạo ở đây | `featureId`, `targetState`, `approval` | @worktrees/businesses/&lt;featureId>: head hiện tại, trạng thái, ma trận và các fingerprint của nó | — | `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED` |
-| 3 | Chuẩn hoá source đã giao thành fact claim, mỗi claim kèm path, khoảng dòng và head | — | đầu vào `backend-source-application`, @workspaces/be ở head đóng băng, đầu vào `quality-verification` và `uat-flow-verification` chỉ như bằng chứng, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING` |
+| 3 | Chuẩn hoá source đã giao thành fact claim, mỗi claim kèm path, khoảng dòng và head | — | đầu vào theo sourceRole `backend-source-application` hoặc `frontend-source-application`, @workspaces/be hoặc @workspaces/fe ở head đóng băng, đầu vào `quality-verification` và `uat-flow-verification` chỉ như bằng chứng, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING` |
 | 4 | Đối chiếu mọi matrix row với delivery, ghi toàn bộ discrepancy và unchecked, và phát typed repair hoặc replan evidence mà không viết lại goal | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> cho ma trận ở head đã publish, @worktrees/unchecked/&lt;product> cho thứ lần kiểm chứng của bản giao đã không lấy | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
 | 5 | Publish head dưới lease độc quyền cùng phần đối chiếu nó đang mang: thư mục feature, object nó được lưu trữ dưới, và mục gọi tên nó | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> ở head trước, object đã lưu trữ của nó và mục chỉ mục head gọi tên nó | @worktrees/businesses/&lt;featureId> thành model.json head mới, object của nó trong kho nội dung và mục của feature trong chỉ mục head, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
 | 6 | Phát | — | mọi thứ ở trên | `response/response.json` | — |
@@ -183,9 +184,9 @@ source đã giao; một lần chạy lại không thêm thay đổi đã giao, p
 | `claims` | `response/data/claims.json` | data | có |
 | `model` | `response/data/model.json` | data | có |
 
-## Kết quả tốt nhất
+## Operator Result
 
-Khi `done`, in **Kết quả tốt nhất** là bản đối chiếu lời hứa với phần đã giao trong `response/response.md`, kèm `response/data/claims.json` và `response/data/model.json` làm bảng phụ. Mismatch phải đưa các dòng claim chưa khớp cùng evidence lên trước thay vì tuyên bố lời hứa đã được implement.
+Khi `done`, in **Operator Result** là bản đối chiếu lời hứa với phần đã giao trong `response/response.md`, kèm `response/data/claims.json` và `response/data/model.json` làm bảng phụ. Mismatch phải đưa các dòng claim chưa khớp cùng evidence lên trước thay vì tuyên bố lời hứa đã được implement.
 
 ## Dừng
 

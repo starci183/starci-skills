@@ -23,7 +23,7 @@ export function renderBrief(pkg) {
   const op = pkg.en;
   const id = pkg.manifest.id;
   const inputs = (op.tables.inputs?.rows ?? []).filter((r) => kindOf(r.kind) !== '—' && kindOf(r.kind) !== '');
-  const optional = (r) => (isYes(r.required) ? '' : '?');
+  const optional = (r) => (String(r.required).startsWith('when ') ? '[' + r.required + ']' : isYes(r.required) ? '' : '?');
   // The Requirements are not repeated here: the orchestrator fills their defaults into request.json
   // before dispatch (resources/orchestrator.json#agent.requirements), so the agent reads every value
   // there. The Next table is the orchestrator's, not the agent's: an agent ends its branch and never

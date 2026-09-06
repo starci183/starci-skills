@@ -33,8 +33,10 @@ export function resolveWorkflowOwner(source, project) {
 }
 export const ownerFingerprint = owner => { const { routeHash, ...identity } = owner; return contentHash(identity); };
 export function workflowOwnerErrors(root, session, state, { dispatch = false } = {}) {
+  if (existsSync(path.join(session, 'retirement.json'))) return ['WORKFLOW_RETIRED: this ledger is historical and cannot execute'];
   if (existsSync(path.join(session, 'relocation.json'))) return ['WORKFLOW_RELOCATED: source evidence is retained read-only; use the verified destination ledger'];
-  if (state?.runtimeRevision !== RUNTIME_REVISION) return dispatch ? ['WORKFLOW_UPGRADE_REQUIRED: legacy evidence is readable; migrate ownership and resolve the current goal before new dispatch'] : [];
+  if (state?.upgrade) return ['WORKFLOW_RESET_REQUIRED: migrated history cannot execute or prove the current workflow; archive it and open a fresh current session'];
+  if (state?.runtimeRevision !== RUNTIME_REVISION) return dispatch || state?.contractVersion === 'starci/v2.2' ? ['WORKFLOW_RESET_REQUIRED: archive the old ledger and open a fresh current session; old evidence cannot prove new work'] : [];
   const errors = [];
   try {
     const saved = state.workflowOwner;
@@ -52,17 +54,6 @@ export function workflowOwnerErrors(root, session, state, { dispatch = false } =
   return errors;
 }
 export const workflowRootOf = (root, state) => state?.workflowOwner?.ownerRoot ?? path.dirname(root);
-export function legacyBranchOf(state, branch, request) {
-  if (!state.upgrade) return null;
-  const ref = `step-${request.step}/parallel-${request.parallel}${request.exchange ? `/${request.exchange}` : ''}/request/request.json`;
-  if (!state.upgrade.legacyRequestRefs.includes(ref)) return null;
-  const located = readSessionState(branch); if (!located) throw Error('MIGRATION_CHANGED: migrated request has no ledger');
-  const bytes = readFileSync(path.join(located.session, state.upgrade.legacyInventory));
-  if (digest(bytes) !== state.upgrade.legacyInventoryHash) throw Error('MIGRATION_CHANGED: original inventory seal changed');
-  const record = JSON.parse(bytes).files.find(file => file.path === ref);
-  if (!record || record.hash !== digest(readFileSync(path.join(branch, 'request', 'request.json')))) throw Error('MIGRATION_CHANGED: original request bytes changed');
-  return path.join(state.upgrade.from, path.dirname(path.dirname(ref)));
-}
 export function locateWorkflowSession(source, sessionId, fallbackOwner = source) {
   if (!safeId(sessionId)) throw Error('WORKFLOW_OWNER_INVALID: unsafe session id');
   const index = path.join(source, '.workspaces', 'local', 'workflows', `${sessionId}.json`);
@@ -83,14 +74,6 @@ export function locateWorkflowSession(source, sessionId, fallbackOwner = source)
   }
   const archive = path.join(owner, '.worktrees', 'done', sessionId);
   return existsSync(live) ? { session: live, archive: null, ownerRoot: owner } : { session: path.join(archive, 'bundle'), archive, ownerRoot: owner };
-}
-export function legacyMissionState(state, branch, request) {
-  if (!legacyBranchOf(state, branch, request)) return state;
-  const located = readSessionState(branch);
-  const bytes = readFileSync(path.join(located.session, state.upgrade.legacyState));
-  if (digest(bytes) !== state.upgrade.legacyStateHash) throw Error('MIGRATION_CHANGED: original mission state seal changed');
-  const original = JSON.parse(bytes);
-  return { ...state, mission: original.mission, choices: original.choices };
 }
 export function readSessionState(branch) {
   let cursor = path.resolve(branch);

@@ -1,3 +1,4 @@
+import { requiredWhen } from './operator-conditions.mjs';
 // A request made only of an operator's own defaults must pass validate-request. This is the static
 // half of "the tables agree with the gates": every Requirements row whose Default is not — is turned
 // into a value, every required Input is pointed at a placeholder file, the request is written into a
@@ -18,7 +19,7 @@ const head = 'a'.repeat(40);
 function valueFor(row) {
   const d = unquote(row.default).trim();
   const type = row.type.trim().toLowerCase();
-  if (isRequiredField(row)) {
+  if (isRequiredField(row) || d.startsWith('when ')) {
     if (type.startsWith('number')) return 1;
     if (type.startsWith('list')) return ['placeholder'];
     if (type.startsWith('choice')) { const m = /\(([^)]+)\)/.exec(row.type) || /(\w+(?:\s*\|\s*\w+)+)/.exec(row.ask ?? ''); return m ? m[1].split(/\s*\|\s*/)[0].trim() : 'placeholder'; }
@@ -46,7 +47,7 @@ export async function validateDefaults(root) {
       for (const row of op.tables.requirements?.rows ?? []) requirements[unquote(row.field)] = valueFor(row);
       const inputs = {};
       for (const row of op.tables.inputs?.rows ?? []) {
-        if (!isYes(row.required)) continue;
+        if (!requiredWhen(row.required, requirements)) continue;
         const kind = kindOf(row.kind);
         const producer = path.join(session, 'step-0', 'parallel-1', 'response');
         mkdirSync(path.join(producer, 'data'), { recursive: true });

@@ -51,7 +51,7 @@ Operator chỉ ghi file English chuẩn bị phản biện và mirror tiếng Vi
 | --- | --- | --- | --- |
 | `knowledge-repair-receipt` | `response/data/knowledge-repair.json` | data | có |
 
-## Kết quả tốt nhất
+## Operator Result
 
 Với repair thành công, `outcome.primary` là bản table đã khai của biên nhận sửa chữa có kiểu. Nó cho
 thấy chính xác file owner trước/sau, bằng chứng, phạm vi rule và consumer bị ảnh hưởng;

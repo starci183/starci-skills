@@ -105,8 +105,8 @@ export function sessionWorkflowTopologyErrors(policy, state, { dispatch = false,
   const mode = readParts(state, modePath);
   const topologyRecord = readParts(state, modePath.slice(0, -1));
   if (mode === undefined) return (dispatch || terminal)
-    ? [`state.json: ${policy.state} is required before dispatch or successful close; reopen the host session to migrate v2.2.0 state`]
-    : []; // v2.2.0 remains readable, but cannot execute or close until session-open migrates it.
+    ? [`state.json: ${policy.state} is required before dispatch or successful close; archive the old ledger and open a fresh current session`]
+    : []; // Unmarked topology is not current execution authority.
   if (!plainObject(topologyRecord) || Object.keys(topologyRecord).some((key) => key !== modePath.at(-1))) return [`state.json: ${policy.state} must be the only field in its topology record`];
   if (!Object.hasOwn(policy.modes, mode)) return [`state.json: ${policy.state} ${mode ?? 'missing'} is not declared by resources/orchestrator.json#workflowTopologies`];
   const rule = policy.modes[mode];

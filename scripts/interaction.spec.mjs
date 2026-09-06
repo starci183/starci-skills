@@ -126,3 +126,10 @@ test('standalone question gate requires an explicit blocked status', async () =>
     }
   });
 });
+
+test('visible presentation uses the compact result while dense transition records remain internal', () => {
+ assert.equal(policy.transitionLog.visibility,'internal');
+ assert.equal(policy.outcomePresentation.heading,'Operator Result');
+ assert.deepEqual(policy.outcomePresentation.columns,['Step','Status','Result','Next']);
+ assert.deepEqual(policy.outcomePresentation.order,['heading','summary-table','embedded-images','short-details','original-image-links']);
+});

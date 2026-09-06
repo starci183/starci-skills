@@ -306,8 +306,8 @@ export function outcomeRegistryErrors(outcomeRegistry, packages) {
 export async function outcomeErrors(root, dir, response, pkg, { exchange = null, rel = (f) => f, registry: suppliedRegistry, packages } = {}) {
   if (response?.contractVersion !== V22_CONTRACT) return [];
   const at = rel('response/response.json');
-  if (response.status !== 'done') return response.outcome === undefined ? [] : [`${at}: outcome is reserved for an accepted done result; ${response.status} reports its truthful typed state without a best-outcome block`];
-  if (!response.outcome) return [`${at}: every v2.2 done receipt selects outcome.primary for “The best outcome”`];
+  if (response.status !== 'done') return response.outcome === undefined ? [] : [`${at}: outcome is reserved for an accepted done result; ${response.status} reports its truthful typed state without an Operator Result block`];
+  if (!response.outcome) return [`${at}: every v2.2 done receipt selects outcome.primary for “Operator Result”`];
   let outcomeRegistry = suppliedRegistry;
   if (!outcomeRegistry) {
     try { outcomeRegistry = await loadOutcomeRegistry(root); }

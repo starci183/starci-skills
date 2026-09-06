@@ -331,9 +331,9 @@ Raw gate evidence stays bound to this merged head.
 | `checks` | `response/data/checks.json` | data | yes |
 | `changes` | `response/changes.md` | md | no |
 
-## The best outcome
+## Operator Result
 
-For `stack-up`, `locate`, `start-role`, `serve`, `restart` or `reset`, print **The best outcome** as the resulting URL, generation and attested head in `response/response.md`, with `response/data/checks.json` and `response/data/delta.json` as secondary evidence; a proved reuse is labeled a no-op. For `stop`, show the stopped generation and released lease or port instead of a URL; a held port, stale head or failed probe leads with the conflicting holder or observation and never offers the route as ready.
+For `stack-up`, `locate`, `start-role`, `serve`, `restart` or `reset`, print **Operator Result** as the resulting URL, generation and attested head in `response/response.md`, with `response/data/checks.json` and `response/data/delta.json` as secondary evidence; a proved reuse is labeled a no-op. For `stop`, show the stopped generation and released lease or port instead of a URL; a held port, stale head or failed probe leads with the conflicting holder or observation and never offers the route as ready.
 
 ## Stops
 

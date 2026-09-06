@@ -120,7 +120,7 @@ test('renderer requires a matched accepted seal and emits the native image as an
   const rendered = await renderOutcome(sourceRoot, f.branch, { validateStepFn: async (...args) => { fullGate = args; return { errors: [] }; } });
   assert.equal(fullGate[1], f.branch);
   assert.deepEqual(fullGate[2], { operator: true, requestPhase: 'accept' });
-  assert.match(rendered, /^## The best outcome\n\n/);
+  assert.match(rendered, /^## Operator Result\n\n/);
   assert.match(rendered, /!\[Selected candidate\]\(<[A-Z]:\/|!\[Selected candidate\]\(<\//);
   assert.match(rendered, /response\/artifacts\/selected\.png>\)/);
 
@@ -221,6 +221,8 @@ test('renderer chooses result and verdict tables over receipt binding and embeds
   await sealFixture(f);
   const rendered = await renderOutcome(sourceRoot, f.branch, { validateStepFn: async () => ({ errors: [] }) });
   assert.match(rendered, /### Results/);
+  assert.ok(rendered.indexOf('![Relevant content image]') < rendered.indexOf('### Results'));
+  assert.ok(rendered.indexOf('### Results') < rendered.indexOf('[Original image — Relevant content image]'));
   assert.match(rendered, /### Gate verdict/);
   assert.doesNotMatch(rendered, /### Binding/);
   assert.match(rendered, /!\[Relevant content image\]\(<.*response\/artifacts\/selected\.png>\)/);
@@ -275,4 +277,28 @@ test('renderer refuses unaccepted and post-accept modified evidence', async (t) 
   await writeFile(path.join(f.session, 'state.json'), JSON.stringify({ contractVersion: contract, attempts: { '1/1': { id: 'attempt-1', status: 'matched', responseRef: 'step-1/parallel-1/response/response.json', evidenceManifest: manifest } } }));
   await writeFile(path.join(f.branch, 'response', 'artifacts', 'selected.png'), Buffer.concat([png, Buffer.from('tamper')]));
   await assert.rejects(() => renderOutcome(sourceRoot, f.branch, { validateStepFn: async () => ({ errors: [] }) }), /inventory changed after acceptance/);
+});
+
+test('summary preserves failing findings, escapes table text, hides hashes/paths and names the real next cell', async t => {
+ const f=await fixture();t.after(()=>rm(f.base,{recursive:true,force:true}));
+ f.response.outcome.summary='Verification completed.\nTwo checks failed | follow-up required. sha256:'+'a'.repeat(64)+' D:/private/very-long-workspace/evidence/result.json';
+ await writeFile(path.join(f.branch,'response/response.json'),JSON.stringify(f.response));await sealFixture(f);
+ const stateFile=path.join(f.session,'state.json'),state=JSON.parse(await readFile(stateFile,'utf8'));state.chain=[['1/1'],['2/1']];state.steps={'1/1':'demo.make','2/1':'quality.verify'};await writeFile(stateFile,JSON.stringify(state));
+ const rendered=await renderOutcome(sourceRoot,f.branch,{validateStepFn:async()=>({errors:[]})});
+ const row=rendered.split('\n').find(line=>line.startsWith('| 1/1 '));assert.match(row,/done \(receipt accepted\)/);assert.match(row,/Two checks failed \\\| follow-up required/);assert.match(row,/2\/1 quality.verify/);assert.doesNotMatch(row,/[a-f0-9]{40}|D:\/private|all.*passed/i);assert.equal(row.split(/(?<!\\)\|/).length,6);
+ assert.ok(rendered.indexOf('| Step | Status | Result | Next |')<rendered.indexOf('![Selected candidate]'));
+ assert.ok(rendered.indexOf('![Selected candidate]')<rendered.indexOf('[Original image — Selected candidate]'));
+});
+
+test('summary distinguishes a completed planned chain from an unrecorded next step', async t => {
+ const f=await fixture();t.after(()=>rm(f.base,{recursive:true,force:true}));await sealFixture(f);
+ const stateFile=path.join(f.session,'state.json'),state=JSON.parse(await readFile(stateFile,'utf8'));state.chain=[['1/1']];state.steps={'1/1':'demo.make'};await writeFile(stateFile,JSON.stringify(state));
+ assert.match(await renderOutcome(sourceRoot,f.branch,{validateStepFn:async()=>({errors:[]})}),/Planned chain complete/);
+ delete state.chain;await writeFile(stateFile,JSON.stringify(state));const unknown=await renderOutcome(sourceRoot,f.branch,{validateStepFn:async()=>({errors:[]})});assert.match(unknown,/Not recorded/);assert.doesNotMatch(unknown,/Planned chain complete/);
+});
+
+test('short code details keep their closing fence and original artifact link', async t => {
+ const f=await fixture();t.after(()=>rm(f.base,{recursive:true,force:true}));const ref='response/artifacts/change.ts';await writeFile(path.join(f.branch,ref),Array.from({length:70},(_,i)=>'// observed line '+i).join('\n'));
+ f.response.fields={source:ref};f.response.outcome={summary:'Source review completed.',primary:{kind:'code',label:'Source change',ref}};await writeFile(path.join(f.branch,'response/response.json'),JSON.stringify(f.response));await sealFixture(f);
+ const rendered=await renderOutcome(sourceRoot,f.branch,{validateStepFn:async()=>({errors:[]})});assert.equal((rendered.match(/^```/gm)??[]).length,2);assert.match(rendered,/```\n\n\[Open the full Source change artifact\]/);assert.doesNotMatch(rendered,/observed line 69/);
 });

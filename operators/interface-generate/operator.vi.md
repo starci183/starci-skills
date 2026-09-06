@@ -434,7 +434,7 @@ minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bả
 | `changes` | `response/changes.md` | md | có |
 | `writes` | `response/data/writes.json` | data | có |
 
-## Kết quả tốt nhất
+## Operator Result
 
 Ở mọi lượt chạy thành công — `apply` hoặc `dry`, tại mọi change level gồm `new`, `reconstruct` và
 `refine` — `outcome.primary` là `image` có ref trỏ tới `selected-candidate-capture` bắt buộc.

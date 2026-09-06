@@ -21,16 +21,27 @@
     "cases",
     "flowSource",
     "golden",
-    "isolation"
+    "isolation",
+    "access",
+    "fixtures",
+    "sourceRoles",
+    "provenance"
   ],
   "properties": {
     "runId": {
       "$ref": "#/$defs/runId"
     },
     "approval": {
-      "description": "The authority that covered this run's own writes: an approval id, or the environment declaration's reference (path and content hash) when the declaration marks `seed` and `identity-provisioning` declared for `env`.",
-      "type": "string",
-      "minLength": 1
+      "oneOf": [
+        {
+          "description": "The authority that covered this run's own writes: an approval id, or the environment declaration's reference (path and content hash) when the declaration marks `seed` and `identity-provisioning` declared for `env`.",
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "feature": {
       "$ref": "#/$defs/slug"
@@ -125,7 +136,7 @@
     "accounts": {
       "description": "One frozen account per alias the flow names, each a dedicated username with the shared password resolved by name. Every field is a name or a reference, so a password has nowhere to live even by accident.",
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "maxItems": 16,
       "items": {
         "type": "object",
@@ -164,20 +175,51 @@
             "minItems": 1,
             "maxItems": 16,
             "uniqueItems": true,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "providerAccountRef": { "type": "string", "minLength": 1 },
-          "accountAction": { "enum": ["reuse", "create", "repair"] },
+          "providerAccountRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accountAction": {
+            "enum": [
+              "reuse",
+              "create",
+              "repair"
+            ]
+          },
           "loginProof": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["method", "endpoint", "outcome", "evidenceRef", "verifiedAt"],
+            "required": [
+              "method",
+              "endpoint",
+              "outcome",
+              "evidenceRef",
+              "verifiedAt"
+            ],
             "properties": {
-              "method": { "const": "browser" },
-              "endpoint": { "type": "string", "pattern": "^https?://" },
-              "outcome": { "const": "passed" },
-              "evidenceRef": { "type": "string", "minLength": 1 },
-              "verifiedAt": { "type": "string", "format": "date-time" }
+              "method": {
+                "const": "browser"
+              },
+              "endpoint": {
+                "type": "string",
+                "pattern": "^https?://"
+              },
+              "outcome": {
+                "const": "passed"
+              },
+              "evidenceRef": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verifiedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
             }
           },
           "credentialName": {
@@ -221,34 +263,41 @@
       "$ref": "#/$defs/namespace"
     },
     "seed": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "recordsRef",
-        "expectedRef",
-        "fingerprint",
-        "namespace",
-        "isUat"
-      ],
-      "properties": {
-        "recordsRef": {
-          "type": "string",
-          "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/seed/records\\.json$"
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "recordsRef",
+            "expectedRef",
+            "fingerprint",
+            "namespace",
+            "isUat"
+          ],
+          "properties": {
+            "recordsRef": {
+              "type": "string",
+              "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/seed/records\\.json$"
+            },
+            "expectedRef": {
+              "type": "string",
+              "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/seed/expected\\.json$"
+            },
+            "fingerprint": {
+              "$ref": "#/$defs/fingerprint"
+            },
+            "namespace": {
+              "$ref": "#/$defs/namespace"
+            },
+            "isUat": {
+              "const": true
+            }
+          }
         },
-        "expectedRef": {
-          "type": "string",
-          "pattern": "^\\.worktrees/uat/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*/seed/expected\\.json$"
-        },
-        "fingerprint": {
-          "$ref": "#/$defs/fingerprint"
-        },
-        "namespace": {
-          "$ref": "#/$defs/namespace"
-        },
-        "isUat": {
-          "const": true
+        {
+          "type": "null"
         }
-      }
+      ]
     },
     "flowSource": {
       "const": "planned",
@@ -429,8 +478,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "fe",
-        "be"
+        "fe"
       ],
       "properties": {
         "fe": {
@@ -442,6 +490,24 @@
           "pattern": "^[0-9a-f]{40}$"
         }
       }
+    },
+    "access": {
+      "enum": [
+        "authenticated",
+        "anonymous"
+      ]
+    },
+    "fixtures": {
+      "enum": [
+        "seeded",
+        "none"
+      ]
+    },
+    "sourceRoles": {
+      "enum": [
+        "full",
+        "frontend"
+      ]
     }
   },
   "$defs": {
@@ -461,5 +527,109 @@
       "type": "string",
       "pattern": "^uat-[A-Za-z0-9._-]+$"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "access"
+        ],
+        "properties": {
+          "access": {
+            "const": "anonymous"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "accounts": {
+            "maxItems": 0
+          },
+          "approval": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "accounts": {
+            "minItems": 1
+          },
+          "approval": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "fixtures"
+        ],
+        "properties": {
+          "fixtures": {
+            "const": "none"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "seed": {
+            "type": "null"
+          },
+          "isolation": {
+            "properties": {
+              "seededIds": {
+                "maxItems": 0
+              },
+              "rollbackIds": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "seed": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "sourceRoles"
+        ],
+        "properties": {
+          "sourceRoles": {
+            "const": "frontend"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "provenance"
+        ],
+        "properties": {
+          "provenance": {
+            "properties": {
+              "be": false
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "provenance": {
+            "required": [
+              "fe",
+              "be"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }

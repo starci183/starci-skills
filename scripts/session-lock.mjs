@@ -26,7 +26,7 @@ export async function withOwnedFileLock(lock, operation, { requiredFile = null }
   lock = path.resolve(lock);
   requiredFile = requiredFile ? path.resolve(requiredFile) : null;
   if (requiredFile && !existsSync(requiredFile)) throw new Error('SESSION_MISSING: state.json is absent');
-  await mkdir(path.dirname(lock), { recursive: true });
+  if (!existsSync(path.dirname(lock))) await mkdir(path.dirname(lock), { recursive: true });
   const owner = { pid: process.pid, token: randomUUID(), acquiredAt: new Date().toISOString() };
   let handle;
   for (let tries = 0; tries < 400; tries += 1) {
@@ -67,7 +67,12 @@ export async function withOwnedFileLock(lock, operation, { requiredFile = null }
 
 export async function withSessionLock(session, operation) {
   session = path.resolve(session);
-  return withOwnedFileLock(path.join(session, 'runtime', '.session-lock'), operation, { requiredFile: path.join(session, 'state.json') });
+  const refuseRetired = () => {
+    if (existsSync(path.join(session,'retirement.json'))) throw Error('WORKFLOW_RETIRED: historical ledger cannot be written');
+    if (existsSync(path.join(session,'relocation.json'))) throw Error('WORKFLOW_RELOCATED: former owner ledger cannot be written');
+  };
+  refuseRetired();
+  return withOwnedFileLock(path.join(session, 'runtime', '.session-lock'), async () => { refuseRetired(); return operation(); }, { requiredFile: path.join(session, 'state.json') });
 }
 
 export async function mutateSession(session, operation) {
@@ -76,6 +81,7 @@ export async function mutateSession(session, operation) {
     if (existsSync(path.join(session, 'relocation.json'))) throw Error('WORKFLOW_RELOCATED: retained source ledger is read-only; use its verified destination');
     const file = path.join(session, 'state.json');
     const state = JSON.parse(await readFile(file, 'utf8'));
+    if (state.upgrade || state.contractVersion === 'starci/v2.2' && state.runtimeRevision !== 3) throw Error('WORKFLOW_RESET_REQUIRED: old or migrated state is immutable; archive and open a fresh current session');
     const result = await operation(state);
     const temp = `${file}.${process.pid}.${randomUUID()}.tmp`;
     await writeFile(temp, `${JSON.stringify(state, null, 2)}\n`, 'utf8');

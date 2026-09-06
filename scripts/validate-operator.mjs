@@ -1,3 +1,4 @@
+import { requiredWhen, requirementValues, conditionalRequirementErrors } from './operator-conditions.mjs';
 // An operator.md package is closed when its own tables agree with each other, with the stop-code
 // registry, with the kind contracts, and with its Vietnamese mirror: Params ↔ Requirements, Steps ↔
 // Stops ↔ errors registry, Writes ↔ Outputs ↔ templates/kinds, Inputs ↔ templates/kinds, nested
@@ -136,6 +137,16 @@ export async function validateOperators(root) {
     }
     for (const needed of ['validate.mjs', 'self-test.mjs']) if (!existsSync(path.join(pkg.dir, needed))) errors.push(`operators/${pkg.name}/${needed}: missing`);
 
+    errors.push(...conditionalRequirementErrors(op));
+    for (const row of [...op.tables.context.rows,...op.tables.inputs.rows]) {
+      try { requiredWhen(row.required, requirementValues(op)); }
+      catch(error) { errors.push(at + ': ' + error.message); }
+      const match=/^when ([a-zA-Z][a-zA-Z0-9]*)=([a-zA-Z0-9-]+)$/.exec(row.required);
+      if(match) {
+        const field=op.tables.requirements.rows.find(r=>unquote(r.field)===match[1]);
+        if(!field || !String(field.type).startsWith('enum:') || !String(field.type).slice(5).split(',').map(value => value.trim()).includes(match[2]))errors.push(at + ': conditional Required must name a declared enum field and value');
+      }
+    }
     // Params ↔ Requirements.
     const fields = new Map(op.tables.requirements.rows.map((r) => [unquote(r.field), r]));
     const usedFields = new Set();

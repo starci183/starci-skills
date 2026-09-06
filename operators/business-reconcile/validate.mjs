@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { validateStep } from '../../scripts/validate-step.mjs';
 import { tableUnder } from '../../scripts/validate-response.mjs';
 import { businessesRootOf, contentAddress, objectRef, openStore, verifyHeadPublication } from '../../scripts/business-registry.mjs';
-import { hostRootOf } from '../../scripts/validate-request.mjs';
+import { hostRootOf, sessionRootOf } from '../../scripts/validate-request.mjs';
 import { openUnchecked } from '../../scripts/unchecked.mjs';
 import { ledgerKeyOf } from '../../scripts/record-unchecked.mjs';
 
@@ -52,8 +52,25 @@ export async function validateReconcileStep(branchDir, root = ROOT, { uncheckedR
   const has = (f) => existsSync(path.join(branchDir, f));
   const read = (f) => readFile(path.join(branchDir, f), 'utf8');
   const inputs = request?.inputs ?? {};
-  const delivered = inputs['backend-source-application'];
+  const sourceRole = requirements.sourceRole ?? 'be';
+  const sourceKind = sourceRole === 'fe' ? 'frontend-source-application' : 'backend-source-application';
+  const delivered = inputs[sourceKind];
+  const sourceHead = request?.contexts?.find(c => c.alias === '@workspaces/' + sourceRole)?.head;
+  if (!['be','fe'].includes(sourceRole)) errors.push('sourceRole must be be or fe');
+  if (sourceRole === 'fe' && inputs['backend-source-application']) errors.push('frontend reconciliation must not substitute a backend source receipt');
   const target = requirements.targetState;
+  if (sourceRole === 'fe' && delivered) {
+    try {
+      const receiptPath=path.resolve(sessionRootOf(branchDir),delivered), responseDir=path.dirname(receiptPath), owner=path.dirname(responseDir);
+      const producer=JSON.parse(await readFile(path.join(owner,'request/request.json'),'utf8'));
+      const result=JSON.parse(await readFile(path.join(responseDir,'response.json'),'utf8'));
+      const binding=fields(tableUnder(await readFile(receiptPath,'utf8'),'## Binding'));
+      if(producer.operatorId!=='interface.generate' || result.operatorId!=='interface.generate' || result.status!=='done') errors.push('frontend reconciliation requires a completed frontend source producer');
+      const refs=[result.fields?.[sourceKind]].flat().filter(Boolean);
+      if(!refs.some(ref=>path.resolve(owner,ref)===receiptPath))errors.push('frontend delivered source was not emitted by its producer');
+      if(binding.Commit!==sourceHead)errors.push('frontend delivered source commit differs from the pinned frontend head');
+    } catch {errors.push('frontend delivered source provenance is unavailable');}
+  }
 
   if (!empty(target) && !RECONCILE_STATES.has(target)) errors.push(`request.json: targetState ${target} is not one a reconciliation publishes; a head is reconciled into implemented or in-progress, and decided into anything else by business.decide`);
   for (const key of ['mode', 'promise', 'dimensions']) if (requirements[key] !== undefined) errors.push(`request.json: requirements.${key} belongs to business.decide; a reconciliation models nothing`);
@@ -74,6 +91,7 @@ export async function validateReconcileStep(branchDir, root = ROOT, { uncheckedR
         if (claims.has(claim.claimId)) errors.push(`response/data/claims.json: claim ${claim.claimId} is declared more than once`);
         claims.set(claim.claimId, claim);
         if (claim.lineEnd < claim.lineStart) errors.push(`response/data/claims.json: claim ${claim.claimId} has an inverted line range`);
+        if (sourceRole === 'fe' && claim.kind === 'fact' && claim.sourceHead !== sourceHead) errors.push('frontend fact claim must bind the pinned frontend head');
         if (claim.kind === 'fact' && claim.sourceHead === null) errors.push(`response/data/claims.json: fact claim ${claim.claimId} must bind the observed source head`);
         if (claim.kind === 'contradiction') errors.push(`response/data/claims.json: claim ${claim.claimId} is a contradiction, which is a discrepancy against its dimension rather than a published claim`);
       }
@@ -123,7 +141,7 @@ export async function validateReconcileStep(branchDir, root = ROOT, { uncheckedR
     const lineage = fields(tableUnder(text, '## Lineage'));
     if (!empty(requirements.featureId) && binding.Feature !== requirements.featureId) errors.push(`response/response.md: Feature ${binding.Feature} differs from the request's ${requirements.featureId}`);
     if (!empty(target) && binding['Target state'] !== target) errors.push(`response/response.md: Target state ${binding['Target state']} differs from the request's ${target}`);
-    if (!empty(delivered) && binding['Delivered source'] !== delivered) errors.push(`response/response.md: Delivered source ${binding['Delivered source']} is not the backend-source-application input ${delivered} the request bound`);
+    if (!empty(delivered) && binding['Delivered source'] !== delivered) errors.push(`response/response.md: Delivered source ${binding['Delivered source']} is not the ${sourceKind} input ${delivered} the request bound`);
     if (model) {
       if (binding.Head !== model.headRef) errors.push(`response/response.md: Head ${binding.Head} differs from the published head ${model.headRef}`);
       if (lineage.Transition !== model.lineage.transition) errors.push(`response/response.md: Transition ${lineage.Transition} differs from the model's ${model.lineage.transition}`);

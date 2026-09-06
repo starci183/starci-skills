@@ -1,3 +1,4 @@
+import { uatModeErrors, uatCasePrerequisiteErrors } from '../../scripts/uat-prerequisites.mjs';
 import { workflowRootOf, readSessionState } from '../../scripts/workflow-root.mjs';
 // uat.plan's own law over one branch, on top of the shared step check: the Flows table and the unit
 // list are one list — every Flows row has a units.json entry with the same id and every entry has its
@@ -75,9 +76,9 @@ export async function validateUatPlanStep(branchDir, root = ROOT, { uncheckedRoo
       flowIds.add(id);
       tierRows.push([id, tier]);
       if (!byId.has(id)) errors.push(`${RECEIPT}: Flows row ${id} has no entry in ${UNITS}; the plan and the unit list are one list`);
-      if (aliases.has(alias)) errors.push(`${RECEIPT}: flows ${aliases.get(alias)} and ${id} share the account alias ${alias}; two walkers that share a sign-in prove each other's session`);
+      if (alias !== '—' && aliases.has(alias)) errors.push(`${RECEIPT}: flows ${aliases.get(alias)} and ${id} share the account alias ${alias}; two walkers that share a sign-in prove each other's session`);
       aliases.set(alias, id);
-      if (namespaces.has(namespace)) errors.push(`${RECEIPT}: flows ${namespaces.get(namespace)} and ${id} share the seed namespace ${namespace}; one run's rollback would be the other's failure`);
+      if (namespace !== '—' && namespaces.has(namespace)) errors.push(`${RECEIPT}: flows ${namespaces.get(namespace)} and ${id} share the seed namespace ${namespace}; one run's rollback would be the other's failure`);
       namespaces.set(namespace, id);
     }
     errors.push(...tierErrors(tierRows, units, { at: RECEIPT, table: 'Flows' }));
@@ -99,9 +100,11 @@ export async function validateUatPlanStep(branchDir, root = ROOT, { uncheckedRoo
       for (const flow of sheet.flows ?? []) {
         if (sheetFlows.has(flow.flowId)) errors.push(`${CASES}: flow ${flow.flowId} is classified twice`);
         sheetFlows.set(flow.flowId, flow);
+        errors.push(...uatModeErrors(requirements, flow, 'flow ' + flow.flowId));
+        errors.push(...uatCasePrerequisiteErrors(flow, (sheet.cases ?? []).filter(c => c.flowId === flow.flowId)));
         if (!flowIds.has(flow.flowId)) errors.push(`${CASES}: classified flow ${flow.flowId} has no Flows row`);
         const row = (tableUnder(receipt, '## Flows') ?? []).find(([id]) => id === flow.flowId);
-        if (row && (row[1].replaceAll('`', '') !== flow.entry || row[4].replaceAll('`', '') !== flow.namespace)) errors.push(`${CASES}: flow ${flow.flowId} entry or namespace differs from the human plan`);
+        if (row && (row[1].replaceAll('`', '') !== flow.entry || row[4].replaceAll('`', '') !== (flow.namespace ?? '—'))) errors.push(`${CASES}: flow ${flow.flowId} entry or namespace differs from the human plan`);
       }
       for (const id of flowIds) if (!sheetFlows.has(id)) errors.push(`${CASES}: flow ${id} has no reuse/update/create classification`);
 
@@ -114,11 +117,11 @@ export async function validateUatPlanStep(branchDir, root = ROOT, { uncheckedRoo
         const flow = sheetFlows.get(c.flowId);
         if (!flow) { errors.push(`${CASES}: case ${c.caseId} names unknown flow ${c.flowId}`); continue; }
         coveredFlows.add(c.flowId);
-        if (!flow.actorAliases.includes(c.actor)) errors.push(`${CASES}: case ${c.caseId} actor ${c.actor} is absent from flow ${c.flowId}`);
+        if ((flow.access ?? 'authenticated') !== 'anonymous' && !flow.actorAliases.includes(c.actor)) errors.push(`${CASES}: case ${c.caseId} actor ${c.actor} is absent from flow ${c.flowId}`);
         const order = `${c.flowId}:${c.order}`;
         if (orders.has(order)) errors.push(`${CASES}: flow ${c.flowId} repeats case order ${c.order}`);
         orders.add(order);
-        if (c.fixture?.createsAssertedOutcome !== false) errors.push(`${CASES}: case ${c.caseId} fixture creates the outcome the walk must prove`);
+        if ((flow.fixtures ?? 'seeded') !== 'none' && c.fixture?.createsAssertedOutcome !== false) errors.push(`${CASES}: case ${c.caseId} fixture creates the outcome the walk must prove`);
       }
       for (const id of flowIds) if (!coveredFlows.has(id)) errors.push(`${CASES}: flow ${id} has no case row; a flow cannot be executed from its name alone`);
     }

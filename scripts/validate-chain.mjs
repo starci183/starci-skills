@@ -1,4 +1,5 @@
 import { deliveryTargets, deliveryPolicy } from './mission-scope.mjs';
+import { effectiveOperator } from './operator-conditions.mjs';
 // A chain is never chosen from an example: scripts/plan-chain.mjs derives it from the mission's
 // done-when lines, and this file is the gate every planned or replanned chain passes before a branch
 // of it is dispatched. It reads the state.json shape (chain: [["1/1"], ["2/1", "2/2"]], steps:
@@ -127,7 +128,6 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
   for (const target of deliveryTargets(mission)) if (!Object.values(steps ?? {}).includes(target)) errors.push(`state.json: frozen delivery impact requires ${target}; shallow doneWhen cannot omit its lane`);
   const planned = options.planned ?? {};
   const imported = options.imported ?? {};
-  const activeFromStep = Math.max(1, Number(options.activeFromStep ?? 1));
   if (!Array.isArray(chain) || !chain.length) { errors.push('state.json: chain must be a non-empty array of steps'); return errors; }
   const req = (cell) => byBranch[cell] ?? null;
   const opOf = (cell) => steps?.[cell];
@@ -148,13 +148,8 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
   for (const cell of Object.keys(planned)) if (!cells.has(cell)) errors.push(`state.json: planned records ${cell}, which the chain does not name`);
   const produced = new Set(); // kinds produced by earlier steps
   const boundRoles = new Set(); // roles bound by earlier workspace.bind branches
-  // A replan begins a new active segment while the earlier immutable ledger remains in the chain.
-  // Current delivery ordering is judged inside that segment, not against older-scope attempts.
-  const position = new Map(); // operator -> first step index in the active segment
-  chain.forEach((step, n) => {
-    if (n + 1 < activeFromStep || !Array.isArray(step)) return;
-    for (const cell of step) { const id = opOf(cell); if (id !== undefined && !position.has(id)) position.set(id, n); }
-  });
+  const position = new Map(); // operator -> first step index it runs in, over the whole chain
+  chain.forEach((step, n) => { if (Array.isArray(step)) for (const cell of step) { const id = opOf(cell); if (id !== undefined && !position.has(id)) position.set(id, n); } });
   if (mission?.discovery) {
     const policy = deliveryPolicy(root); const mode = mission.discovery.stage === 'handoff' ? 'plan' : 'execute';
     for (const [laneId, lane] of Object.entries(mission.discovery.lanes)) if (lane.status === 'planned') for (const consumer of policy.lanes[laneId]?.[mode] ?? []) for (const dependency of lane.dependsOn ?? []) for (const producer of policy.lanes[dependency]?.[mode] ?? []) {
@@ -169,10 +164,11 @@ export function validateChain(root, packages, chain, steps, byBranch = {}, optio
     const seenWrites = new Map();
     for (const cell of step) {
       const id = opOf(cell); if (id === undefined) continue;
-      const node = graph.get(id);
-      if (!node) { errors.push(`${cell}: unknown operator ${id}`); continue; }
+      const rawNode = graph.get(id);
+      if (!rawNode) { errors.push(`${cell}: unknown operator ${id}`); continue; }
+      const node = effectiveOperator(rawNode, req(cell)?.requirements ?? planned[cell]?.requirements ?? {});
       const r = req(cell);
-      if (previous && n + 1 > activeFromStep && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id))) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
+      if (previous && !previous.some((prev) => prev === id || (graph.get(prev)?.next ?? new Set()).has(id))) errors.push(`${cell}: step ${n + 1} runs ${id}, which no Next table of step ${n} (${previous.join(', ')}) permits`);
       for (const input of node.required) if (!produced.has(input.kind) && !imported[cell]?.has(input.kind)) errors.push(`${cell}: ${id} requires input ${input.kind}, which no earlier step produces and no imported slot the request names supplies`);
       if (id !== BIND_OPERATOR) for (const role of node.roles) if (!boundRoles.has(role)) errors.push(`${cell}: ${id} requires @workspaces/${role}, which no earlier ${BIND_OPERATOR} (role ${role}) bound or is planned to bind`);
       if (r && planned[cell]) errors.push(...plannedRequirementErrors(planned[cell], r, `${cell}: request.json`));

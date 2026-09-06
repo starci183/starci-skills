@@ -3,13 +3,13 @@
 ## Job
 
 Enumerate the user journeys the mission goal names, one flow per journey with its entry route, its
-step budget, its own account alias and its own seed namespace, so that the blind walkers that follow
+step budget, its declared account and fixture prerequisites, so that the blind walkers that follow
 each walk one flow and no two of them ever share a row.
 
 ## Done when
 
 Done when the `uat-plan` names one flow per journey the goal names, each with its entry route, its
-step budget, its own account alias, its own seed namespace and its tier, and the `units` file carries
+step budget, its declared account and fixture prerequisites and its tier, and the `units` file carries
 one flow unit per Flows row with the same id and tier.
 
 ## The unit of a blind walker is one flow
@@ -28,7 +28,7 @@ seed namespace.
 
 Two walkers that share an account share a sign-in, and then each proves the other's session; two
 walkers that share a seed namespace share a cleanup, and one run's rollback becomes the other's
-failure. The plan therefore gives every flow its own account alias and its own namespace, disjoint
+failure. The plan therefore gives each authenticated flow its own account alias and each seeded flow its own namespace, disjoint
 from every other flow of the plan, and the validator refuses a plan in which two rows carry the same
 alias or the same namespace. A flow folder that already exists keeps the name, the aliases and the
 namespace it has, because a record nobody can predict is a record nobody reads; the plan reuses it
@@ -72,6 +72,10 @@ and `response.json`. It drafts no flow document, seeds nothing, provisions no ac
 nowhere, opens no browser and walks nothing; the walk belongs to the operator that receives one flow.
 It names credentials by alias only and has no field that could hold one.
 
+## Journey prerequisites
+
+The request and each machine flow freeze access, fixtures and sourceRoles; snapshot and verdict must preserve them. Defaults are authenticated, seeded and full. Anonymous drives a public surface in a fresh browser context, carries null walk account and case actor anonymous, and accepts no account or credential. None carries null case fixture and plan seed namespace, case cleanup none, no seed receipt, no seeded or rollback ids and no data.seed handoff. Run evidence still uses uat-<runId>. Frontend pins the frontend head and both actual admissions at that head, with no invented backend head. These modes are independent: an anonymous journey may need seeded data, and a no-fixture journey may need sign-in. Account, sign-in and seed procedures apply only when their respective prerequisites require them; every case, control, capture, runtime ancestry check, all three lanes and append-only history remain mandatory.
+
 ## Context
 
 | Alias | Bind | Required |
@@ -93,18 +97,21 @@ It names credentials by alias only and has no field that could hold one.
 | `goal` | text | — | The mission goal in the person's words; every journey it names becomes one flow |
 | `feature` | id | — | The feature key that addresses the flow directories and titles the plan |
 | `env` | id | dev | The environment whose flow folders, accounts and seed the flows are planned for |
+| `access` | enum:authenticated,anonymous | authenticated | Access frozen by the plan; anonymous uses a fresh unauthenticated browser and no credential. |
+| `fixtures` | enum:seeded,none | seeded | Fixture prerequisites frozen by the plan; none carries no seed input or database cleanup. |
+| `sourceRoles` | enum:full,frontend | full | Source dependencies exercised by the journey; frontend pins only frontend delivery. |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate and resume | `resume` | `request/request.json`, the blocked plan when resuming | — | `INVALID_INPUT`, `NO_PROGRESS` |
+| 1 | Validate the gate and resume | `resume`, `access`, `fixtures`, `sourceRoles` | `request/request.json`, the blocked plan when resuming | — | `INVALID_INPUT`, `NO_PROGRESS` |
 | 2 | Read the goal: every user journey it names, each as one sentence with the actor that walks it | `goal` | the goal the request carries | — | — |
 | 3 | Read the surface map when bound: the entry route each journey starts at and the pages and modals it crosses | — | input `surface-map` | — | — |
 | 4 | Inspect existing flow folders and machine case sheets, classifying stable flows and cases reusable, missing or invalid while preserving names, aliases, namespaces and history | `feature`, `env` | @worktrees/uat/<flow>, @worktrees/_templates for the shape a flow folder takes | — | — |
 | 5 | Reuse, update or create one flow per journey and write its cases before execution: actor, precondition, input, ordered UI actions, assertions, expected result, verification, JSON fixture, optional SQL and cleanup | — | the journeys, the map, the existing flows | — | `FLOW_UNDEFINED` |
-| 6 | Give every flow its own account alias and its own seed namespace, disjoint from every other flow of the plan | `env` | the flows, @worktrees/uat/<flow> for the aliases already provisioned | — | — |
+| 6 | Freeze each flow’s access, fixtures and sourceRoles; give authenticated flows distinct account aliases and seeded flows distinct namespaces, otherwise record the explicit absence | `env` | the flows, @worktrees/uat/<flow> for the aliases already provisioned | — | — |
 | 7 | Tier every flow against the mission's done-when lines: `journey` where a line walks it, `secondary` with one sentence of reason where none does, and every open entry of this feature taken back or extended | — | the mission's done-when lines, the flows, @worktrees/unchecked/<product> | — | — |
 | 8 | Write the unit list: one flow unit per Flows row with the same id and tier, the journey as its goal and its deferral reason where it has one | — | the plan | `units` | — |
 | 9 | Emit the human plan, machine case sheet, matching units and receipt only after every case and fixture reference validates | — | everything above | `uat-plan`, `uat-case-sheet`, `response/data/cases.json`, `units`, `response/response.json` | — |
@@ -122,9 +129,9 @@ whose plan names the same flows as the branch it resumes is `NO_PROGRESS`.
 | `uat-case-sheet` | `response/data/cases.json` | data | yes |
 | `units` | `response/data/units.json` | data | yes |
 
-## The best outcome
+## Operator Result
 
-On `done`, print **The best outcome** as the flow and case table from `response/data/cases.json`, showing actor, entry, account alias, fixture reference and isolated namespace, with `response/data/units.json` and `response/response.md` as secondary plan evidence. Missing entries or fixtures remain explicit unchecked rows and are never presented as runnable cases.
+On `done`, print **Operator Result** as the flow and case table from `response/data/cases.json`, showing actor, entry, account alias, fixture reference and isolated namespace, with `response/data/units.json` and `response/response.md` as secondary plan evidence. Missing entries or fixtures remain explicit unchecked rows and are never presented as runnable cases.
 
 ## Stops
 
@@ -141,3 +148,4 @@ On `done`, print **The best outcome** as the flow and case table from `response/
 | every flow has its entry, its account alias and its namespace: each flow is walked on its own branch carrying its unit id | `uat.verify` |
 | every case has frozen preconditions and fixture references that must become one executable seed unit per flow | `data.plan` |
 | a journey the goal names is one the person may not want walked, so the person says whether it belongs to the mission | `user` |
+| the case sheet is frozen and the planned frontend journey still needs its implementation | `interface.generate` |

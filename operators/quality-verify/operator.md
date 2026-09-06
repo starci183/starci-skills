@@ -253,9 +253,9 @@ passed because quality gates or UAT pass. Quality thresholds and frozen UAT case
 | `coverage` | `response/data/coverage.json` | data | no |
 | `audit-scope` | `response/data/audit-scope.json` | data | no |
 
-## The best outcome
+## Operator Result
 
-Print **The best outcome** as the gate table in `response/response.md`, linking each required `response/data/gates/<gate>.json` result and `response/data/coverage.json` when present. Completing the verification may validly produce a failing verdict: failed, skipped and not-run gates remain distinct and visible, and a red or incomplete set is never presented as passing quality.
+Print **Operator Result** as the gate table in `response/response.md`, linking each required `response/data/gates/<gate>.json` result and `response/data/coverage.json` when present. Completing the verification may validly produce a failing verdict: failed, skipped and not-run gates remain distinct and visible, and a red or incomplete set is never presented as passing quality.
 
 ## Stops
 

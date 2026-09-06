@@ -10,7 +10,11 @@
     "historyRef",
     "lanes",
     "experience",
-    "cleanup"
+    "cleanup",
+    "access",
+    "fixtures",
+    "sourceRoles",
+    "provenance"
   ],
   "properties": {
     "runId": {
@@ -97,11 +101,21 @@
           "const": false
         },
         "owner": {
-          "const": "data.seed"
+          "enum": [
+            "data.seed",
+            null
+          ]
         },
         "seedReceiptRef": {
-          "type": "string",
-          "minLength": 1
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "isUat": {
           "const": true
@@ -198,8 +212,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "fe",
-        "be"
+        "fe"
       ],
       "properties": {
         "fe": {
@@ -211,6 +224,100 @@
           "pattern": "^[0-9a-f]{40}$"
         }
       }
+    },
+    "access": {
+      "enum": [
+        "authenticated",
+        "anonymous"
+      ]
+    },
+    "fixtures": {
+      "enum": [
+        "seeded",
+        "none"
+      ]
+    },
+    "sourceRoles": {
+      "enum": [
+        "full",
+        "frontend"
+      ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "fixtures"
+        ],
+        "properties": {
+          "fixtures": {
+            "const": "none"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "cleanup": {
+            "properties": {
+              "owner": {
+                "type": "null"
+              },
+              "seedReceiptRef": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "cleanup": {
+            "properties": {
+              "owner": {
+                "const": "data.seed"
+              },
+              "seedReceiptRef": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "sourceRoles"
+        ],
+        "properties": {
+          "sourceRoles": {
+            "const": "frontend"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "provenance"
+        ],
+        "properties": {
+          "provenance": {
+            "properties": {
+              "be": false
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "provenance": {
+            "required": [
+              "fe",
+              "be"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }

@@ -175,9 +175,9 @@ choose its own writer.
 the matching `operations` array; together they are the mutation contract `backend.generate`
 consumes, and no other output of this operator crosses into that step.
 
-## The best outcome
+## Operator Result
 
-On `done`, print **The best outcome** as the accepted boundary in `response/response.md`; when `response/artifacts/<decisionId>-alternatives.html` exists, render or link it as the clearest diagram and keep `response/data/current-state.json` and `response/data/stack-model.json` as secondary evidence. `RESTATEMENT_UNCONFIRMED` shows the unconfirmed restatement and stop instead of presenting an architecture as chosen.
+On `done`, print **Operator Result** as the accepted boundary in `response/response.md`; when `response/artifacts/<decisionId>-alternatives.html` exists, render or link it as the clearest diagram and keep `response/data/current-state.json` and `response/data/stack-model.json` as secondary evidence. `RESTATEMENT_UNCONFIRMED` shows the unconfirmed restatement and stop instead of presenting an architecture as chosen.
 
 ## Stops
 

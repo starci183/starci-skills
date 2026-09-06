@@ -9,11 +9,10 @@ chế ra một phán quyết.
 ## Xong khi
 
 Xong khi `uat-snapshot` đã đóng băng trước mọi hành động trên sản phẩm, gọi tên commit đã ghim, head
-được phục vụ có chứa nó, các case theo thứ tự cùng các khẳng định của chúng, hồ sơ tài khoản chỉ gồm
-tên và fingerprint của seed, mọi case đã đóng băng có `uat-capture` và `screenshot` đã che của nó
-chụp sau khi redirect đăng nhập đã đến chỉ qua các điều khiển được render, `uat-verdicts` phán quyết
+được phục vụ có chứa nó, các case theo thứ tự cùng các khẳng định của chúng, tiền điều kiện tài khoản và fixture đã khai báo, mọi case đã đóng băng có `uat-capture` và `screenshot` đã che của nó
+chụp qua các điều khiển được render sau redirect đăng nhập khi cần, `uat-verdicts` phán quyết
 các làn hành vi, trải nghiệm và giao diện trên bằng chứng riêng của mỗi làn với làn trải nghiệm được
-chấm theo từng tiêu chí, handoff rollback chính xác của namespace đã được phát cho `data.seed`, hồ sơ lượt chạy
+chấm theo từng tiêu chí, handoff rollback cần thiết đã phát cho `data.seed` hoặc chế độ không fixture ghi không cleanup, hồ sơ lượt chạy
 chỉ-thêm tồn tại cùng con trỏ và dòng lịch sử của nó, và `uat-flow-verification` liệt kê `sheet`
 cùng bảng phán quyết nó đã in cho người xem, mang `audit-scope` nguyên vẹn khi audit được nhận vào
 có nó.
@@ -69,12 +68,12 @@ luật đó chứ không chép lại. Ba điều khoản của nó là những t
 nêu ra và chúng được kiểm: lượt chạy này thuộc về phiên mà request nêu tên và không ghi thư mục của
 phiên nào khác; nó lái profile trình duyệt của riêng mình, vì hai lượt chạy dùng chung một profile là
 dùng chung một phiên đăng nhập, rồi lượt này lại chứng minh cho lượt kia; và nó chỉ nhận receipt của
-`data.seed` khi mọi định danh cùng rollback set đều nằm dưới namespace của lượt chạy này.
+`data.seed` trong chế độ seeded, khi mọi định danh cùng rollback set đều nằm dưới namespace của lượt chạy này.
 
 ## Prerequisite thiếu được route về đúng owner
 
 Verifier này không draft flow, case sheet hay seed. Flow material thiếu hoặc sai được handoff có kiểu
-cho `uat.plan`; seed material thiếu hoặc sai được handoff cho `data.plan` rồi `data.seed`. Tài khoản
+cho `uat.plan`; seed material bắt buộc theo chế độ seeded bị thiếu hoặc sai được handoff cho `data.plan` rồi `data.seed`. Tài khoản bắt buộc theo chế độ authenticated
 thiếu hoặc sai trả `IDENTITY_MISSING` cho `identity.provision`, và attempt mới chỉ bắt đầu sau khi có
 bằng chứng đăng nhập thật vào sản phẩm. Provider, file niêm phong hay store không thể kết nối là
 `PROVISIONING_UNAVAILABLE`; request không gọi tên flow là `INVALID_INPUT`.
@@ -82,8 +81,8 @@ bằng chứng đăng nhập thật vào sản phẩm. Provider, file niêm phon
 ## Thư mục luồng có đúng một hình dạng
 
 `flow.md` nêu mục tiêu, vai, tiền đề, ngân sách theo số bước và số giây, và các bước cùng kết quả mong
-đợi, bằng chứng và tiêu chí được chấm, mỗi bước nêu alias nó đóng vai. `accounts.<env>.json` chỉ mang
-những cái tên, mỗi alias một tài khoản, theo từng môi trường. `seed/` giữ thứ phải có
+đợi, bằng chứng và tiêu chí được chấm, mỗi bước nêu alias nó đóng vai. Trong chế độ authenticated, `accounts.<env>.json` chỉ mang
+những cái tên, mỗi alias một tài khoản, theo từng môi trường. Trong chế độ seeded, `seed/` giữ thứ phải có
 trước lượt chạy, nói một lần và đặt lại được. `snapshots/` là bản tham chiếu chuẩn và chỉ đổi khi một
 con người duyệt. `runs/<runId>/` là lịch sử chỉ-thêm, `runId` gồm dấu thời gian của lượt chạy và commit
 rút gọn nó kiểm, nên hai lượt chạy cùng luồng tại cùng commit vẫn phân biệt được và không lượt nào đè
@@ -133,7 +132,7 @@ phải nêu đúng commit đã ghim; thiếu một trong hai, hoặc một trong
 `ADMISSION_MISSING`, vì một bề mặt sạch và một cổng xanh ở commit khác chẳng nói gì về sản phẩm mà
 lượt chạy này đang lái.
 
-Khi frontend và backend là hai bản bàn giao riêng, bind cả @workspaces/fe và @workspaces/be. snapshot.provenance và verdicts.provenance đóng băng {fe, be} từ đúng hai context; commit và đuôi run-id chỉ frontend. Hai entry admission mang role fe và commit frontend. Request thật của owner phải pin head frontend đó, biên nhận owner phát ra phải nêu đúng head; request quality có thể pin thêm context backend mà admission frontend không biến thành backend. Bảng Snapshot in Frontend commit và Backend commit; result nối thêm lưu cả hai. Nếu route hoặc admission frontend mang head khác backend thì bắt buộc dùng dạng tường minh này, kể cả caller bỏ context frontend. Hồ sơ cũ chỉ có backend vẫn hợp lệ khi không có bằng chứng hai vai trò khác nhau. Không đổi nhãn SHA frontend thành SHA backend.
+Mọi lượt browser bind @workspaces/fe tại head đã giao; sourceRoles full còn bind @workspaces/be. Provenance của snapshot và verdict mang đúng những head đó; commit và đuôi run-id chỉ frontend. Hai admission mang role fe tại cùng commit frontend, được kiểm bằng request và receipt thật của owner. Bảng Snapshot in Frontend commit và Backend commit (— nếu chỉ frontend); result nối thêm giữ cùng provenance. Không đổi nhãn SHA frontend thành backend.
 
 ## Làn trải nghiệm được chấm, không phải được khẳng định
 
@@ -195,16 +194,20 @@ bước chạm tới sản phẩm bằng cách khác — một endpoint, một m
 đã render (`UX-1` Case 2) — không phải là một bước của lượt đi, và một tiêu chí được chấm từ đó là
 `EVIDENCE_UNAVAILABLE`, không bao giờ là một pass.
 
+## Tiền điều kiện của hành trình
+
+Ba trường access, fixtures và sourceRoles được đóng băng trong request và từng flow của case sheet; snapshot và verdict phải giữ đúng chúng. Mặc định là authenticated, seeded và full. Anonymous chỉ đi qua bề mặt công khai bằng browser context mới, account của walk là null, actor của case là anonymous và không nhận account hay credential. None mang fixture và namespace seed là null trong kế hoạch, cleanup của case là none, không nhận seed receipt, không tạo hay rollback dòng dữ liệu và không handoff data.seed. Namespace hồ sơ lượt chạy vẫn là uat-<runId>. Frontend ghim head frontend và hai admission của chính head đó, không bịa head backend. Các chế độ độc lập: hành trình công khai vẫn có thể cần dữ liệu seed; hành trình không seed vẫn có thể cần đăng nhập. Những bước liên quan tài khoản, sign-in và seed chỉ chạy khi tiền điều kiện tương ứng có hiệu lực; mọi case, control, capture, kiểm ancestry runtime, ba làn và lịch sử chỉ-thêm vẫn bắt buộc.
+
 ## Context
 
 | Alias | Bind | Bắt buộc |
 | --- | --- | --- |
-| `@worktrees/uat/<flow>/<case>` | thư mục luồng ở đúng một hình dạng: `flow.md`, `accounts.<env>.json`, `seed/`, `snapshots/` đã duyệt, lịch sử chỉ-thêm `runs/<runId>/`, con trỏ `latest.json` và `history.md`, bind theo fingerprint từng file và chỉ ghi khi giữ lease độc quyền | có |
+| `@worktrees/uat/<flow>/<case>` | thư mục luồng ở đúng một hình dạng: `flow.md`, account và seed theo chế độ đã đóng băng, `snapshots/` đã duyệt, lịch sử chỉ-thêm `runs/<runId>/`, con trỏ `latest.json` và `history.md`, bind theo fingerprint từng file và chỉ ghi khi giữ lease độc quyền | có |
 | `@worktrees/_templates` | hợp đồng hình dạng thư mục UAT, chỉ dùng để validate flow đã plan; việc tạo canonical thuộc `uat.plan` và `data.plan`; tiêu thụ, không sửa | có |
 | `@worktrees/sessions/central-runtime` | generation của chủ runtime đứng sau endpoint đã ràng; sự sẵn sàng do đầu vào `route` chứng minh, không bao giờ suy lại từ sổ đăng ký này | có |
-| `@workspaces/device-state` | sổ thông tin đăng nhập niêm phong; mật khẩu UAT dùng chung được giải theo tên ở đây lúc đăng nhập và không đọc ở đâu khác | có |
-| `@workspaces/be` | checkout backend được route tại commit đã ghim, nơi luồng kiểm hành vi và nơi store giữ các bản ghi có namespace | có |
-| `@workspaces/fe` | head frontend khi bề mặt trình duyệt và backend tách biệt; bắt buộc khi route hoặc admission nêu head frontend khác | không |
+| `@workspaces/device-state` | sổ thông tin đăng nhập niêm phong; mật khẩu UAT dùng chung được giải theo tên ở đây lúc đăng nhập và không đọc ở đâu khác | when access=authenticated |
+| `@workspaces/be` | checkout backend được route tại commit đã ghim, nơi luồng kiểm hành vi và nơi store giữ các bản ghi có namespace | when sourceRoles=full |
+| `@workspaces/fe` | bản giao frontend mà browser thực sự đi qua, tại source head đã ghim | có |
 | `@knowledge/ui/proof` | topic UX: các tiêu chí làn trải nghiệm chấm và rule biến chúng thành phán quyết của làn | có |
 | `@worktrees/unchecked/<product>` | phần chưa kiểm của feature này ở làn walk: những flow mà các nhiệm vụ trước để lại chưa đi, và cái nào trong số đó lần chạy này kiểm | không |
 
@@ -215,30 +218,33 @@ bước chạm tới sản phẩm bằng cách khác — một endpoint, một m
 | `frontend-surface-audit` | lượt soi bề mặt kết luận frontend sạch, lấy tại commit đã ghim | có |
 | `quality-verification` | cổng chất lượng đã xanh, lấy tại đúng commit đã ghim ấy | có |
 | `route` | `workspace.bind` ở vai fe; route đã ràng mà lượt chạy này lái theo endpoint của nó | có |
-| `uat-account` | `identity.provision`; mọi actor alias, provider account, observation role/membership và proof login product thật cho environment này | có |
+| `uat-account` | `identity.provision`; mọi actor alias, provider account, observation role/membership và proof login product thật cho environment này | when access=authenticated |
 | `units` | `uat.plan`; danh sách luồng mà nhánh này đi đúng một luồng, gọi tên bằng `request.unit` | không |
 | `uat-plan` | `uat.plan`; flow entry, budget, actor alias và namespace | có |
 | `uat-case-sheet` | `uat.plan`; bảng máy đọc bất biến có actor, precondition, action, assertion, expected và fixture ref | có |
-| `seed-receipt` | `data.seed`; những dòng luồng này đi trên đó, quy được về namespace của nó, kèm rollback | có |
+| `seed-receipt` | `data.seed`; những dòng luồng này đi trên đó, quy được về namespace của nó, kèm rollback | when fixtures=seeded |
 
 ## Yêu cầu
 
 | Field | Kiểu | Mặc định | Hỏi |
 | --- | --- | --- | --- |
-| `approval` | id | — | Thẩm quyền cho đăng nhập bằng tài khoản của flow: approval id, hoặc tham chiếu khai báo môi trường — path và hash nội dung — khi `identity-provisioning` là `declared` cho `env`; không có mặc định vì im lặng không phải đồng ý |
+| `approval` | id | when access=authenticated | Thẩm quyền cho đăng nhập bằng tài khoản của flow: approval id, hoặc tham chiếu khai báo môi trường — path và hash nội dung — khi `identity-provisioning` là `declared` cho `env`; không có mặc định vì im lặng không phải đồng ý |
 | `feature` | id | — | Khoá feature dùng để địa chỉ hoá thư mục luồng |
 | `flow` | id | — | Luồng sản phẩm duy nhất mà lần gọi này kiểm chứng |
 | `env` | id | dev | Stack mà lượt chạy này lái: nó chọn file tài khoản, bí mật niêm phong, entry trong sổ đăng ký runtime, đích của seed và bản tham chiếu đã duyệt |
 | `cases` | list `caseId` | every case of the flow | Chạy những case đã đóng băng nào; mặc định là mọi case `flow.md` khai, theo đúng thứ tự của nó |
 | `runId` | id | — | Không hỏi người: orchestrator điền nó, và nó namespace mọi bản ghi lượt chạy này ghi ra |
 | `lease` | token | — | Không hỏi người: orchestrator điền nó, cấp lease độc quyền trên thư mục luồng trước khi nhánh bắt đầu |
+| `access` | enum:authenticated,anonymous | authenticated | Chế độ truy cập đóng băng theo kế hoạch; anonymous dùng browser context mới không đăng nhập và không credential. |
+| `fixtures` | enum:seeded,none | seeded | Tiền điều kiện fixture đóng băng theo kế hoạch; none không mang seed input hay cleanup cơ sở dữ liệu. |
+| `sourceRoles` | enum:full,frontend | full | Source mà hành trình thực sự kiểm chứng; frontend chỉ ghim bản giao frontend. |
 | `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
 
 ## Các bước
 
 | # | Bước | Tham số | Đọc | Ghi | Dừng với |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Kiểm gate, lần chạy lại, lease độc quyền và thẩm quyền của lượt chạy | `approval`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> để lấy `latest` và hồ sơ lượt chạy trước, @workspaces/be tại commit đã ghim, khai báo của môi trường khi `approval` tham chiếu tới nó, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
+| 1 | Kiểm gate, lần chạy lại, lease độc quyền và thẩm quyền của lượt chạy | `approval`, `lease`, `resume`, `access`, `fixtures`, `sourceRoles` | `request/request.json`, @worktrees/uat/<flow>/<case> để lấy `latest` và hồ sơ lượt chạy trước, @workspaces/fe và @workspaces/be khi sourceRoles là full tại commit đã ghim, khai báo của môi trường khi `approval` tham chiếu tới nó, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
 | 2 | Xác nhận admission bề mặt sạch và chất lượng xanh tại head frontend, giữ riêng head backend | — | đầu vào `frontend-surface-audit`, đầu vào `quality-verification` | — | `ADMISSION_MISSING` |
 | 3 | Validate runtime, real product login proof và `seed-receipt` theo exact environment, actor alias, namespace, FE/BE revision; handoff prerequisite thiếu/sai cho owner trước browser action | `env` | @workspaces/device-state để lấy thông tin đăng nhập mà `accounts.<env>.json` nêu tên, @worktrees/sessions/central-runtime để lấy entry của route đã bind, generation và các origin, đầu vào `uat-account` khi danh tính đã được cấp, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 4 | Đóng băng machine case sheet đã plan, account ref, seed receipt, endpoint, revision và expected assertion; verifier không draft canonical flow data hay đổi expected | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates để lấy khuôn luồng | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
@@ -290,9 +296,9 @@ xong mà sổ cái không giữ các lần hỏng của nó.
 | `screenshot` | `response/artifacts/<case>.png` | artifact | có |
 | `sheet` | `response/artifacts/sheet.png` | artifact | có |
 
-## Kết quả tốt nhất
+## Operator Result
 
-Khi `done`, hiện tổng quan đầy đủ kết quả các case làm **Kết quả tốt nhất**, chọn bảng dễ đọc, `response/artifacts/sheet.png` hoặc screenshot của case giúp giải thích finding quan trọng nhất. Kèm dòng verdict và link tới bằng chứng mọi case; ảnh được chọn phải hiện trực tiếp. Một lượt kiểm hoàn tất vẫn có thể có verdict fail, phải hiện rõ thay vì che bằng capture pass. Attempt fail và incomplete phải hiện actual state đã capture cùng assertion còn thiếu và không bao giờ dùng lại ảnh pass cũ làm kết quả hiện tại.
+Khi `done`, hiện tổng quan đầy đủ kết quả các case làm **Operator Result**, chọn bảng dễ đọc, `response/artifacts/sheet.png` hoặc screenshot của case giúp giải thích finding quan trọng nhất. Kèm dòng verdict và link tới bằng chứng mọi case; ảnh được chọn phải hiện trực tiếp. Một lượt kiểm hoàn tất vẫn có thể có verdict fail, phải hiện rõ thay vì che bằng capture pass. Attempt fail và incomplete phải hiện actual state đã capture cùng assertion còn thiếu và không bao giờ dùng lại ảnh pass cũ làm kết quả hiện tại.
 
 ## Dừng
 

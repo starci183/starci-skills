@@ -1,13 +1,11 @@
 # uat flow — <feature>/<flow>
 
-The flow document `uat.verify` freezes at step 4. `README.md` beside this file is the contract for
+The flow document `uat.plan` prepares and `uat.verify` binds unchanged. `README.md` beside this file is the contract for
 the whole folder — `accounts.<env>.json`, `seed/`, `snapshots/`, the append-only `runs/<runId>/`
-history, `latest.json` and `history.md` — and this document is the part a person writes. Nothing here
+history, `latest.json` and `history.md` — and this document describes the planned journey. Nothing here
 is a secret: a credential is named, never written.
 
-Replace every `<placeholder>`. A flow document that does not exist yet is drafted from this template
-and marked as a draft in the receipt, which is honest; a placeholder left standing in a document
-somebody committed is not.
+Replace every `<placeholder>` during planning. The machine case sheet freezes the access, fixtures and sourceRoles modes; verification refuses missing plan material.
 
 ## Goal
 
@@ -31,8 +29,7 @@ Frozen in this order. `caseId` is lower-case and hyphenated, and every case name
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `<case-id>` | `<alias>` | `<the surface and state the case starts from>` | `<n>` | `<the observable end state, in the store and on screen>` | `behavior`, `ux`, `ui` |
 
-`As` names one alias of `accounts.<env>.json`. Every alias a case or a step names is provisioned
-before the run; an alias nobody declared has nobody to act as, and that is refused at the freeze.
+`As` is `anonymous` for anonymous access, otherwise one provisioned alias of `accounts.<env>.json`, as required by the frozen machine case sheet.
 
 ## Assertions
 
@@ -55,8 +52,7 @@ through to offer a next action or a way back.
 
 ## Fixtures
 
-What `seed/` must place before the run, and what the run itself creates. A seed may never create the
-outcome under test.
+For seeded mode, name the planned prerequisites and what the run itself creates; seed may never create the asserted outcome. For fixtures=none, record none, matching the null machine fixture.
 
 | Record | Source | Created by | Namespaced |
 | --- | --- | --- | --- |
@@ -73,5 +69,4 @@ run captures at that step, and capture begins only after a sign-in redirect has 
 
 ## Cleanup
 
-Names exactly the namespace this flow's runs write, so step 9 can delete that and nothing else. Run
-records under `runs/` are history and are never deleted.
+For seeded mode, name the exact receipt-owned rollback set handed to `data.seed`. For fixtures=none, record none. Verification performs no data mutation; run records are never deleted.

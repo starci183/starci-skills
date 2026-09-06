@@ -804,8 +804,12 @@
                 "minimum": 1
               },
               "maxSameOperator": {
-                "type": "integer",
-                "minimum": 1
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1,
+                "description": "null grants unlimited same-operator entries only through the recorded user continue choice; finite maxSteps and progress/ownership gates remain active"
               }
             }
           }
@@ -1401,58 +1405,6 @@
           ]
         }
       }
-    },
-    "upgrade": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "from",
-        "migratedAt",
-        "legacyInventory",
-        "legacyState",
-        "legacyStateHash",
-        "legacyRequestRefs",
-        "legacyInventoryHash"
-      ],
-      "properties": {
-        "from": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1000
-        },
-        "migratedAt": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1000
-        },
-        "legacyInventory": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1000
-        },
-        "legacyState": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1000
-        },
-        "legacyStateHash": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 1000
-        },
-        "legacyRequestRefs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1000
-          }
-        },
-        "legacyInventoryHash": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
     }
   },
   "allOf": [
@@ -1471,7 +1423,9 @@
           "mission",
           "choices",
           "brief",
-          "budget"
+          "budget",
+          "runtimeRevision",
+          "workflowOwner"
         ]
       }
     }

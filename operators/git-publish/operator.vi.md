@@ -215,9 +215,9 @@ dạng một remote head mới vì cùng một quan sát không thể cho một 
 | --- | --- | --- | --- |
 | `git-publication` | `response/response.md` | md | có |
 
-## Kết quả tốt nhất
+## Operator Result
 
-Khi `done`, in **Kết quả tốt nhất** là branch đã publish và link commit được ghi trong `response/response.md`. Push bị từ chối, xung đột non-fast-forward hoặc dừng do authority phải hiện remote state không đổi và đúng owner tiếp theo thay vì link publication.
+Khi `done`, in **Operator Result** là branch đã publish và link commit được ghi trong `response/response.md`. Push bị từ chối, xung đột non-fast-forward hoặc dừng do authority phải hiện remote state không đổi và đúng owner tiếp theo thay vì link publication.
 
 ## Dừng
 

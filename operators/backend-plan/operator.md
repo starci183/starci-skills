@@ -121,9 +121,9 @@ names the same modules as the branch it resumes is `NO_PROGRESS`.
 | `backend-plan` | `response/response.md` | md | yes |
 | `units` | `response/data/units.json` | data | yes |
 
-## The best outcome
+## Operator Result
 
-On `done`, print **The best outcome** as the executable module table in `response/data/units.json`, with `response/response.md` explaining order and boundaries. An incomplete contract shows the missing module or boundary in the stop evidence rather than a usable implementation plan.
+On `done`, print **Operator Result** as the executable module table in `response/data/units.json`, with `response/response.md` explaining order and boundaries. An incomplete contract shows the missing module or boundary in the stop evidence rather than a usable implementation plan.
 
 ## Stops
 

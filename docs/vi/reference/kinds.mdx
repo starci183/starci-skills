@@ -431,7 +431,7 @@ Khung: [`templates/kinds/uat-plan.skeleton.md`](https://github.com/starci183/sta
 
 | Mục | Dòng đầu của bảng | Số dòng | Ràng buộc ô |
 | --- | --- | --- | --- |
-| `^## Flows$` | `\| Flow \| Entry \| Steps \| Account \| Seed namespace \| Tier \|` | minRows 1 | `Flow`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Entry`: `\S`<br />`Steps`: `^[1-9][0-9]*$`<br />`Account`: `^`[a-z][a-z0-9-]*`$`<br />`Seed namespace`: `^`uat-[A-Za-z0-9._-]+`$`<br />`Tier`: `^(journey\|secondary — \S.*)$` |
+| `^## Flows$` | `\| Flow \| Entry \| Steps \| Account \| Seed namespace \| Tier \|` | minRows 1 | `Flow`: `^`[a-z0-9][a-z0-9-]*`$`<br />`Entry`: `\S`<br />`Steps`: `^[1-9][0-9]*$`<br />`Account`: `^(?:`[a-z][a-z0-9-]*`\|—)$`<br />`Seed namespace`: `^(?:`uat-[A-Za-z0-9._-]+`\|—)$`<br />`Tier`: `^(journey\|secondary — \S.*)$` |
 | `^## Fallbacks taken$` | `\| Code \| Action \|` | — | `Code`: `^`[A-Z][A-Z0-9_]+`$`<br />`Action`: `\S` |
 
 ### `workspace-route-binding`
@@ -501,8 +501,8 @@ Khung: [`templates/kinds/workspace-route-binding.skeleton.md`](https://github.co
 | `uat-account` | [`templates/kinds/uat-account.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-account.schema.json) | `env`, `flow`, `identity`, `accounts`, `plaintextRecorded` |
 | `uat-capture` | [`templates/kinds/uat-capture.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-capture.schema.json) | `caseId`, `runId`, `order`, `executedAt`, `screenshotRef`, `loginFieldMasked`, `captureStartedAfterRedirect`, `outcome`, `assertions` |
 | `uat-case-sheet` | [`templates/kinds/uat-case-sheet.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-case-sheet.schema.json) | `contractVersion`, `feature`, `env`, `planVersion`, `flows`, `cases` |
-| `uat-snapshot` | [`templates/kinds/uat-snapshot.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-snapshot.schema.json) | `runId`, `approval`, `feature`, `flow`, `env`, `commit`, `frozenAt`, `flowRoot`, `snapshotRef`, `snapshotFingerprint`, `lease`, `admission`, `accounts`, `fixtureNamespace`, `seed`, `cases`, `flowSource`, `golden`, `isolation` |
-| `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `historyRef`, `lanes`, `experience`, `cleanup` |
+| `uat-snapshot` | [`templates/kinds/uat-snapshot.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-snapshot.schema.json) | `runId`, `approval`, `feature`, `flow`, `env`, `commit`, `frozenAt`, `flowRoot`, `snapshotRef`, `snapshotFingerprint`, `lease`, `admission`, `accounts`, `fixtureNamespace`, `seed`, `cases`, `flowSource`, `golden`, `isolation`, `access`, `fixtures`, `sourceRoles`, `provenance` |
+| `uat-verdicts` | [`templates/kinds/uat-verdicts.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-verdicts.schema.json) | `runId`, `commit`, `resultRef`, `latestRef`, `historyRef`, `lanes`, `experience`, `cleanup`, `access`, `fixtures`, `sourceRoles`, `provenance` |
 | `uat-walk` | [`templates/kinds/uat-walk.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/uat-walk.schema.json) | `schemaVersion`, `id`, `flow`, `entry`, `account`, `steps` |
 | `ui-coverage` | [`templates/kinds/ui-coverage.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/ui-coverage.schema.json) | `directionId`, `surfaceClass`, `actions`, `regions`, `states`, `responsive` |
 | `unchecked` | [`templates/kinds/unchecked.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/kinds/unchecked.schema.json) | `id`, `product`, `featureId`, `unit`, `state`, `lane`, `tier`, `reason`, `recordedBy`, `recordedAt`, `resolvedBy`, `resolvedAt` |

@@ -202,7 +202,7 @@ version, never a silent rewrite.
 The session runs under a budget (`state.json.budget`, from `resources/orchestrator.json#budget`): a
 step cap and a same-operator cap. A request that would pass either is `BUDGET_EXHAUSTED`, and the
 person answers one typed `budget-choice` — narrow, continue, stop — recorded in `state.json.choices`;
-continue extends the cap on record. The orchestrator's own memory is `state.json.brief` — what is
+continue extends the cap on record. An explicit unlimited same-operator authorization is recorded once under `resources/orchestrator.json#budget`; it does not remove the step, progress or ownership gates. The orchestrator's own memory is `state.json.brief` — what is
 proven, what is blocked and on whom, what is next, which peer task or session owns which head, and the last
 report the person received — rewritten after every transition and read back after a compaction; no
 note file beside it is recognised. `scripts/validate-session.mjs` checks the whole ledger after every
@@ -217,16 +217,7 @@ points at nothing. The receipt answers that goal: a done branch that serves a do
 the receipt declares and exists on disk, with at least one behind `achieved: true`. Only a
 validator-accepted goalCheck reaches `brief.proven`, as `doneWhen:<n> …`; three consecutive done
 branches that evidenced no done-when line stop the chain and the person is asked, never a fourth
-branch dispatched (`scripts/validate-session.mjs`). After every transition the orchestrator prints to
-the root chat exactly the two lines `resources/interaction.json#transitionLog` declares — the branch
-goal, then its outcome with the count of evidenced done-when lines, the artifact paths and the next
-cell. For an accepted v2.2 done result it also runs `scripts/render-outcome.mjs <branch>` and emits the
-returned **The best outcome** Markdown/media visibly in the root chat: the selected UI render as an
-embedded image, or the operator's readable code/diff, diagram, table, document or measured result.
-The bound `response.json.outcome` and `resources/outcomes.json` define what to show. Only after both
-the transition pair and required outcome block are shown does it record `logged: true`; full evidence
-stays in the session folder. A failed or incomplete attempt shows its truthful state and repair step,
-never a successful best-outcome claim.
+branch dispatched (`scripts/validate-session.mjs`). After every transition retain the internal machine record and show the visible result defined by `resources/interaction.json#outcomePresentation`. For an accepted done receipt, run `scripts/render-outcome.mjs <branch>` and emit its **Operator Result** Markdown/media. Do not duplicate the dense machine pair in chat. The presentation policy owns the table, media and detail order; record `logged: true` only after that visible result and the retained record exist. Full evidence stays in the session folder; every unsuccessful or incomplete attempt keeps its truthful state and next action.
 
 A rule a person states in their own words is restated to them before anything is designed on it:
 `business.decide` and `architecture.decide` write a `restatement` of at most five lines in the

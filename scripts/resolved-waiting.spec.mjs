@@ -7,8 +7,6 @@ import path from 'node:path';
 import test from 'node:test';
 import { buildEvidenceManifest } from './evidence-manifest.mjs';
 import { resolvedWaitingAttemptKeys, resolvedWaitingReplanErrors } from './resolved-waiting.mjs';
-import { migrateSession, prepareScopeUpgrade, upgradeScope, verifyMigration } from './session-migrate.mjs';
-import { declareOwner, discoveryFor, answerFor } from './v23-test-fixture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const sha = (bytes) => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -69,41 +67,6 @@ async function withFixture(options, run) {
   const value = await fixture(options);
   try { await run(value); } finally { rmSync(value.session, { recursive: true, force: true }); }
 }
-
-test('migration and scope upgrade honor a sealed waiting-parent replan and reject damaged history before writing', async () => withFixture({}, async value => {
-  const base = mkdtempSync(path.join(tmpdir(), 'resolved-waiting-migration-'));
-  const source = path.join(base, 'Source'); const owner = path.join(base, 'Owner');
-  mkdirSync(source); mkdirSync(owner); declareOwner(source, 'sample', owner);
-  const session = path.join(source, '.worktrees', 'sessions', value.state.id);
-  mkdirSync(path.dirname(session), { recursive: true }); renameSync(value.session, session);
-  try {
-    const state = { ...value.state, project: 'sample', status: 'running', lifecycle: { phase: 'active' }, workerSlots: [], leases: {}, choices: {}, mission: { version: 1, goal: 'Deliver the reviewed model', target: 'bounded module', includes: ['the model'], excludes: [], outputs: ['reviewed model'], verification: 'model and review evidence', sourceRef: 'user:opening', doneWhen: [{ evidence: 'reviewed model', producedBy: 'architecture.decide' }], confirmation: { status: 'confirmed', decisionId: `goal:${value.state.id}:v1`, sourceRef: 'user:opening' } } };
-    state.choices[state.mission.confirmation.decisionId] = { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user:opening' };
-    put(session, 'state.json', state);
-    const resolved = await resolvedWaitingAttemptKeys(root, session, state, { requireSuccessorTerminal: true });
-    assert.deepEqual(resolved.errors, []); assert.ok(resolved.settled.has(value.parentKey));
-    const reviewRef = 'step-2/parallel-1/critique/response/critique.md';
-    const review = readFileSync(path.join(session, reviewRef)); const originalState = readFileSync(path.join(session, 'state.json'));
-    writeFileSync(path.join(session, reviewRef), 'changed review');
-    await assert.rejects(() => migrateSession(session, { sourceRoot: source }), /MIGRATION_HISTORY/);
-    assert.deepEqual(readFileSync(path.join(session, 'state.json')), originalState);
-    assert.equal(existsSync(path.join(owner, '.worktrees', 'sessions', state.id)), false);
-    writeFileSync(path.join(session, reviewRef), review);
-    const moved = await migrateSession(session, { sourceRoot: source });
-    assert.equal(moved.status, 'migrated'); assert.deepEqual(await verifyMigration(moved.session), []);
-    const git = (...args) => execFileSync('git', ['-C', owner, ...args], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-    git('init'); git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-m', 'Fixture owner');
-    const discovery = discoveryFor('sample', { head: git('rev-parse', 'HEAD') });
-    const beforeUpgrade = readFileSync(path.join(moved.session, 'state.json'));
-    const preview = prepareScopeUpgrade(JSON.parse(beforeUpgrade), discovery); const authority = answerFor(preview);
-    writeFileSync(path.join(moved.session, reviewRef), 'changed review');
-    await assert.rejects(() => upgradeScope(moved.session, { discovery, authority }), /MIGRATION_HISTORY/);
-    assert.deepEqual(readFileSync(path.join(moved.session, 'state.json')), beforeUpgrade);
-    writeFileSync(path.join(moved.session, reviewRef), review);
-    assert.equal((await upgradeScope(moved.session, { discovery, authority })).status, 'scope-upgraded');
-    assert.deepEqual(await verifyMigration(moved.session), []);
-  } finally { rmSync(base, { recursive: true, force: true }); }
-}));
 
 test('an exact sealed terminal review authorizes only its bound later same-operator replan', async () => withFixture({}, async ({ session, state, parentKey, successorRequest }) => {
   assert.deepEqual(await resolvedWaitingReplanErrors(root, session, state, successorRequest, { requireSuccessorRecorded: true, requireSuccessorTerminal: true }), []);

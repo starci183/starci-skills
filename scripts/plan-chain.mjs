@@ -1,3 +1,4 @@
+import { effectiveOperator, conditionalRequirementErrors } from './operator-conditions.mjs';
 import { deliveryTargets, deliveryPolicy, scopeErrors, frozenScopeErrors } from './mission-scope.mjs';
 import { workflowOwnerErrors } from './workflow-root.mjs';
 // The chain is derived from the goal, never chosen from an example. planChain starts from the
@@ -36,9 +37,7 @@ export class PlanError extends Error { constructor(errors) { super(errors.join('
 const bindKey = (role) => `${BIND_OPERATOR}#${role}`;
 const byKey = (a, b) => a.localeCompare(b);
 
-// Operators that consume an already-served runtime. When the chain also owns runtime.serve, that
-// operator inventories, creates and attests the generation after binding; requiring the generation
-// in the opening preflight would make its own producer unreachable.
+// The operators that touch a runtime: their presence makes the preflight check the runtime family of every bound role.
 const RUNTIME_OPERATORS = new Set(['runtime.serve', 'interface.audit', 'uat.verify']);
 
 export function planChain({ packages, mission, options = {} }) {
@@ -68,7 +67,7 @@ export function planChain({ packages, mission, options = {} }) {
     const named = all.filter((n) => input.from.includes(n.operator));
     let picked = named.length ? named : all;
     // Several bindings in the chain: a consumer that requires a role reads the binding of that role.
-    const roles = graph.get(consumer.operator).roles;
+    const roles = effectiveOperator(graph.get(consumer.operator), consumer.presets).roles;
     const binds = picked.filter((n) => n.operator === BIND_OPERATOR);
     if (binds.length > 1 && roles.size) { const mine = binds.filter((n) => roles.has(n.presets.role)); if (mine.length) picked = [...picked.filter((n) => n.operator !== BIND_OPERATOR), ...mine]; }
     // Several branches of one operator: which of them a consumer reads is settled by the mission's own
@@ -136,7 +135,8 @@ export function planChain({ packages, mission, options = {} }) {
       for (const n of [...nodes.values()]) {
         if (resolved.has(n.key)) continue;
         resolved.add(n.key); changed = true;
-        const op = graph.get(n.operator);
+        const op = effectiveOperator(graph.get(n.operator), n.presets);
+        errors.push(...conditionalRequirementErrors(op.pkg.en, n.presets));
         for (const role of op.roles) {
           const b = add(bindKey(role), BIND_OPERATOR, { role }, `binds @workspaces/${role}, which ${n.operator} requires`);
           if (b) depend(n, b.key);
@@ -196,13 +196,9 @@ export function planChain({ packages, mission, options = {} }) {
   if (effectful.length && graph.has(PREFLIGHT_OPERATOR)) {
     const roles = [...new Set([...nodes.values()].filter((n) => n.operator === BIND_OPERATOR).map((n) => n.presets.role))].sort();
     const tools = [...new Set(effectful.flatMap((id) => operatorEffects(graph.get(id).pkg).map((t) => t.id)))].sort();
-    // Preflight checks an existing runtime only when the chain consumes one without producing it.
-    // A chain containing runtime.serve preflights the host/declarations, then that sole owner
-    // inventories, bootstraps and attests the runtime before any consumer can observe it.
+    // A runtime is owed only by a chain that serves, observes or walks one: then every bound role's runtime is checked, else none.
     const touchesRuntime = [...nodes.values()].some((n) => RUNTIME_OPERATORS.has(n.operator));
-    const ownsRuntimeBootstrap = [...nodes.values()].some((n) => n.operator === 'runtime.serve');
-    const runtimeRoles = touchesRuntime && !ownsRuntimeBootstrap ? roles : [];
-    const pre = add(PREFLIGHT_OPERATOR, PREFLIGHT_OPERATOR, roles.length ? { roles, runtimeRoles } : {}, `opens the chain: ${effectful.join(', ')} hold ${tools.join(', ')}`);
+    const pre = add(PREFLIGHT_OPERATOR, PREFLIGHT_OPERATOR, roles.length ? { roles, runtimeRoles: touchesRuntime ? roles : [] } : {}, `opens the chain: ${effectful.join(', ')} hold ${tools.join(', ')}`);
     for (const n of nodes.values()) if (n.key !== pre.key) depend(n, pre.key);
     closure();
   }
@@ -221,7 +217,7 @@ export function planChain({ packages, mission, options = {} }) {
   const edges = new Map([...nodes.values()].map((n) => [n.key, new Set(n.deps)]));
   const sorted = [...nodes.values()].sort((a, b) => byKey(a.key, b.key));
   for (const n of sorted) {
-    for (const input of graph.get(n.operator).optional) {
+    for (const input of effectiveOperator(graph.get(n.operator), n.presets).optional) {
       for (const key of producersInChain(input, n).sort(byKey)) {
         if (edges.get(n.key).has(key)) continue;
         // n after key: illegal when key already runs after n.
@@ -332,10 +328,10 @@ export function previewChain(plan, mission) {
 }
 
 export function planningStateErrors(state) {
-  if (state?.contractVersion !== V22_CONTRACT) return [];
+  if (state?.contractVersion !== V22_CONTRACT) return ['WORKFLOW_RESET_REQUIRED: planning requires the current session wire contract'];
   const errors = [];
   if (state.lifecycle?.phase !== 'active') errors.push(`state.json: lifecycle.phase is ${state.lifecycle?.phase ?? 'missing'}; ${V22_CONTRACT} planning requires an active, confirmed session`);
-  if (state.runtimeRevision !== 3) errors.push('WORKFLOW_UPGRADE_REQUIRED: legacy evidence may be read; upgrade owner and scope before planning new work');
+  if (state.runtimeRevision !== 3) errors.push('WORKFLOW_RESET_REQUIRED: archive obsolete execution evidence and open a fresh current session before planning');
   errors.push(...frozenScopeErrors(state));
   const mission = state.mission;
   if (!mission) {

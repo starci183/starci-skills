@@ -3,13 +3,7 @@
 The working sheet for one run, written under `runs/<runId>/` once, at the end, under the exclusive
 lease, and never edited afterwards. A second attempt is a new `runId`.
 
-This skeleton is aligned to the kind contract that already exists,
-`templates/kinds/uat-flow-verification.contract.json`: the `## Admission`, `## Snapshot`, `## Cases`,
-`## Lanes` and `## Fallbacks taken` sections below carry that contract's exact table headers, row sets
-and cell patterns, so they are copied verbatim into `response/response.md` and validated there. The
-published `response.md` carries only those five sections in that order and its title must match
-`# uat-flow-verification — <feature>/<flow>`; the extra sections here — `## Steps` and `## UX scores` —
-are the working detail the contract does not model and they stay in the run record.
+This is a working sheet. The published receipt follows `templates/kinds/uat-flow-verification.contract.json` and its skeleton, including every required section; working detail stays in the run record.
 
 ## Admission
 
@@ -23,16 +17,16 @@ are the working detail the contract does not model and they stay in the run reco
 | Field | Value |
 | --- | --- |
 | Run | `<runId>` |
-| Requested by | `<the person who asked; UAT never starts without one>` |
+| Approval | `<authenticated sign-in authority; — for anonymous>` |
 | Feature | `<feature>` |
 | Flow | `<flow>` |
 | Commit | `<40 hex>` |
 | Snapshot | `<.worktrees/uat/<feature>/<flow>/snapshot.json>` |
 | Namespace | `uat-<runId>` |
-| Accounts | `<alias>`, `<alias>` |
+| Accounts | `<authenticated aliases; — for anonymous>` |
 | Environment | `<env>` |
-| Credential | `<sealed file path>`, resolved by name at login only |
-| Flow source | `<committed \| drafted-from-template>` |
+| Credential | `<authenticated sealed reference resolved only at login; — for anonymous>` |
+| Flow source | `<the bound uat.plan flow reference>` |
 | Golden | `<approved \| candidate>` |
 | Run record | `<.worktrees/uat/<feature>/<flow>/runs/<runId>/result.json>` |
 | Latest | `<runId>` |

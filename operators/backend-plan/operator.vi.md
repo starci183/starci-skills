@@ -121,9 +121,9 @@ module như nhánh nó chạy lại là `NO_PROGRESS`.
 | `backend-plan` | `response/response.md` | md | có |
 | `units` | `response/data/units.json` | data | có |
 
-## Kết quả tốt nhất
+## Operator Result
 
-Khi `done`, in **Kết quả tốt nhất** là bảng module thực thi được trong `response/data/units.json`, kèm `response/response.md` giải thích thứ tự và ranh giới. Contract chưa đủ phải hiện module hoặc ranh giới còn thiếu trong evidence dừng thay vì một implementation plan dùng được.
+Khi `done`, in **Operator Result** là bảng module thực thi được trong `response/data/units.json`, kèm `response/response.md` giải thích thứ tự và ranh giới. Contract chưa đủ phải hiện module hoặc ranh giới còn thiếu trong evidence dừng thay vì một implementation plan dùng được.
 
 ## Dừng
 

@@ -4,13 +4,13 @@ Follow operator.md; write its declared paths and your branch response/; replace 
 
 ## Done when
 
-Done when the `uat-snapshot` was frozen before any product action, naming the pinned commit, the served head that contains it, the cases in order with their assertions, the account record of names and the seed fingerprint, every frozen case has its `uat-capture` and masked `screenshot` taken after the sign-in redirect landed through the rendered controls alone, the `uat-verdicts` judge the behaviour, experience and interface lanes on their own evidence with the experience lane scored criterion by criterion, the exact rollback handoff for the run namespace was emitted to `data.seed`, the append-only run record exists with its pointer and history line, and the `uat-flow-verification` lists the `sheet` and the verdict table it printed to the person, carrying the `audit-scope` unchanged when the admitted audit had one.
+Done when the `uat-snapshot` was frozen before any product action, naming the pinned commit, the served head that contains it, the cases in order with their assertions, the declared account and fixture prerequisites, every frozen case has its `uat-capture` and masked `screenshot` taken through the rendered controls after any required sign-in redirect landed, the `uat-verdicts` judge the behaviour, experience and interface lanes on their own evidence with the experience lane scored criterion by criterion, the required rollback handoff was emitted to `data.seed` or the no-fixture mode records no cleanup, the append-only run record exists with its pointer and history line, and the `uat-flow-verification` lists the `sheet` and the verdict table it printed to the person, carrying the `audit-scope` unchanged when the admitted audit had one.
 
 Primary output: `uat-flow-verification`
 
 ## Inputs
 
-`frontend-surface-audit`, `quality-verification`, `route`, `uat-account`, `units`?, `uat-plan`, `uat-case-sheet`, `seed-receipt`
+`frontend-surface-audit`, `quality-verification`, `route`, `uat-account`[when access=authenticated], `units`?, `uat-plan`, `uat-case-sheet`, `seed-receipt`[when fixtures=seeded]
 
 ## Outputs
 

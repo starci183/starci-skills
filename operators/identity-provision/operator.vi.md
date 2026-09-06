@@ -171,9 +171,9 @@ Một lần resume bắt đầu lại từ cổng vào, chỉ dùng lại quan s
 | `checks` | `response/data/checks.json` | data | có |
 | `uat-account` | `response/data/account.json` | data | không |
 
-## Kết quả tốt nhất
+## Operator Result
 
-Với provisioning, in **Kết quả tốt nhất** là bảng reuse, create hoặc repair theo alias từ `response/data/delta.json` cùng kết quả đăng nhập an toàn trong `response/data/checks.json`; `response/data/account.json` có thể nêu tài khoản bằng tên làm evidence phụ. Với admin rotation, hiện credential cũ bị từ chối và credential thay thế được chấp nhận mà không phát account record; không bao giờ in, link hay sao chép giá trị credential, sealed file hoặc lệnh chứa secret, và login chưa chứng minh phải được hiện là chưa chứng minh.
+Với provisioning, in **Operator Result** là bảng reuse, create hoặc repair theo alias từ `response/data/delta.json` cùng kết quả đăng nhập an toàn trong `response/data/checks.json`; `response/data/account.json` có thể nêu tài khoản bằng tên làm evidence phụ. Với admin rotation, hiện credential cũ bị từ chối và credential thay thế được chấp nhận mà không phát account record; không bao giờ in, link hay sao chép giá trị credential, sealed file hoặc lệnh chứa secret, và login chưa chứng minh phải được hiện là chưa chứng minh.
 
 ## Dừng
 

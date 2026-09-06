@@ -332,7 +332,7 @@ audit nhỏ hơn.
 | `family-understanding` | `response/data/family-understanding.json` | data | không |
 | `knowledge-question` | `response/data/knowledge-question.json` | data | không |
 
-## Kết quả tốt nhất
+## Operator Result
 
 Với audit đã hoàn tất, `outcome.primary` là một capture `image` thật đã khai của bề mặt được audit.
 Một verdict table hoặc tài liệu audit bắt buộc làm mục phụ để ảnh không bao giờ được trình mà thiếu

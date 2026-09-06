@@ -147,6 +147,7 @@ function writeBranch(files) {
   writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['1/1']], steps: { '1/1': OPERATOR }, current: '1/1', status: 'running' }));
   for (const [name, content] of Object.entries(files)) {
     if (content === null) continue;
+    mkdirSync(path.dirname(path.join(branch,name)),{recursive:true});
     writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
   }
   return { branch, session };
@@ -222,7 +223,7 @@ await expectError(reconciled({ request: { inputs: {} } }), 'required input backe
 await expectError(reconciled({ request: { extra: { mode: 'reconcile' } } }), 'requirements.mode is not a field', 'the retired mode field');
 await expectError(reconciled({ request: { extra: { promise: 'a paying learner reads every course' } } }), 'requirements.promise is not a field', 'a promise supplied to a reconciliation');
 await expectError(reconciled({ targetState: 'rejected' }), 'is not one a reconciliation publishes', 'a reconciliation asked to reject');
-await expectError(reconciled({ request: { contexts: [{ alias: '@workspaces/be', head }, { alias: `@worktrees/businesses/${FEATURE}`, head: null }, { alias: '@workspaces/fe', head: null }] } }), 'is covered by no Context row', 'an isolated agent handed an alias its Context table never declared');
+await expectError(reconciled({ request: { contexts: [{ alias: '@workspaces/be', head }, { alias: `@worktrees/businesses/${FEATURE}`, head: null }, { alias: '@workspaces/undeclared', head: null }] } }), 'is covered by no Context row', 'an isolated agent handed an alias its Context table never declared');
 await expectError(reconciled({ response: { ...responseJson(), stop: 'RECONCILIATION_DISCREPANCY' } }), 'only a blocked response carries a stop', 'done with a stop');
 await expectError(reconciled({ response: responseJson({ status: 'blocked', stop: 'COVERAGE_INCOMPLETE', next: [] }) }), 'not a registered code business.reconcile may emit', 'a modelling stop on a reconciliation');
 await expectError(reconciled({ response: responseJson({ fields: { ...ALL_FIELDS, 'coverage-matrix': 'response/data/coverage-matrix.json' } }) }), 'is not an Output of business.reconcile', 'a reconciliation that froze a matrix');
@@ -283,3 +284,16 @@ await expectError(reconciled({ md: { unchecked: [SECONDARY] } }), 'Unchecked omi
 await expectError(reconciled({ md: { unchecked: [JOURNEY] } }), 'republished implemented while the feature carries an open journey entry', 'a promise declared enforced over a journey nobody finished measuring', { unchecked: [JOURNEY] });
 
 process.stdout.write('business.reconcile self-test: 7 valid branches, 44 rejected mutations\n');
+
+function frontendReconciled() {
+ return reconciled({request:{extra:{sourceRole:'fe'},inputs:{'frontend-source-application':DELIVERED},contexts:[{alias:'@workspaces/fe',head},{alias:'@worktrees/businesses/'+FEATURE,head:null}]},files:{
+ '../parallel-2/request/request.json':{operatorId:'interface.generate',contexts:[{alias:'@workspaces/fe',head}]},
+ '../parallel-2/response/response.json':{operatorId:'interface.generate',status:'done',fields:{'frontend-source-application':'response/response.md'}},
+ '../parallel-2/response/response.md':'# frontend-source-application — sample\n\n## Binding\n\n| Field | Value |\n| --- | --- |\n| Commit | '+head+' |\n'
+ }});
+}
+await expectValid(frontendReconciled(),'frontend promise reconciles against actual delivered frontend receipt and fact heads');
+const staleFrontend=frontendReconciled();staleFrontend['request/request.json'].contexts[0].head='d'.repeat(40);
+await expectError(staleFrontend,'commit differs from the pinned frontend','stale frontend source receipt');
+const missingFrontend=frontendReconciled();missingFrontend['request/request.json'].inputs={};
+await expectError(missingFrontend,'required input frontend-source-application is absent','frontend reconciliation still requires source');

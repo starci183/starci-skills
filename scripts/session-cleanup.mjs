@@ -59,10 +59,7 @@ async function retainedFiles(session, state) {
     }
   };
   const inputRefs = new Set();
-  if (state.upgrade) {
-    await add(state.upgrade.legacyState);
-    await add(state.upgrade.legacyInventory);
-  }
+  if (state.upgrade) throw Error('WORKFLOW_RESET_REQUIRED: archive obsolete history separately; it cannot be retained as current completion proof');
   for (const attempt of Object.values(state.attempts ?? {})) {
     await add(attempt.requestRef);
     const requestFile = await confinedFile(session, attempt.requestRef);

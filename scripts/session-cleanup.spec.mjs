@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { retainSessionBundle, verifyRetention, closeSuccessfulSession } from './session-cleanup.mjs';
-import { openSession, confirmSession } from './v23-test-fixture.mjs';
+import { openSession, confirmSession, cleanupFixtureOwners } from './v23-test-fixture.mjs';
 import { openAttempt } from './attempt-gate.mjs';
 import { buildEvidenceManifest } from './evidence-manifest.mjs';
 
@@ -29,7 +29,7 @@ async function fixture(run) {
     return ref;
   };
   mkdirSync(session, { recursive: true });
-  try { await run({ base, session, state, put, branch }); } finally { rmSync(base, { recursive: true, force: true }); }
+  try { await run({ base, session, state, put, branch }); } finally { cleanupFixtureOwners(base); rmSync(base, { recursive: true, force: true }); }
 }
 
 test('retention preserves frozen inputs, actual evidence, linked assets, previous attempts and nested exchanges', async () => fixture(async ({session,state,put,branch}) => {

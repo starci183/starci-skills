@@ -1,5 +1,5 @@
+import { requiredWhen, requirementValues, conditionalRequirementErrors } from './operator-conditions.mjs';
 import { deliveryRequestErrors } from './mission-scope.mjs';
-import { legacyBranchOf, legacyMissionState } from './workflow-root.mjs';
 // The request half of one branch (step-N/parallel-M/request/request.json), checked before any agent
 // runs: the gate schema; the operator exists and is an operator.md package; every requirement key is
 // one the operator declares and every required one (Default —) has a value; every declared input is
@@ -95,9 +95,9 @@ export function effectiveBudget(state, perUnit = PER_UNIT) {
   const caps = { maxSteps: budget.maxSteps + perUnit * (budget.units ?? 0), maxSameOperator: budget.maxSameOperator + (budget.units ?? 0) };
   for (const ext of budget.extensions ?? []) {
     const choice = state.choices?.[ext.decisionId];
-    if (!choice || choice.selected !== 'continue') continue;
+    if (!choice || choice.selected !== 'continue' || choice.selectedBy !== 'user' || !String(choice.sourceRef ?? '').trim()) continue;
     caps.maxSteps = Math.max(caps.maxSteps, ext.maxSteps);
-    caps.maxSameOperator = Math.max(caps.maxSameOperator, ext.maxSameOperator);
+    caps.maxSameOperator = caps.maxSameOperator === null || ext.maxSameOperator === null ? null : Math.max(caps.maxSameOperator, ext.maxSameOperator);
   }
   return caps;
 }
@@ -112,7 +112,7 @@ export function sessionBudgetErrors(state, request) {
   if (!caps || request.exchange) return errors;
   if (request.step > caps.maxSteps) errors.push(`state.json: step ${request.step} passes budget.maxSteps ${caps.maxSteps} (BUDGET_EXHAUSTED); a recorded user choice of continue on a budget:<id> decision extends it`);
   const same = Object.entries(state.steps ?? {}).filter(([branch, op]) => op === request.operatorId && Number(branch.split('/')[0]) !== request.step).length;
-  if (same + 1 > caps.maxSameOperator) errors.push(`state.json: ${request.operatorId} would run for the ${same + 1}th time, past budget.maxSameOperator ${caps.maxSameOperator} (BUDGET_EXHAUSTED); the same operator re-entered this often is the loop NO_PROGRESS exists to end`);
+  if (caps.maxSameOperator !== null && same + 1 > caps.maxSameOperator) errors.push(`state.json: ${request.operatorId} would run for the ${same + 1}th time, past budget.maxSameOperator ${caps.maxSameOperator} (BUDGET_EXHAUSTED); the same operator re-entered this often is the loop NO_PROGRESS exists to end`);
   return errors;
 }
 
@@ -418,6 +418,7 @@ export function v22RequestErrors(state, request, pkg, dir = null, phase = curren
   if (stateV22 && !requestV22) errors.push(`request.json: contractVersion ${V22_CONTRACT} is required by this v2.2 session; legacy compatibility is not an execution bypass`);
   if (requestV22 && !stateV22) errors.push(`request.json: a v2.2 attempt cannot run under a legacy or unmarked state.json`);
   if (!stateV22 || !requestV22) return errors;
+  if (state.runtimeRevision !== 3 || state.upgrade) errors.push('WORKFLOW_RESET_REQUIRED: old or migrated evidence cannot be accepted as current execution');
   if (phase !== 'accept') errors.push(...deliveryRequestErrors(state, request));
   if (request.sessionId !== state.id) errors.push(`request.json: sessionId ${request.sessionId} does not match the owning session ${state.id}`);
   if (state.lifecycle?.phase !== 'active') errors.push(`state.json: lifecycle.phase is ${state.lifecycle?.phase ?? 'missing'}; only an active, confirmed user session dispatches attempts`);
@@ -431,8 +432,7 @@ export function v22RequestErrors(state, request, pkg, dir = null, phase = curren
   if (dir && request.environment?.outputRoot) {
     const output = path.resolve(dir, request.environment.outputRoot);
     const owned = path.resolve(dir, 'response');
-    const legacy = phase === 'accept' ? legacyBranchOf(state, dir, request) : null;
-    if (output !== owned && (!legacy || output !== path.resolve(legacy, 'response'))) errors.push(`request.json: environment.outputRoot resolves to ${output}; an attempt owns only ${owned}`);
+    if (output !== owned) errors.push(`request.json: environment.outputRoot resolves to ${output}; an attempt owns only ${owned}`);
   }
   if (request.environment?.workspace?.worktree && !path.isAbsolute(request.environment.workspace.worktree)) errors.push(`request.json: environment.workspace.worktree is not absolute; isolation names the exact worktree`);
   const writes = request.environment?.writes ?? [];
@@ -695,12 +695,17 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   } else {
     const declared = new Map((op.tables.requirements?.rows ?? []).map((r) => [unquote(r.field), r]));
     for (const key of Object.keys(request.requirements ?? {})) if (!declared.has(key)) errors.push(`request.json: requirements.${key} is not a field ${op.id} declares`);
-    for (const [key, row] of declared) if (isRequiredField(row) && isEmpty(request.requirements?.[key])) errors.push(`request.json: required field ${key} has no value`);
+    for (const [key, row] of declared) if ((isRequiredField(row) || (String(row.default).startsWith('when ') && requiredWhen(row.default, requirementValues(op, request.requirements)))) && isEmpty(request.requirements?.[key])) errors.push(`request.json: required field ${key} has no value`);
     const declaredInputs = new Map((op.tables.inputs?.rows ?? []).map((r) => [kindOf(r.kind), r]));
     for (const kind of Object.keys(request.inputs ?? {})) if (!declaredInputs.has(kind)) errors.push(`request.json: inputs.${kind} is not an Input ${op.id} declares`);
     // An isolated agent cannot go and find a missing input: what request.json does not name does not exist for it.
     const isolated = pkg.manifest.resources?.mode === 'isolated' ? `; ${op.id} runs isolated and sees only what request.json names, so the input is not there to be found` : '';
-    for (const [kind, row] of declaredInputs) if (isYes(row.required) && isEmpty(request.inputs?.[kind])) errors.push(`request.json: required input ${kind} is absent${isolated}`);
+    for (const [kind, row] of declaredInputs) if (requiredWhen(row.required, requirementValues(op, request.requirements)) && isEmpty(request.inputs?.[kind])) errors.push(`request.json: required input ${kind} is absent${isolated}`);
+    errors.push(...conditionalRequirementErrors(op, request.requirements));
+    for (const row of op.tables.context?.rows ?? []) if (String(row.required).startsWith('when ') && request.requirements?.[String(row.required).split(/[ =]/)[1]] !== undefined && requiredWhen(row.required, requirementValues(op, request.requirements))) {
+      const alias = cellAliases(row.alias)[0];
+      if (!(request.contexts ?? []).some(context => context.alias === alias)) errors.push('request.json: required conditional context ' + alias + ' is absent');
+    }
     errors.push(...isolatedContextErrors(pkg, request));
   }
   for (const [kind, p] of Object.entries(request.inputs ?? {})) {
@@ -712,7 +717,6 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   if (sessionRoot && existsSync(path.join(sessionRoot, 'state.json'))) {
     try {
       let state = JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8'));
-      if (phase === 'accept' && state.upgrade) state = legacyMissionState(state, dir, request);
       recordedChoices = state.choices ?? {};
       errors.push(...validateAgainst(JSON.parse(await readFile(path.join(root, 'templates', 'step', 'state.schema.json'), 'utf8')), state, 'state.json'));
       const topologyPolicy = JSON.parse(await readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8')).workflowTopologies;

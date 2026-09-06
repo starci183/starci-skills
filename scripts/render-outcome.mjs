@@ -33,6 +33,7 @@ const limited = (value, lines = 80, chars = 8000) => {
   if (kept.length < source.length || text.length < kept.join('\n').length) text += '\n…';
   return text.trim();
 };
+const shortExcerpt = value => { const text = limited(value, 36, 3200); return (text.match(/^```/gm)?.length ?? 0) % 2 ? text + '\n```' : text; };
 const fenced = (text, language = '') => `\`\`\`${language}\n${limited(text)}\n\`\`\``;
 
 const display = (value) => String(typeof value === 'object' ? JSON.stringify(value) : value ?? '').replaceAll('|', '\\|').replace(/[\r\n]+/g, ' ').slice(0, 240);
@@ -125,7 +126,7 @@ async function presentPrimary(branch, item) {
   const label = markdownLabel(item.label);
   if (item.kind === 'image') return `![${label}](<${target}>)`;
   if (item.kind === 'link') return `[${label}](<${target}>)`;
-  const withFullArtifact = (excerpt) => `${excerpt}\n\n[Open the full ${label} artifact](<${target}>)`;
+  const withFullArtifact = (excerpt) => `${shortExcerpt(excerpt)}\n\n[Open the full ${label} artifact](<${target}>)`;
   const bytes = await readFile(absolute);
   if (!isReadableText(bytes)) return `[${label}](<${target}>)`;
   const text = bytes.toString('utf8').replace(/^\uFEFF/, '');
@@ -152,6 +153,21 @@ async function presentPrimary(branch, item) {
   return withFullArtifact(limited(text));
 }
 
+
+const summaryText = value => String(value ?? '').replace(/\bsha(?:256|512):[A-Za-z0-9+/=]{20,}/gi, '[digest]').replace(/\b[a-f0-9]{40,128}\b/gi, '[digest]').replace(/[A-Za-z]:[\\/][^\s,;]+/g, '[path]').replace(/\S*[\\/]\S{48,}/g, '[path]').replace(/[\r\n]+/g, ' ').trim();
+const summaryCell = value => String(value).replaceAll('\\', '\\\\').replaceAll('|', '\\|').replace(/[\r\n]+/g, ' ');
+function nextPlanned(state, key) {
+  const cell = key.split('/').slice(0, 2).join('/');
+  if (key.split('/').length > 2 && state.attempts?.[cell]?.status !== 'matched') return cell + ' ' + (state.steps?.[cell] ?? '') + ' (resume)';
+  const index = state.chain?.findIndex(row => Array.isArray(row) && row.includes(cell)) ?? -1;
+  if (index < 0) return 'Not recorded';
+  for (let at = index; at < state.chain.length; at++) {
+    const pending = state.chain[at].filter(candidate => candidate !== cell && state.attempts?.[candidate]?.status !== 'matched');
+    if (pending.length) return pending.map(candidate => [candidate, state.steps?.[candidate]].filter(Boolean).join(' ')).join(', ');
+  }
+  return 'Planned chain complete';
+}
+
 export async function renderOutcome(root, branch, { validateStepFn = validateStep, evidenceErrorsFn = evidenceManifestErrors } = {}) {
   root = path.resolve(root);
   branch = path.resolve(branch);
@@ -159,10 +175,10 @@ export async function renderOutcome(root, branch, { validateStepFn = validateSte
   if (!session || !existsSync(path.join(session, 'state.json'))) throw new Error('SESSION_MISSING: outcome belongs to no open or retained user session');
   const { exchange, parallelDir, key } = branchIdentity(branch);
   const state = JSON.parse(await readFile(path.join(session, 'state.json'), 'utf8'));
-  if (state.contractVersion !== V22_CONTRACT) throw new Error('OUTCOME_LEGACY: The best outcome renderer requires an enforced v2.2 session');
+  if (state.contractVersion !== V22_CONTRACT) throw new Error('OUTCOME_LEGACY: Operator Result renderer requires an enforced v2.2 session');
   const attempt = state.attempts?.[key];
   if (!attempt) throw new Error(`OUTCOME_UNACCEPTED: attempts[${key}] is missing`);
-  if (attempt.status !== 'matched') throw new Error(`OUTCOME_UNACCEPTED: attempt ${attempt.id} is ${attempt.status}; only an accepted matched attempt has a best outcome`);
+  if (attempt.status !== 'matched') throw new Error(`OUTCOME_UNACCEPTED: attempt ${attempt.id} is ${attempt.status}; only an accepted matched attempt has an Operator Result`);
   if (!attempt.evidenceManifest) throw new Error(`OUTCOME_UNSEALED: attempt ${attempt.id} has no accepted evidence manifest`);
   const expectedResponseRef = `${path.relative(session, branch).split(path.sep).join('/')}/response/response.json`;
   if (attempt.responseRef !== expectedResponseRef) throw new Error(`OUTCOME_UNACCEPTED: attempts[${key}].responseRef does not bind this branch`);
@@ -176,13 +192,20 @@ export async function renderOutcome(root, branch, { validateStepFn = validateSte
   }
   if (response.attempt?.id !== attempt.id) throw new Error(`OUTCOME_UNACCEPTED: sealed response belongs to ${response.attempt?.id ?? 'no attempt'}, not ${attempt.id}`);
   if (!response.outcome?.primary) throw new Error('OUTCOME_MISSING: accepted done receipt has no primary outcome');
-  const lines = ['## The best outcome', '', response.outcome.summary.trim(), '', await presentPrimary(branch, response.outcome.primary)];
-  if (response.outcome.selectionReason) lines.push('', response.outcome.selectionReason.trim());
-  if (response.outcome.secondary?.length) {
-    lines.push('', ...response.outcome.secondary.map((item) => item.kind === 'image'
-      ? `![${markdownLabel(item.label)}](<${markdownPath(path.resolve(branch, item.ref))}>)`
-      : `- [${markdownLabel(item.label)}](<${markdownPath(path.resolve(branch, item.ref))}>)`));
-  }
+  const presentation = JSON.parse(await readFile(path.join(root, 'resources/interaction.json'), 'utf8')).outcomePresentation;
+  const summary = summaryText(response.outcome.summary);
+  const compact = summary.length > 320 ? summary.slice(0, 300) + '… (details below)' : summary;
+  const headers = presentation.columns;
+  const values = [key + ' ' + response.operatorId, 'done (receipt accepted)', compact, nextPlanned(state, key)];
+  const lines = ['## ' + presentation.heading, '', '| ' + headers.join(' | ') + ' |', '| ' + headers.map(() => '---').join(' | ') + ' |', '| ' + values.map(summaryCell).join(' | ') + ' |'];
+  const items = [response.outcome.primary, ...(response.outcome.secondary ?? [])];
+  const images = items.filter(item => item.kind === 'image');
+  for (const item of images) lines.push('', await presentPrimary(branch, item));
+  if (summary.length > 320) lines.push('', summary);
+  if (response.outcome.primary.kind !== 'image') lines.push('', await presentPrimary(branch, response.outcome.primary));
+  if (response.outcome.selectionReason) lines.push('', limited(response.outcome.selectionReason.trim(), 4, 600));
+  for (const item of response.outcome.secondary ?? []) if (item.kind !== 'image') lines.push('', '- [' + markdownLabel(item.label) + '](<' + markdownPath(path.resolve(branch, item.ref)) + '>)');
+  for (const item of images) lines.push('', '[Original image — ' + markdownLabel(item.label) + '](<' + markdownPath(path.resolve(branch, item.ref)) + '>)');
   return `${lines.join('\n')}\n`;
 }
 

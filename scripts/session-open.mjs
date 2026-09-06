@@ -23,6 +23,12 @@ async function writeJsonAtomic(file, value) {
   await writeFile(temp, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
   await replaceFile(temp, file);
 }
+export async function readWorkflowLocator(file) {
+  let bytes;
+  try { bytes = await readFile(file, 'utf8'); }
+  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  return JSON.parse(bytes);
+}
 
 function normalizeMission(sessionId, mission, version = 1) {
   mission = completeDeliveryMission(mission, root);
@@ -88,38 +94,39 @@ export async function openSession(sessionsRoot, input, { sourceRoot = path.dirna
   const locatorRoot = path.join(sourceRoot, '.workspaces', 'local', 'workflows');
   return withOwnedFileLock(path.join(locatorRoot, `.host-${hostKey}.lock`), async () => {
     const sourceSessions = path.join(sourceRoot, '.worktrees', 'sessions');
-    if (!sameRoot(sourceSessions, sessionsRoot) && await findReusable(sourceSessions, input.hostBinding)) throw Error('WORKFLOW_UPGRADE_REQUIRED: the host already owns a legacy Source ledger; migrate it instead of opening a duplicate');
+    if (!sameRoot(sourceSessions, sessionsRoot) && await findReusable(sourceSessions, input.hostBinding)) throw Error('WORKFLOW_RESET_REQUIRED: archive the old Source ledger before opening the fresh project workflow');
     for (const name of await readdir(locatorRoot)) {
       if (!name.endsWith('.json')) continue;
-      const locator = JSON.parse(await readFile(path.join(locatorRoot, name), 'utf8'));
+      const locator = await readWorkflowLocator(path.join(locatorRoot, name));
+      if (locator === null) continue;
       const otherRoot = path.join(locator.ownerRoot, '.worktrees', 'sessions');
       if (!sameRoot(otherRoot, sessionsRoot) && await findReusable(otherRoot, input.hostBinding)) throw Error('WORKFLOW_OWNER_CONFLICT: this host already has a ledger under another owner');
     }
     const reused = await findReusable(sessionsRoot, input.hostBinding);
     if (reused) {
-      if (reused.state.runtimeRevision !== RUNTIME_REVISION) throw Error('WORKFLOW_UPGRADE_REQUIRED: migrate the existing host ledger; do not create a second session');
+      if (reused.state.runtimeRevision !== RUNTIME_REVISION) throw Error('WORKFLOW_RESET_REQUIRED: archive the old host ledger before opening a fresh current session');
       const ownerErrors = workflowOwnerErrors(path.join(sourceRoot, '.claude'), reused.session, reused.state, { dispatch: true });
       if (ownerErrors.length) throw Error(ownerErrors.join('\n'));
       const existingMode = workflowTopologyMode(topologyPolicy, reused.state);
+      if (existingMode === undefined) throw Error('WORKFLOW_RESET_REQUIRED: missing current topology; archive the old ledger and open a fresh session');
       if (existingMode !== undefined) {
         const existingErrors = sessionWorkflowTopologyErrors(topologyPolicy, reused.state);
         if (existingErrors.length) throw new Error(existingErrors.join('\n'));
       }
-      const topology = requestedTopology ?? (existingMode === undefined ? defaultTopology : { mode: existingMode });
+      const topology = requestedTopology ?? { mode: existingMode };
       const changesTopology = existingMode !== undefined && topology.mode !== existingMode;
-      if (existingMode === undefined || changesTopology) {
+      if (changesTopology) {
         await mutateSession(reused.session, async (state) => {
           const currentMode = workflowTopologyMode(topologyPolicy, state);
           const cleanDraft = state.lifecycle?.phase === 'draft' && !(state.chain ?? []).length && !Object.keys(state.steps ?? {}).length && !Object.keys(state.attempts ?? {}).length;
           if (currentMode !== undefined && currentMode !== topology.mode && !cleanDraft) {
             throw new Error(`SESSION_TOPOLOGY_MISMATCH: active session uses ${currentMode}, requested ${topology.mode}; finish or close the current mission before changing topology`);
           }
-          if (currentMode === undefined && !cleanDraft && !requestedTopology) throw new Error('SESSION_TOPOLOGY_MIGRATION_REQUIRED: active v2.2.0 state needs an explicit topology before reuse');
           setWorkflowTopologyMode(topologyPolicy, state, topology.mode);
           if (cleanDraft && topologyPolicy.modes[topology.mode].maximumPeers === 0) setWorkflowTopologyPeers(topologyPolicy, state, {});
           if (!cleanDraft) {
-            const migrationErrors = sessionWorkflowTopologyErrors(topologyPolicy, state, { dispatch: true });
-            if (migrationErrors.length) throw new Error(migrationErrors.join('\n'));
+            const topologyErrors = sessionWorkflowTopologyErrors(topologyPolicy, state, { dispatch: true });
+            if (topologyErrors.length) throw new Error(topologyErrors.join('\n'));
           }
         });
       }
@@ -177,7 +184,7 @@ export async function confirmSession(session, decision) {
     if (state.lifecycle.phase !== 'draft') throw new Error(`state.json: lifecycle ${state.lifecycle.phase} cannot confirm another draft`);
     state.choices[decisionId] = { selected: decision.selected, selectedBy: 'user', sourceRef: decision.sourceRef };
     if (decision.selected === 'as-stated') {
-      if (state.runtimeRevision !== RUNTIME_REVISION) throw Error('WORKFLOW_UPGRADE_REQUIRED: legacy scope cannot be silently confirmed for new dispatch');
+      if (state.runtimeRevision !== RUNTIME_REVISION) throw Error('WORKFLOW_RESET_REQUIRED: old scope cannot be confirmed for current dispatch');
       const authorizationErrors = authorityErrors(current, decision.authority, root);
       authorizationErrors.push(...scopeBindingErrors(state, {}));
       if (decision.authority?.kind === 'bank-approval') {

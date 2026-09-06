@@ -189,9 +189,9 @@ deployment; a resume that adds no authorization, manifest, credential or observa
 | `release-deployment` | `response/response.md` | md | yes |
 | `probes` | `response/data/probes.json` | data | yes |
 
-## The best outcome
+## Operator Result
 
-Print **The best outcome** from the steady state in `response/response.md` and its health and readiness rows in `response/data/probes.json`: a successful rollout shows the new release address, identifier and digest, while a fallback rollback shows the exact prior release restored and never calls it a new delivery. A failed probe shows the actual deployed state and failing observation truthfully and does not advertise the release as healthy.
+Print **Operator Result** from the steady state in `response/response.md` and its health and readiness rows in `response/data/probes.json`: a successful rollout shows the new release address, identifier and digest, while a fallback rollback shows the exact prior release restored and never calls it a new delivery. A failed probe shows the actual deployed state and failing observation truthfully and does not advertise the release as healthy.
 
 ## Stops
 

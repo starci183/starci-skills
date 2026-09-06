@@ -11,7 +11,7 @@ Sinh bởi `scripts/generate-operators-index.mjs` từ mọi `operator.md`; `--c
 | `backend.generate` | `sol-fresh` | `@knowledge/patterns/be`, `@workspaces/be`, `@worktrees/businesses/<featureId>` | `business-reconciliation`, `architecture-decision`, `model`, `backend-source-application`, `units` | `backend-source-application`, `changes`, `mutations`, `conformance`, `proof` | 8 | `INVALID_INPUT`, `SESSION_MISSING`, `SOURCE_DRIFT`, `NO_PROGRESS`, `CONTRACT_UNFROZEN`, `CONTRACT_WIDENED`, `BUSINESS_AUTHORITY_MISSING`, `OWNER_CONFLICT`, `OWNER_WIDENED`, `PATTERN_UNBOUND`, `PROOF_UNAVAILABLE` |
 | `backend.plan` | `sol-reviewer` | `@workspaces/be` | `architecture-decision`, `business-promise-authority` | `backend-plan`, `units` | 9 | `INVALID_INPUT`, `NO_PROGRESS`, `EVIDENCE_MISSING`, `MODULE_UNDEFINED` |
 | `business.decide` | `sol-reviewer` | `@workspaces/be`, `@worktrees/businesses/<featureId>` | `architecture-decision` | `business-promise-authority`, `restatement`, `claims`, `coverage-matrix`, `model` | 9 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `RESTATEMENT_UNCONFIRMED`, `EVIDENCE_MISSING`, `CONTRADICTION_UNRESOLVED`, `LIFECYCLE_TRANSITION_INVALID`, `AUTHORITY_CONFLICT`, `APPROVAL_REQUIRED`, `COVERAGE_INCOMPLETE`, `CONSUMER_UNPROVEN` |
-| `business.reconcile` | `sol-reviewer` | `@workspaces/be`, `@worktrees/businesses/<featureId>`, `@worktrees/unchecked/<product>` | `backend-source-application`, `quality-verification`, `uat-flow-verification`, `api-verification` | `business-reconciliation`, `claims`, `model` | 6 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED`, `EVIDENCE_MISSING`, `RECONCILIATION_DISCREPANCY` |
+| `business.reconcile` | `sol-reviewer` | `@workspaces/be`, `@workspaces/fe`, `@worktrees/businesses/<featureId>`, `@worktrees/unchecked/<product>` | `backend-source-application`, `frontend-source-application`, `quality-verification`, `uat-flow-verification`, `api-verification` | `business-reconciliation`, `claims`, `model` | 6 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED`, `EVIDENCE_MISSING`, `RECONCILIATION_DISCREPANCY` |
 | `content.generate` | `sol-fresh` | `@remote/minio/<contentId>/<locale>`, `@worktrees/sessions/central-runtime` | `content-generation-receipt` | `content-generation-receipt`, `content-brief`, `e2e`, `content-review`, `article`, `image`, `image-prompt`, `track` | 9 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `BRIEF_UNBOUND`, `OUTCOME_UNCOVERED`, `IMAGE_UNAVAILABLE`, `CODE_BUILD_FAILED`, `E2E_FAILED`, `CONTRACT_WEAKENED`, `REVIEW_REVISION_REQUIRED`, `REVIEW_ROUNDS_EXHAUSTED` |
 | `data.plan` | `sol-reviewer` | `@workspaces/be`, `@worktrees/_templates`, `@worktrees/uat/<flow>` | `uat-plan`, `surface-map` | `seed-plan`, `units` | 10 | `INVALID_INPUT`, `NO_PROGRESS`, `EVIDENCE_MISSING`, `SEED_UNDEFINED` |
 | `data.seed` | `sol-fresh` | `@workspaces/device-state`, `@worktrees/sessions/central-runtime`, `@worktrees/uat/<flow>` | `seed-plan`, `uat-account`, `units` | `seed-receipt` | 7 | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT`, `IDENTITY_MISSING`, `SEED_SHARED_ROW`, `PROVISIONING_UNAVAILABLE`, `SEED_UNPROVEN` |
@@ -49,7 +49,7 @@ Mọi kind đi qua giữa các operator, ai ghi nó, ai đọc nó. Kind không 
 | `article` | `content.generate` | — |
 | `audit-scope` | `quality.verify`, `uat.verify` | — |
 | `backend-plan` | `backend.plan` | — |
-| `backend-source-application` | `backend.generate` | `backend.generate (optional)`, `business.reconcile`, `interface.generate (optional)`, `migration.release`, `quality.verify (optional)` |
+| `backend-source-application` | `backend.generate` | `backend.generate (optional)`, `business.reconcile (when sourceRole=be)`, `interface.generate (optional)`, `migration.release`, `quality.verify (optional)` |
 | `business-promise-authority` | `business.decide` | `backend.plan (optional)`, `interface.generate (optional)`, `interface.plan (optional)` |
 | `business-reconciliation` | `business.reconcile` | `backend.generate (optional)`, `git.publish (optional)` |
 | `candidates` | `interface.generate` | — |
@@ -75,7 +75,7 @@ Mọi kind đi qua giữa các operator, ai ghi nó, ai đọc nó. Kind không 
 | `findings` | `interface.audit`, `uat.verify` | `interface.generate (optional)` |
 | `frontend-direction-decision` | `interface.generate` | `interface.audit`, `interface.generate (optional)` |
 | `frontend-presentation-resolution` | `interface.generate` | `interface.audit`, `interface.fix` |
-| `frontend-source-application` | `interface.fix`, `interface.generate` | `interface.audit`, `interface.fix`, `quality.verify (optional)` |
+| `frontend-source-application` | `interface.fix`, `interface.generate` | `business.reconcile (when sourceRole=fe)`, `interface.audit`, `interface.fix`, `quality.verify (optional)` |
 | `frontend-surface-audit` | `interface.audit` | `interface.fix (optional)`, `interface.generate (optional)`, `quality.verify (optional)`, `uat.verify` |
 | `gate-result` | `quality.verify` | — |
 | `git-publication` | `git.publish` | — |
@@ -107,14 +107,14 @@ Mọi kind đi qua giữa các operator, ai ghi nó, ai đọc nó. Kind không 
 | `route` | `workspace.bind` | `interface.audit`, `library.update`, `migration.release`, `uat.verify` |
 | `screenshot` | `interface.audit`, `uat.verify` | — |
 | `seed-plan` | `data.plan` | `data.seed` |
-| `seed-receipt` | `data.seed` | `api.verify (optional)`, `interface.audit (optional)`, `uat.verify` |
+| `seed-receipt` | `data.seed` | `api.verify (optional)`, `interface.audit (optional)`, `uat.verify (when fixtures=seeded)` |
 | `selected-candidate-capture` | `interface.generate` | — |
 | `service-receipt` | `service.operate` | `quality.verify (optional)` |
 | `sheet` | `uat.verify` | — |
 | `stack-model` | `architecture.decide` | — |
 | `surface-map` | `interface.plan` | `data.plan (optional)`, `uat.plan (optional)` |
 | `track` | `content.generate` | — |
-| `uat-account` | `identity.provision` | `api.verify (optional)`, `data.seed (optional)`, `interface.audit (optional)`, `uat.verify` |
+| `uat-account` | `identity.provision` | `api.verify (optional)`, `data.seed (optional)`, `interface.audit (optional)`, `uat.verify (when access=authenticated)` |
 | `uat-capture` | `uat.verify` | — |
 | `uat-case-sheet` | `uat.plan` | `uat.verify` |
 | `uat-flow-verification` | `uat.verify` | `business.reconcile (optional)`, `interface.fix (optional)`, `quality.verify (optional)` |
@@ -157,7 +157,7 @@ Mọi kind đi qua giữa các operator, ai ghi nó, ai đọc nó. Kind không 
 | `release.deploy` | Deploy one immutable release to one declared target under its declared authorization and prove the steady state it reached, taking the recovery or rollback branch inside the same pass rather than assuming the rollout succeeded. |
 | `runtime.serve` | Serve one product route's integration branch on its one fixed port: climb the named rung of the runtime ladder for the bound route — bring the environment's infrastructure up, locate the routed checkouts, start a role, merge this session's commit into the integration branch and serve it, restart, reset or stop the one detached server — attest the entry from what answered, and hold the lease that orders sessions. |
 | `service.operate` | Bring one auxiliary service the environment declares — an observability stack, a code-quality service, a tunnel beside a served runtime — to the state that declaration asks for, prove from its own probe that it is in that state, and record the holder that answers, under the lease that orders sessions. |
-| `uat.plan` | Enumerate the user journeys the mission goal names, one flow per journey with its entry route, its step budget, its own account alias and its own seed namespace, so that the blind walkers that follow each walk one flow and no two of them ever share a row. |
+| `uat.plan` | Enumerate the user journeys the mission goal names, one flow per journey with its entry route, its step budget, its declared account and fixture prerequisites, so that the blind walkers that follow each walk one flow and no two of them ever share a row. |
 | `uat.verify` | Verify one product flow end to end on the running product at the pinned commit, and publish one append-only run record with three independently judged lanes, or stop at the exact unavailability instead of manufacturing a verdict. |
 | `workflow.verify` | Verify one coordinator's frozen peer portfolio from the original terminal solo session receipts and evidence, independently proving every child goal and pinning every delivered repository boundary, without changing any peer session, worktree, source or ledger. |
 | `workspace.bind` | Resolve one project and role into a verified checkout identity and its exact source head, and return that as one typed route receipt; the runtime a caller consumes is the runtime owner's to serve and bind. |

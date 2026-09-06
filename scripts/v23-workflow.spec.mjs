@@ -8,15 +8,37 @@ import { fileURLToPath } from 'node:url';
 import { openSession, confirmSession, discoverSession } from './session-open.mjs';
 import { completeDeliveryMission, authorityErrors, scopeErrors, scopeHash, deliveryTargets, deliveryRequestErrors, scopeBindingErrors } from './mission-scope.mjs';
 import { resolveWorkflowOwner, workflowOwnerErrors } from './workflow-root.mjs';
-import { migrateSession, verifyMigration } from './session-migrate.mjs';
 import { mutateSession } from './session-lock.mjs';
 import { loadOperatorPackages } from './operator-md.mjs';
 import { loadOperatorGraph, validateChain } from './validate-chain.mjs';
 import { planChain } from './plan-chain.mjs';
 import { declareOwner, discoveryFor, answerFor } from './v23-test-fixture.mjs';
+import { validateAgainst } from './json-schema.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const mission = discovery => completeDeliveryMission({ version: 1, language: 'en', goal: 'Deliver bounded module behavior', target: 'declared module', includes: ['bounded behavior'], excludes: [], outputs: ['reviewable delivery'], doneWhen: [{ evidence: 'the promise is decided', producedBy: 'business.decide' }], verification: 'positive and negative module journeys', sourceRef: 'user:opening', discovery });
 function fixture(run) { const base = mkdtempSync(path.join(tmpdir(), 'starci v23 relocated ')); return Promise.resolve().then(() => run(base)).finally(() => rmSync(base, { recursive: true, force: true })); }
+
+test('old execution cannot migrate or replay; retirement stays denied after moving the folder', async () => fixture(async base => {
+  const source = path.join(base,'Source'), owner = path.join(base,'Project');mkdirSync(source);mkdirSync(owner);mkdirSync(path.join(source,'.claude'));
+  declareOwner(source,'sample',owner);
+  const session = path.join(owner,'.worktrees/sessions/old-one');mkdirSync(session,{recursive:true});
+  const old = { contractVersion:'starci/v2.2',id:'old-one',project:'sample',attempts:{},workerSlots:[],leases:{} };
+  const file=path.join(session,'state.json');writeFileSync(file,JSON.stringify(old));const bytes=readFileSync(file);
+  assert.ok(workflowOwnerErrors(path.join(source,'.claude'),session,old).some(error=>error.includes('WORKFLOW_RESET_REQUIRED')));
+  await assert.rejects(()=>mutateSession(session,state=>{state.runtimeRevision=3;}),/WORKFLOW_RESET_REQUIRED/);
+  assert.deepEqual(readFileSync(file),bytes);
+  writeFileSync(path.join(session,'retirement.json'),JSON.stringify({version:1,status:'retired',executionAllowed:false}));
+  const retired=path.join(base,'retired-history');renameSync(session,retired);
+  await assert.rejects(()=>mutateSession(retired,()=>{}),/WORKFLOW_RETIRED/);
+  const fresh=await openSession(path.join(owner,'.worktrees/sessions'),{sessionId:'old-one',project:'sample',hostBinding:{kind:'codex-task',hostId:'fresh-host',worktree:owner,sourcePromptRef:'user:opening'},mission:mission(discoveryFor('sample'))},{sourceRoot:source});
+  const state=JSON.parse(readFileSync(path.join(fresh.session,'state.json')));
+  assert.equal(state.runtimeRevision,3);assert.equal(state.upgrade,undefined);assert.deepEqual(state.attempts,{});assert.deepEqual(state.chain,[]);
+  assert.deepEqual(readFileSync(path.join(retired,'state.json')),bytes);
+  const schema=JSON.parse(readFileSync(path.join(ROOT,'templates/step/state.schema.json')));
+  assert.ok(validateAgainst(schema,{...state,upgrade:{from:retired}}).some(error=>error.includes('unexpected property')));
+  writeFileSync(path.join(fresh.session,'relocation.json'),'{}');
+  await assert.rejects(()=>mutateSession(fresh.session,()=>{}),/WORKFLOW_RELOCATED/);
+}));
 test('a vague prompt cannot become an exact opening-scope answer; displayed scope answer seals each reviewed field', () => {
   const value = mission(discoveryFor('sample'));
   const vague = { ...answerFor(value), kind: 'opening-scope', sourceRef: value.sourceRef, statement: 'please do it', coverage: { goal: 'please do it', impact: 'please do it', destination: 'please do it', stage: 'please do it', verification: 'please do it' } };
@@ -95,25 +117,4 @@ test('project owner declaration separates runtime Source and workflow storage; v
   assert.ok(workflowOwnerErrors(path.join(source, '.claude'), opened.session, active, { dispatch: true }).some(error => error.includes('WORKFLOW_OWNER_DRIFT')));
   route.repository.diskPath = owner; writeFileSync(routeFile, JSON.stringify(route));
   await assert.rejects(() => discoverSession(opened.session, input.mission), /GOAL_FROZEN/);
-}));
-test('migration copies and verifies original bytes, disables legacy writer and refuses changed preserved evidence', async () => fixture(async base => {
-  const source = path.join(base, 'Source'); const owner = path.join(base, 'Project'); mkdirSync(source); mkdirSync(owner); declareOwner(source, 'sample', owner);
-  const session = path.join(source, '.worktrees', 'sessions', 'legacy-one'); mkdirSync(path.join(session, 'step-1', 'parallel-1', 'request'), { recursive: true });
-  const state = { contractVersion: 'starci/v2.2', id: 'legacy-one', project: 'sample', status: 'running', lifecycle: { phase: 'active' }, mission: mission(undefined), attempts: {}, workerSlots: [], leases: {}, choices: {} };
-  const bytes = JSON.stringify(state); const request = '{"immutable":"legacy request bytes"}\n'; writeFileSync(path.join(session, 'state.json'), bytes); writeFileSync(path.join(session, 'step-1', 'parallel-1', 'request', 'request.json'), request);
-  const result = await migrateSession(session, { sourceRoot: source }); assert.notEqual(result.session, session);
-  assert.equal(readFileSync(path.join(result.session, 'upgrade', 'legacy-state.json'), 'utf8'), bytes);
-  assert.equal(readFileSync(path.join(result.session, 'step-1', 'parallel-1', 'request', 'request.json'), 'utf8'), request);
-  assert.deepEqual(await verifyMigration(result.session), []);
-  await mutateSession(result.session, current => { current.brief = { next: 'The destination is writable after transfer.' }; });
-  const markerFile = path.join(session, 'relocation.json'); const marker = JSON.parse(readFileSync(markerFile));
-  renameSync(result.session, marker.staging); marker.status = 'switching'; writeFileSync(markerFile, JSON.stringify(marker));
-  const pendingState = readFileSync(path.join(marker.staging, 'state.json'));
-  writeFileSync(path.join(marker.staging, 'state.json'), JSON.stringify({ id: state.id, project: 'unrelated' }));
-  await assert.rejects(() => migrateSession(session, { sourceRoot: source }), /MIGRATION_CONFLICT/);
-  writeFileSync(path.join(marker.staging, 'state.json'), pendingState);
-  assert.equal((await migrateSession(session, { sourceRoot: source })).status, 'migration-recovered');
-  await assert.rejects(() => mutateSession(session, current => { current.status = 'done'; }), /WORKFLOW_RELOCATED/);
-  assert.ok(workflowOwnerErrors(path.join(source, '.claude'), session, state, { dispatch: true }).some(error => error.includes('WORKFLOW_RELOCATED')));
-  writeFileSync(path.join(result.session, 'step-1', 'parallel-1', 'request', 'request.json'), '{}'); assert.ok((await verifyMigration(result.session)).some(error => error.includes('MIGRATION_CHANGED')));
 }));

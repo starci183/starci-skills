@@ -67,32 +67,6 @@ test('an unknown operator, a step no Next table reaches, and a same-operator re-
   assert.ok(check([['environment.preflight'], ['quality.verify']]).some((e) => e.includes('no Next table of step 1')));
   assert.deepEqual(check([['workspace.bind'], ['workspace.bind'], ['quality.verify']]), []);
 });
-test('a replan boundary starts a fresh reachability and delivery-order segment', () => {
-  const mission = fakeMission([line('business.decide'), line('architecture.decide')], {
-    discovery: {
-      stage: 'implement',
-      lanes: {
-        business: { status: 'planned', dependsOn: [] },
-        architecture: { status: 'planned', dependsOn: ['business'] },
-      },
-    },
-  });
-  const spec = [
-    ['architecture.decide'],
-    ['quality.verify'],
-    ['environment.preflight'],
-    ['business.decide'],
-    ['architecture.decide'],
-  ];
-  const { chain, steps, byBranch } = chainOf(spec);
-  const withoutBoundary = validateChain(root, packages, chain, steps, byBranch, { graph, mission });
-  assert.ok(withoutBoundary.some((e) => e.includes('architecture.decide must follow business.decide')));
-  assert.ok(withoutBoundary.some((e) => e.includes('step 3 runs environment.preflight')));
-  const withBoundary = validateChain(root, packages, chain, steps, byBranch, { graph, mission, activeFromStep: 3 });
-  assert.ok(!withBoundary.some((e) => e.includes('architecture.decide must follow business.decide')));
-  assert.ok(!withBoundary.some((e) => e.includes('step 2 runs quality.verify')), 'historical Next mismatches stay immutable outside the active segment');
-  assert.ok(!withBoundary.some((e) => e.includes('step 3 runs environment.preflight')));
-});
 test('a required input needs an earlier producer; a required role needs an earlier bind of that role', () => {
   const noInput = check([['workspace.bind'], ['git.publish']]);
   assert.ok(noInput.some((e) => e.includes('git.publish requires input changes')));
@@ -185,4 +159,13 @@ test('when the chain holds a plan, it runs before the branches that execute its 
   assert.ok(late.some((e) => e.includes('2/1: interface.generate runs in step 2 and interface.plan, whose units it executes, runs in step 3')));
   const same = check([[fe], ['interface.generate', 'interface.plan']]);
   assert.ok(same.some((e) => e.includes('runs in step 2 and interface.plan')));
+});
+
+test('an activeFromStep option cannot bypass current reachability or full surface proof', () => {
+ const interrupted = [...surface.slice(0,5), ['business.decide'], ...surface.slice(5)];
+ const ordinary = check(interrupted);
+ assert.ok(ordinary.some(error => error.includes('no Next table')));
+ assert.deepEqual(check(interrupted, { activeFromStep: 6 }), ordinary);
+ const missingAudit = surface.filter(row => row[0] !== 'interface.audit');
+ assert.ok(check(missingAudit, { activeFromStep: 999 }).some(error => error.includes('no interface.audit anywhere')));
 });

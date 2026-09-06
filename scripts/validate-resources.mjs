@@ -166,9 +166,11 @@ if (orchestrator.dispatch !== 'routing.json') errors.push('orchestrator.json: di
 if (orchestrator.interactionPolicy !== 'resources/interaction.json') errors.push('orchestrator.json: interactionPolicy must name resources/interaction.json');
 const interaction = JSON.parse(await readFile(path.join(root, 'resources/interaction.json'), 'utf8'));
 // The two-line transition log: interaction.json#transitionLog fixes how many lines the orchestrator
-// prints to the root chat after a transition and their shape; validate-interaction reads the same record.
+// retains internally after a transition and their shape; validate-interaction reads the same record.
 const log = interaction.transitionLog;
 if (!log || log.linesPerBranch !== 2 || !Array.isArray(log.shape) || log.shape.length !== 2 || log.shape.some((s) => typeof s !== 'string' || !s.trim()) || typeof log.rule !== 'string' || !log.rule.trim()) errors.push('interaction.json: transitionLog must declare linesPerBranch 2, a shape of exactly two line templates and a rule');
+const presentation = interaction.outcomePresentation;
+if ((typeof presentation?.heading !== 'string' || !presentation.heading.trim()) || !Array.isArray(presentation.columns) || presentation.columns.length !== 4 || presentation.columns.some(column => typeof column !== 'string' || !column.trim()) || new Set(presentation.columns).size !== 4) errors.push('interaction.json: outcomePresentation declares a heading and four distinct summary columns');
 if (![3, 4].includes(interaction.schemaVersion) || !Array.isArray(interaction.questionKinds) || !interaction.questionKinds.length || interaction.questionKinds.some((kind) => typeof kind !== 'string' || !kind.trim())) errors.push('interaction.json: schemaVersion and questionKinds must declare a communication contract');
 if (!Number.isInteger(interaction.minOptions) || !Number.isInteger(interaction.maxOptions) || interaction.minOptions < 1 || interaction.maxOptions < interaction.minOptions) errors.push('interaction.json: option bounds must be ordered positive integers');
 // The display language: interaction.json#language names the settings pair, and the pair itself parses to a language tag.

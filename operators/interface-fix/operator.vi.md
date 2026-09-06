@@ -126,7 +126,7 @@ chuyển, chúng mang lời khai nào, và bề mặt nào phải được đo h
 | `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | không |
 | `family-understanding` | `response/data/family-understanding.json` | data | không |
 
-## Kết quả tốt nhất
+## Operator Result
 
 Với fix thành công, `outcome.primary` là bản code hoặc document đã khai cho thấy trực tiếp nhất phần
 sửa có giới hạn, thường là changes diff hoặc source application. Test hay phép kiểm đúng mục tiêu đã

@@ -444,7 +444,7 @@ surfaces must now be observed.
 | `changes` | `response/changes.md` | md | yes |
 | `writes` | `response/data/writes.json` | data | yes |
 
-## The best outcome
+## Operator Result
 
 On every successful run — `apply` or `dry`, at every change level including `new`, `reconstruct` and
 `refine` — `outcome.primary` is an `image` whose ref is the required

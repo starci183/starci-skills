@@ -9,11 +9,10 @@ instead of manufacturing a verdict.
 ## Done when
 
 Done when the `uat-snapshot` was frozen before any product action, naming the pinned commit, the
-served head that contains it, the cases in order with their assertions, the account record of names
-and the seed fingerprint, every frozen case has its `uat-capture` and masked `screenshot` taken
-after the sign-in redirect landed through the rendered controls alone, the `uat-verdicts` judge the
+served head that contains it, the cases in order with their assertions, the declared account and fixture prerequisites, every frozen case has its `uat-capture` and masked `screenshot` taken
+through the rendered controls after any required sign-in redirect landed, the `uat-verdicts` judge the
 behaviour, experience and interface lanes on their own evidence with the experience lane scored
-criterion by criterion, the exact rollback handoff for the run namespace was emitted to `data.seed`, the append-only run record
+criterion by criterion, the required rollback handoff was emitted to `data.seed` or the no-fixture mode records no cleanup, the append-only run record
 exists with its pointer and history line, and the `uat-flow-verification` lists the `sheet` and the
 verdict table it printed to the person, carrying the `audit-scope` unchanged when the admitted audit
 had one.
@@ -42,7 +41,7 @@ the production default once, read from there and never copied here. A non-produc
 that has not tightened that class needs nothing further: `approval` carries that declaration's
 reference — its path and the hash of its bytes — and the run proceeds with no person in the loop. An
 environment that marks that class `person`, which production always does, needs an approval id
-instead, and `approval` has no default: silence is not consent, whatever reached this operator.
+instead; authenticated access requires `approval`, while anonymous access carries null and requests no sign-in authority.
 
 ## The endpoint is the bound one, never a re-derived one
 
@@ -66,14 +65,14 @@ The isolation law is published once, by the operator that owns the runtime, and 
 inside it rather than restating it. Three of its clauses are things only this receipt can carry, so
 the snapshot states them and they are checked: this run belongs to the session the request names and
 writes no other session's folder; it drives its own browser profile, because two runs sharing one
-profile share a sign-in and then each proves the other's; and it accepts only a `data.seed` receipt
+profile share a sign-in and then each proves the other's; and seeded mode accepts only a `data.seed` receipt
 whose identifiers and rollback set stay under this run's namespace.
 
 ## Missing prerequisites are routed to their owners
 
 This verifier does not draft a flow, case sheet or seed. Missing or invalid flow material returns a
-typed handoff to `uat.plan`; missing or invalid seed material returns one to `data.plan` and then
-`data.seed`. A missing or invalid account returns `IDENTITY_MISSING` to `identity.provision`, which
+typed handoff to `uat.plan`; missing or invalid required seeded-mode material returns one to `data.plan` and then
+`data.seed`. A missing or invalid required authenticated-mode account returns `IDENTITY_MISSING` to `identity.provision`, which
 must return a real product-login proof before a new attempt begins. An unreachable provider, sealed
 file or store is `PROVISIONING_UNAVAILABLE`; a request naming no flow is `INVALID_INPUT`.
 
@@ -81,8 +80,8 @@ file or store is `PROVISIONING_UNAVAILABLE`; a request naming no flow is `INVALI
 
 `flow.md` states the goal, the role, the preconditions, the budget in steps and seconds, and the
 steps with their expected result, evidence and scored criteria, each naming the alias it acts as.
-`accounts.<env>.json` carries names only, one account per alias, per environment.
-`seed/` holds what must exist before the run, said once and idempotently. `snapshots/` is the golden
+In authenticated mode, `accounts.<env>.json` carries names only, one account per alias, per environment.
+In seeded mode, `seed/` holds what must exist before the run, said once and idempotently. `snapshots/` is the golden
 reference and changes only when a person approves it. `runs/<runId>/` is the append-only history,
 `runId` being the run's timestamp and the short commit it verified, so two runs of the same flow at
 the same commit are still distinguishable and neither can overwrite the other. `latest.json` names the
@@ -134,7 +133,7 @@ must name the same commit as the pinned head; either one absent, or either one t
 commit, is `ADMISSION_MISSING`, because a clean surface and a green gate at some other commit say
 nothing about the product this run drives.
 
-When frontend and backend are separate deliveries, bind both @workspaces/fe and @workspaces/be. snapshot.provenance and verdicts.provenance freeze {fe, be} from those exact contexts; commit and the run-id suffix identify the frontend. Both admission entries carry role fe and the frontend commit. Their actual owning requests must pin that frontend head, and their emitted receipts must identify it; a quality request may also pin backend context without turning its frontend admission into a backend one. The Snapshot table prints Frontend commit and Backend commit, and the appended result retains both. A frontend route or admission with a head distinct from the backend requires this explicit form even if a caller omits frontend context. Backend-only legacy records remain valid when no split-role evidence exists. No frontend SHA is relabeled as a backend SHA.
+Every browser run binds @workspaces/fe at the delivered head; full sourceRoles also binds @workspaces/be. Snapshot and verdict provenance carry precisely those heads; commit and the run-id suffix identify frontend. Both admissions carry role fe at that same frontend commit, verified from their actual owner requests and receipts. The Snapshot table prints Frontend commit and Backend commit (— for frontend-only); the appended result preserves the same provenance. No frontend SHA is relabeled as backend.
 
 ## The experience lane is scored, not asserted
 
@@ -198,16 +197,20 @@ any other means — an endpoint, a mutation, a console command in place of the r
 Case 2) — is not a step of the walk, and a criterion scored from it is `EVIDENCE_UNAVAILABLE`, never a
 pass.
 
+## Journey prerequisites
+
+The request and each machine flow freeze access, fixtures and sourceRoles; snapshot and verdict must preserve them. Defaults are authenticated, seeded and full. Anonymous drives a public surface in a fresh browser context, carries null walk account and case actor anonymous, and accepts no account or credential. None carries null case fixture and plan seed namespace, case cleanup none, no seed receipt, no seeded or rollback ids and no data.seed handoff. Run evidence still uses uat-<runId>. Frontend pins the frontend head and both actual admissions at that head, with no invented backend head. These modes are independent: an anonymous journey may need seeded data, and a no-fixture journey may need sign-in. Account, sign-in and seed procedures apply only when their respective prerequisites require them; every case, control, capture, runtime ancestry check, all three lanes and append-only history remain mandatory.
+
 ## Context
 
 | Alias | Bind | Required |
 | --- | --- | --- |
-| `@worktrees/uat/<flow>/<case>` | the flow directory in its one shape: `flow.md`, `accounts.<env>.json`, `seed/`, the approved `snapshots/`, the append-only `runs/<runId>/` history, the `latest.json` pointer and `history.md`, bound by fingerprint per file and written only under the exclusive lease | yes |
+| `@worktrees/uat/<flow>/<case>` | the flow directory in its one shape: `flow.md`, the accounts and seed required by its frozen modes, the approved `snapshots/`, the append-only `runs/<runId>/` history, the `latest.json` pointer and `history.md`, bound by fingerprint per file and written only under the exclusive lease | yes |
 | `@worktrees/_templates` | the UAT folder contract used only to validate the planned flow shape; canonical creation belongs to `uat.plan` and `data.plan`; consumed, never modified | yes |
 | `@worktrees/sessions/central-runtime` | the runtime owner's generation behind the bound endpoint; readiness is proved by the `route` Input, never re-derived from this registry | yes |
-| `@workspaces/device-state` | the sealed credential roster; the shared UAT password is resolved by name here at login and read nowhere else | yes |
-| `@workspaces/be` | the routed backend checkout at the pinned commit, whose behaviour the flow verifies and whose store holds the namespaced records | yes |
-| `@workspaces/fe` | the frontend delivery head when the browser surface and backend are distinct; required whenever route or admission evidence identifies a different frontend head | no |
+| `@workspaces/device-state` | the sealed credential roster; the shared UAT password is resolved by name here at login and read nowhere else | when access=authenticated |
+| `@workspaces/be` | the routed backend checkout at the pinned commit, whose behaviour the flow verifies and whose store holds the namespaced records | when sourceRoles=full |
+| `@workspaces/fe` | the frontend delivery actually driven by this browser run, at its pinned source head | yes |
 | `@knowledge/ui/proof` | the UX topic: the criteria the experience lane scores and the rule that turns them into its verdict | yes |
 | `@worktrees/unchecked/<product>` | the unchecked coverage of this feature in the walk lane: which flows earlier missions left unwalked, and which of them this run covers | no |
 
@@ -218,30 +221,33 @@ pass.
 | `frontend-surface-audit` | the surface audit that found the frontend clean, taken at the pinned commit | yes |
 | `quality-verification` | the quality gate that passed, taken at the same pinned commit | yes |
 | `route` | `workspace.bind` on the fe role; the bound route whose endpoint this run drives | yes |
-| `uat-account` | `identity.provision`; every actor alias, provider account, role/membership observation and real product-login proof for this environment | yes |
+| `uat-account` | `identity.provision`; every actor alias, provider account, role/membership observation and real product-login proof for this environment | when access=authenticated |
 | `units` | `uat.plan`; the flow list whose one flow this branch walks, named by `request.unit` | no |
 | `uat-plan` | `uat.plan`; the flow entry, budget, actor aliases and namespace | yes |
 | `uat-case-sheet` | `uat.plan`; the immutable machine table of actor, preconditions, actions, assertions, expected and fixture refs | yes |
-| `seed-receipt` | `data.seed`; the rows this flow walks on, attributable to its namespace, with their rollback | yes |
+| `seed-receipt` | `data.seed`; the rows this flow walks on, attributable to its namespace, with their rollback | when fixtures=seeded |
 
 ## Requirements
 
 | Field | Type | Default | Ask |
 | --- | --- | --- | --- |
-| `approval` | id | — | The authority covering sign-in as the flow's account: an approval id, or the environment declaration's reference — its path and content hash — when `identity-provisioning` is `declared` for `env`; no default, because silence is not consent |
+| `approval` | id | when access=authenticated | The authority covering sign-in as the flow's account: an approval id, or the environment declaration's reference — its path and content hash — when `identity-provisioning` is `declared` for `env`; no default, because silence is not consent |
 | `feature` | id | — | The feature key that addresses the flow directory |
 | `flow` | id | — | The one product flow this invocation verifies |
 | `env` | id | dev | The stack this run drives: it selects the accounts file, the sealed secret, the runtime registry entry, the seed target and the approved reference |
 | `cases` | list of `caseId` | every case of the flow | Which frozen cases to run; the default is every case `flow.md` declares, in its order |
 | `runId` | id | — | Not asked of a person: the orchestrator fills it, and it namespaces every record this run writes |
 | `lease` | token | — | Not asked of a person: the orchestrator fills it, granting the exclusive lease on the flow directory before the branch starts |
+| `access` | enum:authenticated,anonymous | authenticated | Access frozen by the plan; anonymous uses a fresh unauthenticated browser and no credential. |
+| `fixtures` | enum:seeded,none | seeded | Fixture prerequisites frozen by the plan; none carries no seed input or database cleanup. |
+| `sourceRoles` | enum:full,frontend | full | Source dependencies exercised by the journey; frontend pins only frontend delivery. |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate, the resume, the exclusive lease and the run's authority | `approval`, `lease`, `resume` | `request/request.json`, @worktrees/uat/<flow>/<case> for `latest` and the prior run record, @workspaces/be at the pinned commit, the environment's declaration when `approval` references it, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
+| 1 | Validate the gate, the resume, the exclusive lease and the run's authority | `approval`, `lease`, `resume`, `access`, `fixtures`, `sourceRoles` | `request/request.json`, @worktrees/uat/<flow>/<case> for `latest` and the prior run record, @workspaces/fe and, for full sourceRoles, @workspaces/be at the pinned commit, the environment's declaration when `approval` references it, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS`, `AUTHORITY_DRIFT` |
 | 2 | Confirm the clean surface and green quality admissions at the frontend head, preserving the backend head separately | — | input `frontend-surface-audit`, input `quality-verification` | — | `ADMISSION_MISSING` |
 | 3 | Validate the runtime, real product login proof and `seed-receipt` for the exact environment, actor aliases, namespace and FE/BE revisions; hand every missing or invalid prerequisite to its owner before browser action | `env` | @workspaces/device-state for the credential named by `accounts.<env>.json`, @worktrees/sessions/central-runtime for the entry of the bound route, its generation and origins, input `uat-account` when the identity was provisioned, @tools/secrets, @tools/http | — | `PROVISIONING_UNAVAILABLE`, `IDENTITY_MISSING` |
 | 4 | Freeze the already planned machine case sheet, account refs, seed receipt, endpoint, revisions and expected assertions; this verifier neither drafts canonical flow data nor changes expected | `feature`, `flow`, `env`, `cases` | @worktrees/uat/<flow>/<case>, @worktrees/_templates for the flow template | @worktrees/uat/<flow>/<case> (snapshot), `response/data/snapshot.json`, @tools/sourcewrite | `CANONICAL_WRITE_DENIED` |
@@ -293,9 +299,9 @@ whose failures the ledger does not hold.
 | `screenshot` | `response/artifacts/<case>.png` | artifact | yes |
 | `sheet` | `response/artifacts/sheet.png` | artifact | yes |
 
-## The best outcome
+## Operator Result
 
-On `done`, show the complete case result summary as **The best outcome**, choosing a readable result table, `response/artifacts/sheet.png`, or the case screenshot that best explains the significant finding. Include the verdict rows and links to all case evidence; display selected images visibly. A completed verification may contain failing verdicts, which must be prominent rather than hidden behind a passing capture. Failed and incomplete attempts show their actual captured state and missing assertions and never reuse a prior pass image as the current result.
+On `done`, show the complete case result summary as **Operator Result**, choosing a readable result table, `response/artifacts/sheet.png`, or the case screenshot that best explains the significant finding. Include the verdict rows and links to all case evidence; display selected images visibly. A completed verification may contain failing verdicts, which must be prominent rather than hidden behind a passing capture. Failed and incomplete attempts show their actual captured state and missing assertions and never reuse a prior pass image as the current result.
 
 ## Stops
 
@@ -321,8 +327,8 @@ On `done`, show the complete case result summary as **The best outcome**, choosi
 | all three lanes pass | `git.publish` |
 | all three lanes pass and the promise must be reconciled against the journey that was actually walked | `business.reconcile` |
 | the walk passed and another routed checkout of the mission still awaits its gates | `quality.verify` |
-| the UI lane fails on an application-owned node | `interface.generate` |
-| the behaviour lane fails | `backend.generate` |
+| the UI lane fails on an application-owned node or a frontend-only behaviour assertion fails | `interface.generate` |
+| the behaviour lane fails in a journey that exercises backend source | `backend.generate` |
 | the flow has no dedicated account yet, so the identity is provisioned before the run continues | `identity.provision` |
 | the flow or machine case sheet is missing or invalid | `uat.plan` |
 | the seed plan or receipt is missing or invalid | `data.plan` |

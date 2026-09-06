@@ -210,7 +210,7 @@ một `budget-choice` có kiểu — thu hẹp, tiếp tục, dừng — đượ
 nới trần có ghi nhận. Trí nhớ của chính orchestrator là `state.json.brief` — đã chứng minh gì, đang
 kẹt ở đâu và chờ ai, tiếp theo là gì, task hay phiên anh em nào giữ head nào, và bản báo cáo cuối người đã
 nhận — viết lại sau mỗi chuyển bước và đọc lại sau mỗi lần nén ngữ cảnh; không file ghi chú nào bên
-cạnh được công nhận. `scripts/validate-session.mjs` kiểm cả sổ sau mỗi chuyển bước.
+cạnh được công nhận. `scripts/validate-session.mjs` kiểm cả sổ sau mỗi chuyển bước. Quyền không giới hạn lượt cùng operator được ghi một lần theo `resources/orchestrator.json#budget`; trần bước và các gate tiến triển, phạm vi, quyền sở hữu vẫn có hiệu lực.
 
 Trong một nhiệm vụ, mỗi nhánh gọi tên mục tiêu của nó trước khi chạy: `request.json.goal` trỏ về đúng
 một dòng `state.json.mission.doneWhen` mà `producedBy` là operator của nhánh, hoặc khai nhánh mà nó là
@@ -221,15 +221,7 @@ Biên nhận trả lời mục tiêu ấy: nhánh done phục vụ một dòng "
 output biên nhận đã khai và có trên đĩa, với ít nhất một cái đứng sau `achieved: true`. Chỉ goalCheck
 đã qua validator mới vào `brief.proven`, dưới dạng `doneWhen:<n> …`; ba nhánh done liên tiếp không
 thêm bằng chứng cho dòng "xong khi" nào thì chuỗi dừng và hỏi người, không bao giờ điều phối nhánh
-thứ tư (`scripts/validate-session.mjs`). Sau mỗi chuyển bước orchestrator in vào chat gốc đúng hai
-dòng mà `resources/interaction.json#transitionLog` khai — mục tiêu của nhánh, rồi kết quả kèm số dòng
-"xong khi" đã có bằng chứng, đường dẫn artifact và ô kế tiếp. Với v2.2 done đã nghiệm thu, chạy thêm
-`scripts/render-outcome.mjs <branch>` và hiện Markdown/media **The best outcome** ngay trong chat:
-hình render của UI được chọn phải được nhúng thành ảnh, còn operator khác hiện source/diff, sơ đồ,
-bảng, tài liệu hoặc kết quả đo dễ xem. `response.json.outcome` và `resources/outcomes.json` xác định
-phần cần hiển thị. Chỉ sau bản ghi hai dòng và khối outcome bắt buộc mới ghi `logged: true`; bằng
-chứng đầy đủ vẫn ở thư mục session. Attempt lỗi hoặc chưa hoàn tất hiện đúng trạng thái cùng bước
-sửa tiếp, không được mang lời khẳng định best outcome đã thành công.
+thứ tư (`scripts/validate-session.mjs`). Sau mỗi chuyển bước giữ bản ghi máy nội bộ và hiện kết quả theo `resources/interaction.json#outcomePresentation`. Với receipt done đã nghiệm thu, chạy `scripts/render-outcome.mjs <branch>` và hiển thị Markdown/media **Operator Result**. Không in trùng hai dòng máy dày vào chat. Chính sách hiển thị sở hữu thứ tự bảng, ảnh và chi tiết; chỉ ghi `logged: true` khi khối kết quả đã hiện và bản ghi được giữ. Bằng chứng đầy đủ ở thư mục session; attempt chưa đạt hoặc chưa hoàn tất giữ đúng trạng thái và bước tiếp.
 
 Một luật người nêu bằng lời của họ được nói lại cho họ trước khi thiết kế bất cứ gì trên đó:
 `business.decide` và `architecture.decide` viết một `restatement` tối đa năm dòng bằng ngôn ngữ của

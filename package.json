@@ -1,6 +1,6 @@
 {
   "name": "@starci/skills",
-  "version": "2.3.3",
+  "version": "2.4.0",
   "description": "StarCi Skills: one entry, bounded operators, a closed routing map and a tool registry, installed as the .claude runtime of a repository for Claude Code and Codex.",
   "license": "MIT",
   "type": "module",
@@ -33,7 +33,10 @@
     "workflows/",
     "README.md",
     "README.vi.md",
-    "tests/evidence/20260906-goal-impact-workflow-owner.md"
+    "tests/evidence/20260906-goal-impact-workflow-owner.md",
+    "skills/starci-lite/",
+    "tests/evidence/20260906-current-public-workflows.md",
+    "tests/evidence/20260906-starci-lite-profile.md"
   ],
   "repository": {
     "type": "git",

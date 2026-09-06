@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { openSession, confirmSession, discoveryFor, answerFor } from './v23-test-fixture.mjs';
+import { openSession, confirmSession, discoveryFor, answerFor, cleanupFixtureOwners } from './v23-test-fixture.mjs';
 import { openAttempt } from './attempt-gate.mjs';
 import { acquireWorkerSlot, releaseWorkerSlot } from './worker-slots.mjs';
 import { buildEvidenceManifest } from './evidence-manifest.mjs';
@@ -19,7 +19,6 @@ import { playwrightInstallOf } from './browser-walk.mjs';
 import { workflowPeerSnapshotErrors, buildWorkflowVerification, workflowReportErrors, WORKFLOW_PEERS, WORKFLOW_REPORT } from './workflow-verification.mjs';
 import { validateWorkflowStep } from '../operators/workflow-verify/validate.mjs';
 import { validateStep } from './validate-step.mjs';
-import { migrateSession, verifyMigration, prepareScopeUpgrade, upgradeScope } from './session-migrate.mjs';
 import { mutateSession } from './session-lock.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -111,41 +110,8 @@ async function fixture(run) {
     await openAttempt(parent.branch);
     parent.state = read(parent.stateFile);
     await run({ host, root, children, parent, snapshot, doneWhen, finish });
-  } finally { rmSync(host, { recursive: true, force: true }); }
+  } finally { cleanupFixtureOwners(host); rmSync(host, { recursive: true, force: true }); }
 }
-
-test('a validator-accepted legacy receipt replays byte-identically after project ownership migration', async () => fixture(async ({ host, root, children }) => {
-  const child = children[0];
-  const before = await validateStep(root, child.branch, { operator: true, requestPhase: 'accept' });
-  assert.deepEqual(before.errors, []);
-  const original = read(child.stateFile); const owner = original.workflowOwner; const legacy = structuredClone(original);
-  delete legacy.runtimeRevision; delete legacy.workflowOwner; delete legacy.mission.discovery; delete legacy.mission.confirmation.scopeHash; delete legacy.mission.confirmation.authority;
-  put(child.stateFile, legacy);
-  const requestBytes = readFileSync(path.join(child.branch, 'request/request.json')); const responseBytes = readFileSync(path.join(child.branch, 'response/response.json'));
-  const destination = path.join(host, 'project evidence'); mkdirSync(destination);
-  const routeFile = path.join(owner.sourceRoot, owner.routeRef); const route = read(routeFile); route.repository.diskPath = destination; put(routeFile, route);
-  const migrated = await migrateSession(child.session, { sourceRoot: owner.sourceRoot });
-  const branch = path.join(migrated.session, 'step-1/parallel-1');
-  assert.deepEqual(readFileSync(path.join(branch, 'request/request.json')), requestBytes);
-  assert.deepEqual(readFileSync(path.join(branch, 'response/response.json')), responseBytes);
-  assert.deepEqual(await verifyMigration(migrated.session), []);
-  assert.deepEqual((await validateStep(root, branch, { operator: true, requestPhase: 'accept' })).errors, []);
-  await mutateSession(migrated.session, state => { state.brief.next = 'Review upgraded discovery before any new attempt.'; });
-  await assert.rejects(() => openAttempt(branch), /GOAL_UNRESOLVED|mission.discovery/);
-  const git = (...args) => execFileSync('git', ['-C', destination, ...args], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  git('init'); git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-m', 'Relocated owner');
-  const discovery = discoveryFor(legacy.project, { tags: ['feature', 'backend'], head: git('rev-parse', 'HEAD') });
-  const preview = prepareScopeUpgrade(read(path.join(migrated.session, 'state.json')), discovery);
-  const authority = answerFor(preview);
-  await upgradeScope(migrated.session, { discovery, authority });
-  const upgraded = read(path.join(migrated.session, 'state.json'));
-  assert.equal(upgraded.mission.version, legacy.mission.version + 1);
-  assert.ok(upgraded.mission.doneWhen.length > legacy.mission.doneWhen.length);
-  assert.deepEqual(upgraded.choices[legacy.mission.confirmation.decisionId], legacy.choices[legacy.mission.confirmation.decisionId]);
-  assert.deepEqual((await validateStep(root, branch, { operator: true, requestPhase: 'accept' })).errors, []);
-  assert.deepEqual(await verifyMigration(migrated.session), []);
-  await assert.rejects(() => upgradeScope(migrated.session, { discovery, authority }), /GOAL_FROZEN/);
-}));
 
 test('ordinary-message coordination closes only with a verified local receipt, without imports', async () => fixture(async ({ root, parent, children, finish }) => {
   const built = await buildWorkflowVerification(root, parent.branch, parent.request, parent.state);

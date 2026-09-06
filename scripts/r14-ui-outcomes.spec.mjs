@@ -8,7 +8,7 @@ import { checkDocument, loadKindTemplates, loadTemplates } from './validate-temp
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const uiOperators = ['interface-plan', 'interface-generate', 'interface-fix', 'interface-audit', 'library-update', 'knowledge-repair'];
 
-test('all UI-owned operator mirrors declare their reviewable best outcome', async () => {
+test('all UI-owned operator mirrors declare their reviewable Operator Result', async () => {
   const contract = (await loadTemplates(root)).find((candidate) => candidate.kind === 'operator');
   for (const id of uiOperators) {
     for (const [name, lang] of [['operator.md', 'en'], ['operator.vi.md', 'vi']]) {

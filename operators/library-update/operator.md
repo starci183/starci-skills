@@ -219,7 +219,7 @@ mode's answer and not a column's: `validate.mjs` requires the package set under 
 the consumer set under `full` and `consume`, and refuses the other half's set as a section that
 branch had no authority to write.
 
-## The best outcome
+## Operator Result
 
 For a successful run, `outcome.primary` chooses the declared link, code, document or table that most
 directly proves the requested half: package change/release proof for `publish`, consumer dependency

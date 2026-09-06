@@ -50,13 +50,6 @@ test('required inputs and context roles are walked back to their producers; an e
   assert.match(p.reasons['4/1'], /produces frontend-surface-audit, which uat.verify requires/);
   assert.deepEqual(accepted(p, mission), []);
 });
-test('a chain that owns runtime.serve can bootstrap an absent runtime after preflight and binding', () => {
-  const mission = fakeMission([line('interface.generate'), line('runtime.serve')]);
-  const p = planChain({ packages, mission, options: { graph, roles: ['fe'] } });
-  assert.deepEqual(ops(p), [['environment.preflight'], ['workspace.bind#fe'], ['interface.generate'], ['runtime.serve']]);
-  assert.deepEqual(p.presets['1/1'], { roles: ['fe'], runtimeRoles: [] });
-  assert.deepEqual(accepted(p, mission), []);
-});
 test('more than one done-when line for an operator with a plan: the plan runs first, the execute branch fans out by units and stands alone in its step', () => {
   const one = plan([line('interface.generate')]);
   assert.ok(!ops(one).flat().includes('interface.plan'), 'one unit needs no map');
@@ -164,7 +157,7 @@ test('the preview prints two lines per branch and the end', () => {
   assert.doesNotMatch(text, /isolationId=[^/ ]+/, 'a preview never invents an isolation id before request binding');
 });
 
-test('v2.2 session planning refuses drafts and accepts only the matching confirmed user choice; legacy planning remains readable', async () => {
+test('current session planning requires confirmed scope and refuses obsolete or unmarked execution', async () => {
   const session = await mkdtemp(path.join(os.tmpdir(), 'starci-plan-session-'));
   const mission = fakeMission([line('content.generate')], { target: 'fixture', outputs: ['content-generation-receipt'], verification: 'the receipt is checked' });
   const decisionId = 'goal:plan-session:v1';
@@ -182,16 +175,16 @@ test('v2.2 session planning refuses drafts and accepts only the matching confirm
     await assert.rejects(planSession(root, session), (error) => error instanceof PlanError && /matching explicit user as-stated choice/.test(error.message));
 
     state.choices[decisionId] = { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:confirm' };
-    assert.match(planningStateErrors(state).join('\n'), /WORKFLOW_UPGRADE_REQUIRED/);
+    assert.match(planningStateErrors(state).join('\n'), /WORKFLOW_RESET_REQUIRED/);
     await writeFile(path.join(session, 'state.json'), `${JSON.stringify(state)}\n`);
-    await assert.rejects(planSession(root, session), /WORKFLOW_UPGRADE_REQUIRED/);
+    await assert.rejects(planSession(root, session), /WORKFLOW_RESET_REQUIRED/);
 
     delete state.contractVersion;
     delete state.lifecycle;
     delete state.mission.confirmation;
     delete state.choices;
     await writeFile(path.join(session, 'state.json'), `${JSON.stringify(state)}\n`);
-    assert.deepEqual(Object.values((await planSession(root, session)).plan.steps), ['content.generate']);
+    await assert.rejects(planSession(root, session), /WORKFLOW_RESET_REQUIRED/);
   } finally { await rm(session, { recursive: true, force: true }); }
 });
 

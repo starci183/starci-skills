@@ -23,7 +23,7 @@ const unitsDoc = (units = UNITS, producedBy = OPERATOR) => ({ schemaVersion: 9, 
 const caseSheetDoc = (units = UNITS, rows = ROWS) => ({
   contractVersion: 'starci/v2.2', feature: FEATURE, env: 'dev', planVersion: 'uat-plan/1',
   flows: units.map((u) => ({
-    flowId: u.id, state: 'missing', action: 'create', entry: rows[u.id].entry.replaceAll('`', ''),
+    access:'authenticated',fixtures:'seeded',sourceRoles:'full',flowId: u.id, state: 'missing', action: 'create', entry: rows[u.id].entry.replaceAll('`', ''),
     actorAliases: [rows[u.id].alias], namespace: rows[u.id].namespace,
   })),
   cases: units.map((u, i) => ({
@@ -137,7 +137,7 @@ await expectError({ ...lawful(), 'response/response.json': responseJson({ next: 
 
 await expectError({ ...lawful(), 'response/data/cases.json': { ...caseSheetDoc(), flows: caseSheetDoc().flows.map((f, i) => i ? f : { ...f, state: 'valid', action: 'create' }) } }, 'expected "reuse"', 'a valid flow classified for creation');
 await expectError({ ...lawful(), 'response/data/cases.json': { ...caseSheetDoc(), cases: caseSheetDoc().cases.map((c, i) => i ? c : { ...c, actor: 'another-actor' }) } }, 'absent from flow', 'a case assigned to an undeclared actor');
-await expectError({ ...lawful(), 'response/data/cases.json': { ...caseSheetDoc(), cases: caseSheetDoc().cases.map((c, i) => i ? c : { ...c, fixture: { ...c.fixture, createsAssertedOutcome: true } }) } }, 'expected false', 'a fixture that creates the asserted outcome');
+await expectError({ ...lawful(), 'response/data/cases.json': { ...caseSheetDoc(), cases: caseSheetDoc().cases.map((c, i) => i ? c : { ...c, fixture: { ...c.fixture, createsAssertedOutcome: true } }) } }, 'fixture creates the outcome', 'a fixture that creates the asserted outcome');
 
 // Tiering: a journey the mission does not walk is planned secondary with its reason, and the plan says so.
 const DEFERRED = { id: 'archive-item', kind: 'flow', goal: 'a viewer archives an item and it leaves the list', inputs: [], dependsOn: [], tier: 'secondary', deferral: { reason: 'no done-when line walks the archive' } };
@@ -158,3 +158,15 @@ await expectValid(lawful(), 'a plan that covers its open walk entry by tiering t
 await expectError(lawful(), 'carries an open walk entry on unit archive-item', 'a plan that drops an open walk entry from its list', { unchecked: [openLine('archive-item', 'no done-when line walks the archive')] });
 
 process.stdout.write('uat.plan self-test: one lawful plan, one tiered plan, two lawful stops and every mutation refused\n');
+
+const publicPlan=lawful();
+const publicModes={access:'anonymous',fixtures:'none',sourceRoles:'frontend'};
+Object.assign(publicPlan['request/request.json'].requirements,publicModes);
+for(const flow of publicPlan['response/data/cases.json'].flows)Object.assign(flow,publicModes,{actorAliases:[],namespace:null});
+for(const c of publicPlan['response/data/cases.json'].cases)Object.assign(c,{actor:'anonymous',fixture:null,cleanup:'none'});
+publicPlan['response/response.md']=publicPlan['response/response.md'].replace(/`viewer-(?:open|remove)`/g,'—').replace(/`uat-(?:open|remove)-item`/g,'—');
+await expectValid(publicPlan,'multiple public anonymous journeys need no invented account alias or seed namespace');
+const wrongMode=structuredClone(publicPlan);wrongMode['response/data/cases.json'].flows[0].access='authenticated';
+await expectError(wrongMode,'differs from the frozen','public plan cannot change access after request');
+const hiddenFixture=structuredClone(publicPlan);hiddenFixture['response/data/cases.json'].cases[0].fixture=caseSheetDoc().cases[0].fixture;
+await expectError(hiddenFixture,'fixture differs','no-fixture plan cannot conceal seed rows');

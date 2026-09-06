@@ -60,9 +60,10 @@ const accountInput = (env = ENV) => ({
   }])),
   plaintextRecorded: false,
 });
+const currentModes={access:'authenticated',fixtures:'seeded',sourceRoles:'full'};
 const caseSheetInput = (env = ENV) => ({
   contractVersion: 'starci/v2.2', feature: FEATURE, env, planVersion: 'uat-plan/1',
-  flows: [{ flowId: FLOW, state: 'valid', action: 'reuse', entry: '/enroll', actorAliases: ['learner'], namespace: NS }],
+  flows: [{ ...currentModes, flowId: FLOW, state: 'valid', action: 'reuse', entry: '/enroll', actorAliases: ['learner'], namespace: NS }],
   cases: CASES.map((caseId, i) => ({
     caseId, flowId: FLOW, order: i + 1, actor: 'learner',
     preconditions: ['the account and namespaced seed are ready'], inputs: ['representative enrollment'],
@@ -90,12 +91,12 @@ const isolation = (over = {}) => ({
 
 function snapshot(over = {}) {
   return {
-    runId: RUN, approval: APPROVAL, feature: FEATURE, flow: FLOW, env: ENV, commit: COMMIT, frozenAt: T(10),
+    ...currentModes, provenance:{fe:COMMIT,be:COMMIT}, runId: RUN, approval: APPROVAL, feature: FEATURE, flow: FLOW, env: ENV, commit: COMMIT, frozenAt: T(10),
     flowRoot: 'PATCHED-BY-WRITE-BRANCH', snapshotRef: SNAPSHOT_REF, snapshotFingerprint: FP(3),
     lease: { leaseRef: `uat-lease://s-test/${FLOW}`, exclusive: true, expiresAt: T(180) },
     admission: [
-      { kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT },
-      { kind: 'quality-verification', ref: QUALITY_IN, commit: COMMIT },
+      { kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT, role:'fe' },
+      { kind: 'quality-verification', ref: QUALITY_IN, commit: COMMIT, role:'fe' },
     ],
     accounts: [account()],
     flowSource: 'planned',
@@ -152,7 +153,7 @@ const lanes = (over = {}) => ['behavior', 'ux', 'ui'].map((l) => lane(l, over[l]
 
 function verdicts(over = {}) {
   return {
-    runId: RUN, commit: COMMIT, resultRef: `${DIR}/runs/${RUN}/result.json`, latestRef: `${DIR}/latest.json`, historyRef: `${DIR}/history.md`,
+    ...currentModes, provenance:{fe:COMMIT,be:COMMIT}, runId: RUN, commit: COMMIT, resultRef: `${DIR}/runs/${RUN}/result.json`, latestRef: `${DIR}/latest.json`, historyRef: `${DIR}/history.md`,
     lanes: lanes(), experience: experience(), cleanup: { performed: false, owner: 'data.seed', seedReceiptRef: SEED_IN, isUat: true, namespace: NS, runRecordsDeleted: false },
     ...over,
   };
@@ -177,16 +178,16 @@ ${snap.admission.map((a) => `| \`${a.kind}\` | \`${a.ref}\` | \`${a.commit}\` |`
 | Field | Value |
 | --- | --- |
 | Run | \`${snap.runId}\` |
-| Approval | ${snap.approval} |
+| Approval | ${snap.approval ?? '—'} |
 | Feature | \`${snap.feature}\` |
 | Flow | \`${snap.flow}\` |
 | Commit | \`${snap.commit}\` |
-${snap.provenance ? `| Frontend commit | ${snap.provenance.fe} |\n| Backend commit | ${snap.provenance.be} |\n` : ''}\
+${snap.provenance ? `| Frontend commit | ${snap.provenance.fe} |\n| Backend commit | ${snap.provenance.be ?? '—'} |\n` : ''}\
 | Snapshot | \`${snap.snapshotRef}\` |
 | Namespace | \`${snap.fixtureNamespace}\` |
-| Accounts | ${snap.accounts.map((a) => BT + a.alias + BT).join(', ')} |
+| Accounts | ${(snap.accounts.length ? snap.accounts.map((a) => BT + a.alias + BT).join(', ') : '—')} |
 | Environment | ${snap.env} |
-| Credential | \`${snap.accounts[0].credentialRef}\`, resolved by name at login only |
+| Credential | \`${(snap.accounts[0]?.credentialRef ?? 'none')}\`, resolved by name at login only |
 | Flow source | ${snap.flowSource} |
 | Golden | ${snap.golden.state}, awaiting a person's approval |
 | Run record | \`${verd.resultRef}\` |
@@ -239,7 +240,7 @@ ${printed.join('\n')}
 
 const requestJson = ({ extra = {}, inputs, cases = [...CASES] } = {}) => ({
   schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, sessionId: 's-test',
-  contexts: [{ alias: '@workspaces/be', head: COMMIT }, { alias: '@worktrees/uat/enrollment/paid-enrollment', head: null }],
+  contexts: [{alias:'@workspaces/fe',head:COMMIT}, { alias: '@workspaces/be', head: COMMIT }, { alias: '@worktrees/uat/enrollment/paid-enrollment', head: null }],
   requirements: { approval: APPROVAL, feature: FEATURE, flow: FLOW, env: ENV, cases, runId: RUN, lease: `uat-lease://s-test/${FLOW}`, resume: null, ...extra },
   inputs: inputs ?? { 'frontend-surface-audit': AUDIT_IN, 'quality-verification': QUALITY_IN, route: ROUTE_IN, 'uat-account': ACCOUNT_IN, 'uat-plan': UAT_PLAN_IN, 'uat-case-sheet': CASE_SHEET_IN, 'seed-receipt': SEED_IN },
   resume: null,
@@ -309,7 +310,7 @@ function writeBranch(files, history = 'match') {
       mkdirSync(runDir, { recursive: true });
       const recorded = history === 'rewritten'
         ? { runId: verd.runId, commit: OTHER_COMMIT, lanes: verd.lanes }
-        : { runId: verd.runId, commit: verd.commit, lanes: verd.lanes, ...(verd.provenance?{provenance:verd.provenance}:{}) };
+        : { access: verd.access, fixtures: verd.fixtures, sourceRoles: verd.sourceRoles, runId: verd.runId, commit: verd.commit, lanes: verd.lanes, ...(verd.provenance?{provenance:verd.provenance}:{}) };
       writeFileSync(path.join(runDir, 'result.json'), JSON.stringify(recorded, null, 2));
     }
     writeFileSync(path.join(flowRoot, 'latest.json'), JSON.stringify({ runId: history === 'stale-latest' ? '20260109-000000-1111111' : RUN }, null, 2));
@@ -376,12 +377,12 @@ const splitRole = () => {
   return files;
 };
 await expectValid(splitRole(),'different FE/BE repositories retain their own heads and FE admissions');
-const omittedFrontend=baseline();omittedFrontend['../../step-1/parallel-2/response/data/route.json']={role:'fe',sourceHead:OTHER_COMMIT};
+const omittedFrontend=baseline();omittedFrontend['request/request.json'].contexts=omittedFrontend['request/request.json'].contexts.filter(c=>c.alias!=='@workspaces/fe');omittedFrontend['../../step-1/parallel-2/response/data/route.json']={role:'fe',sourceHead:OTHER_COMMIT};
 await expectError(omittedFrontend,'requires an explicit frontend context','omitting FE context cannot conceal a distinct frontend route head');
-const omittedAdmission=baseline();omittedAdmission['../../step-2/parallel-1/request/request.json']={operatorId:'quality.verify',contexts:[{alias:'@workspaces/fe',head:OTHER_COMMIT}]};
+const omittedAdmission=baseline();omittedAdmission['request/request.json'].contexts=omittedAdmission['request/request.json'].contexts.filter(c=>c.alias!=='@workspaces/fe');omittedAdmission['../../step-2/parallel-1/request/request.json']={operatorId:'quality.verify',contexts:[{alias:'@workspaces/fe',head:OTHER_COMMIT}]};
 await expectError(omittedAdmission,'requires an explicit frontend context','omitting FE context cannot conceal a distinct actual admission head');
-const sameRepositoryLegacy=baseline();sameRepositoryLegacy['../../step-1/parallel-2/response/data/route.json']={role:'fe',sourceHead:COMMIT};
-await expectValid(sameRepositoryLegacy,'legacy shared-commit frontend/backend remains valid');
+const sameRepositoryCurrent=baseline();sameRepositoryCurrent['../../step-1/parallel-2/response/data/route.json']={role:'fe',sourceHead:COMMIT};
+await expectValid(sameRepositoryCurrent,'current shared-repository frontend/backend preserves both roles');
 for(const [mutate,needle,label]of [
   [f=>{delete f['response/data/snapshot.json'].provenance;},'role provenance differs','missing explicit role provenance'],
   [f=>{f['response/data/snapshot.json'].provenance={fe:OTHER_COMMIT,be:COMMIT};},'role provenance differs','swapped snapshot role heads'],
@@ -402,14 +403,14 @@ await expectValid({ 'request/request.json': requestJson(), 'response/response.js
 await expectError({ ...baseline(), 'response/response.json': { ...responseJson(), stop: 'LEASE_INVALID' } }, 'only a blocked response carries a stop', 'a done branch carrying a stop');
 await expectValid({ ...blocked(), 'response/response.json': { schemaVersion: 9, operatorId: 'uat.verify', step: 3, parallel: 1, status: 'blocked', stop: 'RUNTIME_UNAVAILABLE', fallbacks: [], fields: {}, commits: [], next: [] } }, 'blocked on the shared RUNTIME_UNAVAILABLE code');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { password: 'x' } }) }, 'requirements.password is not a field', 'a credential has nowhere to go in a request');
-await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { approval: '' } }) }, 'required field approval has no value', 'a run with no authority behind it');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { approval: '' } }) }, 'approval has no default', 'a run with no authority behind it');
 await expectError({ ...baseline(), 'request/request.json': requestJson({ inputs: { 'frontend-surface-audit': AUDIT_IN, route: ROUTE_IN } }) }, 'required input quality-verification is absent', 'a run admitted by one receipt only');
 
 // Admission at the pinned commit.
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ admission: [{ kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT }, { kind: 'quality-verification', ref: QUALITY_IN, commit: OTHER_COMMIT }] }) }, 'ADMISSION_MISSING — quality-verification was taken at', 'an admission from another commit');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ admission: [{ kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT }, { kind: 'frontend-surface-audit', ref: AUDIT_IN, commit: COMMIT }] }) }, 'ADMISSION_MISSING — quality-verification is absent', 'a missing admission');
 await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ admission: [{ kind: 'frontend-surface-audit', ref: 'step-9/parallel-1/response/response.md', commit: COMMIT }, { kind: 'quality-verification', ref: QUALITY_IN, commit: COMMIT }] }) }, 'but the request handed in', 'an admission the request never handed in');
-await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ commit: OTHER_COMMIT }) }, 'but the request pinned @workspaces/be at', 'a snapshot frozen at another commit');
+await expectError({ ...baseline(), 'response/data/snapshot.json': snapshot({ commit: OTHER_COMMIT }) }, 'but the request pinned @workspaces/fe at', 'a snapshot frozen at another commit');
 await expectError({ ...baseline(), 'response/data/verdicts.json': verdicts({ commit: OTHER_COMMIT }) }, 'is not the pinned head', 'a result carrying another commit');
 
 // Three lanes, judged apart.
@@ -658,3 +659,45 @@ await expectError(playwrightFiles({ captures: { [CASES[1]]: capture(CASES[1]) } 
 }
 
 process.stdout.write('uat.verify self-test: admission, scope, walk and mutation checks passed\n');
+
+const publicModes = {access:'anonymous',fixtures:'none',sourceRoles:'frontend'};
+function publicFiles() {
+  const files=splitRole(),req=files['request/request.json'];
+  Object.assign(req.requirements,publicModes,{approval:null});
+  req.contexts=req.contexts.filter(c=>c.alias!=='@workspaces/be');
+  delete req.inputs['uat-account'];delete req.inputs['seed-receipt'];
+  const snap=files['response/data/snapshot.json'];
+  Object.assign(snap,publicModes,{approval:null,accounts:[],seed:null,provenance:{fe:COMMIT},isolation:{...snap.isolation,seededIds:[],rollbackIds:[]}});
+  snap.cases=snap.cases.map(c=>({...c,as:'anonymous'}));
+  const verd=files['response/data/verdicts.json'];
+  Object.assign(verd,publicModes,{provenance:{fe:COMMIT},cleanup:{...verd.cleanup,owner:null,seedReceiptRef:null}});
+  files['response/response.json'].next=['git.publish','user'];
+  files['response/response.md']=responseMd({snap,verd});
+  const sheet=caseSheetInput();
+  sheet.flows=sheet.flows.map(flow=>({...flow,...publicModes,actorAliases:[],namespace:null}));
+  sheet.cases=sheet.cases.map(c=>({...c,actor:'anonymous',fixture:null,cleanup:'none'}));
+  files['../../'+CASE_SHEET_IN]=sheet;
+  const w=walkDoc();w.account=null;w.steps=w.steps.filter(s=>!['user','pass','sign-in','landed'].includes(s.id));
+  const driven=playwrightFiles({w});
+  for(const key of [WALK_REF,RESULT_REF,...CASES.map(c=>'response/data/captures/'+c+'.json')])files[key]=driven[key];
+  Object.assign(files['response/response.json'].fields,{'uat-walk':WALK_REF,'walk-result':RESULT_REF});
+  return files;
+}
+await expectValid(publicFiles(),'anonymous public frontend UAT retains captures, both admissions, all lanes and append-only evidence without fake account or seed');
+for (const [change,needle] of [
+ [f=>{f['request/request.json'].requirements.access='unknown';},'must be one of'],
+ [f=>{f['../../'+CASE_SHEET_IN].flows[0].access='authenticated';},'differs from the frozen'],
+ [f=>{f['request/request.json'].inputs['uat-account']=ACCOUNT_IN;},'accepts no account'],
+ [f=>{f['request/request.json'].inputs['seed-receipt']=SEED_IN;},'accepts no seed receipt'],
+ [f=>{f['response/data/snapshot.json'].accounts=[account()];},'array is too long'],
+ [f=>{f['response/data/snapshot.json'].isolation.seededIds=['uat-unowned'];},'array is too long'],
+ [f=>{f['response/data/verdicts.json'].cleanup.owner='data.seed';},'no cleanup owner'],
+ [f=>{f['response/data/snapshot.json'].provenance.fe=OTHER_COMMIT;},'role provenance differs'],
+ [f=>{delete f['response/response.json'].fields.screenshot;},'has no screenshot registered'],
+ [f=>{f['response/data/verdicts.json'].lanes.pop();},'lane is missing'],
+]) {const files=publicFiles();change(files);await expectError(files,needle,'public mode refuses '+needle);}
+const publicDriven=publicFiles(),publicWalk=walkDoc();publicWalk.account=null;publicWalk.steps=publicWalk.steps.filter(s=>!['user','pass','sign-in','landed'].includes(s.id));
+const driven=playwrightFiles({w:publicWalk});
+for(const key of [WALK_REF,RESULT_REF,...CASES.map(c=>'response/data/captures/'+c+'.json')])publicDriven[key]=driven[key];
+Object.assign(publicDriven['response/response.json'].fields,{'uat-walk':WALK_REF,'walk-result':RESULT_REF});
+await expectValid(publicDriven,'anonymous declarative browser walk uses null account and preserves runner evidence');

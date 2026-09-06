@@ -10,7 +10,7 @@ Primary output: `business-reconciliation`
 
 ## Inputs
 
-`backend-source-application`, `quality-verification`?, `uat-flow-verification`?, `api-verification`?
+`backend-source-application`[when sourceRole=be], `frontend-source-application`[when sourceRole=fe], `quality-verification`?, `uat-flow-verification`?, `api-verification`?
 
 ## Outputs
 

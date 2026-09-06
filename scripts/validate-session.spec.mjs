@@ -1,5 +1,6 @@
+import { validateAgainst } from './json-schema.mjs';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -325,4 +326,33 @@ test('the scope line counts every plan the mission landed, not the newest one', 
   assert.equal(early.length, 1);
   assert.ok(early[0].includes('no plan of this session has landed a units.json'));
   assert.deepEqual(await scopeErrors([surfacePlan], null), [], 'before the block carries a scope there is nothing to check');
+});
+
+
+test('explicit unlimited same-operator authority applies to request and session gates without removing finite steps', async () => {
+  const extension = { decisionId: 'budget:repeat', maxSteps: 24, maxSameOperator: null };
+  const choices = { ...confirmed(), 'budget:repeat': { selected: 'continue', selectedBy: 'user', sourceRef: 'user-message:unlimited-same-operator' } };
+  const state = { budget: { maxSteps: 24, maxSameOperator: 4, extensions: [extension] }, choices, steps: Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`${i + 1}/1`, 'backend.generate'])) };
+  assert.equal(effectiveBudget(state).maxSameOperator, null);
+  assert.deepEqual(sessionBudgetErrors(state, { step: 21, operatorId: 'backend.generate' }), []);
+  assert.ok(sessionBudgetErrors(state, { step: 25, operatorId: 'backend.generate' }).some(e => e.includes('maxSteps')));
+  state.budget.extensions.push({ decisionId: 'budget:finite', maxSteps: 24, maxSameOperator: 8 });
+  state.choices['budget:finite'] = { selected: 'continue', selectedBy: 'user', sourceRef: 'user-message:finite' };
+  assert.equal(effectiveBudget(state).maxSameOperator, null, 'later finite extension does not revoke the standing unlimited grant');
+  const receipts = { '1/1': 'done', '2/1': 'done', '3/1': 'blocked', '4/1': 'blocked' };
+  assert.deepEqual(await run(session({ steps: backend, current: '5/1', receipts, requests: backendRequests, mission: backendMission(), extensions: [extension], choices })), []);
+  const ledger = Array.from({ length: 3 }, (_, i) => ({ branch: `${i+1}/1`, operator: 'backend.generate', doneWhen: 0, done: true, achieved: false }));
+  assert.equal(threeBranchStopErrors({ ...state, mission: mission() }, ledger).length, 1, 'unlimited count never suppresses missing goal progress');
+});
+
+test('unlimited same-operator needs the actual user choice and remains an extension-only schema value', () => {
+  const budgetSchema = JSON.parse(readFileSync(path.join(root, 'templates/step/state.schema.json'), 'utf8')).properties.budget;
+  const extension = { decisionId: 'budget:repeat', maxSteps: 24, maxSameOperator: null };
+  const b = { maxSteps: 24, maxSameOperator: 4, extensions: [extension] };
+  assert.deepEqual(validateAgainst(budgetSchema, b), []);
+  assert.ok(validateAgainst(budgetSchema, { ...b, maxSameOperator: null }).length);
+  assert.ok(validateAgainst(budgetSchema, { ...b, extensions: [{ ...extension, maxSteps: null }] }).length);
+  for (const choice of [undefined, { selected: 'continue' }, { selected: 'continue', selectedBy: 'assistant', sourceRef: 'assistant:guess' }, { selected: 'continue', selectedBy: 'user', sourceRef: ' ' }, { selected: 'narrow', selectedBy: 'user', sourceRef: 'user-message:narrow' }]) {
+    assert.equal(effectiveBudget({ budget: b, choices: { 'budget:repeat': choice } }).maxSameOperator, 4);
+  }
 });

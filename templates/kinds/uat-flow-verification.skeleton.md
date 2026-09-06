@@ -1,7 +1,7 @@
 # uat-flow-verification — enrollment/paid-enrollment
 
 One paragraph: what triggered this run, which flow it verified at which commit, what authorised its
-seeding and its sign-in, and what the three lanes independently concluded. Written by `uat.verify` as
+applicable seed and sign-in prerequisites, and what the three lanes independently concluded. Written by `uat.verify` as
 `response/response.md`. The shared UAT password never appears here, in a capture, in a run record or
 in a log: the credential is named, and the login field is masked in every screenshot.
 
@@ -26,7 +26,7 @@ in a log: the credential is named, and the login field is masked in every screen
 | Accounts | `learner` |
 | Environment | local |
 | Credential | `.stacks/local/secrets/uat.enc`, resolved by name at login only |
-| Flow source | drafted-from-template |
+| Flow source | planned |
 | Golden | candidate, awaiting a person's approval |
 | Run record | `.worktrees/uat/enrollment/paid-enrollment/runs/run-2026-01-10-1/result.json` |
 | Latest | `run-2026-01-10-1` |

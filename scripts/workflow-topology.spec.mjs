@@ -62,10 +62,10 @@ test('coordinated topology uses ordinary messages and requires peer heads only w
   assert.ok(malformedErrors.some((error) => error.includes('requires a recorded peer head')));
 });
 
-test('older v2.2 state is read-only until migration and malformed policy returns errors', () => {
+test('missing current topology refuses execution and malformed policy returns errors', () => {
   assert.deepEqual(sessionWorkflowTopologyErrors(policy, { workflow: null, brief: { peers: {} } }), []);
-  assert.ok(sessionWorkflowTopologyErrors(policy, { workflow: null, brief: { peers: {} } }, { dispatch: true }).some((error) => error.includes('reopen the host session to migrate')));
-  assert.ok(sessionWorkflowTopologyErrors(policy, { workflow: null, brief: { peers: {} } }, { terminal: true }).some((error) => error.includes('reopen the host session to migrate')));
+  assert.ok(sessionWorkflowTopologyErrors(policy, { workflow: null, brief: { peers: {} } }, { dispatch: true }).some((error) => error.includes('archive the old ledger')));
+  assert.ok(sessionWorkflowTopologyErrors(policy, { workflow: null, brief: { peers: {} } }, { terminal: true }).some((error) => error.includes('archive the old ledger')));
   assert.ok(sessionWorkflowTopologyErrors(policy, { topology: { mode: 'controller' }, brief: { peers: {} } }).some((error) => error.includes('not declared')));
   const mutated = structuredClone(policy);
   delete mutated.modes.coordinated.minimumPeers;

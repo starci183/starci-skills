@@ -22,7 +22,7 @@ const ops = packages.map((p) => {
     steps: op.tables.steps?.rows.length ?? 0,
     codes: (op.tables.stops?.rows ?? []).map((r) => cellCodes(r.code)[0] ?? r.code.trim()),
     context: [...reads].sort(),
-    inputs: (op.tables.inputs?.rows ?? []).map((r) => ({ kind: kindOf(r.kind), required: isYes(r.required) })).filter((i) => i.kind && i.kind !== '—'),
+    inputs: (op.tables.inputs?.rows ?? []).map((r) => ({ kind: kindOf(r.kind), required: isYes(r.required), condition: String(r.required).startsWith('when ') ? r.required : null })).filter((i) => i.kind && i.kind !== '—'),
     outputs: (op.tables.outputs?.rows ?? []).map((r) => ({ kind: kindOf(r.kind), file: r.file.replace(/`/g, ''), type: r.type.trim(), required: isYes(r.required) })),
   };
 });
@@ -31,7 +31,7 @@ const ops = packages.map((p) => {
 const producers = new Map();
 for (const op of ops) for (const o of op.outputs) producers.set(o.kind, [...(producers.get(o.kind) ?? []), op.id]);
 const consumers = new Map();
-for (const op of ops) for (const i of op.inputs) consumers.set(i.kind, [...(consumers.get(i.kind) ?? []), `${op.id}${i.required ? '' : ' (optional)'}`]);
+for (const op of ops) for (const i of op.inputs) consumers.set(i.kind, [...(consumers.get(i.kind) ?? []), `${op.id}${i.condition ? ' (' + i.condition + ')' : i.required ? '' : ' (optional)'}`]);
 
 const code = (s) => `\`${s}\``;
 const list = (arr) => (arr.length ? arr.map(code).join(', ') : '—');

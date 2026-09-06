@@ -39,9 +39,7 @@ its content address and named by the head index with the state it now holds.
 ## A reconciliation reads delivered source, never a plan
 
 Nothing is modelled here. The head was decided and its coverage matrix frozen by `business.decide`;
-this operator takes that matrix as it stands and asks, for every row, whether the source a backend
-run delivered enforces what the row promised. The Input `backend-source-application` is therefore
-required, because a reconciliation with no delivered source is an opinion about code nobody read,
+this operator takes that matrix as it stands and asks, for every row, whether the delivered source enforces what the row promised. sourceRole selects the required receipt and pinned checkout: be consumes `backend-source-application`, fe consumes `frontend-source-application`, because a reconciliation with no delivered source is an opinion about code nobody read,
 and `implemented` is never published on the strength of a plan: it is published here, after the
 comparison, or not at all. A feature with no published head has nothing to reconcile against, and a
 head whose state does not admit the target transition cannot take it; both are
@@ -140,14 +138,16 @@ modifies product source, or claims that a quality gate or a UAT run has passed.
 | Alias | Bind | Required |
 | --- | --- | --- |
 | `@worktrees/businesses/<featureId>` | the published head, its state and its frozen coverage matrix, by content address from the head index; the one place this operator writes outside its branch, as the feature directory, the archived objects and the feature's index entry together | yes |
-| `@workspaces/be` | the routed backend checkout read at the frozen head; every fact claim cites it by path, line range and head | yes |
+| `@workspaces/be` | the routed backend checkout read at the frozen head; every fact claim cites it by path, line range and head | when sourceRole=be |
+| `@workspaces/fe` | delivered frontend checkout at the frozen head | when sourceRole=fe |
 | `@worktrees/unchecked/<product>` | the feature's open unchecked coverage: the units and states the delivery's own verification did not take, listed in the receipt beside the claims | no |
 
 ## Inputs
 
 | Kind | From | Required |
 | --- | --- | --- |
-| `backend-source-application` | `backend.generate`; the delivered source the reconciliation reads | yes |
+| `backend-source-application` | `backend.generate`; the delivered source the reconciliation reads | when sourceRole=be |
+| `frontend-source-application` | `interface.generate`; delivered frontend source | when sourceRole=fe |
 | `quality-verification` | `quality.verify`; the gates that passed on the delivered head, read as evidence only | no |
 | `uat-flow-verification` | `uat.verify`; the journey that was walked on the delivered head, read as evidence only | no |
 | `api-verification` | `api.verify`; the end-to-end suite run as a client against the delivered head, read as evidence only | no |
@@ -159,15 +159,16 @@ modifies product source, or claims that a quality gate or a UAT run has passed.
 | `featureId` | id | — | The one feature whose published promise is reconciled |
 | `targetState` | choice | — | `implemented` when the delivered source enforces every row, or `in-progress` when the head is republished with what was delivered so far |
 | `approval` | id | null | The owner approval the transition needs, supplied on resume after `APPROVAL_REQUIRED` |
+| `sourceRole` | enum:be,fe | be | Delivered source role; the respective source receipt and pinned checkout are required. |
 | `resume` | token | null | The blocked branch's token when re-entering after a stop |
 
 ## Steps
 
 | # | Step | Params | Reads | Writes | Stops with |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Validate the gate, the delivered-source input and the resume | `resume` | `request/request.json`, input `backend-source-application`, @workspaces/be at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 1 | Validate the gate, the delivered-source input and the resume | `resume`, `sourceRole` | `request/request.json`, the sourceRole-selected input `backend-source-application` or `frontend-source-application`, @workspaces/be or @workspaces/fe at the frozen head | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
 | 2 | Inspect the promise and classify it reusable, missing or invalid before transition checks; hand missing or invalid promise to business.decide and create nothing here | `featureId`, `targetState`, `approval` | @worktrees/businesses/&lt;featureId>: the current head, its state, its matrix and its fingerprints | — | `HEAD_NOT_RECONCILABLE`, `APPROVAL_REQUIRED` |
-| 3 | Normalize the delivered source into fact claims, each with its path, line range and head | — | input `backend-source-application`, @workspaces/be at the frozen head, inputs `quality-verification` and `uat-flow-verification` as evidence only, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING` |
+| 3 | Normalize the delivered source into fact claims, each with its path, line range and head | — | the sourceRole-selected input `backend-source-application` or `frontend-source-application`, @workspaces/be or @workspaces/fe at the frozen head, inputs `quality-verification` and `uat-flow-verification` as evidence only, @tools/git | `response/data/claims.json` | `EVIDENCE_MISSING` |
 | 4 | Compare every matrix row with delivery, record the complete discrepancy and unchecked sets, and emit typed repair or replan evidence without rewriting the goal | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> for the matrix at the published head, @worktrees/unchecked/&lt;product> for what the delivery's verification did not take | `response/response.md` | `RECONCILIATION_DISCREPANCY` |
 | 5 | Publish the head under an exclusive lease with the reconciliation it now carries: the feature directory, the object it is archived under and the entry that names it | — | `response/data/claims.json`, @worktrees/businesses/&lt;featureId> at the previous head, its archived object and the head index entry that names it | @worktrees/businesses/&lt;featureId> as the new model.json head, its object in the content store and the feature's entry in the head index, `response/data/model.json`, @tools/sourcewrite | `SOURCE_DRIFT` |
 | 6 | Emit | — | everything above | `response/response.json` | — |
@@ -184,9 +185,9 @@ delivered source again; a resume that adds no delivered change, approval or evid
 | `claims` | `response/data/claims.json` | data | yes |
 | `model` | `response/data/model.json` | data | yes |
 
-## The best outcome
+## Operator Result
 
-On `done`, print **The best outcome** as the promise-to-delivery reconciliation in `response/response.md`, with `response/data/claims.json` and `response/data/model.json` as secondary tables. A mismatch leads with the unresolved claim rows and their evidence instead of claiming the promise is implemented.
+On `done`, print **Operator Result** as the promise-to-delivery reconciliation in `response/response.md`, with `response/data/claims.json` and `response/data/model.json` as secondary tables. A mismatch leads with the unresolved claim rows and their evidence instead of claiming the promise is implemented.
 
 ## Stops
 

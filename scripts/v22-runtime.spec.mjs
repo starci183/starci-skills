@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { openSession, confirmSession } from './v23-test-fixture.mjs';
+import { openSession, confirmSession, cleanupFixtureOwners } from './v23-test-fixture.mjs';
 import { openAttempt } from './attempt-gate.mjs';
 import { attemptContractErrors, validateResponse } from './validate-response.mjs';
 import { localAcceptedInputErrors, uiKnowledgeRequestErrors, validateRequest, V22_CONTRACT } from './validate-request.mjs';
@@ -39,7 +39,7 @@ async function fixture(run) {
   mkdirSync(sessions, { recursive: true });
   mkdirSync(worktree, { recursive: true });
   try { await run({ base, sessions, worktree }); }
-  finally { rmSync(base, { recursive: true, force: true }); }
+  finally { cleanupFixtureOwners(base); rmSync(base, { recursive: true, force: true }); }
 }
 
 test('session opens before confirmation, reuses the host binding, and only explicit as-stated activates it', async () => fixture(async ({ sessions, worktree }) => {
@@ -57,12 +57,6 @@ test('session opens before confirmation, reuses the host binding, and only expli
   assert.equal(reused.status, 'reused');
   assert.equal(reused.sessionId, opened.sessionId);
   assert.equal(reused.topology, 'solo');
-  delete state.topology;
-  writeFileSync(stateFile, JSON.stringify(state));
-  const migrated = await openSession(sessions, draft(worktree));
-  assert.equal(migrated.sessionId, opened.sessionId);
-  assert.equal(migrated.topology, 'solo');
-  assert.deepEqual(JSON.parse(readFileSync(stateFile, 'utf8')).topology, { mode: 'solo' });
   await assert.rejects(() => confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'agent', sourceRef: 'agent' }), /selectedBy:user/);
   const confirmed = await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:1' });
   assert.equal(confirmed.status, 'confirmed');
@@ -90,28 +84,13 @@ test('session-open follows corrected draft demand but freezes topology after act
   await assert.rejects(() => openSession(sessions, { ...coordinatedDraft, topology: { mode: 'controller' } }), /unknown/);
 }));
 
-test('active v2.2.0 migration requires explicit compatible demand and preserves peer tracking', async () => fixture(async ({ sessions, worktree }) => {
-  const coordinatedDraft = { ...draft(worktree), topology: { mode: 'coordinated' } };
-  const opened = await openSession(sessions, coordinatedDraft);
-  await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user-message:1' });
-  const stateFile = path.join(opened.session, 'state.json');
-  const state = JSON.parse(readFileSync(stateFile, 'utf8'));
-  state.brief.peers = {
-    'peer-accounting': { owns: 'accounting', head: null },
-    'peer-chatbot': { owns: 'chatbot', head: null }
-  };
-  delete state.topology;
-  writeFileSync(stateFile, JSON.stringify(state));
-  await assert.rejects(() => openSession(sessions, draft(worktree)), /SESSION_TOPOLOGY_MIGRATION_REQUIRED/);
-  await assert.rejects(() => openSession(sessions, { ...draft(worktree), topology: { mode: 'solo' } }), /at most 0 peer tasks/);
-  let preserved = JSON.parse(readFileSync(stateFile, 'utf8'));
-  assert.equal(preserved.topology, undefined);
-  assert.equal(Object.keys(preserved.brief.peers).length, 2);
-  const migrated = await openSession(sessions, coordinatedDraft);
-  assert.equal(migrated.topology, 'coordinated');
-  preserved = JSON.parse(readFileSync(stateFile, 'utf8'));
-  assert.deepEqual(preserved.topology, { mode: 'coordinated' });
-  assert.equal(Object.keys(preserved.brief.peers).length, 2);
+test('missing current topology refuses reuse without rewriting old state', async () => fixture(async ({ sessions, worktree }) => {
+  const input = draft(worktree), opened = await openSession(sessions, input);
+  const file = path.join(opened.session,'state.json'), state=JSON.parse(readFileSync(file));delete state.topology;
+  writeFileSync(file,JSON.stringify(state));const before=readFileSync(file);
+  await assert.rejects(()=>openSession(sessions,input),/WORKFLOW_RESET_REQUIRED/);
+  await assert.rejects(()=>openSession(sessions,{...input,topology:{mode:'solo'}}),/WORKFLOW_RESET_REQUIRED/);
+  assert.deepEqual(readFileSync(file),before);
 }));
 
 test('concurrent first prompts create one host session and unsafe explicit ids cannot escape sessions root', async () => fixture(async ({ sessions, worktree }) => {
@@ -134,7 +113,7 @@ test('a session lock waiter never recreates a session removed by its current own
   const owner = withSessionLock(opened.session, async () => {
     entered();
     await hold;
-    rmSync(opened.session, { recursive: true, force: true });
+    rmSync(opened.session, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
   });
   await inside;
   const waiter = mutateSession(opened.session, async (state) => { state.status = 'blocked'; });

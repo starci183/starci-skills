@@ -10,8 +10,8 @@
         "Flow": "^`[a-z0-9][a-z0-9-]*`$",
         "Entry": "\\S",
         "Steps": "^[1-9][0-9]*$",
-        "Account": "^`[a-z][a-z0-9-]*`$",
-        "Seed namespace": "^`uat-[A-Za-z0-9._-]+`$",
+        "Account": "^(?:`[a-z][a-z0-9-]*`|—)$",
+        "Seed namespace": "^(?:`uat-[A-Za-z0-9._-]+`|—)$",
         "Tier": "^(journey|secondary — \\S.*)$"
       }
     },

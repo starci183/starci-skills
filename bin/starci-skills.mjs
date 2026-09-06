@@ -28,7 +28,7 @@ const publicEvidence = (pkg.files ?? []).filter(ref => /^tests\/evidence\/[A-Za-
 export const PAYLOAD = [
   'UPDATE.md', 'UPDATE.vi.md',
   'INDEX.md', 'INDEX.vi.md', 'SKILL.md', 'SKILL.vi.md', 'routing.json',
-  'alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'workflows',
+  'alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'workflows', 'skills/starci-lite',
   ...publicEvidence,
 ];
 const MANIFEST = '.starci-skills.json';
@@ -53,6 +53,19 @@ This file is only a bootstrap. Do not copy context, brainstorm, compiler, gate o
 the entry routes, and a rule copied here becomes a second home that nobody remembers to update.
 `;
 
+const LITE_ENTRY = `${ENTRY_MARKER}
+For every user prompt, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md) and use its scope classification.
+Existing full workflows keep their current session and gates; formal UAT and publication use full StarCi.
+<!-- /starci:prompt-entry -->`;
+const LITE_BOOTSTRAP = BOOTSTRAP.replace(PROMPT_ENTRY, LITE_ENTRY)
+  .replace('Read [\`<Source>/.claude/INDEX.md\`](.claude/INDEX.md) completely and follow its load order.',
+    'Read [StarCi Lite](.claude/skills/starci-lite/SKILL.md) first; it routes complex work to the full entry.');
+function selectedProfile(opts, manifest) {
+  const profile = opts.profile ?? manifest?.profile ?? 'full';
+  if (!['full', 'lite'].includes(profile)) throw new Error('profile must be full or lite');
+  return profile;
+}
+
 // The validators the tree ships, in the order npm test runs them. --quick keeps the three that
 // finish in seconds; the full doctor also runs the operator self-tests and the script specs.
 const DOCTOR_QUICK = ['validate-routing.mjs', 'validate-alias.mjs', 'validate-operator.mjs'];
@@ -68,12 +81,16 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === '--dir') out.dir = path.resolve(argv[++i] ?? '.');
     else if (a.startsWith('--dir=')) out.dir = path.resolve(a.slice(6));
+    else if (a === '--profile') out.profile = argv[++i];
+    else if (a.startsWith('--profile=')) out.profile = a.slice(10);
     else if (a === '--force') out.force = true;
     else if (a === '--quick') out.quick = true;
     else if (a === '--no-bootstrap') out.bootstrap = false;
     else if (a === '-h' || a === '--help') out.command = 'help';
     else throw new Error(`unknown argument ${a}`);
   }
+  if (out.profile !== undefined && !['full', 'lite'].includes(out.profile)) throw new Error('profile must be full or lite');
+  if (argv.includes('--profile') && out.profile === undefined) throw new Error('--profile requires full or lite');
   return out;
 }
 
@@ -97,8 +114,8 @@ function readManifest(target) {
   const file = path.join(target, MANIFEST);
   return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
 }
-function writeManifest(target, kept = []) {
-  const manifest = { name: pkg.name, version: pkg.version, installedAt: new Date().toISOString(), files: hashTree(target) };
+function writeManifest(target, kept = [], profile = 'full', bootstrapProfile = null) {
+  const manifest = { name: pkg.name, version: pkg.version, profile, bootstrapProfile, installedAt: new Date().toISOString(), files: hashTree(target) };
   if (kept.length) manifest.keptLocal = kept;
   writeFileSync(path.join(target, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
@@ -114,15 +131,42 @@ function copyPayload(target) {
   }
 }
 
-function writeBootstraps(repo, log) {
-  for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+// Plan host changes before any payload mutation. Only exact installer-owned text is replaced.
+function bootstrapPlan(repo, profile) {
+  const entry = profile === 'lite' ? LITE_ENTRY : PROMPT_ENTRY;
+  const bootstrap = profile === 'lite' ? LITE_BOOTSTRAP : BOOTSTRAP;
+  return ['CLAUDE.md', 'AGENTS.md'].map(name => {
     const file = path.join(repo, name);
-    if (!existsSync(file)) { writeFileSync(file, BOOTSTRAP); log(`wrote ${name}`); continue; }
+    if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
     const current = readFileSync(file, 'utf8');
-    if (!current.includes(ENTRY_MARKER)) {
-      appendFileSync(file, `${current.endsWith('\n') ? '\n' : '\n\n'}${PROMPT_ENTRY}\n`);
-      log(`updated ${name} (added prompt entry; preserved existing instructions)`);
-    } else log(`kept ${name} (already routes every prompt to StarCi)`);
+    for (const known of [BOOTSTRAP, LITE_BOOTSTRAP]) {
+      const normalized = current.replace(/\r\n/g, '\n'), authored = known.replace(/\r\n/g, '\n');
+      if (normalized.startsWith(authored)) {
+        let end = 0, count = 0;
+        while (count < authored.length) { if (!(current[end] === '\r' && current[end + 1] === '\n')) count++; end++; }
+        const suffix = current.slice(end);
+        if (profile === 'lite' && suffix.includes('.claude/INDEX.md')) throw new Error(name + ': custom suffix still names the full entry; Lite cannot replace that instruction');
+        return { name, file, text: bootstrap + suffix, action: 'updated' };
+      }
+    }
+    const managed = [PROMPT_ENTRY, LITE_ENTRY].find(value => current.includes(value));
+    if (managed) {
+      const outside = current.replace(managed, '');
+      if (profile === 'lite' && outside.includes('.claude/INDEX.md')) throw new Error(name + ': custom instructions still name the full entry; preserve them and resolve the profile explicitly before Lite bootstrap changes');
+      return { name, file, text: current.replace(managed, entry), action: 'updated' };
+    }
+    if (current.includes(ENTRY_MARKER)) {
+      if (profile === 'lite') throw new Error(name + ': custom StarCi entry cannot be replaced by the Lite profile');
+      return { name, file, text: current, action: 'kept' };
+    }
+    if (profile === 'lite' && current.includes('.claude/INDEX.md')) throw new Error(name + ': custom instructions still name the full entry; preserve them and resolve the profile explicitly before Lite bootstrap changes');
+    return { name, file, text: current + (current.endsWith('\n') ? '\n' : '\n\n') + entry + '\n', action: 'updated' };
+  });
+}
+function writeBootstraps(repo, log, plan) {
+  for (const { name, file, text, action } of plan) {
+    if (!existsSync(file) || readFileSync(file, 'utf8') !== text) writeFileSync(file, text);
+    log(action + ' ' + name + ' (preserved custom instructions)');
   }
   const ignore = path.join(repo, '.gitignore');
   const lines = existsSync(ignore) ? readFileSync(ignore, 'utf8').split(/\r?\n/) : [];
@@ -137,16 +181,18 @@ export function init(opts, log = console.log) {
   const target = path.join(repo, '.claude');
   if (!existsSync(repo)) throw new Error(`${repo} does not exist`);
   const manifest = readManifest(target);
+  const profile = selectedProfile(opts, manifest);
+  const hostPlan = opts.bootstrap ? bootstrapPlan(repo, profile) : null;
   if (existsSync(target) && readdirSync(target).length && !manifest && !opts.force) {
     throw new Error(`${target} exists and was not installed by ${pkg.name}; move it away or pass --force to replace the runtime paths inside it`);
   }
   if (manifest) log(`re-installing over ${manifest.name}@${manifest.version} (use "update" to keep local changes)`);
   mkdirSync(target, { recursive: true });
   copyPayload(target);
-  const written = writeManifest(target);
+  const written = writeManifest(target, [], profile, hostPlan ? profile : manifest?.bootstrapProfile ?? null);
   log(`installed ${pkg.name}@${pkg.version} into ${target} (${Object.keys(written.files).length} files)`);
-  if (opts.bootstrap) writeBootstraps(repo, log);
-  log('next: open the repo with Claude Code or Codex; the bootstrap routes every agent to .claude/INDEX.md');
+  if (hostPlan) writeBootstraps(repo, log, hostPlan);
+  log('installed profile: ' + profile + (hostPlan ? '; bootstrap updated' : '; host bootstrap unchanged'));
   return written;
 }
 
@@ -154,6 +200,8 @@ export function update(opts, log = console.log) {
   const target = path.join(opts.dir, '.claude');
   const manifest = readManifest(target);
   if (!manifest) throw new Error(`${target} has no ${MANIFEST}; run init first`);
+  const profile = selectedProfile(opts, manifest);
+  const hostPlan = opts.bootstrap !== false ? bootstrapPlan(opts.dir, profile) : null;
   const before = hashTree(target);
   const locallyChanged = Object.entries(before).filter(([rel, h]) => manifest.files[rel] && manifest.files[rel] !== h).map(([rel]) => rel);
   const locallyAdded = Object.keys(before).filter((rel) => !manifest.files[rel]);
@@ -168,11 +216,11 @@ export function update(opts, log = console.log) {
       kept.push(rel);
     }
   }
-  const written = writeManifest(target, kept);
+  const written = writeManifest(target, kept, profile, hostPlan ? profile : manifest.bootstrapProfile ?? null);
   log(`updated ${manifest.name}@${manifest.version} -> ${pkg.name}@${pkg.version} in ${target}`);
   for (const rel of kept) log(`kept ${rel} (changed locally; pass --force to take the package version)`);
   if (opts.force && (locallyChanged.length || locallyAdded.length)) log(`replaced ${locallyChanged.length + locallyAdded.length} locally changed file(s)`);
-  if (opts.bootstrap !== false) writeBootstraps(opts.dir, log);
+  if (hostPlan) writeBootstraps(opts.dir, log, hostPlan);
   return written;
 }
 
@@ -205,8 +253,8 @@ export function doctor(opts, log = console.log) {
 
 const HELP = `${pkg.name} ${pkg.version}
 
-  npx ${pkg.name} init   [--dir <repo>] [--force] [--no-bootstrap]
-  npx ${pkg.name} update [--dir <repo>] [--force]
+  npx ${pkg.name} init   [--dir <repo>] [--profile full|lite] [--force] [--no-bootstrap]
+  npx ${pkg.name} update [--dir <repo>] [--profile full|lite] [--force]
   npx ${pkg.name} doctor [--dir <repo>] [--quick]
   npx ${pkg.name} version
 
@@ -216,6 +264,10 @@ init    copies the runtime into <repo>/.claude, adds the StarCi entry once to CL
 update  replaces the runtime paths with this version; a file changed locally is kept and listed
         (resources/settings.json is the person's own and is never part of the package)
         unless --force. Files outside the runtime paths are never touched.
+profile full is the default. Lite is an explicit separate entry for bounded work; all full operators
+        remain installed. Update retains the installed profile unless --profile explicitly changes it.
+        Custom host rules are preserved; --no-bootstrap leaves their entry routing under your control.
+        Active full workflows retain their existing scope, evidence and gates.
 doctor  runs the tree's own validators on the installed copy and reports local drift.
 `;
 

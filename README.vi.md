@@ -11,7 +11,7 @@ cây. Tài liệu: <https://harness.starci.org/docs/vi>. Bản tiếng Anh là t
 npx @starci/skills init
 ```
 
-Chạy ở gốc repository sẽ sở hữu runtime. Mọi prompt vào StarCi; follow-up giữ cùng host session. Lệnh chép cây vào `./.claude`, viết `CLAUDE.md` (Claude Code
+Chạy ở gốc repository sẽ sở hữu runtime. Với profile full mặc định, mọi prompt vào StarCi; follow-up giữ cùng host session. Lệnh chép cây vào `./.claude`, viết `CLAUDE.md` (Claude Code
 đọc) và `AGENTS.md` (Codex đọc) khi chưa có; file đã có được thêm cửa vào StarCi một lần, giữ nguyên
 chỉ dẫn riêng. Lệnh thêm `.worktrees/sessions/` vào `.gitignore` vì phiên
 làm việc nằm ở đó. Hãy commit `.claude/` cùng repository: nó là source, không phải cache. Cần Node 20
@@ -21,10 +21,12 @@ trở lên; CLI không có dependency. Cùng CLI đó chạy thẳng từ nhánh
 npx --package=github:starci183/starci-skills#main starci-skills init
 ```
 
+Profile mặc định là StarCi đầy đủ. Chọn entry riêng [StarCi Lite](skills/starci-lite/SKILL.md) bằng `npx @starci/skills init --profile lite`, hoặc đổi rõ profile của host đã cài bằng `update --profile lite`. Lite xử lý câu hỏi, tài liệu và sửa nhỏ trong một repo; tính năng phức tạp, UAT công khai chính thức và publication dùng entry đầy đủ. Mọi operator đầy đủ vẫn được cài. Update giữ profile đã chọn nếu không có override. Manifest ghi riêng `profile` và `bootstrapProfile`: `--no-bootstrap` giữ nguyên chỉ dẫn host và không nhận là đã đổi entry. Chỉ dẫn riêng bắt buộc full phải được xử lý rõ; installer không xóa chúng. Session full đang chạy giữ scope, bằng chứng và gate.
+
 | Lệnh | Việc nó làm |
 | --- | --- |
-| `npx @starci/skills init [--dir <repo>] [--force] [--no-bootstrap]` | Cài cây và hai bootstrap. Từ chối một `.claude` đã có sẵn mà không do nó cài, trừ khi `--force`, và kể cả khi đó cũng chỉ thay các đường dẫn runtime. |
-| `npx @starci/skills update [--dir <repo>] [--force] [--no-bootstrap]` | Nâng cây đã cài lên phiên bản của gói. File đã sửa tay được giữ lại và liệt kê; `--force` lấy bản của gói. File ngoài các đường dẫn runtime không bao giờ bị đụng. |
+| `npx @starci/skills init [--dir <repo>] [--profile <full-or-lite>] [--force] [--no-bootstrap]` | Cài cây và hai bootstrap. Từ chối một `.claude` đã có sẵn mà không do nó cài, trừ khi `--force`, và kể cả khi đó cũng chỉ thay các đường dẫn runtime. |
+| `npx @starci/skills update [--dir <repo>] [--profile <full-or-lite>] [--force] [--no-bootstrap]` | Nâng cây đã cài lên phiên bản của gói. File đã sửa tay được giữ lại và liệt kê; `--force` lấy bản của gói. File ngoài các đường dẫn runtime không bao giờ bị đụng. |
 | `npx @starci/skills doctor [--dir <repo>] [--quick]` | Chạy chính bộ validator của cây trên bản đã cài (routing, alias, operator, workflow, mặc định, template, trích dẫn knowledge, self-test của operator và helper, và spec của script) và báo những file đã đổi từ lúc cài. |
 | `npx @starci/skills version` | In phiên bản gói. |
 
@@ -35,7 +37,7 @@ Các đường dẫn runtime là `UPDATE.md`, `UPDATE.vi.md`, `INDEX.md`, `INDEX
 
 ## Claude Code và Codex
 
-Hai runtime vào cùng một cửa. `CLAUDE.md` và `AGENTS.md` mang cùng một đoạn bootstrap: đọc trọn
+Với profile full, hai runtime vào cùng một cửa. `CLAUDE.md` và `AGENTS.md` mang cùng một đoạn bootstrap: đọc trọn
 `.claude/INDEX.md` và theo thứ tự nạp của nó. Processor chạy từng operator trên profile mà
 `operator.json` của nó ràng (`resources/agents/profiles/openai.json` cho Codex, `claude.json` cho Claude
 Code, ghép cặp trong `resources/orchestrator.json`), và mỗi operator chỉ được gọi những tool mà
@@ -63,7 +65,7 @@ và quyền riêng cho từng vai trò. [Tài nguyên](resources/INDEX.vi.md) li
 Quy trình UI ràng buộc toàn bộ knowledge đã áp dụng, phân tích family Grammar trước khi sửa và
 đánh giá cả thẩm mỹ trên bản render. `knowledge.repair` và `library.update` sở hữu hai loại sửa tương ứng.
 
-Mỗi operator đã được nghiệm thu hiện **The best outcome** ngay trong chat. UI generation nhúng ảnh
+Mỗi operator đã được nghiệm thu hiện **Operator Result** ngay trong chat. UI generation nhúng ảnh
 render của phương án được chọn; operator khác hiện source/diff, sơ đồ, bảng, tài liệu hoặc kết quả đo
 dễ xem, kèm link bằng chứng đầy đủ. Attempt lỗi giữ đúng trạng thái và bước sửa tiếp.
 
