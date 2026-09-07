@@ -30,7 +30,7 @@ Chỉ đọc graph node đã chọn. Không thêm/bỏ dependency, refs, require
 
 | Nguồn | Khi nào đọc |
 | --- | --- |
-| [knowledge/ui/proof/INDEX.md](../../knowledge/ui/proof/INDEX.md) | Đọc topic observation phù hợp assertion chọn; chỉ dùng tiêu chí đã chấp nhận áp dụng/measurement thật/công cụ có sẵn, không machinery chain cũ. |
+| [knowledge/ui/proof/INDEX.md](../../knowledge/ui/proof/INDEX.md) | Đọc topic observation phù hợp assertion chọn; chỉ dùng tiêu chí đã chấp nhận áp dụng/measurement thật/công cụ có sẵn, không machinery thực thi chưa chọn. |
 
 ## Ghi gì vào đâu
 

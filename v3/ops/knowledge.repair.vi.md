@@ -20,13 +20,7 @@ Chỉ đọc graph node đã chọn. Không thêm/bỏ dependency, refs, require
 | --- | --- | --- |
 | target | N/node.md | Đọc N/node.md đã chọn đang tồn tại, scope cha, ref/dependency/assertion đã khai và freshness. Consumer op cần node đích có sẵn. Thiếu target là gap scope/graph: báo và đề xuất scope op được chọn riêng; không tạo target hay bịa acceptance/graph tại đây. |
 | repo | repository:<repo-id>/<bound-paths> | Khi có/chọn source, resolve resource repo, checkout/root/HEAD/dirty thật; đọc hướng dẫn, manifest, code owner, caller, test. Greenfield/spec-only ghi source chưa tạo, lấy ý định từ yêu cầu; không bịa repo/trích dẫn fact. Implement source vẫn cần repo thật được chọn và được ghi. |
-| rule | selected canonical knowledge file + mirror + UPDATE.md + original challenge evidence | Đọc rule ID/case thật, owner/caller, phản ví dụ quan sát, enforcement hiện có; nếu sửa skill phải đọc đầy đủ hướng dẫn skill liên quan. |
-
-## Tham chiếu chuyên môn có điều kiện
-
-| Nguồn | Khi nào đọc |
-| --- | --- |
-| [UPDATE.md](../../UPDATE.md) | Đọc đầy đủ trước đổi knowledge canonical, ID, mirror hoặc generator. |
+| rule | selected canonical knowledge file + mirror + applicable owner maintenance policy + original challenge evidence | Đọc rule ID/case thật, owner/caller, phản ví dụ quan sát, enforcement hiện có; nếu sửa skill phải đọc đầy đủ hướng dẫn skill liên quan. |
 
 ## Ghi gì vào đâu
 
@@ -40,7 +34,7 @@ Chỉ đọc graph node đã chọn. Không thêm/bỏ dependency, refs, require
 
 | # | Đọc ID | Ghi ID | Thực hiện và kiểm tra |
 | --- | --- | --- | --- |
-| 1 | target, rule, repo | — | Theo UPDATE.md kiểm lỗi là hổng enforcement/thiếu concept/rule sai/concept trùng. Chọn một owner canonical trước sửa. |
+| 1 | target, rule, repo | — | Theo chính sách bảo trì thật của owner được chọn, kiểm lỗi là hổng enforcement/thiếu concept/rule sai/concept trùng. Chọn một owner canonical trước sửa. |
 | 2 | rule, repo | source | Sửa rule/gate/step nhỏ đúng scope, ID ổn định, mirror Việt cùng commit, không luật riêng product. Cập nhật caller/contract thật cùng; không lén workaround consumer. |
 | 3 | rule, repo | evidence | Chạy validation/citation/parity/regression behavior thật liên quan. Tài liệu generate dùng generator owner; inspect thay đổi, không coi shape text chứng minh chỉ dẫn tốt. |
 | 4 | target, rule, repo | node, evidence | Commit phần sở hữu khi được phép, báo context gốc cần đánh giá lại. Không tự rerun op gốc/claim visual đúng. |

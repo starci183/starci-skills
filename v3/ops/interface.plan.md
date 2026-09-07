@@ -28,13 +28,13 @@ This op may declare/change only its explicitly selected scope graph: dependsOn n
 | Source | When to read |
 | --- | --- |
 | [knowledge/patterns/fe/INDEX.md](../../knowledge/patterns/fe/INDEX.md) | Only when the selected frontend/library actually adopts this family; retain the current repository convention when it differs. |
-| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or legacy receipt requirement. |
+| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or unrelated receipt requirement. |
 
 ## Exact writes and field/content matrix
 
 | ID | Destination | Fields / sections | Required content |
 | --- | --- | --- | --- |
-| node | .work/<business>/architecture/interface/<piece>/node.md + selected implementation/frontend/<piece>/node.md | body: Surface map / Shared shell / Interaction states / Data contracts / Accessibility / Source scope / Acceptance; refs; dependsOn; assertions; required | Surface rows: stable ID, route/host, actor/task, shell owner, entry/exit, reads/writes, loading/empty/error/denied/success, viewport/keyboard needs, source path and AC refs. Keep implementation children todo. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof. |
+| node | .work/<business>/architecture/interface/<piece>/node.md + selected implementation/frontend/<piece>/node.md + explicitly selected audit/quality child directories/node.md | body: Surface map / Shared shell / Interaction states / Data contracts / Accessibility / Source scope / Acceptance; refs; dependsOn; assertions; required | Surface rows: stable ID, route/host, actor/task, shell owner, entry/exit, reads/writes, loading/empty/error/denied/success, viewport/keyboard needs, source path and AC refs. Keep implementation children todo. If the current request explicitly selects a scoped preset with a later audit/quality/portfolio review, declare that exact consumer target and expected assertions now, todo, under the approved graph. Do not create review scope merely because this planning op ran; no consumer invents missing targets later. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof. |
 | evidence | E/manifest.yaml + E/surface-review.md | id; nodeId; inputDigest; outcome; assertions; assets; provenance; codeRefs; extensions | Record discovered routes/screens and accepted/proposed distinctions, omitted scope with reasons, and mapping review. |
 
 ## Ordered bounded procedure

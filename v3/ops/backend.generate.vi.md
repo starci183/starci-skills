@@ -27,7 +27,7 @@ Chỉ đọc graph node đã chọn. Không thêm/bỏ dependency, refs, require
 
 | Nguồn | Khi nào đọc |
 | --- | --- |
-| [knowledge/patterns/be/INDEX.md](../../knowledge/patterns/be/INDEX.md) | Chỉ khi backend đã chọn thật sự dùng họ NestJS được mô tả; inspect code hiện tại trước áp dụng topic. Đây là index chuyên môn, không routing v2. |
+| [knowledge/patterns/be/INDEX.md](../../knowledge/patterns/be/INDEX.md) | Chỉ khi backend đã chọn thật sự dùng họ NestJS được mô tả; inspect code hiện tại trước áp dụng topic. Chỉ dùng index cho pattern code áp dụng. |
 
 ## Ghi gì vào đâu
 

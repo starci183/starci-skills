@@ -26,8 +26,8 @@ Read the selected node graph only. Do not add/remove dependencies, refs, require
 
 | Source | When to read |
 | --- | --- |
-| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or legacy receipt requirement. |
-| [knowledge/ui/proof/INDEX.md](../../knowledge/ui/proof/INDEX.md) | Read relevant observation topics for the selected assertions; use only applicable accepted criteria, actual measurements and available instruments, not old run-chain machinery. |
+| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or unrelated receipt requirement. |
+| [knowledge/ui/proof/INDEX.md](../../knowledge/ui/proof/INDEX.md) | Read relevant observation topics for the selected assertions; use only applicable accepted criteria, actual measurements and available instruments, not unselected execution machinery. |
 
 ## Exact writes and field/content matrix
 

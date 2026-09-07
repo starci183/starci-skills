@@ -30,7 +30,7 @@ Chỉ đọc graph node đã chọn. Không thêm/bỏ dependency, refs, require
 | Nguồn | Khi nào đọc |
 | --- | --- |
 | [knowledge/patterns/fe/INDEX.md](../../knowledge/patterns/fe/INDEX.md) | Chỉ khi FE/thư viện chọn thật sự dùng họ này; giữ convention repo hiện tại nếu khác. |
-| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt legacy. |
+| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt không liên quan. |
 | [knowledge/ui/presentation/INDEX.md](../../knowledge/ui/presentation/INDEX.md) | Đọc topic presentation khớp khi đã gắn họ component/token cài thật; không bịa rule ID/API từ index. |
 
 ## Ghi gì vào đâu

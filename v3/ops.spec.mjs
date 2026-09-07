@@ -6,18 +6,19 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { outputs, generate, root } from './ops/generate.mjs';
+import { ops as sourceContracts } from './ops/contracts.mjs';
 import { validateCatalog } from './ops/validate.mjs';
 import { validateWorkspace, sha256 } from './core/index.mjs';
 const repository=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const catalogue=JSON.parse(fs.readFileSync(path.join(root,'catalog.json'),'utf8'));
 const fresh=()=>structuredClone(catalogue);
-const errors=cat=>validateCatalog(cat,{root,legacyRoot:repository}).errors.map(e=>e.code);
+const errors=cat=>validateCatalog(cat,{root,repositoryRoot:repository}).errors.map(e=>e.code);
 
-test('31 detailed contracts and all 29 original identities have actual resolvable authority/mirrors',()=>{
-  const result=validateCatalog(catalogue,{root,legacyRoot:repository});
+test('current V3 contracts have complete resolvable catalogue identities and authority/mirrors',()=>{
+  const result=validateCatalog(catalogue,{root,repositoryRoot:repository});
   assert.deepEqual(result.errors,[]);
-  assert.equal(catalogue.ops.length,31);
-  assert.equal(catalogue.legacyMappings.length,29);
+  assert.deepEqual(catalogue.ops.map(op=>op.id).sort(),sourceContracts.map(op=>op.id).sort());
+  assert.deepEqual(Object.keys(catalogue).sort(),['commonDocument','ops','schema']);
   assert.ok(catalogue.ops.some(o=>o.id==='goal.setup'));
   assert.ok(catalogue.ops.some(o=>o.id==='scope.retire'));
 });
@@ -25,6 +26,58 @@ test('all generated authority/mirror/catalogue bytes are reproducible without wr
   const before=new Map([...outputs()].map(([name])=>[name,fs.readFileSync(path.join(root,name),'utf8')]));
   assert.deepEqual(generate({check:true}),[]);
   for(const [name,bytes] of before) assert.equal(fs.readFileSync(path.join(root,name),'utf8'),bytes);
+});
+test('operator generation and catalogue validation need only current operator sources and selected domain references',()=>{
+  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'work3-ops-minimal-'));
+  try {
+    const isolatedRoot=path.join(temporary,'v3','ops');fs.cpSync(root,isolatedRoot,{recursive:true});
+    for(const ref of new Set(catalogue.ops.flatMap(op=>op.supportingReferences.map(r=>r.path)))) {
+      const target=path.join(temporary,ref);fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(path.join(repository,ref),target);
+    }
+    const observed=spawnSync(process.execPath,['generate.mjs','--check'],{cwd:isolatedRoot,encoding:'utf8'});
+    assert.equal(observed.status,0,observed.stderr+observed.stdout);
+    assert.deepEqual(fs.readdirSync(temporary).sort(),['knowledge','v3']);
+    assert.deepEqual(validateCatalog(catalogue,{root:isolatedRoot,repositoryRoot:temporary}).errors,[]);
+  } finally {assert.equal(path.dirname(temporary),os.tmpdir());assert.ok(path.basename(temporary).startsWith('work3-ops-minimal-'));fs.rmSync(temporary,{recursive:true,force:true});}
+});
+test('migration contract cannot substitute inferred intent, completed imports or unsafe worktree retirement',()=>{
+  const c=fresh(),op=c.ops.find(o=>o.id==='workspace.migrate');assert.ok(op);
+  assert.equal(op.contract.graphPolicy.mode,'selected-scope-only');
+  op.contract.migrationPolicy.importState='done';assert.ok(errors(c).includes('MIGRATION_POLICY'));
+  op.contract.migrationPolicy=structuredClone(catalogue.ops.find(o=>o.id===op.id).contract.migrationPolicy);
+  op.contract.migrationPolicy.registeredWorktreeRemoval='recursive-delete';assert.ok(errors(c).includes('MIGRATION_POLICY'));
+  op.contract.reads=op.contract.reads.filter(r=>r.id!=='custody');assert.ok(errors(c).includes('MIGRATION_BINDING'));
+});
+test('one-pilot import binds real committed source and recoverable untracked bytes without accepting implementation or UAT',()=>{
+  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'work3-op-import-'));
+  try {
+    const repo=path.join(temporary,'source');fs.mkdirSync(repo);
+    const git=(...args)=>{const result=spawnSync('git',args,{cwd:repo,encoding:'utf8'});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
+    git('init');fs.writeFileSync(path.join(repo,'chat.mjs'),'export const draftState = "draft";\n');git('add','chat.mjs');git('-c','user.name=Synthetic Test','-c','user.email=test@example.invalid','commit','-m','Synthetic source fixture');
+    const commit=git('rev-parse','HEAD');assert.match(commit,/^[a-f0-9]{40,64}$/);
+    fs.mkdirSync(path.join(repo,'old-artifacts'));const original=path.join(repo,'old-artifacts','notes.md');fs.writeFileSync(original,'Historical note: draft save was claimed complete; no current proof.\n');
+    const status=git('status','--porcelain','--untracked-files=all');assert.match(status,/\?\? old-artifacts\/notes.md/);
+    const worktrees=git('worktree','list','--porcelain');assert.match(worktrees,/worktree /);
+    const work=path.join(temporary,'.work'),resource=path.join(work,'_resources','imports','pilot');fs.mkdirSync(path.join(resource,'assets'),{recursive:true});
+    fs.writeFileSync(path.join(work,'workspace.yaml'),JSON.stringify({schema:'work/workspace@1',id:'synthetic-import'}));
+    const preserved=path.join(resource,'assets','notes.md');fs.copyFileSync(original,preserved);assert.equal(sha256(fs.readFileSync(original)),sha256(fs.readFileSync(preserved)));
+    fs.writeFileSync(path.join(resource,'resource.yaml'),JSON.stringify({schema:'work/resource@1',id:'source-facts',kind:'import',owner:'synthetic-owner',revision:commit,details:{repository:repo,commit,sourcePath:'chat.mjs',observed:'source exports draft string',intent:'candidate; not approved',untracked:status,worktrees},files:[{path:'assets/notes.md'}]}));
+    const bodies=new Map();const metadata=new Map();
+    const put=(id,meta)=>{const dir=path.join(work,'pilot',id);fs.mkdirSync(dir,{recursive:true});const body=bodies.get(id)??'# Synthetic import\nObserved source only; expected intent is unapproved.\n';bodies.set(id,body);metadata.set(id,meta);fs.writeFileSync(path.join(dir,'node.md'),'---\n'+JSON.stringify(meta)+'\n---\n'+body);};
+    for(const [id,kind] of [['business','business'],['implementation','implementation'],['uat','uat.ux']]) put(id,{schema:'work/node@1',id,kind,required:true,state:'suspended',suspensionReason:'Imported source claim requires independently selected intent/proof review.',assertions:['own-proof'],refs:['source-facts']});
+    put('consumer',{schema:'work/node@1',id:'consumer',kind:'operations',required:true,state:'todo',assertions:['consumer-proof'],dependsOn:['implementation']});
+    put('migration',{schema:'work/node@1',id:'migration',kind:'operations',required:true,state:'todo',assertions:['preservation'],refs:['source-facts']});
+    const before=validateWorkspace(work);assert.deepEqual(before.errors,[]);assert.equal(before.nodes.find(n=>n.id==='consumer').eligible,false);
+    const node=before.nodes.find(n=>n.id==='migration'),evidenceDir=path.join(work,'pilot','migration','evidence','import-check');fs.mkdirSync(evidenceDir,{recursive:true});
+    const report=JSON.stringify({commit,status,worktrees,originHash:sha256(fs.readFileSync(original)),retrievedHash:sha256(fs.readFileSync(preserved)),cleanup:'not-requested',acceptance:'migration preservation only; product unapproved'});
+    fs.writeFileSync(path.join(evidenceDir,'preservation.json'),report);
+    fs.writeFileSync(path.join(evidenceDir,'manifest.yaml'),JSON.stringify({schema:'work/evidence@1',id:'import-check',nodeId:'migration',inputDigest:node.inputDigest,outcome:'pass',assertions:[{id:'preservation',outcome:'pass',observation:'Read actual Git commit/status/worktree inventory and independently compared retained original versus copied untracked note hashes in this isolated synthetic fixture.'}],assets:[{path:'preservation.json',sha256:sha256(report)}]}));
+    put('migration',{...metadata.get('migration'),state:'done',completion:{inputDigest:node.inputDigest,evidence:['import-check']}});
+    const after=validateWorkspace(work);assert.deepEqual(after.errors,[]);assert.equal(after.nodes.find(n=>n.id==='migration').effectiveState,'done');
+    for(const id of ['business','implementation','uat']) {assert.equal(after.nodes.find(n=>n.id===id).effectiveState,'suspended');assert.equal(metadata.get(id).completion,undefined);}
+    assert.equal(after.nodes.find(n=>n.id==='consumer').eligible,false);assert.equal(fs.existsSync(original),true);
+    const withoutReason={...metadata.get('business')};delete withoutReason.suspensionReason;put('business',withoutReason);assert.equal(validateWorkspace(work).ok,false);
+  } finally {assert.equal(path.dirname(temporary),os.tmpdir());assert.ok(path.basename(temporary).startsWith('work3-op-import-'));fs.rmSync(temporary,{recursive:true,force:true});}
 });
 test('operator and document identity collision is refused',()=>{
   const c=fresh();c.ops.push(structuredClone(c.ops[0]));
@@ -58,10 +111,10 @@ test('a catalogue cannot omit fields, proof or concrete blockers and still pass'
   const c=fresh();c.ops[0].contract.writes[0].fields=[];c.ops[0].contract.proofs=[];c.ops[0].contract.blockers=[];
   assert.ok(errors(c).includes('WRITE_FIELDS'));assert.ok(errors(c).includes('EMPTY_CONTRACT'));
 });
-test('legacy operator cannot disappear, map to nonexistent replacement or cite fabricated source',()=>{
-  const c=fresh();c.legacyMappings.pop();assert.ok(errors(c).includes('LEGACY_COVERAGE'));
-  c.legacyMappings[0].replacement='imaginary.op';assert.ok(errors(c).includes('LEGACY_TARGET'));
-  c.legacyMappings[0].source='operators/not-real/operator.md';assert.ok(errors(c).includes('LEGACY_SOURCE'));
+test('a V3 operator cannot disappear from the catalogue or carry unknown catalogue root fields',()=>{
+  const c=fresh();c.ops.pop();assert.ok(errors(c).includes('DOCUMENT_COVERAGE'));
+  c.ops=[];assert.ok(errors(c).includes('CATALOG_EMPTY'));
+  c.unexpectedMapping={};assert.ok(errors(c).includes('CATALOG_FIELDS'));
 });
 test('summary write ceilings/effects cannot drift from detailed contracts',()=>{
   const c=fresh();c.ops[0].writeScope.push('arbitrary external target');assert.ok(errors(c).includes('WRITE_SCOPE_DRIFT'));
@@ -70,7 +123,7 @@ test('summary write ceilings/effects cannot drift from detailed contracts',()=>{
 test('all completion profiles refer to actually supported core profiles',()=>{
   const profileFile=JSON.parse(fs.readFileSync(path.join(repository,'v3/schemas/profiles.json'),'utf8'));
   const profiles=profileFile.profiles??profileFile;
-  const result=validateCatalog(catalogue,{root,legacyRoot:repository,profiles});
+  const result=validateCatalog(catalogue,{root,repositoryRoot:repository,profiles});
   assert.deepEqual(result.errors,[]);
   const c=fresh();c.ops[0].completionProfile='fake-profile';c.ops[0].nodeKinds=['fake-profile'];c.ops[0].contract.completionProfile='fake-profile';
   assert.ok(validateCatalog(c,{profiles}).errors.some(e=>e.code==='UNKNOWN_PROFILE'));

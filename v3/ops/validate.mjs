@@ -9,9 +9,11 @@ const issue = (errors,code,subject,message)=>errors.push({code,subject,message})
 
 // Validates authoring/catalogue referential integrity, NOT real-world execution or truth.
 // Never executes an op, resolves a credential, fetches a URL or mutates a workspace.
-export function validateCatalog(catalog,{root,legacyRoot,profiles}={}) {
+export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
   const errors=[];
   if(!catalog||catalog.schema!=='work/ops@1'||!Array.isArray(catalog.ops)) return {ok:false,errors:[{code:'CATALOG_SCHEMA',subject:'catalog',message:'Expected work/ops@1 and ops array'}]};
+  if(Object.keys(catalog).some(key=>!['schema','commonDocument','ops'].includes(key))) issue(errors,'CATALOG_FIELDS','catalog','Unknown catalogue root field');
+  if(!catalog.ops.length) issue(errors,'CATALOG_EMPTY','catalog','At least one concrete operator is required');
   function fileRef(ref,subject,english=true) {
     if(!safeRelative(ref)||(english&&ref.endsWith('.vi.md'))) {issue(errors,'DOCUMENT_PATH',subject,'Unsafe/non-authority document path');return;}
     if(root) {
@@ -29,7 +31,7 @@ export function validateCatalog(catalog,{root,legacyRoot,profiles}={}) {
     fileRef(op.document,at);fileRef(op.mirror,at,false);
     for(const ref of op.supportingReferences??[]) {
       if(!safeRelative(ref.path)||!nonempty(ref.when)||!nonempty(ref.whenVi)) issue(errors,'DOMAIN_REFERENCE',at,'Reference requires safe repo-relative source and bilingual applicability');
-      else if(legacyRoot&&!fs.existsSync(path.resolve(legacyRoot,ref.path))) issue(errors,'DOMAIN_REFERENCE',at,'Referenced domain source does not exist');
+      else if(repositoryRoot&&!fs.existsSync(path.resolve(repositoryRoot,ref.path))) issue(errors,'DOMAIN_REFERENCE',at,'Referenced domain source does not exist');
     }
     if(op.mirror!==op.document?.replace(/\.md$/,'.vi.md')) issue(errors,'MIRROR_PATH',at,'Mirror must share the English stem');
     if(!nonempty(op.goal)||!Array.isArray(op.nodeKinds)||!op.nodeKinds.includes(op.completionProfile)) issue(errors,'PROFILE',at,'Goal and compatible profile required');
@@ -40,6 +42,11 @@ export function validateCatalog(catalog,{root,legacyRoot,profiles}={}) {
     if(!c.reads.length||!c.writes.length||!c.steps.length||!c.proofs.length||!c.blockers.length) issue(errors,'EMPTY_CONTRACT',at,'Reads/writes/steps/proofs/blockers cannot be empty');
     if(!c.graphPolicy||!['read-only','selected-scope-only'].includes(c.graphPolicy.mode)||c.graphPolicy.prerequisiteState!=='done'||c.graphPolicy.dispatch!=='never'||c.graphPolicy.location!=='.work node dependsOn/refs and resource files') issue(errors,'GRAPH_POLICY',at,'Graph authority must live in .work, require done prerequisites and never dispatch automatically');
     if(c.graphPolicy?.mode==='read-only'&&c.writes.some(w=>w.id==='node'&&w.fields?.some(f=>['dependsOn','refs','required'].includes(f)))) issue(errors,'CONSUMER_GRAPH_WRITE',at,'A consumer op cannot silently rewrite scope/input graph fields');
+    if(at==='workspace.migrate') {
+      const expected={scope:'one-selected-business',importState:'suspended',reasonField:'suspensionReason',importCompletion:'forbidden',intentAuthority:'approved-intent-not-inferred-source',cleanup:'explicit-exact-preserved-inactive-only',registeredWorktreeRemoval:'git-without-force'};
+      if(!c.migrationPolicy||Object.entries(expected).some(([key,value])=>c.migrationPolicy[key]!==value)||c.graphPolicy?.mode!=='selected-scope-only') issue(errors,'MIGRATION_POLICY',at,'Migration imports one unapproved suspended scope and permits only exact preserved inactive authorized cleanup');
+      if(!c.reads.some(r=>r.id==='inventory')||!c.reads.some(r=>r.id==='custody')||!c.writes.some(w=>w.id==='node'&&w.fields?.includes('suspensionReason'))||!c.writes.some(w=>w.id==='resources'&&w.fields?.includes('files:[{path}]'))||!['source','preservation','suspension','cleanup'].every(id=>c.proofs.some(p=>p.id===id))) issue(errors,'MIGRATION_BINDING',at,'Migration requires actual inventory/custody, suspended source resources and independent preservation/import/cleanup proofs');
+    }
     if(c.goal.en!==op.goal||c.completionProfile!==op.completionProfile||JSON.stringify(c.sideEffects)!==JSON.stringify(op.sideEffects)) issue(errors,'CATALOG_DRIFT',at,'Summary and contract differ');
     if(JSON.stringify(c.writes.map(w=>w.path))!==JSON.stringify(op.writeScope)) issue(errors,'WRITE_SCOPE_DRIFT',at,'Write scope must derive from write matrix');
     const readIds=c.reads.map(r=>r.id),writeIds=c.writes.map(w=>w.id);
@@ -66,22 +73,10 @@ export function validateCatalog(catalog,{root,legacyRoot,profiles}={}) {
     if(!unique(c.proofs.map(p=>p.id))||!c.proofs.every(p=>nonempty(p.id)&&pair(p.requirement))) issue(errors,'PROOF_SHAPE',at,'Proof identities and bilingual requirements required');
     if(!unique(c.blockers.map(b=>b.code))||!c.blockers.every(b=>/^[A-Z][A-Z_]+$/.test(b.code)&&pair(b.condition))) issue(errors,'BLOCKER_SHAPE',at,'Concrete bilingual blocker conditions required');
   }
-  const mappings=catalog.legacyMappings;
-  if(!Array.isArray(mappings)||!unique(mappings.map(m=>m.legacy))) issue(errors,'LEGACY_MAPPING','catalog','Unique legacy mappings required');
-  else {
-    const ids=new Set(catalog.ops.map(o=>o.id));
-    for(const m of mappings) {
-      if(!ids.has(m.replacement)||!nonempty(m.change)||m.disposition!=='preserved-scope-replaced-protocol') issue(errors,'LEGACY_TARGET',m.legacy,'Legacy replacement or disposition invalid');
-      if(!safeRelative(m.source)) issue(errors,'LEGACY_PATH',m.legacy,'Unsafe source citation');
-      if(legacyRoot&&safeRelative(m.source)) {
-        const full=path.resolve(legacyRoot,m.source);
-        if(!fs.existsSync(full)||!fs.readFileSync(full,'utf8').startsWith('# '+m.legacy)) issue(errors,'LEGACY_SOURCE',m.legacy,'Original operator source/title missing');
-      }
-    }
-    if(legacyRoot) {
-      const observed=fs.readdirSync(path.join(legacyRoot,'operators'),{withFileTypes:true}).filter(e=>e.isDirectory()&&fs.existsSync(path.join(legacyRoot,'operators',e.name,'operator.md'))).map(e=>fs.readFileSync(path.join(legacyRoot,'operators',e.name,'operator.md'),'utf8').split(/\r?\n/)[0].replace(/^# /,'')).sort();
-      if(JSON.stringify(observed)!==JSON.stringify(mappings.map(m=>m.legacy).sort())) issue(errors,'LEGACY_COVERAGE','catalog','Mapping must cover every actual legacy operator exactly once');
-    }
+  if(root) {
+    const actualDocuments=fs.readdirSync(root).filter(name=>/^[a-z]+(?:\.[a-z]+)+\.md$/.test(name)&&!name.endsWith('.vi.md')).sort();
+    const declaredDocuments=catalog.ops.map(op=>op.document).sort();
+    if(JSON.stringify(actualDocuments)!==JSON.stringify(declaredDocuments)) issue(errors,'DOCUMENT_COVERAGE','catalog','Catalogue must name each actual V3 operator document exactly once');
   }
   return {ok:errors.length===0,errors};
 }

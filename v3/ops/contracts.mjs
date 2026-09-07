@@ -21,7 +21,7 @@ const genericProof = () => proof('binding', 'Run workspace validation; every cit
 const commitProof = () => proof('commit', 'Inspect exact staged diff and actual tests; bind full real source commit(s), per repository, and separately retain integration/tested mappings. Report uncommitted or no-change honestly.', 'Đọc staged diff chính xác và test thật; gắn SHA nguồn đầy đủ theo repo, lưu mapping integration/tested riêng. Báo thật khi chưa commit hoặc không đổi.');
 const ops = [];
 function add(id, goal, vi, kind, effect, reads, writes, steps, proofs, blockers, extra={}) {
-  const scopeWriters=new Set(['goal.setup','business.decide','architecture.decide','backend.plan','interface.plan','uat.plan','data.plan','scope.retire']);
+  const scopeWriters=new Set(['goal.setup','workspace.migrate','business.decide','architecture.decide','backend.plan','interface.plan','uat.plan','data.plan','scope.retire']);
   const graphMode=scopeWriters.has(id)?'selected-scope-only':'read-only';
   if(graphMode==='read-only') {
     const target=reads.find(r=>r.id==='target');
@@ -31,14 +31,21 @@ function add(id, goal, vi, kind, effect, reads, writes, steps, proofs, blockers,
     writes.unshift(write('workspace','.work/workspace.yaml',['schema','id','extensions'],'Initialize only an explicitly new canonical workspace; reuse an existing workspace unchanged. Never invent repository/environment resources merely to satisfy setup.','Chỉ khởi tạo workspace canonical mới được yêu cầu; dùng workspace cũ nguyên trạng. Không bịa resource repo/environment để đủ setup.'));
     steps[0].writes.unshift('workspace');
     writes.find(w=>w.id==='node').fields.push('extensions.work3.nativeGoal: actual returned current-task goal reference only');
+    const goalNode=writes.find(w=>w.id==='node');
+    goalNode.content=pair(goalNode.content.en+' When the user explicitly selected a scoped setup preset, its workspace-binding and business-review targets are planned child nodes here with their own expected assertions, todo. Do not invent a repository binding or accepted business decision to close them.',goalNode.content.vi+' Khi user chọn preset setup đúng scope rõ ràng, target workspace-binding/business-review là node con plan ở đây, assertion riêng, todo. Không bịa binding repo hoặc quyết định business đã duyệt để đóng chúng.');
   }
   if(id==='interface.draw') {
     writes.push(write('designSource','.work/_resources/design/<resource>/resource.yaml + .work/_resources/design/<resource>/assets/<asset>',['files:[{path}]','details: accepted direction identity / source provenance'],'Write the selected approved art-direction asset as a canonical source input, with files paths relative to its resource.yaml directory. The core hashes actual bytes; do not author a sha256 field in files. Preserve the selected node graph: if its design resource/ref is missing, report the scope gap instead of silently adding a dependency. Generated/captured evidence images are not automatically design authority.','Ghi art-direction asset đã chọn/duyệt thành input nguồn canonical; path trong files tương đối với thư mục resource.yaml. Core hash bytes thật, không viết sha256 trong files. Giữ graph node chọn: thiếu resource/ref design thì báo gap scope, không tự thêm dependency. Ảnh generated/capture evidence không tự là design authority.'));
     steps[1].writes.push('designSource');steps[2].writes.push('designSource');
   }
+  if(['interface.plan','uat.plan'].includes(id)) {
+    const n=writes.find(w=>w.id==='node');
+    n.path+=id==='interface.plan'?' + explicitly selected audit/quality child directories/node.md':' + explicitly selected workflow-review/node.md';
+    n.content=pair(n.content.en+' If the current request explicitly selects a scoped preset with a later audit/quality/portfolio review, declare that exact consumer target and expected assertions now, todo, under the approved graph. Do not create review scope merely because this planning op ran; no consumer invents missing targets later.',n.content.vi+' Nếu request hiện tại chọn preset có audit/quality/review portfolio sau đó, khai chính xác target consumer và assertion mong đợi ngay, todo, trong graph đã duyệt. Không tạo scope review chỉ vì op plan chạy; consumer sau không bịa target thiếu.');
+  }
   // Specs are inputs. Actual delivery/findings are outputs: put them in evidence rather than
   // causing a verifier to invalidate its own inputDigest by editing semantic node prose.
-  if(['implementation','operations','release','uat.ui','uat.ux'].includes(kind)) {
+  if(id!=='workspace.migrate'&&['implementation','operations','release','uat.ui','uat.ux'].includes(kind)) {
     const n=writes.find(w=>w.id==='node'),e=writes.find(w=>w.id==='evidence');
     if(n&&e) {
       const resultContent=n.content;

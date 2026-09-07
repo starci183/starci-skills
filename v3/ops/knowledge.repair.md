@@ -20,13 +20,7 @@ Read the selected node graph only. Do not add/remove dependencies, refs, require
 | --- | --- | --- |
 | target | N/node.md | Read the existing selected N/node.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here. |
 | repo | repository:<repo-id>/<bound-paths> | When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty state; read applicable instructions, manifests, owning code, callers and relevant tests. Greenfield/spec-only work records source not-yet-created and grounds intent in the user request; no invented repository or fact citation. Source implementation still needs an actual selected writable repository. |
-| rule | selected canonical knowledge file + mirror + UPDATE.md + original challenge evidence | Read the actual rule identifier/case and its owner/callers, observed counterexamples and existing enforcement. Read relevant skill instructions fully if editing a skill. |
-
-## Conditional domain references
-
-| Source | When to read |
-| --- | --- |
-| [UPDATE.md](../../UPDATE.md) | Read fully before changing canonical knowledge, IDs, mirrors or generators. |
+| rule | selected canonical knowledge file + mirror + applicable owner maintenance policy + original challenge evidence | Read the actual rule identifier/case and its owner/callers, observed counterexamples and existing enforcement. Read relevant skill instructions fully if editing a skill. |
 
 ## Exact writes and field/content matrix
 
@@ -40,7 +34,7 @@ Read the selected node graph only. Do not add/remove dependencies, refs, require
 
 | # | Read IDs | Write IDs | Action and check |
 | --- | --- | --- | --- |
-| 1 | target, rule, repo | — | Check whether the issue is existing enforcement failure, missing concept, wrong existing rule or duplicate concept using UPDATE.md. Choose one canonical owner before edits. |
+| 1 | target, rule, repo | — | Check whether the issue is existing enforcement failure, missing concept, wrong existing rule or duplicate concept using the actual maintenance policy of the selected owner. Choose one canonical owner before edits. |
 | 2 | rule, repo | source | Make smallest scoped rule/gate/step repair with stable IDs, same-commit Vietnamese mirror and no product-specific law. Update genuine callers/contracts together; do not patch consumers as hidden workaround. |
 | 3 | rule, repo | evidence | Run actual relevant validation/citation/parity and behavioral regression checks. Generated documents use their owned generators; inspect changes rather than claiming textual shape proves sound guidance. |
 | 4 | target, rule, repo | node, evidence | Commit owned change when authorized and report exact originating context needing re-evaluation. Do not automatically rerun its operation or claim visual correctness. |

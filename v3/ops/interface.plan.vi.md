@@ -28,13 +28,13 @@ Op này chỉ được khai/sửa graph thuộc scope đang được chọn rõ:
 | Nguồn | Khi nào đọc |
 | --- | --- |
 | [knowledge/patterns/fe/INDEX.md](../../knowledge/patterns/fe/INDEX.md) | Chỉ khi FE/thư viện chọn thật sự dùng họ này; giữ convention repo hiện tại nếu khác. |
-| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt legacy. |
+| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt không liên quan. |
 
 ## Ghi gì vào đâu
 
 | ID | Nơi ghi | Trường / section | Nội dung bắt buộc |
 | --- | --- | --- | --- |
-| node | .work/<business>/architecture/interface/<piece>/node.md + selected implementation/frontend/<piece>/node.md | body: Surface map / Shared shell / Interaction states / Data contracts / Accessibility / Source scope / Acceptance; refs; dependsOn; assertions; required | Mỗi surface: ID ổn định, route/host, actor/task, owner shell, entry/exit, read/write, loading/empty/error/denied/success, viewport/keyboard, source path, AC refs. Con implementation vẫn todo. Chỉ sửa graph thuộc scope được chọn rõ đã duyệt: prerequisite node IDs thật ở dependsOn, input ngữ nghĩa node/resource IDs ở refs. Không chain toàn catalogue hoặc scope khác; chốt graph/spec trước proof review. |
+| node | .work/<business>/architecture/interface/<piece>/node.md + selected implementation/frontend/<piece>/node.md + explicitly selected audit/quality child directories/node.md | body: Surface map / Shared shell / Interaction states / Data contracts / Accessibility / Source scope / Acceptance; refs; dependsOn; assertions; required | Mỗi surface: ID ổn định, route/host, actor/task, owner shell, entry/exit, read/write, loading/empty/error/denied/success, viewport/keyboard, source path, AC refs. Con implementation vẫn todo. Nếu request hiện tại chọn preset có audit/quality/review portfolio sau đó, khai chính xác target consumer và assertion mong đợi ngay, todo, trong graph đã duyệt. Không tạo scope review chỉ vì op plan chạy; consumer sau không bịa target thiếu. Chỉ sửa graph thuộc scope được chọn rõ đã duyệt: prerequisite node IDs thật ở dependsOn, input ngữ nghĩa node/resource IDs ở refs. Không chain toàn catalogue hoặc scope khác; chốt graph/spec trước proof review. |
 | evidence | E/manifest.yaml + E/surface-review.md | id; nodeId; inputDigest; outcome; assertions; assets; provenance; codeRefs; extensions | Ghi route/screen tìm thấy, tách accepted/proposed, scope bỏ kèm lý do và review mapping. |
 
 ## Thứ tự thực hiện hữu hạn

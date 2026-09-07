@@ -27,7 +27,7 @@ Chỉ đọc graph node đã chọn. Không thêm/bỏ dependency, refs, require
 
 | Nguồn | Khi nào đọc |
 | --- | --- |
-| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt legacy. |
+| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt không liên quan. |
 
 ## Ghi gì vào đâu
 

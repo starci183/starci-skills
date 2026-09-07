@@ -276,8 +276,8 @@
       "supportingReferences": [
         {
           "path": "knowledge/patterns/be/INDEX.md",
-          "when": "Only when the selected backend actually uses the documented NestJS family; inspect actual current code before adopting a topic. This is a topic index, not v2 routing.",
-          "whenVi": "Chỉ khi backend đã chọn thật sự dùng họ NestJS được mô tả; inspect code hiện tại trước áp dụng topic. Đây là index chuyên môn, không routing v2."
+          "when": "Only when the selected backend actually uses the documented NestJS family; inspect actual current code before adopting a topic. Use this index only for applicable code patterns.",
+          "whenVi": "Chỉ khi backend đã chọn thật sự dùng họ NestJS được mô tả; inspect code hiện tại trước áp dụng topic. Chỉ dùng index cho pattern code áp dụng."
         }
       ],
       "contract": {
@@ -529,8 +529,8 @@
       "supportingReferences": [
         {
           "path": "knowledge/patterns/be/INDEX.md",
-          "when": "Only when the selected backend actually uses the documented NestJS family; inspect actual current code before adopting a topic. This is a topic index, not v2 routing.",
-          "whenVi": "Chỉ khi backend đã chọn thật sự dùng họ NestJS được mô tả; inspect code hiện tại trước áp dụng topic. Đây là index chuyên môn, không routing v2."
+          "when": "Only when the selected backend actually uses the documented NestJS family; inspect actual current code before adopting a topic. Use this index only for applicable code patterns.",
+          "whenVi": "Chỉ khi backend đã chọn thật sự dùng họ NestJS được mô tả; inspect code hiện tại trước áp dụng topic. Chỉ dùng index cho pattern code áp dụng."
         }
       ],
       "contract": {
@@ -794,8 +794,8 @@
       "supportingReferences": [
         {
           "path": "knowledge/patterns/be/INDEX.md",
-          "when": "Only when the selected backend actually uses the documented NestJS family; inspect actual current code before adopting a topic. This is a topic index, not v2 routing.",
-          "whenVi": "Chỉ khi backend đã chọn thật sự dùng họ NestJS được mô tả; inspect code hiện tại trước áp dụng topic. Đây là index chuyên môn, không routing v2."
+          "when": "Only when the selected backend actually uses the documented NestJS family; inspect actual current code before adopting a topic. Use this index only for applicable code patterns.",
+          "whenVi": "Chỉ khi backend đã chọn thật sự dùng họ NestJS được mô tả; inspect code hiện tại trước áp dụng topic. Chỉ dùng index cho pattern code áp dụng."
         }
       ],
       "contract": {
@@ -2706,8 +2706,8 @@
               "extensions.work3.nativeGoal: actual returned current-task goal reference only"
             ],
             "content": {
-              "en": "Write the parent purpose with no state. The one setup leaf .work/<business>/setup/node.md is N for this op, kind business, with only scope-review assertions. All planned business/architecture/code/UAT leaves remain todo, or explicit blocked/na with real reasons. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof.",
-              "vi": "Ghi mục đích cha không có state. Lá setup duy nhất .work/<business>/setup/node.md là N của op, kind business, chỉ có assertion review scope. Mọi lá nghiệp vụ/kiến trúc/code/UAT dự kiến vẫn todo, hoặc blocked/na có lý do thật. Tách implement/defer/không áp dụng; ID requirement chỉ có một nơi. Chỉ sửa graph thuộc scope được chọn rõ đã duyệt: prerequisite node IDs thật ở dependsOn, input ngữ nghĩa node/resource IDs ở refs. Không chain toàn catalogue hoặc scope khác; chốt graph/spec trước proof review."
+              "en": "Write the parent purpose with no state. The one setup leaf .work/<business>/setup/node.md is N for this op, kind business, with only scope-review assertions. All planned business/architecture/code/UAT leaves remain todo, or explicit blocked/na with real reasons. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. When the user explicitly selected a scoped setup preset, its workspace-binding and business-review targets are planned child nodes here with their own expected assertions, todo. Do not invent a repository binding or accepted business decision to close them. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof.",
+              "vi": "Ghi mục đích cha không có state. Lá setup duy nhất .work/<business>/setup/node.md là N của op, kind business, chỉ có assertion review scope. Mọi lá nghiệp vụ/kiến trúc/code/UAT dự kiến vẫn todo, hoặc blocked/na có lý do thật. Tách implement/defer/không áp dụng; ID requirement chỉ có một nơi. Khi user chọn preset setup đúng scope rõ ràng, target workspace-binding/business-review là node con plan ở đây, assertion riêng, todo. Không bịa binding repo hoặc quyết định business đã duyệt để đóng chúng. Chỉ sửa graph thuộc scope được chọn rõ đã duyệt: prerequisite node IDs thật ở dependsOn, input ngữ nghĩa node/resource IDs ở refs. Không chain toàn catalogue hoặc scope khác; chốt graph/spec trước proof review."
             }
           },
           {
@@ -3132,8 +3132,8 @@
       "supportingReferences": [
         {
           "path": "knowledge/ui/proof/INDEX.md",
-          "when": "Read relevant observation topics for the selected assertions; use only applicable accepted criteria, actual measurements and available instruments, not old run-chain machinery.",
-          "whenVi": "Đọc topic observation phù hợp assertion chọn; chỉ dùng tiêu chí đã chấp nhận áp dụng/measurement thật/công cụ có sẵn, không machinery chain cũ."
+          "when": "Read relevant observation topics for the selected assertions; use only applicable accepted criteria, actual measurements and available instruments, not unselected execution machinery.",
+          "whenVi": "Đọc topic observation phù hợp assertion chọn; chỉ dùng tiêu chí đã chấp nhận áp dụng/measurement thật/công cụ có sẵn, không machinery thực thi chưa chọn."
         }
       ],
       "contract": {
@@ -3389,13 +3389,13 @@
       "supportingReferences": [
         {
           "path": "knowledge/ui/composition/INDEX.md",
-          "when": "Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or legacy receipt requirement.",
-          "whenVi": "Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt legacy."
+          "when": "Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or unrelated receipt requirement.",
+          "whenVi": "Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt không liên quan."
         },
         {
           "path": "knowledge/ui/proof/INDEX.md",
-          "when": "Read relevant observation topics for the selected assertions; use only applicable accepted criteria, actual measurements and available instruments, not old run-chain machinery.",
-          "whenVi": "Đọc topic observation phù hợp assertion chọn; chỉ dùng tiêu chí đã chấp nhận áp dụng/measurement thật/công cụ có sẵn, không machinery chain cũ."
+          "when": "Read relevant observation topics for the selected assertions; use only applicable accepted criteria, actual measurements and available instruments, not unselected execution machinery.",
+          "whenVi": "Đọc topic observation phù hợp assertion chọn; chỉ dùng tiêu chí đã chấp nhận áp dụng/measurement thật/công cụ có sẵn, không machinery thực thi chưa chọn."
         }
       ],
       "contract": {
@@ -3894,8 +3894,8 @@
         },
         {
           "path": "knowledge/ui/composition/INDEX.md",
-          "when": "Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or legacy receipt requirement.",
-          "whenVi": "Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt legacy."
+          "when": "Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or unrelated receipt requirement.",
+          "whenVi": "Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt không liên quan."
         },
         {
           "path": "knowledge/ui/presentation/INDEX.md",
@@ -4169,7 +4169,7 @@
         "architecture"
       ],
       "writeScope": [
-        ".work/<business>/architecture/interface/<piece>/node.md + selected implementation/frontend/<piece>/node.md",
+        ".work/<business>/architecture/interface/<piece>/node.md + selected implementation/frontend/<piece>/node.md + explicitly selected audit/quality child directories/node.md",
         "E/manifest.yaml + E/surface-review.md"
       ],
       "sideEffects": [],
@@ -4182,8 +4182,8 @@
         },
         {
           "path": "knowledge/ui/composition/INDEX.md",
-          "when": "Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or legacy receipt requirement.",
-          "whenVi": "Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt legacy."
+          "when": "Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or unrelated receipt requirement.",
+          "whenVi": "Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt không liên quan."
         }
       ],
       "contract": {
@@ -4240,7 +4240,7 @@
         "writes": [
           {
             "id": "node",
-            "path": ".work/<business>/architecture/interface/<piece>/node.md + selected implementation/frontend/<piece>/node.md",
+            "path": ".work/<business>/architecture/interface/<piece>/node.md + selected implementation/frontend/<piece>/node.md + explicitly selected audit/quality child directories/node.md",
             "fields": [
               "body: Surface map / Shared shell / Interaction states / Data contracts / Accessibility / Source scope / Acceptance",
               "refs",
@@ -4249,8 +4249,8 @@
               "required"
             ],
             "content": {
-              "en": "Surface rows: stable ID, route/host, actor/task, shell owner, entry/exit, reads/writes, loading/empty/error/denied/success, viewport/keyboard needs, source path and AC refs. Keep implementation children todo. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof.",
-              "vi": "Mỗi surface: ID ổn định, route/host, actor/task, owner shell, entry/exit, read/write, loading/empty/error/denied/success, viewport/keyboard, source path, AC refs. Con implementation vẫn todo. Chỉ sửa graph thuộc scope được chọn rõ đã duyệt: prerequisite node IDs thật ở dependsOn, input ngữ nghĩa node/resource IDs ở refs. Không chain toàn catalogue hoặc scope khác; chốt graph/spec trước proof review."
+              "en": "Surface rows: stable ID, route/host, actor/task, shell owner, entry/exit, reads/writes, loading/empty/error/denied/success, viewport/keyboard needs, source path and AC refs. Keep implementation children todo. If the current request explicitly selects a scoped preset with a later audit/quality/portfolio review, declare that exact consumer target and expected assertions now, todo, under the approved graph. Do not create review scope merely because this planning op ran; no consumer invents missing targets later. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof.",
+              "vi": "Mỗi surface: ID ổn định, route/host, actor/task, owner shell, entry/exit, read/write, loading/empty/error/denied/success, viewport/keyboard, source path, AC refs. Con implementation vẫn todo. Nếu request hiện tại chọn preset có audit/quality/review portfolio sau đó, khai chính xác target consumer và assertion mong đợi ngay, todo, trong graph đã duyệt. Không tạo scope review chỉ vì op plan chạy; consumer sau không bịa target thiếu. Chỉ sửa graph thuộc scope được chọn rõ đã duyệt: prerequisite node IDs thật ở dependsOn, input ngữ nghĩa node/resource IDs ở refs. Không chain toàn catalogue hoặc scope khác; chốt graph/spec trước proof review."
             }
           },
           {
@@ -4397,13 +4397,7 @@
         "scoped local commits when authorized"
       ],
       "completionProfile": "implementation",
-      "supportingReferences": [
-        {
-          "path": "UPDATE.md",
-          "when": "Read fully before changing canonical knowledge, IDs, mirrors or generators.",
-          "whenVi": "Đọc đầy đủ trước đổi knowledge canonical, ID, mirror hoặc generator."
-        }
-      ],
+      "supportingReferences": [],
       "contract": {
         "id": "knowledge.repair",
         "goal": {
@@ -4443,7 +4437,7 @@
           },
           {
             "id": "rule",
-            "path": "selected canonical knowledge file + mirror + UPDATE.md + original challenge evidence",
+            "path": "selected canonical knowledge file + mirror + applicable owner maintenance policy + original challenge evidence",
             "purpose": {
               "en": "Read the actual rule identifier/case and its owner/callers, observed counterexamples and existing enforcement. Read relevant skill instructions fully if editing a skill.",
               "vi": "Đọc rule ID/case thật, owner/caller, phản ví dụ quan sát, enforcement hiện có; nếu sửa skill phải đọc đầy đủ hướng dẫn skill liên quan."
@@ -4508,8 +4502,8 @@
             ],
             "writes": [],
             "action": {
-              "en": "Check whether the issue is existing enforcement failure, missing concept, wrong existing rule or duplicate concept using UPDATE.md. Choose one canonical owner before edits.",
-              "vi": "Theo UPDATE.md kiểm lỗi là hổng enforcement/thiếu concept/rule sai/concept trùng. Chọn một owner canonical trước sửa."
+              "en": "Check whether the issue is existing enforcement failure, missing concept, wrong existing rule or duplicate concept using the actual maintenance policy of the selected owner. Choose one canonical owner before edits.",
+              "vi": "Theo chính sách bảo trì thật của owner được chọn, kiểm lỗi là hổng enforcement/thiếu concept/rule sai/concept trùng. Chọn một owner canonical trước sửa."
             }
           },
           {
@@ -4626,8 +4620,8 @@
       "supportingReferences": [
         {
           "path": "knowledge/ui/composition/INDEX.md",
-          "when": "Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or legacy receipt requirement.",
-          "whenVi": "Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt legacy."
+          "when": "Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or unrelated receipt requirement.",
+          "whenVi": "Chỉ đọc topic composition khớp family/scope; không import component Grammar không có hoặc yêu cầu receipt không liên quan."
         }
       ],
       "contract": {
@@ -6502,7 +6496,7 @@
         "architecture"
       ],
       "writeScope": [
-        ".work/<business>/uat/<flow>/node.md + ui/<screen>/node.md + ux/<piece>/node.md",
+        ".work/<business>/uat/<flow>/node.md + ui/<screen>/node.md + ux/<piece>/node.md + explicitly selected workflow-review/node.md",
         "E/manifest.yaml + E/case-coverage.md"
       ],
       "sideEffects": [],
@@ -6570,7 +6564,7 @@
         "writes": [
           {
             "id": "node",
-            "path": ".work/<business>/uat/<flow>/node.md + ui/<screen>/node.md + ux/<piece>/node.md",
+            "path": ".work/<business>/uat/<flow>/node.md + ui/<screen>/node.md + ux/<piece>/node.md + explicitly selected workflow-review/node.md",
             "fields": [
               "body: Flow / Actor / Preconditions / Case steps / Expected / Proof / Cleanup / Isolation",
               "refs",
@@ -6580,8 +6574,8 @@
               "state"
             ],
             "content": {
-              "en": "Flow parent states purpose and common preconditions. UI leaves identify screen/state, viewport/theme and appearance criteria. UX leaves identify case/AC, actor, fixture, ordered action, expected output/state, persistence/denial proof and cleanup ownership. Planned leaves remain todo. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof.",
-              "vi": "Cha flow ghi mục đích/precondition chung. Lá UI ghi screen/state, viewport/theme, tiêu chí appearance. Lá UX ghi case/AC, actor/fixture, action có thứ tự, expected output/state, persistence/denial proof, cleanup owner. Lá dự kiến vẫn todo. Chỉ sửa graph thuộc scope được chọn rõ đã duyệt: prerequisite node IDs thật ở dependsOn, input ngữ nghĩa node/resource IDs ở refs. Không chain toàn catalogue hoặc scope khác; chốt graph/spec trước proof review."
+              "en": "Flow parent states purpose and common preconditions. UI leaves identify screen/state, viewport/theme and appearance criteria. UX leaves identify case/AC, actor, fixture, ordered action, expected output/state, persistence/denial proof and cleanup ownership. Planned leaves remain todo. If the current request explicitly selects a scoped preset with a later audit/quality/portfolio review, declare that exact consumer target and expected assertions now, todo, under the approved graph. Do not create review scope merely because this planning op ran; no consumer invents missing targets later. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof.",
+              "vi": "Cha flow ghi mục đích/precondition chung. Lá UI ghi screen/state, viewport/theme, tiêu chí appearance. Lá UX ghi case/AC, actor/fixture, action có thứ tự, expected output/state, persistence/denial proof, cleanup owner. Lá dự kiến vẫn todo. Nếu request hiện tại chọn preset có audit/quality/review portfolio sau đó, khai chính xác target consumer và assertion mong đợi ngay, todo, trong graph đã duyệt. Không tạo scope review chỉ vì op plan chạy; consumer sau không bịa target thiếu. Chỉ sửa graph thuộc scope được chọn rõ đã duyệt: prerequisite node IDs thật ở dependsOn, input ngữ nghĩa node/resource IDs ở refs. Không chain toàn catalogue hoặc scope khác; chốt graph/spec trước proof review."
             }
           },
           {
@@ -6746,8 +6740,8 @@
       "supportingReferences": [
         {
           "path": "knowledge/ui/proof/INDEX.md",
-          "when": "Read relevant observation topics for the selected assertions; use only applicable accepted criteria, actual measurements and available instruments, not old run-chain machinery.",
-          "whenVi": "Đọc topic observation phù hợp assertion chọn; chỉ dùng tiêu chí đã chấp nhận áp dụng/measurement thật/công cụ có sẵn, không machinery chain cũ."
+          "when": "Read relevant observation topics for the selected assertions; use only applicable accepted criteria, actual measurements and available instruments, not unselected execution machinery.",
+          "whenVi": "Đọc topic observation phù hợp assertion chọn; chỉ dùng tiêu chí đã chấp nhận áp dụng/measurement thật/công cụ có sẵn, không machinery thực thi chưa chọn."
         }
       ],
       "contract": {
@@ -7403,211 +7397,366 @@
           "screen": "Selected surface/state slug / slug screen-state đã chọn"
         }
       }
-    }
-  ],
-  "legacyMappings": [
-    {
-      "legacy": "api.verify",
-      "replacement": "api.verify",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/api-verify/operator.md",
-      "change": "Actual API suite and isolated effects; no automatic blanket cleanup or invented missing cases."
     },
     {
-      "legacy": "architecture.decide",
-      "replacement": "architecture.decide",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/architecture-decide/operator.md",
-      "change": "Concrete repository/path/symbol code-scope is required; no automatic critique dispatch or unconditional selection confirmation."
-    },
-    {
-      "legacy": "backend.generate",
-      "replacement": "backend.generate",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/backend-generate/operator.md",
-      "change": "One bounded outcome, ordinary repository ownership and real per-piece commits; no mandatory session request, one-commit limit or source widening."
-    },
-    {
-      "legacy": "backend.plan",
-      "replacement": "backend.plan",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/backend-plan/operator.md",
-      "change": "Filesystem implementation leaves replace duplicate units/response partition; no fan-out execution."
-    },
-    {
-      "legacy": "business.decide",
-      "replacement": "business.decide",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/business-decide/operator.md",
-      "change": "Business leaves and detailed FR/NFR/BR/AC matrices replace business head/model/history; no repeated restatement approval."
-    },
-    {
-      "legacy": "business.reconcile",
-      "replacement": "business.reconcile",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/business-reconcile/operator.md",
-      "change": "Current requirement-to-code/evidence comparison, no duplicate head/index/object publication or rewritten expected behavior."
-    },
-    {
-      "legacy": "content.generate",
-      "replacement": "content.generate",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/content-generate/operator.md",
-      "change": "Selected grounded content outcome and actual media/example checks; no forced independent reviewer or default edition assumptions."
-    },
-    {
-      "legacy": "data.plan",
-      "replacement": "data.plan",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/data-plan/operator.md",
-      "change": "Shared fixture resource owns inputs/namespace/cleanup contract; expected outcomes cannot be seeded."
-    },
-    {
-      "legacy": "data.seed",
-      "replacement": "data.seed",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/data-seed/operator.md",
-      "change": "Exact selected inspect/apply/cleanup action; no account creation, broad restore or automatic next UAT."
-    },
-    {
-      "legacy": "environment.preflight",
-      "replacement": "environment.preflight",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/environment-preflight/operator.md",
-      "change": "Only selected op prerequisites; no mandatory whole-chain preflight or repairing effects."
-    },
-    {
-      "legacy": "git.publish",
-      "replacement": "git.publish",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/git-publish/operator.md",
-      "change": "Exact requested remote/ref effects and per-repo lineage; no session lifecycle prerequisite or automatic cleanup."
-    },
-    {
-      "legacy": "identity.provision",
-      "replacement": "identity.provision",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/identity-provision/operator.md",
-      "change": "Explicit inspect/create/repair/rotate scope; UAT permission alone never creates/resets accounts; canonical sealed refs."
-    },
-    {
-      "legacy": "interface.audit",
-      "replacement": "interface.audit",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/interface-audit/operator.md",
-      "change": "Real UI proof on selected scope; available browser tools instead of mandatory legacy walk runner; no source repairs."
-    },
-    {
-      "legacy": "interface.draw",
-      "replacement": "interface.draw",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/interface-draw/operator.md",
-      "change": "Requested actual visual direction only; no forced image generation for every UI task or automatic generate handoff."
-    },
-    {
-      "legacy": "interface.fix",
-      "replacement": "interface.fix",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/interface-fix/operator.md",
-      "change": "Observed defect, bounded ownership and regression proof; no arbitrary universal file-count rule."
-    },
-    {
-      "legacy": "interface.generate",
-      "replacement": "interface.generate",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/interface-generate/operator.md",
-      "change": "Code plus actual captured/inspected result in one selected outcome; no compulsory candidate/session/three-receipt chain."
-    },
-    {
-      "legacy": "interface.plan",
-      "replacement": "interface.plan",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/interface-plan/operator.md",
-      "change": "Surface/state leaves and canonical shell ownership; no duplicate units list or forced shell when none applies."
-    },
-    {
-      "legacy": "knowledge.repair",
-      "replacement": "knowledge.repair",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/knowledge-repair/operator.md",
-      "change": "Canonical evidence-backed owner repair with mirror and real tests; no automatic originating-op retry."
-    },
-    {
-      "legacy": "landing.compose",
-      "replacement": "landing.compose",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/landing-compose/operator.md",
-      "change": "Truthful section/content/asset/motion contract, no mandatory legacy Grammar/tool or subsequent generation."
-    },
-    {
-      "legacy": "library.update",
-      "replacement": "library.update",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/library-update/operator.md",
-      "change": "Selected owner/consumer/pack/publish mode with actual integrity; no default patch bump or implicit registry publication."
-    },
-    {
-      "legacy": "migration.release",
-      "replacement": "migration.release",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/migration-release/operator.md",
-      "change": "Exact source-owned migration and target authority; no automatic down/retry/deploy; actual journal invariants."
-    },
-    {
-      "legacy": "quality.verify",
-      "replacement": "quality.verify",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/quality-verify/operator.md",
-      "change": "Exact actual commands/metrics; no fabricated project-wide pass or blanket E2E approval loop."
-    },
-    {
-      "legacy": "release.deploy",
-      "replacement": "release.deploy",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/release-deploy/operator.md",
-      "change": "Immutable artifact with actual authority/probes; quality success is not deployment authorization."
-    },
-    {
-      "legacy": "runtime.serve",
-      "replacement": "runtime.serve",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/runtime-serve/operator.md",
-      "change": "Owned runtime resource and real served-build proof; no universal fixed port, automatic merge or runtime ladder chain."
-    },
-    {
-      "legacy": "service.operate",
-      "replacement": "service.operate",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/service-operate/operator.md",
-      "change": "One declared auxiliary service and actual probes; no inferred ownership or unrelated lifecycle effects."
-    },
-    {
-      "legacy": "uat.plan",
-      "replacement": "uat.plan",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/uat-plan/operator.md",
-      "change": "Canonical flow/UI/UX leaves hold executable expected cases; no duplicate request/case-sheet/units chain."
-    },
-    {
-      "legacy": "uat.verify",
-      "replacement": "uat.verify",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/uat-verify/operator.md",
-      "change": "Real UI behavior and persistence; explicit actor/fixture refs and immutable evidence bundles replace duplicated run/latest/history files."
-    },
-    {
-      "legacy": "workflow.verify",
-      "replacement": "workflow.verify",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/workflow-verify/operator.md",
-      "change": "Selected peer/piece proof versus task purpose, not terminal v2 solo-session receipts or automatic peer messaging."
-    },
-    {
-      "legacy": "workspace.bind",
-      "replacement": "workspace.bind",
-      "disposition": "preserved-scope-replaced-protocol",
-      "source": "operators/workspace-bind/operator.md",
-      "change": "Verified repository/work-root resource replaces route/session receipt; explicit supplied identity can ground a new workspace."
+      "id": "workspace.migrate",
+      "document": "workspace.migrate.md",
+      "mirror": "workspace.migrate.vi.md",
+      "goal": "Preserve and import one selected business/pilot from inspected source and existing artifacts into canonical .work, without claiming imported implementation or UAT is complete.",
+      "nodeKinds": [
+        "operations"
+      ],
+      "writeScope": [
+        ".work/workspace.yaml",
+        ".work/<business>/node.md + .work/<business>/migration/node.md + optional .work/<business>/cleanup/node.md + selected imported child directories/node.md",
+        ".work/_resources/repositories/<resource>/resource.yaml + .work/_resources/imports/<resource>/resource.yaml + .work/_resources/imports/<resource>/assets/<asset>",
+        "E/manifest.yaml + E/inventory.json + E/source-map.md + E/preservation.json + E/import-review.md + E/cleanup.json",
+        "repository:<repo-id>/<retirement-target>"
+      ],
+      "sideEffects": [
+        "selected canonical workspace/resource/scope writes",
+        "scoped documentation commits only when authorized",
+        "optional explicitly authorized exact preserved artifact-directory retirement; registered Git worktree removal only through Git"
+      ],
+      "completionProfile": "operations",
+      "supportingReferences": [],
+      "contract": {
+        "id": "workspace.migrate",
+        "goal": {
+          "en": "Preserve and import one selected business/pilot from inspected source and existing artifacts into canonical .work, without claiming imported implementation or UAT is complete.",
+          "vi": "Bảo toàn và nhập một business/pilot đã chọn từ source và artifact đã kiểm tra vào .work canonical, không coi implementation hoặc UAT nhập vào là đã hoàn thành."
+        },
+        "nodeKinds": [
+          "operations"
+        ],
+        "completionProfile": "operations",
+        "sideEffects": [
+          "selected canonical workspace/resource/scope writes",
+          "scoped documentation commits only when authorized",
+          "optional explicitly authorized exact preserved artifact-directory retirement; registered Git worktree removal only through Git"
+        ],
+        "graphPolicy": {
+          "mode": "selected-scope-only",
+          "location": ".work node dependsOn/refs and resource files",
+          "prerequisiteState": "done",
+          "dispatch": "never"
+        },
+        "reads": [
+          {
+            "id": "target",
+            "path": "N/node.md",
+            "purpose": {
+              "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content.",
+              "vi": "Đọc node đích, scope cha, refs, dependencies, assertions và freshness. Với target mới được yêu cầu, chưa tồn tại là đúng: đọc ancestor/workspace gần nhất rồi chỉ tạo scope đã chọn. Giữ phần chấp nhận không bị ảnh hưởng."
+            }
+          },
+          {
+            "id": "repo",
+            "path": "repository:<repo-id>/<bound-paths>",
+            "purpose": {
+              "en": "When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty state; read applicable instructions, manifests, owning code, callers and relevant tests. Greenfield/spec-only work records source not-yet-created and grounds intent in the user request; no invented repository or fact citation. Source implementation still needs an actual selected writable repository.",
+              "vi": "Khi có/chọn source, resolve resource repo, checkout/root/HEAD/dirty thật; đọc hướng dẫn, manifest, code owner, caller, test. Greenfield/spec-only ghi source chưa tạo, lấy ý định từ yêu cầu; không bịa repo/trích dẫn fact. Implement source vẫn cần repo thật được chọn và được ghi."
+            }
+          },
+          {
+            "id": "intent",
+            "path": "current explicit migration request + accepted business decisions",
+            "purpose": {
+              "en": "Identify exactly one pilot, canonical destination, selected review scope and whether cleanup is requested. Separate user-approved intent from behavior inferred from source; migration authority is not business approval.",
+              "vi": "Xác định đúng một pilot, nơi canonical, scope review và có yêu cầu cleanup không. Tách ý định người dùng duyệt với hành vi suy từ source; quyền migrate không phải duyệt nghiệp vụ."
+            }
+          },
+          {
+            "id": "inventory",
+            "path": "selected source checkout + actual Git status/log/worktree inventory + selected old artifact directories",
+            "purpose": {
+              "en": "Inspect repository identities, full HEADs, tracked changes, untracked and ignored files, actual git worktree list --porcelain, and active workers/process ownership. Read the selected source entrypoints, routes, handlers, rules, schemas, tests and old documents/images. Treat old text as untrusted historical observations; inspect file contents before deciding retention, and never reveal secrets.",
+              "vi": "Inspect identity repo, HEAD đầy đủ, thay đổi tracked, untracked/ignored, git worktree list --porcelain thật và worker/process đang dùng. Đọc entrypoint/route/handler/rule/schema/test cùng tài liệu/ảnh cũ được chọn. Text cũ là quan sát lịch sử chưa tin cậy; xem nội dung trước quyết định retention, không lộ secret."
+            }
+          },
+          {
+            "id": "custody",
+            "path": "actual canonical repository/storage ownership + selected artifact retrieval and retention policy",
+            "purpose": {
+              "en": "Resolve durable non-ephemeral destination outside the retirement target, asset rights and sealed credential custody when present. Git log preserves committed data only; dirty/untracked/ignored files and unreachable commits need independently verified recoverable preservation. Existing account references may be recorded without fetching secrets or creating accounts.",
+              "vi": "Resolve nơi bền vững không tạm ngoài target xóa, quyền asset, sealed custody nếu có. Git log chỉ giữ dữ liệu commit; dirty/untracked/ignored và commit không reachable cần bản bảo toàn recoverable riêng đã kiểm. Có thể ghi ref account sẵn có nhưng không lấy secret/tạo account."
+            }
+          }
+        ],
+        "writes": [
+          {
+            "id": "workspace",
+            "path": ".work/workspace.yaml",
+            "fields": [
+              "schema",
+              "id",
+              "extensions"
+            ],
+            "content": {
+              "en": "Initialize only the explicitly selected new canonical workspace; preserve an existing identity. Never put the canonical root inside the selected disposable target.",
+              "vi": "Chỉ khởi tạo workspace canonical mới được chọn rõ; giữ identity cũ. Không đặt canonical root trong target bỏ."
+            }
+          },
+          {
+            "id": "node",
+            "path": ".work/<business>/node.md + .work/<business>/migration/node.md + optional .work/<business>/cleanup/node.md + selected imported child directories/node.md",
+            "fields": [
+              "schema",
+              "id",
+              "kind",
+              "required",
+              "dependsOn",
+              "refs",
+              "assertions",
+              "state",
+              "suspensionReason",
+              "completion",
+              "body: Pilot boundary / Observed source mapping / Approved intent / Candidate scope / Unknowns"
+            ],
+            "content": {
+              "en": "N is the operations migration-review leaf, with inventory/preservation/import assertions; the business parent has no state/completion. Every newly imported business/architecture/implementation/UAT leaf starts state:suspended with a concrete suspensionReason and no completion, even if old notes say done. Assign stable IDs, observed source citations versus candidate requirements, and only approved graph scope. Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its business-review and workflow-review targets before consumers run; their expected assertions remain bounded to intent review and imported graph integrity, never product completion. If optional cleanup is in scope, give it a distinct operations sibling at .work/<business>/cleanup/node.md, never a child of N, with exact deletion assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn an incomplete parent done. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof.",
+              "vi": "N là lá operations migration-review, assertion inventory/bảo toàn/import; parent business không state/completion. Mọi lá business/architecture/implementation/UAT nhập mới bắt đầu state:suspended, suspensionReason cụ thể, không completion dù note cũ ghi done. Gán ID ổn định, tách citation source quan sát với requirement ứng viên, chỉ graph scope được phép. Không ghi đè node đã duyệt. Nếu preset được chọn rõ thì khai target business-review/workflow-review trước consumer; assertion chỉ review ý định và integrity graph nhập, không hoàn thành product. Cleanup nếu thuộc scope có lá operations ngang hàng tại .work/<business>/cleanup/node.md, không nằm dưới N, assertion xóa chính xác; N luôn là lá; cleanup chưa đủ điều kiện vẫn blocked, không biến parent thiếu thành done. Chỉ sửa graph thuộc scope được chọn rõ đã duyệt: prerequisite node IDs thật ở dependsOn, input ngữ nghĩa node/resource IDs ở refs. Không chain toàn catalogue hoặc scope khác; chốt graph/spec trước proof review."
+            }
+          },
+          {
+            "id": "resources",
+            "path": ".work/_resources/repositories/<resource>/resource.yaml + .work/_resources/imports/<resource>/resource.yaml + .work/_resources/imports/<resource>/assets/<asset>",
+            "fields": [
+              "schema",
+              "id",
+              "kind",
+              "owner",
+              "revision",
+              "details",
+              "files:[{path}]"
+            ],
+            "content": {
+              "en": "Record inspected repository root/identity/full commits and source mappings in details; keep observed versus inferred facts explicit. Preserve selected nonsecret source/design documents and images in imports assets with files relative paths. A source image is not product screenshot evidence. Preserve original artifact names, actual hashes and origin in the inventory report; register only retrievable existing account custody refs without secrets. Bind stable resource IDs in selected imported node refs before computing review digest. Do not copy whole source repositories or credentials into .work.",
+              "vi": "Ghi root/identity/commit đầy đủ và mapping source đã inspect ở details, phân fact quan sát/suy luận. Giữ tài liệu/hình nguồn-design không secret đã chọn trong imports assets, files path tương đối. Ảnh source không là evidence screenshot product. Giữ tên gốc/hash thật/origin trong inventory; chỉ ref custody account có sẵn truy xuất được, không secret. Gắn resource ID ở refs node nhập trước digest review. Không chép cả source repo/credential vào .work."
+            }
+          },
+          {
+            "id": "evidence",
+            "path": "E/manifest.yaml + E/inventory.json + E/source-map.md + E/preservation.json + E/import-review.md + E/cleanup.json",
+            "fields": [
+              "id",
+              "nodeId",
+              "inputDigest",
+              "outcome",
+              "assertions",
+              "assets",
+              "provenance",
+              "codeRefs",
+              "extensions"
+            ],
+            "content": {
+              "en": "Inventory each selected path: origin repository/commit, tracked/dirty/untracked/ignored status, actual byte hash, classification, retention decision, durable destination and verified retrieval hash or explicit unresolved status. Source rows cite actual path/symbol/commit, observed behavior, candidate business interpretation, confidence/unknown and separate intent authority. Preserve historical UAT as historical files, never a fresh pass manifest. Record migration assertions only, final .work validation output, cleanup target/authority/worker checks and actual action or blocked/not-requested. Imported child product assertions must have no fabricated evidence.",
+              "vi": "Inventory từng path: repo/commit gốc, tracked/dirty/untracked/ignored, hash bytes thật, phân loại, quyết định giữ, nơi bền vững và hash đọc lại hoặc chưa rõ. Row source có path/symbol/commit thật, hành vi quan sát, diễn giải business ứng viên, confidence/unknown và nguồn ý định riêng. Giữ UAT lịch sử dạng file lịch sử, không manifest pass mới. Chỉ assertion migration, output validate .work cuối, target/quyền/worker cleanup và action thật hoặc blocked/not-requested. Không bịa evidence assertion product của con."
+            }
+          },
+          {
+            "id": "source",
+            "path": "repository:<repo-id>/<retirement-target>",
+            "fields": [
+              "optional exact old artifact-directory removal only; no product implementation edits"
+            ],
+            "content": {
+              "en": "Only if cleanup was explicitly selected and authorized: retire the one resolved old directory after all preservation/retrieval hashes, committed history reachability, recoverable dirty/untracked/ignored data, ownership and inactive-worker checks pass. The target cannot be a repository root, canonical .work root, broad parent or symlink; use actual registered worktree inventory, not its folder name. Registered Git worktrees require git worktree remove for the exact target without force; custom artifact directories use a recoverable same-shell move/removal at the exact verified target. If the target is outside the bound selected repository ceiling or any check is uncertain, do not delete; leave blocked cleanup. No accounts, deployments, broad cleanup, force or raw recursive deletion of Git worktrees.",
+              "vi": "Chỉ khi cleanup được chọn và cho phép rõ: bỏ đúng thư mục cũ đã resolve sau khi hash bảo toàn/đọc lại, reachable commit history, dirty/untracked/ignored recoverable, ownership và không worker đều pass. Target không là root repo/.work canonical/parent rộng/symlink; dùng inventory worktree thật, không đoán theo tên. Git worktree đăng ký phải git worktree remove đúng target không force; thư mục artifact tùy chỉnh dùng move/removal recoverable cùng shell đúng target đã kiểm. Target ngoài ceiling repo hoặc bất kỳ check chưa chắc thì không xóa, cleanup blocked. Không account/deploy/cleanup rộng/force/raw recursive delete Git worktree."
+            }
+          }
+        ],
+        "steps": [
+          {
+            "reads": [
+              "intent",
+              "target",
+              "repo",
+              "inventory",
+              "custody"
+            ],
+            "writes": [
+              "workspace",
+              "evidence"
+            ],
+            "action": {
+              "en": "Confirm one pilot and exact canonical destination. Inspect existing target and ancestors; absence is expected only for selected new scope. Inventory actual Git roots/HEAD/status/worktrees and selected historical artifacts before any writes or cleanup. Stop if ownership or pilot boundary is ambiguous.",
+              "vi": "Chốt một pilot và nơi canonical chính xác. Inspect target/ancestor; chỉ scope mới được chọn được phép chưa có. Inventory Git root/HEAD/status/worktree và artifact thật trước ghi/cleanup. Dừng nếu ownership hoặc boundary pilot mơ hồ."
+            }
+          },
+          {
+            "reads": [
+              "repo",
+              "inventory",
+              "intent"
+            ],
+            "writes": [
+              "evidence"
+            ],
+            "action": {
+              "en": "Read the bounded source and tests; map routes/actions/data/rules to source facts at actual commits. Report contradictions and missing behavior. Label inferred business as candidate, never approved intent; old checkmarks and test file existence prove no current execution.",
+              "vi": "Đọc source/test đúng phạm vi; map route/action/data/rule tới fact source ở commit thật. Báo mâu thuẫn/hành vi thiếu. Nghiệp vụ suy ra là candidate, không là ý định duyệt; dấu tick cũ/tồn tại test không chứng minh đã chạy hiện tại."
+            }
+          },
+          {
+            "reads": [
+              "inventory",
+              "custody",
+              "repo"
+            ],
+            "writes": [
+              "resources",
+              "evidence"
+            ],
+            "action": {
+              "en": "Classify and preserve only selected durable nonsecret artifacts; hash original bytes and retrieve/re-hash destination bytes outside the cleanup target. Verify committed history remains reachable and separately preserve dirty/untracked/ignored material with owned safe custody. A missing or secret-containing artifact blocks its cleanup, not permission to copy secrets or drop data.",
+              "vi": "Phân loại/giữ artifact bền vững không secret đã chọn; hash bytes gốc rồi đọc lại/hash nơi đích ngoài target cleanup. Kiểm lịch sử commit còn reachable và bảo toàn riêng dirty/untracked/ignored bằng custody an toàn sở hữu. Artifact thiếu/chứa secret chặn cleanup, không cho phép chép secret/bỏ dữ liệu."
+            }
+          },
+          {
+            "reads": [
+              "intent",
+              "target",
+              "inventory",
+              "repo",
+              "custody"
+            ],
+            "writes": [
+              "node",
+              "resources"
+            ],
+            "action": {
+              "en": "Author the selected candidate tree and canonical source resources. Imported leaves are suspended with a specific suspensionReason until their own selected review/implementation/UAT proof; do not add completion. Preserve approved existing nodes. Declare only actual selected graph edges and preset review targets when explicitly requested; unresolved edges are recorded as unknown rather than invented IDs.",
+              "vi": "Viết cây candidate đã chọn/resource source canonical. Lá nhập suspended với suspensionReason riêng tới khi review/implementation/UAT được chọn có proof riêng, không completion. Giữ node cũ duyệt. Chỉ khai edge thật/target review preset nếu được chọn; edge chưa rõ ghi unknown không bịa ID."
+            }
+          },
+          {
+            "reads": [
+              "target",
+              "intent",
+              "inventory",
+              "custody",
+              "repo"
+            ],
+            "writes": [
+              "source",
+              "evidence"
+            ],
+            "action": {
+              "en": "If and only if exact cleanup is selected, re-inspect worktree registration, source/dirty inventory and active-worker ownership immediately before removal. Require explicit deletion authority, verified durable bytes and recoverable commits/uncommitted data. Remove a registered worktree with Git without force, or retire a verified custom artifact directory recoverably. If any check fails, leave original untouched and record the separate cleanup leaf blocked. Do not run a successor op.",
+              "vi": "Chỉ nếu chọn cleanup chính xác, inspect lại đăng ký worktree/inventory source-dirty/worker ngay trước xóa. Cần quyền xóa rõ, bytes bền vững đã kiểm, commit/uncommitted recoverable. Worktree đăng ký xóa bằng Git không force; thư mục artifact tùy chỉnh retire recoverable. Check fail thì giữ nguyên gốc, ghi cleanup riêng blocked. Không chạy op kế."
+            }
+          },
+          {
+            "reads": [
+              "target",
+              "intent",
+              "inventory",
+              "repo",
+              "custody"
+            ],
+            "writes": [
+              "node",
+              "evidence"
+            ],
+            "action": {
+              "en": "Finalize semantic scope/resources first, obtain the real inputDigest, then verify imported IDs/refs/assertions, preservation hashes and all suspended states. Write only observed migration evidence and migration-review completion after verification. Keep product children suspended and cleanup truth explicit; commit only selected documentation when authorized, record actual commit separately in evidence, then stop.",
+              "vi": "Chốt scope/resource ngữ nghĩa trước, lấy inputDigest thật rồi kiểm ID/ref/assertion nhập/hash bảo toàn/state suspended. Chỉ ghi evidence migration quan sát và completion migration-review sau kiểm. Giữ con product suspended, cleanup trung thực; commit tài liệu đã chọn khi được phép, ghi commit thật riêng trong evidence, rồi dừng."
+            }
+          }
+        ],
+        "proofs": [
+          {
+            "id": "binding",
+            "requirement": {
+              "en": "Run workspace validation; every cited ID/path exists or is explicitly proposed, required assertions are covered, input bindings are current, and an honest not-run/fail cannot earn done.",
+              "vi": "Chạy validate workspace; ID/path trích dẫn tồn tại hoặc ghi rõ dự kiến, đủ assertions bắt buộc, binding còn mới; not-run/fail không được done."
+            }
+          },
+          {
+            "id": "source",
+            "requirement": {
+              "en": "Every claimed source behavior has inspected path/symbol/full commit and is distinguished from approved business intent; unknowns remain visible.",
+              "vi": "Mọi claim hành vi source có path/symbol/commit đầy đủ đã inspect và tách với ý định business duyệt; unknown hiển thị."
+            }
+          },
+          {
+            "id": "preservation",
+            "requirement": {
+              "en": "Every selected retained artifact has independently re-read identical hashes at a durable destination; dirty/untracked/ignored data and history remain recoverable before any deletion.",
+              "vi": "Mỗi artifact giữ có hash đọc lại trùng ở đích bền vững; dirty/untracked/ignored/history recoverable trước xóa."
+            }
+          },
+          {
+            "id": "suspension",
+            "requirement": {
+              "en": "Imported product leaves are stored suspended with suspensionReason and without completion; they cannot satisfy done-only dependencies or receive migration evidence as product acceptance.",
+              "vi": "Lá product nhập lưu suspended/suspensionReason, không completion; không thỏa dependency cần done hoặc nhận evidence migration thành acceptance product."
+            }
+          },
+          {
+            "id": "cleanup",
+            "requirement": {
+              "en": "Cleanup is not-requested, proven exact safe retirement, or separately blocked with original data retained. Migration success never hides required unresolved cleanup.",
+              "vi": "Cleanup là không yêu cầu, retire chính xác an toàn đã chứng minh, hoặc blocked riêng và giữ gốc. Migrate thành công không giấu cleanup bắt buộc chưa xong."
+            }
+          }
+        ],
+        "blockers": [
+          {
+            "code": "PILOT_SCOPE_UNKNOWN",
+            "condition": {
+              "en": "One business boundary, actual source ownership or canonical destination cannot be resolved.",
+              "vi": "Chưa resolve một boundary business, ownership source thật hoặc nơi canonical."
+            }
+          },
+          {
+            "code": "PRESERVATION_UNPROVEN",
+            "condition": {
+              "en": "Selected bytes/history/uncommitted data cannot be retrieved identically and recoverably outside the retirement target; retain originals.",
+              "vi": "Bytes/history/uncommitted đã chọn chưa truy xuất trùng/recoverable ngoài target bỏ; giữ gốc."
+            }
+          },
+          {
+            "code": "RETIREMENT_UNSAFE",
+            "condition": {
+              "en": "Deletion authority, exact target ownership, inactive worker status or worktree registration is missing/uncertain; do not delete or force.",
+              "vi": "Thiếu/chưa chắc quyền xóa/ownership target/worker ngừng/đăng ký worktree; không xóa/force."
+            }
+          },
+          {
+            "code": "DECLARED_DEPENDENCY_UNMET",
+            "condition": {
+              "en": "A declared prerequisite is not effectively done, or a required declared input/scope is missing. Report node/resource IDs and propose a separately selected graph update when needed; never run predecessors or weaken dependsOn/refs/required to proceed.",
+              "vi": "Prerequisite đã khai chưa effective done hoặc thiếu input/scope bắt buộc đã khai. Báo ID node/resource và đề xuất cập nhật graph được chọn riêng khi cần; không chạy predecessor hoặc nới dependsOn/refs/required để tiếp tục."
+            }
+          }
+        ],
+        "placeholders": {
+          "business": "Selected business slug / slug nghiệp vụ đã chọn",
+          "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
+          "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
+          "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
+          "environment": "Resolved environment resource slug / slug environment đã resolve",
+          "identity": "Selected actor resource slug / slug actor đã chọn",
+          "fixture": "Selected fixture resource slug / slug fixture đã chọn",
+          "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
+          "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
+          "piece": "Stable selected piece slug / slug piece đã chọn",
+          "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
+          "screen": "Selected surface/state slug / slug screen-state đã chọn",
+          "retirement-target": "Exact inventoried old directory relative to the bound repository, verified within the selected ceiling / thư mục cũ inventory chính xác tương đối repo trong ceiling"
+        },
+        "migrationPolicy": {
+          "scope": "one-selected-business",
+          "importState": "suspended",
+          "reasonField": "suspensionReason",
+          "importCompletion": "forbidden",
+          "intentAuthority": "approved-intent-not-inferred-source",
+          "cleanup": "explicit-exact-preserved-inactive-only",
+          "registeredWorktreeRemoval": "git-without-force"
+        }
+      }
     }
   ]
 }

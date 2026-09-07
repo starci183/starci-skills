@@ -30,7 +30,7 @@ Read the selected node graph only. Do not add/remove dependencies, refs, require
 | Source | When to read |
 | --- | --- |
 | [knowledge/patterns/fe/INDEX.md](../../knowledge/patterns/fe/INDEX.md) | Only when the selected frontend/library actually adopts this family; retain the current repository convention when it differs. |
-| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or legacy receipt requirement. |
+| [knowledge/ui/composition/INDEX.md](../../knowledge/ui/composition/INDEX.md) | Read matching composition topics only for the selected design family and scope; do not import a missing Grammar component or unrelated receipt requirement. |
 | [knowledge/ui/presentation/INDEX.md](../../knowledge/ui/presentation/INDEX.md) | Read matching presentation topics when the selected installed component/token family is bound. Never invent a rule ID or API from this index. |
 
 ## Exact writes and field/content matrix

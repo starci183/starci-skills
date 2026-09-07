@@ -27,7 +27,7 @@ Read the selected node graph only. Do not add/remove dependencies, refs, require
 
 | Source | When to read |
 | --- | --- |
-| [knowledge/patterns/be/INDEX.md](../../knowledge/patterns/be/INDEX.md) | Only when the selected backend actually uses the documented NestJS family; inspect actual current code before adopting a topic. This is a topic index, not v2 routing. |
+| [knowledge/patterns/be/INDEX.md](../../knowledge/patterns/be/INDEX.md) | Only when the selected backend actually uses the documented NestJS family; inspect actual current code before adopting a topic. Use this index only for applicable code patterns. |
 
 ## Exact writes and field/content matrix
 
