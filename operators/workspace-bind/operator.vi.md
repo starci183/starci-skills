@@ -187,6 +187,7 @@ Khi `done`, in **Operator Result** là bảng route đã resolve từ `response/
 
 | Khi | Operator |
 | --- | --- |
+| Tạo hoặc dựng lại bề mặt cần PNG gắn nghiệp vụ trước mã frontend | `interface.draw` |
 | route đã ràng và checkout mang một bản publish cần đẩy | `git.publish` |
 | route đã ràng và một lời hứa phải được quyết dựa trên source của nó | `business.decide` |
 | route đã ràng và một ranh giới phải được quyết bên trong nó | `architecture.decide` |

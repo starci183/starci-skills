@@ -87,5 +87,16 @@
       "discovery"
     ],
     "rule": "An explicit user delegation can authorize the named coordinator to review an in-scope restatement for the exact confirmed mission and named operators. This is a coordinator decision, never a user answer. Retain the user statement and source reference, exact mission and host identity, sealed reading/request hashes, every line mapped to approved scope clauses, all reviewed exclusions and no material changes. The scope approval alone grants no delegation. Material change requires the user; effect grants, ownership, goal confirmation, tier and budget choices are unaffected. Clause mapping is an accountable reviewer judgment, not machine-proven semantic equivalence."
+  },
+  "artDirection": {
+    "operator": "interface.draw",
+    "visualChangeLevels": [
+      "new",
+      "reconstruct"
+    ],
+    "context": "art-direction-presentations",
+    "brief": "request/art-direction-brief.json",
+    "rule": "Draw one business/concept-grounded PNG by default, show it inline, then continue without a user choice. Only an explicit comparison request permits the interaction policy option count and actual user selection. ImageGen receives the exact frozen brief, concept, Grammar adoption and regional imagery plan. HTML implements the selected PNG and is never a competing direction. Grammar retains geometry authority; sample content grants no business scope. Display attribution is retained evidence, not proof that a human physically viewed the image.",
+    "defaultCandidates": 1
   }
 }

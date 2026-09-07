@@ -243,7 +243,7 @@ export async function acceptInterfaceRoute(f, { step = 10, goal = { prerequisite
 
 
 
-async function freezeKnowledge(f, dir, bindings, { before = 'request/before.html', after = 'response/artifacts/form.html' } = {}) {
+export async function freezeKnowledge(f, dir, bindings, { before = 'request/before.html', after = 'response/artifacts/form.html' } = {}) {
 
   const { buildKnowledgeManifest } = await f.load('scripts/knowledge-manifest.mjs');
 
@@ -374,7 +374,7 @@ function tasteFrom(measurements) {
 
 
 
-export async function acceptInterface(f, runtime, route, { step = 11, goal = { doneWhen: 2 }, browserHostRoot, coordination = null, beforeRequest = null, transform = source => source.replace('>Run</button>', '>Transform</button>'), description = 'Name the existing fixture action Transform', beforeButton = null } = {}) {
+export async function acceptInterface(f, runtime, route, { step = 11, goal = { doneWhen: 2 }, browserHostRoot, coordination = null, beforeRequest = null, beforeResponse = null, transform = source => source.replace('>Run</button>', '>Transform</button>'), description = 'Name the existing fixture action Transform', beforeButton = null } = {}) {
 
   const worktree = f.feWorktree ?? f.worktree, base = git(worktree, 'rev-parse', 'HEAD'), sessionBranch = git(worktree, 'branch', '--show-current'), before = readFileSync(path.join(worktree, INTERFACE_PAGE), 'utf8'), after = transform(before);
 
@@ -443,6 +443,7 @@ export async function acceptInterface(f, runtime, route, { step = 11, goal = { d
 
   response.outcome.primary = { kind: 'image', label: 'Actual refined fixture form', ref: 'response/artifacts/form.wide.png' };
 
+  if(beforeResponse)await beforeResponse({request,response,dir,head});
   await accept(f, request, response);
 
   return { step, head, base, request, ref: `${ref(step)}/response/response.md`, changesRef: `${ref(step)}/response/changes.md`, resolutionRef: `${ref(step)}/response/resolution.md`, directionRef: `${ref(step)}/response/direction.md`, captures, scores };
@@ -451,7 +452,7 @@ export async function acceptInterface(f, runtime, route, { step = 11, goal = { d
 
 
 
-export async function acceptAudit(f, runtime, source, route, { step = 12, goal = { doneWhen: 3 }, browserHostRoot, observation = null, coordination = null } = {}) {
+export async function acceptAudit(f, runtime, source, route, { step = 12, goal = { doneWhen: 3 }, browserHostRoot, observation = null, coordination = null, beforeRequest = null, beforeResponse = null } = {}) {
 
   const worktree = f.feWorktree, head = git(worktree, 'rev-parse', 'HEAD'); assert.equal(head, source.head);
 
@@ -471,7 +472,7 @@ export async function acceptAudit(f, runtime, source, route, { step = 12, goal =
 
   const dir = branch(f, step); const html = readFileSync(path.join(worktree, INTERFACE_PAGE)); put(path.join(dir, 'request/before.html'), html);
 
-  const frozen = await freezeKnowledge(f, dir, UI_BINDINGS); request.frozenInputs = ['request/knowledge-manifest.json', 'request/family-understanding.json', 'request/before.html'].map(ref => ({ ref, sha256: sha(readFileSync(path.join(dir, ref))) })); await open(f, request);
+  const frozen = await freezeKnowledge(f, dir, UI_BINDINGS); request.frozenInputs = ['request/knowledge-manifest.json', 'request/family-understanding.json', 'request/before.html'].map(ref => ({ ref, sha256: sha(readFileSync(path.join(dir, ref))) })); if(beforeRequest)await beforeRequest({request,dir}); await open(f, request);
 
   put(path.join(dir, 'response/artifacts/form.html'), html);
 
@@ -583,6 +584,7 @@ export async function acceptAudit(f, runtime, source, route, { step = 12, goal =
 
   response.outcome.primary = { kind: 'image', label: 'Actual audited narrow form', ref: 'response/artifacts/narrow-light-loaded.png' };
 
+  if(beforeResponse)await beforeResponse({request,response,dir,head});
   await accept(f, request, response);
 
   return { step, head, ref: `${ref(step)}/response/response.md`, request, scope, captures, verdicts, topicRows };

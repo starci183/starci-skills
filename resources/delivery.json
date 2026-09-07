@@ -18,7 +18,8 @@
       "interface.plan",
       "data.plan",
       "uat.plan",
-      "workflow.verify"
+      "workflow.verify",
+      "interface.draw"
     ],
     "implement": [],
     "publish": [],

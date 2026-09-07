@@ -391,7 +391,7 @@ export async function directionErrors({ branchDir, root = ROOT, request, respons
     }
     for (const [slot, why, claim, file] of tableUnder(text, '## Images') ?? []) {
       if (empty(why) || empty(claim)) errors.push(`${at}: image ${slot} requires a task or content role and the claim it serves`);
-      if (/fill(?:ing)? (?:an? )?(?:empty |blank )?(?:space|region)|decorat(?:e|ion)|density/i.test(`${why} ${claim}`)) errors.push(`${at}: image ${slot} is decorative filler; imagery must earn a content or task role`);
+      if (!request.inputs?.['frontend-art-direction'] && /fill(?:ing)? (?:an? )?(?:empty |blank )?(?:space|region)|decorat(?:e|ion)|density/i.test(`${why} ${claim}`)) errors.push(`${at}: image ${slot} is decorative filler; imagery must earn a content or task role`);
       if (empty(file)) errors.push(`${at}: image ${slot} names no artifact`);
     }
     // The surface class is declared once, here, and the later audit reads it from the coverage. The
@@ -778,6 +778,8 @@ export async function validateGenerateStep(branchDir, root = ROOT) {
   errors.push(...resolutionStaleErrors({ at: FILES.inventory, inventory, tree, treeRef }));
   const application = await applicationErrors({ branchDir, request, response, requirements, present, inventory: present.has('inventory') ? inventory : null });
   errors.push(...application.errors);
+  const { artAdoptionErrors } = await import('../../scripts/art-direction.mjs');
+  errors.push(...await artAdoptionErrors(root, branchDir, request, response));
   return { errors };
 }
 

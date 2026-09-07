@@ -14,12 +14,12 @@ Primary output: `landing-composition`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`landing-composition` `response/response.md` (md)
-`knowledge-coverage` `response/data/knowledge-coverage.json`? (data)
-`family-understanding` `response/data/family-understanding.json`? (data)
-`knowledge-question` `response/data/knowledge-question.json`? (data)
+`landing-composition` `response.md` (md)
+`knowledge-coverage` `data/knowledge-coverage.json`? (data)
+`family-understanding` `data/family-understanding.json`? (data)
+`knowledge-question` `data/knowledge-question.json`? (data)
 
 ## Stops
 

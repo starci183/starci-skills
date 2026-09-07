@@ -116,7 +116,8 @@ Một output producer có kiểu được session StarCi khác dùng làm input 
 | Ranh giới hệ thống, quyền sở hữu dữ liệu, hay tech stack | `architecture.decide` |
 | Hành vi phía server, một hợp đồng API, lưu trữ, hay một job | `backend.generate` |
 | Gọi tên mọi trang và modal một tính năng cần, trước khi sinh bất kỳ cái nào | `interface.plan` |
-| Tạo mới, dựng lại, hay thiết kế lại một trang hoặc một modal | `interface.generate` |
+| Vẽ định hướng hình ảnh cho một trang hoặc modal trước khi triển khai | `interface.draw` |
+| Triển khai một trang hoặc modal theo định hướng đã bind, hoặc bảo trì bề mặt hiện có | `interface.generate` |
 | Một finding nhỏ trên trang đã có: dưới ba file, không đổi bố cục | `interface.fix` |
 | Sửa package thư viện do owner quản lý và tiêu thụ bản phát hành của nó qua metadata dependency chính xác | `workspace.bind`, rồi `library.update` |
 | Một surface đã render có thật sự đứng vững không | `interface.audit` |

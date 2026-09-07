@@ -1,5 +1,7 @@
 # Interaction
 
+For frontend creation/redesign, `interface.draw` follows the `artDirection` policy: one concept-grounded PNG by default, displayed inline before code and continued without a choice question. Only an explicit user comparison request enables two or three PNGs and the actual user choice. The frozen business brief, Grammar and per-region imagery plan travel with the prompt and selected PNG. `node scripts/art-direction.mjs present <branch>` produces the native image sheet; emit it unchanged and use `shown` to retain its actual display source. A comparison uses `answer` for the actual user selection. The displayed PNG cannot prove source behavior or UAT, and technical green alone cannot claim the applied surface visually complete.
+
 [interaction.json](interaction.json) owns the communication policy. The entry reads it before
 dispatch. Operator Ask columns, workflow `asks`, missing defaults and route names identify inputs
 or owners; they do not independently authorize a question or an action.

@@ -15,14 +15,25 @@ function resolveLocalRef(schema, ref) {
   if (!ref.startsWith('#/')) throw new Error(`unsupported non-local schema reference ${ref}`);
   return ref.slice(2).split('/').reduce((current, key) => current?.[key.replaceAll('~1', '/').replaceAll('~0', '~')], schema);
 }
-function inspect(schema, rule, value, at, errors, arrayLimits = new Map(), location = []) {
-  if (rule.$ref) return inspect(schema, resolveLocalRef(schema, rule.$ref), value, at, errors, arrayLimits, location);
-  for (const item of rule.allOf ?? []) inspect(schema, item, value, at, errors, arrayLimits, location);
+function inspect(schema, rule, value, at, errors, arrayLimits = new Map(), location = [], contentLocations = new Map()) {
+  if (rule.$ref) return inspect(schema, resolveLocalRef(schema, rule.$ref), value, at, errors, arrayLimits, location, contentLocations);
+  if (typeof value === 'string') {
+    const key = JSON.stringify(location);
+    if (rule.type || rule.pattern || rule.format || Object.hasOwn(rule, 'x-content')) {
+      const allowed = rule['x-content'] === 'source-text';
+      contentLocations.set(key, (contentLocations.get(key) ?? true) && allowed);
+    }
+  }
+  for (const item of rule.allOf ?? []) inspect(schema, item, value, at, errors, arrayLimits, location, contentLocations);
   if (rule.oneOf || rule.anyOf) {
     const branches = rule.oneOf ?? rule.anyOf;
-    const matches = branches.map((branch) => { const e = []; const limits = new Map(); inspect(schema, branch, value, at, e, limits, location); return { e, limits }; }).filter(({ e }) => e.length === 0);
+    const matches = branches.map((branch) => { const e = []; const limits = new Map(), content = new Map(); inspect(schema, branch, value, at, e, limits, location, content); return { e, limits, content }; }).filter(({ e }) => e.length === 0);
     if ((rule.oneOf && matches.length !== 1) || (rule.anyOf && matches.length === 0)) errors.push(`${at}: no unique allowed schema branch`);
     else {
+      for (const key of new Set(matches.flatMap(({ content }) => [...content.keys()]))) {
+        const allowed = matches.every(({ content }) => content.get(key) === true);
+        contentLocations.set(key, (contentLocations.get(key) ?? true) && allowed);
+      }
       const alternatives = new Map();
       for (const { limits } of matches) for (const [array, limit] of limits) alternatives.set(array, Math.max(alternatives.get(array) ?? 0, limit));
       for (const [array, limit] of alternatives) arrayLimits.set(array, Math.min(arrayLimits.get(array) ?? Infinity, limit));
@@ -31,8 +42,8 @@ function inspect(schema, rule, value, at, errors, arrayLimits = new Map(), locat
   }
   if (rule.if) {
     const c = []; inspect(schema, rule.if, value, at, c);
-    if (c.length === 0 && rule.then) inspect(schema, rule.then, value, at, errors, arrayLimits, location);
-    if (c.length > 0 && rule.else) inspect(schema, rule.else, value, at, errors, arrayLimits, location);
+    if (c.length === 0 && rule.then) inspect(schema, rule.then, value, at, errors, arrayLimits, location, contentLocations);
+    if (c.length > 0 && rule.else) inspect(schema, rule.else, value, at, errors, arrayLimits, location, contentLocations);
   }
   if (Object.hasOwn(rule, 'const') && value !== rule.const) errors.push(`${at}: expected ${JSON.stringify(rule.const)}`);
   if (rule.enum && !rule.enum.includes(value)) errors.push(`${at}: value is outside the allowed enum`);
@@ -56,7 +67,7 @@ function inspect(schema, rule, value, at, errors, arrayLimits = new Map(), locat
     if (rule.minItems !== undefined && value.length < rule.minItems) errors.push(`${at}: array is too short`);
     if (rule.maxItems !== undefined && value.length > rule.maxItems) errors.push(`${at}: array is too long`);
     if (rule.uniqueItems && new Set(value.map((item) => JSON.stringify(item))).size !== value.length) errors.push(`${at}: duplicate items are forbidden`);
-    if (rule.items) value.forEach((item, index) => inspect(schema, rule.items, item, `${at}[${index}]`, errors, arrayLimits, [...location, index]));
+    if (rule.items) value.forEach((item, index) => inspect(schema, rule.items, item, `${at}[${index}]`, errors, arrayLimits, [...location, index], contentLocations));
   }
   if (isObject(value)) {
     for (const key of rule.required ?? []) if (!Object.hasOwn(value, key)) errors.push(`${at}.${key}: required`);
@@ -65,18 +76,19 @@ function inspect(schema, rule, value, at, errors, arrayLimits = new Map(), locat
     if (rule.additionalProperties === false) {
       for (const key of Object.keys(value)) if (!Object.hasOwn(properties, key)) errors.push(`${at}.${key}: unexpected property`);
     } else if (isObject(rule.additionalProperties)) {
-      for (const [key, child] of Object.entries(value)) if (!Object.hasOwn(properties, key)) inspect(schema, rule.additionalProperties, child, `${at}.${key}`, errors, arrayLimits, [...location, key]);
+      for (const [key, child] of Object.entries(value)) if (!Object.hasOwn(properties, key)) inspect(schema, rule.additionalProperties, child, `${at}.${key}`, errors, arrayLimits, [...location, key], contentLocations);
     }
-    for (const [key, child] of Object.entries(properties)) if (Object.hasOwn(value, key)) inspect(schema, child, value[key], `${at}.${key}`, errors, arrayLimits, [...location, key]);
+    for (const [key, child] of Object.entries(properties)) if (Object.hasOwn(value, key)) inspect(schema, child, value[key], `${at}.${key}`, errors, arrayLimits, [...location, key], contentLocations);
   }
 }
-// Path traversal and unbounded strings are refused everywhere, whatever the schema says.
-function hygiene(value, arrayLimits, rootAt) {
+// Reference hygiene is the default. Only schema-declared source text is opaque content;
+// universal size limits still apply, and payload fields cannot grant an exemption.
+function hygiene(value, arrayLimits, contentLocations, rootAt) {
   const errors = [];
   const visit = (current, at, location = []) => {
     if (typeof current === 'string') {
       if (current.length > 8192) errors.push(`${at}: string exceeds the contract limit`);
-      if (!at.endsWith('.$schema') && /(^|[\\/])\.\.([\\/]|$)/.test(current) && !/^\.\.\/step-\d+-\d+\//.test(current)) errors.push(`${at}: path traversal is forbidden`);
+      if (contentLocations.get(JSON.stringify(location)) !== true && !at.endsWith('.$schema') && /(^|[\\/])\.\.([\\/]|$)/.test(current) && !/^\.\.\/step-\d+-\d+\//.test(current)) errors.push(`${at}: path traversal is forbidden`);
       return;
     }
     if (Array.isArray(current)) { if (current.length > (arrayLimits.get(JSON.stringify(location)) ?? 512)) errors.push(`${at}: array exceeds the contract limit`); current.forEach((item, i) => visit(item, `${at}[${i}]`, [...location, i])); return; }
@@ -87,9 +99,9 @@ function hygiene(value, arrayLimits, rootAt) {
 }
 export function validateAgainst(schema, value, at = '$') {
   const errors = [];
-  const arrayLimits = new Map();
-  inspect(schema, schema, value, at, errors, arrayLimits);
-  if (errors.length === 0) errors.push(...hygiene(value, arrayLimits, at));
+  const arrayLimits = new Map(), contentLocations = new Map();
+  inspect(schema, schema, value, at, errors, arrayLimits, [], contentLocations);
+  if (errors.length === 0) errors.push(...hygiene(value, arrayLimits, contentLocations, at));
   return errors;
 }
 

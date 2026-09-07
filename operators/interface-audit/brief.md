@@ -10,23 +10,24 @@ Primary output: `frontend-surface-audit`
 
 ## Inputs
 
-`frontend-source-application`, `frontend-presentation-resolution`, `frontend-direction-decision`, `route`, `uat-account`?, `platform-operation-receipt`?, `seed-receipt`?, `units`?, `landing-composition`?, `knowledge-repair-receipt`?
+`quality-verification`?, `frontend-source-application`, `frontend-presentation-resolution`, `frontend-direction-decision`, `route`, `uat-account`?, `platform-operation-receipt`?, `seed-receipt`?, `units`?, `landing-composition`?, `knowledge-repair-receipt`?
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`frontend-surface-audit` `response/response.md` (md)
-`capture` `response/data/captures/<matrixId>.json` (data)
-`screenshot` `response/artifacts/<matrixId>.png` (artifact)
-`verdicts` `response/data/verdicts.json` (data)
-`findings` `response/data/findings.json`? (data)
-`uat-walk` `response/data/walks/<walk>/walk.json`? (data)
-`walk-result` `response/data/walks/<walk>/walk-result.json`? (data)
-`host` `response/artifacts/host.json`? (artifact)
-`knowledge-coverage` `response/data/knowledge-coverage.json`? (data)
-`family-understanding` `response/data/family-understanding.json`? (data)
-`knowledge-question` `response/data/knowledge-question.json`? (data)
+`art-direction-fidelity` `data/art-direction-fidelity.json`? (data)
+`frontend-surface-audit` `response.md` (md)
+`capture` `data/captures/<matrixId>.json` (data)
+`screenshot` `artifacts/<matrixId>.png` (artifact)
+`verdicts` `data/verdicts.json` (data)
+`findings` `data/findings.json`? (data)
+`uat-walk` `data/walks/<walk>/walk.json`? (data)
+`walk-result` `data/walks/<walk>/walk-result.json`? (data)
+`host` `artifacts/host.json`? (artifact)
+`knowledge-coverage` `data/knowledge-coverage.json`? (data)
+`family-understanding` `data/family-understanding.json`? (data)
+`knowledge-question` `data/knowledge-question.json`? (data)
 
 ## Stops
 

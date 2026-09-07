@@ -158,6 +158,8 @@ export async function validateAuditStep(branchDir, root = ROOT) {
   const errors = [...base.errors];
   const { request, response, requirements = {}, present = new Set() } = base;
   if (!response || response.operatorId !== 'interface.audit') return { errors };
+  const { artFidelityErrors } = await import('../../scripts/art-direction.mjs');
+  errors.push(...await artFidelityErrors(root, branchDir, request, response));
   errors.push(...knowledgeQuestionStopErrors({ branchDir, response }));
   errors.push(...uiKnowledgeGateErrors({ root, branchDir, bindings: ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof', '@knowledge/grammars/<family>'], request, status: response.status }));
   const has = (f) => existsSync(path.join(branchDir, f));

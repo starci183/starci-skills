@@ -8,6 +8,8 @@ import {createSharedSourceFixture,incorporateAndRegress} from './workflow-shared
 import {acceptQuality,read,put,git,sha,current,actual,planCells,open,accept} from './workflow-source-fixture.mjs';
 import {startFixtureApi,acceptRuntimeObservation,acceptApiVerification,acceptUatPlan,acceptBrowserVerification,transformWalksFor,judgeTransformExperience,API_SUITE_REF,API_SUITE_SOURCE} from './workflow-verifier-fixture.mjs';
 import {startInterfaceRuntime,acceptInterface,acceptAudit,acceptInterfaceQuality} from './workflow-interface-fixture.mjs';
+import {acceptDrawingOnPeer,drawingAdoption,drawingFidelity} from './workflow-art-fixture.mjs';
+import {technicalQuality} from './art-direction-quality-fixture.mjs';
 import * as runtimeIntegration from './workflow-runtime-integration-fixture.mjs';
 import {playwrightInstallStatus} from './browser-walk.mjs';
 import {hostRootOf} from './validate-request.mjs';
@@ -16,7 +18,7 @@ const goal=(f,operator)=>({doneWhen:f.state().mission.doneWhen.findIndex(line=>l
 const combinedCells = {
  'consumer-a':['workspace.bind','architecture.decide','architecture.decide','backend.generate','backend.generate','runtime.serve','quality.verify','api.verify'],
  'producer-c':['workspace.bind','architecture.decide','architecture.decide','backend.generate','runtime.serve','quality.verify','api.verify'],
- 'consumer-b':['workspace.bind','workspace.bind','architecture.decide','architecture.decide','backend.generate','backend.generate','interface.generate','runtime.serve','runtime.serve','runtime.serve','interface.audit','quality.verify','api.verify','runtime.serve','uat.plan','uat.verify','quality.verify','api.verify','runtime.serve','runtime.serve','quality.verify']
+ 'consumer-b':['workspace.bind','workspace.bind','architecture.decide','architecture.decide','backend.generate','backend.generate','interface.draw','interface.generate','runtime.serve','runtime.serve','runtime.serve','quality.verify','interface.audit','quality.verify','api.verify','runtime.serve','uat.plan','uat.verify','quality.verify','api.verify','runtime.serve','runtime.serve','quality.verify']
 };
 async function freezeCompleteGraph(f){
  const cells=combinedCells[f.sessionId].map((id,index)=>[index+1,id]);
@@ -35,7 +37,7 @@ async function openCoordinatorProof(f,peers,assignment){
  const {WORKFLOW_PEERS}=await coordinator.load('scripts/workflow-verification.mjs');
  const contexts=[a,b,c,coordinator].map(peer=>({alias:`@worktrees/sessions/${peer.sessionId}`,head:null}));
  const request=current(coordinator,{operatorId:'workflow.verify',contexts,requirements:{peers:WORKFLOW_PEERS},inputs:{}},1,{goal:{doneWhen:0},workspace:false,coordination});
- const snapshot={version:2,peers,coordination:{assignment,consumers:[a,b].map(peer=>({dependencyId:dependencies.find(row=>row.consumerSessionId===peer.sessionId&&row.kind==='backend-source-application').id,incorporation:{step:peer.consumerStep,parallel:1,kind:'backend-source-application'},regression:{step:peer===a?7:21,parallel:1,kind:'quality-verification'}})),combined:{sessionId:b.sessionId,step:16,parallel:1,kind:'uat-flow-verification'}}};
+ const snapshot={version:2,peers,coordination:{assignment,consumers:[a,b].map(peer=>({dependencyId:dependencies.find(row=>row.consumerSessionId===peer.sessionId&&row.kind==='backend-source-application').id,incorporation:{step:peer.consumerStep,parallel:1,kind:'backend-source-application'},regression:{step:peer===a?7:23,parallel:1,kind:'quality-verification'}})),combined:{sessionId:b.sessionId,step:18,parallel:1,kind:'uat-flow-verification'}}};
  const dir=path.join(coordinator.session,'step-1/parallel-1');put(path.join(dir,WORKFLOW_PEERS),snapshot);
  request.frozenInputs=[{ref:WORKFLOW_PEERS,sha256:sha(readFileSync(path.join(dir,WORKFLOW_PEERS)))}];await open(coordinator,request);
  return{dir,request,snapshot};
@@ -99,8 +101,9 @@ test('three current workflows extract one writer and prove both consumers in one
  // FE source is observed before its candidate is served by the new BE integration. Its audit and
  // scored browser journey run later against the actual proxy to that integration.
  const frontend=await startInterfaceRuntime(t,b,{apiEndpoint:aRuntime.endpoint});
- const feSource=await acceptInterface(b,frontend,b.interfaceRoute,{step:7,coordination,browserHostRoot});
- const integrated=await runtimeIntegration.acceptRuntimeIntegration(b,{targetHead:aDelivery.source.head,baseHead:bDelivery.source.head,worktree:path.join(b.home,'integrated-be')},{step:8,goal:{prerequisite:'9/1'},coordination,t,changes:bDelivery.source.changesRef});
+ const drawing=await acceptDrawingOnPeer(b,{step:7,nextStep:8,coordination});
+ const feSource=await acceptInterface(b,frontend,b.interfaceRoute,{step:8,coordination,browserHostRoot,beforeRequest:({request})=>{request.inputs['frontend-art-direction']=drawing.ref;},beforeResponse:drawingAdoption(b,drawing)});
+ const integrated=await runtimeIntegration.acceptRuntimeIntegration(b,{targetHead:aDelivery.source.head,baseHead:bDelivery.source.head,worktree:path.join(b.home,'integrated-be')},{step:9,goal:{prerequisite:'10/1'},coordination,t,changes:bDelivery.source.changesRef});
  try{
   assert.deepEqual(git(integrated.entry.server.worktree,'show','-s','--format=%P','HEAD').split(' '),[bDelivery.source.head,aDelivery.source.head]);
   assert.equal(git(b.worktree,'rev-parse','HEAD'),bDelivery.source.head,'runtime integration does not advance the consumer source checkout');
@@ -108,24 +111,25 @@ test('three current workflows extract one writer and prove both consumers in one
   // A separate real FE server now proxies only the integrated endpoint; no in-process worker can
   // satisfy the browser assertions. The first server was used only by source captures.
   const servingFE=await startInterfaceRuntime(t,b,{apiEndpoint:integrated.endpoint});
-  const beforeBE=await acceptRuntimeObservation(b,integrated,{step:9,goal:{prerequisite:'13/1'},coordination,worktree:integrated.entry.server.worktree,wantedCommit:bDelivery.source.head});
-  await acceptRuntimeObservation(b,servingFE,{step:10,goal:{prerequisite:'11/1'},coordination,role:'fe',worktree:b.feWorktree});
-  const audit=await acceptAudit(b,servingFE,feSource,b.interfaceRoute,{step:11,coordination,browserHostRoot});
-  const quality=await acceptInterfaceQuality(b,feSource,audit,{step:12,coordination});
+  const beforeBE=await acceptRuntimeObservation(b,integrated,{step:10,goal:{prerequisite:'15/1'},coordination,worktree:integrated.entry.server.worktree,wantedCommit:bDelivery.source.head});
+  await acceptRuntimeObservation(b,servingFE,{step:11,goal:{prerequisite:'13/1'},coordination,role:'fe',worktree:b.feWorktree});
+  const technical=await technicalQuality(b,feSource,{step:12,auditStep:13,coordination});
+  const audit=await acceptAudit(b,servingFE,feSource,b.interfaceRoute,{step:13,coordination,browserHostRoot,beforeRequest:({request})=>{request.inputs['quality-verification']=technical.ref;},beforeResponse:drawingFidelity(b,feSource)});
+  const quality=await acceptInterfaceQuality(b,feSource,audit,{step:14,coordination});
   const repository=f.canonicalRepository(b.repository),feRepository=f.canonicalRepository(b.feRepository);
   const repositories=[{repository,head:integrated.head,contributions:[{sessionId:a.sessionId,head:aDelivery.source.head},{sessionId:b.sessionId,head:bDelivery.source.head},{sessionId:c.sessionId,head:c.deliverySource.head}]},{repository:feRepository,head:feSource.head,contributions:[{sessionId:b.sessionId,head:feSource.head}]}];
   const selector=step=>({sessionId:b.sessionId,step,parallel:1});
-  const integration={criterionId:'combined',repositories,runtime:[{alias:'@workspaces/be',routeKey:`${b.state().project}/be`,before:selector(9),after:selector(19),verification:{...selector(18),kind:'api-verification'}},{alias:'@workspaces/fe',routeKey:`${b.state().project}/fe`,before:selector(14),after:selector(20),verification:{...selector(16),kind:'uat-flow-verification'}}]};
+  const integration={criterionId:'combined',repositories,runtime:[{alias:'@workspaces/be',routeKey:`${b.state().project}/be`,before:selector(10),after:selector(21),verification:{...selector(20),kind:'api-verification'}},{alias:'@workspaces/fe',routeKey:`${b.state().project}/fe`,before:selector(16),after:selector(22),verification:{...selector(18),kind:'uat-flow-verification'}}]};
   const combined={...coordination,integration},criteria=[{id:'combined',required:true,expected:'Both delivered consumers and their shared producer work in the same served FE/BE tuple.',verification:'Run actual HTTP requests and browser actions against the bracketed immutable runtime tuple containing every contribution.'}];
-  await acceptApiVerification(b,integrated,beforeBE,{step:13,goal:goal(b,'api.verify'),pinnedHead:bDelivery.source.head,coordination});
-  await acceptRuntimeObservation(b,servingFE,{step:14,goal:{prerequisite:'16/1'},coordination,role:'fe',worktree:b.feWorktree});
-  const plan=await acceptUatPlan(b,{step:15,goal:{prerequisite:'16/1'},coordination});
-  const uat=await acceptBrowserVerification(b,{plan,audit,quality,route:b.interfaceRoute,runtime:servingFE,feWorktree:b.feWorktree,beHead:bDelivery.source.head},{step:16,goal:goal(b,'uat.verify'),coordination:combined,criteria,browserHostRoot,walksFor:transformWalksFor,judgeExperience:judgeTransformExperience});
-  await acceptInterfaceQuality(b,feSource,audit,{step:17,coordination,uat});
-  await acceptApiVerification(b,integrated,beforeBE,{step:18,goal:goal(b,'api.verify'),pinnedHead:bDelivery.source.head,coordination:combined,criteria});
-  await acceptRuntimeObservation(b,integrated,{step:19,goal:{prerequisite:'21/1'},coordination,worktree:integrated.entry.server.worktree,wantedCommit:bDelivery.source.head});
-  await acceptRuntimeObservation(b,servingFE,{step:20,goal:{prerequisite:'21/1'},coordination,role:'fe',worktree:b.feWorktree});
-  await acceptQuality(b,bDelivery.source,{step:21,goal:goal(b,'quality.verify'),coordination});
+  await acceptApiVerification(b,integrated,beforeBE,{step:15,goal:goal(b,'api.verify'),pinnedHead:bDelivery.source.head,coordination});
+  await acceptRuntimeObservation(b,servingFE,{step:16,goal:{prerequisite:'18/1'},coordination,role:'fe',worktree:b.feWorktree});
+  const plan=await acceptUatPlan(b,{step:17,goal:{prerequisite:'18/1'},coordination});
+  const uat=await acceptBrowserVerification(b,{plan,audit,quality,route:b.interfaceRoute,runtime:servingFE,feWorktree:b.feWorktree,beHead:bDelivery.source.head},{step:18,goal:goal(b,'uat.verify'),coordination:combined,criteria,browserHostRoot,walksFor:transformWalksFor,judgeExperience:judgeTransformExperience});
+  await acceptInterfaceQuality(b,feSource,audit,{step:19,coordination,uat});
+  await acceptApiVerification(b,integrated,beforeBE,{step:20,goal:goal(b,'api.verify'),pinnedHead:bDelivery.source.head,coordination:combined,criteria});
+  await acceptRuntimeObservation(b,integrated,{step:21,goal:{prerequisite:'23/1'},coordination,worktree:integrated.entry.server.worktree,wantedCommit:bDelivery.source.head});
+  await acceptRuntimeObservation(b,servingFE,{step:22,goal:{prerequisite:'23/1'},coordination,role:'fe',worktree:b.feWorktree});
+  await acceptQuality(b,bDelivery.source,{step:23,goal:goal(b,'quality.verify'),coordination});
   await terminal(b);t.diagnostic('B complete source/API/wide+narrow audit/browser UAT/quality mission passes full session validation.');
   const {buildWorkflowVerification,WORKFLOW_PEERS,WORKFLOW_REPORT}=await b.load('scripts/workflow-verification.mjs');
   const peers={};

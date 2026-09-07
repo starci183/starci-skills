@@ -1,5 +1,7 @@
 # Tương tác
 
+Với tạo mới/thiết kế lại frontend, `interface.draw` theo `artDirection`: mặc định một PNG theo concept, hiển thị inline trước code rồi tiếp tục, không hỏi chọn. Chỉ yêu cầu so sánh rõ của người dùng mới mở hai hoặc ba PNG và lựa chọn thật. Brief nghiệp vụ, Grammar và imagery plan từng region đã đóng băng đi cùng prompt và PNG đã chốt. `node scripts/art-direction.mjs present <branch>` xuất sheet ảnh native; hiển thị nguyên bản rồi dùng `shown` giữ nguồn message thật. Lượt so sánh dùng `answer` cho lựa chọn thật của người dùng. PNG không chứng minh hành vi source hay UAT; kỹ thuật xanh chưa đủ kết luận bề mặt triển khai đã đạt hình ảnh.
+
 [interaction.json](interaction.json) sở hữu chính sách giao tiếp. Entry đọc trước khi điều phối.
 Cột Ask của operator, `asks` trong workflow, thiếu mặc định và tên route xác định input hoặc owner;
 tự chúng không cho phép hỏi hay thực hiện một thao tác.

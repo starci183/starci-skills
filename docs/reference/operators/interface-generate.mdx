@@ -319,6 +319,17 @@ a selector or a passed class, touch a file outside the declared write set, commi
 push, merge, start or reconfigure runtime services, or record a verdict, score or pass claim on the
 written source: it knows what it decided and what it wrote, never how it renders. It never stashes, resets, forces, cleans, rebases or checks out another branch inside the routed checkout, and it deletes nothing by hand under a checkout whose `node_modules` is a junction — a temporary worktree is removed with `git worktree remove --force`. `## Binding` of `changes.md` is where those two laws are read: `Preflight` as `<passed|failed> at <ISO 8601 instant>`, and `Reflog before` and `Reflog after` as `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
 
+## Selected PNG handoff
+
+Fresh new or reconstruct work consumes the accepted frontend-art-direction from interface.draw before any frontend source write. The exact PNG must already have been embedded through Operator Result and its presentation retained. Default art direction has one PNG and no selection question; explicit comparison preserves the actual selected PNG. In this path Steps 5–7 realize and measure that one PNG: HTML is implementation/render evidence, never an alternate direction or an ImageGen fallback. Keep candidates=1 and automatic internal verification; do not ask for an HTML direction choice. The direction receipt keeps the selected PNG candidate id, and art-direction-adoption binds its exact hash, every business region and separately usable assets. Grammar still owns geometry; refine without an art input keeps its bounded maintenance contract.
+
+An applied PNG-directed surface is source-only progress until the same committed source passes its required technical commands and a rendered audit accepts both PNG fidelity and every existing visual topic. The planner uses the authorized audit lane and its technical prerequisite; it does not invent a goal, runtime mutation or UAT permission. If that verification extent is absent, report partial source delivery. Each asset retains its own identity even when several assets share a region. Business/brand/atmosphere purpose comes from the frozen imagery plan, not an automatic decoration ban. A visual failure goes to its actual source or Grammar owner, then through fresh exact-head technical and rendered checks; a build alone never closes surface delivery.
+
+
+## Asset and anatomy realization
+
+For an art-directed surface, realize the selected direction's frozen visual contract through [art-direction-adoption](../../templates/kinds/art-direction-adoption.schema.json). Bind every element to its actual committed source blob and keep native connectors and semantic registry identities intact. Supply each independent asset separately; different subjects cannot be copies of one raster. Complete the transparent asset review specified by interface.draw before accepting the source receipt. Source acceptance does not itself prove the resulting surface's fidelity.
+
 ## Context
 
 | Alias | Bind | Required |
@@ -335,6 +346,7 @@ written source: it knows what it decided and what it wrote, never how it renders
 
 | Kind | From | Required |
 | --- | --- | --- |
+| `frontend-art-direction` | `interface.draw`; exact previously shown PNG direction for visual creation/redesign | no |
 | `business-promise-authority` | `business.decide`; required by `new`, and by `reconstruct` when the state set changes | no |
 | `backend-source-application` | `backend.generate`; required when a data contract changes | no |
 | `architecture-decision` | `architecture.decide`; required when a boundary changes | no |
@@ -374,7 +386,7 @@ written source: it knows what it decided and what it wrote, never how it renders
 | 4 | Resolve the reference standards by class, bounded | `references`, `changeLevel` | @knowledge/ui/composition (the gap the research must close), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 5 | Form the candidates and apply the Grammar filter | `candidates`, `ownerCeiling` | the compiled UI contract, @grammar/core (what a component owns and which props exist), @knowledge/grammars/&lt;family> | — | `NO_VIABLE_DIRECTION`, `GRAMMAR_REQUIRED` |
 | 6 | Render every surviving candidate with its judged images, serve the pages for a person and print them | `candidates`, `preview` | the surviving candidates, @knowledge/grammars/&lt;family>, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | `candidates`, `selected-candidate-capture`, `direction-image`, `host` | — |
-| 7 | Falsify and score every rendered candidate for conformance and perceived task quality, then write the decision | `selectionPolicy`, `approval` | the candidates, reference, inputs `business-promise-authority` and `backend-source-application`, `ui-coverage`, @knowledge/ui/proof | `frontend-direction-decision`, `knowledge-coverage`, `family-understanding`, or `knowledge-question` when contradicted | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED`, `KNOWLEDGE_QUESTION` |
+| 7 | Falsify and score every rendered candidate for conformance and perceived task quality, then write the decision | `selectionPolicy`, `approval` | the candidates, reference, inputs `business-promise-authority` and `backend-source-application`, `ui-coverage`, @knowledge/ui/proof | `frontend-direction-decision`, `art-direction-adoption`, `knowledge-coverage`, `family-understanding`, or `knowledge-question` when contradicted | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED`, `KNOWLEDGE_QUESTION` |
 | 8 | Bind the presentation authority and walk the decided tree once under the owner ceiling | — | @knowledge/ui/presentation (every topic with its fingerprint and rule inventory), @grammar/core (the published package's owned relationships), @workspaces/fe (the frozen tree, in document order), `frontend-direction-decision`, @tools/registry | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED`, `OWNER_CONFLICT` |
 | 9 | Resolve one published rule per application-owned property, remove what the tree may not carry, record the gaps and emit the claims | `contractEmission` | @knowledge/ui/presentation (the cases the bound topics publish), @grammar/core (the owned relationships, Grammar anatomy and the closed scale), @workspaces/fe (the properties each node presently carries) | `inventory`, `resolved-tree`, `frontend-presentation-resolution` | `RULE_MISSING`, `UNKNOWN_RULE` |
 | 10 | Project the resolved tree onto the declared write set, check every value against the inventory and sweep the projection | `mode` | `inventory` beside `resolved-tree`, @workspaces/fe (the declared paths and their owner roots), @tools/shell | `writes` | `RESOLUTION_STALE`, `OWNER_CONFLICT`, `WRITE_REJECTED` |
@@ -451,6 +463,7 @@ surfaces must now be observed.
 
 | Kind | File | Type | Required |
 | --- | --- | --- | --- |
+| `art-direction-adoption` | `response/data/art-direction-adoption.json` | data | no |
 | `frontend-direction-decision` | `response/direction.md` | md | yes |
 | `ui-coverage` | `response/data/coverage.json` | data | yes |
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | no |

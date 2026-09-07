@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.14
+# StarCi Skills 2.5.0-rc.16
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -91,6 +91,10 @@ thì không được publish.
   đổi nghĩa.
 
 ## Dòng dõi
+
+2.5.0-rc.16 (2026-09-07): CLI kiến trúc hoàn tất khởi tạo module trước kiểm tra đệ quy; kiểm thử phối hợp giữ đầy đủ đầu vào hình và bằng chứng giao diện hiện hành. Bản phát hành cần bằng chứng kiểm thử tích hợp.
+
+2.5.0-rc.15 (2026-09-07): định hướng hình ảnh bám nghiệp vụ đi trước triển khai frontend, với bằng chứng asset và giao diện thực; nội dung mã nguồn được khai báo trong schema giữ nguyên byte mà không nới kiểm tra đường dẫn. Bản phát hành cần bằng chứng kiểm thử tích hợp.
 
 2.5.0-rc.14 (2026-09-07): tiếp tục một nhánh song song đã niêm phong giữ phần việc độc lập chưa chạy và tách nhóm kế tiếp hỗn hợp trước các nhánh phụ thuộc; preview trên hai workflow thực giữ nguyên bằng chứng và ledger. Thay file registry dùng chung cơ chế retry có giới hạn trên Windows, giữ head cũ và giải phóng quyền ghi khi thất bại.
 

@@ -14,18 +14,18 @@ Primary output: `uat-flow-verification`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`uat-flow-verification` `response/response.md` (md)
-`uat-snapshot` `response/data/snapshot.json` (data)
-`uat-capture` `response/data/captures/<case>.json` (data)
-`uat-verdicts` `response/data/verdicts.json` (data)
-`audit-scope` `response/data/audit-scope.json`? (data)
-`findings` `response/data/findings.json`? (data)
-`uat-walk` `response/data/walks/<walk>/walk.json`? (data)
-`walk-result` `response/data/walks/<walk>/walk-result.json`? (data)
-`screenshot` `response/artifacts/<case>.png` (artifact)
-`sheet` `response/artifacts/sheet.png` (artifact)
+`uat-flow-verification` `response.md` (md)
+`uat-snapshot` `data/snapshot.json` (data)
+`uat-capture` `data/captures/<case>.json` (data)
+`uat-verdicts` `data/verdicts.json` (data)
+`audit-scope` `data/audit-scope.json`? (data)
+`findings` `data/findings.json`? (data)
+`uat-walk` `data/walks/<walk>/walk.json`? (data)
+`walk-result` `data/walks/<walk>/walk-result.json`? (data)
+`screenshot` `artifacts/<case>.png` (artifact)
+`sheet` `artifacts/sheet.png` (artifact)
 
 ## Stops
 

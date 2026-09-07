@@ -10,13 +10,13 @@ const sha = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex'
 const put = async (file, value) => { await mkdir(path.dirname(file), {recursive:true}); await writeFile(file, typeof value === 'string' ? value : JSON.stringify(value)); };
 const table = (heading, columns, rows) => `\n## ${heading}\n\n| ${columns.join(' | ')} |\n| ${columns.map(()=>'---').join(' | ')} |\n${rows.map(row=>`| ${row.join(' | ')} |`).join('\n')}\n`;
 
-export async function fixture(t, { selection = 'return', followupReading = false, readingOnly = false } = {}) {
+export async function fixture(t, { selection = 'return', followupReading = false, readingOnly = false, migration = false } = {}) {
  const host = await mkdtemp(path.join(os.tmpdir(), 'starci-review-lifecycle-')), root = path.join(host,'.claude');
  t.after(()=>rm(host,{recursive:true,force:true}));
  const payload = JSON.parse(await readFile(path.join(source,'package.json')));
  for (const file of ['package.json',...payload.files]) await cp(path.join(source,file),path.join(root,file),{recursive:true});
  const load = file => import(pathToFileURL(path.join(root,file)).href);
- const [{openSession,confirmSession,cleanupFixtureOwners},{openAttempt,acceptAttempt},{retainContext},{scopeHash},{restatementDecisionId,recordRestatementChoice},plans,{waitingReviewBinding,resolvedWaitingAttemptKeys},{baseline,confirmed},{acquireWorkerSlot,releaseWorkerSlot}] = await Promise.all([
+ const [{openSession,confirmSession,cleanupFixtureOwners},{openAttempt,acceptAttempt},{retainContext},{scopeHash},{restatementDecisionId,recordRestatementChoice},plans,{waitingReviewBinding,resolvedWaitingAttemptKeys},{baseline,confirmed,migrationFixture},{acquireWorkerSlot,releaseWorkerSlot}] = await Promise.all([
   load('scripts/v23-test-fixture.mjs'),load('scripts/attempt-gate.mjs'),load('scripts/mission-history.mjs'),load('scripts/mission-scope.mjs'),load('scripts/restatement-choice.mjs'),load('scripts/plan-history.mjs'),load('scripts/resolved-waiting.mjs'),load('operators/architecture-decide/self-test.mjs'),load('scripts/worker-slots.mjs')]);
  const owner=path.join(host,'owner');await mkdir(owner);
  const git=(...args)=>execFileSync('git',['-C',owner,...args],{windowsHide:true,stdio:['ignore','pipe','pipe']});
@@ -51,7 +51,7 @@ export async function fixture(t, { selection = 'return', followupReading = false
  await put(path.join(branch('1/1'),'response/data/route.json'),binding);await put(path.join(branch('1/1'),'response/response.md'),md.replace(/\| (ROUTE_HYDRATED_FROM_PORTABLE|IDENTITY_ROSTER_SEALED|WORKTREE_BRANCH_FORBIDDEN) \|/g,(_,$1)=>'| `'+$1+'` |'));
  const bindResponse=actual(bind,{schemaVersion:9,operatorId:'workspace.bind',fields:{'workspace-route-binding':'response/response.md',route:'response/data/route.json'},fallbacks:[],commits:[],next:['architecture.decide']},'done',['response/response.md']);delete bindResponse.goalCheck;
  bindResponse.boundProfile='sol-fresh';bindResponse.ranProfile='sol-fresh';await put(path.join(branch('1/1'),'response/response.json'),bindResponse);await acceptAttempt(branch('1/1'));
- const [files]=confirmed(baseline());
+ const [files]=confirmed(migration ? migrationFixture() : baseline());
  for(const ref of ['response/data/current-state.json','response/data/stack-model.json'])files[ref]=JSON.parse(JSON.stringify(files[ref]).replaceAll('b'.repeat(40),head));
  const template=files['request/request.json'];template.contexts[0].head=head;delete template.decisionId;delete template.selectedOption;template.requirements.resume=null;
  const first=current(template,2),text=files['response/restatement.md'];

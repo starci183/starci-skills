@@ -14,11 +14,11 @@ Primary output: `migration-release`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`migration-release` `response/migration-release.md` (md)
-`migration-release-proof` `response/data/migration-release.json` (data)
-`migration-log` `response/artifacts/migration-<n>.log`? (artifact)
+`migration-release` `migration-release.md` (md)
+`migration-release-proof` `data/migration-release.json` (data)
+`migration-log` `artifacts/migration-<n>.log`? (artifact)
 
 ## Stops
 

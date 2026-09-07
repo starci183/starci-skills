@@ -14,13 +14,13 @@ Primary output: `business-promise-authority`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`business-promise-authority` `response/response.md` (md)
-`restatement` `response/restatement.md`? (md)
-`claims` `response/data/claims.json` (data)
-`coverage-matrix` `response/data/coverage-matrix.json` (data)
-`model` `response/data/model.json` (data)
+`business-promise-authority` `response.md` (md)
+`restatement` `restatement.md`? (md)
+`claims` `data/claims.json` (data)
+`coverage-matrix` `data/coverage-matrix.json` (data)
+`model` `data/model.json` (data)
 
 ## Stops
 

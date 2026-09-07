@@ -145,7 +145,8 @@
             "type": "array",
             "items": {
               "type": "string",
-              "maxLength": 8192
+              "maxLength": 8192,
+              "x-content": "source-text"
             }
           }
         }

@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.14
+# StarCi Skills 2.5.0-rc.16
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,10 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.5.0-rc.16 (2026-09-07): architecture CLI completes module initialization before recursive validation; coordinated lifecycle verification retains current drawing and rendered evidence prerequisites. Candidate publication requires integrated release proof.
+
+2.5.0-rc.15 (2026-09-07): business-bound image direction precedes frontend implementation with exact asset and rendered fidelity evidence; schema-declared source text retains its immutable content without weakening reference hygiene. Candidate publication requires integrated release proof.
 
 2.5.0-rc.14 (2026-09-07): resuming a sealed parallel owner preserves unopened independent work and splits mixed successor groups before dependent consumers; both real workflow previews retain prior evidence without ledger mutation. Atomic registry replacement shares bounded Windows retry behavior while preserving the previous head and releasing publication ownership on failure.
 

@@ -60,8 +60,8 @@ export function landingCompositionErrors(receipt, requirements = {}, response = 
   if (!auditOwner || !/evidence|verdict/i.test(auditOwner[1]) || !/source|repair|direction/i.test(auditOwner[2])) errors.push(`${RECEIPT}: interface.audit must own evidence and disown source repair or direction`);
 
   if ((response.commits ?? []).length) errors.push(`response/response.json: ${OPERATOR} is read-only and carries no commits`);
-  if (response.status === 'done' && (response.next?.length !== 1 || response.next[0] !== 'interface.generate')) {
-    errors.push(`response/response.json: a completed composition hands off exactly to interface.generate`);
+  if (response.status === 'done' && (response.next?.length !== 1 || response.next[0] !== 'interface.draw')) {
+    errors.push(`response/response.json: a completed composition hands off exactly to interface.draw`);
   }
   return errors;
 }

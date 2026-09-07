@@ -288,6 +288,17 @@ của chính nó, không thò tay vào giải phẫu Grammar bằng selector hay
 ngoài write set đã khai, không commit lên nhánh nào khác, không push, không merge, không khởi động hay
 cấu hình lại dịch vụ runtime, và không ghi phán quyết, điểm số hay tuyên bố pass lên source đã ghi:
 nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render ra sao. Nó không bao giờ stash, reset, force, clean, rebase hay checkout sang nhánh khác bên trong checkout được route, và không xoá bằng tay bất cứ thứ gì dưới một checkout có `node_modules` là junction — một worktree tạm được gỡ bằng `git worktree remove --force`. `## Binding` của `changes.md` là nơi đọc hai luật ấy: `Preflight` dạng `<passed|failed> at <ISO 8601 instant>`, còn `Reflog before` và `Reflog after` dạng `HEAD <reflog entries> <head sha>; stash <reflog entries>` (orchestrator.json#sourceWrites).
+## Handoff PNG đã chốt
+
+Công việc new/reconstruct mới phải tiêu thụ frontend-art-direction đã chấp nhận từ interface.draw trước khi sửa FE. PNG chính xác phải được embed trong Operator Result và giữ record hiển thị. Mặc định một PNG không hỏi chọn; compare rõ ràng giữ đúng PNG người đã chọn. Trong đường này bước 5–7 chỉ hiện thực và đo một PNG ấy: HTML là bằng chứng implementation/render, không phải hướng cạnh tranh hay fallback ImageGen. Giữ candidates=1 và kiểm nội bộ automatic, không hỏi chọn HTML. direction giữ candidate id của PNG; art-direction-adoption gắn hash, mọi business region và asset dùng riêng. Grammar vẫn sở hữu geometry; refine không có art input giữ contract bảo trì giới hạn.
+
+Bề mặt triển khai theo PNG chỉ có tiến độ source cho đến khi đúng commit vượt các lệnh kỹ thuật bắt buộc và audit render chấp nhận cả độ khớp PNG lẫn mọi topic hình ảnh hiện hữu. Planner dùng lane audit đã được cho phép cùng bước kỹ thuật tiên quyết; không bịa mục tiêu, quyền sửa runtime hay UAT. Nếu phạm vi chưa có phần kiểm chứng ấy, báo source mới hoàn thành một phần. Mỗi asset giữ định danh riêng dù nhiều asset cùng region. Mục đích nghiệp vụ/brand/atmosphere lấy từ imagery plan đã đóng băng, không áp lệnh cấm trang trí chung. Lỗi hình ảnh về đúng owner source hoặc Grammar, rồi chạy lại kỹ thuật và render tại HEAD mới; build pass không đóng toàn bộ bề mặt.
+
+
+## Hiện thực asset và anatomy
+
+Với bề mặt theo art direction, hiện thực visual contract đã đóng băng qua [art-direction-adoption](../../templates/kinds/art-direction-adoption.schema.json). Bind từng phần tử với blob source thực đã commit; giữ connector native và identity icon registry đúng nghĩa. Cấp từng asset độc lập; các subject khác nhau không phải bản sao của một raster. Hoàn tất review asset trong suốt theo interface.draw trước khi accept source. Accept source chưa chứng minh fidelity của bề mặt đã render.
+
 ## Context
 
 | Alias | Bind | Bắt buộc |
@@ -304,6 +315,7 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 
 | Kind | Từ đâu | Bắt buộc |
 | --- | --- | --- |
+| `frontend-art-direction` | `interface.draw`; exact previously shown PNG direction for visual creation/redesign | no |
 | `business-promise-authority` | `business.decide`; bắt buộc với `new`, và với `reconstruct` khi tập trạng thái đổi | không |
 | `backend-source-application` | `backend.generate`; bắt buộc khi một contract dữ liệu đổi | không |
 | `architecture-decision` | `architecture.decide`; bắt buộc khi một ranh giới đổi | không |
@@ -343,7 +355,7 @@ nó biết nó đã quyết gì và ghi gì, không bao giờ biết nó render 
 | 4 | Chốt các chuẩn tham chiếu theo lớp, có giới hạn | `references`, `changeLevel` | @knowledge/ui/composition (khoảng trống mà nghiên cứu phải lấp), @tools/websearch | — | `REFERENCE_EVIDENCE_EXHAUSTED`, `REFERENCE_MISSING` |
 | 5 | Hình thành các phương án và áp bộ lọc Grammar | `candidates`, `ownerCeiling` | UI contract vừa biên, @grammar/core (component sở hữu gì và có prop nào), @knowledge/grammars/<family> | — | `NO_VIABLE_DIRECTION`, `GRAMMAR_REQUIRED` |
 | 6 | Render mọi phương án còn sống kèm hình đã tự xét, phục vụ các trang cho một người xem rồi in ra | `candidates`, `preview` | các phương án còn sống, @knowledge/grammars/<family>, @tools/visualize, @tools/imagegen, @tools/host, @tools/print | `candidates`, `selected-candidate-capture`, `direction-image`, `host` | — |
-| 7 | Phản chứng và chấm mọi phương án đã render theo conform cùng chất lượng thật cho tác vụ, rồi viết quyết định | `selectionPolicy`, `approval` | các phương án, tham chiếu, đầu vào `business-promise-authority` và `backend-source-application`, `ui-coverage`, @knowledge/ui/proof | `frontend-direction-decision`, `knowledge-coverage`, `family-understanding`, hoặc `knowledge-question` khi mâu thuẫn | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED`, `KNOWLEDGE_QUESTION` |
+| 7 | Phản chứng và chấm mọi phương án đã render theo conform cùng chất lượng thật cho tác vụ, rồi viết quyết định | `selectionPolicy`, `approval` | các phương án, tham chiếu, đầu vào `business-promise-authority` và `backend-source-application`, `ui-coverage`, @knowledge/ui/proof | `frontend-direction-decision`, `art-direction-adoption`, `knowledge-coverage`, `family-understanding`, hoặc `knowledge-question` khi mâu thuẫn | `NO_VIABLE_DIRECTION`, `DIRECTION_CHOICE_REQUIRED`, `KNOWLEDGE_QUESTION` |
 | 8 | Bind thẩm quyền trình bày và đi hết cây đã quyết một lượt dưới trần owner | — | @knowledge/ui/presentation (mọi topic kèm fingerprint và kho luật), @grammar/core (các quan hệ đã sở hữu của gói đã publish), @workspaces/fe (cây đóng băng, theo thứ tự tài liệu), `frontend-direction-decision`, @tools/registry | — | `KNOWLEDGE_UNBOUND`, `GRAMMAR_UNPUBLISHED`, `OWNER_CONFLICT` |
 | 9 | Chọn một luật đã publish cho mỗi thuộc tính ứng dụng sở hữu, bỏ những gì cây không được mang, ghi các khoảng trống và phát lời khai | `contractEmission` | @knowledge/ui/presentation (các case topic được bind publish), @grammar/core (các quan hệ đã sở hữu, giải phẫu Grammar và thang đóng), @workspaces/fe (thuộc tính mỗi node đang mang) | `inventory`, `resolved-tree`, `frontend-presentation-resolution` | `RULE_MISSING`, `UNKNOWN_RULE` |
 | 10 | Chiếu cây đã resolve lên write set đã khai, đối chiếu mọi giá trị với kho rồi quét bản chiếu | `mode` | `inventory` cạnh `resolved-tree`, @workspaces/fe (các path đã khai và gốc owner của chúng), @tools/shell | `writes` | `RESOLUTION_STALE`, `OWNER_CONFLICT`, `WRITE_REJECTED` |
@@ -419,6 +431,7 @@ minh rằng cây đã commit đúng là cây đã resolve. `changes.md` là bả
 
 | Kind | File | Kiểu | Bắt buộc |
 | --- | --- | --- | --- |
+| `art-direction-adoption` | `response/data/art-direction-adoption.json` | data | no |
 | `frontend-direction-decision` | `response/direction.md` | md | có |
 | `ui-coverage` | `response/data/coverage.json` | data | có |
 | `candidates` | `response/artifacts/<candidateId>.html` | artifact | không |

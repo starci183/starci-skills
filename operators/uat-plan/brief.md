@@ -14,11 +14,11 @@ Primary output: `uat-plan`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`uat-plan` `response/response.md` (md)
-`uat-case-sheet` `response/data/cases.json` (data)
-`units` `response/data/units.json` (data)
+`uat-plan` `response.md` (md)
+`uat-case-sheet` `data/cases.json` (data)
+`units` `data/units.json` (data)
 
 ## Stops
 

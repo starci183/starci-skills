@@ -122,27 +122,6 @@
         "vi": "Đổi thẩm quyền hoặc ràng buộc; biến thể bề ngoài không phải delta."
       }
     },
-    "DIRECTION_CHOICE_REQUIRED": {
-      "domain": "caller",
-      "disposition": "fallback",
-      "meaning": {
-        "en": "Under automatic, several candidates survive and the scores prove none dominant. Under approval-required, material tier or direction alternatives await the user's choice; scores inform the recommendation, not the selection.",
-        "vi": "Dưới automatic, nhiều phương án sống sót và bảng điểm không cho thấy phương án trội. Dưới approval-required, các tier hoặc hướng khác nhau về bản chất chờ người dùng chọn; điểm hỗ trợ đề xuất, không thay lựa chọn."
-      },
-      "fallback": {
-        "en": "Among the tied top scorers, select the candidate that introduces the fewest new nodes; the scores stay under ## Scores and the pick under ## Decision.",
-        "vi": "Trong các phương án hoà điểm dẫn đầu, chọn phương án thêm ít node mới nhất; bảng điểm giữ dưới ## Scores và lựa chọn ghi dưới ## Decision."
-      },
-      "unless": {
-        "param": "selectionPolicy",
-        "equals": "approval-required",
-        "then": "terminate"
-      },
-      "resume": {
-        "en": "The person supplies approval naming one candidate.",
-        "vi": "Người nhập approval gọi tên một phương án."
-      }
-    },
     "KNOWLEDGE_UNBOUND": {
       "domain": "knowledge",
       "disposition": "terminate",

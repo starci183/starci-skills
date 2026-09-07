@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { cellAliases, kindOf, isYes } from './operator-md.mjs';
 
 const plain = value => String(value ?? '').replaceAll('`', '').trim();
@@ -26,6 +28,11 @@ export function effectiveOperator(node, requirements = {}) {
   const op = node.pkg.en, values = requirementValues(op, requirements);
   const rows = new Map((op.tables.inputs?.rows ?? []).map(row => [kindOf(row.kind), row]));
   const inputs = node.inputs.map(input => ({ ...input, required: requiredWhen(rows.get(input.kind)?.required, values) }));
+  const direction = inputs.find(input => input.kind === 'frontend-art-direction');
+  if (node.pkg.manifest?.id === 'interface.generate' && direction) {
+    const policy = JSON.parse(readFileSync(path.resolve(node.pkg.dir, '../../resources/interaction.json'), 'utf8')).artDirection;
+    direction.required = !requirements.changeLevel || policy.visualChangeLevels.includes(requirements.changeLevel);
+  }
   const roles = new Set((op.tables.context?.rows ?? []).filter(row => requiredWhen(row.required, values)).flatMap(row => cellAliases(row.alias)).map(alias => /^@workspaces\/(fe|be)\b/.exec(alias)?.[1]).filter(Boolean));
   return { ...node, inputs, required: inputs.filter(input => input.required), optional: inputs.filter(input => !input.required), roles };
 }

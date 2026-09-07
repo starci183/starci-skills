@@ -14,13 +14,13 @@ Primary output: `backend-source-application`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`backend-source-application` `response/response.md` (md)
-`changes` `response/changes.md` (md)
-`mutations` `response/data/mutations.json` (data)
-`conformance` `response/data/conformance/<operationId>.<facet>.json`? (data)
-`proof` `response/data/proofs/<operationId>.<proofKind>.json`? (data)
+`backend-source-application` `response.md` (md)
+`changes` `changes.md` (md)
+`mutations` `data/mutations.json` (data)
+`conformance` `data/conformance/<operationId>.<facet>.json`? (data)
+`proof` `data/proofs/<operationId>.<proofKind>.json`? (data)
 
 ## Stops
 

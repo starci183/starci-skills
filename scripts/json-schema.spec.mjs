@@ -50,3 +50,33 @@ test('additionalProperties false still permits declared properties and rejects u
   assert.deepEqual(validateAgainst(schema, { fixed: 'declared' }), []);
   assert.ok(validateAgainst(schema, { fixed: 'declared', extra: true }).some((error) => error.includes('$.extra: unexpected property')));
 });
+
+
+test('schema-declared source text preserves traversal-looking bytes while references and universal caps remain guarded', () => {
+  const content = { type: 'string', 'x-content': 'source-text' };
+  const schema = { type: 'object', properties: { chunks: { type: 'array', items: { $ref: '#/$defs/content' } }, path: { type: 'string' } }, $defs: { content } };
+  const chunks = ['COPY ../../package.json /app/', '# ../comment', 'volume: ../../data:/data'];
+  assert.deepEqual(validateAgainst(schema, { chunks, path: 'Dockerfile' }), []);
+  for (const path of ['../escape', 'root/../../escape', '..\\escape']) assert.ok(validateAgainst(schema, { chunks, path }).some(e => e.includes('traversal')));
+  assert.ok(validateAgainst(schema, { chunks: ['x'.repeat(8193)] }).some(e => e.includes('contract limit')));
+  assert.ok(validateAgainst(schema, { chunks: Array(513).fill('../literal') }).some(e => e.includes('contract limit')));
+  assert.ok(validateAgainst({ type: 'object', properties: { value: { type: 'string' } } }, { value: '../escape', 'x-content': 'source-text' }).some(e => e.includes('traversal')));
+  assert.ok(validateAgainst({ type: 'object', properties: { a: { type: 'object', properties: { b: content } }, 'a.b': { type: 'string' } } }, { a: { b: '../literal' }, 'a.b': '../escape' }).some(e => e.includes('traversal')));
+});
+
+test('opaque source annotations follow only matching schema branches and cannot widen ambiguous reference alternatives', () => {
+  const content = { type: 'string', 'x-content': 'source-text' }, ref = { type: 'string' };
+  assert.deepEqual(validateAgainst({ oneOf: [content, { type: 'number' }] }, '../literal'), []);
+  assert.deepEqual(validateAgainst({ anyOf: [content, content] }, '../literal'), []);
+  assert.ok(validateAgainst({ type: 'string', anyOf: [content] }, '../escape').some(e => e.includes('traversal')));
+  assert.ok(validateAgainst({ anyOf: [content, ref] }, '../escape').some(e => e.includes('traversal')));
+  assert.ok(validateAgainst({ anyOf: [content, {}] }, '../escape').some(e => e.includes('traversal')));
+  assert.ok(validateAgainst({ allOf: [content, ref] }, '../escape').some(e => e.includes('traversal')));
+  assert.deepEqual(validateAgainst({ allOf: [content] }, '../literal'), []);
+  assert.ok(validateAgainst({ type: 'string', allOf: [content] }, '../escape').some(e => e.includes('traversal')));
+  assert.ok(validateAgainst({ oneOf: [{ ...content, pattern: '^safe' }, ref] }, '../escape').some(e => e.includes('traversal')));
+  const branch = { type: 'object', properties: { kind: { const: 'content' } }, required: ['kind'] };
+  const schema = { if: branch, then: { properties: { value: content } }, else: { properties: { value: ref } } };
+  assert.deepEqual(validateAgainst(schema, { kind: 'content', value: '../literal' }), []);
+  assert.ok(validateAgainst(schema, { kind: 'reference', value: '../escape' }).some(e => e.includes('traversal')));
+});

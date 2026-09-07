@@ -16,10 +16,13 @@ test('every declared output resolves through the brief to its actual canonical k
   const brief=await readFile(path.join(pkg.dir,'brief.md'),'utf8');
   assert.match(brief,/Before write\/resume, read \.\.\/\.\.\/templates\/kinds\/<kind>/);
   assert.match(brief,/md \.contract\.json \+ \.skeleton\.md; data \.schema\.json; artifact follows operator\.md/);
+  assert.match(brief,/Paths: response\//);
   for(const output of pkg.en.tables.outputs?.rows??[]){
    const kind=kindOf(output.kind),type=clean(output.type);seen.add(type);
-   const line=brief.split('\n').find(value=>value.startsWith('`'+kind+'` `'+clean(output.file)+'`'));
+   const authored=clean(output.file),relative=authored.replace(/^response\//,'');
+   const line=brief.split('\n').find(value=>value.startsWith('`'+kind+'` `'+relative+'`'));
    assert.ok(line?.endsWith(`(${type})`),`${pkg.manifest.id}/${kind}: brief must preserve its authored output type`);
+   if(authored.startsWith('response/'))assert.equal(path.posix.normalize('response/'+relative),authored,'compact output paths resolve to the exact authoritative branch path');
    const home=path.resolve(pkg.dir,'../../templates/kinds');
    if(type==='md'){
     const contract=JSON.parse(await readFile(path.join(home,kind+'.contract.json'),'utf8'));

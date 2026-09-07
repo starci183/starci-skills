@@ -14,10 +14,10 @@ Primary output: `release-deployment`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`release-deployment` `response/response.md` (md)
-`probes` `response/data/probes.json` (data)
+`release-deployment` `response.md` (md)
+`probes` `data/probes.json` (data)
 
 ## Stops
 

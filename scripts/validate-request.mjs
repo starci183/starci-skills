@@ -218,7 +218,7 @@ export function plannedRequirementErrors(planned, request, at = 'request.json') 
 }
 
 export const V22_CONTRACT = 'starci/v2.2';
-const FAMILY_BOUND_OPERATORS = new Set(['interface.plan', 'landing.compose', 'interface.generate', 'interface.fix', 'interface.audit', 'knowledge.repair']);
+const FAMILY_BOUND_OPERATORS = new Set(['interface.draw', 'interface.plan', 'landing.compose', 'interface.generate', 'interface.fix', 'interface.audit', 'knowledge.repair']);
 const SOURCE_WRITING_OPERATORS = new Set(['backend.generate', 'interface.generate', 'interface.fix', 'knowledge.repair', 'library.update']);
 const canonicalJson = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
@@ -384,6 +384,7 @@ export async function sealedWorkspaceBindingErrors(session, state, request) {
 }
 
 const UI_BINDINGS = {
+  'interface.draw': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof'],
   'interface.plan': ['@knowledge/ui/composition'],
   'landing.compose': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof'],
   'interface.generate': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof'],
@@ -824,6 +825,10 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   errors.push(...selectionErrors(delegatedSelection ? { ...policy, selectionSource: 'coordinator' } : policy, request, recordedChoices));
   if (request.contractVersion === V22_CONTRACT) errors.push(...await frozenInputErrors(dir, request));
   errors.push(...await uiKnowledgeRequestErrors(root, dir, request, { phase }));
+  if (request.contractVersion === V22_CONTRACT && ['interface.draw', 'interface.generate', 'interface.audit'].includes(request.operatorId)) {
+    const { artRequestErrors, artConsumerErrors, artAuditAdmissionErrors } = await import('./art-direction.mjs');
+    errors.push(...await artRequestErrors(root, dir, request, { phase }), ...await artConsumerErrors(root, dir, request, { phase }), ...await artAuditAdmissionErrors(root, dir, request, { phase }));
+  }
   if (request.operatorId === 'architecture.decide' && request.exchange === 'critique') {
     const { architectureSourceRequestErrors } = await import('./architecture-source-review.mjs');
     errors.push(...await architectureSourceRequestErrors(root, dir, request, { phase }));

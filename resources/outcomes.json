@@ -253,6 +253,15 @@
         "link"
       ],
       "guidance": "Show the resolved role, route, checkout, branch, revision and mutation readiness. A source binding does not prove the runtime is serving that revision."
+    },
+    "interface.draw": {
+      "primaryKinds": [
+        "image"
+      ],
+      "primaryOutputs": [
+        "art-direction-png"
+      ],
+      "guidance": "Embed the actual selected full PNG first; drawing is visual direction, never functional or UAT proof."
     }
   }
 }

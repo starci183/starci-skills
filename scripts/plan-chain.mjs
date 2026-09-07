@@ -63,7 +63,7 @@ export function planChain({ packages, mission, options = {} }) {
   // and some of them are in the chain, only those count: a shared kind (units, changes) is read from
   // the producer the row names, never from every branch that happens to emit it.
   const producersInChain = (input, consumer) => {
-    const all = [...nodes.values()].filter((n) => n.key !== consumer.key && n.operator !== consumer.operator && graph.get(n.operator).outputs.has(input.kind));
+    const all = [...nodes.values()].filter((n) => n.key !== consumer.key && n.operator !== consumer.operator && graph.get(n.operator).outputs.has(input.kind) && (!n.technicalAudit || n.technicalAudit === consumer.key));
     const named = all.filter((n) => input.from.includes(n.operator));
     let picked = named.length ? named : all;
     // Several bindings in the chain: a consumer that requires a role reads the binding of that role.
@@ -183,8 +183,29 @@ export function planChain({ packages, mission, options = {} }) {
     closure();
     if (errors.length) throw new PlanError(errors);
   }
+  // Art-directed source is partial until its rendered check; schedule it only within the already
+  // authorized verification lane. A PNG-only mission has no writer and stays a drawing mission.
+  if (mission.discovery && mission.discovery.stage !== 'handoff' && mission.discovery.lanes?.audit?.status === 'planned') {
+    for(const writer of writers){
+      if(!effectiveOperator(graph.get(writer.operator),writer.presets).inputs.some(i=>i.kind==='frontend-art-direction'&&i.required))continue;
+      const audit=add('interface.audit','interface.audit',{},'the applied PNG direction needs exact rendered proof before surface completion');depend(audit,writer.key);
+    }
+    closure();
+  }
   // 4. The roles the mission declares are bound even when no table pulls them in, and every working
   //    branch runs after that binding: the mission said which checkout the work is on.
+  // A technical check is a prerequisite of an art-directed audit, never that audit's visual credit.
+  // Its ordinary quality request names source/gates; the later reconciliation may consume the audit.
+  for (const audit of [...nodes.values()].filter(n => n.operator === 'interface.audit')) {
+    const input = effectiveOperator(graph.get(audit.operator), audit.presets).inputs.find(i => i.kind === 'frontend-source-application');
+    for (const key of input ? producersInChain(input, audit) : []) {
+      const writer = nodes.get(key);
+      if (!effectiveOperator(graph.get(writer.operator), writer.presets).inputs.some(i => i.kind === 'frontend-art-direction' && i.required)) continue;
+      const technical = add(`quality.verify:before:${audit.key}:${key}`, 'quality.verify', {}, 'proves exact source technical gates before the art-directed rendered audit');
+      technical.technicalAudit = audit.key; technical.technicalSource = key;
+      depend(technical, key); depend(audit, technical.key);
+    }
+  }
   for (const role of options.roles ?? []) {
     const b = add(bindKey(role), BIND_OPERATOR, { role }, `binds @workspaces/${role}, which the mission declares`);
     if (b) for (const n of nodes.values()) if (n.operator !== BIND_OPERATOR && n.operator !== PREFLIGHT_OPERATOR) depend(n, b.key);
@@ -219,6 +240,11 @@ export function planChain({ packages, mission, options = {} }) {
   const sorted = [...nodes.values()].sort((a, b) => byKey(a.key, b.key));
   for (const n of sorted) {
     for (const input of effectiveOperator(graph.get(n.operator), n.presets).optional) {
+      if(n.operator==='interface.audit'&&input.kind==='quality-verification'){
+        for(const technical of nodes.values())if(technical.technicalAudit===n.key){edges.get(n.key).add(technical.key);n.soft.add(technical.key);}continue;
+      }
+      if (n.technicalAudit && ['frontend-surface-audit', 'uat-flow-verification'].includes(input.kind)) continue;
+      if (n.technicalSource && input.kind === 'frontend-source-application') { edges.get(n.key).add(n.technicalSource); n.soft.add(n.technicalSource); continue; }
       for (const key of producersInChain(input, n).sort(byKey)) {
         if (edges.get(n.key).has(key)) continue;
         // n after key: illegal when key already runs after n.

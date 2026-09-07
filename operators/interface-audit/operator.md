@@ -170,6 +170,17 @@ anything it observes, start, stop, deploy or reconfigure a runtime service, cite
 absent from the bound inventory, judge a node it did not measure, or accept a claim as evidence that
 a node passes.
 
+## Selected direction fidelity
+
+When the source carries art-direction-adoption, emit art-direction-fidelity against that exact selected PNG and its original business region mapping. Cite actual rendered captures for every region, record observed deviations and a truthful aggregate verdict alongside existing Grammar, accessibility and responsive results. A PNG does not prove working controls or data; ordinary UAT remains required.
+
+
+## Complete PNG fidelity
+
+For an art-directed surface, [art-direction-fidelity](../../templates/kinds/art-direction-fidelity.schema.json) covers every frozen element, required state and exact viewport across anatomy, dimensions, responsive arrangement, motion and semantics. Compare the selected PNG anchors with the actual composition, including connector endpoints, visual centers, text baselines and optical icon size where applicable. Bind each judgment to its actual owner-routed rule, screenshot, measured node and capture walk/result. Numeric width/height claims must equal the runner's measurements and stay within the frozen responsive bounds; viewport and device scaling follow the actual capture driver. An overflow-only sheet is incomplete.
+
+Semantic similarity, optical alignment and motion quality remain accountable review of the retained render/walk, not conclusions manufactured from a pixel hash or a passing build. A failed item retains its owner's repair route and blocks complete visual delivery. Re-render and re-audit the changed source under fresh exact-head technical proof; preserve the failed evidence.
+
 ## Context
 
 | Alias | Bind | Required |
@@ -186,6 +197,7 @@ a node passes.
 
 | Kind | From | Required |
 | --- | --- | --- |
+| `quality-verification` | quality.verify; required current-head technical gate proof before final audit of an art-directed source | no |
 | `frontend-source-application` | `interface.generate`, or the `interface.fix` that repaired one finding on it; the commit under observation and the claims it wrote | yes |
 | `frontend-presentation-resolution` | `interface.generate`, the owner of every node | yes |
 | `frontend-direction-decision` | `interface.generate`, the route and the coverage the matrix is derived from | yes |
@@ -221,7 +233,7 @@ a node passes.
 | 6 | Run each walk through the tree's runner under @tools/browsercontrol mode `playwright` — a fresh browser context per walk at the endpoint the runtime owner's entry carries — or drive the entry through the browser under mode `required` when no walk was written | — | `uat-walk`, @worktrees/sessions/central-runtime for the endpoint, @tools/browsercontrol, @tools/secrets | `walk-result`, `response/artifacts/<matrixId>.png` | `RUNTIME_UNAVAILABLE` |
 | 7 | Capture and measure each entry, reading the nodes, their claims and their values off the record the runner wrote or the driven browser shows | — | @worktrees/sessions/central-runtime, @workspaces/fe (the observed owners and the identifiers each node carries), `walk-result`, @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
 | 8 | Judge the measurable lanes per entry: compare against the claims and every applicable bound knowledge file, rule and Case, judge by owner, and let each measurable topic close itself; for a landing, also prove the composition contract's visual storytelling, motion, reduced-motion and performance evidence, routing failures through its audit contract. Under mode `playwright` every presentation, contrast, accessibility and responsive result cites the element of the runner's `capture-measurements` record it read — the `ref` and the value — so the receipt states no number the runner did not record. Every non-applicable item carries a specific reason and evidence. If a bound knowledge item cannot be applied consistently, write the typed question and stop rather than changing knowledge here | — | the frozen knowledge manifest and family-understanding brief, all three @knowledge/ui groups, @knowledge/grammars/<family>, input `landing-composition` when present, the captures, `walk-result` (the `capture-measurements` record it names beside each screenshot) | `knowledge-coverage`, `family-understanding`, or `knowledge-question` | `UNKNOWN_RULE`, `KNOWLEDGE_QUESTION` |
-| 9 | Score the taste lens once over every sheet of the scope, calibrated on the three anchors and ranked relatively, then emit | — | @knowledge/ui/proof (the calibration set under `calibration/`: the anchors, their bands and the tolerance), the captures of every selected surface | `verdicts`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALIBRATION_OFF`, `NO_PROGRESS` |
+| 9 | Score the taste lens once over every sheet of the scope, calibrated on the three anchors and ranked relatively, then emit | — | @knowledge/ui/proof (the calibration set under `calibration/`: the anchors, their bands and the tolerance), the captures of every selected surface | `verdicts`, `art-direction-fidelity`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALIBRATION_OFF`, `NO_PROGRESS` |
 
 Step 8 judges every claim and lets each measurable proof topic close itself. The canon judgement is
 the one above: every claim measured, judged against the published rule, routed by the owner of the
@@ -327,6 +339,7 @@ different tiering, never a smaller audit.
 
 | Kind | File | Type | Required |
 | --- | --- | --- | --- |
+| `art-direction-fidelity` | `response/data/art-direction-fidelity.json` | data | no |
 | `frontend-surface-audit` | `response/response.md` | md | yes |
 | `capture` | `response/data/captures/<matrixId>.json` | data | yes |
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | yes |

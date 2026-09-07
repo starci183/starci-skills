@@ -149,6 +149,8 @@ export async function validateArchitectureStep(branchDir, root = ROOT, { origin 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const target = process.argv[2];
   if (!target) { process.stderr.write('usage: node validate.mjs <session>/step-N/parallel-M\n'); process.exit(2); }
-  const { errors } = await validateArchitectureStep(path.resolve(target));
-  if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('valid architecture.decide branch\n');
+  // Migration validation imports this module again; finish module evaluation before waiting.
+  validateArchitectureStep(path.resolve(target)).then(({ errors }) => {
+    if (errors.length) { process.stderr.write(`${errors.join('\n')}\n`); process.exitCode = 1; } else process.stdout.write('valid architecture.decide branch\n');
+  }).catch(error => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
 }

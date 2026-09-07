@@ -190,6 +190,7 @@ On `done`, print **Operator Result** as the resolved route table from `response/
 
 | When | Operator |
 | --- | --- |
+| visual creation or reconstruction needs a business-grounded PNG before frontend code | `interface.draw` |
 | the route is bound and the checkout carries a publication to push | `git.publish` |
 | the route is bound and a promise must be decided against its source | `business.decide` |
 | the route is bound and a boundary must be decided inside it | `architecture.decide` |

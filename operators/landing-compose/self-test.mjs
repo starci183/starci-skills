@@ -11,13 +11,13 @@ const receipt = skeleton
   .replace('canonical mascot asset', 'canonical NIVO unicorn asset');
 
 const requirements = { surface: 'nivo-landing' };
-const response = { status: 'done', commits: [], next: ['interface.generate'] };
+const response = { status: 'done', commits: [], next: ['interface.draw'] };
 assert.deepEqual(landingCompositionErrors(receipt, requirements, response), []);
 assert.ok(landingCompositionErrors(receipt.replace('canonical NIVO unicorn asset', '—'), requirements, response).some((error) => error.includes('identity')));
 assert.ok(landingCompositionErrors(receipt.replace('| `hero` | heading and body copy | grammar | `Heading` and `Text` |', '| `hero` | heading and body copy | custom | — |'), requirements, response).some((error) => error.includes('ownership reason')));
 assert.ok(landingCompositionErrors(receipt.replace('| 03 | `roles`', '| 02 | `roles`'), requirements, response).some((error) => error.includes('repeats an order')));
 assert.ok(landingCompositionErrors(receipt.replace('show final state immediately; no drift', '—'), requirements, response).some((error) => error.includes('reduced-motion')));
 assert.ok(landingCompositionErrors(receipt, requirements, { ...response, commits: ['a'.repeat(40)] }).some((error) => error.includes('read-only')));
-assert.ok(landingCompositionErrors(receipt, requirements, { ...response, next: ['git.publish'] }).some((error) => error.includes('exactly to interface.generate')));
+assert.ok(landingCompositionErrors(receipt, requirements, { ...response, next: ['git.publish'] }).some((error) => error.includes('exactly to interface.draw')));
 
 process.stdout.write('landing.compose self-test: one lawful contract and six ownership or completeness mutations refused\n');

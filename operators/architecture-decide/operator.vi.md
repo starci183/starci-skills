@@ -209,6 +209,7 @@ Khi `done`, in **Operator Result** là ranh giới đã chấp nhận trong `res
 
 | Khi | Operator |
 | --- | --- |
+| Tạo hoặc dựng lại bề mặt cần PNG gắn nghiệp vụ trước mã frontend | `interface.draw` |
 | lời hứa nghiệp vụ phải được mô hình lại theo các boundary đã quyết | `business.decide` |
 | quyết định đã xác nhận và một contract backend thay đổi | `backend.generate` |
 | quyết định đã được xác nhận và các thao tác của nó trải qua hơn một ranh giới writer, nên chúng được gom thành module trước khi mỗi nhánh điền một module | `backend.plan` |

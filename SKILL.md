@@ -102,7 +102,8 @@ A typed producer output consumed as an input by another StarCi session uses scri
 | System boundaries, data ownership, or the tech stack | `architecture.decide` |
 | Server behaviour, an API contract, persistence, or a job | `backend.generate` |
 | Naming every page and modal a feature needs before any of them is generated | `interface.plan` |
-| Creating, restructuring, or redesigning one page or one modal | `interface.generate` |
+| Drawing the visual direction for one page or modal before implementation | `interface.draw` |
+| Implementing one page or modal from its bound direction, or maintaining an existing surface | `interface.generate` |
 | One small finding on a page that exists: under three files, no layout change | `interface.fix` |
 | Repairing an owner library package and consuming its release through exact dependency metadata | `workspace.bind`, then `library.update` |
 | Whether a rendered surface actually holds up | `interface.audit` |

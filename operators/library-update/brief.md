@@ -14,18 +14,18 @@ Primary output: `library-source-application`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`library-source-application` `response/data/library.json`? (data)
-`library-proof` `response/data/proofs/<phase>.json`? (data)
-`library-release` `response/data/release.json`? (data)
-`library-archive` `response/artifacts/release/<file>.tgz`? (artifact)
-`dependency-update` `response/data/dependency.json`? (data)
-`dependency-proof` `response/data/proofs/consumer-<phase>.json`? (data)
-`dependency-log` `response/artifacts/proofs/consumer-<phase>.log`? (artifact)
-`changes` `response/changes.md` (md)
-`knowledge-coverage` `response/data/knowledge-coverage.json`? (data)
-`family-understanding` `response/data/family-understanding.json`? (data)
+`library-source-application` `data/library.json`? (data)
+`library-proof` `data/proofs/<phase>.json`? (data)
+`library-release` `data/release.json`? (data)
+`library-archive` `artifacts/release/<file>.tgz`? (artifact)
+`dependency-update` `data/dependency.json`? (data)
+`dependency-proof` `data/proofs/consumer-<phase>.json`? (data)
+`dependency-log` `artifacts/proofs/consumer-<phase>.log`? (artifact)
+`changes` `changes.md` (md)
+`knowledge-coverage` `data/knowledge-coverage.json`? (data)
+`family-understanding` `data/family-understanding.json`? (data)
 
 ## Stops
 

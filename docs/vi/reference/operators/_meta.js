@@ -13,6 +13,7 @@ export default {
   "git-publish": "git.publish",
   "identity-provision": "identity.provision",
   "interface-audit": "interface.audit",
+  "interface-draw": "interface.draw",
   "interface-fix": "interface.fix",
   "interface-generate": "interface.generate",
   "interface-plan": "interface.plan",

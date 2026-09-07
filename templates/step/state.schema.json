@@ -389,7 +389,7 @@
             "properties": {
               "ref": {
                 "type": "string",
-                "pattern": "^runtime/history/restatement-(delegations|reviews)/[a-f0-9]{64}\\.json$"
+                "pattern": "^runtime/history/(?:restatement-(delegations|reviews)|art-direction-presentations)/[a-f0-9]{64}\\.json$"
               },
               "hash": {
                 "type": "string",

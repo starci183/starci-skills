@@ -181,6 +181,13 @@ export async function goalPartitionCoverage(root, session, state, suppliedForeca
       goals.get(member.goal)?.proven.add(key);
     } catch (error) { errors.push(error.message); }
   }
+  const art = await (await import('./art-direction.mjs')).artDeliveryCoverage(root,session,state,new Set([...active].filter(cell=>!retiredSources.has(cell)&&!pendingSources.has(cell))),cell=>sealedInvocation(root,session,state,cell));
+  errors.push(...art.errors);
+  for(const row of art.rows){
+    need(row.goal,row.key);
+    if(row.complete)goals.get(row.goal).proven.add(row.key);
+    if(!branches.has(row.cell))branches.set(row.cell,{key:row.key,goal:row.goal});
+  }
   for (const goal of goals.values()) goal.complete = !errors.length && !goal.pendingReviews?.length && goal.required.size > 0 && [...goal.required].every(key => goal.proven.has(key));
   return { errors, goals, branches, sets, partitions, retiredSources: [...retiredSources], pendingReviews: reviews.pending };
 }

@@ -267,6 +267,12 @@ export async function editForecast(root, session, state, original, edit, top) {
         const errors = await delegatedRestatementErrors(root, branchPath(session, sourceCell), state, projected, { phase: 'predispatch' });
         if (errors.length) throw Error('PLAN_REENTRY_UNAUTHORIZED: ' + errors.join('\n'));
       } else if (choice?.selectedBy !== 'user') throw Error('PLAN_REENTRY_UNAUTHORIZED: the rendered reading has no actual user answer or verified delegated review');
+    } else if (operator === 'interface.draw' && response.stop === 'DIRECTION_CHOICE_REQUIRED') {
+      const { artChoiceErrors } = await import('./art-direction.mjs');
+      const decisionId = response.interaction?.decisionId, choice = state.choices?.[decisionId];
+      const [step, parallel] = sourceCell.split('/').map(Number);
+      const errors = await artChoiceErrors(root, branchPath(session, sourceCell), state, { ...originalRequest, decisionId, selectedOption: choice?.selected, resume: { step, parallel, token: decisionId } });
+      if (errors.length) throw Error('PLAN_REENTRY_UNAUTHORIZED: ' + errors.join('\n'));
     } else {
       const shared = JSON.parse(readFileSync(path.join(root, 'operators/errors.json'))).codes;
       const own = JSON.parse(readFileSync(path.join(root, 'operators', operator.replaceAll('.','-'), 'errors.json'))).codes;

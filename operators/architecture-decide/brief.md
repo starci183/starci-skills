@@ -14,13 +14,13 @@ Primary output: `architecture-decision`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`architecture-decision` `response/response.md` (md)
-`restatement` `response/restatement.md`? (md)
-`current-state` `response/data/current-state.json` (data)
-`stack-model` `response/data/stack-model.json` (data)
-`alternatives` `response/artifacts/<decisionId>-alternatives.html`? (artifact)
+`architecture-decision` `response.md` (md)
+`restatement` `restatement.md`? (md)
+`current-state` `data/current-state.json` (data)
+`stack-model` `data/stack-model.json` (data)
+`alternatives` `artifacts/<decisionId>-alternatives.html`? (artifact)
 `independent-critique` `critique/response/critique.md` (md)
 
 ## Stops

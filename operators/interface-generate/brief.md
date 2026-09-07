@@ -10,27 +10,28 @@ Primary output: `frontend-source-application`
 
 ## Inputs
 
-`business-promise-authority`?, `backend-source-application`?, `architecture-decision`?, `frontend-direction-decision`?, `frontend-surface-audit`?, `library-source-application`?, `units`?, `landing-composition`?, `findings`?, `knowledge-repair-receipt`?
+`frontend-art-direction`?, `business-promise-authority`?, `backend-source-application`?, `architecture-decision`?, `frontend-direction-decision`?, `frontend-surface-audit`?, `library-source-application`?, `units`?, `landing-composition`?, `findings`?, `knowledge-repair-receipt`?
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`frontend-direction-decision` `response/direction.md` (md)
-`ui-coverage` `response/data/coverage.json` (data)
-`candidates` `response/artifacts/<candidateId>.html`? (artifact)
-`selected-candidate-capture` `response/artifacts/<candidateId>.<viewport>.png` (artifact)
-`direction-image` `response/artifacts/images/<slot>.png`? (artifact)
-`host` `response/artifacts/host.json`? (artifact)
-`knowledge-question` `response/data/knowledge-question.json`? (data)
-`knowledge-coverage` `response/data/knowledge-coverage.json`? (data)
-`family-understanding` `response/data/family-understanding.json`? (data)
-`frontend-presentation-resolution` `response/resolution.md` (md)
-`inventory` `response/data/inventory.json` (data)
-`resolved-tree` `response/artifacts/<target>.resolved.tsx` (artifact)
-`frontend-source-application` `response/response.md` (md)
-`changes` `response/changes.md` (md)
-`writes` `response/data/writes.json` (data)
+`art-direction-adoption` `data/art-direction-adoption.json`? (data)
+`frontend-direction-decision` `direction.md` (md)
+`ui-coverage` `data/coverage.json` (data)
+`candidates` `artifacts/<candidateId>.html`? (artifact)
+`selected-candidate-capture` `artifacts/<candidateId>.<viewport>.png` (artifact)
+`direction-image` `artifacts/images/<slot>.png`? (artifact)
+`host` `artifacts/host.json`? (artifact)
+`knowledge-question` `data/knowledge-question.json`? (data)
+`knowledge-coverage` `data/knowledge-coverage.json`? (data)
+`family-understanding` `data/family-understanding.json`? (data)
+`frontend-presentation-resolution` `resolution.md` (md)
+`inventory` `data/inventory.json` (data)
+`resolved-tree` `artifacts/<target>.resolved.tsx` (artifact)
+`frontend-source-application` `response.md` (md)
+`changes` `changes.md` (md)
+`writes` `data/writes.json` (data)
 
 ## Stops
 

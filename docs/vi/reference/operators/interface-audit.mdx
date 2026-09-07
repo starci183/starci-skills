@@ -189,6 +189,17 @@ thứ gì nó thấy, không khởi động, dừng, deploy hay cấu hình lạ
 identifier vắng mặt trong kho đã bind, không phán quyết một node nó chưa đo, và không nhận lời khai
 làm bằng chứng rằng node đã pass.
 
+## Độ khớp hướng đã chốt
+
+Khi source mang art-direction-adoption, ghi art-direction-fidelity so với đúng PNG và business region mapping gốc. Mỗi region dẫn capture render thật, nêu sai khác quan sát được và verdict tổng hợp trung thực bên cạnh Grammar/accessibility/responsive. PNG không chứng minh control/data hoạt động; UAT bình thường vẫn bắt buộc.
+
+
+## Đủ bằng chứng khớp PNG
+
+Với bề mặt theo art direction, [art-direction-fidelity](../../templates/kinds/art-direction-fidelity.schema.json) bao phủ từng phần tử, state và viewport đã đóng băng theo anatomy, kích thước, responsive, motion và ngữ nghĩa. So anchor trong PNG đã chốt với composition thật, gồm đầu nối, tâm hình, baseline chữ và kích thước quang học của icon khi phù hợp. Bind mỗi nhận xét với rule của đúng owner, screenshot, node đã đo và walk/result của capture. Width/height phải bằng số runner đo và nằm trong khoảng responsive đã đóng băng; viewport và device scale theo driver capture thật. Chỉ kiểm overflow là thiếu.
+
+Độ giống ngữ nghĩa, căn chỉnh quang học và chất lượng motion vẫn là trách nhiệm review render/walk đã giữ, không suy ra từ hash pixel hay build pass. Mục fail giữ đúng owner sửa và chặn hoàn tất bề mặt. Render/audit lại source đã sửa với technical proof mới đúng HEAD; giữ nguyên bằng chứng fail.
+
 ## Context
 
 | Alias | Bind | Bắt buộc |
@@ -205,6 +216,7 @@ làm bằng chứng rằng node đã pass.
 
 | Kind | Từ đâu | Bắt buộc |
 | --- | --- | --- |
+| `quality-verification` | quality.verify; required current-head technical gate proof before final audit of an art-directed source | no |
 | `frontend-source-application` | `interface.generate`, hoặc `interface.fix` đã sửa một phát hiện trên đó; commit đang được quan sát và các lời khai nó đã ghi | có |
 | `frontend-presentation-resolution` | `interface.generate`, chủ sở hữu của từng node | có |
 | `frontend-direction-decision` | `interface.generate`, route và coverage mà ma trận suy ra từ đó | có |
@@ -240,7 +252,7 @@ làm bằng chứng rằng node đã pass.
 | 6 | Chạy từng lượt đi qua runner của cây dưới @tools/browsercontrol chế độ `playwright` — một ngữ cảnh trình duyệt mới tinh cho mỗi lượt đi tại endpoint mà entry của chủ runtime mang — hoặc lái mục đó qua trình duyệt dưới chế độ `required` khi không viết lượt đi nào | — | `uat-walk`, @worktrees/sessions/central-runtime để lấy endpoint, @tools/browsercontrol, @tools/secrets | `walk-result`, `response/artifacts/<matrixId>.png` | `RUNTIME_UNAVAILABLE` |
 | 7 | Chụp và đo từng mục, đọc các node, lời khai và giá trị của chúng từ bản ghi runner để lại hoặc từ trình duyệt đang lái | — | @worktrees/sessions/central-runtime, @workspaces/fe (các owner được quan sát và identifier từng node mang), `walk-result`, @tools/browsercontrol | `response/artifacts/<matrixId>.png`, `response/data/captures/<matrixId>.json` | `EVIDENCE_MISSING` |
 | 8 | Phán các làn đo được theo từng mục: đối chiếu với lời khai cùng mọi file, rule và Case kiến thức đã bind mà áp dụng được, phán theo chủ sở hữu, và để từng topic đo được tự đóng; với landing, còn phải chứng minh bằng chứng visual storytelling, motion, reduced-motion và performance của composition contract, rồi route lỗi theo audit contract của nó. Dưới chế độ `playwright`, mọi kết quả presentation, contrast, accessibility và responsive trích dẫn đúng phần tử của bản ghi `capture-measurements` mà runner đã đo — `ref` và giá trị đọc được — để biên nhận không nêu một con số nào runner chưa ghi. Mỗi mục không áp dụng mang lý do cụ thể và bằng chứng. Nếu một mục kiến thức đã bind không thể áp dụng nhất quán, ghi câu hỏi có kiểu rồi dừng thay vì sửa kiến thức tại đây | — | manifest kiến thức và brief hiểu family đã đóng băng, cả ba nhóm @knowledge/ui, @knowledge/grammars/&lt;family>, đầu vào `landing-composition` khi có, các bức chụp, `walk-result` (bản ghi `capture-measurements` nó nêu cạnh từng bức chụp) | `knowledge-coverage`, `family-understanding`, hoặc `knowledge-question` | `UNKNOWN_RULE`, `KNOWLEDGE_QUESTION` |
-| 9 | Chấm ống kính thẩm mỹ một lần trên mọi tấm của phạm vi, hiệu chuẩn trên ba tấm mốc và xếp hạng theo tương quan, rồi phát | — | @knowledge/ui/proof (bộ hiệu chuẩn dưới `calibration/`: các mốc, dải của chúng và khoảng dung sai), các bức chụp của mọi bề mặt đã chọn | `verdicts`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALI<br />ATION_OFF`, `NO_PROGRESS` |
+| 9 | Chấm ống kính thẩm mỹ một lần trên mọi tấm của phạm vi, hiệu chuẩn trên ba tấm mốc và xếp hạng theo tương quan, rồi phát | — | @knowledge/ui/proof (bộ hiệu chuẩn dưới `calibration/`: các mốc, dải của chúng và khoảng dung sai), các bức chụp của mọi bề mặt đã chọn | `verdicts`, `art-direction-fidelity`, `frontend-surface-audit`, `findings`, `response/response.json`, `host` | `CALI<br />ATION_OFF`, `NO_PROGRESS` |
 
 Bậc 8 phán mọi lời khai và để từng topic proof đo được tự đóng lại. Phần phán canon là cái ở trên: mọi
 lời khai đều được đo, phán theo luật đã publish, định tuyến theo chủ sở hữu của node nó đứng lên; tra
@@ -343,6 +355,7 @@ audit nhỏ hơn.
 
 | Kind | File | Kiểu | Bắt buộc |
 | --- | --- | --- | --- |
+| `art-direction-fidelity` | `response/data/art-direction-fidelity.json` | data | no |
 | `frontend-surface-audit` | `response/response.md` | md | có |
 | `capture` | `response/data/captures/<matrixId>.json` | data | có |
 | `screenshot` | `response/artifacts/<matrixId>.png` | artifact | có |

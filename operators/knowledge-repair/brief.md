@@ -14,9 +14,9 @@ Primary output: `knowledge-repair-receipt`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`knowledge-repair-receipt` `response/data/knowledge-repair.json` (data)
+`knowledge-repair-receipt` `data/knowledge-repair.json` (data)
 
 ## Stops
 

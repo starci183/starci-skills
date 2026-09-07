@@ -24,13 +24,9 @@ const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf
 // What an installed tree is made of. Only these paths are copied, hashed and updated; anything else
 // a person adds beside them (other tests, notes) is theirs and is never touched. Public evidence
 // explicitly allowlisted by package.json is copied file-by-file, never as the whole tests tree.
-const publicEvidence = (pkg.files ?? []).filter(ref => /^tests\/evidence\/[A-Za-z0-9._-]+\.md$/.test(ref));
-export const PAYLOAD = [
-  'UPDATE.md', 'UPDATE.vi.md',
-  'INDEX.md', 'INDEX.vi.md', 'SKILL.md', 'SKILL.vi.md', 'routing.json',
-  'alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'workflows', 'skills/starci-lite',
-  ...publicEvidence,
-];
+// The explicit npm allowlist also defines the self-contained installed runtime. Its metadata and
+// CLI must survive relocation: installed doctor fixtures copy this same declared payload.
+export const PAYLOAD = [...new Set(['package.json', ...pkg.files.map(ref => ref.replace(/\/$/, ''))])];
 const MANIFEST = '.starci-skills.json';
 const SESSIONS_IGNORE = '.worktrees/sessions/';
 const ENTRY_MARKER = '<!-- starci:prompt-entry -->';

@@ -170,6 +170,11 @@ function nextPlanned(state, key) {
 
 export async function renderOutcome(root, branch, { validateStepFn = validateStep, evidenceErrorsFn = evidenceManifestErrors } = {}) {
   root = path.resolve(root);
+  const requestedResponse = JSON.parse(await readFile(path.join(branch, 'response/response.json'), 'utf8'));
+  if (requestedResponse.operatorId === 'interface.draw') {
+    const { renderArtSheet } = await import('./art-direction.mjs');
+    return renderArtSheet(root, path.resolve(branch));
+  }
   branch = path.resolve(branch);
   const session = sessionRootOf(branch);
   if (!session || !existsSync(path.join(session, 'state.json'))) throw new Error('SESSION_MISSING: outcome belongs to no open or retained user session');

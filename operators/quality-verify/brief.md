@@ -14,12 +14,12 @@ Primary output: `quality-verification`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`quality-verification` `response/response.md` (md)
-`gate-result` `response/data/gates/<gate>.json` (data)
-`coverage` `response/data/coverage.json`? (data)
-`audit-scope` `response/data/audit-scope.json`? (data)
+`quality-verification` `response.md` (md)
+`gate-result` `data/gates/<gate>.json` (data)
+`coverage` `data/coverage.json`? (data)
+`audit-scope` `data/audit-scope.json`? (data)
 
 ## Stops
 

@@ -7,12 +7,10 @@ import path from 'node:path';
 import { test as nodeTest } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
-// An installed tree has no bin/ and no package.json beside scripts/, so doctor skips this file there.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const isPackage = existsSync(path.join(root, 'bin', 'starci-skills.mjs')) && existsSync(path.join(root, 'package.json'));
-const { PAYLOAD, init, update, doctor } = isPackage ? await import('../bin/starci-skills.mjs') : {};
-const pkg = isPackage ? JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) : null;
-const test = (name, fn) => nodeTest(name, { skip: isPackage ? false : 'not the package checkout' }, fn);
+const { PAYLOAD, init, update, doctor } = await import('../bin/starci-skills.mjs');
+const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+const test = nodeTest;
 const quiet = () => {};
 
 test('a clean relocated install opens and confirms one project-owned workflow across repository roles', async () => {
@@ -43,9 +41,9 @@ function freshRepo() {
   return repo;
 }
 
-test('package.json ships exactly the runtime paths the installer copies, plus bin and the READMEs', () => {
-  const shipped = pkg.files.map((f) => f.replace(/\/$/, ''));
-  for (const p of PAYLOAD) assert.ok(shipped.includes(p), `${p} is copied by init but not in package.json files`);
+test('the explicit package allowlist and metadata define the complete installed runtime', () => {
+  const shipped = ['package.json', ...pkg.files.map((f) => f.replace(/\/$/, ''))];
+  assert.deepEqual([...PAYLOAD].sort(), [...new Set(shipped)].sort());
   for (const stale of ['sites', 'docs', 'tests', '.github']) assert.ok(!shipped.includes(stale), `${stale} must not ship`);
   const policy = JSON.parse(readFileSync(path.join(root, 'resources/orchestrator.json'), 'utf8')).workflowTopologies;
   for (const source of policy.sources) assert.ok(PAYLOAD.includes(source), 'a required public evidence source must survive init, not merely npm pack');
@@ -60,7 +58,7 @@ test('init installs the tree, writes both bootstraps and the sessions ignore, an
     const manifest = init({ dir: repo, force: false, bootstrap: true }, quiet);
     assert.equal(manifest.version, pkg.version);
     for (const p of PAYLOAD) assert.ok(existsSync(path.join(repo, '.claude', p)), `${p} not installed`);
-    assert.ok(!existsSync(path.join(repo, '.claude', 'package.json')), 'the package manifest is not part of the runtime');
+    assert.equal(readFileSync(path.join(repo, '.claude', 'package.json'), 'utf8'), readFileSync(path.join(root, 'package.json'), 'utf8'));
     for (const name of ['CLAUDE.md', 'AGENTS.md']) {
       const text = readFileSync(path.join(repo, name), 'utf8');
       assert.match(text, /\.claude\/INDEX\.md/);
@@ -71,6 +69,19 @@ test('init installs the tree, writes both bootstraps and the sessions ignore, an
     assert.match(readFileSync(path.join(repo, '.gitignore'), 'utf8'), /^\.worktrees\/sessions\/$/m);
     assert.equal(doctor({ dir: repo, quick: true }, quiet), 0);
   } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test('an installed current workflow fixture creates its own complete runtime and confirmed owner', async t => {
+  const repo = freshRepo();
+  t.after(() => rmSync(repo, { recursive: true, force: true }));
+  init({ dir: repo, force: false, bootstrap: false }, quiet);
+  const installedRoot = path.join(repo, '.claude');
+  const { createSourceFixture } = await import(pathToFileURL(path.join(installedRoot, 'scripts/workflow-source-fixture.mjs')));
+  const f = await createSourceFixture(t, { sessionId: 'installed-source-owner' });
+  for (const ref of PAYLOAD) assert.ok(existsSync(path.join(f.root, ref)), `fixture lost installed resource ${ref}`);
+  assert.equal(f.state().lifecycle.phase, 'active');
+  assert.equal(f.state().id, 'installed-source-owner');
+  assert.deepEqual(readFileSync(path.join(f.root, 'package.json')), readFileSync(path.join(root, 'package.json')));
 });
 
 test('init refuses a populated .claude it did not install, and --force replaces only runtime paths', () => {

@@ -448,6 +448,18 @@
       "knowledge": {
         "kind": "resume"
       }
+    },
+    "interface.draw": {
+      "interface": {
+        "kind": "resume"
+      },
+      "caller": {
+        "kind": "user"
+      },
+      "workspace": {
+        "kind": "operator",
+        "target": "workspace.bind"
+      }
     }
   }
 }

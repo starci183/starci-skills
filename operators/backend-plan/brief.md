@@ -14,10 +14,10 @@ Primary output: `backend-plan`
 
 ## Outputs
 
-Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist.
+Before write/resume, read ../../templates/kinds/<kind>: md .contract.json + .skeleton.md; data .schema.json; artifact follows operator.md. Current-status declared kinds; evidence must exist. Paths: response/.
 
-`backend-plan` `response/response.md` (md)
-`units` `response/data/units.json` (data)
+`backend-plan` `response.md` (md)
+`units` `data/units.json` (data)
 
 ## Stops
 
