@@ -1,0 +1,97 @@
+{
+  "schema": "work/preset@1",
+  "id": "starci-uat",
+  "modes": {
+    "browser": {
+      "when": "Actual rendered browser journeys are requested.",
+      "branches": {
+        "min": 1,
+        "allowed": [
+          "flow-1",
+          "flow-2",
+          "flow-3"
+        ]
+      },
+      "waves": [
+        {
+          "id": "wave-1",
+          "invocations": [
+            {
+              "slot": "uat-plan",
+              "op": "uat.plan",
+              "scope": "selected-flow-set"
+            }
+          ]
+        },
+        {
+          "id": "wave-2",
+          "invocations": [
+            {
+              "slot": "uat-verify-flow-1",
+              "op": "uat.verify",
+              "scope": "named-flow-1",
+              "branch": "flow-1"
+            },
+            {
+              "slot": "uat-verify-flow-2",
+              "op": "uat.verify",
+              "scope": "named-flow-2",
+              "branch": "flow-2"
+            },
+            {
+              "slot": "uat-verify-flow-3",
+              "op": "uat.verify",
+              "scope": "named-flow-3",
+              "branch": "flow-3"
+            }
+          ]
+        },
+        {
+          "id": "wave-3",
+          "invocations": [
+            {
+              "slot": "workflow-verify",
+              "op": "workflow.verify",
+              "scope": "selected-uat-review"
+            }
+          ]
+        }
+      ]
+    },
+    "api": {
+      "when": "API-only acceptance is requested, with no UI claim.",
+      "waves": [
+        {
+          "id": "wave-1",
+          "invocations": [
+            {
+              "slot": "uat-plan",
+              "op": "uat.plan",
+              "scope": "selected-api-acceptance"
+            }
+          ]
+        },
+        {
+          "id": "wave-2",
+          "invocations": [
+            {
+              "slot": "api-verify",
+              "op": "api.verify",
+              "scope": "selected-api-acceptance"
+            }
+          ]
+        },
+        {
+          "id": "wave-3",
+          "invocations": [
+            {
+              "slot": "workflow-verify",
+              "op": "workflow.verify",
+              "scope": "selected-api-review"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

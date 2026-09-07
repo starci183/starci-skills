@@ -1,0 +1,41 @@
+{
+  "schema": "work/preset@1",
+  "id": "starci-business",
+  "modes": {
+    "default": {
+      "when": "Selected business intent needs explicit decisions and reconciliation.",
+      "waves": [
+        {
+          "id": "wave-1",
+          "invocations": [
+            {
+              "slot": "business-decide",
+              "op": "business.decide",
+              "scope": "selected-business"
+            }
+          ]
+        },
+        {
+          "id": "wave-2",
+          "invocations": [
+            {
+              "slot": "business-reconcile",
+              "op": "business.reconcile",
+              "scope": "selected-business-reconciliation"
+            }
+          ]
+        },
+        {
+          "id": "wave-3",
+          "invocations": [
+            {
+              "slot": "workflow-verify",
+              "op": "workflow.verify",
+              "scope": "selected-business-review"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

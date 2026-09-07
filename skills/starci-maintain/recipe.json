@@ -1,0 +1,91 @@
+{
+  "schema": "work/preset@1",
+  "id": "starci-maintain",
+  "modes": {
+    "library": {
+      "when": "A selected library/dependency update is requested.",
+      "waves": [
+        {
+          "id": "wave-1",
+          "invocations": [
+            {
+              "slot": "library-update",
+              "op": "library.update",
+              "scope": "selected-library"
+            }
+          ]
+        },
+        {
+          "id": "wave-2",
+          "invocations": [
+            {
+              "slot": "quality-verify",
+              "op": "quality.verify",
+              "scope": "selected-library-quality"
+            }
+          ]
+        },
+        {
+          "id": "wave-3",
+          "invocations": [
+            {
+              "slot": "workflow-verify",
+              "op": "workflow.verify",
+              "scope": "selected-maintenance-review"
+            }
+          ]
+        }
+      ]
+    },
+    "knowledge": {
+      "when": "A selected knowledge correction is requested.",
+      "waves": [
+        {
+          "id": "wave-1",
+          "invocations": [
+            {
+              "slot": "knowledge-repair",
+              "op": "knowledge.repair",
+              "scope": "selected-knowledge"
+            }
+          ]
+        },
+        {
+          "id": "wave-2",
+          "invocations": [
+            {
+              "slot": "workflow-verify",
+              "op": "workflow.verify",
+              "scope": "selected-knowledge-review"
+            }
+          ]
+        }
+      ]
+    },
+    "retire": {
+      "when": "Selected scope retirement is explicitly requested.",
+      "waves": [
+        {
+          "id": "wave-1",
+          "invocations": [
+            {
+              "slot": "scope-retire",
+              "op": "scope.retire",
+              "scope": "selected-retirement"
+            }
+          ]
+        },
+        {
+          "id": "wave-2",
+          "invocations": [
+            {
+              "slot": "workflow-verify",
+              "op": "workflow.verify",
+              "scope": "selected-retirement-review"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

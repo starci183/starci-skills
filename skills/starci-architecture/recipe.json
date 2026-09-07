@@ -1,0 +1,62 @@
+{
+  "schema": "work/preset@1",
+  "id": "starci-architecture",
+  "modes": {
+    "default": {
+      "when": "Approved intent needs architecture plus selected discipline plans.",
+      "branches": {
+        "min": 1,
+        "allowed": [
+          "backend",
+          "frontend",
+          "data"
+        ]
+      },
+      "waves": [
+        {
+          "id": "wave-1",
+          "invocations": [
+            {
+              "slot": "architecture-decide",
+              "op": "architecture.decide",
+              "scope": "selected-architecture"
+            }
+          ]
+        },
+        {
+          "id": "wave-2",
+          "invocations": [
+            {
+              "slot": "backend-plan-backend",
+              "op": "backend.plan",
+              "scope": "selected-backend",
+              "branch": "backend"
+            },
+            {
+              "slot": "interface-plan-frontend",
+              "op": "interface.plan",
+              "scope": "selected-frontend",
+              "branch": "frontend"
+            },
+            {
+              "slot": "data-plan-data",
+              "op": "data.plan",
+              "scope": "selected-data",
+              "branch": "data"
+            }
+          ]
+        },
+        {
+          "id": "wave-3",
+          "invocations": [
+            {
+              "slot": "workflow-verify",
+              "op": "workflow.verify",
+              "scope": "selected-architecture-review"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

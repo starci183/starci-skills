@@ -1,0 +1,111 @@
+{
+  "schema": "work/preset@1",
+  "id": "starci-runtime",
+  "modes": {
+    "serve": {
+      "when": "Starting the selected runtime is explicitly in scope.",
+      "waves": [
+        {
+          "id": "wave-1",
+          "invocations": [
+            {
+              "slot": "environment-preflight",
+              "op": "environment.preflight",
+              "scope": "selected-runtime-environment"
+            }
+          ]
+        },
+        {
+          "id": "wave-2",
+          "invocations": [
+            {
+              "slot": "runtime-serve",
+              "op": "runtime.serve",
+              "scope": "selected-runtime"
+            }
+          ]
+        },
+        {
+          "id": "wave-3",
+          "invocations": [
+            {
+              "slot": "api-verify",
+              "op": "api.verify",
+              "scope": "selected-runtime-postconditions"
+            }
+          ]
+        }
+      ]
+    },
+    "operate": {
+      "when": "A specific service operation is explicitly in scope.",
+      "waves": [
+        {
+          "id": "wave-1",
+          "invocations": [
+            {
+              "slot": "environment-preflight",
+              "op": "environment.preflight",
+              "scope": "selected-service-environment"
+            }
+          ]
+        },
+        {
+          "id": "wave-2",
+          "invocations": [
+            {
+              "slot": "service-operate",
+              "op": "service.operate",
+              "scope": "selected-service"
+            }
+          ]
+        },
+        {
+          "id": "wave-3",
+          "invocations": [
+            {
+              "slot": "api-verify",
+              "op": "api.verify",
+              "scope": "selected-service-postconditions"
+            }
+          ]
+        }
+      ]
+    },
+    "identity": {
+      "when": "Provisioning the selected identity is explicitly authorized.",
+      "waves": [
+        {
+          "id": "wave-1",
+          "invocations": [
+            {
+              "slot": "environment-preflight",
+              "op": "environment.preflight",
+              "scope": "selected-identity-environment"
+            }
+          ]
+        },
+        {
+          "id": "wave-2",
+          "invocations": [
+            {
+              "slot": "identity-provision",
+              "op": "identity.provision",
+              "scope": "selected-identity"
+            }
+          ]
+        },
+        {
+          "id": "wave-3",
+          "invocations": [
+            {
+              "slot": "api-verify",
+              "op": "api.verify",
+              "scope": "selected-identity-postconditions"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
