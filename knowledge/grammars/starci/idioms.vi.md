@@ -15,6 +15,11 @@ file và không bao giờ được đem ra ghép. Chỗ nào chủ sở hữu đ
 nguyên từ `classNames.ts` của chính block, vì đó là lời của chủ sở hữu về lý do hình dạng ấy tồn tại.
 Mọi ô composition chỉ gọi tên renderer và prop mà package thực sự công bố.
 
+Các số đếm và trích dẫn bên dưới là mẫu quan sát source lịch sử được giữ tại commit skill
+`edf72554425f918e80c9205e9c6db10596e722f0`; không khẳng định block hiện tại còn giống.
+Đối chiếu source được chọn trước khi áp dụng; idiom không thay thế spec nghiệp vụ đã duyệt.
+[DNA](DNA.vi.md) là snapshot package, không phải chứng nhận API cài hiện tại.
+
 ## Joined bands in one flush card
 
 Một thẻ duy nhất, không thẻ lồng: thân thẻ phẳng, và chỉ có đường kẻ ngang chia nó thành các dải.
@@ -68,9 +73,9 @@ nhiều nhất trong toàn bộ tập mặt phẳng.
 | Phần bổ nghĩa phải nằm trên tiêu đề | `Text size="xs" tone="muted"` trước, rồi `Text size="md" weight="semibold"` | `ContinueLearning`. Chủ sở hữu: "Keep the supporting kind close to the destination title it qualifies" |
 | Muốn Grammar sở hữu cặp này | `SurfaceCopyGroup` — renderer duy nhất được công bố cho nhịp ấy | Trạng thái mua của `ProSubscriptionBlock` |
 
-Đếm mỗi container một lần trên toàn bộ block bằng chứng, cặp này xuất hiện tám lần, bảy trong số đó
-dựng tay bằng `div` của app; bản kiểm kê và đề xuất cấp slot có kiểu cho `SurfaceCopyGroup` nằm ở
-[audits/1.0.1/proposals/copy-group-composite.md](../../../audits/1.0.1/proposals/copy-group-composite.md).
+Ghi chú lịch sử đếm tám cặp trong mẫu, bảy cặp dựng tay bằng `div`. Tài liệu đề xuất slot có kiểu
+được nhắc trong bản cũ không còn sẵn và chưa được kiểm chứng; không coi đề xuất ấy là API đã publish.
+Nếu cần thay đổi ownership, kiểm tra source hiện tại và lập đề xuất mới trong scope đã duyệt.
 
 ## Pending is the same tree, resting
 

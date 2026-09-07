@@ -61,18 +61,18 @@ HIERARCHY-1 và STATE-1.
 
 ## A11Y-5 — Phán quyết của accessibility
 
-Chi phối việc các tiêu chí trên trở thành đúng một hàng của topic này trong bảng `## Verdict` của receipt.
+Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.work` hiện tại.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
 | Case 1 | Lens chạy | `A11Y-1` đến `A11Y-4` đều được xét ở mọi state mà coverage khai, trong mọi bảng màu, dựa trên cây accessibility đã tính và bản render đã đo chứ không dựa vào source |
 | Case 2 | Tính verdict | Tập chặn cửa là toàn bộ tập: `pass` đòi mọi tiêu chí đều đạt, vì một người đọc không với tới được control thì không được phục vụ một phần. Ở đây không có trung bình và không có dung sai, và gộp topic này vào topic khác sẽ bác bỏ nó |
 | Case 3 | Một tiêu chí không có quan sát nào đứng sau | Verdict là `blocked`, không bao giờ là `pass` và không bao giờ là `fail`, vì một bản render không ai đo thì chưa xứng với cả hai |
-| Case 4 | Một lần fail được định tuyến | Thiếu một giá trị thì về `resolve`; thiếu một cấu trúc hay một quan hệ thì về `direction`; một năng lực mà family đã publish không có thì về `grammar-gap`, không bao giờ thành một bản vá cục bộ trong ứng dụng |
+| Case 4 | Một lỗi đã được đo | Ghi lỗi đã đo thuộc giá trị, cấu trúc/quan hệ hay năng lực thiếu trong family đã kiểm tra cài thực tế. Đây là finding và đề xuất owner, không cấp quyền sửa owner khác hoặc chạy op tiếp theo. |
 
-Tập được chấm là `A11Y-1` đến `A11Y-4`; rule này là phần số học và bản thân nó không được chấm. Kết
-quả của nó là hàng `accessibility` trong bảng `## Verdict` của receipt audit, được chép từ đó và không
-bao giờ tính lại ở phía sau.
+Tập được chấm là `A11Y-1` đến `A11Y-4`; rule này chỉ tổng hợp và bản thân không được chấm.
+Lưu assertion, quan sát và artifact tham chiếu trong bằng chứng của node được chọn; không có
+bảng receipt riêng hoặc quy tắc chép verdict xuống bước sau. Thiếu bằng chứng không thành đạt.
 
 ## File này không quyết định
 

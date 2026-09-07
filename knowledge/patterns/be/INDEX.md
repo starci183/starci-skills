@@ -4,10 +4,16 @@
 NestJS code behind it is written: which root a file lives under, what a GraphQL unit's files are
 called, how a handler is shaped, which alias an import uses, where a docblock sits relative to a
 decorator, how an exception is declared and where it is mapped to HTTP and GraphQL, and where the
-spec goes. Every rule below was extracted from the bound project's backend checkout (`@workspaces/be/src/`)
+spec goes. Every rule below was extracted from the historical reference backend source
 by opening files and counting; each table cites its sources. Where the code is split, the file
-records the dominant variant with its count instead of legislating. Lint rule names from the bound
-project's own ESLint config are quoted only where the code already follows them.
+records the dominant variant with its count instead of legislating. Lint rule names from the reference
+project's ESLint config are quoted only where the code already follows them.
+
+Applicability: these are historical reference-source observations preserved at skill commit
+`edf72554425f918e80c9205e9c6db10596e722f0`, not universal framework rules or current-project
+source evidence. Inspect the selected repository's actual types/APIs, aliases and lint/test setup;
+use only patterns compatible with approved `.work` scope. Old counts cannot claim a fresh scan.
+Current business requirements and architecture belong to `.work`; code patterns do not approve them.
 
 ## Catalog
 
@@ -24,5 +30,5 @@ project's own ESLint config are quoted only where the code already follows them.
 
 ## Sources
 
-The bound project's backend checkout (`@workspaces/be/src/`), `apps/core/src/app.module.ts` for
+The historical reference backend source, `apps/core/src/app.module.ts` for
 filter registration, `tsconfig.json`, `jest.config.ts`, `eslint.config.mjs`.

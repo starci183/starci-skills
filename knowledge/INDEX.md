@@ -1,23 +1,16 @@
 # Knowledge
 
-This tree contains decision authority, not workflow.
+This tree contains scoped development reference material, not task orchestration.
 
-| Branch | Owns | Must not own |
-| --- | --- | --- |
-| [`ui/`](ui/INDEX.md) | Cross-family condition-to-Grammar rules, practical Core examples, measurable UI relationships, and review falsifiers | Business facts, page copy, routes, artwork identity, one-off effects, or operator orchestration |
-| [`findings/`](findings/INDEX.md) | The ledger of what audits and walks found, one `<family>.jsonl` per grammar family, and the proposals drafted from rule-less findings for a person to author | Law, a context any operator binds, or a rule a script wrote into `ui/` |
-| [`grammars/<family>/`](grammars/starci/INDEX.md) | Exact `<family>` public exports, component/state/composition contracts, direct consumption, and derived-family extension rules | Product truth, local substitutes, or app-owned repairs of Grammar output |
+| Branch | Use |
+| --- | --- |
+| [Backend patterns](patterns/be/INDEX.md) | Observed NestJS conventions; adopt only after checking the selected repository. |
+| [Frontend patterns](patterns/fe/INDEX.md) | Observed frontend conventions; installed code and owner policy take precedence. |
+| [UI](ui/INDEX.md) | Composition, presentation and rendered-proof criteria selected for the current scope. |
+| [Grammar snapshots](grammars/INDEX.md) | Family-specific package observations, not a guarantee of current exports. |
 
-Load the smallest canonical English `.md` file and indexed rule that can change the current decision.
-Same-stem `.vi.md` files are human mirrors and must not enter runtime context. Knowledge files omit
-per-topic routing metadata; Grammar operators own lookup and orchestration.
+Read the smallest applicable English topic; same-stem Vietnamese files are human mirrors. Stable rule IDs identify observations and criteria, not executable commands or automatic gates. Current product facts, scope approval, dependencies, state and proof belong in the selected `.work` node/resources/evidence. These references neither create a task nor authorize the next op.
 
-`@grammar/core` is the reference compatibility contract. A published derived Grammar may
-override family-scoped CSS, replace existing Core renderers/elements, and add elements through
-declared extension points while preserving public props, meaning, state behavior, accessibility,
-ownership, and substitutability. The application selects one family and supplies product truth; it
-does not patch CSS or import a parallel primitive.
+Component names, tokens, ownership tables and source counts describe the reference family at observation time. Verify the actual installed package/source before using them; do not invent missing APIs or impose this family on a different stack. A source-derived business description remains unapproved until its owner accepts it.
 
-When both branches apply, UI knowledge selects the relationship and the selected Grammar binds it to
-an exact published interface. Missing typed family registration or a missing component/prop remains
-`grammar-gap`; neither branch may invent a runnable API or silently override the other.
+Historical evidence links are pinned Git provenance at commit `edf72554425f918e80c9205e9c6db10596e722f0`, not current instructions or current product proof. If the remote link is unavailable, inspect that exact object with `git show <commit>:<path>` in this skills repository.

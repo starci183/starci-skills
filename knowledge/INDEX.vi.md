@@ -1,23 +1,16 @@
 # Knowledge
 
-Cây này chứa decision authority, không chứa workflow.
+Cây này chứa tài liệu chuyên môn theo phạm vi, không điều phối task.
 
-| Nhánh | Sở hữu | Không được sở hữu |
-| --- | --- | --- |
-| [`ui/`](ui/INDEX.vi.md) | Rule condition-to-Grammar dùng chung giữa family, ví dụ Core thực dụng, quan hệ UI đo được và review falsifier | Business fact, copy page, route, identity artwork, effect một lần hay operator orchestration |
-| [`findings/`](findings/INDEX.vi.md) | Sổ ghi những gì audit và lượt đi thử phát hiện, mỗi họ grammar một `<family>.jsonl`, cùng các đề xuất soạn từ finding chưa có rule để một người viết thành luật | Luật, một context mà operator bind, hay một rule do script tự ghi vào `ui/` |
-| [`grammars/<family>/`](grammars/starci/INDEX.vi.md) | Exact public export của `<family>`, contract component/state/composition, direct consumption và luật extension của derived family | Product truth, substitute cục bộ hay sửa Grammar output ở app |
+| Nhánh | Cách dùng |
+| --- | --- |
+| [Backend patterns](patterns/be/INDEX.vi.md) | Convention NestJS đã quan sát; chỉ áp dụng sau khi kiểm tra repo được chọn. |
+| [Frontend patterns](patterns/fe/INDEX.vi.md) | Convention frontend đã quan sát; code cài thật và policy owner được ưu tiên. |
+| [UI](ui/INDEX.vi.md) | Tiêu chí composition, presentation và proof đã render phù hợp scope. |
+| [Grammar snapshots](grammars/INDEX.vi.md) | Quan sát package riêng theo family, không bảo đảm export hiện tại. |
 
-Chỉ load file `.md` tiếng Anh canonical và indexed rule nhỏ nhất có thể đổi quyết định hiện tại. File
-`.vi.md` cùng stem là mirror cho người đọc, không được vào runtime context. Knowledge file bỏ routing
-metadata riêng theo topic; Grammar operator sở hữu lookup và orchestration.
+Đọc topic tiếng Anh nhỏ nhất phù hợp; file tiếng Việt cùng tên là mirror cho người đọc. Rule ID ổn định định danh observation/tiêu chí, không phải command hoặc gate tự chạy. Product fact, scope approval, dependency, state và proof hiện tại nằm trong node/resource/evidence `.work` đã chọn. Tài liệu này không tạo task hoặc cho phép op kế tiếp.
 
-`@grammar/core` là reference compatibility contract. Derived Grammar đã publish được override
-CSS có scope theo family, thay renderer/element Core hiện có và thêm element qua extension point đã
-khai báo, đồng thời giữ public prop, meaning, state behavior, accessibility, ownership và
-substitutability. Application chọn đúng một family và truyền product truth; không patch CSS hay
-import primitive song song.
+Tên component/token, bảng ownership và số đếm source mô tả family tại lúc quan sát. Kiểm package/source cài thật trước khi dùng; không bịa API còn thiếu hoặc ép family này lên stack khác. Business suy từ source chưa được duyệt cho tới khi owner chấp nhận.
 
-Khi cả hai nhánh cùng áp dụng, UI knowledge chọn quan hệ và Grammar đã chọn bind quan hệ đó vào public
-interface chính xác. Typed family registration hoặc component/prop còn thiếu vẫn là `grammar-gap`;
-không nhánh nào được bịa API runnable hay âm thầm override nhánh kia.
+Link evidence lịch sử là Git provenance cố định tại commit `edf72554425f918e80c9205e9c6db10596e722f0`, không phải chỉ dẫn hay proof sản phẩm hiện tại. Nếu link remote chưa có, xem đúng object bằng `git show <commit>:<path>` trong repo skills này.

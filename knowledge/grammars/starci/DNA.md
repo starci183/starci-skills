@@ -2,7 +2,15 @@
 
 `@starci/grammar@0.4.13` · checkout `41be722701c439e76910f80a8cbb65261da72e01` · generated 2026-09-05
 
-This file is generated from the live `@starci/grammar` package, never written by hand: identity, tokens, renderers, published props, `data-contract` claims, and emitted classes are read out of `src/`, and the gap list is copied from the `## Gaps` table in [Family and DNA](family.md). Prime a direction agent with this file: it says what exists. [Idioms](idioms.md) says how StarCi composes it, and [Playbook](playbook.md) says which idioms a business shape needs. Regenerate with `node scripts/generate-grammar-dna.mjs`, and verify with `--check`; it needs the routed FE checkout, so it is not part of `npm test`.
+Historical snapshot: `@starci/grammar@0.4.13`, source checkout
+`41be722701c439e76910f80a8cbb65261da72e01`, captured 2026-09-05. This is not a claim that the
+currently installed package has these APIs or gaps. Before use, inspect the selected repository's
+manifest/lockfile, exported types, renderers and CSS; record actual source/version in `.work`.
+If source is unavailable, report unverified; do not infer current APIs or defects from old tables.
+
+The tables below preserve snapshot data and need no old generator to read. [Family](family.md)
+explains ownership boundaries; [Idioms](idioms.md) and [Playbook](playbook.md) are composition
+references. Static source inspection does not prove runtime behavior.
 
 ## Identity
 

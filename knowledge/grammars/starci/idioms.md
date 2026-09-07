@@ -14,6 +14,11 @@ at the bottom and never composed from. Where the owner has already written down 
 sentence is quoted from the block's own `classNames.ts`, because it is the owner's word on why the
 shape exists. Every composition cell names only renderers and props the package publishes.
 
+Counts and quotations below are historical source observations preserved at skill commit
+`edf72554425f918e80c9205e9c6db10596e722f0`; they do not claim current blocks are unchanged.
+Check selected source before applying; idioms do not replace approved business specifications.
+[DNA](DNA.md) is a package snapshot, not certification of the currently installed API.
+
 ## Joined bands in one flush card
 
 One card, no inner cards: the body is flush, and horizontal rules alone divide it into bands.
@@ -67,9 +72,9 @@ the most repeated relationship in the whole surface set.
 | The qualifier belongs above the title | `Text size="xs" tone="muted"` first, then `Text size="md" weight="semibold"` | `ContinueLearning`. Owner: "Keep the supporting kind close to the destination title it qualifies" |
 | Grammar should own the pair | `SurfaceCopyGroup` — the one renderer published for this rhythm | `ProSubscriptionBlock` purchase status |
 
-Counted once per container across the evidence blocks, this pair occurs eight times, seven of them
-hand-built with an app `div`; the inventory and the proposal to give `SurfaceCopyGroup` typed slots
-are in [audits/1.0.1/proposals/copy-group-composite.md](../../../audits/1.0.1/proposals/copy-group-composite.md).
+The historical note counted eight pairs in its sample, seven built with an app `div`. The typed-slot
+proposal cited by the old document is unavailable and unverified; do not treat that proposal as a
+published API. If ownership needs changing, inspect current source and record a fresh scoped proposal.
 
 ## Pending is the same tree, resting
 

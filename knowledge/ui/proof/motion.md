@@ -56,17 +56,18 @@ Governs what closes a motion claim.
 
 ## MOTION-5 — The motion verdict
 
-Governs how the criteria above become this topic's one row in the receipt's `## Verdict` table.
+Governs how selected observations are summarized in the current `.work` node's evidence.
 
 | Case | When | Observe |
 | --- | --- | --- |
 | Case 1 | The lens runs | `MOTION-1` to `MOTION-4` are judged on the capture pair the coverage requires: one with the reduced-motion preference unset and one with it set to reduce |
 | Case 2 | The verdict is computed | The gating set is the whole set: `pass` requires every criterion to pass, because movement that loses meaning once has lost it |
 | Case 3 | One of the two captures is missing | The verdict is `blocked`; a lens run on the ordinary capture alone has not tested the preference at all |
-| Case 4 | A failure is routed | A duration or an easing outside the published scale routes to `resolve` with an off-scale cause; wrong choreography, a lost outcome or a reflow routes to `direction` |
+| Case 4 | A failure has been measured | Record measured duration/easing defects separately from choreography, lost outcomes and reflow. Identify the owning value or composition without executing another op. |
 
-The scored set is `MOTION-1` to `MOTION-4`; this rule is the arithmetic and is not itself scored. Its
-result is the `motion` row of the audit receipt's `## Verdict` table.
+The scored set is `MOTION-1` to `MOTION-4`; this rule only summarizes and is not itself scored.
+Store assertions, observations and artifact references in the selected node's evidence; there is
+no separate receipt table or downstream verdict-copying rule. Missing evidence never earns a pass.
 
 ## What this file does not decide
 

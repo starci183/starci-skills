@@ -41,9 +41,10 @@ throughout its own renderers; an application region that wraps text must do the 
 ## Width scale
 
 A capped width takes one step of this closed scale and nothing else; an arbitrary width such as
-`max-w-[720px]` is outside the scale and is removed by `interface.generate`. The prose cap
-`max-w-[65ch]` is the one character-based step, because line length follows the text. Owner ruling
-2026-09-03: the scale is fixed for every application, not derived per project.
+`max-w-[720px]` is outside the selected family scale. Report or replace it only within an authorized
+implementation scope. The prose cap `max-w-[65ch]` is the one character-based step, because line
+length follows the text. The retained owner ruling of 2026-09-03 fixes the scale for applications
+adopting this family; it does not override a different approved design system.
 
 | Step | Class | Width |
 | --- | --- | --- |
@@ -61,7 +62,7 @@ A capped width takes one step of this closed scale and nothing else; an arbitrar
 
 ## Measure Common already owns
 
-Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
+Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](INDEX.md#source-and-maintenance).
 
 | Component | Element or condition | Rule |
 | --- | --- | --- |

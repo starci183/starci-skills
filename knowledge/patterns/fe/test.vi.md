@@ -7,11 +7,16 @@ Nguồn: `src/components/pages/CartPage/index.spec.tsx`,
 `pages/CodingDomainPage/component.spec.tsx`, `blocks/commerce/CartBlock/index.spec.tsx`,
 `hooks/index.ts`, `packages/grammar/src/**/*.spec.tsx`, `packages/grammar/src/**/*.test.mjs`,
 script trong `package.json` (`vitest run`), và
-[bằng chứng gom nhà](../../../tests/evidence/20260903-consolidation.md) cho phần kiểm kê đứng sau
+[bằng chứng gom nhà](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.md) cho phần kiểm kê đứng sau
 FE-TEST-1 Case 7.
 
 Một rule đã nghỉ ở đây: `FE-TEST-7` gộp vào `FE-TEST-1` Case 7, vì "spec nằm đâu" và "spec đo nửa nào"
 là một luật về một chỗ đặt. Số của nó không được dùng lại.
+
+Phạm vi: các số đếm và ghi chú được trích là quan sát lịch sử tại commit skill
+`edf72554425f918e80c9205e9c6db10596e722f0`, không phải kiểm kê dự án hiện tại. Kiểm tra source,
+manifest/lockfile, alias và cấu hình lint/test thực tế trong repository được chọn trước khi áp dụng.
+Các link lịch sử là provenance, không phải script hay chỉ dẫn chạy.
 
 ## FE-TEST-1 — Vị trí
 
@@ -77,6 +82,6 @@ là một luật về một chỗ đặt. Số của nó không được dùng l
 - Một thiểu số spec component và index vẫn ghim chuỗi class nguyên văn. FE-TEST-5 Case 4 ghi đa số
   thành luật và coi phần còn lại là một khoản nợ đối lập với luật chứ không phải một thực hành thứ
   hai; file này không nói nên xoá cái nào trước. Số đếm nằm ở
-  [bằng chứng gom nhà](../../../tests/evidence/20260903-consolidation.md).
+  [bằng chứng gom nhà](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.md).
 - FE-TEST-1 Case 7 ràng một unit mới. Nó không phải bản kiểm kê cây hiện tại: phần lớn unit đang có
   một spec chứ không phải hai, và ở đây không luật hoá một đợt quét khoản tồn ấy.

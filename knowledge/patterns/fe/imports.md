@@ -8,9 +8,13 @@ Sources: `tsconfig.json` (`paths`), `eslint.config.mjs`, `src/hooks/index.ts`,
 
 One Case is retired here: `FE-IMPORTS-7` Case 9 folded into Case 7, because where a band is mounted
 and whether a band was drawn by hand are one law about one object and were drifting as two. The
-presentation sweep reads the shell-unit names out of Case 7 rather than keeping a list of its own, and
-the occurrences that justified the case are recorded in
-[the presentation sweep evidence](../../../tests/evidence/20260903-presentation-sweep.md).
+historical observations that justified the case are recorded in
+[the presentation sweep evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.md).
+
+Scope: cited counts and notes are historical observations at skill commit
+`edf72554425f918e80c9205e9c6db10596e722f0`, not a census of the current project. Inspect actual
+source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
+Historical links supply provenance, not scripts or execution instructions.
 
 ## FE-IMPORTS-1 — Paths
 

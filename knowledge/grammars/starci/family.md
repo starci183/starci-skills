@@ -1,5 +1,11 @@
 # StarCi Core family and DNA
 
+Historical snapshot: `@starci/grammar@0.4.13`, source checkout
+`41be722701c439e76910f80a8cbb65261da72e01`, captured 2026-09-05. This is not a claim that the
+currently installed package has these APIs or gaps. Before use, inspect the selected repository's
+manifest/lockfile, exported types, renderers and CSS; record actual source/version in `.work`.
+If source is unavailable, report unverified; do not infer current APIs or defects from old tables.
+
 ## Family identity
 
 StarCi Core is defined by `coreGrammar` and selected by `CoreGrammarRoot`. It implements the Common contract; it is not the parent of Common or of any other family. `CORE_GRAMMAR_COMPONENTS` remains only a compatibility alias to `COMMON_GRAMMAR_COMPONENTS`.
@@ -28,10 +34,9 @@ Core supports light, explicit dark, system dark, forced colors, focus-visible, a
 
 ## Gaps
 
-Capabilities the live package does not publish, read out of the renderer source named in each row.
-This table is the one gap inventory of the family: `scripts/generate-grammar-dna.mjs` copies it into
-[DNA](DNA.md), so a gap recorded anywhere else is not published. A row states what is missing, never
-which rule it once hung on.
+Capabilities recorded as absent at the snapshot, with historical source locations in each row.
+Recheck actual installed source before recording a current gap in the `.work` node; this table
+is not the sole live gap inventory and does not trigger library edits.
 
 | Component | Missing capability | Evidence |
 | --- | --- | --- |

@@ -7,6 +7,9 @@ A call to action is settled from consequence, never from a wish for a larger or 
 The variant, the semantics, the blocked states, and the order of an action group are all decided
 before the region is built, because each of them is a promise the rendered page then has to keep.
 
+Applicability: API examples belong to the documented Grammar family; verify installed source and
+the selected `.work` specification before use. Gap labels here are findings, not dispatch commands.
+
 ## CTA-1 — Emphasis follows consequence
 
 Governs which control carries the strongest treatment.
@@ -52,7 +55,7 @@ Governs the final action that cannot be undone.
 
 | Case | When | Assert |
 | --- | --- | --- |
-| Case 1 | An action irreversibly deletes, revokes, or discards valuable state | The receipt carries explicit destructive copy, a confirmation proportionate to the consequence, and a typed danger action treatment |
+| Case 1 | An action irreversibly deletes, revokes, or discards valuable state | The `.work` specification carries explicit destructive copy, a confirmation proportionate to the consequence, and a typed danger action treatment |
 | Case 2 | The published `ButtonVariant` offers no danger value | A `GRAMMAR_REQUIRED` gap records it, and the CTA does not ship on the primary variant instead |
 | Case 3 | The direction is tempted to import the vendor danger variant, or to add local red | No vendor danger variant and no local red appears against that control |
 | Case 4 | The action is a reversible cancel or an ordinary negative outcome | It carries no destructive treatment and no confirmation earned by destructiveness |
@@ -65,15 +68,15 @@ Governs the sequence of two or more actions that form one decision.
 | --- | --- | --- |
 | Case 1 | A decision offers a dominant action, an alternative, and a way out | DOM order runs dominant decision, supporting alternative, then escape or recovery, as the product requires |
 | Case 2 | The group wraps or stacks at a narrower width | Reading order and sequential focus order are identical at every width, and no CSS `order` reverses the group |
-| Case 3 | A translated label grows well past its original length | The receipt names the longest label the group must hold, and the group wraps or stacks rather than overlapping at that length |
-| Case 4 | Two actions live in separate regions | They belong to separate decision owners in the receipt, and neither ranks against the other |
+| Case 3 | A translated label grows well past its original length | The `.work` specification names the longest label the group must hold, and the group wraps or stacks rather than overlapping at that length |
+| Case 4 | Two actions live in separate regions | They belong to separate decision owners in the `.work` specification, and neither ranks against the other |
 
 ## What this file does not decide
 
 Which region holds the decision is [Layout](layout.md), and which anchor names it is
 [Hierarchy](hierarchy.md). How many effects an activation may produce and who owns pending is
 [Action](action.md). How scarce the dominant treatment is across the page is [Accent](accent.md),
-and what happens after the action settles is [Feedback](feedback.md). What the receipt must
+and what happens after the action settles is [Feedback](feedback.md). What the `.work` specification must
 enumerate about these actions is [Coverage](coverage.md). Whether the rendered control is reachable,
 named, and visibly focused is [Accessibility](../proof/accessibility.md) and
 [Focus](../proof/focus.md).

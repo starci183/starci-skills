@@ -6,8 +6,8 @@ up to, and this topic decides whether the surface was usable by someone who came
 not with a rule book. A surface can be owned correctly, look convincing in a still frame, and still
 strand the person who needed it, which is why the evidence here is a run rather than a screenshot.
 
-The instrument is normally the UAT run: `uat.verify` drives one frozen flow at the pinned commit and
-judges the `ux` lane on its own captures, so an `Observe` cell names a step of a real attempt — the
+The instrument is normally the UAT run: `uat.verify` exercises the selected `.work` flow and
+records evidence from the runtime with actually observed artifact/source version bindings, so an `Observe` cell names a step of a real attempt — the
 assertion that was reached, the number of steps it took, the latency between an activation and the
 first visible change, the state after a refresh. Where a criterion is settled by a single render and
 needs no attempt, `interface.audit` may measure it from a capture it already took; each rule
@@ -18,16 +18,21 @@ does not prove a progress signal ever appeared.
 Sources: the owner ruling that everything needed to decide whether a surface has passed must be a rule
 with a threshold, that UX is judged on a task run rather than a static screenshot, and that an average
 may never hide a fatal; plus two anonymised flows, a sign-in and a purchase, scored end to end in
-[the UX scorecard evidence](../../../tests/evidence/20260903-ux-scorecard.md).
+[the UX scorecard evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-ux-scorecard.md).
+
+The pinned note above is historical, not evidence for the current product. Select applicable
+criteria and thresholds in `.work` before execution; `ship` is a rubric label, not release authority.
+A local commit alone does not prove the served version. Findings recommend ownership without
+starting the next op. A still capture cannot substitute for a run on behavioral assertions.
 
 ## UX-1 — The task completes
 
 Governs whether the flow's declared goal was actually reached, unaided. Measured in a UAT run; a
-failure routes to the flow owner, because only a person decides what the flow was for.
+failure identifies a flow-owner finding, because only a person decides what the flow was for.
 
 | Case | When | Observe |
 | --- | --- | --- |
-| Case 1 | The run reaches the flow's terminal assertion | The goal state named in `flow.md` is present in the capture and in the store. A run that ends on the last screen without the record the goal names falsifies it |
+| Case 1 | The run reaches the flow's terminal assertion | The goal state named in the selected `.work` flow node is present in the capture and in the store. A run that ends on the last screen without the record the goal names falsifies it |
 | Case 2 | The run is driven with no operator knowledge beyond what the surface shows | Every step was chosen from a visible label, and no step required a URL typed by hand, a console command, or a hint from the flow author. One such intervention falsifies it |
 | Case 3 | The flow declares an alternate path such as a decline, a cancellation or a retry | That path also reaches a named terminal assertion. A branch that runs out of screens falsifies it |
 | Case 4 | The task completes | It completes within the flow's declared time budget from first activation to terminal assertion. Exceeding the budget is recorded as a fail with the measured duration, not waived |
@@ -37,12 +42,12 @@ Not this rule: whether the backend actually performed the work is the `behavior`
 ## UX-2 — Steps stay inside the flow's budget
 
 Governs how much work the person had to do to finish. Measured in a UAT run against the budget the
-flow declares, and against the class band this rule owns; a failure routes to `direction`.
+flow declares, and against the class band this rule owns; a failure identifies a composition-owner finding.
 
 | Case | When | Observe |
 | --- | --- | --- |
-| Case 1 | The run completes | The count of committed steps — each navigation, submission or confirmation the person had to perform — is at most the budget `flow.md` declares for that flow. Exceeding it falsifies it |
-| Case 2 | The flow declares no budget | The class band applies instead and the receipt names it: on a `console` any action the surface owns is at most three steps from entry; on a `form` at most three for a single purpose and at most seven for a declared multi-step flow; on a `landing` conversion is at most two; on a `catalog` list to detail is exactly one step and the return one; on a `reader` the return to the origin list is one. A run scored against no number at all is void |
+| Case 1 | The run completes | The count of committed steps — each navigation, submission or confirmation the person had to perform — is at most the budget the selected `.work` flow node declares for that flow. Exceeding it falsifies it |
+| Case 2 | The flow declares no budget | The class band applies instead and the evidence record names it: on a `console` any action the surface owns is at most three steps from entry; on a `form` at most three for a single purpose and at most seven for a declared multi-step flow; on a `landing` conversion is at most two; on a `catalog` list to detail is exactly one step and the return one; on a `reader` the return to the origin list is one. A run scored against no number at all is void |
 | Case 3 | Two steps are compared | No step exists only to acknowledge the previous one. An interstitial confirming a non-destructive action falsifies it |
 | Case 4 | The same task is repeated by a returning person in the run | The repeat costs no more steps than the first attempt: nothing the person already supplied is asked again |
 
@@ -51,7 +56,7 @@ Not this rule: which actions the surface offers at all is [CTA-1](../composition
 ## UX-3 — A wrong input is corrected in place
 
 Governs recovery: the person made a mistake, and what it cost them. Measured in a UAT run; a failure
-routes to `direction`.
+identifies a composition-owner finding.
 
 | Case | When | Observe |
 | --- | --- | --- |
@@ -66,7 +71,7 @@ whether the message is announced to assistive technology is [A11Y-1](accessibili
 ## UX-4 — The surface answers within the latency bands
 
 Governs whether the person ever waited without knowing they were waiting. Measured in a UAT run by
-timing from activation to rendered change; a failure routes to `direction`, because the missing signal
+timing from activation to rendered change; a failure identifies a composition-owner finding, because the missing signal
 is a composition problem even when the slow work is not.
 
 | Case | When | Observe |
@@ -84,7 +89,7 @@ is [TASTE-11](taste.md).
 
 Governs whether the person could locate what they came for. Measured in a UAT run for the flow's own
 destinations, and from an audit capture for the navigation the surface exposes at rest; a failure
-routes to `direction`.
+identifies a composition-owner finding.
 
 | Case | When | Observe |
 | --- | --- | --- |
@@ -98,7 +103,7 @@ Not this rule: which regions exist and who owns them is [LAYOUT-1](../compositio
 ## UX-6 — No dead ends
 
 Governs every state the run can land in. Measured in a UAT run, and from an audit capture for the
-static empty, error and success renders; a failure routes to `direction`.
+static empty, error and success renders; a failure identifies a composition-owner finding.
 
 | Case | When | Observe |
 | --- | --- | --- |
@@ -112,8 +117,7 @@ whether the state has a designed composition is [TASTE-10](taste.md).
 
 ## UX-7 — Place survives back, refresh and a shared link
 
-Governs continuity: the person left and came back. Measured in a UAT run; a failure routes to the flow
-owner, because where a route may be resumed is a product decision.
+Governs continuity: the person left and came back. Measured in a UAT run; a failure identifies a flow-owner finding, because where a route may be resumed is a product decision.
 
 | Case | When | Observe |
 | --- | --- | --- |
@@ -127,7 +131,7 @@ Not this rule: which choices are persistent peers is [STATE-6](../composition/st
 ## UX-8 — The form can be filled
 
 Governs the ergonomics of every field the run touches. Measured from an audit capture for structure
-and order, and in a UAT run for the keyboard and autofill passes; a failure routes to `direction`.
+and order, and in a UAT run for the keyboard and autofill passes; a failure identifies a composition-owner finding.
 
 | Case | When | Observe |
 | --- | --- | --- |
@@ -142,7 +146,7 @@ Not this rule: whether the field's accessible name and relationships are compute
 ## UX-9 — The primary action is in reach on a phone
 
 Governs whether the surface can be driven one-handed. Measured from an audit capture at the narrow
-viewport; a failure routes to `direction`.
+viewport; a failure identifies a composition-owner finding.
 
 | Case | When | Observe |
 | --- | --- | --- |
@@ -156,7 +160,7 @@ Not this rule: what survives when space shrinks is [RESPONSIVE-1](../composition
 ## UX-10 — The same verb sits in the same place
 
 Governs consistency across the surfaces one flow crosses. Measured across the run's captures; a
-failure routes to `direction`.
+failure identifies a composition-owner finding.
 
 | Case | When | Observe |
 | --- | --- | --- |
@@ -169,8 +173,7 @@ Not this rule: which action deserves the dominant accent is [ACCENT-1](../compos
 
 ## UX-11 — The words say what the thing is
 
-Governs the copy the run actually read. Measured from the run's captures; a failure routes to the flow
-owner, because copy authority is not the designer's to change.
+Governs the copy the run actually read. Measured from the run's captures; a failure identifies a flow-owner finding, because copy authority is not the designer's to change.
 
 | Case | When | Observe |
 | --- | --- | --- |
@@ -189,18 +192,17 @@ Governs how the criteria above become one decision.
 | --- | --- | --- |
 | Case 1 | The UX lens runs | Every criterion from `UX-1` to `UX-11` carries a pass or fail and a score from 1 to 5, each backed by the run step or the capture its own rule names |
 | Case 2 | The verdict is computed | `ship` requires no fail on `UX-1`, `UX-3`, `UX-4`, `UX-6` or `UX-7`, and a mean score of at least 4 across the eleven. Anything else is `fix-first` |
-| Case 3 | A gating criterion fails while the mean is at least 4 | The verdict is `fix-first` regardless of the mean. A receipt shipping on the average alone falsifies the lens |
+| Case 3 | A gating criterion fails while the mean is at least 4 | The verdict is `fix-first` regardless of the mean. An evidence record shipping on the average alone falsifies the lens |
 | Case 4 | A criterion's evidence is a screenshot with no attempt behind it, for a rule this file assigns to a run | The entry is `EVIDENCE_UNAVAILABLE`, not a pass and not a fail, and the lens is incomplete |
-| Case 5 | A failure is routed | It goes to the destination its own rule names — `direction` for a composition failure, the flow owner for a failure of intent, authority or copy — and never to `resolve`, because no value swap repairs a flow |
+| Case 5 | A failure has been measured | Record a finding for the composition owner for layout defects, or the flow owner for intent/authority/copy defects. This recommends ownership, not automatic dispatch, spec edits or authorized mutations. |
 
 The scored set is `UX-1` to `UX-11`; this rule is the arithmetic and is not itself scored. The five
 criteria that gate `ship` are the ones that strand a person mid-task: the task never finishes, the
 mistake cannot be undone, the wait is unexplained, the state has no exit, or the place is lost on the
 way back. A score of 3 means the criterion was met without conviction, so a flow that never actually
 fails can still be `fix-first` on the mean, which is the intended outcome for a flow that merely
-works. UX findings never carry a canon base verdict and never become a `grammar-gap`. The scored
-result is the `ux` lane of the run record, and it is the `experience` row of every `## Verdict` table
-downstream of it.
+works. Store UX results and observations in the selected flow node's evidence, binding assertions
+and artifacts. No separate lane/receipt format or downstream verdict copying is required.
 
 ## What this file does not decide
 
@@ -213,4 +215,4 @@ movement keeps meaning is [Motion](motion.md), whether the rendered claim traces
 [Hierarchy](../composition/hierarchy.md), [CTA](../composition/cta.md),
 [Layout](../composition/layout.md), [State](../composition/state.md) and
 [Accent](../composition/accent.md). How the lenses combine into one shippable verdict is
-[the scorecard](ui.md).
+[proof index](INDEX.md).

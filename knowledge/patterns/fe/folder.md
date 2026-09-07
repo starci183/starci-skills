@@ -6,6 +6,11 @@ name does it get?
 Sources: the reference application's `src/components/**`, `src/hooks/**`, `src/modules/api/**`, `src/app/**`,
 `packages/grammar/src/**`. Counts are file counts at the time of reading.
 
+Scope: cited counts and notes are historical observations at skill commit
+`edf72554425f918e80c9205e9c6db10596e722f0`, not a census of the current project. Inspect actual
+source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
+Historical links supply provenance, not scripts or execution instructions.
+
 ## FE-FOLDER-1 — Tier directories
 
 `src/components/` holds eight tier folders. Blocks are grouped by product domain; pages and leaves
@@ -87,13 +92,13 @@ export const authenticationPageClassName = cn(formPageClassName)
 | Case 2 | Class strings in `component.tsx` | Never; they go to `classNames.ts` (lint `class-names-in-colocated-file`, `no-inline-class-name`) |
 | Case 3 | A `__tests__/` folder | 0 across `src/`; specs sit beside their file |
 | Case 4 | A `helpers/` or `utils/` folder | 0 under `src/components` (lint `no-helper-folder-in-components`) |
-| Case 5 | A deployment constant | Never. `process.env.NEXT_PUBLIC_*` lives under `src/modules/` and is reached through the module that owns it. A component folder that reads the variable inline takes a default with it, so the same environment change acquires one home per folder that read it. The occurrences are in [the presentation sweep evidence](../../../tests/evidence/20260903-presentation-sweep.md) |
+| Case 5 | A deployment constant | Never. `process.env.NEXT_PUBLIC_*` lives under `src/modules/` and is reached through the module that owns it. A component folder that reads the variable inline takes a default with it, so the same environment change acquires one home per folder that read it. The occurrences are in [the presentation sweep evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.md) |
 
 ## Open question — currency and locale literals
 
 A currency or locale literal is not a deployment constant. The formatter is built where the locale is
 read, so the money literal sits in the connected half beside it, and the observations point that way
-rather than towards a shared module — recorded in [the presentation sweep evidence](../../../tests/evidence/20260903-presentation-sweep.md). FE-FOLDER-6 Case 5
+rather than towards a shared module — recorded in [the presentation sweep evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.md). FE-FOLDER-6 Case 5
 therefore covers deployment constants only, and whether a currency belongs to a money module of its
 own is an owner decision this file does not make.
 

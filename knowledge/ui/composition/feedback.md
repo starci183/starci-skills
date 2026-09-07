@@ -7,6 +7,9 @@ Feedback is decided at the smallest place that can actually be corrected or reco
 announced further out than it can be fixed makes the reader hunt for the cause, and a page-level
 recovery for a single failed panel throws away work that never failed.
 
+Applicability: API examples belong to the documented Grammar family; verify installed source and
+the selected `.work` specification before use. Gap labels here are findings, not dispatch commands.
+
 ## FEEDBACK-1 — Correct at the nearest owner
 
 Governs where a validation failure lives.
@@ -50,6 +53,6 @@ Retired: FEEDBACK-4 is retired into COVERAGE-1 and is not reused; the address st
 
 Who owns pending among several controls is [Action](action.md), and which conditions exist at all is
 [State](state.md). Which action the reader is being pushed towards is [CTA](cta.md). What the
-receipt must enumerate about these outcome paths is [Coverage](coverage.md). Whether a message is
+`.work` specification must enumerate about these outcome paths is [Coverage](coverage.md). Whether a message is
 programmatically related to its field, and whether it is announced once, is
 [Accessibility](../proof/accessibility.md) and [Render truth](../proof/render-truth.md).

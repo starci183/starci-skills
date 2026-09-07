@@ -30,8 +30,9 @@ and not a component variant.
 
 The rule number is the row's position on that ramp, counting `rounded-none` as zero, and it is a stable
 address: the ramp is printed whole so the published numbers never shift when a step is added. A step
-gets its number, and a case table below, only once two authorized blocks write it; the four steps
-reading `—` are reserved addresses, because one occurrence is a product decision, not a rule.
+gets its number and a case table through a selected evidence-grounded knowledge change; the four
+steps reading `—` keep reserved addresses. A one-off product preference alone does not establish a
+reusable case.
 
 Because the factors are fixed and only `--radius` moves, an application that writes a rem value
 directly — `rounded-[1.25rem]` — freezes one family's decision into every family and leaves the ramp
@@ -56,10 +57,10 @@ component with a selector or a passed class to change its corner is `APP_OVERRID
 ## Classes off the scale
 
 `rounded-small`, `rounded-medium` and `rounded-large` are not on this scale and are not utilities this
-app publishes. They are the vendor's Tailwind 3 plugin names, and the compiled stylesheet of this head
+recorded app published. They were the vendor's Tailwind 3 plugin names, and the compiled stylesheet recorded in the historical snapshot
 emits no rule for any of them: `rounded-` prints `none`, `sm`, `md`, `lg`, `xl`, `2xl`, `3xl`, `full`
-and `field`, and nothing else. A boundary written with one of them therefore renders square while the
-source reads as though a corner were chosen.
+and `field`, and nothing else. That observation explained a square boundary despite a corner-like
+class name. Inspect the current compiled stylesheet before applying the same diagnosis today.
 
 They are removed rather than translated. The removal reason is `off the closed scale`, and the
 replacement is the ramp step the boundary's case names, not the step whose word happens to match.
@@ -76,9 +77,9 @@ controls and tooltip content; `--starci-core-pill-radius` (`999px`) rounds the p
 family may set those tokens to its own numbers, which is why an application that copies the current
 number freezes one family's decision into every family.
 
-`scripts/generate-presentation-owned.mjs` does not yet carry a `RADIUS` topic, so this file has no
-generated ownership table. Until it does, a reader rules out writing a class by finding the boundary
-among the three tokens above.
+The tokens above are retained family references, not a live package inventory. Inspect the actual
+selected component and computed token values to establish ownership before writing an app class.
+See [source and maintenance](INDEX.md#source-and-maintenance); no external generator is required.
 
 ## RADIUS-2 — `rounded-sm` / `.25rem`
 

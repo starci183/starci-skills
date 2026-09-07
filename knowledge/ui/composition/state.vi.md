@@ -8,6 +8,9 @@ bước chuyển giữa chúng trước, rồi mới gán từng cái vào một
 carrier sẽ hoá thành một dữ kiện, còn một dữ kiện không có carrier thì hoá thành phỏng đoán, nên
 chính bước biên dịch đó mới là rule.
 
+Phạm vi áp dụng: ví dụ API thuộc family Grammar đã ghi nhận; đối chiếu source cài thực tế và
+đặc tả `.work` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch.
+
 ## Năm loại
 
 | Loại | Ví dụ | Bản chất |
@@ -28,7 +31,7 @@ Chi phối thứ tự đưa ra quyết định về state.
 
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
-| Case 1 | Một tính năng có hơn một điều kiện chạm tới được | Mọi dữ kiện business và mọi bước chuyển giữa chúng đã có tên trong receipt trước khi bất kỳ prop carrier nào đứng cạnh chúng |
+| Case 1 | Một tính năng có hơn một điều kiện chạm tới được | Mọi dữ kiện business và mọi bước chuyển giữa chúng đã có tên trong đặc tả `.work` trước khi bất kỳ prop carrier nào đứng cạnh chúng |
 | Case 2 | Các dữ kiện đã sẵn sàng để gán | Mỗi dữ kiện đã đặt tên phân giải về carrier riêng của nó: `isDisabled`, `isPending` hoặc `isSkeleton` ở nơi owner có công bố chúng, `Tabs.selectedKey`, `SurfaceAccordionCard.isOpen`, hoặc một `PresentationState` trên owner của nó |
 | Case 3 | Một cờ chung có thể phủ được vài dữ kiện cùng lúc | Không carrier nào đứng cho quá một dữ kiện, nên disabled, pending và chưa giải quyết không bao giờ chung một cờ |
 | Case 4 | Có sẵn một dấu hiệu thoáng qua trông rất tiện | Không có dấu hiệu hover hay focus nào mang giá trị selected hoặc expanded |
@@ -100,7 +103,7 @@ Chi phối một phần tóm tắt làm hiện ra một vùng.
 Trang có những vùng nào để chứa các state này thuộc [Layout](layout.vi.md), và nhánh nào sống sót
 qua reflow thuộc [Responsive](responsive.vi.md). Control nào mang quyết định, và khi nhiều control
 cùng tham gia thì ai giữ pending, thuộc [CTA](cta.vi.md) và [Action](action.vi.md). Người đọc được
-nói gì ở mỗi kết cục thuộc [Feedback](feedback.vi.md). Receipt phải liệt kê những gì về các state
+nói gì ở mỗi kết cục thuộc [Feedback](feedback.vi.md). Đặc tả `.work` phải liệt kê những gì về các state
 này thuộc [Coverage](coverage.vi.md). State sau khi render có được đọc lên, có chạm tới được và có
 đúng sự thật không thuộc [Accessibility](../proof/accessibility.vi.md),
 [Focus](../proof/focus.vi.md) và [Render truth](../proof/render-truth.vi.md).

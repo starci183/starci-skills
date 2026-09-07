@@ -8,6 +8,11 @@ Sources: `src/components/pages/AuthenticationPage/*`, `pages/CartPage/index.tsx`
 `leaves/ButtonStateSample/index.tsx`, `hooks/swr/useQueryCourseSwr.ts`,
 `hooks/swr/useMutateAddToCartSwr.ts`, `packages/grammar/src/core/primitive/Button/index.tsx`.
 
+Scope: cited counts and notes are historical observations at skill commit
+`edf72554425f918e80c9205e9c6db10596e722f0`, not a census of the current project. Inspect actual
+source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
+Historical links supply provenance, not scripts or execution instructions.
+
 ## FE-FUNCTION-1 — A component is an arrow const with one `props` parameter
 
 | Case | When | Write |
@@ -43,7 +48,7 @@ Sources: `src/components/pages/AuthenticationPage/*`, `pages/CartPage/index.tsx`
 | Case 2 | Pure half | No `"use client"` (0/49 pages, 3/109 blocks); no runtime import from `@/hooks` or `@/modules/api` (0 of 150 `component.tsx`; 18 import a type only) |
 | Case 3 | Route-derived input | `const routeState = (value: string \| null) => { switch (value) { case "sign-up": return { mode: "signUp" as const, step: "details" as const, measure: "form" as const } … } }` in `index.tsx`, then `const initial = routeState(authState)` |
 | Case 4 | Navigation as an action | `on={{ signedIn: () => router.replace("/dashboard") }}` |
-| Case 5 | A pure half choosing between a connected block and its Base | Never: `props.data === null ? <X /> : <XBase {...props.data} />` lets the pure half decide, per render, whether a child fetches its own data. The pure half mounts one of them, the same one every time; the page-level provider lives in `index.tsx`, which resolves the data and hands `XBase` its props. The occurrences are in [the presentation sweep evidence](../../../tests/evidence/20260903-presentation-sweep.md) |
+| Case 5 | A pure half choosing between a connected block and its Base | Never: `props.data === null ? <X /> : <XBase {...props.data} />` lets the pure half decide, per render, whether a child fetches its own data. The pure half mounts one of them, the same one every time; the page-level provider lives in `index.tsx`, which resolves the data and hands `XBase` its props. The occurrences are in [the presentation sweep evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.md) |
 
 ## FE-FUNCTION-5 — When a helper is extracted
 

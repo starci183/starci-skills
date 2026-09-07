@@ -4,10 +4,15 @@
 đứng sau giao diện ấy được viết ra sao: một tệp nằm dưới gốc nào, các tệp của một đơn vị GraphQL
 tên gì, một handler có hình dạng nào, một import dùng alias nào, docblock đứng ở đâu so với
 decorator, một exception được khai báo thế nào và được ánh xạ sang HTTP và GraphQL ở đâu, và spec
-nằm chỗ nào. Mọi luật dưới đây được rút ra từ checkout backend của project đang bind
-(`@workspaces/be/src/`) bằng cách mở tệp và đếm; mỗi bảng dẫn nguồn của nó. Nơi nào mã nguồn chia
+nằm chỗ nào. Mọi luật dưới đây được rút ra từ source backend tham chiếu lịch sử bằng cách mở tệp và đếm; mỗi bảng dẫn nguồn của nó. Nơi nào mã nguồn chia
 hai ngả, tệp ghi lại biến thể chiếm ưu thế cùng con số thay vì áp đặt. Tên luật lint từ chính
-ESLint config của project đang bind chỉ được dẫn ở nơi mã đã tuân theo.
+ESLint config của project tham chiếu chỉ được dẫn ở nơi mã đã tuân theo.
+
+Phạm vi áp dụng: đây là quan sát nguồn tham chiếu lịch sử được giữ ở commit skill
+`edf72554425f918e80c9205e9c6db10596e722f0`, không phải luật framework phổ quát hoặc bằng chứng
+source dự án hiện tại. Kiểm tra repository, type/API, alias, cấu hình lint/test thực tế đã chọn;
+chỉ dùng mẫu hợp với scope `.work` được duyệt. Số đếm cũ không được dùng để tuyên bố scan mới.
+Yêu cầu nghiệp vụ và kiến trúc hiện tại thuộc node `.work`, không suy ra thành đã duyệt từ mẫu code.
 
 ## Danh mục
 
@@ -24,5 +29,5 @@ ESLint config của project đang bind chỉ được dẫn ở nơi mã đã tu
 
 ## Nguồn
 
-Checkout backend của project đang bind (`@workspaces/be/src/`), `apps/core/src/app.module.ts` cho
+Source backend tham chiếu lịch sử, `apps/core/src/app.module.ts` cho
 việc đăng ký bộ lọc, `tsconfig.json`, `jest.config.ts`, `eslint.config.mjs`.

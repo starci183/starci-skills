@@ -34,7 +34,7 @@ silently without it, because the region never becomes narrower than its longest 
 
 ## Text flow Common already owns
 
-Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
+Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](INDEX.md#source-and-maintenance).
 
 | Component | Element or condition | Rule |
 | --- | --- | --- |

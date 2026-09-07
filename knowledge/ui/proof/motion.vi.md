@@ -56,17 +56,18 @@ Chi phối những gì khép lại một tuyên bố về chuyển động.
 
 ## MOTION-5 — Phán quyết của chuyển động
 
-Chi phối việc các tiêu chí trên trở thành đúng một hàng của topic này trong bảng `## Verdict` của receipt.
+Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.work` hiện tại.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
 | Case 1 | Lens chạy | `MOTION-1` đến `MOTION-4` được xét trên cặp ảnh chụp mà coverage đòi: một ảnh khi tuỳ chọn giảm chuyển động chưa bật và một ảnh khi đã bật |
 | Case 2 | Tính verdict | Tập chặn cửa là toàn bộ tập: `pass` đòi mọi tiêu chí đều đạt, vì chuyển động đánh mất nghĩa một lần là đã mất |
 | Case 3 | Thiếu một trong hai ảnh chụp | Verdict là `blocked`; một lens chỉ chạy trên ảnh thường thì chưa hề thử tới tuỳ chọn ấy |
-| Case 4 | Một lần fail được định tuyến | Một thời lượng hay một easing ngoài thang đã publish thì về `resolve` kèm nguyên nhân ngoài thang; sai dàn dựng, mất outcome hay gây dồn lại bố cục thì về `direction` |
+| Case 4 | Một lỗi đã được đo | Ghi lỗi thời lượng/easing đã đo riêng với lỗi dàn dựng, mất outcome và reflow. Xác định owner giá trị hoặc composition nhưng không thực thi op tiếp theo. |
 
-Tập được chấm là `MOTION-1` đến `MOTION-4`; rule này là phần số học và bản thân nó không được chấm.
-Kết quả của nó là hàng `motion` trong bảng `## Verdict` của receipt audit.
+Tập được chấm là `MOTION-1` đến `MOTION-4`; rule này chỉ tổng hợp và bản thân không được chấm.
+Lưu assertion, quan sát và artifact tham chiếu trong bằng chứng của node được chọn; không có
+bảng receipt riêng hoặc quy tắc chép verdict xuống bước sau. Thiếu bằng chứng không thành đạt.
 
 ## File này không quyết định
 

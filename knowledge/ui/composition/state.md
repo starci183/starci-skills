@@ -7,6 +7,9 @@ State is compiled before anything renders. The direction lists the business fact
 transitions between them first, then binds each to a real carrier. Two facts that share a carrier
 become one fact, and a fact with no carrier becomes a guess, so the compiling step is the rule.
 
+Applicability: API examples belong to the documented Grammar family; verify installed source and
+the selected `.work` specification before use. Gap labels here are findings, not dispatch commands.
+
 ## The five kinds
 
 | Kind | Examples | Nature |
@@ -27,7 +30,7 @@ Governs the order in which state decisions are made.
 
 | Case | When | Assert |
 | --- | --- | --- |
-| Case 1 | A feature has more than one reachable condition | Every business fact and every transition between them is named in the receipt before any carrier prop appears against it |
+| Case 1 | A feature has more than one reachable condition | Every business fact and every transition between them is named in the `.work` specification before any carrier prop appears against it |
 | Case 2 | The named facts are ready to bind | Each named fact resolves to its own carrier: `isDisabled`, `isPending`, or `isSkeleton` where the owner publishes them, `Tabs.selectedKey`, `SurfaceAccordionCard.isOpen`, or a `PresentationState` on its owner |
 | Case 3 | A single generic flag would cover several of them | No carrier appears against more than one named fact, so disabled, pending, and unresolved never share one flag |
 | Case 4 | A transient cue is available and looks convenient | No hover or focus cue carries a selected or expanded value |
@@ -99,7 +102,7 @@ Governs a summary that reveals a region.
 Which regions exist to hold these states is [Layout](layout.md), and which branch survives a reflow
 is [Responsive](responsive.md). Which control carries a decision, and who owns pending among several
 controls, is [CTA](cta.md) and [Action](action.md). What the reader is told at each outcome is
-[Feedback](feedback.md). What the receipt must enumerate about these states is
+[Feedback](feedback.md). What the `.work` specification must enumerate about these states is
 [Coverage](coverage.md). Whether the rendered state is announced, reachable, and truthful is
 [Accessibility](../proof/accessibility.md), [Focus](../proof/focus.md), and
 [Render truth](../proof/render-truth.md).

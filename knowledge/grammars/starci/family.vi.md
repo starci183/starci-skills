@@ -1,5 +1,11 @@
 # StarCi Core family và DNA
 
+Snapshot lịch sử: `@starci/grammar@0.4.13`, source checkout
+`41be722701c439e76910f80a8cbb65261da72e01`, ghi nhận 2026-09-05. Đây không phải API/gap đã
+kiểm chứng trên package đang cài hôm nay. Trước khi dùng, đọc manifest/lockfile, export/type,
+renderer và CSS thực tế của repository được chọn; ghi source/phiên bản vào node `.work`.
+Nếu không có source thì ghi chưa kiểm chứng, không suy ra API hoặc lỗi hiện tại từ bảng cũ.
+
 ## Family identity
 
 StarCi Core được định nghĩa bởi `coreGrammar` và được chọn bằng `CoreGrammarRoot`. Nó hiện thực Common contract; nó không phải parent của Common hay family khác. `CORE_GRAMMAR_COMPONENTS` chỉ còn là compatibility alias tới `COMMON_GRAMMAR_COMPONENTS`.
@@ -28,10 +34,9 @@ Core hỗ trợ light, explicit dark, system dark, forced colors, focus-visible 
 
 ## Gap
 
-Những năng lực package đang chạy không công bố, đọc từ đúng source renderer mà mỗi dòng nêu tên. Bảng
-này là bản kiểm kê gap duy nhất của family: `scripts/generate-grammar-dna.mjs` chép nó sang
-[DNA](DNA.vi.md), nên một gap ghi ở chỗ khác là chưa được công bố. Mỗi dòng nói cái gì đang thiếu,
-không nói nó từng treo vào luật nào.
+Các năng lực bị ghi nhận thiếu tại snapshot, kèm vị trí source lịch sử trong từng dòng.
+Đối chiếu lại source cài thực tế trước khi ghi một gap hiện tại vào node `.work`; bảng này
+không phải kho gap sống duy nhất và không kích hoạt sửa library.
 
 | Component | Năng lực còn thiếu | Bằng chứng |
 | --- | --- | --- |

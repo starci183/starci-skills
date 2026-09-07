@@ -9,7 +9,7 @@ business
 -> UI đã render
 ```
 
-Mọi rule trong folder này được operator direction tiêu thụ. Operator đó trả lời những câu hỏi phải
+Op composition được chọn có thể dùng các rule này để trả lời những câu hỏi phải
 chốt xong khi trang vẫn còn là một bản mô tả: trang có những vùng nào, nội dung nào đứng trên nội
 dung nào, action nào mang quyết định, tính năng có thể rơi vào những điều kiện nào, người đọc được
 nói gì ở mỗi kết cục, và phần nhấn mạnh mạnh nhất vốn khan hiếm thì tiêu ở đâu. Những chủ đề này
@@ -30,7 +30,7 @@ và đó chính là lý do nó được quyết trước.
 | [State](state.vi.md) | Có những điều kiện nào, và carrier công khai nào giữ từng cái | STATE-1 đến STATE-7 |
 | [Feedback](feedback.vi.md) | Ai báo lỗi, ai chỉ cách sửa, ai phục hồi, ai công bố kết quả | FEEDBACK-1 đến FEEDBACK-3 |
 | [Accent](accent.vi.md) | Phần nhấn mạnh mạnh nhất và khan hiếm được tiêu ở đâu | ACCENT-1 đến ACCENT-5 |
-| [Coverage](coverage.vi.md) | Receipt của direction phải liệt kê những gì trước khi được phát ra | COVERAGE-1 |
+| [Coverage](coverage.vi.md) | Đặc tả thiết kế được chọn phải liệt kê những gì | COVERAGE-1 |
 
 Năm rule phạm vi của từng chủ đề đã gộp vào COVERAGE-1, và một địa chỉ đã nghỉ thì không dùng lại:
 đã nghỉ là `ACTION-4`, `STATE-4`, `FEEDBACK-4`, `LAYOUT-5` và `RESPONSIVE-5`.
@@ -45,12 +45,12 @@ Mỗi rule gồm heading, một dòng gọi tên thứ mà rule chi phối, và 
 
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
-| Case 1 | Tình huống cụ thể dẫn tới rule này. | Một khẳng định phủ định được về receipt của direction hoặc về cây đã dựng, viết bằng ngôn ngữ mà phía sản phẩm đọc được. |
+| Case 1 | Tình huống cụ thể dẫn tới rule này. | Một khẳng định phủ định được về đặc tả thiết kế được chọn hoặc về cây đã dựng, viết bằng ngôn ngữ mà phía sản phẩm đọc được. |
 
-Ô `Khẳng định` nêu một mệnh đề mà receipt hoặc cây đã dựng hoặc thoả hoặc trượt, không phải lời
+Ô `Khẳng định` nêu một mệnh đề mà đặc tả hoặc cây đã dựng hoặc thoả hoặc trượt, không phải lời
 khuyên và không phải tên class. Nó có thể gọi tên một component hay prop công khai khi đó chính là
 thứ phải được mang, nhưng nó không bao giờ chốt một giá trị CSS; phần đó thuộc về presentation. Bố
-cục và gu thẩm mỹ được quyết trong `@knowledge/grammars/<family>`; các rule ở đây chỉ nói một direction
+cục và gu thẩm mỹ được quyết trong [snapshot family áp dụng](../../grammars/INDEX.vi.md), sau khi kiểm tra source hiện tại; các rule ở đây chỉ nói một direction
 phải thoả điều gì.
 
 Một case thuộc về rule hàng xóm thì không nằm trong bảng. Nó đứng thành một dòng ngay sau bảng, theo
@@ -58,6 +58,8 @@ dạng `Không phải rule này: <điều kiện> thuộc PREFIX-n`. Mỗi file 
 `## File này không quyết định`, dẫn sang các file anh em và sang nhóm proof, nơi kết quả được quan
 sát.
 
-Tên component và tên prop trong các file này đều phải phân giải được về `@grammar/common`.
-Một API không tồn tại ở đó thì không được viết vào rule; một năng lực cần mà chưa có thì ghi nhận
-thành capability gap.
+Tên component và prop minh hoạ family Grammar đã ghi nhận, không phải yêu cầu chung cho mọi sản phẩm.
+Kiểm tra export và ownership trong source package thực sự được cài ở dự án trước khi dùng.
+Năng lực thiếu được ghi thành gap; không bịa API hoặc tự dispatch op tiếp theo.
+Lưu quyết định thiết kế trong Markdown hoặc extension có namespace của node `.work` hiện tại,
+kèm assertion nghiệm thu rõ ràng; folder này không định nghĩa receipt riêng.

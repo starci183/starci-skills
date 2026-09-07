@@ -7,8 +7,8 @@ một nhiệm vụ chứ không mang theo cuốn luật. Một bề mặt có th
 khung hình tĩnh, mà vẫn bỏ rơi giữa đường chính người cần nó, nên bằng chứng ở đây là một lượt chạy
 chứ không phải một ảnh chụp.
 
-Dụng cụ đo thông thường là lượt UAT: `uat.verify` lái một flow đã đóng băng tại commit đã ghim và
-phán lane `ux` trên chính capture của nó, nên một ô `Quan sát` gọi tên một bước của một lần thử thật —
+Dụng cụ đo thông thường là lượt UAT: `uat.verify` chạy flow `.work` đã chọn và ghi nhận
+bằng chứng trên runtime có phiên bản artifact/source đã quan sát thực tế, nên một ô `Quan sát` gọi tên một bước của một lần thử thật —
 assertion đã tới được, số bước đã tốn, độ trễ giữa lúc kích hoạt và thay đổi nhìn thấy đầu tiên,
 trạng thái sau khi tải lại. Ở đâu một tiêu chí đã ngã ngũ chỉ với một bản render và không cần một lần
 thử, `interface.audit` được phép đo nó từ capture nó đã chụp sẵn; mỗi rule dưới đây gọi tên
@@ -20,17 +20,22 @@ Sources: phán quyết của chủ sở hữu rằng mọi thứ cần để quy
 là một rule có ngưỡng, rằng UX được phán trên một lượt chạy nhiệm vụ chứ không trên ảnh chụp tĩnh, và
 rằng một con số trung bình không bao giờ được che một lỗi chí mạng; cộng với hai flow đã ẩn danh, một
 lần đăng nhập và một lần mua, chấm điểm trọn vẹn tại
-[bản ghi bằng chứng UX scorecard](../../../tests/evidence/20260903-ux-scorecard.md).
+[bản ghi bằng chứng UX scorecard](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-ux-scorecard.md).
+
+Nguồn ghi chú được ghim phía trên là lịch sử, không phải bằng chứng sản phẩm hiện tại. Chọn các
+tiêu chí và ngưỡng áp dụng trong scope `.work` trước khi chạy; `ship` chỉ là nhãn rubric, không
+cấp quyền release. Commit local không tự chứng minh phiên bản đang phục vụ. Finding chỉ đề xuất owner,
+không khởi chạy op tiếp theo. Không dùng ảnh tĩnh thay lượt chạy cho assertion hành vi.
 
 ## UX-1 — Nhiệm vụ hoàn tất
 
 Chi phối việc mục tiêu flow đã khai báo có thật sự tới được không, và tới mà không cần ai mách. Đo
-trong một lượt UAT; một lần fail đi về phía chủ flow, vì chỉ một con người mới quyết định flow này
+trong một lượt UAT; một lần fail được ghi cho chủ flow, vì chỉ một con người mới quyết định flow này
 sinh ra để làm gì.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
-| Case 1 | Lượt chạy tới được assertion cuối của flow | Trạng thái mục tiêu mà `flow.md` gọi tên có mặt trong capture và trong store. Một lượt kết thúc ở màn hình cuối mà thiếu bản ghi mục tiêu nói tới sẽ bác bỏ nó |
+| Case 1 | Lượt chạy tới được assertion cuối của flow | Trạng thái mục tiêu mà node flow `.work` được chọn gọi tên có mặt trong capture và trong store. Một lượt kết thúc ở màn hình cuối mà thiếu bản ghi mục tiêu nói tới sẽ bác bỏ nó |
 | Case 2 | Lượt chạy được lái mà không cần kiến thức nào ngoài thứ bề mặt bày ra | Mọi bước đều chọn từ một nhãn nhìn thấy được, không bước nào cần gõ tay một URL, một câu lệnh console, hay một lời mách của tác giả flow. Một lần can thiệp như vậy sẽ bác bỏ nó |
 | Case 3 | Flow khai báo một nhánh khác như từ chối, huỷ hay thử lại | Nhánh đó cũng tới được một assertion cuối có tên. Một nhánh hết màn hình giữa chừng sẽ bác bỏ nó |
 | Case 4 | Nhiệm vụ hoàn tất | Nó hoàn tất trong ngân sách thời gian flow đã khai báo, tính từ lần kích hoạt đầu tới assertion cuối. Vượt ngân sách được ghi là fail kèm thời lượng đo được, không được bỏ qua |
@@ -40,12 +45,12 @@ Không phải rule này: backend có thật sự làm xong việc hay không thu
 ## UX-2 — Số bước nằm trong ngân sách của flow
 
 Chi phối lượng việc người dùng phải tự làm để đi tới đích. Đo trong một lượt UAT, đối chiếu ngân sách
-flow khai báo, và đối chiếu dải theo lớp mà chính rule này sở hữu; một lần fail đi về `direction`.
+flow khai báo, và đối chiếu dải theo lớp mà chính rule này sở hữu; một lần fail được ghi cho owner composition.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
-| Case 1 | Lượt chạy hoàn tất | Số bước đã commit — mỗi lần điều hướng, gửi đi hay xác nhận mà người dùng phải tự làm — nhiều nhất bằng ngân sách `flow.md` khai báo cho flow đó. Vượt qua sẽ bác bỏ nó |
-| Case 2 | Flow không khai báo ngân sách | Dải theo lớp được dùng thay và receipt gọi tên nó: trên `console`, mọi hành động bề mặt sở hữu cách lối vào nhiều nhất ba bước; trên `form`, nhiều nhất ba bước cho một mục đích đơn và nhiều nhất bảy bước cho một flow nhiều bước đã khai; trên `landing`, chuyển đổi nhiều nhất hai bước; trên `catalog`, từ list sang detail đúng một bước và đường về một bước; trên `reader`, đường về list gốc là một bước. Một lượt chấm mà không có con số nào là vô hiệu |
+| Case 1 | Lượt chạy hoàn tất | Số bước đã commit — mỗi lần điều hướng, gửi đi hay xác nhận mà người dùng phải tự làm — nhiều nhất bằng ngân sách node flow `.work` được chọn khai báo cho flow đó. Vượt qua sẽ bác bỏ nó |
+| Case 2 | Flow không khai báo ngân sách | Dải theo lớp được dùng thay và bản ghi bằng chứng gọi tên nó: trên `console`, mọi hành động bề mặt sở hữu cách lối vào nhiều nhất ba bước; trên `form`, nhiều nhất ba bước cho một mục đích đơn và nhiều nhất bảy bước cho một flow nhiều bước đã khai; trên `landing`, chuyển đổi nhiều nhất hai bước; trên `catalog`, từ list sang detail đúng một bước và đường về một bước; trên `reader`, đường về list gốc là một bước. Một lượt chấm mà không có con số nào là vô hiệu |
 | Case 3 | So hai bước với nhau | Không bước nào tồn tại chỉ để xác nhận bước trước. Một màn chen giữa để xác nhận một hành động không huỷ hoại sẽ bác bỏ nó |
 | Case 4 | Cùng nhiệm vụ được một người quay lại làm lần nữa trong lượt chạy | Lần lặp không tốn thêm bước nào: thứ người đó đã cung cấp không bị hỏi lại |
 
@@ -54,7 +59,7 @@ Không phải rule này: bề mặt bày ra những hành động nào thuộc [
 ## UX-3 — Nhập sai được sửa ngay tại chỗ
 
 Chi phối việc phục hồi: người dùng làm sai, và cái sai đó tốn của họ bao nhiêu. Đo trong một lượt UAT;
-một lần fail đi về `direction`.
+một lần fail được ghi cho owner composition.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
@@ -69,7 +74,7 @@ báo có được đọc lên cho công nghệ trợ giúp hay không là [A11Y-
 ## UX-4 — Bề mặt trả lời trong các dải độ trễ
 
 Chi phối việc người dùng có bao giờ phải chờ mà không biết mình đang chờ. Đo trong một lượt UAT bằng
-cách bấm giờ từ lúc kích hoạt tới lúc render đổi; một lần fail đi về `direction`, vì thiếu tín hiệu là
+cách bấm giờ từ lúc kích hoạt tới lúc render đổi; một lần fail được ghi cho owner composition, vì thiếu tín hiệu là
 vấn đề của bố cục kể cả khi phần việc chậm thì không.
 
 | Case | Dùng khi | Quan sát |
@@ -86,8 +91,7 @@ không là [TASTE-11](taste.vi.md).
 ## UX-5 — Tìm ra được điểm đến
 
 Chi phối việc người dùng có định vị được thứ họ tới để tìm. Đo trong một lượt UAT cho các điểm đến của
-chính flow, và từ capture của audit cho phần điều hướng bề mặt bày ra lúc nghỉ; một lần fail đi về
-`direction`.
+chính flow, và từ capture của audit cho phần điều hướng bề mặt bày ra lúc nghỉ; một lần fail được ghi cho owner composition.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
@@ -102,7 +106,7 @@ Không phải rule này: trang có những vùng nào và ai sở hữu chúng l
 ## UX-6 — Không có ngõ cụt
 
 Chi phối mọi trạng thái lượt chạy có thể đáp xuống. Đo trong một lượt UAT, và từ capture của audit cho
-các bản render tĩnh của trạng thái rỗng, lỗi và thành công; một lần fail đi về `direction`.
+các bản render tĩnh của trạng thái rỗng, lỗi và thành công; một lần fail được ghi cho owner composition.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
@@ -117,8 +121,7 @@ Không phải rule này: sự vắng mặt có được render trọn vẹn hay 
 
 ## UX-7 — Chỗ đứng sống sót qua back, tải lại và một link được chia sẻ
 
-Chi phối tính liên tục: người dùng rời đi rồi quay lại. Đo trong một lượt UAT; một lần fail đi về phía
-chủ flow, vì một route được phép tiếp tục ở đâu là quyết định của sản phẩm.
+Chi phối tính liên tục: người dùng rời đi rồi quay lại. Đo trong một lượt UAT; một lần fail được ghi cho chủ flow, vì một route được phép tiếp tục ở đâu là quyết định của sản phẩm.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
@@ -133,7 +136,7 @@ Không phải rule này: lựa chọn nào là lựa chọn bền vững giữa 
 ## UX-8 — Cái form điền được
 
 Chi phối tính công thái của mọi field lượt chạy chạm tới. Đo từ capture của audit cho cấu trúc và thứ
-tự, và trong một lượt UAT cho lượt bàn phím và lượt autofill; một lần fail đi về `direction`.
+tự, và trong một lượt UAT cho lượt bàn phím và lượt autofill; một lần fail được ghi cho owner composition.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
@@ -147,8 +150,7 @@ Không phải rule này: tên khả truy cập và quan hệ của field có đ�
 
 ## UX-9 — Hành động chính nằm trong tầm ngón cái trên điện thoại
 
-Chi phối việc bề mặt có lái được bằng một tay. Đo từ capture của audit ở viewport hẹp; một lần fail đi
-về `direction`.
+Chi phối việc bề mặt có lái được bằng một tay. Đo từ capture của audit ở viewport hẹp; một lần fail được ghi cho owner composition.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
@@ -163,7 +165,7 @@ Không phải rule này: cái gì sống sót khi không gian co lại là
 ## UX-10 — Cùng một động từ nằm cùng một chỗ
 
 Chi phối tính nhất quán qua các bề mặt mà một flow đi ngang. Đo trên toàn bộ capture của lượt chạy;
-một lần fail đi về `direction`.
+một lần fail được ghi cho owner composition.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
@@ -198,18 +200,17 @@ Chi phối cách các tiêu chí trên gộp thành một quyết định.
 | --- | --- | --- |
 | Case 1 | Lens UX chạy | Mỗi tiêu chí từ `UX-1` tới `UX-11` mang một pass hoặc fail và một điểm từ 1 tới 5, mỗi điểm dựa trên bước chạy hoặc capture mà chính rule đó gọi tên |
 | Case 2 | Tính verdict | `ship` đòi không fail ở `UX-1`, `UX-3`, `UX-4`, `UX-6` hay `UX-7`, và điểm trung bình ít nhất 4 trên cả mười một tiêu chí. Mọi trường hợp khác là `fix-first` |
-| Case 3 | Một tiêu chí chặn cửa bị fail trong khi trung bình vẫn từ 4 trở lên | Verdict vẫn là `fix-first` bất kể trung bình. Một receipt ship dựa trên mỗi con số trung bình sẽ bác bỏ lens này |
+| Case 3 | Một tiêu chí chặn cửa bị fail trong khi trung bình vẫn từ 4 trở lên | Verdict vẫn là `fix-first` bất kể trung bình. Một bản ghi bằng chứng ship dựa trên mỗi con số trung bình sẽ bác bỏ lens này |
 | Case 4 | Bằng chứng của một tiêu chí chỉ là ảnh chụp mà không có lần thử nào phía sau, với một rule file này giao cho lượt chạy | Mục đó là `EVIDENCE_UNAVAILABLE`, không phải pass và cũng không phải fail, và lens còn dở |
-| Case 5 | Một lần fail được định tuyến | Nó đi đúng nơi rule của chính nó gọi tên — `direction` cho một lỗi bố cục, chủ flow cho một lỗi về ý định, authority hay copy — và không bao giờ đi về `resolve`, vì không phép đổi giá trị nào sửa được một flow |
+| Case 5 | Một lỗi đã được đo | Ghi finding cho owner composition khi lỗi bố cục, owner flow khi lỗi ý định/thẩm quyền/copy. Đây là đề xuất trách nhiệm, không dispatch, sửa spec hoặc mutation được cấp quyền ngầm. |
 
 Tập được chấm điểm là `UX-1` tới `UX-11`; rule này là phần số học và bản thân nó không được chấm. Năm
 tiêu chí chặn cửa `ship` là năm thứ bỏ rơi một người giữa nhiệm vụ: việc không bao giờ xong, cái sai
 không hoàn tác được, lần chờ không được giải thích, trạng thái không có lối ra, hoặc mất chỗ đứng trên
 đường quay lại. Điểm 3 nghĩa là tiêu chí được đáp ứng mà không có sức thuyết phục, nên một flow không
 bao giờ thật sự hỏng vẫn có thể là `fix-first` chỉ vì trung bình, và đó đúng là kết quả mong muốn cho
-một flow chỉ dừng ở mức chạy được. Finding của UX không bao giờ mang base verdict của canon và không
-bao giờ thành `grammar-gap`. Kết quả đã chấm chính là lane `ux` của run record, và là hàng
-`experience` của mọi bảng `## Verdict` phía sau nó.
+một flow chỉ dừng ở mức chạy được. Lưu kết quả và quan sát UX trong bằng chứng node flow được chọn, liên kết assertion và artifact.
+Không bắt buộc lane/receipt riêng hoặc chép verdict sang op sau.
 
 ## File này không quyết định
 
@@ -222,4 +223,4 @@ authority hay không là [Render truth](render-truth.vi.md), và bố cục có 
 [Hierarchy](../composition/hierarchy.vi.md), [CTA](../composition/cta.vi.md),
 [Layout](../composition/layout.vi.md), [State](../composition/state.vi.md) và
 [Accent](../composition/accent.vi.md). Các lens gộp lại thành một verdict ship được ra sao thuộc
-[scorecard](ui.vi.md).
+[chỉ mục proof](INDEX.vi.md).

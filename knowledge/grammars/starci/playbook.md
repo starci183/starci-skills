@@ -6,6 +6,10 @@ that answer. The idioms themselves are in [Idioms](idioms.md); what the package 
 approved product direction when existing Common semantics, family anatomy and product facts can
 express it; only promotion into the family's reusable idiom set belongs to the family owner.
 
+Use this playbook only when this family is selected in the current `.work` specification. Examples
+below are historical references; verify actually installed exports, renderers and CSS before
+promising a capability. Reading steps below are reasoning within one op, not an auto-running op chain.
+
 ## Shapes
 
 | Business shape | What a supplied reference may contribute | Idiom sequence |
@@ -25,7 +29,7 @@ express it; only promotion into the family's reusable idiom set belongs to the f
    evidence about the reference, not about StarCi.
 3. **Then the idioms**, composed in the order the shape's row gives, each one taken whole: an idiom
    is a relationship, and half of it is a different shape.
-4. **Then [DNA](DNA.md)**, to confirm every renderer and prop the composition names exists, and to
+4. **Compare [DNA](DNA.md) with actually installed source**, to confirm named renderers/props, and to
    read the gaps in [Family and DNA](family.md) before promising a capability. A composition that
    needs a recorded gap is not a direction yet.
 
@@ -39,14 +43,17 @@ express it; only promotion into the family's reusable idiom set belongs to the f
 to different outcomes and whose answer is absent from the request. A reference/idiom conflict is
 resolved by the authority split above: product facts and approved region order come from the
 request, Common semantics come from `knowledge/ui`, and family anatomy and reusable style come from
-this Grammar. A tied score never causes this stop; `interface.generate` applies its deterministic
-fallback and continues.
+the selected Grammar source. State assumptions for minor in-scope choices; when a material
+choice has no answer, ask the user. Do not invent a fallback algorithm or run the next op.
 
 Owner clarification 2026-09-05 on images: imagery can highlight the key idea, explain content,
 strengthen recognition or create a relevant, evocative focal point. Deliberate visual emphasis is a
 concrete role; an image need not be a functional diagram to earn its place. Name the subject, the
-idea or claim it highlights, and the intended order of attention in the direction's `## Images`
-table. Judge its scale, contrast and crop on the rendered surface: it should support that hierarchy
+idea or claim it highlights, and the intended order of attention in the selected `.work` design node.
+Judge its scale, contrast and crop on the rendered surface: it should support that hierarchy
 without obscuring the content or competing with the primary action. Blank space alone is never a
 reason to add an image; filling space or balancing density without a content or emphasis role does
 not qualify. Record no image when imagery would not improve the composition.
+
+Extending or adding an owner is not authorized by this playbook; it needs an op with explicit
+library-edit scope. Historical image notes are design references, not decisions for the current product.

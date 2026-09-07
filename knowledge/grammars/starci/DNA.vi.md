@@ -2,7 +2,15 @@
 
 `@starci/grammar@0.4.13` · checkout `41be722701c439e76910f80a8cbb65261da72e01` · sinh ngày 2026-09-05
 
-File này được sinh ra từ package `@starci/grammar` đang chạy, không viết tay: danh tính, token, renderer, prop công bố, claim `data-contract` và class phát ra đều đọc thẳng từ `src/`, còn danh sách gap được chép từ bảng `## Gap` trong [Family và DNA](family.vi.md). Hãy mồi cho agent định hướng bằng đúng file này: nó nói cái gì đang tồn tại. [Idiom](idioms.vi.md) nói StarCi ghép chúng ra sao, còn [Playbook](playbook.vi.md) nói hình dạng nghiệp vụ nào cần chuỗi idiom nào. Sinh lại bằng `node scripts/generate-grammar-dna.mjs`, kiểm bằng `--check`; lệnh này cần checkout FE đã định tuyến nên không nằm trong `npm test`.
+Snapshot lịch sử: `@starci/grammar@0.4.13`, source checkout
+`41be722701c439e76910f80a8cbb65261da72e01`, ghi nhận 2026-09-05. Đây không phải API/gap đã
+kiểm chứng trên package đang cài hôm nay. Trước khi dùng, đọc manifest/lockfile, export/type,
+renderer và CSS thực tế của repository được chọn; ghi source/phiên bản vào node `.work`.
+Nếu không có source thì ghi chưa kiểm chứng, không suy ra API hoặc lỗi hiện tại từ bảng cũ.
+
+Bảng dưới đây giữ nguyên dữ liệu snapshot, không cần generator cũ để đọc. [Family](family.vi.md)
+giải thích ranh giới ownership; [Idiom](idioms.vi.md) và [Playbook](playbook.vi.md) là tham khảo
+composition. Việc kiểm tra source tĩnh không chứng minh hành vi runtime.
 
 ## Danh tính
 

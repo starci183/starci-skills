@@ -7,6 +7,9 @@ Feedback được chốt ở chỗ nhỏ nhất mà thật sự sửa hoặc ph�
 thể sửa nó sẽ bắt người đọc đi tìm nguyên nhân, còn một lối phục hồi ở tầm cả trang cho một panel
 hỏng sẽ ném đi cả phần công việc chưa từng hỏng.
 
+Phạm vi áp dụng: ví dụ API thuộc family Grammar đã ghi nhận; đối chiếu source cài thực tế và
+đặc tả `.work` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch.
+
 ## FEEDBACK-1 — Sửa ở owner gần nhất
 
 Chi phối chỗ ở của một lỗi validation.
@@ -50,7 +53,7 @@ Retired: FEEDBACK-4 đã nghỉ, gộp vào COVERAGE-1, và số này không đ�
 
 Khi nhiều control cùng tham gia thì ai giữ pending thuộc [Action](action.vi.md), và có những điều
 kiện nào thuộc [State](state.vi.md). Người đọc đang được đẩy về phía action nào thuộc
-[CTA](cta.vi.md). Receipt phải liệt kê những gì về các đường kết cục này thuộc
+[CTA](cta.vi.md). Đặc tả `.work` phải liệt kê những gì về các đường kết cục này thuộc
 [Coverage](coverage.vi.md). Một thông điệp có được gắn về đúng field của nó không, và có được đọc
 lên đúng một lần không, thuộc [Accessibility](../proof/accessibility.vi.md) và
 [Render truth](../proof/render-truth.vi.md).

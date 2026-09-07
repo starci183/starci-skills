@@ -8,6 +8,11 @@ Nguồn: `src/components/pages/AuthenticationPage/*`, `pages/CartPage/index.tsx`
 `leaves/ButtonStateSample/index.tsx`, `hooks/swr/useQueryCourseSwr.ts`,
 `hooks/swr/useMutateAddToCartSwr.ts`, `packages/grammar/src/core/primitive/Button/index.tsx`.
 
+Phạm vi: các số đếm và ghi chú được trích là quan sát lịch sử tại commit skill
+`edf72554425f918e80c9205e9c6db10596e722f0`, không phải kiểm kê dự án hiện tại. Kiểm tra source,
+manifest/lockfile, alias và cấu hình lint/test thực tế trong repository được chọn trước khi áp dụng.
+Các link lịch sử là provenance, không phải script hay chỉ dẫn chạy.
+
 ## FE-FUNCTION-1 — Component là một arrow const với một tham số `props`
 
 | Case | Dùng khi | Viết |
@@ -43,7 +48,7 @@ Nguồn: `src/components/pages/AuthenticationPage/*`, `pages/CartPage/index.tsx`
 | Case 2 | Nửa thuần | Không `"use client"` (0/49 page, 3/109 block); không import lúc chạy từ `@/hooks` hay `@/modules/api` (0 trên 150 `component.tsx`; 18 tệp chỉ import kiểu) |
 | Case 3 | Đầu vào suy từ route | `const routeState = (value: string \| null) => { switch (value) { case "sign-up": return { mode: "signUp" as const, step: "details" as const, measure: "form" as const } … } }` trong `index.tsx`, rồi `const initial = routeState(authState)` |
 | Case 4 | Điều hướng là một hành động | `on={{ signedIn: () => router.replace("/dashboard") }}` |
-| Case 5 | Nửa thuần chọn giữa một block nối và Base của nó | Không bao giờ: `props.data === null ? <X /> : <XBase {...props.data} />` để nửa thuần tự quyết, theo từng lần render, xem một con có tự đi lấy dữ liệu hay không. Nửa thuần mount đúng một trong hai và luôn là cái đó; nơi cấp dữ liệu ở tầng page là `index.tsx`, nó giải dữ liệu rồi trao props cho `XBase`. Các lần xuất hiện nằm ở [bằng chứng lượt quét presentation](../../../tests/evidence/20260903-presentation-sweep.md) |
+| Case 5 | Nửa thuần chọn giữa một block nối và Base của nó | Không bao giờ: `props.data === null ? <X /> : <XBase {...props.data} />` để nửa thuần tự quyết, theo từng lần render, xem một con có tự đi lấy dữ liệu hay không. Nửa thuần mount đúng một trong hai và luôn là cái đó; nơi cấp dữ liệu ở tầng page là `index.tsx`, nó giải dữ liệu rồi trao props cho `XBase`. Các lần xuất hiện nằm ở [bằng chứng lượt quét presentation](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.md) |
 
 ## FE-FUNCTION-5 — Khi nào tách helper
 

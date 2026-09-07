@@ -44,7 +44,7 @@ truyền xuống để sơn lại nó là `APP_OVERRIDE`.
 
 ## Surface mà Common đã sở hữu
 
-Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
+Bảng ownership được giữ làm tham chiếu lịch sử, không chứng minh API/package hiện tại. Đối chiếu source/prop/token cài thật trước dùng; cập nhật hàng sai trong scope bảo trì được chọn theo [nguồn và bảo trì](INDEX.vi.md#nguồn-và-bảo-trì).
 
 | Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |

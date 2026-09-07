@@ -7,6 +7,9 @@ Quyết định về action đến trước khi có cây DOM, vì chúng chốt 
 Một lần kích hoạt chạm tới hai handler, hay một câu lệnh khoác ngữ nghĩa của anchor, đều là lỗi
 composition mà không kiểu styling nào về sau sửa được.
 
+Phạm vi áp dụng: ví dụ API thuộc family Grammar đã ghi nhận; đối chiếu source cài thực tế và
+đặc tả `.work` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch.
+
 ## ACTION-1 — Một lần kích hoạt, một hiệu ứng
 
 Chi phối số thứ được phép phản hồi cho một lần bấm.
@@ -14,8 +17,8 @@ Chi phối số thứ được phép phản hồi cho một lần bấm.
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
 | Case 1 | Một lần kích hoạt thay đổi state của ứng dụng | Đúng một node sở hữu hiệu ứng, và node đó là `Button`, hoặc `TextAction` khi câu lệnh cần đọc như chữ; không node thứ hai nào mang `onPress` cho cùng lần kích hoạt |
-| Case 2 | Câu lệnh tham gia vào một form | Receipt gọi tên `Button.type` đã chọn, nên hành vi submit được nêu ra chứ không thừa hưởng từ form bao ngoài |
-| Case 3 | Direction muốn cả hàng hoặc cả container cũng bấm được | Receipt gọi tên đúng một owner cho lần kích hoạt đó; không wrapper bấm được nào bọc quanh một câu lệnh công khai đang giữ cùng hiệu ứng |
+| Case 2 | Câu lệnh tham gia vào một form | Đặc tả `.work` gọi tên `Button.type` đã chọn, nên hành vi submit được nêu ra chứ không thừa hưởng từ form bao ngoài |
+| Case 3 | Direction muốn cả hàng hoặc cả container cũng bấm được | Đặc tả `.work` gọi tên đúng một owner cho lần kích hoạt đó; không wrapper bấm được nào bọc quanh một câu lệnh công khai đang giữ cùng hiệu ứng |
 | Case 4 | Có listener ở cấp tổ tiên hoặc cấp document nằm trên cùng đường đi | Không listener tổ tiên hay listener cấp document nào trên đường đi đó phản hồi cùng lần kích hoạt |
 
 Không phải rule này: bản thân surface có phải là action hay không thuộc STATE-5.
@@ -29,8 +32,8 @@ Chi phối control nào hiển thị rằng việc đang chạy.
 | Case 1 | Một câu lệnh đã nhận việc và việc chưa xong | Node đã khởi động việc mang `isPending`; nhãn của nó không đổi, trạng thái bận được để lộ, và lần kích hoạt thứ hai bị từ chối |
 | Case 2 | Việc do action phục hồi bên trong một vùng rỗng hoặc vùng lỗi khởi động | `EmptyNotice.isActionPending` mang nó, và prop đó phân giải về đúng nút mà vùng đó sở hữu |
 | Case 3 | Có những control khác đang hiển thị trong lúc việc chạy | Không node nào khác đổi state vì việc đó, và không khoá toàn trang hay spinner toàn cục nào đứng thay cho pending của kẻ khởi động |
-| Case 4 | Direction bị cám dỗ tráo `isDisabled` vào trong khoảng thời gian đó | Receipt gắn `isPending` chứ không phải `isDisabled` cho việc đã nhận; disabled chỉ xuất hiện ở nơi việc chưa thể bắt đầu |
-| Case 5 | Owner cần pending lại không công bố prop pending nào | Trong receipt có một gap `GRAMMAR_REQUIRED` gọi tên owner đó, và không có thứ thay thế pending cấp ứng dụng nào trong cây |
+| Case 4 | Direction bị cám dỗ tráo `isDisabled` vào trong khoảng thời gian đó | Đặc tả `.work` gắn `isPending` chứ không phải `isDisabled` cho việc đã nhận; disabled chỉ xuất hiện ở nơi việc chưa thể bắt đầu |
+| Case 5 | Owner cần pending lại không công bố prop pending nào | Trong đặc tả `.work` có một gap `GRAMMAR_REQUIRED` gọi tên owner đó, và không có thứ thay thế pending cấp ứng dụng nào trong cây |
 
 ## ACTION-3 — Hệ quả chọn ngữ nghĩa
 
@@ -49,7 +52,7 @@ Retired: ACTION-4 đã nghỉ, gộp vào COVERAGE-1, và số này không đư�
 
 Action nào xứng đáng được nhấn mạnh và variant của nó hứa gì thuộc [CTA](cta.vi.md). Surface nào tự
 nó là một action, và giá trị điều khiển nào bền vững, thuộc [State](state.vi.md). Người đọc được nói
-gì sau khi action kết thúc thuộc [Feedback](feedback.vi.md). Receipt phải liệt kê những gì về các
+gì sau khi action kết thúc thuộc [Feedback](feedback.vi.md). Đặc tả `.work` phải liệt kê những gì về các
 action này thuộc [Coverage](coverage.vi.md). Mục tiêu sau khi render có tên, có kích thước và có
 focus nhìn thấy được không thuộc [Accessibility](../proof/accessibility.vi.md) và
 [Focus](../proof/focus.vi.md), còn tuyên bố sinh ra có đúng sự thật không thuộc

@@ -7,9 +7,13 @@ Nguồn: `tsconfig.json` (`paths`), `eslint.config.mjs`, `src/hooks/index.ts`,
 `src/components/**`, `src/hooks/swr/**`.
 
 Một Case đã nghỉ ở đây: `FE-IMPORTS-7` Case 9 gộp vào Case 7, vì "dải được mount ở đâu" và "dải có bị
-vẽ tay không" là một luật về một đối tượng và đang trôi thành hai. Lượt quét presentation đọc tên đơn
-vị shell ra từ chính Case 7 thay vì giữ danh sách riêng, còn những lần xuất hiện đã biện minh cho Case
-này được ghi ở [bằng chứng lượt quét presentation](../../../tests/evidence/20260903-presentation-sweep.md).
+vẽ tay không" là một luật về một đối tượng. Những lần xuất hiện lịch sử biện minh cho Case
+này được ghi ở [bằng chứng lượt quét presentation](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.md).
+
+Phạm vi: các số đếm và ghi chú được trích là quan sát lịch sử tại commit skill
+`edf72554425f918e80c9205e9c6db10596e722f0`, không phải kiểm kê dự án hiện tại. Kiểm tra source,
+manifest/lockfile, alias và cấu hình lint/test thực tế trong repository được chọn trước khi áp dụng.
+Các link lịch sử là provenance, không phải script hay chỉ dẫn chạy.
 
 ## FE-IMPORTS-1 — Đường dẫn
 

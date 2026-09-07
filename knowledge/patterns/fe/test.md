@@ -7,11 +7,16 @@ Sources: `src/components/pages/CartPage/index.spec.tsx`,
 `pages/CodingDomainPage/component.spec.tsx`, `blocks/commerce/CartBlock/index.spec.tsx`,
 `hooks/index.ts`, `packages/grammar/src/**/*.spec.tsx`, `packages/grammar/src/**/*.test.mjs`,
 `package.json` scripts (`vitest run`), and
-[the consolidation evidence](../../../tests/evidence/20260903-consolidation.md) for the census behind
+[the consolidation evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.md) for the census behind
 FE-TEST-1 Case 7.
 
 One rule is retired here: `FE-TEST-7` folded into `FE-TEST-1` Case 7, because where a spec lives and
 which half it measures are one law about one placement. Its number is not reused.
+
+Scope: cited counts and notes are historical observations at skill commit
+`edf72554425f918e80c9205e9c6db10596e722f0`, not a census of the current project. Inspect actual
+source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
+Historical links supply provenance, not scripts or execution instructions.
 
 ## FE-TEST-1 — Placement
 
@@ -77,6 +82,6 @@ which half it measures are one law about one placement. Its number is not reused
 - A minority of component and index specs still pin a class literal. FE-TEST-5 Case 4 records the
   majority as the rule and treats the rest as a standing debt against it rather than a second
   practice; this file does not say which of them to delete first. The counts are in
-  [the consolidation evidence](../../../tests/evidence/20260903-consolidation.md).
+  [the consolidation evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.md).
 - FE-TEST-1 Case 7 binds a new unit. It is not a census of the tree: most existing units carry one
   spec and not two, and no sweep of that backlog is legislated here.

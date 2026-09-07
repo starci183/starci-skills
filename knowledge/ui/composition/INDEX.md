@@ -9,7 +9,7 @@ business
 -> rendered UI
 ```
 
-Every rule in this folder is consumed by the direction operator. That operator answers the questions
+The selected composition op may use these rules to answer the questions
 that must be settled while the page is still a description: which regions the page has, which
 content outranks which, which action carries the decision, which conditions the feature can be in,
 what the reader is told at each outcome, and where the scarce dominant emphasis is spent. These
@@ -30,7 +30,7 @@ value, which is exactly why it is decided first.
 | [State](state.md) | Which conditions exist, and which published carrier holds each one | STATE-1 to STATE-7 |
 | [Feedback](feedback.md) | Who reports a failure, a correction, a recovery, and a result | FEEDBACK-1 to FEEDBACK-3 |
 | [Accent](accent.md) | Where the scarce strongest emphasis is spent | ACCENT-1 to ACCENT-5 |
-| [Coverage](coverage.md) | What the direction receipt must enumerate before it is emitted | COVERAGE-1 |
+| [Coverage](coverage.md) | What the selected design specification must enumerate | COVERAGE-1 |
 
 Five per-topic coverage rules were merged into COVERAGE-1, and a retired address is never reused:
 retired are `ACTION-4`, `STATE-4`, `FEEDBACK-4`, `LAYOUT-5`, and `RESPONSIVE-5`.
@@ -44,17 +44,20 @@ Every rule carries its heading, one line naming what the rule governs, and one t
 
 | Case | When | Assert |
 | --- | --- | --- |
-| Case 1 | The concrete situation that reaches this rule. | A falsifiable statement about the direction receipt or the composed tree, in language the product can read. |
+| Case 1 | The concrete situation that reaches this rule. | A falsifiable statement about the selected design specification or the composed tree, in language the product can read. |
 
-The `Assert` cell states a predicate the receipt or the composed tree either satisfies or fails, not
+The `Assert` cell states a predicate the specification or the composed tree either satisfies or fails, not
 advice and not a class name. It may name a published component or prop where that is what must be
 carried, but it never resolves a CSS value; that belongs to presentation. Taste and layout are
-decided in `@knowledge/grammars/<family>`; these rules only say what a direction must satisfy.
+decided in the applicable [family snapshots](../../grammars/INDEX.md), after checking current source; these rules only say what a direction must satisfy.
 
 A case that belongs to a neighbouring rule is not a table row. It goes on one line after the table,
 as `Not this rule: <condition> is PREFIX-n`. Each file closes with a
 `## What this file does not decide` section linking its siblings and the proof knowledge that
 observes the result.
 
-Component and prop names in these files resolve to `@grammar/common`. An API that does not
-exist there is not written into a rule; a required capability that is missing is recorded as a gap.
+Component and prop examples describe the documented Grammar family, not universal product requirements.
+Verify exports and ownership against the selected project's installed source before using them.
+Record an unavailable capability as a gap; do not invent an API or automatically dispatch another op.
+Store selected design decisions in the current `.work` node's Markdown or namespaced extensions,
+with explicit acceptance assertions; this folder defines no separate receipt format.

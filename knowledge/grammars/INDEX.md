@@ -1,8 +1,13 @@
 # Grammar families
 
 This catalog names every authored UI Grammar family. It is inventory, not a default-family rule:
-the routed request must bind one concrete family, and a missing or ambiguous family never silently
-resolves to StarCi.
+the selected `.work` design specification names the applicable installed family, if any. A missing
+or ambiguous family never silently resolves to StarCi. This catalog supplies historical snapshots,
+not a package installer, resolver or requirement that every product use Grammar.
+
+Verify actual package identity/version, exported types, CSS and renderer source in the selected
+repository before using snapshot APIs or gaps. Record current source references in the selected
+`.work` node; an old source census is not current UAT evidence.
 
 | Family | Authority | Package snapshot | Reusable style | Product composition |
 | --- | --- | --- | --- | --- |

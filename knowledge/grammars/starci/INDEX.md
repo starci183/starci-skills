@@ -1,25 +1,26 @@
-# StarCi Core Grammar — reading index
+# StarCi Core Grammar — snapshot index
 
-This branch documents one visual family: StarCi Core, and the taste that directs how it is composed. Universal UI law remains canonical in [knowledge/ui](../../ui/INDEX.md); this branch maps those X-n rules to the live Core family and records the idioms StarCi actually builds with. It never re-narrates renderer anatomy — [DNA](DNA.md), generated from the package, already says what exists and what each renderer owns.
+Historical snapshot: `@starci/grammar@0.4.13`, source checkout
+`41be722701c439e76910f80a8cbb65261da72e01`, captured 2026-09-05. This is not a claim that the
+currently installed package has these APIs or gaps. Before use, inspect the selected repository's
+manifest/lockfile, exported types, renderers and CSS; record actual source/version in `.work`.
+If source is unavailable, report unverified; do not infer current APIs or defects from old tables.
 
-## Authority chain
+This branch preserves observations about one visual family; it does not choose a default family
+or override business requirements. [UI knowledge](../../ui/INDEX.md) supplies scope-selected
+reference criteria; the product owns facts, content, routes, permissions, persistence and effects.
 
-`knowledge/ui X-n → @starci/grammar/common props/anatomy/state → @starci/grammar/core DNA and scoped CSS → product adapter`
+## References
 
-- Common owns public renderers, props, semantic DOM, accessibility, presentation states, universal spacing, `COMMON_GRAMMAR_COMPONENTS`, and `defineGrammarFamily`.
-- Core is a sibling family with id `core`; `CoreGrammarRoot` installs `data-grammar-family="core"`, and the `@starci/grammar/core` entry re-exports every Common renderer, so a Core consumer imports from one entry.
-- Feature code owns domain facts, routes, copy, permissions, persistence, and effects.
-- Product names such as Learn, Console, Dashboard, Navbar, or Course never become Grammar identities.
+- [DNA](DNA.md): tokens, renderers, props, claims and gaps at the pinned version.
+- [Idioms](idioms.md): compositions observed in historical source samples, not current UAT.
+- [Playbook](playbook.md): composition references for approved business shapes.
+- [Family](family.md): Common/family boundaries, CSS direction and snapshot gaps.
 
-## Read order
+## Checks before applying
 
-0. [DNA](DNA.md) — generated from the package: what exists. Prime a direction agent with this file.
-1. [Idioms](idioms.md) — how StarCi composes what exists, each idiom evidenced at least twice in the live blocks.
-2. [Playbook](playbook.md) — which idiom sequence a business shape asks for, and what a supplied reference may contribute.
-3. [Family and DNA](family.md) — the visual family's own identity, tokens, CSS direction, theme binding, and the one gap table the whole family publishes.
-
-Read 0 through 2 to decide what to build; read 3 when a row raises a question about the family itself. How the package is consumed in code (imports, one family root, forbidden clones) is FE-IMPORTS-5 and FE-IMPORTS-7 in knowledge/patterns/fe.
-
-## Review gates
-
-A valid change has no renderer import from `@starci/grammar/core`, no Common CSS import of Core CSS, no feature-named component in Grammar, no duplicated X-n law, and no EN/VI drift. Core-specific claims must resolve to live source or be named as a gap.
+Confirm the actually selected family and one appropriate family root. In the snapshot, Common owns
+renderers/semantics while Core supplies scoped style and a re-export entry; distinguish consumer
+imports from Common's own dependencies. Do not infer valid exports/imports from a package name.
+A recorded gap is a finding; extending the library needs separately authorized scope and op.
+This catalog supplies no generator, router or mandatory op sequence.

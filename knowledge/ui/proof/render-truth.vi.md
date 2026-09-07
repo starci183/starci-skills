@@ -56,17 +56,18 @@ Chi phối những gì khép lại một tuyên bố về render truth.
 
 ## TRUTH-5 — Phán quyết của tính thật của bản render
 
-Chi phối việc các tiêu chí trên trở thành đúng một hàng của topic này trong bảng `## Verdict` của receipt.
+Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.work` hiện tại.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
 | Case 1 | Lens chạy | `TRUTH-1` đến `TRUTH-4` được xét trên mọi ảnh chụp có render một dữ kiện, một mức khả dụng, một tín hiệu tiến trình hay một outcome, mỗi thứ đều truy về thẩm quyền đứng sau nó |
 | Case 2 | Tính verdict | Tập chặn cửa là toàn bộ tập: `pass` đòi mọi tiêu chí đều đạt, vì một tuyên bố trang không chống lưng nổi là một tuyên bố người đọc sẽ hành động theo |
 | Case 3 | Không có kho hay thẩm quyền nào để đối chiếu các tuyên bố | Verdict là `blocked`. Duyệt các tuyên bố vì chúng trông hợp lý sẽ bác bỏ nó |
-| Case 4 | Một lần fail được định tuyến | Một tuyên bố bị thiết kế sai thì về `direction`; một tuyên bố thiếu thẩm quyền thì về chủ của flow, vì không giá trị nào và không bố cục nào cấp được một dữ kiện mà sản phẩm không giữ |
+| Case 4 | Một lỗi đã được đo | Ghi tuyên bố thiết kế sai riêng với thẩm quyền sản phẩm còn thiếu; gọi tên source cần để kiểm chứng dữ kiện. Không bịa thẩm quyền hoặc dispatch op tiếp theo. |
 
-Tập được chấm là `TRUTH-1` đến `TRUTH-4`; rule này là phần số học và bản thân nó không được chấm. Kết
-quả của nó là hàng `render-truth` trong bảng `## Verdict` của receipt audit.
+Tập được chấm là `TRUTH-1` đến `TRUTH-4`; rule này chỉ tổng hợp và bản thân không được chấm.
+Lưu assertion, quan sát và artifact tham chiếu trong bằng chứng của node được chọn; không có
+bảng receipt riêng hoặc quy tắc chép verdict xuống bước sau. Thiếu bằng chứng không thành đạt.
 
 ## File này không quyết định
 

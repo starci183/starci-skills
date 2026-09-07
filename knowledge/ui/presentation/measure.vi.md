@@ -41,9 +41,9 @@ xuyên suốt các renderer của mình; một vùng của ứng dụng có bọ
 ## Thang chiều rộng
 
 Một chiều rộng bị chặn trần lấy đúng một bậc của thang đóng này, không gì khác; chiều rộng tuỳ ý như
-`max-w-[720px]` nằm ngoài thang và bị `interface.generate` gỡ bỏ. Trần cho văn xuôi `max-w-[65ch]`
-là bậc duy nhất tính theo ký tự, vì độ dài dòng đi theo con chữ. Chốt của owner ngày 2026-09-03: thang
-này cố định cho mọi ứng dụng, không suy ra theo từng dự án.
+`max-w-[720px]` nằm ngoài thang family đã chọn; chỉ báo hoặc thay trong scope implement được phép.
+Trần văn xuôi `max-w-[65ch]` là bậc duy nhất theo ký tự vì độ dài dòng đi theo chữ. Chốt owner giữ lại
+ngày 2026-09-03 cố định thang cho app áp dụng family này, không ghi đè design system khác đã duyệt.
 
 | Bậc | Class | Chiều rộng |
 | --- | --- | --- |
@@ -61,7 +61,7 @@ này cố định cho mọi ứng dụng, không suy ra theo từng dự án.
 
 ## Measure mà Common đã sở hữu
 
-Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
+Bảng ownership được giữ làm tham chiếu lịch sử, không chứng minh API/package hiện tại. Đối chiếu source/prop/token cài thật trước dùng; cập nhật hàng sai trong scope bảo trì được chọn theo [nguồn và bảo trì](INDEX.vi.md#nguồn-và-bảo-trì).
 
 | Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |

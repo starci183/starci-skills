@@ -69,18 +69,18 @@ Governs parity between input methods across every interactive owner.
 
 ## FOCUS-6 — The focus verdict
 
-Governs how the criteria above become this topic's one row in the receipt's `## Verdict` table.
+Governs how selected observations are summarized in the current `.work` node's evidence.
 
 | Case | When | Observe |
 | --- | --- | --- |
 | Case 1 | The lens runs | `FOCUS-1` to `FOCUS-5` are each judged from the element that actually held focus, at every state the coverage declares |
 | Case 2 | The verdict is computed | The gating set is the whole set: `pass` requires every criterion to pass, because focus that is lost once is lost for the person who navigates that way |
 | Case 3 | A criterion has no observation behind it | The verdict is `blocked`, and a partial pass over the criteria that were observed falsifies it |
-| Case 4 | A failure is routed | An indicator that is present but wrong routes to `resolve`; an order, a containment or a return that is wrong routes to `direction`; a missing published capability routes to `grammar-gap` |
+| Case 4 | A failure has been measured | Record whether the failure concerns indicator values, reading order/containment/return, or a capability absent from the verified installed API. Identify the owner without executing another op. |
 
-The scored set is `FOCUS-1` to `FOCUS-5`; this rule is the arithmetic and is not itself scored. Its
-result joins the `accessibility` row of the receipt's `## Verdict` table, because a surface that
-cannot be reached and a surface that cannot be seen to be reached fail the same reader.
+The scored set is `FOCUS-1` to `FOCUS-5`; this rule only summarizes and is not itself scored.
+Store assertions, observations and artifact references in the selected node's evidence; there is
+no separate receipt table or downstream verdict-copying rule. Missing evidence never earns a pass.
 
 ## What this file does not decide
 

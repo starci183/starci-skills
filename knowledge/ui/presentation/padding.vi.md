@@ -46,7 +46,7 @@ component bằng selector hoặc bằng class truyền vào để đổi inset c
 
 ## Padding mà Common đã sở hữu
 
-Sinh từ claim của `@grammar/core` bằng `scripts/generate-presentation-owned.mjs`; muốn đổi thì sửa component, đừng sửa bảng này.
+Bảng ownership được giữ làm tham chiếu lịch sử, không chứng minh API/package hiện tại. Đối chiếu source/prop/token cài thật trước dùng; cập nhật hàng sai trong scope bảo trì được chọn theo [nguồn và bảo trì](INDEX.vi.md#nguồn-và-bảo-trì).
 
 | Component | Phần tử hoặc điều kiện | Rule |
 | --- | --- | --- |
@@ -266,7 +266,8 @@ không có, vì `PageContainer` sở hữu (MEASURE-1).
 | --- | --- | --- | --- |
 | Case 1 | `main` của một block được route nằm ngay dưới shell của trang | `App` | `<main className="py-6 sm:py-8">` |
 
-Bằng chứng, bốn block viết cùng một cặp: `blocks/commerce/ProSubscriptionBlock/classNames.ts`
+Vị trí source lịch sử ghi trong [snapshot knowledge](INDEX.vi.md#nguồn-và-bảo-trì), không phải path
+checkout hiện tại hoặc proof render mới: `blocks/commerce/ProSubscriptionBlock/classNames.ts`
 (`proPageClassName`), `blocks/learn/CoursePlaygroundCatalog/classNames.ts`,
 `blocks/learn/PlaygroundSession/classNames.ts`, `blocks/learn/PlaygroundSetup/classNames.ts`.
 

@@ -49,17 +49,18 @@ Không phải rule này: khác biệt có tồn tại khi không có màu hay kh
 
 ## CONTRAST-1 — Phán quyết của tương phản
 
-Chi phối việc các tiêu chí trên trở thành đúng một hàng của topic này trong bảng `## Verdict` của receipt.
+Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.work` hiện tại.
 
 | Case | Dùng khi | Quan sát |
 | --- | --- | --- |
 | Case 1 | Lens chạy | `COLOR-3` và `COLOR-5` được xét dựa trên màu đã đo trong mọi theme và mọi state mà coverage khai, không bao giờ dựa vào tên token |
 | Case 2 | Tính verdict | Tập chặn cửa là toàn bộ tập: `pass` đòi cả hai đều đạt ở mọi theme, vì một khác biệt sống ở theme này mà chết ở theme kia thì không phải khác biệt |
 | Case 3 | Một theme hay một state chưa từng được đo | Verdict của topic là `blocked`, không phải một lần đạt trên những theme đã đo |
-| Case 4 | Một lần fail được định tuyến | Một giá trị đo dưới ngưỡng của nó thì về `resolve`; một khác biệt dựa vào màu không ai publish thì về `direction` |
+| Case 4 | Một lỗi đã được đo | Ghi lỗi là giá trị dưới ngưỡng hay khác biệt không được hỗ trợ, kèm bằng chứng đo và owner source chịu trách nhiệm; không dispatch op tiếp theo. |
 
-Tập được chấm là `COLOR-3` và `COLOR-5`; rule này là phần số học và bản thân nó không được chấm. Kết
-quả của nó là hàng `contrast` trong bảng `## Verdict` của receipt audit.
+Tập được chấm là `COLOR-3` và `COLOR-5`; rule này chỉ tổng hợp và bản thân không được chấm.
+Lưu assertion, quan sát và artifact tham chiếu trong bằng chứng của node được chọn; không có
+bảng receipt riêng hoặc quy tắc chép verdict xuống bước sau. Thiếu bằng chứng không thành đạt.
 
 ## File này không quyết định
 

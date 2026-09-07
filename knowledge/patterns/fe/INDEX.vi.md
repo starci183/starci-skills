@@ -9,6 +9,12 @@ hình ảnh; một luật `ui/` không bao giờ chọn tên tệp. Mọi luật
 mỗi bảng đều dẫn nguồn tệp đã đọc. Nơi nào mã nguồn chia hai ngả, tệp ghi lại biến thể chiếm ưu thế
 cùng con số thay vì áp đặt.
 
+Phạm vi áp dụng: đây là quan sát nguồn tham chiếu lịch sử được giữ ở commit skill
+`edf72554425f918e80c9205e9c6db10596e722f0`, không phải luật framework phổ quát hoặc bằng chứng
+source dự án hiện tại. Kiểm tra repository, type/API, alias, cấu hình lint/test thực tế đã chọn;
+chỉ dùng mẫu hợp với scope `.work` được duyệt. Số đếm cũ không được dùng để tuyên bố scan mới.
+Yêu cầu nghiệp vụ và kiến trúc hiện tại thuộc node `.work`, không suy ra thành đã duyệt từ mẫu code.
+
 ## Danh mục
 
 | Tri thức | Quyết định điều gì | Luật |

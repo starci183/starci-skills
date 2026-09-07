@@ -6,6 +6,10 @@ Bản thân các idiom nằm ở [Idiom](idioms.vi.md); còn package công bố 
 ghép cho định hướng sản phẩm đã duyệt khi ngữ nghĩa Common, giải phẫu family và dữ kiện sản phẩm hiện
 có biểu đạt được nó; chỉ việc nâng nó thành idiom dùng lại của family mới thuộc chủ family.
 
+Chỉ dùng playbook khi family này được chọn trong spec `.work` hiện tại. Ví dụ bên dưới là
+tham khảo lịch sử; đối chiếu export, renderer và CSS cài thực tế trước khi hứa một năng lực.
+Các mục đọc dưới đây là thao tác suy xét trong một op, không phải chain tự chạy nhiều op.
+
 ## Các hình dạng
 
 | Hình dạng nghiệp vụ | Tham chiếu được góp gì | Chuỗi idiom |
@@ -24,7 +28,7 @@ có biểu đạt được nó; chỉ việc nâng nó thành idiom dùng lại 
    theo được bằng cách phá vỡ một idiom là bằng chứng về tham chiếu, không phải về StarCi.
 3. **Rồi tới các idiom**, ghép theo đúng thứ tự dòng của hình dạng, và lấy trọn từng cái: idiom là
    một quan hệ, lấy một nửa thì thành hình dạng khác.
-4. **Rồi tới [DNA](DNA.vi.md)**, để xác nhận mọi renderer và prop mà cách ghép gọi tên đều tồn tại,
+4. **Đối chiếu [DNA](DNA.vi.md) với source cài thực tế**, để xác nhận mọi renderer và prop được gọi tên,
    và để đọc bảng gap trong [Family và DNA](family.vi.md) trước khi hứa một năng lực. Cách ghép nào
    cần tới một gap đã ghi thì chưa phải một định hướng.
 
@@ -37,13 +41,18 @@ có biểu đạt được nó; chỉ việc nâng nó thành idiom dùng lại 
 `DIRECTION_CHOICE_REQUIRED` chỉ dành cho một lựa chọn sản phẩm trọng yếu mà các phương án chấp nhận
 được dẫn tới kết quả khác nhau và yêu cầu chưa trả lời. Xung đột tham chiếu/idiom được giải bằng phân
 quyền ở trên: dữ kiện sản phẩm và thứ tự vùng đã duyệt đến từ yêu cầu, ngữ nghĩa Common đến từ
-`knowledge/ui`, còn giải phẫu family và phong cách dùng lại đến từ Grammar này. Điểm số hoà không gây
-lần dừng này; `interface.generate` áp fallback xác định và tiếp tục.
+`knowledge/ui`, còn giải phẫu family và phong cách dùng lại đến từ source Grammar được chọn.
+Ghi rõ giả định cho lựa chọn nhỏ còn trong scope; nếu lựa chọn trọng yếu chưa có câu trả lời,
+yêu cầu người dùng quyết định. Không bịa thuật toán fallback hay tự chạy op tiếp theo.
 
 Thầy làm rõ ngày 2026-09-05 về hình: hình có thể làm nổi bật ý chính, giải thích nội dung, tăng nhận
 diện hoặc tạo điểm nhấn gợi cảm xúc phù hợp. Nhấn mạnh thị giác có chủ đích là một vai trò cụ thể;
 hình không bắt buộc phải là sơ đồ chức năng mới đáng dùng. Ghi chủ thể, ý hoặc claim được highlight
-và thứ tự chú ý mong muốn vào bảng `## Images` của định hướng. Chấm kích thước, tương phản và crop
+và thứ tự chú ý mong muốn trong node thiết kế `.work` đã chọn. Chấm kích thước, tương phản và crop
 trên bề mặt đã render: hình phải hỗ trợ thứ bậc ấy, không che nội dung hoặc tranh trọng tâm với hành
 động chính. Khoảng trống tự nó không bao giờ là lý do thêm hình; lấp chỗ hoặc cân mật độ mà không có
 vai trò nội dung hay điểm nhấn thì không đạt. Ghi không dùng hình khi hình không cải thiện bố cục.
+
+Mở rộng owner hoặc thêm owner không được cấp quyền bởi playbook; cần op có scope sửa library
+rõ ràng. Ghi chú hình ảnh lịch sử chỉ là nguyên tắc thiết kế tham khảo, không phải quyết định cho
+sản phẩm hiện tại.

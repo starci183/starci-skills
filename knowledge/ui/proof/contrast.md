@@ -51,17 +51,18 @@ text is announced at all is A11Y-1 to A11Y-3.
 
 ## CONTRAST-1 — The contrast verdict
 
-Governs how the criteria above become this topic's one row in the receipt's `## Verdict` table.
+Governs how selected observations are summarized in the current `.work` node's evidence.
 
 | Case | When | Observe |
 | --- | --- | --- |
 | Case 1 | The lens runs | `COLOR-3` and `COLOR-5` are judged from measured colour in every theme and every state the coverage declares, never from a token name |
 | Case 2 | The verdict is computed | The gating set is the whole set: `pass` requires both to pass in every theme, because a distinction that survives one theme and not the other is not a distinction |
 | Case 3 | A theme or a state was never measured | The verdict is `blocked` for the topic, not a pass on the themes that were |
-| Case 4 | A failure is routed | A measured value below its threshold routes to `resolve`; a distinction that depends on a colour nobody published routes to `direction` |
+| Case 4 | A failure has been measured | Record whether the failure is a below-threshold value or an unsupported distinction, with the measured evidence and responsible source owner; do not dispatch another op. |
 
-The scored set is `COLOR-3` and `COLOR-5`; this rule is the arithmetic and is not itself scored. Its
-result is the `contrast` row of the audit receipt's `## Verdict` table.
+The scored set is `COLOR-3` and `COLOR-5`; this rule only summarizes and is not itself scored.
+Store assertions, observations and artifact references in the selected node's evidence; there is
+no separate receipt table or downstream verdict-copying rule. Missing evidence never earns a pass.
 
 ## What this file does not decide
 

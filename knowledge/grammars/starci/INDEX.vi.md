@@ -1,25 +1,26 @@
-# StarCi Core Grammar — mục lục đọc
+# StarCi Core Grammar — mục lục snapshot
 
-Nhánh này mô tả một visual family: StarCi Core, và cái gu chỉ đạo cách ghép nó. Luật UI universal vẫn canonical tại [knowledge/ui](../../ui/INDEX.vi.md); nhánh này map các luật X-n đó vào family Core đang chạy và ghi lại những idiom StarCi thực sự dựng bằng. Nó không kể lại giải phẫu renderer — [DNA](DNA.vi.md), sinh ra từ package, đã nói cái gì tồn tại và mỗi renderer sở hữu cái gì.
+Snapshot lịch sử: `@starci/grammar@0.4.13`, source checkout
+`41be722701c439e76910f80a8cbb65261da72e01`, ghi nhận 2026-09-05. Đây không phải API/gap đã
+kiểm chứng trên package đang cài hôm nay. Trước khi dùng, đọc manifest/lockfile, export/type,
+renderer và CSS thực tế của repository được chọn; ghi source/phiên bản vào node `.work`.
+Nếu không có source thì ghi chưa kiểm chứng, không suy ra API hoặc lỗi hiện tại từ bảng cũ.
 
-## Chuỗi authority
+Nhánh này giữ quan sát về một visual family, không chọn family mặc định hoặc ghi đè nghiệp vụ.
+[Kiến thức UI](../../ui/INDEX.vi.md) cung cấp tiêu chí tham khảo được chọn theo scope; sản phẩm sở hữu
+dữ kiện, nội dung, route, quyền, persistence và effect.
 
-`knowledge/ui X-n → @starci/grammar/common props/anatomy/state → @starci/grammar/core DNA và scoped CSS → product adapter`
+## Tài liệu
 
-- Common sở hữu public renderer, props, semantic DOM, accessibility, presentation state, universal spacing, `COMMON_GRAMMAR_COMPONENTS` và `defineGrammarFamily`.
-- Core là sibling family có id `core`; `CoreGrammarRoot` cài `data-grammar-family="core"`.
-- Feature code sở hữu domain fact, route, copy, permission, persistence và effect.
-- Tên product như Learn, Console, Dashboard, Navbar hay Course không bao giờ trở thành Grammar identity.
+- [DNA](DNA.vi.md): bảng token, renderer, prop, claim và gap tại phiên bản đã ghim.
+- [Idiom](idioms.vi.md): cách ghép đã quan sát trong mẫu source lịch sử, không phải UAT hiện tại.
+- [Playbook](playbook.vi.md): cách ghép tham khảo theo hình dạng nghiệp vụ đã duyệt.
+- [Family](family.vi.md): ranh giới Common/family, hướng CSS và gap snapshot.
 
-## Thứ tự đọc
+## Kiểm tra trước khi áp dụng
 
-0. [DNA](DNA.vi.md) — sinh ra từ package: cái gì đang tồn tại. Mồi cho agent định hướng bằng đúng file này.
-1. [Idiom](idioms.vi.md) — StarCi ghép những thứ đang tồn tại ra sao, mỗi idiom có ít nhất hai bằng chứng trong block đang chạy.
-2. [Playbook](playbook.vi.md) — hình dạng nghiệp vụ nào đòi chuỗi idiom nào, và tham chiếu được góp gì.
-3. [Family và DNA](family.vi.md) — danh tính riêng của visual family, token, hướng CSS, binding theme, và bảng gap duy nhất mà cả family công bố.
-
-Đọc 0 tới 2 để quyết định dựng gì; đọc 3 khi một dòng đặt câu hỏi về chính family. Cách tiêu thụ gói trong code (import, một root family, cấm clone) là FE-IMPORTS-5 và FE-IMPORTS-7 trong knowledge/patterns/fe.
-
-## Gate review
-
-Thay đổi hợp lệ không import renderer từ `@starci/grammar/core`, Common CSS không import Core CSS, Grammar không có feature-named component, không lặp luật X-n và không drift EN/VI. Claim riêng của Core phải resolve được tới source đang chạy hoặc ghi rõ là gap.
+Xác nhận family thực sự được dùng và một family root phù hợp. Trong snapshot, Common sở hữu
+renderer/semantics, Core cung cấp style theo scope và entry re-export; phân biệt consumer import
+với dependency của chính Common. Không suy ra export/import hợp lệ chỉ từ một tên package.
+Một gap được ghi là finding; mở rộng library cần scope và op riêng được cấp quyền. Không có
+generator, router hoặc trình tự op bắt buộc trong catalog này.

@@ -8,6 +8,9 @@ công khai nào sở hữu track và scroll của từng vùng, và chuyện gì
 dòng chảy bình thường hoặc biến mất hẳn. Mọi thứ đo được sau khi trang render đều thuộc về operator
 audit, không thuộc file này.
 
+Phạm vi áp dụng: ví dụ API thuộc family Grammar đã ghi nhận; đối chiếu source cài thực tế và
+đặc tả `.work` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch.
+
 ## Từ vựng owner
 
 | Owner | Nghĩa |
@@ -17,8 +20,8 @@ audit, không thuộc file này.
 | `—` | Chưa có composition công khai nào phủ được vùng này; direction ghi nhận gap |
 
 Với ra một grid của vendor ở chỗ owner là tên một composition chính là `APP_REIMPLEMENTATION`. Với ra
-một grid ở chỗ owner là `—` thì đó là `COMMON_CAPABILITY_MISSING`, và câu trả lời là bổ sung
-composition dùng lại được, chứ không phải tự dựng grid trong ứng dụng.
+một grid ở chỗ owner là `—` là dấu hiệu `COMMON_CAPABILITY_MISSING` sau khi kiểm tra source cài thực tế.
+Ghi gap và đề xuất owner; việc bổ sung composition dùng lại cần scope/library op được cấp quyền riêng.
 
 ## LAYOUT-1 — Trang có những vùng nào
 
@@ -26,10 +29,10 @@ Chi phối số vùng nhiệm vụ mà người đọc nhìn thấy và lý do t
 
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
-| Case 1 | Nội dung business chỉ có một nhiệm vụ và không có phần bổ trợ | Receipt liệt kê đúng một vùng chủ đạo, và mọi vùng khác nó liệt kê đều mang một vai trò nhiệm vụ có tên |
-| Case 2 | Nhiệm vụ chính có phần bổ trợ mà người đọc tra cứu song song | Phần bổ trợ là một rail, và receipt gọi tên vai trò nhiệm vụ đã xứng đáng có nó |
+| Case 1 | Nội dung business chỉ có một nhiệm vụ và không có phần bổ trợ | Đặc tả `.work` liệt kê đúng một vùng chủ đạo, và mọi vùng khác nó liệt kê đều mang một vai trò nhiệm vụ có tên |
+| Case 2 | Nhiệm vụ chính có phần bổ trợ mà người đọc tra cứu song song | Phần bổ trợ là một rail, và đặc tả `.work` gọi tên vai trò nhiệm vụ đã xứng đáng có nó |
 | Case 3 | Nội dung trang được route cần khung chrome bao quanh | `WorkspaceShell` sở hữu các vùng shell, và đúng một phần tử được gọi tên là landmark chính |
-| Case 4 | Các điểm đến cần được gom nhóm để duyệt | `Sidebar` sở hữu việc gom nhóm; receipt chỉ cấp điểm đến và nhãn vào đó |
+| Case 4 | Các điểm đến cần được gom nhóm để duyệt | `Sidebar` sở hữu việc gom nhóm; đặc tả `.work` chỉ cấp điểm đến và nhãn vào đó |
 | Case 5 | Một cuộc hội thoại cần composer luôn nằm yên tại chỗ | `ChatWorkspace` sở hữu cặp hội thoại và composer |
 | Case 6 | Cách sắp xếp cần dùng chưa có composition công khai nào | Một gap `GRAMMAR_REQUIRED` gọi tên composition còn thiếu, và không có cách sắp xếp thay thế nào xuất hiện trong cây |
 
@@ -41,8 +44,8 @@ Chi phối phần code nào quyết định track của một vùng, chứ khôn
 
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
-| Case 1 | Một cột chính nằm cạnh một cột bổ trợ | `PrimaryRailLayout` sở hữu cả hai track; receipt chỉ gọi tên `railWidth` và `align`, và không công thức track nào đứng cạnh vùng đó |
-| Case 2 | Các vùng shell và landmark chính cần được gọi tên | `WorkspaceShell` sở hữu các slot, và receipt cấp `primaryLabel` |
+| Case 1 | Một cột chính nằm cạnh một cột bổ trợ | `PrimaryRailLayout` sở hữu cả hai track; đặc tả `.work` chỉ gọi tên `railWidth` và `align`, và không công thức track nào đứng cạnh vùng đó |
+| Case 2 | Các vùng shell và landmark chính cần được gọi tên | `WorkspaceShell` sở hữu các slot, và đặc tả `.work` cấp `primaryLabel` |
 | Case 3 | Một surface hội thoại cần chiều cao có biên | `ChatWorkspace` sở hữu biên đó, và host cấp chiều cao mà nó yêu cầu |
 | Case 4 | Direction bị cám dỗ dùng grid của vendor hoặc tự tính bề rộng con | Mọi vùng phân giải về một composition công khai hoặc về một gap đã ghi nhận; không grid vendor và không phép tính bề rộng nào sở hữu một vùng |
 | Case 5 | Một family muốn một vùng trông khác đi | Delta của family chỉ thay renderer bằng props tương thích; vai trò của vùng và số lượng owner của nó không đổi |
@@ -72,8 +75,8 @@ kiện.
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
 | Case 1 | Cột bổ trợ cần nằm trong tầm mắt khi cột chính cuộn | `Rail mode="sticky"` mang biên đã công bố của nó, và dưới ngưỡng hẹp vùng đó trở lại dòng chảy bình thường |
-| Case 2 | Một overlay cần geometry fixed có biên | `WorkspaceShell.floatingLayer` chỉ cấp geometry; nếu còn cần giam focus và cách đóng, receipt gọi tên một modal owner hoặc ghi nhận gap |
-| Case 3 | Không gian hẹp không chứa nổi rail hội thoại theo dạng inline | `ChatWorkspace` sở hữu drawer, và receipt cấp `isRailOpen` cùng `onRailOpenChange` |
+| Case 2 | Một overlay cần geometry fixed có biên | `WorkspaceShell.floatingLayer` chỉ cấp geometry; nếu còn cần giam focus và cách đóng, đặc tả `.work` gọi tên một modal owner hoặc ghi nhận gap |
+| Case 3 | Không gian hẹp không chứa nổi rail hội thoại theo dạng inline | `ChatWorkspace` sở hữu drawer, và đặc tả `.work` cấp `isRailOpen` cùng `onRailOpenChange` |
 | Case 4 | Một vùng vắng mặt ở trạng thái hiện tại | Không wrapper, track, divider, đường kẻ, spacer hay khoảng scroll đã đặt trước nào của vùng đó sống sót qua sự vắng mặt |
 | Case 5 | Direction muốn thứ tự thị giác khác đi ở một bề rộng | Thứ tự DOM, thứ tự đọc, thứ tự focus và thứ tự hành động trùng khít thứ tự nhiệm vụ ở mọi bề rộng; composition khác đi, thứ tự thì không |
 
@@ -86,7 +89,7 @@ Retired: LAYOUT-5 đã nghỉ, gộp vào COVERAGE-1, và số này không đư�
 
 Nội dung bên trong một vùng mang cấp độ nào thuộc [Hierarchy](hierarchy.vi.md). Một vùng tái bố cục
 ra sao khi không gian đổi thuộc [Responsive](responsive.vi.md). Action nào trong vùng là chủ đạo
-thuộc [CTA](cta.vi.md) và [Accent](accent.vi.md). Receipt phải liệt kê những gì về các vùng này
+thuộc [CTA](cta.vi.md) và [Accent](accent.vi.md). Đặc tả `.work` phải liệt kê những gì về các vùng này
 thuộc [Coverage](coverage.vi.md). Chuyện kết quả render có khớp với direction này không là việc của
 operator audit, trong [Focus](../proof/focus.vi.md),
 [Accessibility](../proof/accessibility.vi.md), [Motion](../proof/motion.vi.md) và

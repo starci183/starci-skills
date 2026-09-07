@@ -14,10 +14,13 @@ chứng kết quả còn composition đã kiểm chứng ý định.
 
 Sources: phán quyết của chủ sở hữu rằng một bề mặt đúng grammar mà xấu thì vẫn vứt, và ví dụ thực tế
 về một trang tổng quan dạng console đã qua sạch canon mà chỉ đạt khoảng ba trên năm, ghi tại
-[bản ghi bằng chứng taste rubric](../../../tests/evidence/20260903-taste-rubric.md); và phán quyết rằng
-một lựa chọn mà thang điểm đã cho sẵn câu trả lời thì không bao giờ là một lần dừng, cùng tiêu chí mật
-độ đo trên dữ liệu đã seed và lựa chọn của chính người, ghi trong
-[bản ghi bằng chứng phương án trội](../../../tests/evidence/20260903-dominant-candidate.md).
+[bản ghi bằng chứng taste rubric](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-taste-rubric.md); cùng ví dụ lịch sử
+về mật độ đo trên dữ liệu đại diện và lựa chọn được trình rõ cho người dùng, ghi trong
+[bản ghi bằng chứng phương án trội](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-dominant-candidate.md).
+
+Các source phía trên là ghi chú lịch sử tại commit đã ghim, không phải quyền vận hành hiện tại.
+Chỉ dùng ngưỡng/rubric đã được chọn trong scope `.work`; nhãn `ship` không cấp quyền release,
+và một quyết định cũ không thay thế phê duyệt nghiệp vụ của sản phẩm hiện tại.
 
 ## TASTE-1 — Một điểm nhìn trong ba giây
 
@@ -127,9 +130,9 @@ Chi phối việc bao nhiêu phần bề mặt đang thật sự làm việc.
 | --- | --- | --- |
 | Case 1 | Lấy mật độ của một ảnh chụp | Đó là tổng hình chữ nhật bao của các node nội dung và hành động chia cho diện tích đã chụp. Lớp mà coverage đã khai đặt ra dải: `console` ít nhất sáu mươi phần trăm, `catalog` ít nhất năm mươi, `reader` giữa bốn mươi và bảy mươi, `form` giữa hai mươi lăm và năm mươi, `landing` nhiều nhất bốn mươi |
 | Case 2 | Dải của lớp là trần chứ không phải sàn, như với `landing` và với nửa trên của `form` và `reader` | Phần thở giữ mật độ ở dưới trần ấy là liên tục chứ không phải những túi trống rải rác. Vùng trống bị cắt thành những khoảng rời rạc sẽ bác bỏ nó |
-| Case 3 | Phép ước lượng được thực hiện | Các hình chữ nhật được đếm đều được gọi tên trong receipt, để người đọc thứ hai lặp lại được và ra kết quả lệch chừng mười phần trăm |
+| Case 3 | Phép ước lượng được thực hiện | Các hình chữ nhật được đếm đều được gọi tên trong bản ghi bằng chứng, để người đọc thứ hai lặp lại được và ra kết quả lệch chừng mười phần trăm |
 | Case 4 | Một lớp bề mặt dày được chụp ở viewport hẹp | Mật độ đạt được bằng sắp thứ tự và gom nhóm, không phải bằng cách thu nhỏ mục tiêu xuống dưới ngưỡng của chúng |
-| Case 5 | Mật độ phụ thuộc vào số bản ghi mà dữ liệu cung cấp | Nó được đo ở khối lượng seed đại diện của luồng: số bản ghi mà seed của luồng đặt cho thực thể mà bề mặt liệt kê. Một workspace đang phục vụ dưới khối lượng ấy thì không được phán: ô Measured ghi `below-volume` kèm khối lượng đang phục vụ và khối lượng seed đặt, và hàng ấy định tuyến về `seed` — operator sở hữu dữ liệu đưa workspace lên đủ khối lượng rồi mục ấy được chụp lại — không bao giờ về `direction` và không bao giờ tới một người |
+| Case 5 | Mật độ phụ thuộc số bản ghi | Đo theo khối lượng fixture đại diện đã khai cho flow `.work` được chọn và định danh dataset đã quan sát. Bằng chứng dưới khối lượng ghi số thực tế/kỳ vọng và còn thiếu. Tạo dữ liệu hay seed lại cần op được cấp quyền riêng; rubric không sửa dữ liệu hoặc bỏ qua quyết định cần từ người dùng. |
 | Case 6 | Mật độ vẫn hỏng ở khối lượng đại diện | Ô Measured ghi `data-bound` kèm khối lượng đã đo; hàng ấy giữ điểm và kết luận hỏng của nó, và `TASTE-13` Case 6 để nó ngoài verdict, nên nó không chặn quality cũng không chặn UAT |
 
 Không phải rule này: ở mật độ đó mục tiêu còn thao tác được không thuộc
@@ -168,7 +171,7 @@ Chi phối việc bề mặt có thuộc về lớp mà nó tự nhận không.
 | --- | --- | --- |
 | Case 1 | Đọc quyết định direction và nó có bố cục gì đó | Nó gọi tên các chuẩn tham chiếu mà bề mặt này nhắm tới, theo lớp chứ không theo tính từ. Một direction không gọi tên chuẩn nào sẽ bác bỏ cả lần audit trước khi chấm bất kỳ ảnh nào |
 | Case 2 | Đặt ảnh chụp cạnh các tham chiếu đó | Một người đọc không biết cả hai sản phẩm vẫn xếp bề mặt vào cùng một lớp. Xếp nó vào một lớp xoàng hơn sẽ bác bỏ nó |
-| Case 3 | Mô tả khoảng cách | Receipt gọi tên tiêu chí nào ở trên gánh phần chênh đó, để khác biệt là một finding chứ không phải một cảm tưởng |
+| Case 3 | Mô tả khoảng cách | Bản ghi bằng chứng gọi tên tiêu chí nào ở trên gánh phần chênh đó, để khác biệt là một finding chứ không phải một cảm tưởng |
 | Case 4 | Tham chiếu chỏi với một rule của canon | Canon thắng và tham chiếu bị bỏ, vì taste được quyền từ chối một bề mặt tuân thủ nhưng không bao giờ được cấp phép cho một bề mặt không tuân thủ |
 | Case 5 | Direction khai delta trình bày là `none` | Bản giao không bố cục gì để mà xếp lớp, nên tiêu chí này không áp dụng: hàng của nó ghi `n/a`, không mang điểm, và được để ngoài điểm trung bình lẫn tập chặn cửa. Lớp mà bề mặt thuộc về là lớp mà direction nó tinh chỉnh đã được chấm, và vòng này không giành lại cũng không đánh mất |
 
@@ -180,13 +183,13 @@ Chi phối việc các tiêu chí trên gộp thành một quyết định như 
 | --- | --- | --- |
 | Case 1 | Ống kính taste chạy | Mọi tiêu chí từ `TASTE-1` tới `TASTE-12` đều mang một kết luận đạt hoặc hỏng và một điểm từ 1 tới 5, mỗi cái có phép đo mà chính rule đó gọi tên chống lưng |
 | Case 2 | Tính verdict | `ship` đòi không hỏng ở `TASTE-1`, `TASTE-2`, `TASTE-5`, `TASTE-8` và `TASTE-12`, cùng điểm trung bình ít nhất 4 trên mười hai tiêu chí. Mọi trường hợp khác là `fix-first` |
-| Case 3 | Mọi rule của canon đều đạt mà verdict taste là `fix-first` | Bề mặt vẫn là `fix-first`. Một receipt cho ship vì canon xanh sẽ bác bỏ cả ống kính |
-| Case 4 | Một tiêu chí taste hỏng | Nó định tuyến về `direction`, không bao giờ về `resolve`, vì đổi một giá trị không sửa được một bố cục |
+| Case 3 | Mọi rule của canon đều đạt mà verdict taste là `fix-first` | Bề mặt vẫn là `fix-first`. Một bản ghi bằng chứng cho ship vì canon xanh sẽ bác bỏ cả ống kính |
+| Case 4 | Một tiêu chí taste hỏng | Ghi lỗi composition và owner chịu trách nhiệm kèm bằng chứng. Finding này không cấp quyền tự chạy op tiếp theo. |
 | Case 5 | Một điểm được ghi mà không có phép đo | Mục đó vô hiệu, và ống kính chưa hoàn tất cho tới khi phép đo được chụp |
-| Case 6 | Một hàng là `below-volume` hay `data-bound` (`TASTE-9` Case 5 và 6) | Hàng `below-volume` làm verdict thành `blocked`, định tuyến về `seed`, cho tới khi mục ấy được chụp ở đủ khối lượng; hàng `data-bound` được để ngoài điểm trung bình và ngoài tập chặn cửa, nên verdict được tính trên các tiêu chí mà dữ liệu trả lời được |
-| Case 7 | Người đã chọn phương án của bề mặt từ một bảng đã in mà bảng điểm cho thấy tiêu chí này rớt ở chính phương án ấy vào lúc chọn | Ô Measured ghi `person-accepted` và gọi tên nhánh của quyết định người đã duyệt, cạnh phép đo; hàng ấy giữ điểm và kết luận hỏng của nó và được để ngoài điểm trung bình lẫn tập chặn cửa, vì thang điểm không bao giờ lật một quyết định người đã lấy trên chính bằng chứng của mình trong cùng phiên. Một hàng `person-accepted` không gọi tên nhánh nào, gọi tên một quyết định operator tự lấy, hay phủ lên một tiêu chí mà phương án được chọn không được cho thấy là rớt, thì vô hiệu |
-| Case 8 | Phạm vi audit chọn bề mặt chính hoặc chủ động yêu cầu toàn bộ ma trận state | Đọc phạm vi đóng băng do `interface.audit` mang theo. Thiếu entry đã chọn vẫn bị chặn. State phụ đã khai ngoài phạm vi chính là `deferred`, không phải đạt: tiêu chí so state mà schema phạm vi cho phép mang `verdict: deferred`, score null và tên state hoãn, được loại khỏi điểm trung bình. Audit exhaustive thiếu state đã khai vẫn bị chặn. Hoàn thành phạm vi chỉ chứng minh bề mặt đã chọn; không so khác phạm vi để dùng ngân sách vòng |
-| Case 9 | Ống kính được chấm | Cùng một người chấm đã chấm ba tấm mốc của [bộ hiệu chuẩn](calibration/calibration.json) trong cùng một vòng, và mỗi tấm mốc rơi vào đúng dải `taste` của nó trong khoảng dung sai mà file ấy công bố; biên nhận mang ba điểm mốc cạnh điểm của bề mặt. Một tấm mốc lệch xa hơn, hay một ống kính chấm mà không có mốc nào, thì vô hiệu, vì một điểm lấy trên một thang chưa ai chứng minh không so được với tấm khác hay với vòng trước |
+| Case 6 | Một hàng dưới khối lượng hoặc bị giới hạn bởi dữ liệu | Quan sát dưới khối lượng không hoàn thành đánh giá. Chỉ loại tiêu chí data-bound khi phạm vi hiện tại đã duyệt nêu rõ không áp dụng, có lý do ghi lại. Assertion bắt buộc fail vẫn fail; không ngầm cho phép seed hoặc sửa dữ liệu. |
+| Case 7 | Người dùng chấp nhận rõ một ngoại lệ thiết kế đã đo | Ghi tham chiếu quyết định đúng phạm vi hiện tại và phép đo đã trình cho người dùng. Giữ quan sát fail gốc; agent không được bịa duyệt hoặc âm thầm đổi assertion bắt buộc fail thành pass. Đổi phạm vi áp dụng/nghiệm thu thuộc lần sửa spec được duyệt rõ. |
+| Case 8 | Phạm vi audit chọn bề mặt chính hoặc toàn bộ ma trận state | Đọc phạm vi đã duyệt của node `.work` được chọn. Thiếu mục được chọn không được hoàn thành. Gọi tên state phụ ngoài phạm vi là chưa kiểm, không phải đạt; không cần schema audit cũ hay ngân sách vòng. Audit exhaustive thiếu state đã khai còn dở; kết quả giới hạn chỉ chứng minh bề mặt đã chọn. |
+| Case 9 | Ống kính được chấm | Cùng một người chấm đã chấm ba tấm mốc của [bộ hiệu chuẩn](calibration/calibration.json) trong cùng một vòng, và mỗi tấm mốc rơi vào đúng dải `taste` của nó trong khoảng dung sai mà file ấy công bố; bản ghi bằng chứng mang ba điểm mốc cạnh điểm của bề mặt. Một tấm mốc lệch xa hơn, hay một ống kính chấm mà không có mốc nào, thì vô hiệu, vì một điểm lấy trên một thang chưa ai chứng minh không so được với tấm khác hay với vòng trước |
 
 Tập được chấm là `TASTE-1` tới `TASTE-12`; rule này là phần số học và bản thân nó không được chấm.
 Năm tiêu chí chặn cửa `ship` đúng là năm thứ người đọc nhận ra trước khi đọc chữ nào: điểm nhìn,

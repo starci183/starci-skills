@@ -9,8 +9,24 @@ business
 -> UI đã render
 ```
 
-Các rule trong folder này là bắt buộc có điều kiện: khi phần `Khi nào` khớp, presentation phải dùng
-rule đó hoặc giữ giá trị tương đương đã được public Grammar API cung cấp.
+Đây là kiến thức chuyên môn cho design family Grammar được chọn, không phải chain op phổ quát.
+Chỉ áp dụng khi family và tiêu chí này thuộc scope `.work` đã duyệt. Khi `Khi nào` của rule áp dụng
+khớp thì dùng rule hoặc giữ giá trị tương đương từ API public thật. Repo đã chọn và source design
+được duyệt có thẩm quyền nếu khác; báo xung đột, không tự đổi design system hoặc mở scope implement.
+
+## Nguồn và bảo trì
+
+Bảng ownership component và ví dụ riêng package được giữ từ
+[snapshot knowledge](https://github.com/starci183/starci-skills/tree/edf72554425f918e80c9205e9c6db10596e722f0/knowledge/ui/presentation).
+Snapshot là provenance lịch sử, không là thẩm quyền thực thi hoặc bằng chứng package hiện cài.
+Kiểm export/prop/source token/CSS output và số đo render liên quan thật trước dùng hàng bảng, kể cả
+claim trong văn xuôi về ownership hiện tại. API thiếu/quan sát mâu thuẫn vẫn chưa rõ/phải báo;
+không bịa export hoặc sửa source product để bảng cũ thành đúng.
+
+Khi chọn bảo trì knowledge, cập nhật rule/bảng liên quan từ source và evidence quan sát thật, giữ
+địa chỉ rule ổn định và mirror Việt. Sửa component chung cần scope owner riêng được chọn. Giữ lý do
+quan sát lặp cho case tái sử dụng, nhưng không cần machinery generator/session/receipt. `.work`
+quản scope/evidence đã chọn; Git quản lịch sử sửa.
 
 ## Authority
 
@@ -53,11 +69,10 @@ không phải recommendation của presentation.
 `GAP-1`, `FONT-1` và các tên `PREFIX-n` khác là địa chỉ thứ tự ổn định. Con số không phải bước
 Tailwind, giá trị CSS, component variant hay mức độ nghiêm trọng.
 
-Bảng "Common đã sở hữu" trong mỗi topic được sinh ra từ claim `data-contract` mà package công bố,
-bằng `scripts/generate-presentation-owned.mjs`, nên không ai sửa tay: một hàng sai thì sửa component,
-không sửa bảng. Một case bên dưới bảng chỉ được thêm khi hai block bằng chứng được uỷ quyền cùng cho
-thấy tình huống đó, đúng luật bằng chứng mà các idiom của family đang dùng; xuất hiện một lần là
-quyết định sản phẩm, chưa phải rule.
+Bảng tham chiếu từng topic map component và điều kiện element/prop sang rule. Kiểm ownership so với
+package thật đã chọn trước quyết định app viết class hay không. Hàng lịch sử sai là finding tài liệu,
+không tự cấp quyền sửa component. Case tái sử dụng mới cần lý do quan sát vượt một lựa chọn product
+đơn lẻ; ghi source và tính áp dụng thật trong scope bảo trì được chọn.
 
 Mỗi rule chỉ có heading và đúng một bảng:
 

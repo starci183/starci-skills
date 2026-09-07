@@ -1,8 +1,13 @@
 # Các family Grammar
 
 Catalog này gọi tên mọi family UI Grammar đã được viết. Nó là kho kê, không phải luật chọn family
-mặc định: yêu cầu đã route phải bind đúng một family cụ thể, và family thiếu hoặc mơ hồ không bao giờ
-âm thầm được đổi thành StarCi.
+mặc định: đặc tả thiết kế `.work` được chọn gọi tên family cài thực tế áp dụng, nếu có. Family thiếu
+hoặc mơ hồ không âm thầm đổi thành StarCi. Catalog cung cấp snapshot lịch sử, không phải installer,
+resolver hoặc yêu cầu mọi sản phẩm dùng Grammar.
+
+Kiểm tra danh tính/phiên bản package, type export, CSS và source renderer cài thực tế trong repository
+đã chọn trước khi dùng API/gap snapshot. Ghi tham chiếu source hiện tại vào node `.work` đã chọn;
+kiểm kê source cũ không phải bằng chứng UAT hiện tại.
 
 | Family | Thẩm quyền | Snapshot package | Phong cách dùng lại | Cách ghép sản phẩm |
 | --- | --- | --- | --- | --- |

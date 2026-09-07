@@ -9,6 +9,12 @@ the reference application (`src/`) and its Grammar package (`packages/grammar/sr
 and each table cites the files it was read from. Where the code is split, the file records the
 dominant variant with its count instead of legislating.
 
+Applicability: these are historical reference-source observations preserved at skill commit
+`edf72554425f918e80c9205e9c6db10596e722f0`, not universal framework rules or current-project
+source evidence. Inspect the selected repository's actual types/APIs, aliases and lint/test setup;
+use only patterns compatible with approved `.work` scope. Old counts cannot claim a fresh scan.
+Current business requirements and architecture belong to `.work`; code patterns do not approve them.
+
 ## Catalog
 
 | Knowledge | What it decides | Rules |

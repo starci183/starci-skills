@@ -9,8 +9,27 @@ business
 -> rendered UI
 ```
 
-Rules in this folder are conditionally mandatory: when a rule's `When` matches, the presentation
-must use that rule or preserve an equivalent value already supplied by the public Grammar API.
+This is domain knowledge for the selected Grammar design family, not a universal operator chain.
+Apply its rules only when that family and these criteria belong to the approved `.work` scope.
+When an applicable rule's `When` matches, use it or preserve an equivalent value supplied by the
+actual public API. The selected repository and accepted design source govern when they differ;
+report a conflict instead of silently replacing the design system or expanding implementation scope.
+
+## Source and maintenance
+
+Component ownership tables and package-specific examples were retained from the
+[knowledge snapshot](https://github.com/starci183/starci-skills/tree/edf72554425f918e80c9205e9c6db10596e722f0/knowledge/ui/presentation).
+That snapshot is historical provenance, not executable authority or proof of the currently installed
+package. Verify actual component exports, props, source tokens, CSS output and relevant rendered
+measurements before relying on a row, including prose claims about what the package currently owns.
+Missing APIs or conflicting observations remain unknown/reported; never invent an export or alter
+product source to make an old table appear true.
+
+For a selected knowledge maintenance change, update the relevant rule or reference table from real
+source and observed evidence; keep its stable rule address and Vietnamese mirror. Shared component
+changes require their own selected owner scope. Preserve repeated-observation rationale for reusable
+cases, but no generator, session or receipt machinery is required. `.work` owns selected scope and
+evidence; Git owns edit history.
 
 ## Authority
 
@@ -83,13 +102,11 @@ The owner cell is one of three values, and every topic states them once near the
 - `—`, so Common exposes no public path. The class is a recorded workaround linked to
   `COMMON_CAPABILITY_MISSING`.
 
-Each topic also carries one table of the relationships Common already owns, mapping component to the
-element or prop condition that carries the claim, to rule, so a reader can rule out writing anything
-before reaching the cases. That table is generated from the `data-contract` claims the package
-publishes, by `scripts/generate-presentation-owned.mjs`, so it is never edited by hand: a wrong row
-is repaired in the component. A case below it is added only when two authorized evidence blocks show
-the situation, the same evidence rule the family idioms use; one occurrence is a product decision,
-not a rule.
+Each topic also retains a reference table mapping component and element/prop condition to rule.
+Verify this ownership against the actual selected package before deciding whether the app writes a
+class. A wrong historical row is a documentation finding, not automatic permission to modify the
+component. A new reusable case needs observed rationale beyond a one-off product preference;
+record its actual source and applicability in the selected maintenance scope.
 
 A case belonging to a neighbouring value is not a table row. It goes on one line after the table, as
 `Not this rule: <condition> uses GAP-n`.

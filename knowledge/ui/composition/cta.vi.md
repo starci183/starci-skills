@@ -7,6 +7,9 @@ Call to action được chốt từ hệ quả, không bao giờ từ mong muố
 Variant, ngữ nghĩa, các trạng thái bị chặn và thứ tự của một nhóm action đều được quyết trước khi
 dựng vùng, bởi mỗi thứ trong số đó là một lời hứa mà trang sau khi render phải giữ.
 
+Phạm vi áp dụng: ví dụ API thuộc family Grammar đã ghi nhận; đối chiếu source cài thực tế và
+đặc tả `.work` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch.
+
 ## CTA-1 — Điểm nhấn đi theo hệ quả
 
 Chi phối control nào mang treatment mạnh nhất.
@@ -52,7 +55,7 @@ Chi phối action cuối cùng mà không thể hoàn tác.
 
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
-| Case 1 | Một action xoá, thu hồi hoặc vứt bỏ vĩnh viễn thứ có giá trị | Receipt mang copy nêu rõ tính huỷ hoại, một bước xác nhận tương xứng với hệ quả, và một treatment action danger có kiểu |
+| Case 1 | Một action xoá, thu hồi hoặc vứt bỏ vĩnh viễn thứ có giá trị | Đặc tả `.work` mang copy nêu rõ tính huỷ hoại, một bước xác nhận tương xứng với hệ quả, và một treatment action danger có kiểu |
 | Case 2 | `ButtonVariant` công khai chưa có giá trị danger | Một gap `GRAMMAR_REQUIRED` ghi nhận điều đó, và CTA không được đưa lên variant primary để thay thế |
 | Case 3 | Direction bị cám dỗ import variant danger của vendor, hoặc thêm màu đỏ cục bộ | Không variant danger của vendor và không màu đỏ cục bộ nào đứng cạnh control đó |
 | Case 4 | Action là một thao tác huỷ có thể hoàn tác hoặc một kết cục tiêu cực thường | Nó không mang treatment huỷ hoại và không mang bước xác nhận sinh ra từ tính huỷ hoại |
@@ -65,15 +68,15 @@ Chi phối trình tự của hai action trở lên cùng tạo nên một quyế
 | --- | --- | --- |
 | Case 1 | Một quyết định có action chủ đạo, một lựa chọn thay thế và một lối ra | Thứ tự DOM chạy từ quyết định chủ đạo, tới lựa chọn thay thế, rồi tới lối ra hoặc lối phục hồi, tuỳ sản phẩm yêu cầu |
 | Case 2 | Nhóm wrap hoặc xếp chồng ở bề rộng hẹp hơn | Thứ tự đọc và thứ tự focus tuần tự trùng khít nhau ở mọi bề rộng, và không CSS `order` nào đảo nhóm |
-| Case 3 | Một nhãn đã dịch dài hơn hẳn bản gốc | Receipt gọi tên nhãn dài nhất mà nhóm phải chứa, và ở độ dài đó nhóm wrap hoặc xếp chồng chứ không chồng lấn |
-| Case 4 | Hai action nằm ở hai vùng khác nhau | Chúng thuộc hai decision owner riêng trong receipt, và không cái nào so cấp với cái kia |
+| Case 3 | Một nhãn đã dịch dài hơn hẳn bản gốc | Đặc tả `.work` gọi tên nhãn dài nhất mà nhóm phải chứa, và ở độ dài đó nhóm wrap hoặc xếp chồng chứ không chồng lấn |
+| Case 4 | Hai action nằm ở hai vùng khác nhau | Chúng thuộc hai decision owner riêng trong đặc tả `.work`, và không cái nào so cấp với cái kia |
 
 ## File này không quyết định
 
 Vùng nào chứa quyết định thuộc [Layout](layout.vi.md), và anchor nào gọi tên vùng thuộc
 [Hierarchy](hierarchy.vi.md). Một lần kích hoạt được sinh bao nhiêu hiệu ứng và ai giữ pending thuộc
 [Action](action.vi.md). Treatment chủ đạo khan hiếm tới đâu trên cả trang thuộc
-[Accent](accent.vi.md), và sau khi action xong thì nói gì thuộc [Feedback](feedback.vi.md). Receipt
+[Accent](accent.vi.md), và sau khi action xong thì nói gì thuộc [Feedback](feedback.vi.md). Đặc tả `.work`
 phải liệt kê những gì về các action này thuộc [Coverage](coverage.vi.md). Control sau khi render có
 chạm tới được, có tên và có focus nhìn thấy được không thuộc
 [Accessibility](../proof/accessibility.vi.md) và [Focus](../proof/focus.vi.md).

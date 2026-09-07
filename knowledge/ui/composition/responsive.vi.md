@@ -7,6 +7,9 @@ Quyết định responsive được đưa ra trước khi có DOM, vì chúng l�
 cục, nhánh nào biến mất, và sau đó người đọc vẫn phải làm được gì. Một cái tên thiết bị không bao
 giờ là câu trả lời ở đây; câu trả lời luôn là một query có tên trên một owner có tên.
 
+Phạm vi áp dụng: ví dụ API thuộc family Grammar đã ghi nhận; đối chiếu source cài thực tế và
+đặc tả `.work` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch.
+
 ## RESPONSIVE-1 — Cái gì sống sót khi không gian co lại
 
 Chi phối mức sàn mà bố cục hẹp phải giữ.
@@ -40,7 +43,7 @@ Chi phối việc ai giữ state khi một composition có hai hình dạng.
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
 | Case 1 | `NavigationFeatureNav` để lộ trigger dạng gọn của nó | Ứng dụng sở hữu drawer gọn qua extension point đó và cấp đúng những điểm đến, nhãn, state, đường trả focus và lối phục hồi ấy |
-| Case 2 | `ChatWorkspace` đổi rail giữa thường trực và drawer | Composition sở hữu việc đổi; receipt chỉ truyền state điều khiển và callback, và không khai báo listener nào của riêng nó |
+| Case 2 | `ChatWorkspace` đổi rail giữa thường trực và drawer | Composition sở hữu việc đổi; đặc tả `.work` chỉ truyền state điều khiển và callback, và không khai báo listener nào của riêng nó |
 | Case 3 | `PrimaryRailLayout` tái bố cục một rail đang hiện diện | CSS công khai sở hữu việc tái bố cục, còn một rail vắng mặt thì vắng mặt trong DOM chứ không bị ẩn |
 | Case 4 | Cả hai hình dạng cùng render và một cái chỉ bị ẩn | Mỗi lúc tồn tại đúng một nhánh, và nhánh kia không để lại dấu vết layout hay accessibility nào |
 
@@ -51,10 +54,10 @@ Chi phối những cách khác khiến không gian cạn đi.
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
 | Case 1 | Người đọc zoom, phóng chữ, hoặc tự đặt text spacing | Composition tái bố cục; không chiều cao chữ cố định và không cắt xén nào gánh áp lực đó |
-| Case 2 | Copy dài ra vì đã dịch hoặc vì một state thêm chữ | Receipt gọi tên phần dài ra ngay trong quyết định vừa vặn, chứ không như một ngoại lệ của nó |
+| Case 2 | Copy dài ra vì đã dịch hoặc vì một state thêm chữ | Đặc tả `.work` gọi tên phần dài ra ngay trong quyết định vừa vặn, chứ không như một ngoại lệ của nó |
 | Case 3 | Nội dung vốn hai chiều và không thể chảy lại | Đúng một `HorizontalScrollRegion` có tên sở hữu nó, và trang bao quanh vẫn nằm trong biên inline của mình |
 | Case 4 | Bàn phím ảo, xoay màn hình hoặc safe-area làm hụt không gian dùng được | Geometry thường trực vẫn vừa, vẫn nhìn thấy và không che phần nào của nhiệm vụ; việc một layout query vẫn ở chế độ rộng không được nhận là bằng chứng vừa mắt |
-| Case 5 | Một state làm surface nở ra, như lỗi, panel mở hay overlay | Hình dạng nở ra được chốt trong cùng mục receipt với hình dạng lúc nghỉ |
+| Case 5 | Một state làm surface nở ra, như lỗi, panel mở hay overlay | Hình dạng nở ra được chốt trong cùng mục đặc tả `.work` với hình dạng lúc nghỉ |
 | Case 6 | Quyết định được kiểm xem có vừa không | Nó được kiểm hai lần, và không lần nào thay được lần nào. Trước khi có cây, mỗi phương án được render và phục vụ một lần cho mỗi viewport của coverage, để một người so bản rộng với bản hẹp trong lúc hướng còn đổi được. Sau khi cây đã dựng, audit chụp đủ mọi viewport của chính coverage ấy và đo các rule ở trên trên thứ đã render. Một quyết định chỉ được nhìn một lần là mới chỉ được kiểm ở một bề rộng |
 
 Retired: RESPONSIVE-5 đã nghỉ, gộp vào COVERAGE-1, và số này không được dùng lại; địa chỉ đó coi như đã tiêu.
@@ -63,6 +66,6 @@ Retired: RESPONSIVE-5 đã nghỉ, gộp vào COVERAGE-1, và số này không �
 
 Trang có những vùng nào và ai sở hữu track thuộc [Layout](layout.vi.md). Ý nghĩa có giữ được cấp độ
 qua một lần reflow không thuộc [Hierarchy](hierarchy.vi.md), còn một nhóm action có giữ được thứ tự
-không thuộc [CTA](cta.vi.md). Receipt phải liệt kê những gì về các nhánh này thuộc
+không thuộc [CTA](cta.vi.md). Đặc tả `.work` phải liệt kê những gì về các nhánh này thuộc
 [Coverage](coverage.vi.md). Một nhánh hẹp có vắng mặt thật sự hay không được chốt ở
 [State](state.vi.md) và được chứng minh ở [Focus](../proof/focus.vi.md).

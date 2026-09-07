@@ -47,7 +47,7 @@ component with a selector or a passed class to change its inset is `APP_OVERRIDE
 
 ## Padding Common already owns
 
-Generated from `@grammar/core` claims by `scripts/generate-presentation-owned.mjs`; edit the component, not this table.
+Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](INDEX.md#source-and-maintenance).
 
 | Component | Element or condition | Rule |
 | --- | --- | --- |
@@ -267,7 +267,8 @@ none, because `PageContainer` owns them (MEASURE-1).
 | --- | --- | --- | --- |
 | Case 1 | The `main` of a routed block that sits directly under the page shell | `App` | `<main className="py-6 sm:py-8">` |
 
-Evidence, four blocks writing the same pair: `blocks/commerce/ProSubscriptionBlock/classNames.ts`
+Historical source locations recorded in the [knowledge snapshot](INDEX.md#source-and-maintenance),
+not current checkout paths or fresh rendered proof: `blocks/commerce/ProSubscriptionBlock/classNames.ts`
 (`proPageClassName`), `blocks/learn/CoursePlaygroundCatalog/classNames.ts`,
 `blocks/learn/PlaygroundSession/classNames.ts`, `blocks/learn/PlaygroundSetup/classNames.ts`.
 

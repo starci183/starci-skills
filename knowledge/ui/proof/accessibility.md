@@ -60,18 +60,18 @@ HIERARCHY-1 and STATE-1.
 
 ## A11Y-5 — The accessibility verdict
 
-Governs how the criteria above become this topic's one row in the receipt's `## Verdict` table.
+Governs how selected observations are summarized in the current `.work` node's evidence.
 
 | Case | When | Observe |
 | --- | --- | --- |
 | Case 1 | The lens runs | `A11Y-1` to `A11Y-4` are each judged at every state the coverage declares, in every colour scheme, from the computed accessibility tree and the measured render rather than from source |
 | Case 2 | The verdict is computed | The gating set is the whole set: `pass` requires every criterion to pass, because a reader who cannot reach a control is not partially served. There is no mean and no tolerance here, and averaging this topic into another falsifies it |
 | Case 3 | A criterion has no observation behind it | The verdict is `blocked`, never `pass` and never `fail`, because a render nobody measured has earned neither |
-| Case 4 | A failure is routed | A missing value routes to `resolve`; a missing structure or relationship routes to `direction`; a capability the published family does not offer routes to `grammar-gap`, never to a local repair in the application |
+| Case 4 | A failure has been measured | Record whether the measured defect belongs to a value, a structure/relationship, or an unavailable capability in the verified installed family. This is a finding and owner recommendation, not permission to edit another owner or run another op. |
 
-The scored set is `A11Y-1` to `A11Y-4`; this rule is the arithmetic and is not itself scored. Its
-result is the `accessibility` row of the audit receipt's `## Verdict` table, copied from there and
-never recomputed downstream.
+The scored set is `A11Y-1` to `A11Y-4`; this rule only summarizes and is not itself scored.
+Store assertions, observations and artifact references in the selected node's evidence; there is
+no separate receipt table or downstream verdict-copying rule. Missing evidence never earns a pass.
 
 ## What this file does not decide
 

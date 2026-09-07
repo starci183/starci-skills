@@ -15,10 +15,13 @@ it, because taste tests the outcome and composition tested the intent.
 Sources: the owner ruling that a surface which is correct by grammar and ugly by eye is still thrown
 away, and the worked example of a console overview that passed every canon rule and still scored
 about three out of five, recorded in
-[the taste rubric evidence](../../../tests/evidence/20260903-taste-rubric.md); and the ruling that a
-choice whose answer the rubric already gives is never a stop, with the density criterion measured
-against seeded data and the person's own choice, recorded in
-[the dominant-candidate evidence](../../../tests/evidence/20260903-dominant-candidate.md).
+[the taste rubric evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-taste-rubric.md); and a historical worked example
+of density measured against representative data and an explicitly shown user choice, recorded in
+[the dominant-candidate evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-dominant-candidate.md).
+
+The sources above are historical notes at a pinned commit, not current operating authority.
+Use thresholds/rubrics selected in the `.work` scope; a `ship` label grants no release authority,
+and a historical decision cannot replace approval of the current product's business requirements.
 
 ## TASTE-1 — One focal point in three seconds
 
@@ -127,9 +130,9 @@ Governs how much of the surface is doing work.
 | --- | --- | --- |
 | Case 1 | The density of a capture is taken | It is the summed bounding rectangles of content and action nodes divided by the captured area. The class the coverage declared sets the band: `console` at least sixty percent, `catalog` at least fifty, `reader` between forty and seventy, `form` between twenty-five and fifty, `landing` at most forty |
 | Case 2 | The class's band is a ceiling rather than a floor, as it is for `landing` and for the upper half of `form` and `reader` | The breathing room that keeps density under it is continuous rather than scattered pockets. Empty area broken into unrelated gaps falsifies it |
-| Case 3 | The estimate is taken | The rectangles counted are named in the receipt, so a second reader can repeat the estimate and land within about ten percent |
+| Case 3 | The estimate is taken | The rectangles counted are named in the evidence record, so a second reader can repeat the estimate and land within about ten percent |
 | Case 4 | A dense class is captured at a narrow viewport | Density is achieved by ordering and grouping, not by shrinking targets below their minimum |
-| Case 5 | The density depends on how many records the data supplies | It is measured at the flow's representative seeded volume: the count of records the flow's seed places for the entity the surface lists. A served workspace below that volume is not judged: the Measured cell reads `below-volume` with the volume served and the volume the seed places, and the row routes to `seed` — the operator that owns the data brings the workspace to volume and the entry is captured again — never to `direction` and never to a person |
+| Case 5 | Density depends on record count | Measure against the representative fixture volume declared for the selected `.work` flow and identify the observed dataset. Below-volume evidence records actual and expected counts and remains insufficient. Data creation or reseeding requires its own authorized op; this rubric never mutates data or bypasses a needed user decision. |
 | Case 6 | The density still fails at representative volume | The Measured cell reads `data-bound` with the volume it was measured at; the row keeps its score and its fail, and `TASTE-13` Case 6 leaves it out of the verdict, so it blocks neither quality nor UAT |
 
 Not this rule: whether a target is still operable at that density is
@@ -168,7 +171,7 @@ Governs whether the surface belongs to the class it claims.
 | --- | --- | --- |
 | Case 1 | The direction decision is read and it composed something | It names the reference standards this surface is aiming at, by class rather than by adjective. A direction naming none falsifies the audit before any capture is scored |
 | Case 2 | The capture is placed beside those references | A reader who knows neither product would sort the surface into the same class. Sorting it into a plainer class falsifies it |
-| Case 3 | The gap is described | The receipt names which of the criteria above accounts for the distance, so the difference is a finding rather than an impression |
+| Case 3 | The gap is described | The evidence record names which of the criteria above accounts for the distance, so the difference is a finding rather than an impression |
 | Case 4 | The references disagree with a canon rule | Canon wins and the reference is dropped, because taste may reject a conforming surface but may never license a non-conforming one |
 | Case 5 | The direction declares a presentation delta of `none` | The delivery composed nothing to be sorted, so the criterion does not apply: its row reads `n/a`, carries no score, and is left out of the mean and out of the gating set. The class the surface belongs to is the one the direction it refines was scored against, and this round neither re-earns it nor loses it |
 
@@ -180,13 +183,13 @@ Governs how the criteria above become one decision.
 | --- | --- | --- |
 | Case 1 | The taste lens runs | Every criterion from `TASTE-1` to `TASTE-12` carries a pass or fail and a score from 1 to 5, each backed by the measurement its own rule names |
 | Case 2 | The verdict is computed | `ship` requires no fail on `TASTE-1`, `TASTE-2`, `TASTE-5`, `TASTE-8` or `TASTE-12`, and a mean score of at least 4 across the twelve. Anything else is `fix-first` |
-| Case 3 | Every canon rule passed and the taste verdict is `fix-first` | The surface is still `fix-first`. A receipt shipping a surface because canon was green falsifies the lens |
-| Case 4 | A taste criterion fails | It routes to `direction`, never to `resolve`, because a value swap cannot repair a composition |
+| Case 3 | Every canon rule passed and the taste verdict is `fix-first` | The surface is still `fix-first`. An evidence record shipping a surface because canon was green falsifies the lens |
+| Case 4 | A taste criterion fails | Record the composition defect and responsible owner with evidence. This finding does not authorize an automatic next op. |
 | Case 5 | A score is recorded with no measurement | The entry is void, and the lens is incomplete until the measurement is captured |
-| Case 6 | A row is `below-volume` or `data-bound` (`TASTE-9` Case 5 and 6) | A `below-volume` row makes the verdict `blocked`, routed to `seed`, until the entry is captured at volume; a `data-bound` row is left out of the mean and out of the gating set, so the verdict is computed over the criteria the data could answer |
-| Case 7 | The person chose the surface's candidate from a printed sheet whose scores showed this criterion failing for that candidate at choice time | The Measured cell reads `person-accepted` and names the branch of the decision the person approved, beside the measurement; the row keeps its score and its fail and is left out of the mean and the gating set, because the rubric never overturns a decision the person took on its own evidence in the same session. A `person-accepted` row that names no branch, names a decision the operator took by itself, or covers a criterion the chosen candidate was not shown failing, is void |
-| Case 8 | Audit scope selects primary surfaces or explicitly requests an exhaustive state matrix | Read the frozen audit scope carried by `interface.audit`. Missing selected entries still block. Declared secondary states outside a primary scope are `deferred`, never passed: the state-comparison criterion permitted by the audit scope schema carries `verdict: deferred`, null score and the deferred state names, and is excluded from the mean. An exhaustive audit missing a declared state remains blocked. Scope-limited completion proves only the selected surfaces; different scopes are not compared to consume a round budget |
-| Case 9 | The lens is scored | The same auditor scored the three anchor sheets of [the calibration set](calibration/calibration.json) in the same round, and each anchor landed inside its `taste` band within the tolerance that file publishes; the receipt carries the three anchor scores beside the surface's. An anchor that drifts further, or a lens scored with no anchors, is void, because a score taken on a scale nobody proved cannot be compared with another sheet's or with an earlier round's |
+| Case 6 | A row is below-volume or data-bound | Below-volume observations cannot complete the assessment. Exclude a data-bound criterion only when the approved current scope explicitly makes it inapplicable, with the reason recorded. A mandatory failed assertion remains failed; no seed or mutation is implicit. |
+| Case 7 | A user explicitly accepts a measured design exception | Record the exact current-scope decision reference and the measurement shown to the user. Keep the original failing observation; an agent cannot invent approval or silently turn a required failed assertion into pass. Applicability/acceptance changes belong to an explicitly approved spec edit. |
+| Case 8 | Audit scope selects primary surfaces or an exhaustive state matrix | Read the selected `.work` node's approved scope. Missing selected entries prevent completion. Name secondary states outside scope as untested, never passed; no obsolete audit schema or round budget is required. An exhaustive audit missing a declared state is incomplete; scope-limited results prove only the selected surfaces. |
+| Case 9 | The lens is scored | The same auditor scored the three anchor sheets of [the calibration set](calibration/calibration.json) in the same round, and each anchor landed inside its `taste` band within the tolerance that file publishes; the evidence record carries the three anchor scores beside the surface's. An anchor that drifts further, or a lens scored with no anchors, is void, because a score taken on a scale nobody proved cannot be compared with another sheet's or with an earlier round's |
 
 The scored set is `TASTE-1` to `TASTE-12`; this rule is the arithmetic and is not itself scored. The
 five criteria that gate `ship` are the ones a reader notices before reading a word: the focal point,

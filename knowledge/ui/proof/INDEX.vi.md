@@ -33,17 +33,16 @@ luôn gọi tên được thứ đã thật sự được nhìn.
 | [UX](ux.vi.md) | Một người mang theo nhiệm vụ có thật sự làm xong nó trên sản phẩm đang chạy không | UX-1 đến UX-12 (do `uat.verify` đọc) |
 | [Hiệu chuẩn](calibration/calibration.json) | Cái thang mà một ống kính có chấm điểm được chứng minh trên đó: ba tấm mốc (`calibration/anchor-low.html`, `anchor-mid.html`, `anchor-high.html`), mỗi tấm kèm dải `taste` và `ux` nó được kỳ vọng rơi vào cùng lý do một dòng, và khoảng dung sai; TASTE-13 Case 9 đọc nó | dữ liệu, không có rule riêng |
 
-Mọi topic ở đây đều tự chứa. Nó publish các tiêu chí của mình và đóng lại bằng rule verdict của chính
-nó: tập chặn cửa, ngưỡng, verdict, và một lần fail đi về đâu. Không có rule nào gom các topic lại, vì
-một rule mà toàn bộ nội dung là trỏ sang rule khác chính là một tầng id thứ hai: thêm một địa chỉ mà
-không thêm một quyết định nào. Chỗ duy nhất các topic gặp nhau là receipt: `## Verdict` mang một hàng
-cho mỗi topic, mỗi hàng chép từ topic đã tính ra nó, và một dòng nói `ship`, `fix-first` hay
-`blocked` trên các hàng ấy.
+Mỗi topic giữ tiêu chí và phép tổng hợp riêng. Chọn tiêu chí áp dụng trong node `.work`
+trước khi kiểm chứng; liên kết assertion với bằng chứng runtime thực tế. Các nhãn rubric
+`ship`, `fix-first`, `blocked` là kết luận đánh giá, không phải trạng thái node hoặc quyền release.
+Không bắt buộc receipt, bảng response, bộ điều phối hay sao chép verdict giữa các op.
+Thiếu bằng chứng, assertion bắt buộc fail và phạm vi chưa duyệt không được biến thành `done`.
 
 Một topic đã nghỉ ở đây. `UI-1` đến `UI-11` từng là một file scorecard gọi tên các lens rồi trỏ sang
 những rule sở hữu chúng; nay mỗi số ấy tra về đúng rule topic đã sống sót, và những số ấy không bao
 giờ được dùng lại. Bảng ánh xạ nằm ở
-[bằng chứng gom nhà](../../../tests/evidence/20260903-consolidation.md).
+[bằng chứng gom nhà](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.md).
 
 ## Cấu trúc rule
 
@@ -67,6 +66,7 @@ dạng `Không phải rule này: <điều kiện> thuộc PREFIX-n`. Mỗi file 
 `## File này không quyết định`, dẫn sang các file anh em và sang nhóm composition, nơi quyết định
 đang bị kiểm chứng đã được đưa ra.
 
-Tên component và tên prop trong các file này đều phải phân giải được về `@grammar/common`. Ở
-đâu hợp đồng công khai chưa có owner cho một hành vi cần thiết, phần audit ghi nhận capability gap
-thay vì chấp nhận một giải pháp cục bộ.
+Ví dụ component/prop mô tả family Grammar được ghi nhận. Kiểm tra API/source cài thực tế của
+dự án đã chọn trước khi áp dụng; không mặc định mọi sản phẩm dùng family này. Ghi capability gap
+bằng bằng chứng source, không tự cấp quyền sửa library hoặc bịa năng lực.
+Các liên kết ghi chú cũ là provenance lịch sử, không phải chỉ dẫn chạy hoặc bằng chứng sản phẩm hiện tại.

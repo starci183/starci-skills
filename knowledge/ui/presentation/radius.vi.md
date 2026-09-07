@@ -30,8 +30,8 @@ kích cỡ và không phải một variant của component.
 
 Số hiệu rule là vị trí của hàng trên ramp, tính `rounded-none` là không, và nó là một địa chỉ ổn định:
 ramp được in trọn vẹn nên các số đã công bố không bao giờ xê dịch khi thêm một bước. Một bước chỉ nhận
-số hiệu của mình, và nhận bảng case bên dưới, khi đã có hai block được uỷ quyền viết nó; bốn bước đang
-ghi `—` là những địa chỉ đã giữ chỗ, vì xuất hiện một lần là quyết định sản phẩm, chưa phải rule.
+số hiệu và bảng case qua thay đổi knowledge được chọn có evidence; bốn bước ghi `—` giữ nguyên
+địa chỉ dự phòng. Một lựa chọn product đơn lẻ chưa đủ thành case tái sử dụng.
 
 Vì các hệ số cố định và chỉ `--radius` di chuyển, một ứng dụng viết thẳng giá trị rem —
 `rounded-[1.25rem]` — đóng băng quyết định của một family vào mọi family và bỏ ramp lại phía sau.
@@ -55,10 +55,10 @@ Grammar bằng selector hay bằng class truyền vào để đổi góc của n
 ## Những class nằm ngoài thang
 
 `rounded-small`, `rounded-medium` và `rounded-large` không nằm trên thang này và cũng không phải
-utility mà app này công bố. Chúng là tên plugin Tailwind 3 của vendor, và stylesheet đã biên dịch của
-head hiện tại không phát ra quy tắc nào cho chúng cả: `rounded-` chỉ in ra `none`, `sm`, `md`, `lg`,
-`xl`, `2xl`, `3xl`, `full` và `field`, không gì khác. Một boundary viết bằng một trong ba tên ấy vì
-thế render vuông trong khi source đọc lên như thể đã chọn một góc.
+utility mà app trong snapshot công bố. Đó là tên plugin Tailwind 3 của vendor; stylesheet được ghi
+trong snapshot không phát quy tắc cho chúng: `rounded-` chỉ có `none`, `sm`, `md`, `lg`, `xl`, `2xl`,
+`3xl`, `full`, `field`. Quan sát ấy giải thích boundary vuông dù class giống tên góc; phải inspect
+stylesheet biên dịch hiện tại trước khi áp cùng chẩn đoán hôm nay.
 
 Chúng bị gỡ chứ không được dịch sang. Lý do gỡ là `off the closed scale`, và thứ thay thế là bước ramp
 mà case của boundary ấy gọi tên, không phải bước có từ ngữ tình cờ trùng khớp.
@@ -75,9 +75,9 @@ tooltip; `--starci-core-pill-radius` (`999px`) bo các hình pill. Một visual 
 token ấy thành con số của riêng nó, và đó chính là lý do một ứng dụng chép lại con số hiện tại đã đóng
 băng quyết định của một family vào mọi family.
 
-`scripts/generate-presentation-owned.mjs` chưa mang topic `RADIUS`, nên file này chưa có bảng sở hữu
-được sinh ra. Cho tới khi có, người đọc loại trừ việc viết class bằng cách tìm boundary ấy trong ba
-token ở trên.
+Token trên là tham chiếu family được giữ, không phải inventory package đang chạy. Inspect component
+đã chọn thật và giá trị token computed để chốt ownership trước viết class app. Xem
+[nguồn và bảo trì](INDEX.vi.md#nguồn-và-bảo-trì); không cần generator ngoài.
 
 ## RADIUS-2 — `rounded-sm` / `.25rem`
 

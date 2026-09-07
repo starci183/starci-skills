@@ -5,6 +5,11 @@ Tệp này trả lời một câu hỏi: cho một mẩu mã frontend, nó nằm
 Nguồn: `src/components/**` của ứng dụng tham chiếu, `src/hooks/**`, `src/modules/api/**`, `src/app/**`,
 `packages/grammar/src/**`. Các con số là số tệp tại thời điểm đọc.
 
+Phạm vi: các số đếm và ghi chú được trích là quan sát lịch sử tại commit skill
+`edf72554425f918e80c9205e9c6db10596e722f0`, không phải kiểm kê dự án hiện tại. Kiểm tra source,
+manifest/lockfile, alias và cấu hình lint/test thực tế trong repository được chọn trước khi áp dụng.
+Các link lịch sử là provenance, không phải script hay chỉ dẫn chạy.
+
 ## FE-FOLDER-1 — Thư mục theo tầng
 
 `src/components/` chứa tám thư mục tầng. Block được gom theo miền sản phẩm; page và leaf nằm phẳng.
@@ -85,13 +90,13 @@ export const authenticationPageClassName = cn(formPageClassName)
 | Case 2 | Chuỗi class trong `component.tsx` | Không bao giờ; chúng đi vào `classNames.ts` (lint `class-names-in-colocated-file`, `no-inline-class-name`) |
 | Case 3 | Thư mục `__tests__/` | 0 trong toàn bộ `src/`; spec nằm cạnh tệp của nó |
 | Case 4 | Thư mục `helpers/` hay `utils/` | 0 dưới `src/components` (lint `no-helper-folder-in-components`) |
-| Case 5 | Một hằng triển khai | Không bao giờ. `process.env.NEXT_PUBLIC_*` sống dưới `src/modules/` và được với tới qua đúng module sở hữu nó. Một thư mục component đọc thẳng biến môi trường sẽ mang theo một giá trị mặc định, nên cùng một lần đổi môi trường có thêm một nhà cho mỗi thư mục đã đọc nó. Các lần xuất hiện nằm ở [bằng chứng lượt quét presentation](../../../tests/evidence/20260903-presentation-sweep.md) |
+| Case 5 | Một hằng triển khai | Không bao giờ. `process.env.NEXT_PUBLIC_*` sống dưới `src/modules/` và được với tới qua đúng module sở hữu nó. Một thư mục component đọc thẳng biến môi trường sẽ mang theo một giá trị mặc định, nên cùng một lần đổi môi trường có thêm một nhà cho mỗi thư mục đã đọc nó. Các lần xuất hiện nằm ở [bằng chứng lượt quét presentation](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.md) |
 
 ## Câu hỏi để ngỏ — hằng tiền tệ và locale
 
 Một hằng tiền tệ hay locale không phải hằng triển khai. Bộ định dạng được dựng ngay nơi đọc locale,
 nên hằng tiền tệ nằm trong nửa nối cạnh nó, và quan sát chỉ về phía ấy chứ không về một module dùng
-chung — ghi ở [bằng chứng lượt quét presentation](../../../tests/evidence/20260903-presentation-sweep.md). Vì vậy FE-FOLDER-6 Case 5 chỉ phủ hằng triển
+chung — ghi ở [bằng chứng lượt quét presentation](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.md). Vì vậy FE-FOLDER-6 Case 5 chỉ phủ hằng triển
 khai, còn việc một hằng tiền tệ có thuộc về một module tiền riêng hay không là quyết định của chủ sở
 hữu, không phải của tệp này.
 

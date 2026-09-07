@@ -33,17 +33,16 @@ something that was looked at.
 | [UX](ux.md) | Whether a person with a task actually finished it on the running product | UX-1 to UX-12 (read by `uat.verify`) |
 | [Calibration](calibration/calibration.json) | The scale a scored lens is proved on: three anchor sheets (`calibration/anchor-low.html`, `anchor-mid.html`, `anchor-high.html`), each with the `taste` and `ux` band it is expected to land in and the one-line reason, plus the tolerance; read by TASTE-13 Case 9 | data, no rule of its own |
 
-Every topic here is self-contained. It publishes its criteria, and it closes with its own verdict
-rule: the gating set, the threshold, the verdict, and where a failure routes. There is no rule that
-collects the topics, because a rule whose whole content is pointers to other rules is a second id
-layer that adds an address without adding a decision. The one place the topics meet is the receipt:
-`## Verdict` carries one row per topic, each row copied from the topic that computed it, and one
-line saying `ship`, `fix-first` or `blocked` over those rows.
+Each topic keeps its criteria and aggregation rule. Select applicable criteria in the `.work`
+node before verification and bind assertions to actual runtime evidence. Rubric labels
+`ship`, `fix-first`, `blocked` are assessment conclusions, not node states or release authority.
+No receipt, response table, dispatcher or copied verdict is required between ops.
+Missing evidence, failing required assertions and unapproved scope cannot become `done`.
 
 One topic is retired here. `UI-1` to `UI-11` were a scorecard file that named the lenses and pointed
 at the rules that owned them; every one of them now resolves to the topic rule that survived, and
 those numbers are never reused. The mapping is recorded in
-[the consolidation evidence](../../../tests/evidence/20260903-consolidation.md).
+[the consolidation evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.md).
 
 ## Rule shape
 
@@ -68,6 +67,7 @@ as `Not this rule: <condition> is PREFIX-n`. Each file closes with a
 `## What this file does not decide` section linking its siblings and the composition knowledge that
 made the decision being tested.
 
-Component and prop names in these files resolve to `@grammar/common`. Where the published
-contract offers no owner for a required behaviour, the audit records a capability gap rather than
-approving a local substitute.
+Component/prop examples describe the documented Grammar family. Verify the selected project's
+actual installed API/source before applying them; not every product uses this family. Record
+capability gaps with source evidence, not automatic library-edit authority or invented APIs.
+Historical-note links are provenance, not executable instructions or current product evidence.

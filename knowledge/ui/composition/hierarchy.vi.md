@@ -7,6 +7,9 @@ Cấp độ được quyết từ công việc mà nội dung đang làm, không
 hơn. Cấp độ do một semantic owner công khai mang, nhờ vậy dàn bài mà trình đọc màn hình đi qua và
 dàn bài mà mắt người đọc thấy vẫn là cùng một dàn bài.
 
+Phạm vi áp dụng: ví dụ API thuộc family Grammar đã ghi nhận; đối chiếu source cài thực tế và
+đặc tả `.work` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch.
+
 ## HIERARCHY-1 — Cấp độ đến từ công việc, không đến từ vẻ ngoài
 
 Chi phối việc semantic owner nào mang một mảng nội dung.
@@ -17,7 +20,7 @@ Chi phối việc semantic owner nào mang một mảng nội dung.
 | Case 2 | Nội dung giải thích, hoặc nêu một sự kiện trung tính | `Text` ở vai trò mặc định mang nó, không gắn kèm state owner nào |
 | Case 3 | Nội dung báo một kết cục ngắn gọn có authority chống lưng | `Badge`, hoặc một state owner công khai khác cho kết cục đó, mang nó |
 | Case 4 | Nội dung báo một mức hoàn thành đã được kiểm chứng | `Progress` mang nó, với label và value cùng mô tả một phép đo đã kiểm chứng |
-| Case 5 | Có thứ trông quan trọng nhưng không khớp vai trò công khai nào | Receipt gọi tên công việc của nó trước khi gắn owner, và không utility type cục bộ nào đứng thay cho một cấp độ |
+| Case 5 | Có thứ trông quan trọng nhưng không khớp vai trò công khai nào | Đặc tả `.work` gọi tên công việc của nó trước khi gắn owner, và không utility type cục bộ nào đứng thay cho một cấp độ |
 
 Không phải rule này: cấp độ đó nhận bao nhiêu điểm nhấn thuộc ACCENT-1.
 
@@ -28,7 +31,7 @@ Chi phối số thứ được phép đặt tên cho cùng một vùng.
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
 | Case 1 | Một vùng có tên gọi cộng với phần bổ trợ, dữ kiện, trạng thái hoặc action | Đúng một anchor ngữ nghĩa mạnh nhất gọi tên công việc của vùng, qua `SectionHeader`, `Heading` hoặc một surface có nhãn |
-| Case 2 | Hai ứng viên cùng trông như tên của vùng | Hoặc receipt liệt kê hai vùng ngang hàng, mỗi vùng một anchor, hoặc một ứng viên mang cấp độ yếu hơn |
+| Case 2 | Hai ứng viên cùng trông như tên của vùng | Hoặc đặc tả `.work` liệt kê hai vùng ngang hàng, mỗi vùng một anchor, hoặc một ứng viên mang cấp độ yếu hơn |
 | Case 3 | Một trạng thái muốn to tiếng hơn thứ mà nó mô tả | Trạng thái xếp dưới cái tên mà nó bổ nghĩa |
 | Case 4 | Các vùng ngang hàng độc lập nằm cạnh nhau | Anchor của mỗi vùng được chốt trong chính vùng đó; không anchor nào so cấp với anchor của vùng khác |
 

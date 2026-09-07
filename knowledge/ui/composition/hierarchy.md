@@ -7,6 +7,9 @@ Hierarchy is decided from the job the content does, never from how prominent the
 looked. Rank is carried by a published semantic owner, so the outline a screen reader walks and the
 outline a reader sees are the same outline.
 
+Applicability: API examples belong to the documented Grammar family; verify installed source and
+the selected `.work` specification before use. Gap labels here are findings, not dispatch commands.
+
 ## HIERARCHY-1 — Rank comes from the job, not the look
 
 Governs which semantic owner carries a piece of content.
@@ -17,7 +20,7 @@ Governs which semantic owner carries a piece of content.
 | Case 2 | Content explains, or states a neutral fact | `Text` in its default role carries it, with no state owner attached |
 | Case 3 | Content reports a compact outcome backed by authority | `Badge`, or another published state owner for that outcome, carries it |
 | Case 4 | Content reports a verified numeric completion | `Progress` carries it, with a label and value that describe the same verified measurement |
-| Case 5 | Something feels important but matches no published role | The receipt names the job before any owner is bound, and no local type utility stands in for a rank |
+| Case 5 | Something feels important but matches no published role | The `.work` specification names the job before any owner is bound, and no local type utility stands in for a rank |
 
 Not this rule: how much emphasis paint that rank receives is ACCENT-1.
 
@@ -28,7 +31,7 @@ Governs how many things may name the same region.
 | Case | When | Assert |
 | --- | --- | --- |
 | Case 1 | A region carries a name plus supporting copy, facts, statuses, or actions | Exactly one strongest semantic anchor names the region's job, through `SectionHeader`, `Heading`, or a labelled surface |
-| Case 2 | Two candidates both look like the region's name | Either the receipt lists two peer regions each with its own anchor, or one candidate carries a weaker rank |
+| Case 2 | Two candidates both look like the region's name | Either the `.work` specification lists two peer regions each with its own anchor, or one candidate carries a weaker rank |
 | Case 3 | A status wants to be louder than the thing it describes | The status ranks below the name it qualifies |
 | Case 4 | Independent peer regions sit side by side | Each region's anchor is settled within that region; no anchor ranks against another region's anchor |
 

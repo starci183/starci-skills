@@ -7,6 +7,9 @@ Accent khan hiếm là do thiết kế. Mỗi treatment chủ đạo thêm vào 
 đó, nên đây là quyết định về phân bổ chứ không phải về sơn phết. Không thứ gì trong file này được
 đổi điều mà sản phẩm đang tuyên bố; accent chỉ làm cho một tuyên bố sẵn có dễ tìm hơn.
 
+Phạm vi áp dụng: ví dụ API thuộc family Grammar đã ghi nhận; đối chiếu source cài thực tế và
+đặc tả `.work` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch.
+
 ## ACCENT-1 — Một điểm nhấn quyết định chủ đạo
 
 Chi phối số treatment mạnh nhất mà một vùng quyết định được giữ.
@@ -25,7 +28,7 @@ Chi phối cái mỏ neo thị giác nhỏ giúp người đọc quét qua các 
 
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
-| Case 1 | Các tính năng, hàng hoặc section ngang hàng cần một mỏ neo gọn để quét | `IconTile tone="accent"`, hoặc `Icon` ở vai trò đã khai báo, mang nó, với glyph ngữ nghĩa đã duyệt được gọi tên trong receipt |
+| Case 1 | Các tính năng, hàng hoặc section ngang hàng cần một mỏ neo gọn để quét | `IconTile tone="accent"`, hoặc `Icon` ở vai trò đã khai báo, mang nó, với glyph ngữ nghĩa đã duyệt được gọi tên trong đặc tả `.work` |
 | Case 2 | Mỏ neo nằm cạnh một cái tên | Phần chữ nhìn thấy được ở lại, và dấu hiệu không bao giờ thay chỗ nó |
 | Case 3 | Direction muốn một plate khác cỡ hoặc khác hình | Geometry đã công bố mang nó, ở `sm` 32 hoặc `md` 40 pixel CSS danh nghĩa, và không ô bo tròn có màu nào được dựng lại quanh một icon |
 | Case 4 | Glyph sẽ là danh tính duy nhất của một tính năng xa lạ | Mọi tính năng xa lạ đều mang một cái tên; không glyph nào là danh tính duy nhất của nó |
@@ -60,7 +63,7 @@ Chi phối những treatment mà accent không được đứng thay.
 | Case | Dùng khi | Khẳng định |
 | --- | --- | --- |
 | Case 1 | Nội dung báo thành công, cảnh báo, nguy hiểm, đang chạy hoặc selection | `Badge`, một presentation-state owner, hoặc owner của trạng thái hiện hành mang nó; accent primary không mang thứ nào trong số đó |
-| Case 2 | Cần một CTA huỷ hoại cuối cùng | Trước hết cần một treatment action danger có kiểu, và chừng nào `ButtonVariant` chưa công bố giá trị danger thì receipt ghi nhận gap đó |
+| Case 2 | Cần một CTA huỷ hoại cuối cùng | Trước hết cần một treatment action danger có kiểu, và chừng nào `ButtonVariant` chưa công bố giá trị danger thì đặc tả `.work` ghi nhận gap đó |
 | Case 3 | Màu đỏ cục bộ có thể lấp gap đó ngay hôm nay | Không màu đỏ cục bộ nào và không lần sơn lại `primary` của family nào đứng cạnh action đó |
 | Case 4 | Một action primary bình thường trông có vẻ nặng hệ quả | Hệ quả và bước xác nhận được gọi tên trong quyết định sản phẩm, không suy ra từ phần nhấn mạnh |
 

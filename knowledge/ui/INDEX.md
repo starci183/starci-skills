@@ -1,102 +1,21 @@
 # UI knowledge
 
-This tree holds the universal UI law shared by every published Grammar family, split into three
-groups by the operator that reads each one.
-It owns 153 stable live X-n laws (36 in composition, 68 in presentation, 49 in proof), plus five
-composition ids that are retired into COVERAGE-1 and the eleven retired `UI-` ids that now resolve to
-the proof topic rules that survived them, none of which are ever reused, together with observable
-selection conditions, ownership decisions, deterministic verdicts, and audit vectors. It is not an implementation or consumer cookbook. It does not own business facts, page copy,
-routes, permissions, artwork identity, product effects, or family material choices.
+These topics retain observable composition, presentation and proof criteria. They do not supply product facts, route authority, permissions or a mandatory design-system package.
 
-## Runtime policy
-
-- Canonical agent/runtime knowledge is the English `.md` file only.
-- Same-stem `.vi.md` files are complete human-review mirrors. Never load, index, or cite them as runtime
-  authority.
-- Grammar operators resolve the smallest relevant canonical file and rule ID. Individual files omit
-  per-topic routing metadata.
-- Rule IDs are stable public knowledge addresses. Append the next sequential `PREFIX-n`; never
-  renumber, reuse, or silently change the meaning of an existing ID.
-- Knowledge owns invariant decisions and audit vectors, not implementation status, migration plans,
-  workflows, operator DAGs, or task orchestration. Current capability/debt belongs in plans and audits.
-
-## Grammar binding
-
-`@grammar/common` is the public authority for props, semantics, renderer anatomy, state,
-accessibility, composition, and universal implementation. A family-selected application imports
-exactly the selected family stylesheet; that stylesheet imports Common. Direct
-`@grammar/common/styles.css` consumption is reserved for intentional familyless Common usage
-and isolated test harnesses. An application must not import both paths for the same rendered tree.
-
-A visual family is a props-compatible scoped overlay declared through `defineGrammarFamily`. It may
-replace a known Common renderer with the exact compatible props or add a non-colliding extension;
-its stylesheet is scoped by `data-grammar-family`. It must preserve Common meaning, state behavior,
-accessibility, ownership, and substitutability.
-
-Business/application code selects one family and supplies domain content, data, permissions,
-handlers, and verified state. Application CSS may own page canvas, product layout/content/media, and
-placement through public extension points. It must not reach through, rebuild, or override Common-owned
-anatomy, spacing, semantics, state, focus, or variants. Family documents record overlay choices and conformance
-evidence; they never duplicate or redefine these universal laws. A missing reusable capability is a
-Common gap, not permission for product-local anatomy or a family-specific universal rule.
-
-## Groups
-
-A topic lives with the operator that reads it. A topic no operator reads has no reason to exist.
-
-| Group | Decides | Read by |
+| Group | Question | Applicable Work op |
 | --- | --- | --- |
-| [`composition/`](composition/INDEX.md) | Constraints a direction must satisfy, after taste is decided in grammars | `interface.generate` |
-| [`presentation/`](presentation/INDEX.md) | Which CSS value an app-owned boundary takes | `interface.generate` |
-| [`proof/`](proof/INDEX.md) | What only becomes true once rendered | `interface.audit`; [`proof/ux.md`](proof/ux.md) is read by `uat.verify` too, because a task run is the only instrument that answers it |
+| [Composition](composition/INDEX.md) | Regions, hierarchy, actions, states and responsive ownership | Selected interface planning/direction/implementation op |
+| [Presentation](presentation/INDEX.md) | Values and boundaries owned by the application versus its installed components | Selected interface implementation or repair op |
+| [Proof](proof/INDEX.md) | What the running surface actually shows and does | Selected interface audit or UAT op |
 
-The test that places a topic is whether reading source answers it. A spacing value is readable from a
-class, so it is presentation. The number of dominant actions is settled before any tree exists, so it
-is composition. Whether keyboard order matches visual order needs a running page, so it is proof.
+[Code patterns](../patterns/fe/INDEX.md) address source conventions; [Grammar snapshots](../grammars/INDEX.md) describe one reference family. Exact package exports and rendered behavior must be inspected in the current target, never inferred from a table here.
 
-Code conventions for the source that produces all of this live in [`patterns/`](../patterns/fe/INDEX.md).
-Family realization lives in [`grammars/`](../grammars/starci/INDEX.md).
+## Binding criteria to work
 
-## Rule binding architecture
+Select applicable stable rule IDs in the chosen `.work` node's acceptance assertions. Record expected owner, state, viewport and observable condition in that node's Markdown or namespaced extensions; record actual observations and captured assets in its evidence bundle. Use the [current metadata contract](../../v3/core/README.md) for fields and completion. A markup claim, score or copied example is not proof.
 
-Knowledge defines what a rule means; it does not hard-code which current DOM instance passes it. A
-Common reusable exposes stable component, slot, and relationship anchors. A co-located or generated
-binding registry maps those anchors to rules with at least:
+Terms such as direction, observation record and verdict in a topic denote domain decisions and findings for that selected node. They prescribe no separate response files, session ledger, automatic dispatch or extra global validator. Missing instruments or a missing installed API remain explicit limitations, not invented success.
 
-- a stable binding ID and version;
-- `ruleId`;
-- exact target slot or between-slot relationship;
-- the `when` variant, state, or composition selector;
-- the expected owner anchor.
+Where the installed stack uses the documented Common/family pattern, inspect component ownership before adding app styles. Assess the actual reusable output, family delta and application delta separately. Preserve semantic state, focus, accessibility and public props; a missing capability is a source-backed gap to report to its owner, not permission to invent a substitute API.
 
-The registry never duplicates the rule's metric or behavior. Applications do not hand-author rule
-arrays, and no markup can label itself as passing. The auditor resolves bindings from stable DOM
-anchors, collects rendered evidence, and records rule IDs and findings in the audit result. Unknown
-rule IDs, missing slots, stale anchors, and orphan bindings fail validation. DOM outside a registered
-reusable may be selected by semantic inspection, but it cannot receive `PASS` without the same owner
-and runtime evidence.
-
-A contract claim is the one exception, and it is not a self-assessment. A rule-binding operator may
-emit `data-contract` on a node it resolved, as a space-separated list of the identifiers that node
-claims to satisfy. The claim states an intention so the auditor can contradict it: a node claiming
-`GAP-4` while the computed gap is `1.5rem` is a finding, a node carrying spacing that claims nothing
-is an unowned value, and a claimed identifier absent from published knowledge fails validation. A
-claim never carries a verdict, score, or `PASS`, and a hand-written one is invalid because only the
-operator's receipt makes it verifiable. Grammar emits the same claim on the elements that realize a
-relationship it owns, the rows of each topic's "Common already owns" table, so a Grammar-internal
-value is never an unowned value and the resolver never re-claims those nodes. The receipt remains the
-durable record, so the attribute may be stripped from a production build without weakening any audit.
-
-## Canonical verdict model
-
-Base verdicts are exactly: `PASS`, `COMMON_CAPABILITY_MISSING`, `COMMON_IMPLEMENTATION_GLITCH`,
-`FAMILY_OVERRIDE_GLITCH`, `APP_REIMPLEMENTATION`, `APP_OVERRIDE`, `APP_WORKAROUND`, `PROOF_MISSING`.
-
-Cause tags are exactly: `VALUE_DRIFT`, `VENDOR_LEAK`, `WRONG_OWNER`, `OFF_SCALE_VALUE`,
-`DOUBLE_OWNER`, `PHYSICAL_SIDE_DRIFT`, `STATE_OR_VIEWPORT_DRIFT`.
-
-Evaluate capability, isolated Common output, family delta, app delta, then owner/state evidence. One
-finding contains one base verdict and zero or more cause tags. Multiple failed layers produce linked
-findings; they are not collapsed into a composite base verdict or suppressed by first-match logic.
-`PASS` is valid only when no failure finding exists.
-
+Rule IDs remain stable. A rubric applies only when selected by the accepted scope; its score and thresholds do not override business acceptance or authorize shipping, deployment, data mutation or another op. Historical observations may motivate a check but cannot establish current completion.
