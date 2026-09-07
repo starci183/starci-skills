@@ -7,20 +7,20 @@ description: Thực hiện op phát triển sản phẩm đã chọn, dùng cây
 
 Bản hướng dẫn tiếng Việt; [SKILL.md](SKILL.md) là thẩm quyền runtime.
 
-Mỗi prompt, AI tự chọn op chain từ scope sản phẩm: tối đa ba lớp tuần tự, mỗi lớp tối đa ba op đồng thời (tối đa chín invocation). Xong tập đã chọn hoặc gặp blocker thì báo kết quả rồi dừng. Không reset hạn mức bằng batch, agent, task hay subchain mới trong cùng prompt.
+Mỗi prompt, AI chọn preset trong [skills/catalog.json](skills/catalog.json), chọn mode/nhánh theo scope rồi dùng recipe cố định; không tự brainstorm workflow hoặc ghép op tùy ý. Tổng mọi skill tối đa ba lớp tuần tự, mỗi lớp tối đa ba op đồng thời (chín invocation). Không reset theo batch, agent, task, skill hoặc subchain.
 
-Mỗi prompt có thể yêu cầu một hoặc nhiều piece. Tự chọn op phù hợp từ catalogue theo kết quả mong muốn và scope `.work`; không bắt user nhớ tên op hay duyệt lại từng bước trong phạm vi. Nói gọn piece → op và các lớp chạy rồi làm theo quyền đã có. Xếp prerequisite được chọn trước consumer và kiểm chứng kết quả thật trước khi sang lớp kế; không tự thêm prerequisite ngoài scope. Thiếu quyết định nghiệp vụ quan trọng hoặc effect mới vẫn cần hỏi.
+Một prompt có thể chọn nhiều piece/skill; nói gọn piece → preset/mode/nhánh và các lớp chạy. User không cần nhớ tên op hoặc duyệt lại bước đã cho phép. Recipe là trần, không cấp quyền thêm code/account/publish/deploy ngoài yêu cầu. Giữ thứ tự từng recipe trong hạn mức chung, phần không vừa để prompt sau. Thiếu prerequisite thì dừng consumer; không có preset phù hợp thì báo gap, không tự sửa thư viện hay bịa chain. Thiếu quyết định quan trọng hoặc effect mới vẫn phải hỏi.
 
 ## Đọc đúng phần cần dùng
 
 1. Đọc [v3/README.md](v3/README.md) để biết storage, CLI và giới hạn.
-2. Tìm op trong [catalogue](v3/ops/catalog.json); đọc commonDocument và document đúng đường dẫn catalogue, không đoán tên file hoặc nạp tất cả op.
+2. Đọc catalogue skill, document và recipe của skill được chọn; rồi đọc commonDocument và document của các op được chọn trong [catalogue op](v3/ops/catalog.json). Resolve path theo catalogue. Link từ skill con về entry đã đọc không phải dispatch đệ quy.
 3. Đọc goal, node, tổ tiên áp dụng, dependency và resource trong `.work` canonical; kiểm tra source đúng repo/revision trước khi kết luận.
 4. Dùng schema và [tài liệu core](v3/core/README.md) hiện hành cho trường máy. Prose không ghi đè schema/quyền tool.
 
 ## Chọn một phần rồi dừng
 
-Mục đích mới bắt đầu bằng goal.setup: mục tiêu nghiệp vụ, phạm vi, applicability và cây ban đầu. Nó không cấp quyền code toàn cây. Review/diagnose không đồng nghĩa được sửa, deploy hoặc tạo account.
+Mục đích mới chọn starci-goal để xác định nghiệp vụ, phạm vi và cây ban đầu, không tự cấp quyền code cả cây. Nhập từ code chọn starci-migrate: hành vi quan sát không là nghiệp vụ được duyệt; lá chưa xác minh dùng suspended + suspensionReason cụ thể, không bịa completion cũ. Review/diagnose không cấp quyền sửa/deploy/account.
 
 Nêu gọn specific goal, đầu ra, phạm vi ghi và done-when. Tái dùng quyền rõ ràng đã có; chỉ hỏi quyết định thiếu hoặc quyền mới. Không cần request/response file.
 
@@ -42,4 +42,4 @@ Coordinator có thể tự giao op độc lập cho agent trong giới hạn 3×
 
 Chỉ sửa node lá/resource/evidence được giao; cha tự tổng hợp. Ghi full commit SHA và bản integrated/served phù hợp. Giữ thay đổi của người dùng, commit đúng phạm vi; không push/publish/deploy khi chưa được yêu cầu.
 
-Không tự migrate/xóa `.worktrees` hay checkout Git. Các script/routing/session/chain v2 được giữ để tham chiếu, không tham gia execution mới.
+Không tự migrate/xóa `.worktrees` hay checkout Git. V2 alias/routing/session/request-response đã bỏ khỏi package; tra lịch sử bằng Git, không fallback thực thi. Các tên cũ còn trong kiểm tra an toàn migration/installer không phải storage authority hiện hành.

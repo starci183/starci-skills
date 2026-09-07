@@ -2,7 +2,7 @@
 
 Local alpha. The executable surface is a validator and inspection CLI plus bounded agent operation contracts; it is not a scheduler, browser adapter, secret manager or deployment service.
 
-For each user prompt the agent selects suitable ops and ordering from `.work` scope, with at most three sequential waves and at most three concurrent op invocations per wave (nine total). This includes retries and all workers; no per-agent budget reset. Execute only the request-bounded set, verify prerequisites before consumers, and hand off remaining work after the third wave. This is an agent contract, not a CLI execution engine. Operator names/hops do not require repeated approval when the scope and effects are already authorized.
+For each prompt the entry selects named presets/modes from [skills/catalog.json](../skills/catalog.json) against `.work` scope. Follow their fixed recipes; never invent a workflow. Across every selected skill, retry and worker: max three sequential waves × three concurrent invocations (nine total), no reset. Execute only the request-bounded portion, verify prerequisites and hand off what remains. This is an agent contract, not a CLI engine; already-authorized steps need no repeated approval.
 
 ## Current authority
 
@@ -62,7 +62,7 @@ There is no CLI `cook`, `approve`, `done`, `spawn`, `retry`, `deploy` or `migrat
 
 ## Completion and evidence
 
-Stored leaf states are todo/doing/blocked/done/na. `suspended` is derived when relevant inputs differ from completed inputs or a completed piece loses a required prerequisite. The stored completion and old evidence remain intact; do not rewrite their digest to claim re-verification. Fail/not-run/inconclusive are observed test outcomes, not hidden passes. Optional or deferred work stays visible; required obligations cannot be quietly dropped to close a parent.
+Stored leaf states are todo/doing/blocked/done/na/suspended. Authored `suspended` requires a nonempty `suspensionReason`, useful for source imports whose intent/acceptance remains unverified; never fabricate old completion. Separately, completed work becomes effectively suspended when semantic inputs change or a prerequisite loses done. Preserve old completion/evidence; never rewrite digests to pretend re-verification. Fail/not-run/inconclusive are outcomes, not passes; optional/deferred obligations stay visible.
 
 Keep one evidence bundle for a run proving several assertions and refer to it; do not duplicate screenshots into each leaf. Retain exact required assertion IDs, original observed outcome, source/integrated code refs, actual served build identity, environment/account/fixture refs and asset hashes. Requirement expected behavior must not be rewritten to match a failing observed behavior.
 
@@ -92,12 +92,12 @@ A shared resource has one canonical owner and version. Cross-business dependenci
 
 ## Upgrade and legacy data
 
-The new entry does not load v2 automatic routing. The old scripts/contracts remain available as historical sources, not implicit fallback execution. No old accepted receipt automatically becomes a v3 completed node.
+V2 alias/routing/workflows/scripts/contracts and Lite are removed. Historical recovery uses Git, not runtime fallback. Safety tests and migration inventory may name old paths to protect product ownership, not to restore the old storage contract. No old receipt automatically becomes a V3 done node.
 
-The installer requires `--upgrade-major` to replace an installed older major. This acknowledges the entry change, not permission to migrate product data. Custom host protocol conflicts must be resolved explicitly; `--no-bootstrap` leaves routing unchanged and reports that distinction.
+Installer upgrades from older majors require `--upgrade-major`. Only unchanged manifest-owned retired runtime files are removed; modified/unowned files, product data and Git checkouts are preserved. Custom conflicts stop before writes; no-bootstrap cannot abandon an active Lite entry. Init on managed installs uses safe update semantics. This does not grant product migration authority.
 
 Before a separately authorized migration: inventory tracked/untracked/ignored files and nested Git worktrees; preserve unique commits/evidence and secret custody; assign canonical owners; map one business and verify from a clean checkout; then cut over one writer. Never delete old checkouts or artifact folders simply because their names look temporary.
 
 ## Local verification
 
-`npm test` runs v3 executable tests including negative fixtures and relocated installer checks. `doctor --quick` checks installed core/catalogue tests; full doctor adds CLI/acceptance tests. No product server, account or real browser UAT is touched by these checks. Package correctness is not product acceptance. The retained `test:legacy` command is an explicit historical diagnostic, not the default v3 release gate.
+`npm test` runs V3 executable tests and relocated installer checks. Doctor quick checks installed core/ops/presets; full adds CLI/acceptance. No product server, account or real browser UAT is touched. Package correctness is not product acceptance. No legacy test command or executable fallback is shipped.

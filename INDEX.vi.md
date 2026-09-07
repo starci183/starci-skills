@@ -1,22 +1,17 @@
-# StarCi Skills 3.0.0-alpha.1
+# StarCi Work 3.0.0-alpha.2
 
-Entry hiện hành: [SKILL.md](SKILL.md). Agent tự chọn op chain theo scope mỗi prompt: tối đa ba lớp tuần tự, mỗi lớp tối đa ba op đồng thời. Cây completion, tài nguyên và evidence thuộc sản phẩm. Không chain vô hạn hoặc request/response ledger bắt buộc.
+Đọc [SKILL.md](SKILL.md) đầy đủ: prompt → preset/mode có tên → scope → op hữu hạn → kết quả thật.
 
 ## Thứ tự đọc
 
-1. Đọc SKILL.md đầy đủ.
-2. Đọc [v3/README.md](v3/README.md) và common/document của op trong [catalogue](v3/ops/catalog.json).
-3. Resolve đúng business nodes, resources, evidence và source cần cho op.
-4. Trước khi sửa package, đọc [UPDATE.md](UPDATE.md).
+1. Skill gốc và [runtime](v3/README.vi.md).
+2. [Catalogue skill](skills/catalog.json), document và recipe cố định được chọn.
+3. [Contract op](v3/ops/catalog.json) được chọn và common policy.
+4. Node/resource/evidence/source thực tế.
+5. Sửa package thì đọc [UPDATE.md](UPDATE.md).
 
-Runtime mới ở v3/ops, v3/core, v3/schemas, v3/cli; installer ở bin/starci-skills.mjs. Cây .work thuộc sản phẩm, không nằm trong skill.
+`skills/`: 14 preset EN/VI. `v3/ops/`: 32 op chi tiết. `v3/core/`, `v3/schemas/`: validation cây/deps/digest/evidence. `v3/cli/`: tra cứu, không dispatch. `knowledge/`: chuyên môn, không routing. `bin/`: installer. `.work/` thuộc sản phẩm, ngoài skill.
 
-## Tương thích
+Mọi skill/worker/retry dùng chung tối đa 3 lớp tuần tự × 3 op đồng thời. Scope/deps thuộc sản phẩm, recipe chỉ giới hạn execution.
 
-operators/, routing.json, workflows/ và script orchestration v2 giữ làm nguồn tham khảo lịch sử, không dùng để chạy 3.0. Dữ liệu .worktrees không bị đổi; migrate cần scope riêng.
-
-npm test kiểm tra v3; test:legacy giữ suite cũ cho điều tra rõ ràng, không tuyên bố installer/entry cũ còn tương thích. Tài liệu website sinh từ v2 không phải hướng dẫn 3.0.
-
-## Phiên bản
-
-3.0.0-alpha.1: op được chọn, cây completion và quyền sở hữu evidence/resource thay chain tự động. Alpha cục bộ, chưa publish hoặc nghiệm thu sản phẩm live.
+Đã bỏ V2 alias/routing/workflows/helpers/operators/session scripts/templates/website sinh cũ và Lite. Tra lịch sử bằng Git. Guard tên cũ bảo vệ dữ liệu, không là runtime thứ hai. Alpha/test không chứng minh product UAT/publish; installer không migrate ledger hoặc xóa Git worktree.

@@ -2,7 +2,7 @@
 
 Alpha cục bộ. Runtime gồm validator/CLI tra cứu và contract op cho agent; không phải scheduler, browser adapter, secret manager hay dịch vụ deploy. [README.md](README.md) là authority.
 
-Mỗi prompt AI tự chọn op và thứ tự từ scope `.work`: tối đa ba lớp tuần tự, mỗi lớp tối đa ba invocation đồng thời (tổng chín), tính cả retry và toàn bộ worker. Không reset hạn mức theo agent/batch. Chỉ làm tập nằm trong request, kiểm chứng prerequisite trước consumer, hết lớp ba thì bàn giao phần còn lại cho prompt sau. Đây là contract agent, không phải CLI engine. Không cần duyệt lại tên op/từng bước đã nằm trong quyền hiện có.
+Mỗi prompt chọn preset/mode từ [catalogue skill](../skills/catalog.json) theo scope `.work`, dùng recipe cố định, không tự sáng tác workflow. Mọi skill/retry/worker dùng chung tối đa 3 lớp × 3 invocation đồng thời, không reset. Chỉ làm phần request cho phép, kiểm chứng prerequisite, bàn giao phần còn lại. Đây là contract agent, không phải CLI engine; không duyệt lại bước đã cho phép.
 
 ## Nguồn chuẩn và nơi lưu
 
@@ -32,7 +32,7 @@ Không có cook/approve/done/spawn/retry/deploy/migrate CLI. Agent thực hiện
 
 ## Hoàn thành và chứng cứ
 
-Lá lưu todo/doing/blocked/done/na; `suspended` được tính khi input đã đổi hoặc piece hoàn thành mất prerequisite bắt buộc. Giữ completion/evidence cũ, không đổi digest để giả đã kiểm tra lại. Fail/not-run/inconclusive không là pass. Deferred/optional vẫn hiển thị; không tự bỏ requirement bắt buộc.
+Lá lưu todo/doing/blocked/done/na/suspended. Suspended khai báo cần suspensionReason không rỗng, dùng cho import từ code chưa xác minh intent/acceptance, không bịa completion cũ. Piece đã done mà input đổi/mất prerequisite thì effective suspended; giữ completion/evidence cũ, không sửa digest để giả retest. Fail/not-run/inconclusive không là pass; deferred/optional vẫn hiển thị.
 
 Một bundle có thể chứng minh nhiều assertion, không copy ảnh khắp nơi. Giữ requirement IDs, actual outcomes, source/integrated commits, bản thực phục vụ, environment/account/fixture và asset hash. Không sửa expected theo actual lỗi.
 
@@ -54,10 +54,10 @@ Thêm mobile/security/a11y/migration/release/operations bằng cùng kiểu node
 
 Resource có một owner/version; consumer tham chiếu, không copy account/fixture. Nhiều host cần coordination/serialize; Git/file local không bảo vệ runtime khỏi race. Parallel phải được yêu cầu/duyệt và tách scope ghi, session, mutable data.
 
-Entry mới không chạy routing v2. Old scripts chỉ tham khảo, old receipt không tự trở thành done. Installer cần `--upgrade-major` cho major cũ; không đồng nghĩa quyền migrate dữ liệu sản phẩm. Bootstrap custom xung đột phải xử lý trước ghi; `--no-bootstrap` giữ entry host và nói rõ chưa đổi routing.
+Đã bỏ V2 alias/routing/workflows/scripts/contracts và Lite; tra lịch sử bằng Git, không fallback. Tên cũ trong guard/test bảo vệ ownership, không là storage contract. Receipt cũ không tự done. Upgrade-major chỉ xóa file runtime nghỉ còn nguyên có manifest ownership; giữ file sửa/unowned/dữ liệu/Git. Init bản quản lý dùng update. Bootstrap conflict dừng trước ghi; no-bootstrap không được bỏ Lite khi entry còn cần nó. Không tự cấp quyền migrate sản phẩm.
 
 Migration riêng phải inventory tracked/untracked/ignored/nested Git; giữ commit/ảnh/secret custody; map một business và thử checkout sạch; cutover một writer. Không xóa folder vì tên trông tạm.
 
 ## Kiểm tra
 
-npm test chạy fixture v3 và installer được relocate. Doctor quick chạy core/catalogue; full thêm CLI/acceptance. Không test account/server/browser sản phẩm thật. test:legacy là diagnostic lịch sử, không gate release v3 mặc định.
+npm test chạy fixture V3 và installer relocate. Doctor quick chạy core/ops/presets; full thêm CLI/acceptance. Không test account/server/browser sản phẩm thật. Không legacy test command hoặc executable fallback.

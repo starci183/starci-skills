@@ -1,18 +1,18 @@
 ---
 name: starci
-description: Map a product-development request to one or more scoped pieces and suitable operations using a business completion tree and evidence-bound results. Use for tracked business, architecture, implementation, verification, and delivery work; answer ordinary questions without creating a workflow.
+description: Route product-development requests to named StarCi preset skills and scoped business pieces, with evidence-bound results. Use for business, architecture, implementation, UAT, migration and delivery; answer read-only questions without launching a mutating recipe.
 ---
 
 # StarCi Work 3.0
 
-Use the user's current goal and authorization, not a universal pipeline. For each prompt, choose a bounded op chain from the product scope: at most three sequential execution waves, each with at most three concurrent op invocations (nine invocations maximum). Complete that selected chain or report its blockers, then stop. Do not reset the budget by opening another batch, agent, task or subchain within the same prompt.
+Use the user's current goal and authorization. Match each prompt to the named preset skills in [skills/catalog.json](skills/catalog.json), then use the selected mode's fixed recipe. Do not brainstorm a new workflow or choose arbitrary op chains. Across all selected skills: at most three sequential execution waves, each with at most three concurrent op invocations (nine invocations maximum). Complete that selected set or report its blockers, then stop. Never reset this budget by opening another batch, agent, task or subchain within the prompt.
 
-Each prompt may address one or more pieces. Match its intended result to the current `.work` scope and select the suitable catalogue op for each piece yourself; the user need not name operators or approve each in-scope hop again. Briefly state the piece-to-op mapping and waves, then proceed under existing authorization. Selection is request-bounded, not permission to finish every unchecked node or dispatch out-of-scope prerequisites. Order selected dependencies before consumers, validate their actual result before advancing, and stop the affected branch at a missing prerequisite. Unknown business decisions and new external effects still need user direction.
+Each prompt may address one or more pieces. Map intended results to current `.work` scope, preset, mode and named branches yourself; users need not name operators or approve each authorized step again. State that mapping and waves briefly. Execute only the requested portion of a recipe: its maximum sequence is not permission for extra code, accounts, publication or deployment. Multiple selected recipes share one budget, preserving each recipe's ordering; defer what does not fit. Missing prerequisites stop their consumers. If no preset fits, report the coverage gap without inventing ops or changing this library implicitly. Unknown business decisions and new external effects still need user direction.
 
 ## Load only what this operation needs
 
 1. Read [v3/README.md](v3/README.md) for supported storage, CLI and evidence limits.
-2. Resolve the selected operation in [v3/ops/catalog.json](v3/ops/catalog.json). Read its `commonDocument` and its exact `document`, relative to that catalogue. Do not guess an operation path or load all operations.
+2. Read the skill catalogue and selected skill's `document` and `recipe`. Read each selected operation from [v3/ops/catalog.json](v3/ops/catalog.json), including `commonDocument` and exact `document`. Paths resolve relative to their catalogue. Do not load all skills/ops. A preset's link back to this already-read entry is context, not recursive dispatch.
 3. Read the canonical business goal, selected node, applicable ancestors, dependencies and resource references in the product-owned `.work`. Inspect source at the bound repository/revision before making source claims.
 4. Use the current core schemas and [core documentation](v3/core/README.md) for machine fields. Operator prose cannot override a schema or tool permission.
 
@@ -20,7 +20,7 @@ English contracts are runtime authority; same-stem Vietnamese files are human mi
 
 ## Choose and stop
 
-For a new product purpose, use `goal.setup` to establish the business goal, scope, applicability and initial completion tree. This does not authorize implementation of the whole tree. A question, review or diagnosis does not authorize fixes, deployment or account changes.
+For a new product purpose, select `starci-goal`; its setup establishes business purpose and initial scope without authorizing implementation of the whole tree. For code-to-Work adoption, select `starci-migrate`: source facts are observations, not approved intent. Imported unverified leaves can be authored `suspended` with a concrete `suspensionReason`, never fake old completion. A question, review or diagnosis does not authorize fixes, deployment or account changes.
 
 State the selected specific goal, expected result, write boundary and done-when compactly. Reuse explicit user authorization already covering them. Ask only for a missing decision or materially new authority. Keep this exchange in the task; no strict request/response files.
 
@@ -46,4 +46,4 @@ Each worker reads its own operation contract and evidence; ordinary messages are
 
 Update only owned leaf files/resources/evidence. Parents derive completion. Record full code commit SHAs per piece and the actual integrated/served identity where relevant. Preserve user changes and keep commits scoped; do not push, publish or deploy unless requested.
 
-Product `.work` is not a Git checkout container. Existing `.worktrees` data and actual Git worktrees are never automatically deleted or migrated. New execution must not enter the retained v2 `routing.json`, session-open, plan-chain, bank or attempt/request/response loop.
+Product `.work` is not a Git checkout container. Existing `.worktrees` data and actual Git worktrees are never automatically deleted or migrated. The V2 alias, routing, session and request/response runtime is removed from this package. Historical recovery is through Git, not an executable fallback. Migration/installer safety recognition of old names is not current storage authority.

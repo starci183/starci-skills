@@ -1,7 +1,7 @@
 {
   "name": "@starci/skills",
-  "version": "3.0.0-alpha.1",
-  "description": "StarCi Work: scope-selected op chains capped at three sequential waves and three concurrent ops per wave, with business completion and evidence binding.",
+  "version": "3.0.0-alpha.2",
+  "description": "StarCi Work: prompt-to-skill presets, bounded 3x3 operations, business completion trees and evidence-bound dependencies.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -19,38 +19,16 @@
     "INDEX.vi.md",
     "SKILL.md",
     "SKILL.vi.md",
-    "routing.json",
-    "alias/",
-    "helpers/",
     "knowledge/",
-    "operators/",
-    "readiness/",
-    "resources/",
-    "scripts/",
-    "templates/",
-    "tests/evidence/20260906-workflow-topologies-public.md",
-    "tests/evidence/20260906-runtime-bootstrap-preflight.md",
-    "tests/evidence/20260906-replan-segment-validation.md",
-    "workflows/",
     "README.md",
     "README.vi.md",
-    "tests/evidence/20260906-goal-impact-workflow-owner.md",
-    "skills/starci-lite/",
-    "tests/evidence/20260906-current-public-workflows.md",
-    "tests/evidence/20260906-starci-lite-profile.md",
-    "tests/evidence/20260906-dynamic-coordination.md",
-    "tests/evidence/20260906-source-proof-review-reentry.md",
-    "tests/evidence/20260907-unit-successor-reentry.md",
-    "tests/evidence/20260907-goal-presentation-and-prior-waits.md",
-    "tests/evidence/20260907-source-critique-and-early-admission.md",
-    "tests/evidence/20260907-business-promise-revision.md",
-    "tests/evidence/20260907-delegated-restatement-review.md"
+    "skills/"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/starci183/starci-skills.git"
   },
-  "homepage": "https://harness.starci.org",
+  "homepage": "https://github.com/starci183/starci-skills#readme",
   "keywords": [
     "claude-code",
     "codex",
@@ -64,9 +42,6 @@
   "scripts": {
     "test": "node --test v3/*.spec.mjs",
     "test:v3": "node --test v3/*.spec.mjs",
-    "test:legacy": "node scripts/validate-routing.mjs && node scripts/validate-resources.mjs && node scripts/validate-knowledge-citations.mjs && node scripts/validate-alias.mjs && node scripts/generate-alias-doc.mjs --check && node scripts/validate-operator.mjs && node scripts/validate-helper.mjs && node scripts/validate-defaults.mjs && node scripts/generate-operators-index.mjs --check && node scripts/generate-operator-briefs.mjs --check && node scripts/generate-helpers-index.mjs --check && node scripts/generate-helper-briefs.mjs --check && node scripts/validate-templates.mjs && node scripts/run-operator-self-tests.mjs && node --test scripts/*.spec.mjs && npm run docs:check",
-    "work": "node v3/cli/main.mjs",
-    "docs:check": "node docs/scripts/generate-docs.mjs --check",
-    "sweep:presentation": "node scripts/sweep-presentation.mjs"
+    "work": "node v3/cli/main.mjs"
   }
 }

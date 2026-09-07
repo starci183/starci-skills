@@ -12,7 +12,7 @@
 // .claude it did not install unless --force; update keeps a file a person changed locally unless
 // --force; neither ever runs a git command.
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
@@ -39,11 +39,17 @@ For product development work, enter [StarCi](.claude/INDEX.md) and select the bo
 covered by the user's request. Track current product completion in .work; stop after the selected
 operation or explicitly approved parallel group. Questions do not require a work ledger.
 <!-- /starci:prompt-entry -->`;
-const PROMPT_ENTRY = `${ENTRY_MARKER}
+const CAPPED_V3_PROMPT_ENTRY = `${ENTRY_MARKER}
 For product development work, enter [StarCi](.claude/INDEX.md) and select a bounded op chain
 from the user's scope: at most three sequential waves, each with at most three concurrent ops.
 Track current product completion in .work; hand off remaining work when the prompt budget ends.
 Questions do not require a work ledger.
+<!-- /starci:prompt-entry -->`;
+const PROMPT_ENTRY = `${ENTRY_MARKER}
+For product development, enter [StarCi](.claude/INDEX.md), match the prompt to a named preset skill,
+and use its fixed bounded op chain. Across the prompt: at most three sequential waves and three
+concurrent ops per wave. Track selected scope and evidence in .work; do not invent workflows.
+Questions need no work ledger. Hand off work outside the selected scope or remaining budget.
 <!-- /starci:prompt-entry -->`;
 
 const BOOTSTRAP = `# StarCi agent bootstrap
@@ -78,19 +84,10 @@ const LITE_BOOTSTRAP = BOOTSTRAP.replace(PROMPT_ENTRY, LITE_ENTRY)
   .replace('Read [\`<Source>/.claude/INDEX.md\`](.claude/INDEX.md) completely and follow its load order.',
     'Read [StarCi Lite](.claude/skills/starci-lite/SKILL.md) first; it routes complex work to the full entry.');
 function selectedProfile(opts, manifest) {
-  const profile = opts.profile ?? manifest?.profile ?? 'full';
-  if (!['full', 'lite'].includes(profile)) throw new Error('profile must be full or lite');
-  return profile;
+  if (opts.profile !== undefined && opts.profile !== 'full') throw new Error('starci-lite is retired; use the full prompt-to-skill entry');
+  if (manifest?.profile === 'lite' && opts.bootstrap === false) throw new Error('retired Lite bootstrap must be migrated before removing its installed skill; omit --no-bootstrap and review host instructions');
+  return 'full';
 }
-
-// The validators the tree ships, in the order npm test runs them. --quick keeps the three that
-// finish in seconds; the full doctor also runs the operator self-tests and the script specs.
-const DOCTOR_QUICK = ['validate-routing.mjs', 'validate-alias.mjs', 'validate-operator.mjs'];
-const DOCTOR_FULL = [
-  'validate-routing.mjs', 'validate-resources.mjs', 'validate-knowledge-citations.mjs', 'validate-alias.mjs',
-  ['generate-alias-doc.mjs', '--check'], 'validate-operator.mjs', 'validate-helper.mjs', 'validate-defaults.mjs',
-  ['generate-operators-index.mjs', '--check'], ['generate-helpers-index.mjs', '--check'], 'validate-templates.mjs', 'run-operator-self-tests.mjs',
-];
 
 function parseArgs(argv) {
   const out = { command: argv[0] ?? 'help', dir: process.cwd(), force: false, quick: false, bootstrap: true, upgradeMajor: false };
@@ -107,8 +104,8 @@ function parseArgs(argv) {
     else if (a === '-h' || a === '--help') out.command = 'help';
     else throw new Error(`unknown argument ${a}`);
   }
-  if (out.profile !== undefined && !['full', 'lite'].includes(out.profile)) throw new Error('profile must be full or lite');
-  if (argv.includes('--profile') && out.profile === undefined) throw new Error('--profile requires full or lite');
+  if (out.profile !== undefined && out.profile !== 'full') throw new Error('only the full prompt-to-skill entry is supported; Lite is retired');
+  if (argv.includes('--profile') && out.profile === undefined) throw new Error('--profile requires full');
   return out;
 }
 
@@ -140,12 +137,15 @@ function writeManifest(target, kept = [], profile = 'full', bootstrapProfile = n
 }
 
 function copyPayload(target) {
-  for (const p of PAYLOAD) {
-    const from = path.join(packageRoot, p);
-    const to = path.join(target, p);
-    if (!existsSync(from)) throw new Error(`package is incomplete: ${p} is missing`);
-    if (statSync(from).isDirectory()) { rmSync(to, { recursive: true, force: true }); cpSync(from, to, { recursive: true }); }
-    else { mkdirSync(path.dirname(to), { recursive: true }); cpSync(from, to); }
+  for (const relative of PAYLOAD) {
+    if (!existsSync(path.join(packageRoot, relative))) throw new Error(`package is incomplete: ${relative} is missing`);
+  }
+  // Copy declared files, never recursively replace user-populated directories.
+  // Obsolete files are handled only by the separately ownership-checked retirement plan.
+  for (const relative of payloadFiles(packageRoot)) {
+    const to = path.join(target, relative);
+    mkdirSync(path.dirname(to), { recursive: true });
+    cpSync(path.join(packageRoot, relative), to);
   }
 }
 
@@ -166,38 +166,34 @@ function bootstrapPlan(repo, profile) {
     const stat = lstatSync(path.join(repo, name), { throwIfNoEntry: false });
     if (stat && (!stat.isFile() || stat.isSymbolicLink())) throw new Error(name + ': bootstrap target must be a regular owned file, not a symlink/junction');
   }
-  const entry = profile === 'lite' ? LITE_ENTRY : PROMPT_ENTRY;
-  const bootstrap = profile === 'lite' ? LITE_BOOTSTRAP : BOOTSTRAP;
+  const entry = PROMPT_ENTRY;
+  const bootstrap = BOOTSTRAP;
   return ['CLAUDE.md', 'AGENTS.md'].map(name => {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
     const current = readFileSync(file, 'utf8');
-    const customProtocol = [PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
+    const customProtocol = [PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
     if (/session-open\.mjs|plan-chain\.mjs|validated request\.json|Nothing is designed, written or committed outside a session/.test(customProtocol)) {
       throw new Error(name + ': custom v2 session/chain protocol conflicts with v3; reconcile it or use --no-bootstrap before changing payload');
     }
     const legacyBootstrap = BOOTSTRAP.replace(PROMPT_ENTRY, LEGACY_PROMPT_ENTRY);
     const legacyLiteBootstrap = LITE_BOOTSTRAP.replace(LITE_ENTRY, LEGACY_LITE_ENTRY);
-    for (const known of [BOOTSTRAP, LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
+    for (const known of [BOOTSTRAP, LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
       const normalized = current.replace(/\r\n/g, '\n'), authored = known.replace(/\r\n/g, '\n');
       if (normalized.startsWith(authored)) {
         let end = 0, count = 0;
         while (count < authored.length) { if (!(current[end] === '\r' && current[end + 1] === '\n')) count++; end++; }
         const suffix = current.slice(end);
-        if (profile === 'lite' && suffix.includes('.claude/INDEX.md')) throw new Error(name + ': custom suffix still names the full entry; Lite cannot replace that instruction');
         return { name, file, text: bootstrap + suffix, action: 'updated' };
       }
     }
-    const managed = [PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
+    const managed = [PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
     if (managed) {
-      const outside = current.replace(managed, '');
-      if (profile === 'lite' && outside.includes('.claude/INDEX.md')) throw new Error(name + ': custom instructions still name the full entry; preserve them and resolve the profile explicitly before Lite bootstrap changes');
       return { name, file, text: current.replace(managed, entry), action: 'updated' };
     }
     if (current.includes(ENTRY_MARKER)) {
       throw new Error(name + ': custom StarCi entry needs explicit reconciliation; refusing a mixed v2/v3 bootstrap before payload writes');
     }
-    if (profile === 'lite' && current.includes('.claude/INDEX.md')) throw new Error(name + ': custom instructions still name the full entry; preserve them and resolve the profile explicitly before Lite bootstrap changes');
     return { name, file, text: current + (current.endsWith('\n') ? '\n' : '\n\n') + entry + '\n', action: 'updated' };
   });
 }
@@ -214,62 +210,148 @@ function writeBootstraps(repo, log, plan) {
   }
 }
 
+// Even --no-bootstrap must not leave host instructions pointing at removed runtime files.
+function checkRetiredHostReferences(repo, plan) {
+  for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+    const file = path.join(repo, name);
+    const stat = lstatSync(file, { throwIfNoEntry: false });
+    if (stat && (!stat.isFile() || stat.isSymbolicLink())) throw new Error(name + ': host instructions must be a regular file before runtime retirement');
+    const text = plan?.find(item => item.name === name)?.text ?? (stat ? readFileSync(file, 'utf8') : '');
+    if (/\.claude\/(?:skills\/starci-lite\/|alias\/|routing\.json|operators\/|workflows\/|scripts\/)|session-open\.mjs|plan-chain\.mjs|validated request\.json/.test(text)) {
+      throw new Error(name + ': host instructions still require retired runtime paths; reconcile routing before payload cleanup');
+    }
+  }
+}
+
 function checkMajorUpgrade(manifest, opts) {
   if (manifest && Number(manifest.version.split('.')[0]) < Number(pkg.version.split('.')[0]) && !opts.upgradeMajor) {
     throw new Error('major workflow upgrade requires --upgrade-major after reviewing v3/README.md; existing .worktrees data is not migrated or deleted');
   }
 }
 
+// Upgrade ownership only: these names are not executable legacy routing.
+const RETIRED_ROOTS = new Set(['alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'tests', 'workflows', 'docs', 'sites', 'v3', 'skills', 'bin']);
+function retirementPlan(target, manifest) {
+  const current = new Set(payloadFiles(packageRoot));
+  const remove = [], preserved = [];
+  for (const [relative, originalHash] of Object.entries(manifest?.files ?? {})) {
+    if (typeof relative !== 'string' || relative.includes('\\') || relative.includes(':') || path.isAbsolute(relative) || relative.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('invalid installed manifest path; refusing cleanup before writes');
+    if (current.has(relative)) continue;
+    const allowed = relative === 'routing.json' || relative.startsWith('skills/starci-lite/') || RETIRED_ROOTS.has(relative.split('/')[0]);
+    if (!allowed || relative === 'resources/settings.json' || relative.split('/').some(part => ['.git', '.work', '.worktrees', 'worktrees', '_local'].includes(part))) { preserved.push(relative); continue; }
+    let cursor = target, missing = false;
+    for (const part of relative.split('/')) {
+      cursor = path.join(cursor, part);
+      const stat = lstatSync(cursor, { throwIfNoEntry: false });
+      if (!stat) { missing = true; break; }
+      if (stat.isSymbolicLink()) throw new Error('retired manifest path uses a symlink/junction; refusing cleanup before writes');
+    }
+    if (missing) continue;
+    if (!statSync(cursor).isFile()) throw new Error('retired manifest entry must name an owned file, not a directory');
+    if (manifest?.keptLocal?.includes(relative) || sha(cursor) !== originalHash) preserved.push(relative);
+    else remove.push({ relative, file: cursor, hash: originalHash });
+  }
+  // Report remaining old/unowned paths without reading their content or following links.
+  const removedNames = new Set(remove.map(item => item.relative));
+  const inspect = relative => {
+    const stat = lstatSync(path.join(target, relative), { throwIfNoEntry: false });
+    if (!stat) return;
+    if (stat.isSymbolicLink() || relative === 'resources/settings.json' || relative.split('/').some(part => ['.git', '.work', '.worktrees', 'worktrees', '_local'].includes(part))) {
+      preserved.push(relative);
+      return;
+    }
+    if (stat.isDirectory()) {
+      for (const name of readdirSync(path.join(target, relative))) inspect(relative + '/' + name);
+    } else if (!current.has(relative) && !removedNames.has(relative)) preserved.push(relative);
+  };
+  for (const relative of RETIRED_ROOTS) inspect(relative);
+  return { remove, preserved: [...new Set(preserved)] };
+}
+function retireOwnedFiles(target, plan) {
+  const removed = [], preserved = [...plan.preserved];
+  for (const item of plan.remove) {
+    let cursor = target;
+    for (const part of item.relative.split('/')) {
+      cursor = path.join(cursor, part);
+      if (lstatSync(cursor, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('retired target changed to a symlink/junction after planning; stopped cleanup');
+    }
+    const stat = lstatSync(item.file, { throwIfNoEntry: false });
+    // Current payload replacement may already have removed an obsolete nested file.
+    if (stat) {
+      if (stat.isSymbolicLink() || !stat.isFile() || sha(item.file) !== item.hash) { preserved.push(item.relative); continue; }
+      rmSync(item.file);
+    }
+    removed.push(item.relative);
+    let directory = path.dirname(item.file);
+    while (directory !== target && path.relative(target, directory) && !path.relative(target, directory).startsWith('..')) {
+      try { rmdirSync(directory); } catch { break; }
+      directory = path.dirname(directory);
+    }
+  }
+  return { removedRetired: removed, preservedRetired: [...new Set(preserved)] };
+}
+
 export function init(opts, log = console.log) {
-  const repo = opts.dir;
+  const repo = path.resolve(opts.dir);
   const target = path.join(repo, '.claude');
   if (!existsSync(repo)) throw new Error(`${repo} does not exist`);
   safePayloadTarget(target);
   const manifest = readManifest(target);
+  if (manifest) return update({ ...opts, dir: repo }, log);
   checkMajorUpgrade(manifest, opts);
   const profile = selectedProfile(opts, manifest);
   const hostPlan = opts.bootstrap ? bootstrapPlan(repo, profile) : null;
+  checkRetiredHostReferences(repo, hostPlan);
+  const retirement = retirementPlan(target, manifest);
   if (existsSync(target) && readdirSync(target).length && !manifest && !opts.force) {
     throw new Error(`${target} exists and was not installed by ${pkg.name}; move it away or pass --force to replace the runtime paths inside it`);
   }
-  if (manifest) log(`re-installing over ${manifest.name}@${manifest.version} (use "update" to keep local changes)`);
   mkdirSync(target, { recursive: true });
   copyPayload(target);
+  const retired = retireOwnedFiles(target, retirement);
   const written = writeManifest(target, [], profile, hostPlan ? profile : manifest?.bootstrapProfile ?? null);
   log(`installed ${pkg.name}@${pkg.version} into ${target} (${Object.keys(written.files).length} files)`);
   if (hostPlan) writeBootstraps(repo, log, hostPlan);
   log('installed profile: ' + profile + (hostPlan ? '; bootstrap updated' : '; host bootstrap unchanged'));
-  return written;
+  if (retired.removedRetired.length) log(`removed ${retired.removedRetired.length} unchanged retired runtime file(s); recover from the prior package/Git revision`);
+  for (const relative of retired.preservedRetired) log(`preserved retired/unowned ${relative}; review ownership before any manual cleanup`);
+  return { ...written, ...retired };
 }
 
 export function update(opts, log = console.log) {
-  const target = path.join(opts.dir, '.claude');
+  const target = path.resolve(opts.dir, '.claude');
   safePayloadTarget(target);
   const manifest = readManifest(target);
   if (!manifest) throw new Error(`${target} has no ${MANIFEST}; run init first`);
   checkMajorUpgrade(manifest, opts);
   const profile = selectedProfile(opts, manifest);
   const hostPlan = opts.bootstrap !== false ? bootstrapPlan(opts.dir, profile) : null;
+  checkRetiredHostReferences(opts.dir, hostPlan);
+  const retirement = retirementPlan(target, manifest);
   const before = hashTree(target);
   const locallyChanged = Object.entries(before).filter(([rel, h]) => manifest.files[rel] && manifest.files[rel] !== h).map(([rel]) => rel);
   const locallyAdded = Object.keys(before).filter((rel) => !manifest.files[rel]);
-  const saved = Object.fromEntries([...locallyChanged, ...locallyAdded].map((rel) => [rel, readFileSync(path.join(target, rel))]));
+  const previouslyKept = (manifest.keptLocal ?? []).filter(rel => Object.hasOwn(before, rel));
+  const saved = Object.fromEntries([...new Set([...locallyChanged, ...locallyAdded, ...previouslyKept])].map((rel) => [rel, readFileSync(path.join(target, rel))]));
   copyPayload(target);
+  const currentFiles = new Set(payloadFiles(packageRoot));
   const kept = [];
-  if (!opts.force) {
-    for (const [rel, bytes] of Object.entries(saved)) {
-      const file = path.join(target, rel);
-      mkdirSync(path.dirname(file), { recursive: true });
-      writeFileSync(file, bytes);
-      kept.push(rel);
-    }
+  for (const [rel, bytes] of Object.entries(saved)) {
+    if (opts.force && currentFiles.has(rel)) continue;
+    const file = path.join(target, rel);
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, bytes);
+    kept.push(rel);
   }
+  const retired = retireOwnedFiles(target, retirement);
   const written = writeManifest(target, kept, profile, hostPlan ? profile : manifest.bootstrapProfile ?? null);
   log(`updated ${manifest.name}@${manifest.version} -> ${pkg.name}@${pkg.version} in ${target}`);
   for (const rel of kept) log(`kept ${rel} (changed locally; pass --force to take the package version)`);
-  if (opts.force && (locallyChanged.length || locallyAdded.length)) log(`replaced ${locallyChanged.length + locallyAdded.length} locally changed file(s)`);
+  if (opts.force) log(`replaced ${Object.keys(saved).filter(rel => currentFiles.has(rel)).length} local current-payload file(s); unowned and modified retired files retained`);
   if (hostPlan) writeBootstraps(opts.dir, log, hostPlan);
-  return written;
+  if (retired.removedRetired.length) log(`removed ${retired.removedRetired.length} unchanged retired runtime file(s); recover from the prior package/Git revision`);
+  for (const relative of retired.preservedRetired) log(`preserved retired/unowned ${relative}; review ownership before any manual cleanup`);
+  return { ...written, ...retired };
 }
 
 export function doctor(opts, log = console.log) {
@@ -279,7 +361,7 @@ export function doctor(opts, log = console.log) {
     throw new Error('installed v3 runtime is incomplete: missing v3/cli/main.mjs; refusing fallback to legacy validation');
   }
   if (existsSync(path.join(target, 'v3', 'cli', 'main.mjs'))) {
-    const tests = opts.quick ? ['ops.spec.mjs', 'core.spec.mjs'] : ['ops.spec.mjs', 'core.spec.mjs', 'cli.spec.mjs', 'acceptance.spec.mjs'];
+    const tests = opts.quick ? ['ops.spec.mjs', 'core.spec.mjs', 'preset-skills.spec.mjs'] : ['ops.spec.mjs', 'core.spec.mjs', 'preset-skills.spec.mjs', 'cli.spec.mjs', 'acceptance.spec.mjs'];
     const manifest = readManifest(target);
     if (manifest) {
       const drift = Object.entries(manifest.files).filter(([rel, hash]) => !existsSync(path.join(target, rel)) || sha(path.join(target, rel)) !== hash);
@@ -302,35 +384,13 @@ export function doctor(opts, log = console.log) {
     log(failed ? `doctor: ${failed} v3 check(s) failed` : 'doctor: v3 local contracts/tests passed; no product or deployment acceptance implied');
     return failed;
   }
-  if (!existsSync(path.join(target, 'scripts'))) throw new Error(`${target} has no scripts/; run init first`);
-  const manifest = readManifest(target);
-  if (manifest) {
-    const drift = Object.entries(hashTree(target)).filter(([rel, h]) => manifest.files[rel] && manifest.files[rel] !== h).map(([rel]) => rel);
-    log(`${manifest.name}@${manifest.version}; ${drift.length} file(s) changed since install${drift.length ? `: ${drift.join(', ')}` : ''}`);
-  } else log(`no ${MANIFEST}: validating an unmanaged tree`);
-  const steps = opts.quick ? DOCTOR_QUICK : DOCTOR_FULL;
-  let failed = 0;
-  for (const step of steps) {
-    const [script, ...args] = Array.isArray(step) ? step : [step];
-    const r = spawnSync(process.execPath, [path.join(target, 'scripts', script), ...args], { cwd: target, encoding: 'utf8' });
-    const ok = r.status === 0;
-    if (!ok) failed += 1;
-    log(`${ok ? 'ok  ' : 'FAIL'} ${script}${args.length ? ` ${args.join(' ')}` : ''}${ok ? '' : `\n${(r.stdout + r.stderr).trim()}`}`);
-  }
-  if (!opts.quick) {
-    const specs = readdirSync(path.join(target, 'scripts')).filter((f) => f.endsWith('.spec.mjs')).map((f) => path.join(target, 'scripts', f));
-    const r = spawnSync(process.execPath, ['--test', ...specs], { cwd: target, encoding: 'utf8' });
-    if (r.status !== 0) failed += 1;
-    log(`${r.status === 0 ? 'ok  ' : 'FAIL'} node --test scripts/*.spec.mjs (${specs.length} files)${r.status === 0 ? '' : `\n${(r.stdout + r.stderr).trim().split('\n').slice(-30).join('\n')}`}`);
-  }
-  log(failed ? `doctor: ${failed} check(s) failed` : 'doctor: the installed tree validates');
-  return failed;
+  throw new Error('No current v3 runtime is installed; legacy validators are removed. Install or upgrade the skills first.');
 }
 
 const HELP = `${pkg.name} ${pkg.version}
 
-  npx ${pkg.name} init   [--dir <repo>] [--profile full|lite] [--force] [--no-bootstrap]
-  npx ${pkg.name} update [--dir <repo>] [--profile full|lite] [--force]
+  npx ${pkg.name} init   [--dir <repo>] [--force] [--no-bootstrap]
+  npx ${pkg.name} update [--dir <repo>] [--force] [--upgrade-major]
   npx ${pkg.name} doctor [--dir <repo>] [--quick]
   npx ${pkg.name} version
   npx ${pkg.name} work <command> [arguments]
@@ -338,14 +398,13 @@ const HELP = `${pkg.name} ${pkg.version}
 init    copies the runtime into <repo>/.claude, adds the StarCi entry once to CLAUDE.md and AGENTS.md
         while preserving custom instructions, and adds only .work/_local/ to .gitignore.
         Refuses a .claude it did not install unless --force; --no-bootstrap keeps host files unchanged.
-update  replaces the runtime paths with this version; a file changed locally is kept and listed
-        (resources/settings.json is the person's own and is never part of the package)
-        unless --force. Files outside the runtime paths are never touched.
+update  replaces current runtime paths; locally changed current files are kept unless --force.
+        Retired manifest-owned unchanged files are removed; changed or unowned files are preserved.
+        Personal settings, product .work/.worktrees and Git metadata are never cleanup targets.
         A major upgrade requires --upgrade-major; no existing .worktrees data is migrated/deleted.
-profile full is the default. Lite is an explicit separate entry for bounded work; all full operators
-        remain installed. Update retains the installed profile unless --profile explicitly changes it.
-        Custom host rules are preserved; --no-bootstrap leaves their entry routing under your control.
-        Existing v2 ledgers are retained; v3 does not resume or convert their orchestration.
+entry   one full prompt-to-skill router; Lite is removed. Known old bootstraps can be migrated safely.
+        Custom host rules are preserved; unresolved conflicts stop the update before writes.
+        Existing product ledgers are retained; installing skills does not migrate them.
 doctor  runs v3 local contract tests on the installed copy and reports local drift.
 work    runs the bounded .work CLI; use "work help". Never dispatches product operations.
 `;

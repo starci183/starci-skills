@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
@@ -75,7 +76,7 @@ test('major upgrade requires opt-in before writing and never converts existing w
   assert.equal(fs.readFileSync(manifestPath, 'utf8'), before);
   assert.equal(read(root, 'AGENTS.md'), bootstrap);
   const result = update({ dir: root, upgradeMajor: true }, quiet);
-  assert.equal(result.version, '3.0.0-alpha.1');
+  assert.equal(result.version, JSON.parse(read(packageRoot, 'package.json')).version);
   assert.equal(read(root, '.work/business/node.md'), 'User-owned current specification; do not convert.');
   assert.equal(read(root, '.worktrees/uat/evidence.txt'), 'Historical unverified evidence.');
 });
@@ -135,8 +136,8 @@ test('no-bootstrap does not claim changed host routing and local skill edits rem
   const before = read(root, 'AGENTS.md');
   const source = read(root, '.claude/SKILL.md');
   put(root, '.claude/SKILL.md', source + '\nLocal reviewed policy.\n');
-  const result = update({ dir: root, profile: 'lite', bootstrap: false }, quiet);
-  assert.equal(result.profile, 'lite');
+  const result = update({ dir: root, profile: 'full', bootstrap: false }, quiet);
+  assert.equal(result.profile, 'full');
   assert.equal(result.bootstrapProfile, 'full');
   assert.ok(result.keptLocal.includes('SKILL.md'));
   assert.equal(read(root, 'AGENTS.md'), before);
@@ -186,6 +187,22 @@ test('public runtime Markdown links resolve within the shipped payload', () => {
   }
 });
 
+test('retained domain knowledge links resolve without the retired orchestration tree', () => {
+  const visit = directory => fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const file = path.join(directory, entry.name);
+    return entry.isDirectory() ? visit(file) : entry.name.endsWith('.md') ? [file] : [];
+  });
+  for (const file of visit(path.join(packageRoot, 'knowledge'))) {
+    for (const [, ref] of fs.readFileSync(file, 'utf8').matchAll(/\]\(([^)]+)\)/g)) {
+      const reference = ref.split('#')[0];
+      if (!reference || /^[a-z]+:/i.test(reference)) continue;
+      const destination = path.resolve(path.dirname(file), reference);
+      assert.ok(!path.relative(packageRoot, destination).startsWith('..'), 'knowledge reference remains package-local');
+      assert.ok(fs.existsSync(destination), `${path.relative(packageRoot, file)}: ${reference}`);
+    }
+  }
+});
+
 test('doctor cannot downgrade an incomplete v3 installation into legacy success', t => {
   const root = host(t);
   init({ dir: root, bootstrap: false }, quiet);
@@ -200,6 +217,122 @@ test('doctor rejects an all-skipped runner even when its process exits successfu
   const output = [];
   assert.equal(doctor({ dir: root, quick: true }, value => output.push(value)), 1, output.join('\n'));
   assert.ok(output.some(line => line.startsWith('FAIL v3/ops.spec.mjs:')), output.join('\n'));
+});
+
+function ownRetired(root, relative, text, kept = false) {
+  put(root, '.claude/' + relative, text);
+  const file = path.join(root, '.claude/.starci-skills.json');
+  const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+  manifest.files[relative] = createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex');
+  if (kept) manifest.keptLocal = [...(manifest.keptLocal ?? []), relative];
+  fs.writeFileSync(file, JSON.stringify(manifest));
+}
+
+test('retirement removes only unchanged owned files and keeps data through repeated forced updates', t => {
+  const root = host(t);
+  init({ dir: root, bootstrap: true }, quiet);
+  ownRetired(root, 'alias/alias.json', '{"oldAuthority":"worktrees"}');
+  ownRetired(root, 'workflows/old.md', 'owned old workflow');
+  ownRetired(root, 'v3/ops/compatibility.md', 'old compatibility routing');
+  ownRetired(root, 'skills/starci-lite/SKILL.md', 'owned lite');
+  ownRetired(root, 'skills/starci-lite/local.md', 'previously preserved', true);
+  ownRetired(root, 'knowledge/findings/local.jsonl', 'old record');
+  put(root, '.claude/knowledge/findings/local.jsonl', 'user changed record');
+  ownRetired(root, 'resources/settings.json', 'personal settings');
+  ownRetired(root, '.work/keep.md', 'protected product');
+  put(root, '.claude/workflows/unowned.md', 'unowned workflow');
+  put(root, '.claude/skills/local-skill/SKILL.md', 'unowned local skill');
+  put(root, '.worktrees/uat/keep.txt', 'product evidence');
+  const result = update({ dir: root, force: true }, quiet);
+  assert.ok(result.preservedRetired.includes('workflows/unowned.md'));
+  assert.deepEqual(result.removedRetired.sort(), ['alias/alias.json', 'skills/starci-lite/SKILL.md', 'v3/ops/compatibility.md', 'workflows/old.md']);
+  for (const relative of result.removedRetired) assert.equal(fs.existsSync(path.join(root, '.claude', relative)), false);
+  const preserved = {
+    '.claude/skills/starci-lite/local.md': 'previously preserved',
+    '.claude/knowledge/findings/local.jsonl': 'user changed record',
+    '.claude/resources/settings.json': 'personal settings',
+    '.claude/.work/keep.md': 'protected product',
+    '.claude/workflows/unowned.md': 'unowned workflow',
+    '.claude/skills/local-skill/SKILL.md': 'unowned local skill',
+    '.worktrees/uat/keep.txt': 'product evidence',
+  };
+  // init on an owned install must also use preservation semantics.
+  init({ dir: root, bootstrap: true, force: true }, quiet);
+  for (const [relative, bytes] of Object.entries(preserved)) assert.equal(read(root, relative), bytes, relative);
+});
+
+test('retired traversal and junction manifest paths stop before writes', t => {
+  const root = host(t), external = host(t);
+  init({ dir: root, bootstrap: true }, quiet);
+  put(external, 'keep.txt', 'outside-owned');
+  ownRetired(root, 'alias/alias.json', '{}');
+  const manifestPath = path.join(root, '.claude/.starci-skills.json');
+  const original = read(root, '.claude/.starci-skills.json');
+  const source = read(root, '.claude/SKILL.md');
+  for (const relative of ['../outside.txt', 'alias/../../escape', 'C:/outside', 'alias\\outside']) {
+    const manifest = JSON.parse(original);
+    manifest.files[relative] = 'bad';
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    assert.throws(() => update({ dir: root, force: true }, quiet), /invalid installed manifest path/);
+    assert.equal(read(root, '.claude/SKILL.md'), source);
+    assert.equal(read(root, '.claude/alias/alias.json'), '{}');
+  }
+  fs.writeFileSync(manifestPath, original);
+  fs.renameSync(path.join(root, '.claude/alias'), path.join(root, 'owned-alias-backup'));
+  fs.symlinkSync(external, path.join(root, '.claude/alias'), process.platform === 'win32' ? 'junction' : 'dir');
+  assert.throws(() => update({ dir: root, force: true }, quiet), /symlink\/junction/);
+  assert.equal(read(external, 'keep.txt'), 'outside-owned');
+  assert.equal(read(root, '.claude/SKILL.md'), source);
+  fs.unlinkSync(path.join(root, '.claude/alias'));
+});
+
+test('Lite cannot be installed; an old managed Lite bootstrap upgrades without a broken reference', t => {
+  const root = host(t);
+  assert.throws(() => init({ dir: root, profile: 'lite', bootstrap: true }, quiet), /retired/);
+  assert.equal(fs.existsSync(path.join(root, '.claude')), false);
+  init({ dir: root, bootstrap: true }, quiet);
+  const oldEntry = '<!-- starci:prompt-entry -->\nFor every user prompt, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md) and use its scope classification.\nExisting full workflows keep their current session and gates; formal UAT and publication use full StarCi.\n<!-- /starci:prompt-entry -->';
+  put(root, 'AGENTS.md', '# Custom preserved\n\n' + oldEntry + '\n');
+  ownRetired(root, 'skills/starci-lite/SKILL.md', 'old runtime');
+  const file = path.join(root, '.claude/.starci-skills.json');
+  const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+  manifest.profile = manifest.bootstrapProfile = 'lite';
+  fs.writeFileSync(file, JSON.stringify(manifest));
+  assert.throws(() => update({ dir: root, bootstrap: false }, quiet), /must be migrated/);
+  assert.equal(read(root, '.claude/skills/starci-lite/SKILL.md'), 'old runtime');
+  update({ dir: root }, quiet);
+  assert.equal(fs.existsSync(path.join(root, '.claude/skills/starci-lite/SKILL.md')), false);
+  assert.match(read(root, 'AGENTS.md'), /Custom preserved/);
+  assert.match(read(root, 'AGENTS.md'), /named preset skill/);
+  assert.doesNotMatch(read(root, 'AGENTS.md'), /starci-lite/);
+});
+
+test('custom or no-bootstrap routing cannot retain a dangling retired runtime reference', t => {
+  const root = host(t);
+  init({ dir: root, bootstrap: true }, quiet);
+  ownRetired(root, 'workflows/old.md', 'old workflow still consumed');
+  const before = read(root, '.claude/.starci-skills.json');
+  const current = read(root, 'AGENTS.md');
+  for (const bootstrap of [true, false]) {
+    put(root, 'AGENTS.md', current + '\nRead .claude/workflows/old.md before execution.\n');
+    assert.throws(() => update({ dir: root, bootstrap, force: true }, quiet), /still require retired runtime paths/);
+    assert.equal(read(root, '.claude/.starci-skills.json'), before);
+    assert.equal(read(root, '.claude/workflows/old.md'), 'old workflow still consumed');
+  }
+});
+
+test('source and relocated payload contain only current runtime, presets and domain knowledge', t => {
+  const root = host(t);
+  init({ dir: root, bootstrap: true }, quiet);
+  const retired = ['alias', 'routing.json', 'helpers', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'tests', 'workflows', 'docs', 'sites', 'skills/starci-lite', 'knowledge/findings'];
+  for (const relative of retired) {
+    assert.equal(fs.existsSync(path.join(packageRoot, relative)), false, 'source: ' + relative);
+    assert.equal(fs.existsSync(path.join(root, '.claude', relative)), false, 'installed: ' + relative);
+  }
+  const installed = JSON.parse(read(root, '.claude/package.json'));
+  assert.equal(Object.hasOwn(installed.scripts, 'test:legacy'), false);
+  assert.equal(JSON.parse(read(root, '.claude/skills/catalog.json')).skills.length, 14);
+  assert.equal(JSON.parse(read(root, '.claude/v3/ops/catalog.json')).ops.length, 32);
 });
 
 test('a 300-piece multi-repository tree accepts a new unfinished domain without restructuring', t => {

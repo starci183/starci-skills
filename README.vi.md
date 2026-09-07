@@ -1,13 +1,15 @@
 # @starci/skills — Work 3.0 alpha
 
-AI tự chọn op chain theo scope mỗi prompt, tối đa ba lớp tuần tự và ba op song song mỗi lớp. Cây completion `.work` thuộc sản phẩm. Không chain vô hạn, request/response folder bắt buộc hay tự provisioning.
+Prompt → skill/mode có tên → piece nghiệp vụ → op hữu hạn → kết quả thật.
 
-Đọc [hướng dẫn v3](v3/README.vi.md) và [catalogue op](v3/ops/catalog.json). Tiếng Anh là runtime authority.
+[Entry gốc](SKILL.md) chọn [14 preset](skills/catalog.json) dùng [op có thật](v3/ops/catalog.json). Tổng mọi skill/worker/retry tối đa 3 lớp tuần tự × 3 invocation đồng thời. Không tự brainstorm workflow, request/response ledger bắt buộc hoặc provisioning ngầm.
 
-Bản checkout này là `3.0.0-alpha.1` cục bộ, chưa publish. Chạy `node bin/starci-skills.mjs work help`, `npm test`; cài thử bằng `init --dir <repo-moi>` và kiểm tra bằng `doctor --dir <repo> --quick`. Không coi package latest trên registry là candidate này. Cần Node 20+, không dependency runtime ngoài.
+Xem [runtime/storage](v3/README.vi.md). Candidate `3.0.0-alpha.2`; đổi version không phải publish/cài host. Node 20+, không dependency runtime ngoài. Chạy `npm test`, `node bin/starci-skills.mjs work help`; cài thử vào host biệt lập bằng init rồi doctor.
 
-Installer giữ custom host instructions, chỉ ignore `.work/_local/`, không tạo business hoặc migrate `.worktrees`. Upgrade từ major cũ cần `update --upgrade-major` sau khi đọc hướng dẫn. Giữ local runtime edits trừ khi force rõ ràng; bootstrap xung đột phải xử lý trước khi ghi. `--no-bootstrap` giữ nguyên entry host và không nhận là đã đổi routing.
+Installer ghi file package vào `.claude`, giữ custom instructions, chỉ ignore `.work/_local/`. Init bản quản lý dùng update. Không tự tạo nghiệp vụ, resolve credential/migrate dữ liệu.
 
-Profile Lite vẫn cho maintenance nhỏ chưa cần tracking; business được track vào entry v3, không bàn giao session v2.
+Major cũ cần update --upgrade-major. Chỉ xóa file runtime nghỉ còn nguyên có manifest ownership; giữ và báo file sửa/unowned/settings. Force thay file package hiện hành, không xóa file nghỉ đã sửa. Bootstrap cũ nhận diện chính xác có thể chuyển về full router; custom conflict dừng trước ghi. No-bootstrap không được bỏ Lite khi host còn cần nó.
 
-npm test kiểm tra core/catalogue/CLI/ca phản chứng/installer bằng fixture cục bộ, không thay product UAT. test:legacy giữ suite cũ để điều tra, không phải authority đang chạy. Không publish/deploy/migrate credential hoặc xóa evidence thật trong refactor này.
+Đã bỏ V2 alias/routing/workflows/scripts/templates/test cũ/website sinh cũ và Lite; tra lịch sử bằng Git, không fallback. `.worktrees` sản phẩm/Git checkout là owner riêng. Migrate từ code là preset được chọn, phải giữ provenance/evidence/commit/credential custody.
+
+Test fixture/installer không chứng minh product browser UAT/hành vi model. Ảnh phải capture và xem thật; source SHA không thay served build. Xóa website source/CI không gỡ website đã deploy. Refactor không publish registry/rollout/account/migrate ledger thật.
