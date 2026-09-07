@@ -148,8 +148,9 @@ function validate(root) {
     if (n.children.length) {
       if ('state' in n.meta || 'completion' in n.meta) issue('BRANCH_STATE',n.path,'Branches must not store state or completion.');
     } else {
-      if (!['todo','doing','blocked','done','na'].includes(n.meta.state)) issue('STATE',n.path,'Leaf state must be todo, doing, blocked, done or na.');
+      if (!metadataSchema.$defs.node.properties.state.enum.includes(n.meta.state)) issue('STATE',n.path,'Leaf state must be one of the states published by work/node@1.');
       if (n.meta.state==='blocked' && !text(n.meta.blocker)) issue('BLOCKER',n.path,'Blocked leaves require a concrete blocker.');
+      if (n.meta.state==='suspended' && !text(n.meta.suspensionReason)) issue('SUSPENSION_REASON',n.path,'Authored suspended leaves require a concrete suspensionReason; imported source is not approved or verified completion.');
       if (n.meta.state==='na' && !text(n.meta.naReason)) issue('NA_REASON',n.path,'N/A requires a reason.');
     }
   }
@@ -272,6 +273,7 @@ function validate(root) {
     n.eligible=!localInvalid && n.blockedBy.length===0;
     n.suspensionReasons=[];
     if(n.stale)n.suspensionReasons.push({code:'INPUT_CHANGED',ids:[n.meta.id]});
+    if(n.meta.state==='suspended')n.suspensionReasons.push({code:'DECLARED_SUSPENSION',ids:[n.meta.id]});
     if(n.children.length){
       n.children.forEach(roll);const required=n.children.filter(c=>c.meta.required).map(c=>c.effectiveState);
       n.effectiveState=localInvalid?'invalid':!required.length?'na':required.every(s=>s==='na')?'na':required.every(s=>['done','na'].includes(s))?'done':required.includes('invalid')?'invalid':required.includes('blocked')?'blocked':required.includes('suspended')?'suspended':required.some(s=>['doing','done'].includes(s))?'doing':'todo';

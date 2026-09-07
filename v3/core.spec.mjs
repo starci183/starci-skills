@@ -179,11 +179,11 @@ test('module account/chat diamond gates start, suspends on prerequisite regressi
   }
   assert.equal(after.nodes.find(n=>n.id==='chat').inputDigest,chat.inputDigest);assert.equal(after.nodes.find(n=>n.id==='unrelated').effectiveState,'done');assert.deepEqual(fs.readFileSync(path.join(f.root,'chat/evidence/check/manifest.yaml')),proofBefore);
 });
-test('N/A prerequisites never prove module availability and suspended is not a writable state',t=>{
+test('N/A prerequisites never prove module availability and authored suspended needs a concrete reason',t=>{
   const f=fixture(t);f.node('module',{state:'na',naReason:'Module is explicitly out of scope.'});f.node('account',{dependsOn:['module'],state:'doing'});
   assert.deepEqual(f.run().nodes.find(n=>n.id==='account').blockedBy,['module']);assert.equal(f.run().nodes.find(n=>n.id==='account').eligible,false);
   f.done('account');assert.equal(f.run().nodes.find(n=>n.id==='account').effectiveState,'suspended');
-  f.node('forged',{state:'suspended'});assert.ok(codes(f.run()).includes('STATE'));
+  f.node('forged',{state:'suspended'});assert.ok(codes(f.run()).includes('SUSPENSION_REASON'));
 });
 test('semantic refs propagate business changes through architecture/code/UAT but do not impose execution gates',t=>{
   const f=fixture(t);f.node('business');f.node('architecture',{refs:['business']});f.node('code',{refs:['architecture']});f.node('uat',{refs:['code']});f.node('unrelated');
@@ -226,4 +226,17 @@ test('impact distinguishes ancestor spec changes from child-input rollup and is 
   const leafImpact=impactWorkspace(f.root,'group.a');assert.deepEqual(leafImpact.affected.map(n=>n.id),['external','group']);assert.ok(!leafImpact.affected.some(n=>n.id==='group.b'));
   const ancestorImpact=impactWorkspace(f.root,'group');assert.deepEqual(ancestorImpact.affected.map(n=>n.id),['external','group.a','group.b']);assert.ok(ancestorImpact.affected.find(n=>n.id==='group.b').reasons.includes('ancestor-spec'));
   assert.deepEqual(fs.readFileSync(path.join(f.root,'group/node.md')),before);assert.equal(impactWorkspace(f.root,'absent').target,null);
+});
+test('source-imported suspended scope needs no fabricated prior done or evidence and never satisfies prerequisites',t=>{
+  const f=fixture(t);f.node('imported-business',{state:'suspended',suspensionReason:'Inferred from inspected source; business owner has not approved the requirements.'});f.node('implementation',{dependsOn:['imported-business']});
+  const before=fs.readFileSync(path.join(f.root,'imported-business/node.md'));const r=f.run();assert.equal(r.ok,true);
+  const imported=r.nodes.find(n=>n.id==='imported-business');assert.equal(imported.state,'suspended');assert.equal(imported.effectiveState,'suspended');assert.ok(imported.suspensionReasons.some(reason=>reason.code==='DECLARED_SUSPENSION'));
+  assert.equal(f.metas.get('imported-business').completion,undefined);assert.equal(fs.existsSync(path.join(f.root,'imported-business/evidence')),false);assert.deepEqual(fs.readFileSync(path.join(f.root,'imported-business/node.md')),before);
+  const consumer=r.nodes.find(n=>n.id==='implementation');assert.equal(consumer.eligible,false);assert.deepEqual(consumer.blockedBy,['imported-business']);
+});
+test('authored suspension reason is operational, missing/blank reason fails, and fake done still needs proof',t=>{
+  const f=fixture(t);f.node('imported',{state:'suspended',suspensionReason:'Source-derived inventory awaits requirement review.'});const before=f.run().nodes[0].inputDigest;
+  f.node('imported',{...f.metas.get('imported'),suspensionReason:'Scope review remains outstanding; no acceptance claimed.'});assert.equal(f.run().nodes[0].inputDigest,before);
+  f.node('imported',{...f.metas.get('imported'),suspensionReason:'   '});assert.ok(codes(f.run()).includes('SUSPENSION_REASON'));assert.equal(f.run().nodes[0].effectiveState,'invalid');
+  f.node('imported',{...f.metas.get('imported'),state:'done'});assert.ok(codes(f.run()).includes('COMPLETION'));assert.equal(f.run().nodes[0].effectiveState,'invalid');
 });
