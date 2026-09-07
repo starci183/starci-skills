@@ -1,77 +1,30 @@
-# @starci/skills
+# @starci/skills — Work 3.0 alpha
 
-StarCi Skills is the `.claude` runtime of a repository: one entry (`SKILL.md`), operators with explicit boundaries,
-goal-derived workflows, one closed routing map and one tool registry. An agent in Claude Code or
-Codex reads `.claude/INDEX.md` through a one-paragraph bootstrap and follows its load order; the tree
-does the rest. Documentation: <https://harness.starci.org/docs/>. Tiếng Việt: [README.vi.md](README.vi.md).
+A selected-operation development workflow with a product-owned `.work` completion tree. No automatic chains, mandatory request/response directories or implicit provisioning.
 
-## Install
+Read [the v3 guide](v3/README.md) and [operator catalogue](v3/ops/catalog.json). Vietnamese entry: [README.vi.md](README.vi.md).
 
-```bash
-npx @starci/skills init
+## Local candidate
+
+This checkout is a local `3.0.0-alpha.1` candidate, not a published package. Run from this checkout:
+
+```sh
+node bin/starci-skills.mjs work help
+npm test
+node bin/starci-skills.mjs init --dir <new-host-repository>
+node bin/starci-skills.mjs doctor --dir <host-repository> --quick
 ```
 
-Run it at the root of the repository that will own the runtime. Under the default full profile, every prompt enters StarCi; follow-ups reuse the host session. It copies the tree into `./.claude`,
-writes `CLAUDE.md` (read by Claude Code) and `AGENTS.md` (read by Codex) when they do not exist, appends the
-StarCi entry once to existing files while preserving their instructions, and
-adds `.worktrees/sessions/` to `.gitignore`, where sessions live. Commit `.claude/` with the repository:
-it is source, not a cache. Requires Node 20 or newer; the CLI has no dependencies. The same CLI runs
-straight from the Git branch when the registry has not yet listed a version:
+Do not use an unverified registry/latest command and assume it installs this candidate. Node 20+ is required; runtime code has no external package dependencies.
 
-```bash
-npx --package=github:starci183/starci-skills#main starci-skills init
-```
+The installer writes `.claude` package paths and managed bootstrap text, preserves custom host instructions, and ignores only `.work/_local/`. It does not initialize a product business, resolve credentials or migrate `.worktrees`.
 
-The default profile is full StarCi. To select the separate [StarCi Lite](skills/starci-lite/SKILL.md) entry, run `npx @starci/skills init --profile lite`, or explicitly switch an installed host with `update --profile lite`. Lite handles questions, documentation and bounded local fixes; complex features, formal public UAT and publication use the full entry. All full operators remain installed. Updates retain the selected profile unless overridden. The manifest records `profile` separately from `bootstrapProfile`: `--no-bootstrap` leaves host instructions unchanged and does not claim that their entry changed. Custom full-only instructions must be reconciled explicitly; the installer never removes them. Active full sessions keep their scope, evidence and gates.
+An installed older major requires `update --upgrade-major` after reviewing the guide. Local runtime edits are retained unless explicitly forced. Unknown/conflicting bootstrap instructions require reconciliation before mutation. `--no-bootstrap` preserves host instructions and does not claim active routing changed.
 
-| Command | What it does |
-| --- | --- |
-| `npx @starci/skills init [--dir <repo>] [--profile <full-or-lite>] [--force] [--no-bootstrap]` | Installs the tree and the bootstraps. Refuses a populated `.claude` it did not install unless `--force`, and even then replaces only the runtime paths. |
-| `npx @starci/skills update [--dir <repo>] [--profile <full-or-lite>] [--force] [--no-bootstrap]` | Brings an installed tree to this package's version. A file changed locally is kept and listed; `--force` takes the package version. Files outside the runtime paths are never touched. |
-| `npx @starci/skills doctor [--dir <repo>] [--quick]` | Runs the tree's own validators on the installed copy (routing, alias, operators, workflows, defaults, templates, knowledge citations, the operator and helper self-tests and the script specs) and reports files changed since install. |
-| `npx @starci/skills version` | Prints the package version. |
+The explicit Lite profile remains available for untracked bounded maintenance; tracked business work uses the same v3 entry, never a v2 full-session handoff.
 
-The runtime paths are `UPDATE.md`, `UPDATE.vi.md`, `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`, `routing.json`, `alias/`,
-`helpers/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`, `templates/`, `workflows/`. The
-manifest `.claude/.starci-skills.json` records the installed version and a hash per file; `update` and
-`doctor` read it.
+## Verification scope
 
-## Claude Code and Codex
+`npm test` runs v3 core, operator, CLI, adversarial and installer integration checks. These are local synthetic checks, not actual product UAT. `npm run test:legacy` preserves the old suite for historical investigation. Retained v2 scripts/docs are not the active runtime contract.
 
-Under the full profile, both runtimes are entered the same way. `CLAUDE.md` and `AGENTS.md` carry the same bootstrap: read
-`.claude/INDEX.md` completely and follow its load order. The processor runs each operator on the profile
-its `operator.json` binds (`resources/agents/profiles/openai.json` for Codex, `claude.json` for Claude
-Code, paired in `resources/orchestrator.json`), and each operator may call only the tools its
-`operator.json` declares from `resources/tools.json`. The English files are the runtime authority; the
-`.vi.md` siblings are for people.
-
-## Sessions in 2.2
-
-A session belongs to the Codex task/worktree or Claude host session. Child agents are workers within it.
-User workflow topology is selected and gated before this session starts. Its names, demand selector,
-peer limits, communication channel, tracking address and close rule have one executable home:
-[workflowTopologies](resources/orchestrator.json). This layer is separate from operator execution mode.
-
-[SKILL.md](SKILL.md) takes the prompt through a scope draft with a goal, expected results and examples;
-it asks only for confirmation that is still missing. Workflows are derived from that goal and typed outcomes.
-
-Before an operation, the runtime freezes its expected result, inputs and environment. Afterwards,
-validators compare actual evidence, route mismatches to the repair owner and retain every attempt.
-[orchestrator.json](resources/orchestrator.json) owns the limit of three workers and resource isolation.
-Successful close retains a compact and hashed evidence bundle under `.worktrees/done/` before
-removing only that session folder. Unfinished sessions remain available for resumption.
-
-Reasoning and review use Sol/Fable; execution uses Sol/Opus. Sol has separate role contexts and
-grants. [Resources](resources/INDEX.md) lists the actual assignments. UI procedures bind complete
-applicable knowledge, analyze the Grammar family before changes and judge the rendered aesthetic.
-`knowledge.repair` and `library.update` own the corresponding repairs.
-
-Each accepted operator presents **Operator Result** directly in the chat. UI generation embeds the
-selected rendered image; other operators show readable source/diff, diagrams, tables, documents or
-measured results, with full evidence linked. A failed attempt keeps its real status and repair step.
-
-## Develop
-
-This repository is the package. `npm test` runs every validator, the operator self-tests, the script
-specs and the docs check; `docs/` is the Nextra site and `sites/skills` the landing, neither ships in
-the package.
+No publication, production rollout, credential migration or existing evidence cleanup is performed by this refactor.

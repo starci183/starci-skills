@@ -1,7 +1,7 @@
 {
   "name": "@starci/skills",
-  "version": "2.5.0-rc.16",
-  "description": "StarCi Skills: one entry, bounded operators, a closed routing map and a tool registry, installed as the .claude runtime of a repository for Claude Code and Codex.",
+  "version": "3.0.0-alpha.1",
+  "description": "StarCi Work: bounded operators, a business completion tree and evidence-bound development resources. Local alpha; no automatic chains.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -12,6 +12,7 @@
   },
   "files": [
     "bin/",
+    "v3/",
     "UPDATE.md",
     "UPDATE.vi.md",
     "INDEX.md",
@@ -61,7 +62,10 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node scripts/validate-routing.mjs && node scripts/validate-resources.mjs && node scripts/validate-knowledge-citations.mjs && node scripts/validate-alias.mjs && node scripts/generate-alias-doc.mjs --check && node scripts/validate-operator.mjs && node scripts/validate-helper.mjs && node scripts/validate-defaults.mjs && node scripts/generate-operators-index.mjs --check && node scripts/generate-operator-briefs.mjs --check && node scripts/generate-helpers-index.mjs --check && node scripts/generate-helper-briefs.mjs --check && node scripts/validate-templates.mjs && node scripts/run-operator-self-tests.mjs && node --test scripts/*.spec.mjs && npm run docs:check",
+    "test": "node --test v3/*.spec.mjs",
+    "test:v3": "node --test v3/*.spec.mjs",
+    "test:legacy": "node scripts/validate-routing.mjs && node scripts/validate-resources.mjs && node scripts/validate-knowledge-citations.mjs && node scripts/validate-alias.mjs && node scripts/generate-alias-doc.mjs --check && node scripts/validate-operator.mjs && node scripts/validate-helper.mjs && node scripts/validate-defaults.mjs && node scripts/generate-operators-index.mjs --check && node scripts/generate-operator-briefs.mjs --check && node scripts/generate-helpers-index.mjs --check && node scripts/generate-helper-briefs.mjs --check && node scripts/validate-templates.mjs && node scripts/run-operator-self-tests.mjs && node --test scripts/*.spec.mjs && npm run docs:check",
+    "work": "node v3/cli/main.mjs",
     "docs:check": "node docs/scripts/generate-docs.mjs --check",
     "sweep:presentation": "node scripts/sweep-presentation.mjs"
   }

@@ -1,75 +1,13 @@
-# @starci/skills
+# @starci/skills — Work 3.0 alpha
 
-StarCi Skills là runtime `.claude` của một repository: một cửa vào (`SKILL.md`), các operator có ranh giới rõ,
-workflow được lập từ goal đã xác nhận, một bản đồ routing đóng và một sổ tool. Agent trong Claude Code hay Codex đọc
-`.claude/INDEX.md` qua một đoạn bootstrap ngắn rồi theo đúng thứ tự nạp của nó; phần còn lại là việc của
-cây. Tài liệu: <https://harness.starci.org/docs/vi>. Bản tiếng Anh là thẩm quyền khi chạy: [README.md](README.md).
+Workflow chạy op đã chọn, cây completion `.work` thuộc sản phẩm. Không chain tự động, request/response folder bắt buộc hay tự provisioning.
 
-## Cài đặt
+Đọc [hướng dẫn v3](v3/README.vi.md) và [catalogue op](v3/ops/catalog.json). Tiếng Anh là runtime authority.
 
-```bash
-npx @starci/skills init
-```
+Bản checkout này là `3.0.0-alpha.1` cục bộ, chưa publish. Chạy `node bin/starci-skills.mjs work help`, `npm test`; cài thử bằng `init --dir <repo-moi>` và kiểm tra bằng `doctor --dir <repo> --quick`. Không coi package latest trên registry là candidate này. Cần Node 20+, không dependency runtime ngoài.
 
-Chạy ở gốc repository sẽ sở hữu runtime. Với profile full mặc định, mọi prompt vào StarCi; follow-up giữ cùng host session. Lệnh chép cây vào `./.claude`, viết `CLAUDE.md` (Claude Code
-đọc) và `AGENTS.md` (Codex đọc) khi chưa có; file đã có được thêm cửa vào StarCi một lần, giữ nguyên
-chỉ dẫn riêng. Lệnh thêm `.worktrees/sessions/` vào `.gitignore` vì phiên
-làm việc nằm ở đó. Hãy commit `.claude/` cùng repository: nó là source, không phải cache. Cần Node 20
-trở lên; CLI không có dependency. Cùng CLI đó chạy thẳng từ nhánh Git khi registry chưa liệt kê phiên bản:
+Installer giữ custom host instructions, chỉ ignore `.work/_local/`, không tạo business hoặc migrate `.worktrees`. Upgrade từ major cũ cần `update --upgrade-major` sau khi đọc hướng dẫn. Giữ local runtime edits trừ khi force rõ ràng; bootstrap xung đột phải xử lý trước khi ghi. `--no-bootstrap` giữ nguyên entry host và không nhận là đã đổi routing.
 
-```bash
-npx --package=github:starci183/starci-skills#main starci-skills init
-```
+Profile Lite vẫn cho maintenance nhỏ chưa cần tracking; business được track vào entry v3, không bàn giao session v2.
 
-Profile mặc định là StarCi đầy đủ. Chọn entry riêng [StarCi Lite](skills/starci-lite/SKILL.md) bằng `npx @starci/skills init --profile lite`, hoặc đổi rõ profile của host đã cài bằng `update --profile lite`. Lite xử lý câu hỏi, tài liệu và sửa nhỏ trong một repo; tính năng phức tạp, UAT công khai chính thức và publication dùng entry đầy đủ. Mọi operator đầy đủ vẫn được cài. Update giữ profile đã chọn nếu không có override. Manifest ghi riêng `profile` và `bootstrapProfile`: `--no-bootstrap` giữ nguyên chỉ dẫn host và không nhận là đã đổi entry. Chỉ dẫn riêng bắt buộc full phải được xử lý rõ; installer không xóa chúng. Session full đang chạy giữ scope, bằng chứng và gate.
-
-| Lệnh | Việc nó làm |
-| --- | --- |
-| `npx @starci/skills init [--dir <repo>] [--profile <full-or-lite>] [--force] [--no-bootstrap]` | Cài cây và hai bootstrap. Từ chối một `.claude` đã có sẵn mà không do nó cài, trừ khi `--force`, và kể cả khi đó cũng chỉ thay các đường dẫn runtime. |
-| `npx @starci/skills update [--dir <repo>] [--profile <full-or-lite>] [--force] [--no-bootstrap]` | Nâng cây đã cài lên phiên bản của gói. File đã sửa tay được giữ lại và liệt kê; `--force` lấy bản của gói. File ngoài các đường dẫn runtime không bao giờ bị đụng. |
-| `npx @starci/skills doctor [--dir <repo>] [--quick]` | Chạy chính bộ validator của cây trên bản đã cài (routing, alias, operator, workflow, mặc định, template, trích dẫn knowledge, self-test của operator và helper, và spec của script) và báo những file đã đổi từ lúc cài. |
-| `npx @starci/skills version` | In phiên bản gói. |
-
-Các đường dẫn runtime là `UPDATE.md`, `UPDATE.vi.md`, `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`, `routing.json`,
-`alias/`, `helpers/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`, `templates/`,
-`workflows/`. Manifest `.claude/.starci-skills.json` ghi phiên bản đã cài và hash từng file; `update` và
-`doctor` đọc nó.
-
-## Claude Code và Codex
-
-Với profile full, hai runtime vào cùng một cửa. `CLAUDE.md` và `AGENTS.md` mang cùng một đoạn bootstrap: đọc trọn
-`.claude/INDEX.md` và theo thứ tự nạp của nó. Processor chạy từng operator trên profile mà
-`operator.json` của nó ràng (`resources/agents/profiles/openai.json` cho Codex, `claude.json` cho Claude
-Code, ghép cặp trong `resources/orchestrator.json`), và mỗi operator chỉ được gọi những tool mà
-`operator.json` của nó khai từ `resources/tools.json`. File tiếng Anh là thẩm quyền khi chạy; bản `.vi.md`
-dành cho người đọc.
-
-## Phiên làm việc 2.2
-
-Session thuộc task/worktree của Codex hoặc session của Claude. Agent con là worker trong phiên đó.
-Topology workflow người dùng được chọn và qua gate trước khi session này bắt đầu. Tên, bộ chọn theo
-nhu cầu, giới hạn peer, kênh giao tiếp, địa chỉ theo dõi và luật đóng có đúng một nơi thực thi:
-[workflowTopologies](resources/orchestrator.json). Tầng này tách biệt với mode thực thi của operator.
-
-[SKILL.md](SKILL.md) dẫn prompt qua bản nháp scope có bảng goal, kết quả mong đợi và ví dụ;
-chỉ xác nhận còn thiếu mới cần hỏi. Workflow được dựng lại từ goal và kết quả có kiểu.
-
-Trước mỗi thao tác, runtime khóa expected, input và môi trường. Sau đó validator đối chiếu actual
-với bằng chứng; sai thì giao đúng owner sửa rồi chạy attempt mới, giữ lịch sử cũ.
-[orchestrator.json](resources/orchestrator.json) sở hữu giới hạn tối đa 3 worker và cách cô lập tài nguyên.
-Thành công được đóng bằng script lifecycle, giữ compact cùng bundle có hash tại
-`.worktrees/done/` trước khi xóa riêng thư mục session. Phiên chưa xong được giữ để tiếp tục.
-
-Profile suy luận và đánh giá là Sol/Fable; profile thực thi là Sol/Opus. Cùng model Sol vẫn có context
-và quyền riêng cho từng vai trò. [Tài nguyên](resources/INDEX.vi.md) liệt kê assignment thực tế.
-Quy trình UI ràng buộc toàn bộ knowledge đã áp dụng, phân tích family Grammar trước khi sửa và
-đánh giá cả thẩm mỹ trên bản render. `knowledge.repair` và `library.update` sở hữu hai loại sửa tương ứng.
-
-Mỗi operator đã được nghiệm thu hiện **Operator Result** ngay trong chat. UI generation nhúng ảnh
-render của phương án được chọn; operator khác hiện source/diff, sơ đồ, bảng, tài liệu hoặc kết quả đo
-dễ xem, kèm link bằng chứng đầy đủ. Attempt lỗi giữ đúng trạng thái và bước sửa tiếp.
-
-## Phát triển
-
-Repository này chính là gói. `npm test` chạy mọi validator, self-test của operator, spec của script và
-kiểm tra docs; `docs/` là site Nextra và `sites/skills` là landing, cả hai không nằm trong gói.
+npm test kiểm tra core/catalogue/CLI/ca phản chứng/installer bằng fixture cục bộ, không thay product UAT. test:legacy giữ suite cũ để điều tra, không phải authority đang chạy. Không publish/deploy/migrate credential hoặc xóa evidence thật trong refactor này.

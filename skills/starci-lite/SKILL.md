@@ -30,9 +30,9 @@ Do not rerun successful checks without a new change, failure or unresolved conce
 
 For a host installed with full StarCi, follow its existing bootstrap when full mode is required. In a packaged Lite installation this skill is at `<Source>/.claude/skills/starci-lite/SKILL.md`; the full entry is `../../INDEX.md`. In a personal installation, resolve the full entry through the target repository's bootstrap rather than assuming the current directory owns `.claude`.
 
-Carry forward the user request, affected repositories/routes, existing diff and verification results. Do not relabel Lite work as accepted full operator evidence. Open or resume the full session under its current contract, with its own gates. If full StarCi is unavailable, explain that limitation and use the host's normal development process; do not invent an installed runtime.
+Carry forward the user request, affected repositories/routes, existing diff and verification results. Do not relabel Lite work as accepted full operator evidence. For Work 3.0, select the bounded operation through the full entry and use its product-owned .work nodes; do not open a v2 session or chain. If full StarCi is unavailable, explain that limitation and use the host's normal development process; do not invent an installed runtime.
 
-A follow-up in an active full workflow stays in that workflow. Selecting Lite must not discard its frozen scope, evidence or leases. This skill does not override unrelated host instructions or tool permissions. Existing full-only bootstraps need an explicit Lite installation/profile change to remove their unconditional entry overhead.
+A follow-up preserves the current authorized goal and evidence. Selecting Lite must not discard existing scope, evidence or ownership. Existing v2 work requires an explicit migration decision before v3 execution; Lite does not convert it. This skill does not override unrelated host instructions or tool permissions. Existing full-only bootstraps need an explicit Lite installation/profile change.
 
 ## Public pages and cost
 

@@ -12,7 +12,7 @@
 // .claude it did not install unless --force; update keeps a file a person changed locally unless
 // --force; neither ever runs a git command.
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, appendFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
@@ -28,11 +28,16 @@ const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf
 // CLI must survive relocation: installed doctor fixtures copy this same declared payload.
 export const PAYLOAD = [...new Set(['package.json', ...pkg.files.map(ref => ref.replace(/\/$/, ''))])];
 const MANIFEST = '.starci-skills.json';
-const SESSIONS_IGNORE = '.worktrees/sessions/';
+const LOCAL_IGNORE = '.work/_local/';
 const ENTRY_MARKER = '<!-- starci:prompt-entry -->';
-const PROMPT_ENTRY = `${ENTRY_MARKER}
+const LEGACY_PROMPT_ENTRY = `${ENTRY_MARKER}
 For every user prompt, enter [StarCi](.claude/INDEX.md) before planning or target work and follow
 the entry's user-session and goal protocol. Follow-up prompts reuse that host session.
+<!-- /starci:prompt-entry -->`;
+const PROMPT_ENTRY = `${ENTRY_MARKER}
+For product development work, enter [StarCi](.claude/INDEX.md) and select the bounded operation
+covered by the user's request. Track current product completion in .work; stop after the selected
+operation or explicitly approved parallel group. Questions do not require a work ledger.
 <!-- /starci:prompt-entry -->`;
 
 const BOOTSTRAP = `# StarCi agent bootstrap
@@ -49,9 +54,14 @@ This file is only a bootstrap. Do not copy context, brainstorm, compiler, gate o
 the entry routes, and a rule copied here becomes a second home that nobody remembers to update.
 `;
 
-const LITE_ENTRY = `${ENTRY_MARKER}
+const LEGACY_LITE_ENTRY = `${ENTRY_MARKER}
 For every user prompt, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md) and use its scope classification.
 Existing full workflows keep their current session and gates; formal UAT and publication use full StarCi.
+<!-- /starci:prompt-entry -->`;
+const LITE_ENTRY = `${ENTRY_MARKER}
+For bounded maintenance, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md).
+For tracked business work, use [StarCi](.claude/INDEX.md) and its selected-operation contract.
+Do not create an automatic chain or migrate existing workflow evidence implicitly.
 <!-- /starci:prompt-entry -->`;
 const LITE_BOOTSTRAP = BOOTSTRAP.replace(PROMPT_ENTRY, LITE_ENTRY)
   .replace('Read [\`<Source>/.claude/INDEX.md\`](.claude/INDEX.md) completely and follow its load order.',
@@ -72,7 +82,7 @@ const DOCTOR_FULL = [
 ];
 
 function parseArgs(argv) {
-  const out = { command: argv[0] ?? 'help', dir: process.cwd(), force: false, quick: false, bootstrap: true };
+  const out = { command: argv[0] ?? 'help', dir: process.cwd(), force: false, quick: false, bootstrap: true, upgradeMajor: false };
   for (let i = 1; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--dir') out.dir = path.resolve(argv[++i] ?? '.');
@@ -82,6 +92,7 @@ function parseArgs(argv) {
     else if (a === '--force') out.force = true;
     else if (a === '--quick') out.quick = true;
     else if (a === '--no-bootstrap') out.bootstrap = false;
+    else if (a === '--upgrade-major') out.upgradeMajor = true;
     else if (a === '-h' || a === '--help') out.command = 'help';
     else throw new Error(`unknown argument ${a}`);
   }
@@ -127,15 +138,36 @@ function copyPayload(target) {
   }
 }
 
+function safePayloadTarget(target) {
+  const inspect = file => {
+    const stat = lstatSync(file, { throwIfNoEntry: false });
+    if (!stat) return;
+    if (stat.isSymbolicLink()) throw new Error('installer payload target contains a symlink/junction; resolve ownership before updating');
+    if (stat.isDirectory()) for (const name of readdirSync(file)) inspect(path.join(file, name));
+  };
+  if (lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('installer .claude target must not be a symlink/junction');
+  for (const relative of [...PAYLOAD, MANIFEST]) inspect(path.join(target, relative));
+}
+
 // Plan host changes before any payload mutation. Only exact installer-owned text is replaced.
 function bootstrapPlan(repo, profile) {
+  for (const name of ['CLAUDE.md', 'AGENTS.md', '.gitignore']) {
+    const stat = lstatSync(path.join(repo, name), { throwIfNoEntry: false });
+    if (stat && (!stat.isFile() || stat.isSymbolicLink())) throw new Error(name + ': bootstrap target must be a regular owned file, not a symlink/junction');
+  }
   const entry = profile === 'lite' ? LITE_ENTRY : PROMPT_ENTRY;
   const bootstrap = profile === 'lite' ? LITE_BOOTSTRAP : BOOTSTRAP;
   return ['CLAUDE.md', 'AGENTS.md'].map(name => {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
     const current = readFileSync(file, 'utf8');
-    for (const known of [BOOTSTRAP, LITE_BOOTSTRAP]) {
+    const customProtocol = [PROMPT_ENTRY, LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
+    if (/session-open\.mjs|plan-chain\.mjs|validated request\.json|Nothing is designed, written or committed outside a session/.test(customProtocol)) {
+      throw new Error(name + ': custom v2 session/chain protocol conflicts with v3; reconcile it or use --no-bootstrap before changing payload');
+    }
+    const legacyBootstrap = BOOTSTRAP.replace(PROMPT_ENTRY, LEGACY_PROMPT_ENTRY);
+    const legacyLiteBootstrap = LITE_BOOTSTRAP.replace(LITE_ENTRY, LEGACY_LITE_ENTRY);
+    for (const known of [BOOTSTRAP, LITE_BOOTSTRAP, legacyBootstrap, legacyLiteBootstrap]) {
       const normalized = current.replace(/\r\n/g, '\n'), authored = known.replace(/\r\n/g, '\n');
       if (normalized.startsWith(authored)) {
         let end = 0, count = 0;
@@ -145,15 +177,14 @@ function bootstrapPlan(repo, profile) {
         return { name, file, text: bootstrap + suffix, action: 'updated' };
       }
     }
-    const managed = [PROMPT_ENTRY, LITE_ENTRY].find(value => current.includes(value));
+    const managed = [PROMPT_ENTRY, LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
     if (managed) {
       const outside = current.replace(managed, '');
       if (profile === 'lite' && outside.includes('.claude/INDEX.md')) throw new Error(name + ': custom instructions still name the full entry; preserve them and resolve the profile explicitly before Lite bootstrap changes');
       return { name, file, text: current.replace(managed, entry), action: 'updated' };
     }
     if (current.includes(ENTRY_MARKER)) {
-      if (profile === 'lite') throw new Error(name + ': custom StarCi entry cannot be replaced by the Lite profile');
-      return { name, file, text: current, action: 'kept' };
+      throw new Error(name + ': custom StarCi entry needs explicit reconciliation; refusing a mixed v2/v3 bootstrap before payload writes');
     }
     if (profile === 'lite' && current.includes('.claude/INDEX.md')) throw new Error(name + ': custom instructions still name the full entry; preserve them and resolve the profile explicitly before Lite bootstrap changes');
     return { name, file, text: current + (current.endsWith('\n') ? '\n' : '\n\n') + entry + '\n', action: 'updated' };
@@ -166,9 +197,15 @@ function writeBootstraps(repo, log, plan) {
   }
   const ignore = path.join(repo, '.gitignore');
   const lines = existsSync(ignore) ? readFileSync(ignore, 'utf8').split(/\r?\n/) : [];
-  if (!lines.some((l) => l.trim() === SESSIONS_IGNORE || l.trim() === '.worktrees/' || l.trim() === '.worktrees')) {
-    appendFileSync(ignore, `${lines.length && lines.at(-1) !== '' ? '\n' : ''}# StarCi Skills sessions live here and are never committed\n${SESSIONS_IGNORE}\n`);
-    log(`added ${SESSIONS_IGNORE} to .gitignore`);
+  if (!lines.some((l) => l.trim() === LOCAL_IGNORE || l.trim() === '/' + LOCAL_IGNORE)) {
+    appendFileSync(ignore, `${lines.length && lines.at(-1) !== '' ? '\n' : ''}# StarCi Work: only local scratch is ignored; product evidence remains durable\n${LOCAL_IGNORE}\n`);
+    log(`added ${LOCAL_IGNORE} to .gitignore`);
+  }
+}
+
+function checkMajorUpgrade(manifest, opts) {
+  if (manifest && Number(manifest.version.split('.')[0]) < Number(pkg.version.split('.')[0]) && !opts.upgradeMajor) {
+    throw new Error('major workflow upgrade requires --upgrade-major after reviewing v3/README.md; existing .worktrees data is not migrated or deleted');
   }
 }
 
@@ -176,7 +213,9 @@ export function init(opts, log = console.log) {
   const repo = opts.dir;
   const target = path.join(repo, '.claude');
   if (!existsSync(repo)) throw new Error(`${repo} does not exist`);
+  safePayloadTarget(target);
   const manifest = readManifest(target);
+  checkMajorUpgrade(manifest, opts);
   const profile = selectedProfile(opts, manifest);
   const hostPlan = opts.bootstrap ? bootstrapPlan(repo, profile) : null;
   if (existsSync(target) && readdirSync(target).length && !manifest && !opts.force) {
@@ -194,8 +233,10 @@ export function init(opts, log = console.log) {
 
 export function update(opts, log = console.log) {
   const target = path.join(opts.dir, '.claude');
+  safePayloadTarget(target);
   const manifest = readManifest(target);
   if (!manifest) throw new Error(`${target} has no ${MANIFEST}; run init first`);
+  checkMajorUpgrade(manifest, opts);
   const profile = selectedProfile(opts, manifest);
   const hostPlan = opts.bootstrap !== false ? bootstrapPlan(opts.dir, profile) : null;
   const before = hashTree(target);
@@ -222,6 +263,34 @@ export function update(opts, log = console.log) {
 
 export function doctor(opts, log = console.log) {
   const target = path.join(opts.dir, '.claude');
+  const installedPackage = path.join(target, 'package.json');
+  if (existsSync(installedPackage) && Number(JSON.parse(readFileSync(installedPackage, 'utf8')).version?.split('.')[0]) >= 3 && !existsSync(path.join(target, 'v3', 'cli', 'main.mjs'))) {
+    throw new Error('installed v3 runtime is incomplete: missing v3/cli/main.mjs; refusing fallback to legacy validation');
+  }
+  if (existsSync(path.join(target, 'v3', 'cli', 'main.mjs'))) {
+    const tests = opts.quick ? ['ops.spec.mjs', 'core.spec.mjs'] : ['ops.spec.mjs', 'core.spec.mjs', 'cli.spec.mjs', 'acceptance.spec.mjs'];
+    const manifest = readManifest(target);
+    if (manifest) {
+      const drift = Object.entries(manifest.files).filter(([rel, hash]) => !existsSync(path.join(target, rel)) || sha(path.join(target, rel)) !== hash);
+      log(`${manifest.name}@${manifest.version}; ${drift.length} file(s) changed or missing since install`);
+    }
+    let failed = 0;
+    for (const testFile of tests) {
+      const environment = { ...process.env };
+      // Doctor starts independent test runners even when invoked by an installer test.
+      delete environment.NODE_TEST_CONTEXT;
+      const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', path.join(target, 'v3', testFile)], { cwd: target, encoding: 'utf8', windowsHide: true, env: environment });
+      const output = (result.stdout ?? '') + (result.stderr ?? '');
+      const count = Number(output.match(/^# tests (\d+)$/m)?.[1] ?? 0);
+      const passed = Number(output.match(/^# pass (\d+)$/m)?.[1] ?? 0);
+      const failures = Number(output.match(/^# fail (\d+)$/m)?.[1] ?? -1);
+      const success = result.status === 0 && count > 0 && passed === count && failures === 0;
+      if (!success) failed++;
+      log(`${success ? 'ok  ' : 'FAIL'} v3/${testFile}: ${passed}/${count} tests passed${success ? '' : '\n' + output.trim().split('\n').slice(-25).join('\n')}`);
+    }
+    log(failed ? `doctor: ${failed} v3 check(s) failed` : 'doctor: v3 local contracts/tests passed; no product or deployment acceptance implied');
+    return failed;
+  }
   if (!existsSync(path.join(target, 'scripts'))) throw new Error(`${target} has no scripts/; run init first`);
   const manifest = readManifest(target);
   if (manifest) {
@@ -253,22 +322,29 @@ const HELP = `${pkg.name} ${pkg.version}
   npx ${pkg.name} update [--dir <repo>] [--profile full|lite] [--force]
   npx ${pkg.name} doctor [--dir <repo>] [--quick]
   npx ${pkg.name} version
+  npx ${pkg.name} work <command> [arguments]
 
 init    copies the runtime into <repo>/.claude, adds the StarCi entry once to CLAUDE.md and AGENTS.md
-        while preserving custom instructions, and adds .worktrees/sessions/ to .gitignore.
+        while preserving custom instructions, and adds only .work/_local/ to .gitignore.
         Refuses a .claude it did not install unless --force; --no-bootstrap keeps host files unchanged.
 update  replaces the runtime paths with this version; a file changed locally is kept and listed
         (resources/settings.json is the person's own and is never part of the package)
         unless --force. Files outside the runtime paths are never touched.
+        A major upgrade requires --upgrade-major; no existing .worktrees data is migrated/deleted.
 profile full is the default. Lite is an explicit separate entry for bounded work; all full operators
         remain installed. Update retains the installed profile unless --profile explicitly changes it.
         Custom host rules are preserved; --no-bootstrap leaves their entry routing under your control.
-        Active full workflows retain their existing scope, evidence and gates.
-doctor  runs the tree's own validators on the installed copy and reports local drift.
+        Existing v2 ledgers are retained; v3 does not resume or convert their orchestration.
+doctor  runs v3 local contract tests on the installed copy and reports local drift.
+work    runs the bounded .work CLI; use "work help". Never dispatches product operations.
 `;
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
+    if (process.argv[2] === 'work') {
+      const result = spawnSync(process.execPath, [path.join(packageRoot, 'v3', 'cli', 'main.mjs'), ...process.argv.slice(3)], { stdio: 'inherit', windowsHide: true });
+      process.exit(result.status ?? 1);
+    }
     const opts = parseArgs(process.argv.slice(2));
     if (opts.command === 'init') init(opts);
     else if (opts.command === 'update') update(opts);
