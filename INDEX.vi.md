@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.12
+# StarCi Skills 2.5.0
 
 Cây này chính là runtime. Đọc tiếp `SKILL.md` (bản tiếng Anh là bản được nạp; `SKILL.vi.md` chỉ để người đọc); đó là cửa vào duy nhất,
 đóng băng phạm vi của một nhiệm vụ, chọn đúng một operator sở hữu kết quả, rồi định tuyến giữa các
@@ -92,29 +92,7 @@ thì không được publish.
 
 ## Dòng dõi
 
-2.5.0-rc.12 (2026-09-07): phản biện kiến trúc ràng buộc source thực và phân tích độc lập; planner khởi tạo runtime và kiểm tra schema mission sớm từ chối điều kiện tiên quyết hoặc bản nháp sai trước dispatch. Bản ứng viên chỉ được phát hành sau kiểm chứng tích hợp.
-
-2.5.0-rc.11 (2026-09-07): phụ thuộc unit theo đúng chuỗi retry được chấp nhận, không sửa plan được giữ hay receipt thất bại; việc dùng source mới vẫn từ chối source đang bị xem xét hoặc đã bị thay thế. Xem tests/evidence/20260907-unit-successor-reentry.md. Bản xem trước goal hiển thị kiến trúc có nhãn bằng chứng; các bước chờ đã niêm phong của mission trước được giữ là lịch sử khi nhận kế hoạch đã sửa. Xem tests/evidence/20260907-goal-presentation-and-prior-waits.md.
-
-2.5.0-rc.10 (2026-09-06): phân chia mục tiêu rõ ràng yêu cầu đủ mọi route hoặc đơn vị hành trình đã chọn; review source và lần sửa mới giữ nguyên lịch sử đã chấp nhận, đồng thời không tính hoàn thành hiện tại hoặc cho import mới từ source đang bị xem xét hay đã được thay thế. Candidate này cần kiểm chứng vòng tích hợp và bản phát hành trước khi công bố.
-
-2.5.0-rc.9 (2026-09-06): tách workflow chung giữa luồng chuyển đúng một quyền ghi đã niêm phong, chỉ chờ các bước phụ thuộc, giữ bằng chứng tích hợp source chính xác và chứng minh mọi kết quả gốc trên cùng runtime tích hợp đã đo. Xem tests/evidence/20260906-dynamic-coordination.md.
-
-2.5.0-rc.8 (2026-09-06): bằng chứng source chưa đạt đã niêm phong có thể mở lại đúng unit với phương pháp kiểm chứng mới được đóng băng và một commit source thông thường mới; công việc hợp lệ xen giữa được giữ nguyên.
-
-2.5.0-rc.7 (2026-09-06): retry workflow giữ nguyên binding lịch sử đã niêm phong và kiểm tra quyền ghi hiện tại khi mở lần chạy mới; đầu vào kỹ thuật được sửa phải có tiến triển rõ ràng và giữ nguyên bằng chứng thất bại.
-
-2.5.0-rc.6 (2026-09-06): kiểm chứng migration theo unit chỉ lấy module đã chọn từ backend plan được chấp nhận, giữ fingerprint toàn bộ kiến trúc và mọi nghĩa vụ khi không chia unit.
-
-2.5.0-rc.5 (2026-09-06): các review trả lại liên tiếp cho phép admission theo đúng chuỗi waiting đã xác minh trong giao dịch resume, giữ nguyên từng checkpoint và chỉ hoàn tất nghĩa vụ bằng bằng chứng kết thúc mới.
-
-2.5.0-rc.4 (2026-09-06): busy gate chung nhận biết waiting đã được giải quyết bằng proof niêm phong, cho phép replan tiếp theo đúng quyền hạn và giữ nghĩa vụ chưa hoàn thành cùng duy nhất một successor.
-
-2.5.0-rc.3 (2026-09-06): nested return đã niêm phong và vấn đề toàn vẹn review đã khai báo vào lại qua invocation cùng owner và review độc lập mới, giữ nguyên proof gốc cùng quyền hạn goal hiện tại.
-
-2.5.0-rc.2 (2026-09-06): admission forecast gắn exchange đã khai với đúng parent accepted thay vì giao thêm goal delivery; probe runtime chỉ đọc giữ operation header cố định không chứa secret. Kiểm chứng ứng viên chưa phải publication.
-
-2.5.0-rc.1 (2026-09-06): bản ứng viên chứng minh runtime tái dùng chỉ đọc bằng cặp artifact response giữ nguyên registry, endpoint đang sống, chủ socket và Git ancestry; không lấy write lease và giữ gate mutation. Đây là ứng viên phát hành, chưa phải publication.
+2.5.0 (2026-09-06): `landing.compose` thêm contract landing chỉ đọc cho mức áp dụng Grammar, storytelling theo section, quyết định medium asset, choreography motion và reduced-motion, performance budget cùng bằng chứng audit; `interface.generate` vẫn là source writer duy nhất và `interface.audit` dùng contract làm thẩm quyền proof khi render.
 
 2.4.6 (2026-09-06): sửa attestation có kiểu đưa lỗi readiness runtime đã accepted qua repair được kiểm chứng rồi chạy lại preflight đầy đủ; điều phối chịu trách nhiệm gỡ blocker chung và giữ quyền tự chủ triển khai của từng task.
 

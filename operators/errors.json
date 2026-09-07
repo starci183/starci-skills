@@ -315,7 +315,7 @@
       }
     },
     "KNOWLEDGE_QUESTION": {
-      "scope": ["interface.plan", "interface.generate", "interface.fix", "interface.audit"],
+      "scope": ["interface.plan", "landing.compose", "interface.generate", "interface.fix", "interface.audit"],
       "domain": "knowledge",
       "disposition": "terminate",
       "meaning": {

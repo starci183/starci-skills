@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.12
+# StarCi Skills 2.5.0
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -91,29 +91,7 @@ head or the head is not publishable.
 
 ## Lineage
 
-2.5.0-rc.12 (2026-09-07): architecture critique binds actual source and independent analysis; runtime bootstrap planning and early mission schema checks reject invalid prerequisites and drafts before dispatch. Candidate publication requires integrated release proof.
-
-2.5.0-rc.11 (2026-09-07): unit dependencies resolve exact accepted retry lineages without rewriting retained plans or failed receipts; fresh consumption still rejects disputed or retired source. See tests/evidence/20260907-unit-successor-reentry.md. Initial goal previews carry evidence-labelled architecture; sealed prior-mission waits remain historical during corrected forecast admission. See tests/evidence/20260907-goal-presentation-and-prior-waits.md.
-
-2.5.0-rc.10 (2026-09-06): explicit goal partitions require every selected route or journey unit; source-only review and fresh repair preserve accepted history while withholding current delivery credit and fresh imports from disputed or replaced source. This candidate requires integrated lifecycle and release verification before publication.
-
-2.5.0-rc.9 (2026-09-06): dynamic shared-workflow extraction transfers one sealed writer, parks only dependent nodes, retains exact source incorporation and proves all original outcomes against one measured integrated runtime. See tests/evidence/20260906-dynamic-coordination.md.
-
-2.5.0-rc.8 (2026-09-06): sealed non-passing source proof can re-enter the same unit with a changed frozen verification method and a new normal source commit; accepted intervening work remains intact.
-
-2.5.0-rc.7 (2026-09-06): workflow retries retain sealed historical bindings while checking current write authority on fresh invocations; corrected technical inputs re-enter through explicit progress and preserved failure evidence.
-
-2.5.0-rc.6 (2026-09-06): unit-bound migration verification projects only the selected module from its accepted backend plan, retaining the complete architecture fingerprint and all unsplit-contract obligations.
-
-2.5.0-rc.5 (2026-09-06): successive returned reviews admit the exact verified waiting ancestor chain transactionally, retaining every checkpoint and requiring fresh terminal proof before settlement.
-
-2.5.0-rc.4 (2026-09-06): the shared mission busy gate recognizes sealed resolved waits, permitting subsequent authorized replanning while retaining unresolved obligations and unique successor ownership.
-
-2.5.0-rc.3 (2026-09-06): sealed nested return and disclosed review-integrity concerns re-enter through a fresh same-owner invocation and independent review, preserving original proof and current goal authority.
-
-2.5.0-rc.2 (2026-09-06): nested forecast admission binds the declared exchange to its exact accepted parent instead of assigning it a second delivery goal; read-only runtime probes retain a fixed non-secret operation header. Candidate verification does not imply publication.
-
-2.5.0-rc.1 (2026-09-06): candidate read-only runtime reuse proves unchanged registry bytes, live endpoints, socket ownership and Git ancestry through paired response artifacts; it takes no write lease and preserves the mutation proof path. This entry records a release candidate, not publication.
+2.5.0 (2026-09-06): `landing.compose` adds a read-only landing contract for Grammar adoption, section storytelling, asset-medium decisions, motion and reduced-motion choreography, performance budgets and audit evidence; `interface.generate` remains the sole source writer and `interface.audit` consumes the contract as rendered proof authority.
 
 2.4.6 (2026-09-06): typed attestation repair routes accepted runtime readiness walls through verified repair and complete preflight re-entry; coordinated ownership includes active shared-blocker resolution while peers retain execution autonomy.
 

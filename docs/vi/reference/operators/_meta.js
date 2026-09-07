@@ -17,6 +17,7 @@ export default {
   "interface-generate": "interface.generate",
   "interface-plan": "interface.plan",
   "knowledge-repair": "knowledge.repair",
+  "landing-compose": "landing.compose",
   "library-update": "library.update",
   "migration-release": "migration.release",
   "quality-verify": "quality.verify",

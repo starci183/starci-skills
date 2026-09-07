@@ -241,6 +241,13 @@
         "kind": "user"
       }
     },
+    "landing.compose": {
+      "interface": { "kind": "resume" },
+      "business": { "kind": "operator", "target": "business.decide" },
+      "knowledge": { "kind": "chain", "target": "knowledge.repair" },
+      "workspace": { "kind": "operator", "target": "workspace.bind" },
+      "caller": { "kind": "user" }
+    },
     "interface.audit": {
       "plan": {
         "kind": "operator",

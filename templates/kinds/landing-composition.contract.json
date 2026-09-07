@@ -1,0 +1,78 @@
+{
+  "kind": "landing-composition",
+  "title": "^# landing-composition — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Authority$",
+      "table": "| Field | Value |",
+      "rows": ["Business promise", "Grammar family", "Visual identity"],
+      "cell": { "Value": "\\S" }
+    },
+    {
+      "heading": "^## Grammar adoption$",
+      "table": "| Section | Element | Owner | Binding or reason |",
+      "minRows": 5,
+      "cell": {
+        "Section": "^`[a-z0-9][a-z0-9-]*`$",
+        "Element": "\\S",
+        "Owner": "^(grammar|custom)$",
+        "Binding or reason": "\\S"
+      }
+    },
+    {
+      "heading": "^## Visual storyboard$",
+      "table": "| Order | Section | Narrative job | Visual event | Proof |",
+      "minRows": 3,
+      "cell": {
+        "Order": "^[0-9]{2}$",
+        "Section": "^`[a-z0-9][a-z0-9-]*`$",
+        "Narrative job": "\\S",
+        "Visual event": "\\S",
+        "Proof": "\\S"
+      }
+    },
+    {
+      "heading": "^## Asset strategy$",
+      "table": "| Slot | Decision | Identity evidence | Brief |",
+      "minRows": 1,
+      "cell": {
+        "Slot": "^`[a-z0-9][a-z0-9-]*`$",
+        "Decision": "^(imagegen|svg|code-native|existing)$",
+        "Identity evidence": "\\S",
+        "Brief": "\\S"
+      }
+    },
+    {
+      "heading": "^## Motion choreography$",
+      "table": "| Section | Trigger | Choreography | Reduced motion | Performance budget |",
+      "minRows": 1,
+      "cell": {
+        "Section": "^`[a-z0-9][a-z0-9-]*`$",
+        "Trigger": "\\S",
+        "Choreography": "\\S",
+        "Reduced motion": "\\S",
+        "Performance budget": "\\S"
+      }
+    },
+    {
+      "heading": "^## Audit contract$",
+      "table": "| Concern | Evidence | Failure route |",
+      "rows": ["visual storytelling", "motion", "reduced motion", "performance"],
+      "cell": {
+        "Evidence": "\\S",
+        "Failure route": "^(direction|resolve|grammar-gap)$"
+      }
+    },
+    {
+      "heading": "^## Ownership handoff$",
+      "table": "| Operator | Owns | Must not |",
+      "rows": ["landing.compose", "interface.generate", "interface.audit"],
+      "cell": { "Owns": "\\S", "Must not": "\\S" }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |",
+      "cell": { "Code": "^`[A-Z][A-Z0-9_]+`$", "Action": "\\S" }
+    }
+  ]
+}
