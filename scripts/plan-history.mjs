@@ -254,12 +254,19 @@ export async function editForecast(root, session, state, original, edit, top) {
     const packages = await loadOperatorPackages(root);
     const pkg = packages.find(p => p.manifest.id === operator);
     const stop = pkg?.en.tables.stops?.rows.find(row => String(row.code).replaceAll('`','') === response.stop);
-    // User-owned restatements require the exact content-bound answer. Other re-entries retain the
+    // Restatements require their exact content-bound decision. Other re-entries retain the
     // ordinary operator resume and typed stop gates at dispatch; an external stop cannot be edited.
     if (review) {
       // The awaited kind owns the return route; its sealed review binding is checked at admission.
     } else if (response.stop === 'RESTATEMENT_UNCONFIRMED') {
-      if (state.choices?.[response.interaction?.decisionId]?.selectedBy !== 'user') throw Error('PLAN_REENTRY_UNAUTHORIZED: the rendered reading has no actual user answer');
+      const decisionId = response.interaction?.decisionId, choice = state.choices?.[decisionId];
+      if (choice?.selectedBy === 'coordinator') {
+        const { delegatedRestatementErrors } = await import('./restatement-delegation.mjs');
+        const [step, parallel] = sourceCell.split('/').map(Number);
+        const projected = { ...originalRequest, decisionId, selectedOption: choice.selected, resume: { step, parallel, token: decisionId } };
+        const errors = await delegatedRestatementErrors(root, branchPath(session, sourceCell), state, projected, { phase: 'predispatch' });
+        if (errors.length) throw Error('PLAN_REENTRY_UNAUTHORIZED: ' + errors.join('\n'));
+      } else if (choice?.selectedBy !== 'user') throw Error('PLAN_REENTRY_UNAUTHORIZED: the rendered reading has no actual user answer or verified delegated review');
     } else {
       const shared = JSON.parse(readFileSync(path.join(root, 'operators/errors.json'))).codes;
       const own = JSON.parse(readFileSync(path.join(root, 'operators', operator.replaceAll('.','-'), 'errors.json'))).codes;

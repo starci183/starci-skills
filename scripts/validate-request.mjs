@@ -218,7 +218,7 @@ export function plannedRequirementErrors(planned, request, at = 'request.json') 
 }
 
 export const V22_CONTRACT = 'starci/v2.2';
-const FAMILY_BOUND_OPERATORS = new Set(['interface.plan', 'interface.generate', 'interface.fix', 'interface.audit', 'knowledge.repair']);
+const FAMILY_BOUND_OPERATORS = new Set(['interface.plan', 'landing.compose', 'interface.generate', 'interface.fix', 'interface.audit', 'knowledge.repair']);
 const SOURCE_WRITING_OPERATORS = new Set(['backend.generate', 'interface.generate', 'interface.fix', 'knowledge.repair', 'library.update']);
 const canonicalJson = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
@@ -385,6 +385,7 @@ export async function sealedWorkspaceBindingErrors(session, state, request) {
 
 const UI_BINDINGS = {
   'interface.plan': ['@knowledge/ui/composition'],
+  'landing.compose': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof'],
   'interface.generate': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof'],
   'interface.fix': ['@knowledge/ui/presentation'],
   'interface.audit': ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof']

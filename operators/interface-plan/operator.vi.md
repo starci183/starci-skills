@@ -154,5 +154,6 @@ blocked hay mismatch là Operator Result.
 | --- | --- |
 | knowledge đã bind mâu thuẫn với bằng chứng tác vụ hay tham chiếu đã kiểm, nên owner chuẩn sửa nó trước khi thử lại chính bản đồ này | `knowledge.repair` |
 | bản đồ đã đầy đủ: mỗi đơn vị được sinh trên nhánh riêng, mỗi nhánh một trang hay modal, mang id đơn vị của nó | `interface.generate` |
+| một đơn vị đã map là landing cần soạn visual sequence, asset media và motion contract trước khi sinh source | `landing.compose` |
 | một route tham chiếu cho thấy là thứ người không yêu cầu, nên người nói nó có thuộc tính năng hay không | `user` |
 | sơ đồ bề mặt đầy đủ và cần lập kế hoạch kiểm chứng hành trình để bàn giao | `uat.plan` |

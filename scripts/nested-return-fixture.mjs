@@ -10,7 +10,7 @@ const sha = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex'
 const put = async (file, value) => { await mkdir(path.dirname(file), {recursive:true}); await writeFile(file, typeof value === 'string' ? value : JSON.stringify(value)); };
 const table = (heading, columns, rows) => `\n## ${heading}\n\n| ${columns.join(' | ')} |\n| ${columns.map(()=>'---').join(' | ')} |\n${rows.map(row=>`| ${row.join(' | ')} |`).join('\n')}\n`;
 
-export async function fixture(t, { selection = 'return', followupReading = false } = {}) {
+export async function fixture(t, { selection = 'return', followupReading = false, readingOnly = false } = {}) {
  const host = await mkdtemp(path.join(os.tmpdir(), 'starci-review-lifecycle-')), root = path.join(host,'.claude');
  t.after(()=>rm(host,{recursive:true,force:true}));
  const payload = JSON.parse(await readFile(path.join(source,'package.json')));
@@ -59,7 +59,9 @@ export async function fixture(t, { selection = 'return', followupReading = false
  const decisionId=restatementDecisionId(first,template.requirements.decisionId,text);
  await put(path.join(branch('2/1'),'response/restatement.md'),text);
  await put(path.join(branch('2/1'),'response/response.json'),actual(first,{schemaVersion:9,operatorId:'architecture.decide',stop:'RESTATEMENT_UNCONFIRMED',fields:{restatement:'response/restatement.md'},fallbacks:[],commits:[],next:[],interaction:{kind:'restatement-confirm',decisionId,options:[{id:'as-stated',label:'As stated',tradeoff:'Use this reading'},{id:'corrected',label:'Corrected',tradeoff:'Correct this reading'}]}},'blocked',['response/restatement.md']));
- await acceptAttempt(branch('2/1'));await recordRestatementChoice(branch('2/1'),{selected:'as-stated',selectedBy:'user',sourceRef:'user:actual-fixture-answer'});
+ await acceptAttempt(branch('2/1'));
+ if(readingOnly)return {root,host,owner,session,read,save,branch,first,text,template,current,actual,plans,openAttempt,acceptAttempt,restatementDecisionId,recordRestatementChoice,retainContext,scopeHash,openSession,confirmSession,load};
+ await recordRestatementChoice(branch('2/1'),{selected:'as-stated',selectedBy:'user',sourceRef:'user:actual-fixture-answer'});
  const parent=current(template,3,{number:2,previous:first.attempt.id,resume:{step:2,parallel:1,token:decisionId}});parent.decisionId=decisionId;parent.selectedOption='as-stated';parent.requirements.resume=decisionId;
  state=await read();state.resumes={'3/1':{resumes:'2/1',stop:'RESTATEMENT_UNCONFIRMED'}};state.current='3/1';await save(state);
  async function waiting(request) {

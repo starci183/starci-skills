@@ -55,7 +55,7 @@
   "wait": "completion: a dispatched or isolated agent is awaited on its completion event and a chain route on its same-session prerequisite branch's accepted completion; a timed poll is not a step of any chain, and a wait that returns nothing is not evidence of anything",
   "receiptSkeleton": true,
   "outcomePolicy": "resources/interaction.json#outcomePresentation",
-  "briefBytes": 3072,
+  "briefBytes": 3120,
   "budget": {
     "maxSteps": 24,
     "maxSameOperator": 4,

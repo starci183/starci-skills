@@ -117,6 +117,8 @@ head or the head is not publishable.
 
 2.5.0-rc.1 (2026-09-06): candidate read-only runtime reuse proves unchanged registry bytes, live endpoints, socket ownership and Git ancestry through paired response artifacts; it takes no write lease and preserves the mutation proof path. This entry records a release candidate, not publication.
 
+landing.compose (2026-09-06): `landing.compose` adds a read-only landing contract for Grammar adoption, section storytelling, asset-medium decisions, motion and reduced-motion choreography, performance budgets and audit evidence; `interface.generate` remains the sole source writer and `interface.audit` consumes the contract as rendered proof authority.
+
 2.4.6 (2026-09-06): typed attestation repair routes accepted runtime readiness walls through verified repair and complete preflight re-entry; coordinated ownership includes active shared-blocker resolution while peers retain execution autonomy.
 
 2.4.5 (2026-09-06): forecast commit shares the mission busy gate; sealed retired waits remain history rather than active completion obligations, and prior-reading resume preserves unopened parallel peers.
