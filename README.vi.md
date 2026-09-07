@@ -1,6 +1,6 @@
 # @starci/skills — Work 3.0 alpha
 
-Workflow chạy op đã chọn, cây completion `.work` thuộc sản phẩm. Không chain tự động, request/response folder bắt buộc hay tự provisioning.
+AI tự chọn op chain theo scope mỗi prompt, tối đa ba lớp tuần tự và ba op song song mỗi lớp. Cây completion `.work` thuộc sản phẩm. Không chain vô hạn, request/response folder bắt buộc hay tự provisioning.
 
 Đọc [hướng dẫn v3](v3/README.vi.md) và [catalogue op](v3/ops/catalog.json). Tiếng Anh là runtime authority.
 

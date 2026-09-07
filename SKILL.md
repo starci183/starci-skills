@@ -1,11 +1,13 @@
 ---
 name: starci
-description: Work on an explicitly selected product-development operation using a business completion tree, scoped resources, and evidence-bound results. Use for tracked business, architecture, implementation, verification, and delivery work; answer ordinary questions without creating a workflow.
+description: Map a product-development request to one or more scoped pieces and suitable operations using a business completion tree and evidence-bound results. Use for tracked business, architecture, implementation, verification, and delivery work; answer ordinary questions without creating a workflow.
 ---
 
 # StarCi Work 3.0
 
-Use the user's current goal and authorization, not a precomputed chain. One task may contain several operations for one purpose; one invocation completes only the selected operation or explicitly approved independent group and then stops.
+Use the user's current goal and authorization, not a universal pipeline. For each prompt, choose a bounded op chain from the product scope: at most three sequential execution waves, each with at most three concurrent op invocations (nine invocations maximum). Complete that selected chain or report its blockers, then stop. Do not reset the budget by opening another batch, agent, task or subchain within the same prompt.
+
+Each prompt may address one or more pieces. Match its intended result to the current `.work` scope and select the suitable catalogue op for each piece yourself; the user need not name operators or approve each in-scope hop again. Briefly state the piece-to-op mapping and waves, then proceed under existing authorization. Selection is request-bounded, not permission to finish every unchecked node or dispatch out-of-scope prerequisites. Order selected dependencies before consumers, validate their actual result before advancing, and stop the affected branch at a missing prerequisite. Unknown business decisions and new external effects still need user direction.
 
 ## Load only what this operation needs
 
@@ -36,9 +38,9 @@ Keep credentials in the existing sealed/vault owner. Store only refs in `.work`;
 
 ## Parallel work
 
-Default to one active operation. Spawn only when the user or applicable instructions authorize delegation. A requested group of three independent flows can use three agents, with distinct node/source write ownership, browser contexts and mutable-data namespaces. If isolation is unavailable, serialize or report the dependency.
+This protocol permits the coordinator to assign independent selected ops to agents within the three-by-three cap when delegation is available and allowed by higher-priority/tool instructions. Use at most three active execution workers across the whole prompt, not three per parent. A coordinator executing an op occupies a slot too. Distinct node/source ownership, browser contexts and mutable-data namespaces are required; otherwise serialize within the cap or defer work to the next prompt. Three is a maximum, not a mandatory agent count.
 
-Each worker reads its own operation contract and evidence; ordinary messages are not accepted proof by themselves. Do not spawn more agents from an already bounded group without authorization. Do not silently move work to another user task.
+Each worker reads its own operation contract and evidence; ordinary messages are not accepted proof by themselves. Workers return results to the coordinator and do not recursively spawn or dispatch successors. The coordinator alone advances the selected waves. Retries consume an invocation/wave slot too; do not hide an unlimited chain inside one piece. Tool steps inside one bounded op are not separate ops. Do not silently move work to another user task.
 
 ## Persistent result
 

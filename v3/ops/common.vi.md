@@ -1,10 +1,14 @@
-# Giao thức thực thi một op
+# Giao thức op chain có giới hạn scope
 
 Bản tiếng Anh cùng tài liệu tiếng Anh của op được chọn là thẩm quyền runtime. Đọc đầy đủ cả hai. Bản `.vi.md` là bản đối chiếu cho người đọc. Chỉ đọc tài liệu chuyên môn đúng phạm vi; file op cũ phục vụ đối chiếu tương thích, không khôi phục chain, session, request/response hoặc vòng duyệt cũ.
 
 ## Chọn việc và thẩm quyền
 
-Một task có một mục đích và có thể chọn nhiều piece độc lập. Một lần gọi thực hiện một op trên tập đích đã chỉ định, với mục tiêu quan sát được. Có thể duyệt một nhóm op cùng lúc; xong một op không tự gọi op khác. Catalogue là hợp đồng hướng dẫn, không phải engine thực thi hay quyền thao tác.
+Một task có một mục đích; mỗi prompt có thể yêu cầu một hoặc nhiều piece. Agent ánh xạ kết quả yêu cầu vào scope `.work` thật và tự assign op catalogue phù hợp cho từng piece; user không cần gọi hay duyệt riêng tên op. Mỗi lần gọi op làm tập đích và mục tiêu hữu hạn. Có thể dùng nhiều lần gọi để hoàn thành cùng prompt, nhưng xong một op không tự thêm successor ngoài yêu cầu. Catalogue là hợp đồng hướng dẫn, không phải engine thực thi hay quyền thao tác.
+
+Chốt và nói gọn ánh xạ piece → op trong phạm vi prompt trước khi làm, không tạo request/response files. Chọn theo ý định, scope node, mục tiêu/giới hạn ghi của contract và dependency eligibility; không đoán hành động chỉ từ kind. Giữ lựa chọn rõ của user. Yêu cầu kiểm tra chỉ cho đọc, không tự implement; thiếu quyết định quan trọng hoặc effect mới thì hỏi. Làm tập được yêu cầu theo graph, dừng khi thiếu prerequisite ngoài scope thay vì thêm việc; để nguyên piece unfinished/suspended không liên quan.
+
+Coordinator tự chọn và tiến chain trong scope, không hỏi từng tên op: tối đa ba lớp tuần tự, mỗi lớp tối đa ba invocation, tổng tối đa chín invocation mỗi prompt. Consumer chỉ chạy sau khi prerequisite được chọn đã kiểm chứng done. Op độc lập đủ điều kiện có thể chạy song song với tối đa ba worker thực thi tổng cộng; coordinator đang làm op cũng tính slot. Tuân tool và hướng dẫn delegation ưu tiên cao hơn. Worker không spawn đệ quy/gọi successor; coordinator quản lý admission và tiến lớp. Retry tính vào hạn mức invocation/lớp hiện tại. Không reset bằng batch/task/subchain, gộp nhiều op khác nhau thành op giả hay chạy quá lớp ba. Báo phần còn lại cho prompt sau. Tool steps trong một op hữu hạn không phải op mới. Đây là hướng dẫn agent, không phải background scheduler đã được cài.
 
 Yêu cầu hiện tại và node nghiệp vụ đã được chấp nhận xác định ý định; source, runtime và evidence quan sát được xác định sự thật thực tế. Phân biệt đề xuất, ví dụ, chưa biết và mâu thuẫn. Không tự suy yêu cầu từ hành vi cũ, bịa actor/route/repository/rule/kết quả test, hoặc dùng ảnh chứng minh persistence. Có thể đề xuất file mới trong phạm vi được giao, nhưng phải ghi là dự kiến, không giả vờ file đã tồn tại.
 
@@ -79,4 +83,4 @@ Tách context/session browser giữa actor/flow song song và tách namespace d�
 
 Tái sử dụng resource còn khớp, inspect trước khi sửa trạng thái chưa chắc. Dừng khi lỗi giống hệt lặp lại mà không có chẩn đoán hay hướng khác được phép. Tác động bên ngoài chưa rõ kết quả phải read-only reconcile trước khi retry. Không giảm expected, skip test fail, đổi `required`/`na` để làm xanh cha.
 
-Blocker phải nêu thông tin thiếu thật, node bị ảnh hưởng, quan sát gần nhất và quyết định/hành động cần từ owner. Chỉ tiếp tục piece độc lập đã được chọn nếu an toàn. Lỗi không tự kích hoạt repair/deploy/op tiếp/spawn. Kết thúc ngắn với kết quả, node/file đổi, commit thật, phạm vi đã/chưa test, evidence và gap cụ thể. Có thể gợi ý op tiếp theo, rồi dừng.
+Blocker phải nêu thông tin thiếu thật, node bị ảnh hưởng, quan sát gần nhất và quyết định/hành động cần từ owner. Chỉ tiếp tục piece độc lập đã chọn nếu an toàn và còn hạn mức. Lỗi không cấp quyền repair/deploy/chain ngoài scope. Worker trả kết quả, node/file, commit, phần đã/chưa test, evidence và gap cho coordinator rồi dừng, không gọi op khác. Coordinator có thể tiến lớp đã chọn đủ điều kiện; kết thúc prompt khi đạt kết quả, thiếu quyết định bắt buộc hoặc hết ba lớp. Op chưa chọn chỉ là đề xuất cho prompt sau.

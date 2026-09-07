@@ -1,6 +1,6 @@
 # @starci/skills — Work 3.0 alpha
 
-A selected-operation development workflow with a product-owned `.work` completion tree. No automatic chains, mandatory request/response directories or implicit provisioning.
+A scope-bounded development workflow with a product-owned `.work` completion tree. The agent selects an op chain per prompt: at most three sequential waves, at most three parallel ops per wave. No unbounded chains, mandatory request/response directories or implicit provisioning.
 
 Read [the v3 guide](v3/README.md) and [operator catalogue](v3/ops/catalog.json). Vietnamese entry: [README.vi.md](README.vi.md).
 

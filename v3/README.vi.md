@@ -2,6 +2,8 @@
 
 Alpha cục bộ. Runtime gồm validator/CLI tra cứu và contract op cho agent; không phải scheduler, browser adapter, secret manager hay dịch vụ deploy. [README.md](README.md) là authority.
 
+Mỗi prompt AI tự chọn op và thứ tự từ scope `.work`: tối đa ba lớp tuần tự, mỗi lớp tối đa ba invocation đồng thời (tổng chín), tính cả retry và toàn bộ worker. Không reset hạn mức theo agent/batch. Chỉ làm tập nằm trong request, kiểm chứng prerequisite trước consumer, hết lớp ba thì bàn giao phần còn lại cho prompt sau. Đây là contract agent, không phải CLI engine. Không cần duyệt lại tên op/từng bước đã nằm trong quyền hiện có.
+
 ## Nguồn chuẩn và nơi lưu
 
 Chọn ID từ [catalogue](ops/catalog.json), đọc đúng document và commonDocument. [Core](core/README.md) cùng schemas định nghĩa trường máy và giới hạn kiểm tra.

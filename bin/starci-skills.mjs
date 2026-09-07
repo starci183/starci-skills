@@ -34,10 +34,16 @@ const LEGACY_PROMPT_ENTRY = `${ENTRY_MARKER}
 For every user prompt, enter [StarCi](.claude/INDEX.md) before planning or target work and follow
 the entry's user-session and goal protocol. Follow-up prompts reuse that host session.
 <!-- /starci:prompt-entry -->`;
-const PROMPT_ENTRY = `${ENTRY_MARKER}
+const PREVIOUS_V3_PROMPT_ENTRY = `${ENTRY_MARKER}
 For product development work, enter [StarCi](.claude/INDEX.md) and select the bounded operation
 covered by the user's request. Track current product completion in .work; stop after the selected
 operation or explicitly approved parallel group. Questions do not require a work ledger.
+<!-- /starci:prompt-entry -->`;
+const PROMPT_ENTRY = `${ENTRY_MARKER}
+For product development work, enter [StarCi](.claude/INDEX.md) and select a bounded op chain
+from the user's scope: at most three sequential waves, each with at most three concurrent ops.
+Track current product completion in .work; hand off remaining work when the prompt budget ends.
+Questions do not require a work ledger.
 <!-- /starci:prompt-entry -->`;
 
 const BOOTSTRAP = `# StarCi agent bootstrap
@@ -58,10 +64,15 @@ const LEGACY_LITE_ENTRY = `${ENTRY_MARKER}
 For every user prompt, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md) and use its scope classification.
 Existing full workflows keep their current session and gates; formal UAT and publication use full StarCi.
 <!-- /starci:prompt-entry -->`;
-const LITE_ENTRY = `${ENTRY_MARKER}
+const PREVIOUS_V3_LITE_ENTRY = `${ENTRY_MARKER}
 For bounded maintenance, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md).
 For tracked business work, use [StarCi](.claude/INDEX.md) and its selected-operation contract.
 Do not create an automatic chain or migrate existing workflow evidence implicitly.
+<!-- /starci:prompt-entry -->`;
+const LITE_ENTRY = `${ENTRY_MARKER}
+For bounded maintenance, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md).
+For tracked business work, use [StarCi](.claude/INDEX.md) and its scope-bounded chain limits.
+Do not run an unbounded chain or migrate existing workflow evidence implicitly.
 <!-- /starci:prompt-entry -->`;
 const LITE_BOOTSTRAP = BOOTSTRAP.replace(PROMPT_ENTRY, LITE_ENTRY)
   .replace('Read [\`<Source>/.claude/INDEX.md\`](.claude/INDEX.md) completely and follow its load order.',
@@ -161,13 +172,13 @@ function bootstrapPlan(repo, profile) {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
     const current = readFileSync(file, 'utf8');
-    const customProtocol = [PROMPT_ENTRY, LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
+    const customProtocol = [PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
     if (/session-open\.mjs|plan-chain\.mjs|validated request\.json|Nothing is designed, written or committed outside a session/.test(customProtocol)) {
       throw new Error(name + ': custom v2 session/chain protocol conflicts with v3; reconcile it or use --no-bootstrap before changing payload');
     }
     const legacyBootstrap = BOOTSTRAP.replace(PROMPT_ENTRY, LEGACY_PROMPT_ENTRY);
     const legacyLiteBootstrap = LITE_BOOTSTRAP.replace(LITE_ENTRY, LEGACY_LITE_ENTRY);
-    for (const known of [BOOTSTRAP, LITE_BOOTSTRAP, legacyBootstrap, legacyLiteBootstrap]) {
+    for (const known of [BOOTSTRAP, LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
       const normalized = current.replace(/\r\n/g, '\n'), authored = known.replace(/\r\n/g, '\n');
       if (normalized.startsWith(authored)) {
         let end = 0, count = 0;
@@ -177,7 +188,7 @@ function bootstrapPlan(repo, profile) {
         return { name, file, text: bootstrap + suffix, action: 'updated' };
       }
     }
-    const managed = [PROMPT_ENTRY, LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
+    const managed = [PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
     if (managed) {
       const outside = current.replace(managed, '');
       if (profile === 'lite' && outside.includes('.claude/INDEX.md')) throw new Error(name + ': custom instructions still name the full entry; preserve them and resolve the profile explicitly before Lite bootstrap changes');

@@ -7,7 +7,9 @@ description: Thực hiện op phát triển sản phẩm đã chọn, dùng cây
 
 Bản hướng dẫn tiếng Việt; [SKILL.md](SKILL.md) là thẩm quyền runtime.
 
-Một task có thể chứa nhiều op cho một mục đích. Mỗi invocation chỉ làm op hoặc nhóm độc lập đã được duyệt rồi dừng, không chạy chain tự động.
+Mỗi prompt, AI tự chọn op chain từ scope sản phẩm: tối đa ba lớp tuần tự, mỗi lớp tối đa ba op đồng thời (tối đa chín invocation). Xong tập đã chọn hoặc gặp blocker thì báo kết quả rồi dừng. Không reset hạn mức bằng batch, agent, task hay subchain mới trong cùng prompt.
+
+Mỗi prompt có thể yêu cầu một hoặc nhiều piece. Tự chọn op phù hợp từ catalogue theo kết quả mong muốn và scope `.work`; không bắt user nhớ tên op hay duyệt lại từng bước trong phạm vi. Nói gọn piece → op và các lớp chạy rồi làm theo quyền đã có. Xếp prerequisite được chọn trước consumer và kiểm chứng kết quả thật trước khi sang lớp kế; không tự thêm prerequisite ngoài scope. Thiếu quyết định nghiệp vụ quan trọng hoặc effect mới vẫn cần hỏi.
 
 ## Đọc đúng phần cần dùng
 
@@ -36,7 +38,7 @@ Secret ở sealed/vault owner; `.work` chỉ giữ ref. Rà soát/redact artifac
 
 ## Song song và lưu kết quả
 
-Mặc định một op. Chỉ spawn khi được yêu cầu/ủy quyền. Ba luồng độc lập có thể dùng ba agent với quyền ghi node/source riêng, browser context và namespace dữ liệu riêng; không tách được thì serialize hoặc báo dependency. Worker tự đọc contract; tin nhắn không thay chứng cứ. Không tự mở rộng nhóm hoặc tạo task riêng.
+Coordinator có thể tự giao op độc lập cho agent trong giới hạn 3×3 nếu có tool và không trái hướng dẫn ưu tiên cao hơn. Tối đa ba worker thực thi trên toàn prompt, không phải ba cho mỗi parent; coordinator đang làm op cũng chiếm một slot. Tách quyền ghi, browser context và mutable data; không tách được thì chạy tuần tự trong hạn mức hoặc để prompt sau. Ba là tối đa, không bắt đủ ba agent. Worker tự đọc contract, trả kết quả rồi dừng, không spawn đệ quy/gọi successor. Chỉ coordinator tiến lớp tiếp. Retry cũng tính invocation/lớp; không giấu chain vô hạn trong một piece. Các bước tool của một op hữu hạn không phải op riêng.
 
 Chỉ sửa node lá/resource/evidence được giao; cha tự tổng hợp. Ghi full commit SHA và bản integrated/served phù hợp. Giữ thay đổi của người dùng, commit đúng phạm vi; không push/publish/deploy khi chưa được yêu cầu.
 

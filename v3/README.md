@@ -2,6 +2,8 @@
 
 Local alpha. The executable surface is a validator and inspection CLI plus bounded agent operation contracts; it is not a scheduler, browser adapter, secret manager or deployment service.
 
+For each user prompt the agent selects suitable ops and ordering from `.work` scope, with at most three sequential waves and at most three concurrent op invocations per wave (nine total). This includes retries and all workers; no per-agent budget reset. Execute only the request-bounded set, verify prerequisites before consumers, and hand off remaining work after the third wave. This is an agent contract, not a CLI execution engine. Operator names/hops do not require repeated approval when the scope and effects are already authorized.
+
 ## Current authority
 
 - [Operator catalogue](ops/catalog.json): select one ID and read its exact document plus commonDocument. [Vietnamese guide](README.vi.md) is a human mirror.

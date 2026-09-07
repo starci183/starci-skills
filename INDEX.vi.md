@@ -1,6 +1,6 @@
 # StarCi Skills 3.0.0-alpha.1
 
-Entry hiện hành: [SKILL.md](SKILL.md). Một op đã chọn, cây completion thuộc sản phẩm, tài nguyên có phạm vi và bằng chứng kiểm tra được. Không chain tự động hoặc request/response ledger bắt buộc.
+Entry hiện hành: [SKILL.md](SKILL.md). Agent tự chọn op chain theo scope mỗi prompt: tối đa ba lớp tuần tự, mỗi lớp tối đa ba op đồng thời. Cây completion, tài nguyên và evidence thuộc sản phẩm. Không chain vô hạn hoặc request/response ledger bắt buộc.
 
 ## Thứ tự đọc
 

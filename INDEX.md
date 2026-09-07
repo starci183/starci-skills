@@ -1,6 +1,6 @@
 # StarCi Skills 3.0.0-alpha.1
 
-The active entry is [SKILL.md](SKILL.md): one selected operation, a product-owned completion tree, bounded resources and verifiable evidence. There is no automatic chain or mandatory request/response ledger.
+The active entry is [SKILL.md](SKILL.md): the agent maps each prompt to a scope-bounded op chain, at most three sequential waves with at most three concurrent ops per wave. A product-owned completion tree, resources and evidence define the work; no unbounded chain or mandatory request/response ledger.
 
 ## Load order
 

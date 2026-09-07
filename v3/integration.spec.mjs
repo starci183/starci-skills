@@ -92,7 +92,7 @@ test('known old managed entry is replaced, custom text and CRLF suffix preserved
   const result = read(root, 'AGENTS.md');
   assert.ok(result.endsWith(suffix));
   assert.doesNotMatch(result, /Follow-up prompts reuse that host session/);
-  assert.match(result, /selected/);
+  assert.match(result, /bounded op chain/);
   assert.equal((result.match(/<!-- starci:prompt-entry -->/g) ?? []).length, 1);
 });
 
