@@ -1,0 +1,18 @@
+---
+{"schema":"work/node@1","id":"draft","kind":"business","required":true}
+---
+# Synthetic purpose: save a local text draft
+
+## Purpose and authority
+Synthetic evaluation request: establish a purpose and initial requirement/acceptance planning for a local text draft that survives reopening the application. Author only todo planning nodes. Do not implement, run UAT, create accounts, commit, or invoke a successor operation.
+
+## Scope and decisions
+Create the setup, functional requirement, and acceptance-planning leaves only. The folder and IDs are new proposals for this synthetic fixture, not discovered product features.
+
+Implementation, architecture selection, deployment and actual verification are excluded from this invocation; exclusion is not proof that those activities are done or unnecessary for a later product.
+
+## Done when
+All required child obligations have their own valid completion evidence. Initial scaffolding is not a completed business.
+
+## Unknowns
+Storage technology, supported clients, actor permissions, failure/recovery policy and numerical performance targets have not been specified. No value is invented for them.

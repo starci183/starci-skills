@@ -1,0 +1,13 @@
+---
+{"schema":"work/node@1","id":"draft.setup","kind":"business","required":true,"state":"todo","assertions":["scope-reviewed"]}
+---
+# Setup review
+
+## Scope
+Review the proposed draft purpose and minimal planning tree against the synthetic request stated in the parent. This leaf owns setup review only.
+
+## Done when
+An actual scope review confirms every stated outcome has a planning destination and every excluded action remains unexecuted. Any later evidence belongs beneath this setup leaf and proves no implementation or UAT.
+
+## Decisions and unknowns
+Initial scaffolding only was requested. No completion or evidence is authored in this forward-test. Product unknowns remain in the parent, not resolved by assumed defaults.
