@@ -1,7 +1,7 @@
 {
   "name": "@starci/skills",
   "version": "3.0.0-alpha.1",
-  "description": "StarCi Work: bounded operators, a business completion tree and evidence-bound development resources. Local alpha; no automatic chains.",
+  "description": "StarCi Work: scope-selected op chains capped at three sequential waves and three concurrent ops per wave, with business completion and evidence binding.",
   "license": "MIT",
   "type": "module",
   "engines": {
