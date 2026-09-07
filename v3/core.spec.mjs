@@ -140,3 +140,30 @@ test('artifact directories cannot smuggle completion nodes into the tree',t=>{
     const r=f.run();assert.ok(codes(r).includes('LAYOUT'));assert.ok(!r.nodes.some(n=>n.id==='smuggled'));assert.equal(r.nodes[0].effectiveState,'invalid');
   }
 });
+test('changing reasoned NA scope invalidates dependent proof while bare state does not change digest',t=>{
+  const f=fixture(t);f.node('applicability',{state:'na',naReason:'No regulated records are processed.'});f.node('consumer',{dependsOn:['applicability']});f.done('consumer');
+  assert.equal(f.run().ok,true);const before=f.run().nodes.find(n=>n.id==='consumer').inputDigest;
+  f.node('applicability',{...f.metas.get('applicability'),state:'todo'});
+  const stateOnly=f.run();assert.equal(stateOnly.nodes.find(n=>n.id==='consumer').inputDigest,before);assert.equal(stateOnly.nodes.find(n=>n.id==='consumer').effectiveState,'blocked');
+  f.node('applicability',{...f.metas.get('applicability'),state:'na',naReason:'Regulated records are handled by an external service.'});
+  const changed=f.run();assert.notEqual(changed.nodes.find(n=>n.id==='consumer').inputDigest,before);assert.equal(changed.nodes.find(n=>n.id==='consumer').effectiveState,'stale');
+});
+test('goal refs its requirements subtree while sibling implementation depends on requirements without a false cycle',t=>{
+  const f=fixture(t);
+  f.write('goal/node.md',`---\n${JSON.stringify({schema:'work/node@1',id:'goal',kind:'business',required:true,refs:['requirements']})}\n---\nDeliver the bounded business goal.`);
+  f.write('goal/business/node.md',`---\n${JSON.stringify({schema:'work/node@1',id:'requirements',kind:'business',required:true})}\n---\nApproved requirement set.`);
+  f.write('_resources/repositories/backend/resource.yaml',{schema:'work/resource@1',id:'backend',kind:'repository',owner:'test',revision:'1',details:{scope:'Synthetic repository binding; no Git object claim.'}});
+  f.node('goal/business/fr',{id:'functional-requirement'});f.node('goal/business/nfr',{id:'nonfunctional-requirement',state:'na',naReason:'Synthetic baseline has no availability obligation.'});
+  f.node('goal/implementation',{kind:'implementation',refs:['backend'],dependsOn:['functional-requirement']});
+  f.done('goal/business/fr');const codeRefs=[{repository:'backend',commit:'a'.repeat(40)}];f.done('goal/implementation',{codeRefs});
+  const m=f.metas.get('goal/implementation');f.node('goal/implementation',{...m,completion:{...m.completion,codeRefs}});
+  const before=f.run();assert.equal(before.ok,true,JSON.stringify(before.errors));assert.equal(before.nodes.find(n=>n.id==='goal.implementation').effectiveState,'done');
+  // This sibling is not in implementation.dependsOn: the inherited group ref
+  // must still bind it, without making the functional leaf depend on itself.
+  f.node('goal/business/nfr',{...f.metas.get('goal/business/nfr'),naReason:'Availability is delegated to a contracted external service.'});
+  const changed=f.run();assert.ok(!codes(changed).includes('CYCLE'));assert.equal(changed.nodes.find(n=>n.id==='goal.implementation').effectiveState,'stale');
+});
+test('explicit self references and ancestor dependency loops still fail cycle detection',t=>{
+  const f=fixture(t);f.node('self',{refs:['self']});assert.ok(codes(f.run()).includes('CYCLE'));
+  const g=fixture(t);g.write('goal/node.md',`---\n${JSON.stringify({schema:'work/node@1',id:'goal',kind:'business',required:true,dependsOn:['child']})}\n---\nInvalid self-blocking prerequisite.`);g.node('goal/child',{id:'child'});assert.ok(codes(g.run()).includes('CYCLE'));
+});

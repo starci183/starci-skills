@@ -141,7 +141,11 @@ function validate(root) {
     if(visiting.has(n)) {issue('CYCLE',n.path,'Dependency/reference cycle prevents trustworthy input binding.');return 'cycle';}
     visiting.add(n);
     const ancestors=[]; for(let a=n.parent;a;a=a.parent) ancestors.unshift(a);
-    const bindings = item => [...item.deps,...item.refs].map(r=>({id:r.meta.id,digest:r.type==='resource'?r.specDigest:input(r)})).sort((a,b)=>a.id.localeCompare(b.id));
+    // An inherited reference to this scope is already represented by its own
+    // specification/ancestor specifications. Expanding it again fabricates a
+    // self-cycle when a goal points to its requirements subtree. Explicit refs
+    // and all dependency edges still participate in normal cycle detection.
+    const bindings = item => [...item.deps,...item.refs.filter(r=>item===n||r.type!=='node'||!within(r.dir,n.dir))].map(r=>({id:r.meta.id,digest:r.type==='resource'?r.specDigest:input(r)})).sort((a,b)=>a.id.localeCompare(b.id));
     n.inputDigest=digest(canonicalJSON({workspace:workspaceDigest,spec:n.specDigest,ancestors:ancestors.map(a=>({id:a.meta.id,spec:a.specDigest,bindings:bindings(a)})),bindings:bindings(n),children:n.children.map(c=>({id:c.meta.id,digest:input(c)})).sort((a,b)=>a.id.localeCompare(b.id))}));
     visiting.delete(n);return n.inputDigest;
   }
