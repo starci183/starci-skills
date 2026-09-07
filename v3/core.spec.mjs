@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {canonicalJSON,sha256,validateWorkspace} from './core/index.mjs';
+import {canonicalJSON,sha256,validateWorkspace,impactWorkspace} from './core/index.mjs';
 
 function fixture(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'work-core-test-'));
@@ -59,7 +59,7 @@ test('ancestor semantic edit stales descendant while timestamps do not',t=>{
   f.write('biz/node.md',`---\n${JSON.stringify({...b,updatedAt:'2099-01-01'})}\n---\nApproved scope A.`);
   assert.equal(f.run().nodes.find(n=>n.id==='biz.leaf').inputDigest,initial);
   f.write('biz/node.md',`---\n${JSON.stringify(b)}\n---\nApproved scope B.`);
-  assert.equal(f.run().nodes.find(n=>n.id==='biz.leaf').effectiveState,'stale');
+  assert.equal(f.run().nodes.find(n=>n.id==='biz.leaf').effectiveState,'suspended');
 });
 test('stable ID survives same-parent directory rename',t=>{
   const f=fixture(t);f.node('original',{id:'stable-piece'});f.done('original');const before=f.run().nodes[0].inputDigest;
@@ -111,7 +111,7 @@ test('one evidence bundle supports explicitly bound leaves without copying asset
   assert.ok(codes(f.run()).includes('EVIDENCE_OWNER'));
   f.node('flow/unbound',{state:'todo'});
   f.node('flow/b',{...f.metas.get('flow/b'),extensions:{changed:true}});
-  const changed=f.run();assert.equal(changed.nodes.find(n=>n.id==='flow.b').effectiveState,'stale');assert.equal(changed.nodes.find(n=>n.id==='flow.a').effectiveState,'done');
+  const changed=f.run();assert.equal(changed.nodes.find(n=>n.id==='flow.b').effectiveState,'suspended');assert.equal(changed.nodes.find(n=>n.id==='flow.a').effectiveState,'done');
 });
 test('shared bundle refuses duplicate and malformed binding targets',t=>{
   for(const bindings of [[{nodeId:'biz',inputDigest:'a'.repeat(64)}],[{nodeId:'missing',inputDigest:'a'.repeat(64)}],[null]]){
@@ -128,7 +128,7 @@ test('arbitrary extension namespaces and resource details remain preserved and h
   const f=fixture(t);const extensions={'vendor.future':{arbitrary:{dependOn:'data, not an instruction'},list:[1,2]}};
   f.node('biz',{extensions,refs:['custom-resource']});f.write('_resources/custom/resource.yaml',{schema:'work/resource@1',id:'custom-resource',kind:'future-kind',owner:'test',revision:'1',details:{custom:{shape:['future',true]}},extensions});
   f.done('biz');const before=fs.readFileSync(path.join(f.root,'biz/node.md'),'utf8');const r=f.run();assert.equal(r.ok,true);assert.equal(fs.readFileSync(path.join(f.root,'biz/node.md'),'utf8'),before);
-  f.node('biz',{...f.metas.get('biz'),extensions:{...extensions,anotherNamespace:{newValue:1}}});assert.equal(f.run().nodes[0].effectiveState,'stale');
+  f.node('biz',{...f.metas.get('biz'),extensions:{...extensions,anotherNamespace:{newValue:1}}});assert.equal(f.run().nodes[0].effectiveState,'suspended');
 });
 test('workspace plaintext credential fields are rejected without printing values',t=>{
   const f=fixture(t);f.node('biz');f.write('workspace.yaml',{schema:'work/workspace@1',id:'test-workspace',extensions:{vault:{password:'DO-NOT-ECHO-WORKSPACE-SECRET'}}});
@@ -141,12 +141,12 @@ test('artifact directories cannot smuggle completion nodes into the tree',t=>{
   }
 });
 test('changing reasoned NA scope invalidates dependent proof while bare state does not change digest',t=>{
-  const f=fixture(t);f.node('applicability',{state:'na',naReason:'No regulated records are processed.'});f.node('consumer',{dependsOn:['applicability']});f.done('consumer');
+  const f=fixture(t);f.node('applicability',{state:'na',naReason:'No regulated records are processed.'});f.node('consumer',{refs:['applicability']});f.done('consumer');
   assert.equal(f.run().ok,true);const before=f.run().nodes.find(n=>n.id==='consumer').inputDigest;
   f.node('applicability',{...f.metas.get('applicability'),state:'todo'});
-  const stateOnly=f.run();assert.equal(stateOnly.nodes.find(n=>n.id==='consumer').inputDigest,before);assert.equal(stateOnly.nodes.find(n=>n.id==='consumer').effectiveState,'blocked');
+  const stateOnly=f.run();assert.equal(stateOnly.nodes.find(n=>n.id==='consumer').inputDigest,before);assert.equal(stateOnly.nodes.find(n=>n.id==='consumer').effectiveState,'done');
   f.node('applicability',{...f.metas.get('applicability'),state:'na',naReason:'Regulated records are handled by an external service.'});
-  const changed=f.run();assert.notEqual(changed.nodes.find(n=>n.id==='consumer').inputDigest,before);assert.equal(changed.nodes.find(n=>n.id==='consumer').effectiveState,'stale');
+  const changed=f.run();assert.notEqual(changed.nodes.find(n=>n.id==='consumer').inputDigest,before);assert.equal(changed.nodes.find(n=>n.id==='consumer').effectiveState,'suspended');
 });
 test('goal refs its requirements subtree while sibling implementation depends on requirements without a false cycle',t=>{
   const f=fixture(t);
@@ -161,9 +161,69 @@ test('goal refs its requirements subtree while sibling implementation depends on
   // This sibling is not in implementation.dependsOn: the inherited group ref
   // must still bind it, without making the functional leaf depend on itself.
   f.node('goal/business/nfr',{...f.metas.get('goal/business/nfr'),naReason:'Availability is delegated to a contracted external service.'});
-  const changed=f.run();assert.ok(!codes(changed).includes('CYCLE'));assert.equal(changed.nodes.find(n=>n.id==='goal.implementation').effectiveState,'stale');
+  const changed=f.run();assert.ok(!codes(changed).includes('CYCLE'));assert.equal(changed.nodes.find(n=>n.id==='goal.implementation').effectiveState,'suspended');
 });
 test('explicit self references and ancestor dependency loops still fail cycle detection',t=>{
   const f=fixture(t);f.node('self',{refs:['self']});assert.ok(codes(f.run()).includes('CYCLE'));
   const g=fixture(t);g.write('goal/node.md',`---\n${JSON.stringify({schema:'work/node@1',id:'goal',kind:'business',required:true,dependsOn:['child']})}\n---\nInvalid self-blocking prerequisite.`);g.node('goal/child',{id:'child'});assert.ok(codes(g.run()).includes('CYCLE'));
+});
+test('module account/chat diamond gates start, suspends on prerequisite regression and never rewrites evidence',t=>{
+  const f=fixture(t);f.node('module');f.node('account',{dependsOn:['module']});f.node('permission',{dependsOn:['module']});f.node('chat',{dependsOn:['account','permission']});f.node('unrelated');
+  const initial=f.run();assert.deepEqual(initial.nodes.find(n=>n.id==='account').blockedBy,['module']);assert.equal(initial.nodes.find(n=>n.id==='account').eligible,false);
+  assert.deepEqual(initial.nodes.find(n=>n.id==='chat').blockedBy,['account','permission']);
+  for(const p of ['module','account','permission','chat','unrelated'])f.done(p);
+  const before=f.run();assert.equal(before.ok,true);const chat=before.nodes.find(n=>n.id==='chat');const proofBefore=fs.readFileSync(path.join(f.root,'chat/evidence/check/manifest.yaml'));
+  f.node('module',{...f.metas.get('module'),state:'todo'});
+  const after=f.run();for(const id of ['account','permission','chat']){
+    const n=after.nodes.find(n=>n.id===id);assert.equal(n.effectiveState,'suspended');assert.equal(n.state,'done');assert.equal(n.eligible,false);assert.ok(n.suspensionReasons.some(r=>r.code==='PREREQUISITE_NOT_DONE'));
+  }
+  assert.equal(after.nodes.find(n=>n.id==='chat').inputDigest,chat.inputDigest);assert.equal(after.nodes.find(n=>n.id==='unrelated').effectiveState,'done');assert.deepEqual(fs.readFileSync(path.join(f.root,'chat/evidence/check/manifest.yaml')),proofBefore);
+});
+test('N/A prerequisites never prove module availability and suspended is not a writable state',t=>{
+  const f=fixture(t);f.node('module',{state:'na',naReason:'Module is explicitly out of scope.'});f.node('account',{dependsOn:['module'],state:'doing'});
+  assert.deepEqual(f.run().nodes.find(n=>n.id==='account').blockedBy,['module']);assert.equal(f.run().nodes.find(n=>n.id==='account').eligible,false);
+  f.done('account');assert.equal(f.run().nodes.find(n=>n.id==='account').effectiveState,'suspended');
+  f.node('forged',{state:'suspended'});assert.ok(codes(f.run()).includes('STATE'));
+});
+test('semantic refs propagate business changes through architecture/code/UAT but do not impose execution gates',t=>{
+  const f=fixture(t);f.node('business');f.node('architecture',{refs:['business']});f.node('code',{refs:['architecture']});f.node('uat',{refs:['code']});f.node('unrelated');
+  // A semantic ref is deliberately not a prerequisite: consumers can be
+  // structurally bound while the referenced spec remains todo.
+  for(const p of ['architecture','code','uat','unrelated'])f.done(p);
+  assert.equal(f.run().ok,true);const old=f.run().nodes.find(n=>n.id==='uat').inputDigest;
+  f.node('business',{extensions:{approvedChange:'A new business constraint'}});
+  const r=f.run();for(const id of ['architecture','code','uat']){const n=r.nodes.find(n=>n.id===id);assert.equal(n.effectiveState,'suspended');assert.equal(n.eligible,true);assert.deepEqual(n.blockedBy,[]);}
+  assert.notEqual(r.nodes.find(n=>n.id==='uat').inputDigest,old);assert.equal(r.nodes.find(n=>n.id==='unrelated').effectiveState,'done');
+  const impacted=impactWorkspace(f.root,'business').affected.map(n=>n.id);assert.deepEqual(impacted,['architecture','code','uat']);
+});
+test('actual design source bytes suspend only linked UI consumers without a revision bump',t=>{
+  const f=fixture(t);const resource={schema:'work/resource@1',id:'design',kind:'design',owner:'test',revision:'1',details:{purpose:'Synthetic design file'},files:[{path:'reference.svg'}]};
+  f.write('_resources/design/page/resource.yaml',resource);f.write('_resources/design/page/reference.svg','<svg xmlns="http://www.w3.org/2000/svg"><rect fill="red"/></svg>');
+  f.write('feature/node.md',`---\n${JSON.stringify({schema:'work/node@1',id:'feature',kind:'group',required:true})}\n---\nSynthetic delivery scope.`);
+  f.node('feature/ui',{refs:['design']});f.node('feature/uat',{refs:['feature.ui']});f.node('feature/backend');
+  for(const p of ['feature/ui','feature/uat','feature/backend'])f.done(p);
+  const before=f.run();assert.equal(before.ok,true);const metaBytes=fs.readFileSync(path.join(f.root,'_resources/design/page/resource.yaml'));
+  f.write('_resources/design/page/reference.svg','<svg xmlns="http://www.w3.org/2000/svg"><rect fill="blue"/></svg>');
+  const after=f.run();assert.equal(after.nodes.find(n=>n.id==='feature.ui').effectiveState,'suspended');assert.equal(after.nodes.find(n=>n.id==='feature.uat').effectiveState,'suspended');assert.equal(after.nodes.find(n=>n.id==='feature.backend').effectiveState,'done');
+  assert.notEqual(after.resources[0].specDigest,before.resources[0].specDigest);assert.deepEqual(fs.readFileSync(path.join(f.root,'_resources/design/page/resource.yaml')),metaBytes);
+  const impact=impactWorkspace(f.root,'design');assert.deepEqual(impact.affected.map(n=>n.id),['feature','feature.uat','feature.ui']);assert.ok(impact.affected.find(n=>n.id==='feature').reasons.includes('child-input'));
+  assert.ok(!impact.affected.some(n=>n.id==='feature.backend'));
+});
+test('resource file safety rejects missing/traversal/absolute/duplicate/symlink paths',t=>{
+  for(const files of [[{path:'missing.svg'}],[{path:'../escape'}],[{path:'C:\\private\\image.png'}],[{path:'https://host/image.png'}],[{path:'safe.svg'},{path:'safe.svg'}]]){
+    const f=fixture(t);f.node('ui',{refs:['design']});f.write('_resources/design/page/resource.yaml',{schema:'work/resource@1',id:'design',kind:'design',owner:'test',revision:'1',details:{},files});f.write('_resources/design/page/safe.svg','synthetic');assert.equal(f.run().ok,false);
+  }
+  const f=fixture(t);f.node('ui',{refs:['design']});f.write('_resources/design/page/resource.yaml',{schema:'work/resource@1',id:'design',kind:'design',owner:'test',revision:'1',details:{},files:[{path:'link/secret.svg'}]});f.write('outside/secret.svg','synthetic');
+  fs.symlinkSync(path.join(f.root,'outside'),path.join(f.root,'_resources/design/page/link'),'junction');const r=f.run();assert.ok(codes(r).includes('RESOURCE_FILE_UNREADABLE'));assert.ok(codes(r).includes('SYMLINK'));
+});
+test('unreferenced valid resource edits do not invalidate unrelated completion',t=>{
+  const f=fixture(t);f.node('backend');f.write('_resources/design/page/resource.yaml',{schema:'work/resource@1',id:'design',kind:'design',owner:'test',revision:'1',details:{},files:[{path:'image.svg'}]});f.write('_resources/design/page/image.svg','old');f.done('backend');const before=f.run().nodes[0].inputDigest;
+  f.write('_resources/design/page/image.svg','new');assert.equal(f.run().nodes[0].inputDigest,before);assert.equal(f.run().ok,true);assert.deepEqual(impactWorkspace(f.root,'design').affected,[]);
+});
+test('impact distinguishes ancestor spec changes from child-input rollup and is read-only',t=>{
+  const f=fixture(t);f.write('group/node.md',`---\n${JSON.stringify({schema:'work/node@1',id:'group',kind:'group',required:true})}\n---\nSynthetic shared scope.`);f.node('group/a');f.node('group/b');f.node('external',{refs:['group.a']});
+  const before=fs.readFileSync(path.join(f.root,'group/node.md'));
+  const leafImpact=impactWorkspace(f.root,'group.a');assert.deepEqual(leafImpact.affected.map(n=>n.id),['external','group']);assert.ok(!leafImpact.affected.some(n=>n.id==='group.b'));
+  const ancestorImpact=impactWorkspace(f.root,'group');assert.deepEqual(ancestorImpact.affected.map(n=>n.id),['external','group.a','group.b']);assert.ok(ancestorImpact.affected.find(n=>n.id==='group.b').reasons.includes('ancestor-spec'));
+  assert.deepEqual(fs.readFileSync(path.join(f.root,'group/node.md')),before);assert.equal(impactWorkspace(f.root,'absent').target,null);
 });

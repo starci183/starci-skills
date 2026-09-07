@@ -27,7 +27,7 @@ function validate(root) {
   let absolute;
   const rel = p => path.relative(absolute, p).split(path.sep).join('/') || '.';
   const within = (base, p) => { const r = path.relative(base,p); return r === '' || (!r.startsWith(`..${path.sep}`) && r !== '..' && !path.isAbsolute(r)); };
-  const result = () => ({ok:errors.length === 0, errors, warnings, nodes:nodes.map(n => ({id:n.meta.id, path:n.path, kind:n.meta.kind, required:n.meta.required, state:n.meta.state ?? null, effectiveState:n.effectiveState ?? 'invalid', specDigest:n.specDigest, inputDigest:n.inputDigest ?? null, eligible:n.eligible ?? false, children:n.children.map(c => c.meta.id)})), resources:resources.map(r => ({id:r.meta.id,kind:r.meta.kind,revision:r.meta.revision,path:r.path}))});
+  const result = () => ({ok:errors.length === 0, errors, warnings, nodes:nodes.map(n => ({id:n.meta.id, path:n.path, kind:n.meta.kind, required:n.meta.required, state:n.meta.state ?? null, effectiveState:n.effectiveState ?? 'invalid', specDigest:n.specDigest, inputDigest:n.inputDigest ?? null, eligible:n.eligible ?? false, children:n.children.map(c => c.meta.id),dependsOn:(n.effectiveDeps??[]).map(d=>d.meta.id),refs:(n.effectiveRefs??[]).map(d=>d.meta.id),blockedBy:n.blockedBy??[],suspensionReasons:n.suspensionReasons??[]})), resources:resources.map(r => ({id:r.meta.id,kind:r.meta.kind,revision:r.meta.revision,path:r.path,specDigest:r.specDigest}))});
   try {
     absolute = path.resolve(root);
     if (fs.lstatSync(absolute).isSymbolicLink() || !fs.statSync(absolute).isDirectory()) throw new Error('Root must be a real directory, not a symlink.');
@@ -110,7 +110,26 @@ function validate(root) {
   for (const r of resources) {
     for (const key of ['kind','owner','revision']) if (!text(r.meta[key])) issue('RESOURCE_FIELD',r.path,`${key} is required.`);
     if (!object(r.meta.details)) issue('RESOURCE_DETAILS',r.path,'details must be an object.');
-    r.specDigest=digest(canonicalJSON(r.meta));
+    const files=[];
+    if(r.meta.files!==undefined){
+      if(!Array.isArray(r.meta.files))issue('RESOURCE_FILES',r.path,'files must be an array of local relative path objects.');
+      else {
+        const seen=new Set();
+        for(const file of r.meta.files){
+          if(!object(file)||!text(file.path)){issue('RESOURCE_FILE',r.path,'Each resource file requires a local relative path.');continue;}
+          const parts=file.path.split(/[\\/]/);
+          if(path.isAbsolute(file.path)||/^[A-Za-z]:|^[\\/]|:/.test(file.path)||parts.some(p=>p==='..'||p==='.'||p==='')){issue('RESOURCE_FILE_ESCAPE',r.path,'Resource files must be normalized local paths within the resource directory.');continue;}
+          const normalized=parts.join('/');
+          if(seen.has(normalized)){issue('RESOURCE_FILE_DUPLICATE',r.path,'A source file may only be listed once.');continue;}seen.add(normalized);
+          try {
+            let target=r.dir;for(const part of parts){target=path.join(target,part);if(fs.lstatSync(target).isSymbolicLink())throw new Error('symlink');}
+            if(!within(r.dir,fs.realpathSync(target))||!fs.statSync(target).isFile())throw new Error('unsafe');
+            files.push({path:normalized,sha256:digest(fs.readFileSync(target))});
+          }catch{issue('RESOURCE_FILE_UNREADABLE',r.path,'Resource file missing, unreadable, non-file or symlink; no remote retrieval is performed.');}
+        }
+      }
+    }
+    r.specDigest=digest(canonicalJSON({metadata:r.meta,files:files.sort((a,b)=>a.path.localeCompare(b.path))}));
   }
   const operational = new Set(Object.entries(metadataSchema.$defs.node.properties).filter(([,shape])=>shape['x-operational']===true).map(([key])=>key));
   for (const n of nodes) {
@@ -133,6 +152,12 @@ function validate(root) {
       if (n.meta.state==='blocked' && !text(n.meta.blocker)) issue('BLOCKER',n.path,'Blocked leaves require a concrete blocker.');
       if (n.meta.state==='na' && !text(n.meta.naReason)) issue('NA_REASON',n.path,'N/A requires a reason.');
     }
+  }
+  for(const n of nodes){
+    const deps=[...n.deps],refs=[...n.refs];
+    for(let a=n.parent;a;a=a.parent){deps.push(...a.deps);refs.push(...a.refs.filter(r=>r.type!=='node'||!within(r.dir,n.dir)));}
+    const unique=items=>[...new Map(items.map(item=>[item.meta.id,item])).values()].sort((a,b)=>a.meta.id.localeCompare(b.meta.id));
+    n.effectiveDeps=unique(deps);n.effectiveRefs=unique(refs);
   }
   const visiting=new Set();
   const workspaceDigest=workspace?digest(canonicalJSON(workspace.meta)):'';
@@ -207,7 +232,7 @@ function validate(root) {
     const required=stringList(n.meta.assertions,n.path,'assertions',true);
     const evidenceIds=stringList(c.evidence,n.path,'completion.evidence',true);
     const refs=codeRefs(c.codeRefs,n,!!profile.code);
-    for(const r of refs)if(object(r)&&!n.refIds.includes(r.repository))issue('UNBOUND_REPOSITORY',n.path,'Completion repository resources must be included in node refs.');
+    for(const r of refs)if(object(r)&&!n.effectiveRefs.some(ref=>ref.meta.id===r.repository))issue('UNBOUND_REPOSITORY',n.path,'Completion repository resources must be included in own or inherited node refs.');
     const covered=new Set();
     for(const id of evidenceIds){
       const e=resolve(id,n,['evidence']);if(!e)continue;
@@ -226,7 +251,7 @@ function validate(root) {
         if(!text(p.tool)||!text(p.capturedAt)||!/^\d{4}-\d{2}-\d{2}T/.test(p.capturedAt)||!Number.isFinite(Date.parse(p.capturedAt)))issue('UAT_CAPTURE',n.path,'UAT requires tool and ISO timestamp.');
         codeRefs(p.servedVersions,n,true);
         if(Array.isArray(p.servedVersions))for(const version of p.servedVersions)if(!object(version)||!text(version.artifact)||sha(version.artifact))issue('SERVED_ARTIFACT',n.path,'Each served version requires an observed immutable artifact/build identity, distinct from source commit alone.');
-        for(const r of [p.environment,p.actor,...(Array.isArray(p.servedVersions)?p.servedVersions.map(v=>v?.repository):[])].filter(Boolean))if(!n.refIds.includes(r))issue('UNBOUND_PROVENANCE',n.path,'UAT provenance resources must be declared in node refs for invalidation.');
+        for(const r of [p.environment,p.actor,...(Array.isArray(p.servedVersions)?p.servedVersions.map(v=>v?.repository):[])].filter(Boolean))if(!n.effectiveRefs.some(ref=>ref.meta.id===r))issue('UNBOUND_PROVENANCE',n.path,'UAT provenance resources must be declared in own or inherited node refs for invalidation.');
         if(!text(p.servedVersionEvidence))issue('SERVED_VERSION_PROOF',n.path,'servedVersionEvidence must name an included assertion proving runtime version; source HEAD alone is insufficient.');
         else if(!Array.isArray(e.meta.assertions)||!e.meta.assertions.some(a=>object(a)&&a.id===p.servedVersionEvidence&&a.outcome==='pass'))issue('SERVED_VERSION_PROOF',n.path,'Runtime-version proof assertion is missing or not pass.');
       }
@@ -243,17 +268,50 @@ function validate(root) {
     if(n.effectiveState)return n.effectiveState;
     if(rolling.has(n))return 'invalid';rolling.add(n);
     const localInvalid=globalInvalid||errors.some(e=>e.path===n.path && !['STALE_COMPLETION','STALE_EVIDENCE'].includes(e.code));
-    const prerequisites=[...n.deps];for(let a=n.parent;a;a=a.parent)prerequisites.push(...a.deps);
-    n.eligible=!localInvalid && prerequisites.every(d=>['done','na'].includes(roll(d)));
+    n.blockedBy=n.effectiveDeps.filter(d=>roll(d)!=='done').map(d=>d.meta.id);
+    n.eligible=!localInvalid && n.blockedBy.length===0;
+    n.suspensionReasons=[];
+    if(n.stale)n.suspensionReasons.push({code:'INPUT_CHANGED',ids:[n.meta.id]});
     if(n.children.length){
       n.children.forEach(roll);const required=n.children.filter(c=>c.meta.required).map(c=>c.effectiveState);
-      n.effectiveState=localInvalid?'invalid':!required.length?'na':required.every(s=>s==='na')?'na':required.every(s=>['done','na'].includes(s))?'done':required.includes('invalid')?'invalid':required.includes('blocked')?'blocked':required.includes('stale')?'stale':required.some(s=>['doing','done'].includes(s))?'doing':'todo';
+      n.effectiveState=localInvalid?'invalid':!required.length?'na':required.every(s=>s==='na')?'na':required.every(s=>['done','na'].includes(s))?'done':required.includes('invalid')?'invalid':required.includes('blocked')?'blocked':required.includes('suspended')?'suspended':required.some(s=>['doing','done'].includes(s))?'doing':'todo';
+      if(n.effectiveState==='suspended')n.suspensionReasons.push({code:'CHILD_SUSPENDED',ids:n.children.filter(c=>c.meta.required&&c.effectiveState==='suspended').map(c=>c.meta.id)});
       if(n.children.some(c=>!c.meta.required&&!['done','na'].includes(c.effectiveState)))warn('OPTIONAL_UNMET',n.path,'Optional unfinished children remain visible but do not block parent rollup.');
-    }else n.effectiveState=localInvalid?'invalid':n.stale?'stale':n.meta.state;
-    if(n.effectiveState==='done'&&!n.eligible){issue('DEPENDENCY_NOT_DONE',n.path,'Declared dependencies are not complete.');n.effectiveState='blocked';}
+    }else n.effectiveState=localInvalid?'invalid':n.stale?'suspended':n.meta.state;
+    if(!localInvalid&&n.blockedBy.length&&(n.meta.state==='done'||n.effectiveState==='done')){
+      issue('DEPENDENCY_NOT_DONE',n.path,'Prerequisites must be effectively done; N/A is not proof that a prerequisite exists.');
+      n.effectiveState='suspended';n.suspensionReasons.push({code:'PREREQUISITE_NOT_DONE',ids:n.blockedBy});
+    }
     rolling.delete(n);return n.effectiveState;
   }
   nodes.forEach(roll);
   for(const n of nodes)if(!n.children.length&&!Object.hasOwn(profiles,n.meta.kind)&&n.meta.state!=='done')warn('UNSUPPORTED_PROFILE',n.path,'Unknown kind is preserved; no verified completion profile is installed.');
   return result();
+}
+
+/** Read-only impact graph: input propagation is distinct from ancestor spec inheritance. */
+export function impactWorkspace(root,id){
+  const validation=validateWorkspace(root);
+  const targetNode=validation.nodes.find(n=>n.id===id), targetResource=validation.resources.find(r=>r.id===id);
+  const item=targetNode??targetResource;
+  if(!item)return {ok:false,errors:[...validation.errors,{code:'MISSING_TARGET',path:'.',message:'Impact target must resolve to a node or resource id.'}],warnings:validation.warnings,target:null,affected:[]};
+  const byId=new Map(validation.nodes.map(n=>[n.id,n]));
+  const edges=new Map();
+  const edge=(from,to,reason)=>{if(!edges.has(from))edges.set(from,[]);edges.get(from).push({to,reason});};
+  for(const n of validation.nodes){
+    for(const dep of n.dependsOn)edge(dep,n.id,'dependency');
+    for(const ref of n.refs)edge(ref,n.id,'reference');
+    for(const child of n.children)edge(child,n.id,'child-input');
+  }
+  const affected=new Map(),queue=[id],visited=new Set([id]);
+  function affect(to,via,reason,direct){
+    if(to!==id){let entry=affected.get(to);if(!entry){entry={id:to,path:byId.get(to)?.path,kind:byId.get(to)?.kind,direct,via:[],reasons:[]};affected.set(to,entry);}entry.direct ||= direct;if(!entry.via.includes(via))entry.via.push(via);if(!entry.reasons.includes(reason))entry.reasons.push(reason);}
+    if(!visited.has(to)){visited.add(to);queue.push(to);}
+  }
+  if(targetNode){
+    const descendants=[...targetNode.children],seen=new Set();
+    while(descendants.length){const child=descendants.shift();if(seen.has(child))continue;seen.add(child);affect(child,id,'ancestor-spec',true);descendants.push(...(byId.get(child)?.children??[]));}
+  }
+  while(queue.length){const current=queue.shift();for(const {to,reason}of edges.get(current)??[])affect(to,current,reason,current===id);}
+  return {ok:validation.ok,errors:validation.errors,warnings:validation.warnings,target:{id:item.id,path:item.path,type:targetNode?'node':'resource'},affected:[...affected.values()].sort((a,b)=>a.id.localeCompare(b.id)).map(a=>({...a,via:a.via.sort(),reasons:a.reasons.sort()}))};
 }
