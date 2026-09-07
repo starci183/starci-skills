@@ -4,8 +4,9 @@
 // interface by scripts/host-artifacts.mjs — skipped, with the runner's own wording as the reason, when
 // the host carries no Playwright install. Nothing here fakes a browser.
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, statSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createServer } from 'node:http';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -223,7 +224,7 @@ test('the host install is read from the tool registry, and its absence has one w
 
 // The runner, for real: a page with a labelled field, a button and a heading, served on loopback by
 // the tree's own host; the walk fills, clicks, expects and captures; the runner writes the walk, the
-// result at its digest, the ledger, the trace, the screenshot with its accessibility and DOM records,
+// result at its digest, the ledger, the screenshot with its accessibility and DOM records,
 // and the uat-capture whose control is the walk's. A second walk fails at its first wrong step and
 // nothing after it runs. Skipped by name when the host carries no install.
 const HOST_ROOT = process.env.STARCI_WALK_HOST_ROOT ? path.resolve(process.env.STARCI_WALK_HOST_ROOT) : hostRootOf(root);
@@ -254,9 +255,11 @@ test('the runner drives a static page and writes what the receipt is checked aga
     assert.deepEqual(run.errors, []);
     assert.equal(run.code, 0);
     const files = walkFiles(w.id);
-    for (const f of [files.walk, files.result, files.ledger, files.trace, 'artifacts/entry.png', 'artifacts/entry.ax.txt', 'artifacts/entry.dom.json', 'artifacts/entry.measurements.json', 'data/captures/entry.json']) assert.ok(existsSync(path.join(response, f.replace(/^response\//, ''))), `${f} written`);
+    for (const f of [files.walk, files.result, files.ledger, 'artifacts/entry.png', 'artifacts/entry.ax.txt', 'artifacts/entry.dom.json', 'artifacts/entry.measurements.json', 'data/captures/entry.json']) assert.ok(existsSync(path.join(response, f.replace(/^response\//, ''))), `${f} written`);
     const result = JSON.parse(readFileSync(path.join(response, files.result.replace(/^response\//, '')), 'utf8'));
     assert.equal(result.outcome, 'pass');
+    assert.equal(Object.hasOwn(result, 'traceRef'), false);
+    assert.equal(existsSync(path.join(response, files.trace.replace(/^response\//, ''))), false);
     assert.equal(result.walkFingerprint, walkFingerprint(readFileSync(walkFile)));
     // The ledger names what each step itself named: the entry, the field, the button, the heading the
     // expectation read; nothing for the url-only expectation and nothing for the capture.
@@ -312,5 +315,64 @@ test('the runner drives a static page and writes what the receipt is checked aga
     served.stop();
     rmSync(folder, { recursive: true, force: true });
     rmSync(path.dirname(response), { recursive: true, force: true });
+  }
+});
+
+
+test('network credentials and session cookies are never recorded while real browser evidence remains', { skip: install.present ? false : missingInstallMessage(HOST_ROOT, root) }, async () => {
+  const password = 'synthetic-private-password-83fa';
+  const token = 'synthetic-private-session-78ac';
+  let receivedPassword = false;
+  let receivedCookie = false;
+  const server = createServer(async (req, res) => {
+    if (req.url === '/login') {
+      let body = ''; for await (const chunk of req) body += chunk;
+      receivedPassword = body === password;
+      res.setHeader('Set-Cookie', `session=${token}; HttpOnly; Path=/`);
+      res.end('ok'); return;
+    }
+    if (req.url === '/private') {
+      receivedCookie = req.headers.cookie === `session=${token}`;
+      res.end('ok'); return;
+    }
+    if (req.url === '/credentials') { res.end(password); return; }
+    if (req.url === '/app.js') {
+      res.setHeader('Content-Type', 'application/javascript');
+      res.end("fetch('/credentials').then(r=>r.text()).then(password=>fetch('/login',{method:'POST',body:password})).then(()=>fetch('/private')).then(()=>document.querySelector('h1').textContent='Welcome')"); return;
+    }
+    res.setHeader('Content-Type', 'text/html');
+    res.end('<!doctype html><h1>Loading</h1><script src="/app.js"></script>');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const dir = mkdtempSync(path.join(tmpdir(), 'walk-network-privacy-'));
+  try {
+    const route = `http://127.0.0.1:${server.address().port}/`;
+    const w = walk({ account: null, entry: { ...walk().entry, route }, steps: [
+      { id: 'open', action: 'goto', target: null, value: route },
+      { id: 'ready', action: 'expect', target: { role: 'heading', name: 'Welcome' }, expect: { visible: true }, assertion: { caseId: 'entry', assertionId: 'entry', lane: 'ui' } },
+      { id: 'shot', action: 'capture', target: null, capture: { name: 'entry' } },
+    ] });
+    const input = path.join(dir, 'walk.json'); writeFileSync(input, JSON.stringify(w));
+    const response = path.join(dir, 'response');
+    const run = await runWalk(input, response, { hostRoot: HOST_ROOT, root });
+    assert.equal(run.code, 0, JSON.stringify(run.errors));
+    assert.equal(receivedPassword, true, 'the browser sent the real synthetic password body');
+    assert.equal(receivedCookie, true, 'the browser used the returned session cookie');
+    for (const relative of readdirSync(response, { recursive: true, withFileTypes: false })) {
+      const file = path.join(response, relative);
+      if (!statSync(file).isFile()) continue;
+      const bytes = readFileSync(file);
+      assert.equal(bytes.includes(Buffer.from(password)), false, relative);
+      assert.equal(bytes.includes(Buffer.from(token)), false, relative);
+      assert.equal(relative.endsWith('trace.zip'), false);
+    }
+    const files = walkFiles(w.id);
+    const result = JSON.parse(readFileSync(path.join(response, files.result.replace(/^response\//, '')), 'utf8'));
+    assert.equal(Object.hasOwn(result, 'traceRef'), false);
+    assert.equal(result.captures.length, 1);
+    assert.deepEqual(validateWalkFile(path.join(response, 'data', 'walks', w.id, 'walk.json'), response, { root }).errors, []);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    rmSync(dir, { recursive: true, force: true });
   }
 });

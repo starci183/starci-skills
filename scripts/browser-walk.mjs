@@ -12,7 +12,7 @@
 // failed step ends the run — nothing is retried and no locator is guessed. A credential is resolved by
 // name from the sealed reference the walk's account declares, at the fill and nowhere else: it reaches
 // the form field, is masked in every screenshot, and is refused from every file this runner writes.
-// Under <response dir> it writes data/walks/<id>/{walk.json, walk-result.json, capture.json, trace.zip},
+// Under <response dir> it writes data/walks/<id>/{walk.json, walk-result.json, capture.json},
 // artifacts/<name>.{png,ax.txt,dom.json,measurements.json} per capture, and for a UAT walk
 // data/captures/<case>.json in the uat-capture shape with every control copied from the walk.
 //
@@ -327,7 +327,9 @@ export async function runWalk(walkFile, responseDir, { hostRoot = hostRootOf(ROO
     reducedMotion: walk.entry.reducedMotion,
     locale: walk.entry.locale,
   });
-  await context.tracing.start({ screenshots: true, snapshots: true });
+  // Raw Playwright traces persist network bodies, headers and cookies, including sign-in secrets.
+  // Never start tracing, even for anonymous walks. Real captures and the step ledger remain evidence;
+  // the optional traceRef is absent because no trace is produced (not a sanitized-trace claim).
   const page = await context.newPage();
   let firstFailure = null;
 
@@ -408,7 +410,6 @@ export async function runWalk(walkFile, responseDir, { hostRoot = hostRootOf(ROO
       log(`${outcome === 'pass' ? 'ok  ' : 'FAIL'} ${step.id} ${step.action} ${control ?? ''} — ${observed}`);
     }
   } finally {
-    try { await context.tracing.stop({ path: under(files.trace) }); } catch { /* the trace is a convenience */ }
     await context.close();
     await browser.close();
   }
@@ -424,7 +425,7 @@ export async function runWalk(walkFile, responseDir, { hostRoot = hostRootOf(ROO
     outcome: firstFailure ? 'fail' : 'pass', startedAt, finishedAt,
     driver: { playwright: version, browser: 'chromium', browserVersion: browser.version(), headless: true, context: { fresh: true, viewport: [walk.entry.viewport.width, walk.entry.viewport.height], deviceScaleFactor: walk.entry.viewport.deviceScaleFactor, colorScheme: walk.entry.colorScheme, reducedMotion: walk.entry.reducedMotion, locale: walk.entry.locale } },
     steps: ledger.map(({ id, action, control, outcome, url, ms }) => ({ id, action, control, outcome, url, ms })),
-    firstFailure, captures, traceRef: files.trace, ledgerRef: files.ledger,
+    firstFailure, captures, ledgerRef: files.ledger,
   };
   writeFileSync(under(files.result), refuseLeak(`${JSON.stringify(result, null, 2)}\n`, secrets, 'walk-result.json'));
   const uatCaptures = [];
