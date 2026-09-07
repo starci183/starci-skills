@@ -231,7 +231,19 @@ test('one atomic session gate caps concurrent workers at three, prevents duplica
   assert.equal(conflict.reason, 'resource-conflict');
   const nestedRequest = JSON.parse(readFileSync(path.join(branches[4], 'request', 'request.json'), 'utf8'));
   assert.ok(resourcesOverlap(active.exclusive[0], nestedRequest.environment.exclusive[0]));
-  await Promise.all(Array.from({ length: 20 }, () => mutateSession(opened.session, async (fresh) => { fresh.budget.units = (fresh.budget.units ?? 0) + 1; })));
+  // Lock acquisition is deliberately bounded. A burst under the full suite may receive
+  // its lawful busy result before this callback starts; retry only that exact outcome.
+  // All twenty increments still execute, and lost/duplicate writes remain failures.
+  await Promise.all(Array.from({ length: 20 }, async () => {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await mutateSession(opened.session, async (fresh) => { fresh.budget.units = (fresh.budget.units ?? 0) + 1; });
+        return;
+      } catch (error) {
+        if (attempt >= 2 || error.message !== 'SESSION_STATE_BUSY: could not acquire the owning session lock') throw error;
+      }
+    }
+  }));
   assert.equal(JSON.parse(readFileSync(stateFile, 'utf8')).budget.units, 20);
 }));
 

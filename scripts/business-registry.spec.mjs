@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -213,4 +215,27 @@ test('dry publication reads through a busy publisher without changing any tree b
     assert.equal(result.registry.featureHeads[FEATURE].head,contentAddress(model));assert.deepEqual(snapshot(),before);
     assert.throws(()=>applyHeadPublication(store,plan),/SOURCE_DRIFT: registry publication busy/);assert.deepEqual(snapshot(),before);
   } finally {rmSync(dir,{recursive:true,force:true});}
+});
+test('failed atomic registry replacement preserves old head and releases publication lock for retry', () => {
+  const dir = root(), store = openStore(dir), model = modelAt(dir);
+  const plan = planHeadPublication({ store, featureId: FEATURE, model, claims: CLAIMS });
+  const before = readFileSync(path.join(dir, REGISTRY_FILE));
+  const original = fs.renameSync; let calls = 0;
+  try {
+    fs.renameSync = () => {
+      calls++;
+      assert.ok(fs.existsSync(path.join(dir, '.business-registry.lock')), 'ownership is held through every replacement attempt');
+      assert.deepEqual(readFileSync(path.join(dir, REGISTRY_FILE)), before);
+      throw Object.assign(new Error('persistent replacement refusal'), { code: 'EPERM' });
+    };
+    syncBuiltinESMExports();
+    assert.throws(() => applyHeadPublication(store, plan), { code: 'EPERM' });
+    assert.equal(calls, process.platform === 'win32' ? 20 : 1);
+    assert.deepEqual(readFileSync(path.join(dir, REGISTRY_FILE)), before);
+    assert.equal(fs.existsSync(path.join(dir, '.business-registry.lock')), false);
+    assert.equal(readdirSync(dir).some(name => name.endsWith('.tmp')), false);
+    fs.renameSync = original; syncBuiltinESMExports();
+    applyHeadPublication(store, plan);
+    assert.equal(openStore(dir).entry(FEATURE).head, contentAddress(model));
+  } finally { fs.renameSync = original; syncBuiltinESMExports(); rmSync(path.dirname(path.dirname(dir)), { recursive: true, force: true }); }
 });

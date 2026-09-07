@@ -1,3 +1,4 @@
+import { replaceFileSync } from './session-lock.mjs';
 // The head index of a businesses root, in one place. A feature directory is what a reader opens; the
 // index and the object store are what a reader trusts, and an operator that writes the first without
 // the other two publishes a head that no other reader can find. This module owns the whole
@@ -18,7 +19,7 @@
 // Reading one where the other is meant is how a head is published under a name the store does not
 // hold, so both are computed here and nowhere else.
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync, unlinkSync, renameSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -212,7 +213,7 @@ function applyHeadUnderLock(store, plan, { dryRun }) {
   registry.featureHeads[plan.featureId] = plan.entry;
   if (!dryRun) {
     const temp = `${store.registryFile}.${randomUUID()}.tmp`;
-    try { writeFileSync(temp, `${JSON.stringify(registry, null, 2)}\n`, 'utf8'); renameSync(temp, store.registryFile); }
+    try { writeFileSync(temp, `${JSON.stringify(registry, null, 2)}\n`, 'utf8'); replaceFileSync(temp, store.registryFile); }
     finally { if (existsSync(temp)) unlinkSync(temp); }
   }
   return { registry, archived };

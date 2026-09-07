@@ -285,7 +285,19 @@ export async function editForecast(root, session, state, original, edit, top) {
       if (forecast.handoffs?.[target] === cell) forecast.handoffs[target] = next;
     }
     const index = sourceCell === cell ? Math.max(...forecast.chain.map((step,index)=>step.some(cell=>state.attempts?.[cell])?index:-1)) : forecast.chain.findIndex(step => step.includes(cell));
-    if (sourceCell === cell) forecast.chain.splice(index + 1, 0, [next]);
+    if (sourceCell === cell) {
+      // Preserve the unopened independent prefix: its authored Next edge may come from a
+      // sealed parallel peer. Re-enter immediately before the first consumer of this owner.
+      const consumesResume = target => [...(forecast.dependencies[target] ?? []), ...(forecast.evidenceDependencies[target] ?? []), ...(forecast.units?.[target]?.dependsOn ?? []), forecast.handoffs?.[target]].some(owner => owner === next || owner === cell);
+      const consumer = forecast.chain.findIndex((step, position) => position > index && step.some(consumesResume));
+      if (consumer < 0) forecast.chain.splice(index + 1, 0, [next]);
+      else {
+        const group = forecast.chain[consumer];
+        const independent = group.filter(target => !consumesResume(target));
+        const dependent = group.filter(consumesResume);
+        forecast.chain.splice(consumer, 1, ...(independent.length ? [independent] : []), [next], dependent);
+      }
+    }
     else {
       // Replace the unopened logical node in place; its independent peers retain their work.
       // The mapping below still refuses a partially dispatched parallel step.

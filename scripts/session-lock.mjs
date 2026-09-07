@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, renameSync } from 'node:fs';
 import { mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -16,14 +16,26 @@ export async function withCoordinationLock(source, operation) {
 }
 export const currentSessionMutation = session => mutations.getStore()?.active && mutations.getStore().session === path.resolve(session) ? mutations.getStore().state : null;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const replacementDelayMs = 25;
+const retryReplacement = (error, platform, tries) => platform === 'win32' && ['EPERM', 'EACCES', 'EBUSY'].includes(error.code) && tries < 19;
+const waitSync = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+export function replaceFileSync(temp, file, { renameFile = renameSync, platform = process.platform, pause = waitSync } = {}) {
+  for (let tries = 0; ; tries += 1) {
+    try { return renameFile(temp, file); }
+    catch (error) {
+      if (!retryReplacement(error, platform, tries)) throw error;
+      pause(replacementDelayMs);
+    }
+  }
+}
 export async function replaceFile(temp, file, { renameFile = rename, platform = process.platform, pause = wait } = {}) {
   // Windows readers or scanners may briefly deny replacement of an existing file. Keep the
   // owner's lock and both files intact; retry only the atomic rename, never unlink the old state.
   for (let tries = 0; ; tries += 1) {
     try { return await renameFile(temp, file); }
     catch (error) {
-      if (platform !== 'win32' || !['EPERM', 'EACCES', 'EBUSY'].includes(error.code) || tries >= 19) throw error;
-      await pause(25);
+      if (!retryReplacement(error, platform, tries)) throw error;
+      await pause(replacementDelayMs);
     }
   }
 }

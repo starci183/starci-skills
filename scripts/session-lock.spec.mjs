@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtemp, readFile, writeFile, rename, rm } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { replaceFile } from './session-lock.mjs';
+import { replaceFile, replaceFileSync } from './session-lock.mjs';
 
 test('Windows atomic replacement retries transient sharing denial and preserves both files on persistent denial', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'starci-atomic-replace-'));
@@ -78,4 +78,30 @@ test('separate stale-owner contenders wait for recovery serialization and never 
     if(!path.resolve(dir).startsWith(path.resolve(tmpdir())+path.sep))throw Error('unsafe lock fixture cleanup');
     await rm(dir,{recursive:true,force:true});
   }
+});
+
+test('synchronous replacement shares bounded Windows policy and preserves old bytes without unlinking', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'starci-sync-replace-'));
+  const file = path.join(dir, 'index.json'), temp = path.join(dir, 'index.tmp');
+  try {
+    for (const code of ['EPERM', 'EACCES', 'EBUSY']) {
+      writeFileSync(file, 'old'); writeFileSync(temp, 'new'); let calls = 0; const pauses = [];
+      replaceFileSync(temp, file, { platform: 'win32', pause: ms => pauses.push(ms), renameFile: (...args) => {
+        calls++; assert.equal(readFileSync(file, 'utf8'), 'old');
+        if (calls < 3) throw Object.assign(new Error('sharing denial'), { code });
+        return renameSync(...args);
+      } });
+      assert.equal(calls, 3); assert.deepEqual(pauses, [25, 25]); assert.equal(readFileSync(file, 'utf8'), 'new');
+    }
+    writeFileSync(temp, 'later'); let calls = 0;
+    const denied = () => { calls++; throw Object.assign(new Error('persistent'), { code: 'EPERM' }); };
+    assert.throws(() => replaceFileSync(temp, file, { platform: 'win32', pause: () => {}, renameFile: denied }), { code: 'EPERM' });
+    assert.equal(calls, 20); assert.equal(readFileSync(file, 'utf8'), 'new'); assert.equal(readFileSync(temp, 'utf8'), 'later');
+    calls = 0;
+    assert.throws(() => replaceFileSync(temp, file, { platform: 'linux', renameFile: denied }), { code: 'EPERM' });
+    assert.equal(calls, 1);
+    calls = 0;
+    assert.throws(() => replaceFileSync(temp, file, { platform: 'win32', renameFile: () => { calls++; throw Object.assign(new Error('bad path'), { code: 'ENOENT' }); } }), { code: 'ENOENT' });
+    assert.equal(calls, 1);
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

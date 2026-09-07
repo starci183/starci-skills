@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.13
+# StarCi Skills 2.5.0-rc.14
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.5.0-rc.14 (2026-09-07): resuming a sealed parallel owner preserves unopened independent work and splits mixed successor groups before dependent consumers; both real workflow previews retain prior evidence without ledger mutation. Atomic registry replacement shares bounded Windows retry behavior while preserving the previous head and releasing publication ownership on failure.
 
 2.5.0-rc.13 (2026-09-07): explicitly delegated in-scope restatement review retains its user grant, coordinator judgment and exact reading; changed in-progress promises retain truthful lineage, and registry publication serializes competing writers. Candidate publication requires integrated release proof.
 
