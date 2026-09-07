@@ -251,7 +251,20 @@ for (const fx of fixtures) {
       if (count > 1 || requiresSibling) { assert.ok(at(sibling.id) !== -1 && at(sibling.id) < at(op), `${fx.id}: ${sibling.id} precedes ${op}`); if (count > 1) assert.equal(p.fanout[c], 'units'); }
       else assert.equal(at(sibling.id), -1, `${fx.id}: one ${op} unit needs no ${sibling.id}`);
     }
+    // Preflight must not demand the runtime generation this chain itself produces.
+    const preflight = Object.keys(p.steps).find(c => p.steps[c] === 'environment.preflight');
+    if (preflight && at('runtime.serve') !== -1) assert.deepEqual(p.presets[preflight].runtimeRoles, [], fx.id + ': bootstrap runtime is not an existing prerequisite');
     // A served head is observed after it is served, when the chain serves one.
     if (at('runtime.serve') !== -1 && at('interface.audit') !== -1) assert.ok(at('runtime.serve') < at('interface.audit'), `${fx.id}: serve before audit`);
   });
 }
+
+
+test('runtime owner bootstraps while audit-only consumer cannot erase existing-runtime readiness', () => {
+  const bootstrap = plan([line('runtime.serve'), line('uat.verify')], { roles: ['be', 'fe'], requirements: { 'environment.preflight': { runtimeRoles: [] } } });
+  assert.deepEqual(bootstrap.presets['1/1'].runtimeRoles, []);
+  assert.ok(Object.values(bootstrap.steps).includes('runtime.serve'));
+  const consumer = plan([line('interface.audit')], { roles: ['fe'], requirements: { 'environment.preflight': { runtimeRoles: [] } } });
+  assert.ok(!Object.values(consumer.steps).includes('runtime.serve'));
+  assert.deepEqual(consumer.presets['1/1'].runtimeRoles, ['fe']);
+});

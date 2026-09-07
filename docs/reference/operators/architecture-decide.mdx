@@ -100,12 +100,30 @@ does not authorize applying it to an environment.
 
 ## The critique is a nested exchange
 
-After the selected alternative is deepened, the branch pauses: it emits `response/response.json`
-with status `waiting` and `awaiting { exchange: critique, kind: independent-critique }`. The
-orchestrator writes `critique/request/request.json` with only `response/data/stack-model.json` as
-input, never the author's rationale, and runs a fresh agent on this operator's own profile with no
-inherited turns. That agent writes only `critique/response/`. When its response is done the paused
-agent resumes at the confirmation step. Other branches of the same step keep running throughout.
+After deepening the selection, the branch emits a waiting response with
+`awaiting { exchange: critique, kind: independent-critique }`. Draft the nested request, then run
+`node scripts/architecture-source-review.mjs <parent-branch>/critique` before opening it.
+The collector reads regular Git blobs at the parent's frozen source HEAD through its accepted
+workspace binding. It includes every observed component and boundary evidence path, the selected
+model digest, and the parent's frozen constraints and trade-off axes. Proposed implementation
+paths remain proposals; they are not represented as observed source.
+
+Declare the returned `request/source-review.json` ref and digest in the child's `frozenInputs`,
+and its returned alias/HEAD in `contexts` and `environment.reads`. The only authored Input is
+`stack-model`; do not pass the author's rationale or inherited turns. Dispatch a fresh reviewer
+on this operator's profile. The reviewer reads the source snapshot independently, challenges the
+model's boundaries, compares a materially different alternative along the frozen axes, and names
+uncertainties. Each existing adverse-path attack cites relevant `[source:repository/path]` evidence.
+Use the existing independent-critique skeleton's Execution rows for the snapshot digest,
+independent alternative, trade-offs and uncertainty. Additional relevant source paths can be
+collected through `collectArchitectureSource(..., { extraPaths })` before freezing the request.
+
+The reviewer writes only `critique/response/`. Resume the paused parent after the accepted child
+answers; other branches can continue. Fresh dispatch requires this source binding. Exact sealed
+older critiques retain their historical shape, without granting a new child an omission exception.
+The gate proves source identity, frozen input integrity and explicit coverage; it cannot establish
+the quality or independence of reasoning merely from text. The fresh reviewer remains responsible
+for substantive counterexamples, alternatives and honest uncertainty.
 
 ## Concrete attempt flow
 

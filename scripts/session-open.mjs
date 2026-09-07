@@ -1,3 +1,4 @@
+import { validateAgainst } from './json-schema.mjs';
 import { retainMission } from './mission-history.mjs';
 import { evidenceManifestErrors } from './evidence-manifest.mjs';
 import { resolveWorkflowOwner, workflowOwnerErrors, sameRoot, RUNTIME_REVISION } from './workflow-root.mjs';
@@ -35,7 +36,7 @@ export async function readWorkflowLocator(file) {
 function normalizeMission(sessionId, mission, version = 1) {
   mission = completeDeliveryMission(mission, root);
   const decisionId = goalDecisionId(sessionId, version);
-  return {
+  const normalized = {
     version,
     language: mission.language,
     goal: mission.goal,
@@ -51,6 +52,13 @@ function normalizeMission(sessionId, mission, version = 1) {
     ...(mission.bankRef ? { bankRef: mission.bankRef } : {}),
     confirmation: { status: 'draft', decisionId, sourceRef: null }
   };
+  validateMissionShape(normalized);
+  return normalized;
+}
+
+function validateMissionShape(mission) {
+  const errors = validateAgainst({ type: 'object', properties: { mission: stateSchema.properties.mission }, required: ['mission'], $defs: stateSchema.$defs }, { mission });
+  if (errors.length) throw Error(errors.join('\n'));
 }
 
 function draftErrors(input) {
@@ -138,9 +146,9 @@ export async function openSession(sessionsRoot, input, { sourceRoot = path.dirna
     const openedAt = now();
     const sessionId = input.sessionId ?? `${openedAt.replace(/[-:TZ.]/g, '').slice(0, 14)}-${slug(input.project)}-${hostKey.slice(0, 8)}`;
     const session = path.join(sessionsRoot, sessionId);
+    const mission = normalizeMission(sessionId, input.mission);
     await mkdir(sessionsRoot, { recursive: true });
     await mkdir(session, { recursive: false });
-    const mission = normalizeMission(sessionId, input.mission);
     const state = {
     contractVersion: V22_CONTRACT,
     runtimeRevision: RUNTIME_REVISION,
@@ -207,6 +215,9 @@ export async function confirmSession(session, decision) {
     if (state.contractVersion !== V22_CONTRACT) throw new Error(`state.json: confirm requires ${V22_CONTRACT}`);
     const current = state.mission;
     const decisionId = current.confirmation.decisionId;
+    const correctedCandidate = decision.selected === 'corrected' && decision.mission
+      ? normalizeMission(state.id, { ...decision.mission, sourceRef: decision.sourceRef }, current.version + 1) : null;
+    if (decision.selected === 'as-stated') validateMissionShape(current);
     if (current.confirmation.status === 'confirmed' && decision.selected === 'as-stated') return { status: 'already-confirmed', sessionId: state.id, version: current.version };
     if (current.confirmation.status === 'confirmed' && decision.selected === 'corrected') {
       if (await missionCorrectionBusy(session, state)) throw Error('MISSION_BUSY: seal active attempts before correcting their mission');
@@ -239,7 +250,7 @@ export async function confirmSession(session, decision) {
       const topology = selectWorkflowTopology(topologyPolicy, decision.topology ?? (currentMode === undefined ? undefined : { mode: currentMode }));
       const validation = draftErrors({ project: state.project, hostBinding: state.hostBinding, mission: corrected, topology });
       if (validation.length) throw new Error(validation.join('\n'));
-      state.mission = normalizeMission(state.id, corrected, current.version + 1);
+      state.mission = correctedCandidate;
       state.transitions ??= [];
       state.transitions.push({ branch: state.current ?? '1/1', event: 'replanned', at: new Date().toISOString(), goalVersion: state.mission.version, note: 'The user supplied a corrected scope; its new version is draft until confirmed.', logged: true });
       setWorkflowTopologyMode(topologyPolicy, state, topology.mode);

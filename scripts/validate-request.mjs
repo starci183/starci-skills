@@ -817,6 +817,10 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   errors.push(...selectionErrors(policy, request, recordedChoices));
   if (request.contractVersion === V22_CONTRACT) errors.push(...await frozenInputErrors(dir, request));
   errors.push(...await uiKnowledgeRequestErrors(root, dir, request, { phase }));
+  if (request.operatorId === 'architecture.decide' && request.exchange === 'critique') {
+    const { architectureSourceRequestErrors } = await import('./architecture-source-review.mjs');
+    errors.push(...await architectureSourceRequestErrors(root, dir, request, { phase }));
+  }
   if (!errors.length && request.operatorId === 'workspace.bind' && !request.exchange) {
     const { validateWorkspaceCheckoutRequest } = await import('./workspace-checkout.mjs');
     const sealed = phase === 'accept' && sessionRoot ? await sealedWorkspaceBindingErrors(sessionRoot, JSON.parse(await readFile(path.join(sessionRoot, 'state.json'), 'utf8')), request) : null;

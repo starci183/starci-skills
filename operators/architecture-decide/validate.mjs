@@ -141,6 +141,8 @@ export async function validateArchitectureStep(branchDir, root = ROOT, { origin 
       if (given.some((p) => p.endsWith('/response/response.md'))) errors.push('critique/request/request.json: the critique may not be given the author\'s response.md');
     }
   } else if (response.status === 'done') errors.push('critique/response/critique.md: a done branch needs the critique exchange');
+  const { architectureSourceCritiqueErrors } = await import('../../scripts/architecture-source-review.mjs');
+  errors.push(...await architectureSourceCritiqueErrors(root, branchDir));
   return { errors };
 }
 

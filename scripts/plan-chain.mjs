@@ -37,7 +37,7 @@ export class PlanError extends Error { constructor(errors) { super(errors.join('
 const bindKey = (role) => `${BIND_OPERATOR}#${role}`;
 const byKey = (a, b) => a.localeCompare(b);
 
-// The operators that touch a runtime: their presence makes the preflight check the runtime family of every bound role.
+// Runtime consumers require existing service only when this chain does not own its producer.
 const RUNTIME_OPERATORS = new Set(['runtime.serve', 'interface.audit', 'uat.verify']);
 
 export function planChain({ packages, mission, options = {} }) {
@@ -196,9 +196,10 @@ export function planChain({ packages, mission, options = {} }) {
   if (effectful.length && graph.has(PREFLIGHT_OPERATOR)) {
     const roles = [...new Set([...nodes.values()].filter((n) => n.operator === BIND_OPERATOR).map((n) => n.presets.role))].sort();
     const tools = [...new Set(effectful.flatMap((id) => operatorEffects(graph.get(id).pkg).map((t) => t.id)))].sort();
-    // A runtime is owed only by a chain that serves, observes or walks one: then every bound role's runtime is checked, else none.
+    // environment.preflight Requirements: runtime.serve owns bootstrap after binding.
     const touchesRuntime = [...nodes.values()].some((n) => RUNTIME_OPERATORS.has(n.operator));
-    const pre = add(PREFLIGHT_OPERATOR, PREFLIGHT_OPERATOR, roles.length ? { roles, runtimeRoles: touchesRuntime ? roles : [] } : {}, `opens the chain: ${effectful.join(', ')} hold ${tools.join(', ')}`);
+    const ownsRuntime = [...nodes.values()].some((n) => n.operator === 'runtime.serve');
+    const pre = add(PREFLIGHT_OPERATOR, PREFLIGHT_OPERATOR, roles.length ? { roles, runtimeRoles: touchesRuntime && !ownsRuntime ? roles : [] } : {}, `opens the chain: ${effectful.join(', ')} hold ${tools.join(', ')}`);
     for (const n of nodes.values()) if (n.key !== pre.key) depend(n, pre.key);
     closure();
   }

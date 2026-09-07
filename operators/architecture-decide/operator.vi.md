@@ -74,12 +74,28 @@ quyền áp migration vào một môi trường.
 
 ## Phản biện là một cuộc trao đổi lồng
 
-Sau khi phương án đã chọn được đào sâu, nhánh tạm ngưng: nó phát `response/response.json` với status
-`waiting` và `awaiting { exchange: critique, kind: independent-critique }`. Orchestrator ghi
-`critique/request/request.json` chỉ với `response/data/stack-model.json` làm đầu vào, không bao giờ
-kèm lý lẽ của tác giả, rồi chạy một agent mới trên chính profile của operator này, không thừa hưởng
-lượt. Agent đó chỉ ghi `critique/response/`. Khi response của nó done, agent đang ngưng chạy tiếp ở
-bước xác nhận. Các nhánh khác cùng bậc vẫn chạy suốt thời gian đó.
+Sau khi đào sâu phương án, nhánh phát response waiting với
+`awaiting { exchange: critique, kind: independent-critique }`. Soạn request lồng rồi chạy
+`node scripts/architecture-source-review.mjs <parent-branch>/critique` trước khi mở attempt.
+Collector đọc các Git blob thường tại HEAD nguồn đã đóng băng của parent qua workspace binding
+đã accepted: toàn bộ đường dẫn bằng chứng component/boundary đã quan sát, hash model đã chọn,
+constraint và trục trade-off của parent. Đường dẫn triển khai được đề xuất vẫn là đề xuất,
+không được mô tả thành source đã quan sát.
+
+Đưa ref `request/source-review.json` và digest được trả về vào `frozenInputs` của child;
+đưa alias/HEAD vào `contexts` và `environment.reads`. Input do tác giả cung cấp chỉ gồm
+`stack-model`; không truyền lý lẽ tác giả hay lượt kế thừa. Chạy reviewer mới trên profile của
+operator. Reviewer tự đọc source, thử phá các ranh giới, so sánh phương án khác biệt thực chất
+theo các trục đã đóng băng, và nêu điều chưa biết. Mỗi adverse-path attack dẫn bằng chứng phù hợp
+bằng `[source:repository/path]`. Dùng các row Execution trong skeleton independent-critique để
+ghi digest, phương án độc lập, trade-off và bất định. Có thể bổ sung source liên quan qua
+`collectArchitectureSource(..., { extraPaths })` trước khi đóng băng request.
+
+Reviewer chỉ ghi `critique/response/`. Parent tiếp tục sau câu trả lời accepted; nhánh khác vẫn
+có thể chạy. Dispatch mới bắt buộc có source binding. Critique cũ đã niêm phong giữ nguyên shape
+lịch sử, không tạo ngoại lệ bỏ snapshot cho child mới. Gate kiểm chứng nguồn, toàn vẹn input và
+coverage tường minh; chuỗi văn bản không chứng minh được chất lượng hay tính độc lập của lập luận.
+Reviewer mới vẫn chịu trách nhiệm về phản ví dụ, phương án thay thế và điều chưa được kiểm chứng.
 
 ## Luồng attempt cụ thể
 

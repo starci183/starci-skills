@@ -1,0 +1,11 @@
+# Source critique and early workflow admission
+
+This candidate addresses enforcement failures observed while coordinating Nivo module workflows. It does not establish product completion or production readiness.
+
+The shared Setup session `20260906234044-nivo-9861230d` generated a preflight requiring existing backend/frontend runtime generations even though its own plan contained `runtime.serve` at `7/1`. The declared ports had no listeners. The planner now follows the existing preflight contract: the chain's runtime producer owns bootstrap; a consumer-only chain still requires the existing runtime. Focused planner tests and a read-only preview of the actual session exercise both branches without changing session bytes.
+
+Chatbot session `20260905160512-nivo-ca563924` admitted mission version 6 with an overlong goal, twelve includes and overlong evidence/verification text. Dispatch at `23/1` then refused those same fields. Early admission must validate the normalized, delivery-expanded mission against the existing mission schema before persisting or confirming it. The repair must not loosen limits, omit approved requirements or rewrite accepted historical receipts.
+
+Architecture critique previously received an authored model without a mandatory independently supplied source inventory. The candidate binds the critique to the accepted checkout and confirmed repository, exact Git head/tree/regular blobs, parent request and current-state/model digests, and the original constraints. Source-backed attacks and explicit independent analysis are required. Accepted prior invocations retain their original sealed history; that history does not grant a fresh invocation permission to omit source.
+
+Release evidence is recorded outside the package in the owning session's support artifacts and the release manifest. Focused checks alone do not authorize publication: the integrated tree still requires the full regression suite, generated-document checks, packed installation, doctor and exact Git readback. Textual gates authenticate inputs and required coverage; they cannot prove the quality of human-like reasoning. Actual module API, PostgreSQL and browser UAT remain separate required evidence.

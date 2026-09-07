@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, rm, cp } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import {execFileSync} from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 const source = path.resolve(import.meta.dirname, '..');
@@ -18,6 +19,13 @@ export async function fixture(t, { selection = 'return', followupReading = false
  const [{openSession,confirmSession,cleanupFixtureOwners},{openAttempt,acceptAttempt},{retainContext},{scopeHash},{restatementDecisionId,recordRestatementChoice},plans,{waitingReviewBinding,resolvedWaitingAttemptKeys},{baseline,confirmed},{acquireWorkerSlot,releaseWorkerSlot}] = await Promise.all([
   load('scripts/v23-test-fixture.mjs'),load('scripts/attempt-gate.mjs'),load('scripts/mission-history.mjs'),load('scripts/mission-scope.mjs'),load('scripts/restatement-choice.mjs'),load('scripts/plan-history.mjs'),load('scripts/resolved-waiting.mjs'),load('operators/architecture-decide/self-test.mjs'),load('scripts/worker-slots.mjs')]);
  const owner=path.join(host,'owner');await mkdir(owner);
+ const git=(...args)=>execFileSync('git',['-C',owner,...args],{windowsHide:true,stdio:['ignore','pipe','pipe']});
+ git('init');
+ await put(path.join(owner,'package.json'),{name:'review-fixture',private:true,dependencies:{'@nestjs/core':'10.4.0'}});
+ await put(path.join(owner,'compose.yaml'),'services:\n  database:\n    image: postgres:16.2\n');
+ await put(path.join(owner,'src/entitlement/index.ts'),'export function mayRead(granted: boolean) { return granted; }\n');
+ git('add','.');git('-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','Observed review fixture base');
+ git('remote','add','origin','https://github.com/sample/fixture.git');
  const opened=await openSession(path.join(owner,'.worktrees/sessions'),{project:'review',hostBinding:{kind:'codex-task',hostId:path.basename(host),worktree:owner,sourcePromptRef:'user:opening'},mission:{language:'en',goal:'Decide one reviewed architecture.',target:'The bounded read path',includes:['Architecture and independent review'],outputs:['A reviewed architecture decision'],doneWhen:[{producedBy:'architecture.decide',evidence:'The architecture is independently reviewed.'}],verification:'Validate the model and a fresh independent critique.',sourceRef:'user:opening'}});
  t.after(()=>cleanupFixtureOwners(owner));
  await confirmSession(opened.session,{selected:'as-stated',selectedBy:'user',sourceRef:'user:approved'});
@@ -43,7 +51,9 @@ export async function fixture(t, { selection = 'return', followupReading = false
  await put(path.join(branch('1/1'),'response/data/route.json'),binding);await put(path.join(branch('1/1'),'response/response.md'),md.replace(/\| (ROUTE_HYDRATED_FROM_PORTABLE|IDENTITY_ROSTER_SEALED|WORKTREE_BRANCH_FORBIDDEN) \|/g,(_,$1)=>'| `'+$1+'` |'));
  const bindResponse=actual(bind,{schemaVersion:9,operatorId:'workspace.bind',fields:{'workspace-route-binding':'response/response.md',route:'response/data/route.json'},fallbacks:[],commits:[],next:['architecture.decide']},'done',['response/response.md']);delete bindResponse.goalCheck;
  bindResponse.boundProfile='sol-fresh';bindResponse.ranProfile='sol-fresh';await put(path.join(branch('1/1'),'response/response.json'),bindResponse);await acceptAttempt(branch('1/1'));
- const [files]=confirmed(baseline());const template=files['request/request.json'];template.contexts[0].head=head;delete template.decisionId;delete template.selectedOption;template.requirements.resume=null;
+ const [files]=confirmed(baseline());
+ for(const ref of ['response/data/current-state.json','response/data/stack-model.json'])files[ref]=JSON.parse(JSON.stringify(files[ref]).replaceAll('b'.repeat(40),head));
+ const template=files['request/request.json'];template.contexts[0].head=head;delete template.decisionId;delete template.selectedOption;template.requirements.resume=null;
  const first=current(template,2),text=files['response/restatement.md'];
  await put(path.join(branch('2/1'),'request/request.json'),first);await openAttempt(branch('2/1'));
  const decisionId=restatementDecisionId(first,template.requirements.decisionId,text);
@@ -60,8 +70,15 @@ export async function fixture(t, { selection = 'return', followupReading = false
  }
  async function review(request,selection) {
   const dir=path.join(branch(`${request.step}/1`),'critique'),child=current(files['critique/request/request.json'],request.step,{exchange:'critique'});child.inputs={'stack-model':`step-${request.step}/parallel-1/response/data/stack-model.json`};
+  await put(path.join(dir,'request/request.json'),child);
+  const {collectArchitectureSource}=await load('scripts/architecture-source-review.mjs');
+  const snapshot=await collectArchitectureSource(root,dir),snapshotBytes=JSON.stringify(snapshot,null,2)+'\n';
+  await put(path.join(dir,'request/source-review.json'),snapshotBytes);
+  child.frozenInputs=[{ref:'request/source-review.json',sha256:sha(snapshotBytes)}];
+  child.contexts=[{alias:snapshot.alias,head:snapshot.head}];child.environment.reads=[snapshot.alias];
   await put(path.join(dir,'request/request.json'),child);await openAttempt(dir);
   let critique=files['critique/response/critique.md'];if(selection==='return')critique=critique.replace('| Selection | keep |','| Selection | return |').replace('| holds |','| fails |');
+  critique=critique.replace('\n\n## Attacks', '\n| Source snapshot | '+sha(snapshotBytes)+' |\n| Independent alternative | Per-feature guards change ownership and restore boundaries. |\n| Trade-offs | Compare cost, complexity and reversibility against the frozen constraints. |\n| Uncertainty | This lifecycle fixture does not measure product recovery or runtime behavior. |\n\n## Attacks').replace(/(\| (?:partial-failure|retry-idempotency|concurrency|stale-state|deletion|recovery|dependency-outage|rollback) \| )/g,'$1[source:src/entitlement/index.ts] ');
   await put(path.join(dir,'response/critique.md'),critique);await put(path.join(dir,'response/response.json'),actual(child,{...files['critique/response/response.json']},'done',['response/critique.md']));
   assert.equal((await acceptAttempt(dir)).state,'matched');return child;
  }

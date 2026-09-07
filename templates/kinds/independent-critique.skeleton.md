@@ -6,20 +6,24 @@
 | --- | --- |
 | Reviewer execution | the fresh execution's own reference, never the author's |
 | Inherited turns | none |
-| Given | `response/data/stack-model.json` and the claims it makes; no rationale |
+| Given | selected stack-model and frozen source snapshot, constraints and trade-off axes; no author rationale |
+| Source snapshot | sha256 digest of request/source-review.json |
+| Independent alternative | a materially different ownership or failure-boundary design and why it may fit better |
+| Trade-offs | compare the independent alternative using each frozen axis |
+| Uncertainty | unmeasured assumptions and the observations needed to resolve them |
 
 ## Attacks
 
 | Adverse path | Attack | Resolution | Verdict |
 | --- | --- | --- | --- |
-| partial-failure | what breaks when one side completes | how the selected design survives it | holds |
-| retry-idempotency | what a repeated call does | how the design makes it idempotent | holds |
-| concurrency | what two writers do at once | how ownership serialises them | holds |
-| stale-state | what a reader sees after a change | how staleness is bounded | holds |
-| deletion | what deleting the owner's data leaves behind | how readers cope | holds |
-| recovery | what restoring from backup loses | what the restore path proves | holds |
-| dependency-outage | what an unavailable dependency does | how the boundary degrades | holds |
-| rollback | what undoing the migration costs | the rollback step and its proof | holds |
+| partial-failure | [source:actual/observed/path] what breaks when one side completes | how the selected design survives it | holds |
+| retry-idempotency | [source:actual/observed/path] what a repeated call does | how the design makes it idempotent | holds |
+| concurrency | [source:actual/observed/path] what two writers do at once | how ownership serialises them | holds |
+| stale-state | [source:actual/observed/path] what a reader sees after a change | how staleness is bounded | holds |
+| deletion | [source:actual/observed/path] what deleting the owner's data leaves behind | how readers cope | holds |
+| recovery | [source:actual/observed/path] what restoring from backup loses | what the restore path proves | holds |
+| dependency-outage | [source:actual/observed/path] what an unavailable dependency does | how the boundary degrades | holds |
+| rollback | [source:actual/observed/path] what undoing the migration costs | the rollback step and its proof | holds |
 
 ## Verdict
 

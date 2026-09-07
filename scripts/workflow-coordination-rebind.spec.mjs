@@ -1,3 +1,4 @@
+import {observeCheckoutFixture,prepareFixtureSource,fixtureSourceCritique} from './architecture-source-fixture.mjs';
 // Mapping and admission regression using genuine current mismatch acceptance and an official
 // retry/rebind forecast. It does not claim the full resolved-source incorporation lifecycle.
 import test from 'node:test';
@@ -44,7 +45,7 @@ async function architecture(f) {
  const {restatementDecisionId,recordRestatementChoice}=await f.load('scripts/restatement-choice.mjs'),{acquireWorkerSlot}=await f.load('scripts/worker-slots.mjs');
  const [files]=confirmed(baseline()),template=structuredClone(files['request/request.json']);delete template.decisionId;delete template.selectedOption;template.requirements.resume=null;template.contexts[0].head=f.sessionHead;
  const operation={operationId:'fixture-worker',name:'runFixtureWorker',transport:'worker',writerRef:'src/worker.mjs',storeRefs:[],transactionBoundary:'read-only',idempotencyKind:'none',migrationRefs:[],authorityDimensionIds:['deterministic-value']};
- files['response/data/stack-model.json'].operations=[operation];
+ files['response/data/stack-model.json'].operations=[operation];observeCheckoutFixture(files,f.sessionHead);
  files['response/response.md']=files['response/response.md'].replace(/## Operations[\s\S]*?(?=## Handoff)/,table('Operations',['Operation','Transport','Writer','Stores','Transaction','Idempotency','Dimensions'],[[operation.operationId,'worker',operation.writerRef,'—','read-only','none','deterministic-value']])+'\n');
  let state=f.state();state.chain=[['1/1'],['2/1'],['3/1'],['4/1']];state.steps={'1/1':'workspace.bind','2/1':'architecture.decide','3/1':'architecture.decide','4/1':'backend.generate'};state.current='2/1';f.save(state);
  const reading={...template,...f.request('2/1','architecture.decide',template.requirements,template.contexts,{prerequisite:'4/1'})};
@@ -57,7 +58,7 @@ async function architecture(f) {
  for(const ref of ['response/restatement.md','response/data/current-state.json','response/data/stack-model.json'])f.write(path.join(f.branch('3/1'),ref),files[ref]);
  const waiting=f.response(parent,'waiting',{restatement:'response/restatement.md','current-state':'response/data/current-state.json','stack-model':'response/data/stack-model.json'});waiting.awaiting={exchange:'critique',kind:'independent-critique'};waiting.comparison.next='retry';await f.accept(parent,waiting);
  const child={...f.request('3/1','architecture.decide',{},files['critique/request/request.json'].contexts),exchange:'critique',inputs:{'stack-model':'step-3/parallel-1/response/data/stack-model.json'}};delete child.goal;child.attempt={id:'3/1/critique:a1',number:1,kind:'initial',previous:null};child.expected.sourceRef='step-3/parallel-1/response/data/stack-model.json';child.environment.isolationId=child.attempt.id;
- const childDir=path.join(f.branch('3/1'),'critique'),gate=await f.load('scripts/attempt-gate.mjs');f.write(path.join(childDir,'request/request.json'),child);await gate.openAttempt(childDir);f.write(path.join(childDir,'response/critique.md'),files['critique/response/critique.md']);
+ const childDir=path.join(f.branch('3/1'),'critique'),gate=await f.load('scripts/attempt-gate.mjs');f.write(path.join(childDir,'request/request.json'),child);await prepareFixtureSource(f.runtime,childDir,child);await gate.openAttempt(childDir);f.write(path.join(childDir,'response/critique.md'),fixtureSourceCritique(childDir,files['critique/response/critique.md']));
  const reviewed=f.response(child,'done',{'independent-critique':'response/critique.md'});reviewed.exchange='critique';delete reviewed.goalCheck;f.write(path.join(childDir,'response/response.json'),reviewed);await gate.acceptAttempt(childDir);
  await acquireWorkerSlot(f.branch('3/1'),'fixture-author',{resume:true,ranProfile:'sol-reviewer'});
  f.write(path.join(f.branch('3/1'),'response/response.md'),files['response/response.md']);
