@@ -1,4 +1,4 @@
-# StarCi Skills 2.5.0-rc.12
+# StarCi Skills 2.5.0-rc.13
 
 This tree is the runtime. Read [SKILL.md](SKILL.md) next; it is the single entry that freezes a
 mission's scope, selects the one operator that owns the outcome, and routes between operators on
@@ -90,6 +90,8 @@ head or the head is not publishable.
 - Rule IDs are stable public addresses. Append; never renumber, reuse, or silently change meaning.
 
 ## Lineage
+
+2.5.0-rc.13 (2026-09-07): explicitly delegated in-scope restatement review retains its user grant, coordinator judgment and exact reading; changed in-progress promises retain truthful lineage, and registry publication serializes competing writers. Candidate publication requires integrated release proof.
 
 2.5.0-rc.12 (2026-09-07): architecture critique binds actual source and independent analysis; runtime bootstrap planning and early mission schema checks reject invalid prerequisites and drafts before dispatch. Candidate publication requires integrated release proof.
 

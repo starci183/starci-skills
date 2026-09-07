@@ -67,5 +67,25 @@
       "short-details",
       "original-image-links"
     ]
+  },
+  "delegatedRestatement": {
+    "grantSource": "user",
+    "grantSelection": "in-scope-restatement-review",
+    "operators": [
+      "business.decide",
+      "architecture.decide"
+    ],
+    "grantContext": "restatement-delegations",
+    "reviewContext": "restatement-reviews",
+    "scopeFields": [
+      "goal",
+      "target",
+      "includes",
+      "outputs",
+      "doneWhen",
+      "verification",
+      "discovery"
+    ],
+    "rule": "An explicit user delegation can authorize the named coordinator to review an in-scope restatement for the exact confirmed mission and named operators. This is a coordinator decision, never a user answer. Retain the user statement and source reference, exact mission and host identity, sealed reading/request hashes, every line mapped to approved scope clauses, all reviewed exclusions and no material changes. The scope approval alone grants no delegation. Material change requires the user; effect grants, ownership, goal confirmation, tier and budget choices are unaffected. Clause mapping is an accountable reviewer judgment, not machine-proven semantic equivalence."
   }
 }

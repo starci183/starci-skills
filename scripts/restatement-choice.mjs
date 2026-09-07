@@ -50,6 +50,13 @@ export async function recordRestatementChoice(branch, answer, { root = path.reso
 
 async function main() {
   try {
+    if (['delegate', 'delegated-review'].includes(process.argv[2])) {
+      const { recordRestatementDelegation, recordDelegatedRestatementReview } = await import('./restatement-delegation.mjs');
+      const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+      const input=JSON.parse(readFileSync(path.resolve(process.argv[4]), 'utf8'));
+      const operation=process.argv[2] === 'delegate' ? recordRestatementDelegation : recordDelegatedRestatementReview;
+      process.stdout.write(JSON.stringify(await operation(root,path.resolve(process.argv[3]),input))+'\n');return;
+    }
     const answering = process.argv[2] === 'answer';
     const branch = path.resolve(process.argv[answering ? 3 : 2]);
     if (answering) {

@@ -1,6 +1,7 @@
+import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -165,4 +166,51 @@ test('verification refuses every way a head can be published to one place only',
   rmSync(registryFile, { force: true });
   only('no head index under');
   rmSync(dir, { recursive: true, force: true });
+});
+
+test('changed in-progress promise preserves lineage and rejects unchanged, stale and unbound revisions', () => {
+  const dir=root();
+  try {
+    const coverage=fingerprinted({featureId:FEATURE,rows:[{dimension:'scope',disposition:'defer'}]},'fingerprint');
+    const first=modelAt(dir,{mode:'model',state:'in-progress',reconciliation:null,coverageFingerprint:coverage.fingerprint});
+    applyHeadPublication(openStore(dir),planHeadPublication({store:openStore(dir),featureId:FEATURE,model:first,claims:CLAIMS,coverage}));
+    const previous=openStore(dir).entry(FEATURE), oldBytes=readFileSync(openStore(dir).objectFile(previous.head));
+    const revise=statement=>modelAt(dir,{mode:'model',state:'in-progress',reconciliation:null,promise:{...first.promise,statement},coverageFingerprint:coverage.fingerprint,lineage:{previousHeadRef:objectRefFor(previous.head),previousState:'in-progress',transition:'in-progress->in-progress'}});
+    function objectRefFor(hash){return `${dir}/${objectRelPath(hash)}`;}
+    const publish=model=>planHeadPublication({store:openStore(dir),featureId:FEATURE,model,claims:CLAIMS,coverage});
+    assert.throws(()=>publish(revise(' s ')),/NO_PROGRESS/);
+    const changed=revise('Changed approved scope.'),plan=publish(changed);
+    assert.throws(()=>planHeadPublication({store:openStore(dir),featureId:FEATURE,model:changed,claims:CLAIMS}),/COVERAGE/);
+    applyHeadPublication(openStore(dir),plan);
+    assert.equal(openStore(dir).entry(FEATURE).previousHead,previous.head);
+    assert.equal(openStore(dir).entry(FEATURE).authorityStatus,'in-progress');
+    assert.deepEqual(readFileSync(openStore(dir).objectFile(previous.head)),oldBytes);
+    assert.throws(()=>publish(revise('Another change.')),/SOURCE_DRIFT/);
+    assert.throws(()=>applyHeadPublication(openStore(dir),plan),/SOURCE_DRIFT/);
+  } finally {rmSync(dir,{recursive:true,force:true});}
+});
+test('separate publisher processes retain both feature heads under the shared registry lock', async () => {
+  const dir=root();
+  try {
+    const moduleUrl=new URL('./business-registry.mjs',import.meta.url).href;
+    const run=feature=>new Promise((resolve,reject)=>{
+      const code=`import {openStore,planHeadPublication,applyHeadPublication} from ${JSON.stringify(moduleUrl)};const dir=${JSON.stringify(dir)},feature=${JSON.stringify(feature)};const store=openStore(dir);const model={featureId:feature,state:'pending'};const plan=planHeadPublication({store,featureId:feature,model,claims:{featureId:feature,claims:[]}});for(let n=0;n<100;n++){try{applyHeadPublication(store,plan);process.exit(0);}catch(e){if(!e.message.startsWith('SOURCE_DRIFT: registry publication busy'))throw e;Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);}}throw Error('publisher remained busy');`;
+      const child=spawn(process.execPath,['--input-type=module','-e',code],{windowsHide:true,stdio:['ignore','pipe','pipe']});let output='';child.stderr.on('data',b=>output+=b);child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(Error(output)));
+    });
+    await Promise.all([run('first'),run('second')]);
+    assert.ok(openStore(dir).entry('first'));assert.ok(openStore(dir).entry('second'));
+  } finally {rmSync(dir,{recursive:true,force:true});}
+});
+test('dry publication reads through a busy publisher without changing any tree bytes', () => {
+  const dir=root();
+  try {
+    const store=openStore(dir),model=modelAt(dir),plan=planHeadPublication({store,featureId:FEATURE,model,claims:CLAIMS});
+    const lock=path.join(dir,'.business-registry.lock');writeFileSync(lock,JSON.stringify({pid:process.pid,createdAt:'test-owner'}));
+    const snapshot=()=>{
+      const files={};const walk=p=>{for(const e of readdirSync(p,{withFileTypes:true})){const file=path.join(p,e.name);if(e.isDirectory())walk(file);else files[path.relative(dir,file)]=readFileSync(file).toString('base64');}};walk(dir);return files;
+    };
+    const before=snapshot();const result=applyHeadPublication(store,plan,{dryRun:true});
+    assert.equal(result.registry.featureHeads[FEATURE].head,contentAddress(model));assert.deepEqual(snapshot(),before);
+    assert.throws(()=>applyHeadPublication(store,plan),/SOURCE_DRIFT: registry publication busy/);assert.deepEqual(snapshot(),before);
+  } finally {rmSync(dir,{recursive:true,force:true});}
 });

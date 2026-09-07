@@ -718,6 +718,7 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
   const op = pkg.en;
   const sessionRoot = sessionRootOf(dir);
   let recordedChoices = {};
+  let delegatedSelection = false;
   const policy = await loadInteractionPolicy(root);
 
   if (request.exchange) {
@@ -760,6 +761,11 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
         if (retiredPlanCell(state, `${request.step}/${request.parallel}`)) errors.push('PLAN_SUPERSEDED: this coordinate is retained history and cannot dispatch; use the current forecast');
       }
       recordedChoices = state.choices ?? {};
+      if (recordedChoices[request.decisionId]?.selectedBy === 'coordinator') {
+        const { delegatedRestatementErrors } = await import('./restatement-delegation.mjs');
+        const delegatedErrors = await delegatedRestatementErrors(root, dir, state, request, { phase });
+        errors.push(...delegatedErrors); delegatedSelection = delegatedErrors.length === 0;
+      }
       errors.push(...validateAgainst(JSON.parse(await readFile(path.join(root, 'templates', 'step', 'state.schema.json'), 'utf8')), state, 'state.json'));
       const topologyPolicy = JSON.parse(await readFile(path.join(root, 'resources', 'orchestrator.json'), 'utf8')).workflowTopologies;
       errors.push(...sessionWorkflowTopologyErrors(topologyPolicy, state, { dispatch: request.contractVersion === V22_CONTRACT }));
@@ -786,7 +792,7 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
             const { restatementChoiceSource, restatementDecisionId } = await import('./restatement-choice.mjs');
             const source = restatementChoiceSource(dir, request);
             const subject = /^# restatement — ([a-z0-9][a-z0-9-]*)\r?$/m.exec(source.text)?.[1];
-            if (!subject || request.decisionId !== restatementDecisionId(source.request, subject, source.text)) errors.push('RESTATEMENT_CONTENT_MISMATCH: dispatch must bind the exact current-version rendered reading and its user answer');
+            if (!subject || request.decisionId !== restatementDecisionId(source.request, subject, source.text)) errors.push('RESTATEMENT_CONTENT_MISMATCH: dispatch must bind the exact current-version rendered reading and its retained decision');
           } catch (error) { errors.push(error.message); }
         }
         if (targetAttempt?.status === 'waiting') errors.push(...await resolvedWaitingReplanErrors(root, sessionRoot, state, request));
@@ -814,7 +820,7 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
       }
     } catch (e) { errors.push(`state.json: ${e.message}`); }
   }
-  errors.push(...selectionErrors(policy, request, recordedChoices));
+  errors.push(...selectionErrors(delegatedSelection ? { ...policy, selectionSource: 'coordinator' } : policy, request, recordedChoices));
   if (request.contractVersion === V22_CONTRACT) errors.push(...await frozenInputErrors(dir, request));
   errors.push(...await uiKnowledgeRequestErrors(root, dir, request, { phase }));
   if (request.operatorId === 'architecture.decide' && request.exchange === 'critique') {

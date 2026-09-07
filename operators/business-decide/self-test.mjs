@@ -1,3 +1,4 @@
+import { archiveObject, openStore, selfFingerprint } from '../../scripts/business-registry.mjs';
 // Proves validate.mjs on a synthetic session branch: one conforming publication of a first head, the
 // restatement gate in both directions, one branch blocked on a terminate code, and one mutation per
 // law, each of which must fail with a line that names the defect. Reconciliation against delivered
@@ -136,7 +137,7 @@ const ALL_FIELDS = { 'business-promise-authority': 'response/response.md', claim
 function responseJson({ status = 'done', stop, fallbacks = [], fields = null, next = ['backend.generate'], step = 1 } = {}) {
   return {
     schemaVersion: 9, operatorId: 'business.decide', step, parallel: 1, status, ...(stop ? { stop } : {}), fallbacks,
-    fields: fields ?? ALL_FIELDS,
+    fields: fields ?? { ...ALL_FIELDS },
     commits: [], next,
   };
 }
@@ -313,3 +314,22 @@ await expectError(selectedWithoutResume({ response: responseJson({ status: 'wait
 await expectError(selectedWithoutResume({ response: responseJson({ status: 'blocked', stop: 'CONSUMER_UNPROVEN', fields: { restatement: 'response/restatement.md' }, next: [] }) }), 'ends blocked with INVALID_INPUT', 'malformed selected input ending on another stop');
 
 process.stdout.write('business.decide self-test: 9 valid branches, 59 rejected mutations\n');
+
+// A changed promise keeps its honest in-progress state and passes the real operator gate.
+{
+  const dir = path.join(mkdtempSync(path.join(tmpdir(), 'promise-revision-')), '.worktrees', 'businesses').split(path.sep).join('/');
+  mkdirSync(dir, {recursive:true});
+  try {
+    const previous=modelDoc({state:'in-progress'});previous.promise.statement='The previous narrower promise.';
+    const archived=archiveObject(openStore(dir),previous);
+    const value=reentry();const files=value[0];
+    files['response/response.json'].fields={...ALL_FIELDS,restatement:'response/restatement.md'};
+    const coverage=coverageMatrix();coverage.fingerprint=selfFingerprint(coverage,'fingerprint');
+    const claims=claimsDoc();claims.fingerprint=selfFingerprint(claims,'fingerprint');
+    const model=modelDoc({state:'in-progress',transition:'in-progress->in-progress',previousHeadRef:archived.ref,previousState:'in-progress',headRef:`${dir}/features/${FEATURE}`,coverage:coverage.fingerprint});model.claimsFingerprint=claims.fingerprint;
+    files['request/request.json'].requirements.targetState='in-progress';
+    files['response/data/model.json']=model;files['response/data/coverage-matrix.json']=coverage;files['response/data/claims.json']=claims;
+    files['response/response.md']=responseMd({state:'in-progress',transition:'in-progress->in-progress',previousHead:`\`${archived.ref}\``,previousState:'in-progress',headRef:model.headRef,coverage:coverage.fingerprint,claimsFp:claims.fingerprint});
+    await expectValid(value,'changed promise retains in-progress with current authority and archived lineage');
+  } finally {rmSync(path.dirname(path.dirname(dir)),{recursive:true,force:true});}
+}

@@ -17,8 +17,8 @@
 //
 // Reading one where the other is meant is how a head is published under a name the store does not
 // hold, so both are computed here and nowhere else.
-import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync, unlinkSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -118,11 +118,33 @@ export function boundSourceHeads(claims) {
 // What publishing this head writes, computed and returned rather than written, so a caller can print
 // it, diff it, or apply it. `sources` is the roles a caller resolved for the bound heads: a head with
 // no role named falls back to `defaultRole`, because the index names heads and the role is a label.
+export function promiseRevisionErrors(model, previous, claims, coverage) {
+  if (model.lineage?.transition !== 'in-progress->in-progress') return [];
+  const errors = [];
+  if (!previous || contentAddress(previous) !== archivedHashOf(model.lineage.previousHeadRef) || previous.featureId !== model.featureId || previous.state !== 'in-progress'
+      || model.state !== 'in-progress' || model.mode !== 'model' || model.reconciliation !== null)
+    errors.push('LIFECYCLE_TRANSITION_INVALID: revision retains an in-progress promise without delivered credit');
+  const normalized = value => String(value ?? '').replace(/\s+/g, ' ').trim();
+  if (!model.promise?.statement || normalized(model.promise.statement) === normalized(previous?.promise?.statement))
+    errors.push('NO_PROGRESS: promise revision requires changed promise text');
+  if (!coverage || coverage.featureId !== model.featureId || model.coverageFingerprint !== selfFingerprint(coverage, 'fingerprint')
+      || coverage.fingerprint !== model.coverageFingerprint)
+    errors.push('COVERAGE_INCOMPLETE: revision requires its current frozen coverage matrix');
+  if (claims && (claims.featureId !== model.featureId || claims.fingerprint !== model.claimsFingerprint
+      || claims.fingerprint !== selfFingerprint(claims, 'fingerprint')))
+    errors.push('EVIDENCE_MISSING: revision claims must match the current frozen document');
+  return errors;
+}
 export function planHeadPublication({ store, featureId, model, claims, coverage = null, sources = null, defaultRole = 'be' }) {
   if (!featureId) fail('planHeadPublication needs the featureId whose head is published');
   if (!model) fail('planHeadPublication needs the model that is the head');
   if (!claims) fail('planHeadPublication needs the claims the head is frozen behind');
   const previous = store.entry(featureId);
+  if (model.lineage?.transition === 'in-progress->in-progress') {
+    if (!previous || archivedHashOf(model.lineage.previousHeadRef) !== previous.head) fail('SOURCE_DRIFT: revision must name the current head');
+    const errors = promiseRevisionErrors(model, store.readObject(previous.head), claims, coverage);
+    if (errors.length) fail(errors.join('\n'));
+  }
   const head = contentAddress(model);
   const claimsHead = contentAddress(claims);
   const coverageHead = coverage ? contentAddress(coverage) : previous?.coverageHead ?? null;
@@ -162,8 +184,23 @@ export function archiveObject(store, document, { dryRun = false } = {}) {
 // feature's head entry. One call, so a feature directory, an object and an index entry cannot land in
 // three different commits.
 export function applyHeadPublication(store, plan, { dryRun = false } = {}) {
+  if (dryRun) return applyHeadUnderLock(store, plan, { dryRun: true });
+  const lock = path.join(store.root, '.business-registry.lock');
+  let handle;
+  try { handle = openSync(lock, 'wx'); }
+  catch (error) { if (error.code === 'EEXIST') fail('SOURCE_DRIFT: registry publication busy; retry after current publisher releases ownership'); throw error; }
+  try {
+    writeFileSync(handle, JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }), 'utf8');
+    return applyHeadUnderLock(store, plan, { dryRun });
+  }
+  finally { closeSync(handle); unlinkSync(lock); }
+}
+
+function applyHeadUnderLock(store, plan, { dryRun }) {
   if (!store.present) fail(`${store.registryFile}: no head index to publish into`);
-  const registry = JSON.parse(JSON.stringify(store.registry));
+  const live = openStore(store.root);
+  if (canonicalize(live.entry(plan.featureId)) !== canonicalize(plan.previous)) fail('SOURCE_DRIFT: publication head changed since planning');
+  const registry = JSON.parse(JSON.stringify(live.registry));
   const archived = [];
   for (const object of plan.objects) {
     archived.push(archiveObject(store, object.document, { dryRun }));
@@ -173,7 +210,11 @@ export function applyHeadPublication(store, plan, { dryRun = false } = {}) {
   }
   registry.featureHeads ??= {};
   registry.featureHeads[plan.featureId] = plan.entry;
-  if (!dryRun) writeFileSync(store.registryFile, `${JSON.stringify(registry, null, 2)}\n`, 'utf8');
+  if (!dryRun) {
+    const temp = `${store.registryFile}.${randomUUID()}.tmp`;
+    try { writeFileSync(temp, `${JSON.stringify(registry, null, 2)}\n`, 'utf8'); renameSync(temp, store.registryFile); }
+    finally { if (existsSync(temp)) unlinkSync(temp); }
+  }
   return { registry, archived };
 }
 

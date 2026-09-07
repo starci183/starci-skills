@@ -1,6 +1,6 @@
 {
   "name": "@starci/skills",
-  "version": "2.5.0-rc.12",
+  "version": "2.5.0-rc.13",
   "description": "StarCi Skills: one entry, bounded operators, a closed routing map and a tool registry, installed as the .claude runtime of a repository for Claude Code and Codex.",
   "license": "MIT",
   "type": "module",
@@ -41,7 +41,9 @@
     "tests/evidence/20260906-source-proof-review-reentry.md",
     "tests/evidence/20260907-unit-successor-reentry.md",
     "tests/evidence/20260907-goal-presentation-and-prior-waits.md",
-    "tests/evidence/20260907-source-critique-and-early-admission.md"
+    "tests/evidence/20260907-source-critique-and-early-admission.md",
+    "tests/evidence/20260907-business-promise-revision.md",
+    "tests/evidence/20260907-delegated-restatement-review.md"
   ],
   "repository": {
     "type": "git",

@@ -1,3 +1,4 @@
+import { promiseRevisionErrors, openStore, businessesRootOf, archivedHashOf } from '../../scripts/business-registry.mjs';
 import { restatementDecisionId, restatementChoiceSource } from '../../scripts/restatement-choice.mjs';
 // business.decide's own law over one branch, on top of the shared step check: the branch models and
 // never reconciles, so delivered source and an implemented state are refused here and belong to
@@ -32,6 +33,7 @@ const LEGAL_TRANSITIONS = {
   'absent->pending': { from: null, to: 'pending' },
   'pending->in-progress': { from: 'pending', to: 'in-progress' },
   'pending->rejected': { from: 'pending', to: 'rejected' },
+  'in-progress->in-progress': { from: 'in-progress', to: 'in-progress' },
   'in-progress->implemented': { from: 'in-progress', to: 'implemented' },
   'in-progress->rejected': { from: 'in-progress', to: 'rejected' },
   'implemented->in-progress': { from: 'implemented', to: 'in-progress' },
@@ -273,6 +275,12 @@ export async function validateBusinessStep(branchDir, root = ROOT) {
 
     // Lifecycle. A state that arrives through an unlisted transition has no lineage behind it.
     const transition = LEGAL_TRANSITIONS[model.lineage.transition];
+    if (model.lineage.transition === 'in-progress->in-progress') {
+      const storeRoot = businessesRootOf(model.headRef);
+      const previous = storeRoot ? openStore(storeRoot).readObject(archivedHashOf(model.lineage.previousHeadRef)) : null;
+      errors.push(...promiseRevisionErrors(model, previous, has('response/data/claims.json') ? JSON.parse(await read('response/data/claims.json')) : null, matrix));
+      if (collapse(model.promise.statement) !== collapse(requirements.promise)) errors.push('promise revision must match the currently approved request promise');
+    }
     if (!transition) errors.push(`response/data/model.json: transition ${model.lineage.transition} is not a legal lifecycle transition`);
     else {
       if (transition.from !== model.lineage.previousState) errors.push(`response/data/model.json: transition ${model.lineage.transition} contradicts previous state ${String(model.lineage.previousState)}`);

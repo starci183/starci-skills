@@ -33,7 +33,7 @@ Các gate này chỉ kiểm giao tiếp; qua gate không cấp quyền thực hi
 
 Các ví dụ là định hướng, không ép một định dạng cho mọi việc. Đọc contract và mode của operator: hiện expected so với actual, coverage và bước tiếp cạnh kết quả được chọn. Kết quả được chọn giúp đánh giá kết quả, kể cả lỗi quan trọng. Operator kiểm xong vẫn có thể kết luận đối tượng bị kiểm không đạt. Dry-run là đề xuất; reuse/no-op là trạng thái không đổi đã quan sát; rollback là khôi phục. Tổng quan kết quả phải hiện đủ dù chỉ nhúng một artifact đại diện.
 
-Sources: [Bằng chứng tương tác](../tests/evidence/20260904-interaction.md).
+Sources: [Bằng chứng tương tác](../tests/evidence/20260904-interaction.md), [Review diễn giải được ủy quyền](../tests/evidence/20260907-delegated-restatement-review.md).
 
 ## Danh tính lời nói lại
 
@@ -44,3 +44,26 @@ interaction bị chặn dùng đúng id đó. Digest chỉ chuẩn hóa xuống 
 lưu đáp án. Request vào lại gọi nhánh bị chặn và lựa chọn của nó; không dùng lời đọc của phiên bản
 mục tiêu khác. Lựa chọn và receipt trước giữ nguyên. Context invocation giữ lựa chọn tại lúc mở,
 vì vậy câu hỏi lịch sử đã được trả lời không bị hiểu là yêu cầu hỏi lại.
+
+Người dùng có thể uỷ quyền rõ ràng cho coordinator có danh tính để review bản đọc không đổi trong
+scope. Ghi grant bằng `node scripts/restatement-choice.mjs delegate <session> <grant.json>`, theo
+[restatement-delegation.schema.json](../templates/kinds/restatement-delegation.schema.json):
+lời uỷ quyền thật và nguồn, đúng session tiêu thụ cùng hash/phiên bản scope đã xác nhận,
+danh tính session coordinator và các operator restatement được phép. Chỉ duyệt scope hay có vai trò
+agent không phải grant; bên tiêu thụ không tự cấp quyền cho mình. Session coordinated còn draft
+có thể định danh reviewer khi chính grant thật của người cung cấp quyền review này.
+
+Coordinator đối chiếu từng dòng đã hiện với điều khoản đã hash của scope được duyệt, ghi đủ mọi
+loại trừ và không có tác động mới đáng kể, bằng
+`node scripts/restatement-choice.mjs delegated-review <blocked-branch> <review.json>`, theo
+[restatement-delegated-review.schema.json](../templates/kinds/restatement-delegated-review.schema.json).
+Bản review gắn grant id, đúng bytes request và lời đọc đã niêm phong, hash/phiên bản mission và
+danh tính reviewer. Lựa chọn ghi `selectedBy: coordinator`, nguồn review và căn cứ được giữ;
+đây là quyết định kỹ thuật `as-stated`, không được gọi là đáp án của người cho bản đọc ấy.
+Tương đương giữa dòng và scope là nhận định có trách nhiệm của reviewer, không phải ngữ nghĩa được
+hash chứng minh. Thay đổi đáng kể chưa được trả lời vẫn hỏi người. Đường này không đổi goal,
+tác động, ownership, tầng kiểm chứng hay budget. Lệnh `answer` vẫn chỉ nhận đáp án thật của người.
+
+Request resume bình thường tiêu thụ quyết định được giữ. Admission mới kiểm lại grant hiện hành
+và danh tính reviewer; lịch sử đã chấp nhận giữ thẩm quyền lúc mở cùng evidence niêm phong, kể cả
+sau khi sửa scope. Quyết định scope cũ không cấp quyền cho công việc mới hiện hành.

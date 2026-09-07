@@ -33,7 +33,7 @@ proposed questions. These gates validate communication only; passing them author
 
 The examples are guidance, not a format assigned to every job. Read the operator contract and mode: show expected versus actual, scope coverage and the next action alongside the chosen result. The selected result is useful for judging the outcome, including diagnostic failures. A verifier may be done while its subject fails. Dry-run is proposed; reuse/no-op is an observed unchanged state; rollback is restoration. The full result summary must remain visible even when only one representative artifact is embedded.
 
-Sources: [Interaction evidence](../tests/evidence/20260904-interaction.md).
+Sources: [Interaction evidence](../tests/evidence/20260904-interaction.md), [Delegated restatement review](../tests/evidence/20260907-delegated-restatement-review.md).
 
 ## Restatement identity
 
@@ -45,3 +45,26 @@ receipt and its evidence inventory before retaining the answer. A resumed reques
 branch and its choice; it cannot reuse a reading from another mission version. The former choice and
 receipt stay unchanged. The invocation context preserves the choices available when it opened, so
 an answered historical question is not mistaken for a new request to ask again.
+
+An actual user may explicitly delegate review of unchanged in-scope readings to a named coordinator.
+Record that grant with `node scripts/restatement-choice.mjs delegate <session> <grant.json>`,
+using [restatement-delegation.schema.json](../templates/kinds/restatement-delegation.schema.json):
+the actual user statement and source reference, exact consumer session and confirmed scope hash/version,
+coordinator session identity, and permitted restatement operators. Scope approval or an agent role alone
+is not a grant; the consumer cannot grant authority to itself. The named coordinator may be identified
+by its draft coordinated session when the actual user grant supplies this review authority.
+
+The coordinator reviews every rendered line against hashed clauses of that approved scope and records
+every exclusion, with no material new effect, using
+`node scripts/restatement-choice.mjs delegated-review <blocked-branch> <review.json>` and
+[restatement-delegated-review.schema.json](../templates/kinds/restatement-delegated-review.schema.json).
+This binds the grant id, exact sealed request and reading bytes, mission hash/version, and reviewer
+identity. The choice says `selectedBy: coordinator`, with its review source and retained basis;
+it is an `as-stated` technical decision, never represented as the user's answer to that reading.
+Line-to-scope equivalence is the reviewer's explicit judgment, not a semantic fact proved by hashes.
+An unanswered material change still goes to the user. This path cannot change goals, effects,
+ownership, verification tiers or budget. The `answer` command remains user-only.
+
+The normal resume request consumes the retained decision. Fresh admission rechecks the current grant
+and reviewer identity; accepted history retains its opening authority and sealed evidence, including
+after a later scope correction. Old scope decisions cannot authorize fresh current work.

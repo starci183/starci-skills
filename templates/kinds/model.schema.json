@@ -48,6 +48,7 @@
             "pending->in-progress",
             "pending->rejected",
             "in-progress->implemented",
+            "in-progress->in-progress",
             "in-progress->rejected",
             "implemented->in-progress", "implemented->implemented",
             "implemented->rejected",

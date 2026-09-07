@@ -378,6 +378,24 @@
             "type": "string",
             "minLength": 1,
             "description": "Reference to the actual user message selecting this option."
+          },
+          "basis": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ref",
+              "hash"
+            ],
+            "properties": {
+              "ref": {
+                "type": "string",
+                "pattern": "^runtime/history/restatement-(delegations|reviews)/[a-f0-9]{64}\\.json$"
+              },
+              "hash": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              }
+            }
           }
         }
       }

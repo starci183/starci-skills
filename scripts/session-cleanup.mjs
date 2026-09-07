@@ -71,7 +71,7 @@ async function retainedFiles(session, state) {
     // to that peer's retention bundle, just as an extraction's foreign authority does.
     if (typeof value.sessionId === 'string' && typeof value.impactId === 'string' && value.mission?.ref?.startsWith('runtime/history/missions/')) return;
     if (typeof value.ref === 'string' && value.ref.startsWith('runtime/history/')) {
-      const kind = /^runtime\/history\/(missions|invocations|plans|assignments|extractions|incorporations)\//.exec(value.ref)?.[1];
+      const kind = /^runtime\/history\/(missions|invocations|plans|assignments|extractions|incorporations|restatement-delegations|restatement-reviews)\//.exec(value.ref)?.[1];
       if (!kind) throw Error('RETENTION_PATH: invalid immutable context address');
       if (contexts.has(value.ref)) return;
       const record = readContext(session, value, kind);
@@ -92,6 +92,7 @@ async function retainedFiles(session, state) {
     for (const child of Object.values(value)) await retainAddresses(child);
   };
   await retainAddresses(state.missionSnapshots);
+  await retainAddresses(state.choices);
   await retainAddresses(state.planHistory);
   if (state.coordination && !state.coordination.coordinatorSessionId) await retainAddresses(state.coordination);
   await retainAddresses(state.coordination?.incorporations);

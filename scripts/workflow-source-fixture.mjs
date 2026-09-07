@@ -92,7 +92,7 @@ export async function createSourceFixture(t, { sessionId = 'source-fixture', mis
   return { ...f, ...opened, base, state: () => stateOf({ session: opened.session }) };
 }
 
-export async function acceptArchitecture(f, { beforeCritique, startStep = 1, sourceStep = startStep + 3, writerRef = 'src/modules/fixture/worker.mjs', operationId = 'fixture-worker', coordination = null, goal = { prerequisite: `${sourceStep}/1` } } = {}) {
+export async function acceptArchitecture(f, { answerReading, readingLines, beforeCritique, startStep = 1, sourceStep = startStep + 3, writerRef = 'src/modules/fixture/worker.mjs', operationId = 'fixture-worker', coordination = null, goal = { prerequisite: `${sourceStep}/1` } } = {}) {
   const bindStep = startStep, readingStep = startStep + 1, architectureStep = startStep + 2;
   planCells(f, [[bindStep, 'workspace.bind'], [readingStep, 'architecture.decide'], [architectureStep, 'architecture.decide'], [sourceStep, 'backend.generate']]);
   const state = stateOf(f), head = git(f.worktree, 'rev-parse', 'HEAD'), project = state.project, disk = f.worktree.replaceAll('\\', '/'), sessionBranch = git(f.worktree, 'branch', '--show-current');
@@ -112,13 +112,15 @@ export async function acceptArchitecture(f, { beforeCritique, startStep = 1, sou
   const { baseline, confirmed } = await moduleAt(f, 'operators/architecture-decide/self-test.mjs');
   const [template] = confirmed(baseline());
   const objective = 'one deterministic stateless fixture worker', decision = 'fixture-worker-contract';
-  const reading = template['response/restatement.md'].replaceAll('one entitlement read path', objective).replaceAll('entitlement-read-path', decision);
+  let reading = template['response/restatement.md'].replaceAll('one entitlement read path', objective).replaceAll('entitlement-read-path', decision);
+  if(readingLines)reading=reading.replace(/## Restatement[\s\S]*?(?=## Source)/,table('Restatement',['Line','Statement'],readingLines.map((line,index)=>[index+1,line]))+'\n');
   const plain = { operatorId: 'architecture.decide', contexts: [{ alias: '@workspaces/be', head }, { alias: '@worktrees/businesses/fixture', head: null }], requirements: { objective, decisionId: decision, alternatives: 1, tradeoffAxes: ['cost', 'complexity', 'reversibility'], constraints: [{ id: 'deterministic', kind: 'fixed-intent', statement: 'The worker has no side effects.' }, { id: 'invalid-input', kind: 'measurable', statement: 'Invalid inputs throw a TypeError.' }], selectionPolicy: 'automatic', approval: null, resume: null }, inputs: {} };
   const first = current(f, plain, readingStep, { goal, workspace: false, coordination }); await open(f, first);
   const { restatementDecisionId, recordRestatementChoice } = await moduleAt(f, 'scripts/restatement-choice.mjs');
   const decisionId = restatementDecisionId(first, decision, reading); put(path.join(branch(f, readingStep), 'response/restatement.md'), reading);
   await accept(f, first, actual(first, { stop: 'RESTATEMENT_UNCONFIRMED', fields: { restatement: 'response/restatement.md' }, fallbacks: [], commits: [], next: [], interaction: { kind: 'restatement-confirm', decisionId, options: [{ id: 'as-stated', label: 'As stated', tradeoff: 'Use this bounded worker contract' }, { id: 'corrected', label: 'Corrected', tradeoff: 'Correct the worker contract' }] } }, 'blocked', ['response/restatement.md']));
-  await recordRestatementChoice(branch(f, readingStep), { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user:fixture-worker-reading' });
+  if(answerReading)await answerReading(f,{branch:branch(f,readingStep),request:first,reading,decisionId});
+  else await recordRestatementChoice(branch(f, readingStep), { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user:fixture-worker-reading' });
   const request = current(f, plain, architectureStep, { goal, workspace: false, number: 2, previous: first.attempt.id, resume: { step: readingStep, parallel: 1, token: decisionId }, coordination });
   request.decisionId = decisionId; request.selectedOption = 'as-stated'; request.requirements.resume = decisionId;
   const resumed = stateOf(f); resumed.resumes ??= {}; resumed.resumes[`${architectureStep}/1`] = { resumes: `${readingStep}/1`, stop: 'RESTATEMENT_UNCONFIRMED' }; put(path.join(f.session, 'state.json'), resumed);

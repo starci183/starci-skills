@@ -225,8 +225,9 @@ thứ tư (`scripts/validate-session.mjs`). Sau mỗi chuyển bước giữ b�
 
 Một luật người nêu bằng lời của họ được nói lại cho họ trước khi thiết kế bất cứ gì trên đó:
 `business.decide` và `architecture.decide` viết một `restatement` tối đa năm dòng bằng ngôn ngữ của
-người và dừng với `RESTATEMENT_UNCONFIRMED` cho tới khi người chọn `as-stated` hay `corrected` trên
-một lựa chọn `restatement-confirm`; cách đọc đã sửa đến dưới dạng yêu cầu đã sửa và cùng nhánh đó
+người và dừng với `RESTATEMENT_UNCONFIRMED` cho tới khi đúng bản đọc có quyết định được giữ theo
+[chính sách restatement](resources/interaction.md#restatement-identity), gồm đường review trong scope
+được người uỷ quyền rõ ràng. Cách đọc đã sửa đến dưới dạng yêu cầu đã sửa và cùng nhánh đó
 chạy lại. Mỗi lượt orchestrator kết thúc với người là một trong các dạng báo cáo mà
 `resources/interaction.json` khai — đã giao, đang chờ anh quyết, đang làm — bằng ngôn ngữ của người;
 bàn giao cho task hay phiên anh em là một nhánh `waiting` có điều kiện đánh thức, không bao giờ là kết thúc
