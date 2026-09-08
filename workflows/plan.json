@@ -30,5 +30,12 @@
     "run/index.yaml": "Current job states, requests, accepted responses, typed handoffs and evidence references. Preserve every completed producer needed by later jobs. No attempt history."
   },
   "storage": "One backend-owned .starci/plans/<plan-id>/ bundle. All workflows in the same Plan share this directory; never create a separate runs tree or a new Plan per workflow.",
-  "recovery": "Incomplete writes or mismatched Plan digests block resumption; never treat file presence as approval. Keep unfinished bundles. Goal revisions require renewed approval, not overwriting a running goal."
+  "recovery": "Incomplete writes or mismatched Plan digests block resumption; never treat file presence as approval. Keep unfinished bundles. Goal revisions require renewed approval, not overwriting a running goal.",
+  "template": "plan.template.json",
+  "commands": {
+    "template": "node scripts/plan.mjs template",
+    "create": "node scripts/plan.mjs create <filled-plan.yaml> <new-plan-directory>",
+    "render": "node scripts/plan.mjs render <goal/index.yaml>"
+  },
+  "presentation": "Mandatory Goal, areas table, ordered workflows table with input/output/criteria/estimate, exclusions, and pending approval. Translate display prose to config.language. Draft-only trials use the same bundle in an allowed scratch location."
 }
