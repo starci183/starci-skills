@@ -16,3 +16,6 @@ resources/settings.json
 node_modules/
 __pycache__/
 /scheduled_tasks.lock
+
+# Local language, model and reasoning preferences
+/config.json

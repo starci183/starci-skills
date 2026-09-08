@@ -13,6 +13,7 @@ const json = x => JSON.stringify(x) + '\n';
 export function buildFiles() {
   const stale = generate({ check: true }); if (stale.length) throw Error('Regenerate operator outputs before build: ' + stale.join(', '));
   const files = new Map();
+  files.set('config.example.json', fs.readFileSync(path.join(root,'config.example.json')));
   files.set('basic-ops.json', fs.readFileSync(path.join(root, 'ops/basic-ops.json')));
   files.set('ops/consolidation.json', fs.readFileSync(path.join(root, 'ops/consolidation.json')));
   for (const name of fs.readdirSync(path.join(root, 'workflows')).sort()) if (name.endsWith('.json')) files.set('workflows/' + name, fs.readFileSync(path.join(root, 'workflows', name)));

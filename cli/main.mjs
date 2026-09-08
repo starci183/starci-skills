@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {loadConfig} from '../scripts/config.mjs';
 import fs from 'node:fs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import path from 'node:path';
@@ -100,6 +101,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const root = path.resolve(args[0]);
       if (fs.existsSync(root)) throw new Error('Init requires a new root; existing data will not be modified.');
       directory(path.dirname(root));
+      loadConfig(undefined, {initialize:true});
       fs.mkdirSync(root);
       fs.writeFileSync(path.join(root, 'workspace.yaml'), stringifyYaml({ schema: 'work/workspace@1', id: args[2] }), { flag: 'wx' });
       fs.mkdirSync(path.join(root,'_schema'));

@@ -13,6 +13,7 @@
   "files": [
     "bin/",
     "SKILL.md",
+    "config.example.json",
     "knowledge/",
     "workflows/",
     "ops/",

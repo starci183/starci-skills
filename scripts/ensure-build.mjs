@@ -1,8 +1,10 @@
+import {loadConfig} from './config.mjs';
 import { generate } from '../ops/generate.mjs';
 import { build } from './build-workflows.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 export function ensureBuild() {
+  loadConfig(undefined, {initialize:true});
   let stale = generate({check:true}).length > 0;
   if (!stale) { try { stale = !build({check:true}).ok; } catch { stale = true; } }
   if (!stale) return {ok:true, rebuilt:false};

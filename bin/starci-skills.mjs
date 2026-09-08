@@ -11,6 +11,7 @@
 // Every command takes --dir <repo> (default: the current directory). init refuses a non-empty
 // .claude it did not install unless --force; update keeps a file a person changed locally unless
 // --force; neither ever runs a git command.
+import {loadConfig} from '../scripts/config.mjs';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
@@ -321,6 +322,9 @@ export function init(opts, log = console.log) {
   }
   mkdirSync(target, { recursive: true });
   copyPayload(target);
+  loadConfig(target, {initialize:true});
+  const localIgnore = path.join(target, '.gitignore');
+  if (!existsSync(localIgnore) || !readFileSync(localIgnore,'utf8').split(/\r?\n/).includes('/config.json')) appendFileSync(localIgnore, '\n/config.json\n');
   const retired = retireOwnedFiles(target, retirement);
   const written = writeManifest(target, [], profile, hostPlan ? profile : manifest?.bootstrapProfile ?? null);
   log(`installed ${pkg.name}@${pkg.version} into ${target} (${Object.keys(written.files).length} files)`);
@@ -347,6 +351,9 @@ export function update(opts, log = console.log) {
   const previouslyKept = (manifest.keptLocal ?? []).filter(rel => Object.hasOwn(before, rel));
   const saved = Object.fromEntries([...new Set([...locallyChanged, ...locallyAdded, ...previouslyKept])].map((rel) => [rel, readFileSync(path.join(target, rel))]));
   copyPayload(target);
+  loadConfig(target, {initialize:true});
+  const localIgnore = path.join(target, '.gitignore');
+  if (!existsSync(localIgnore) || !readFileSync(localIgnore,'utf8').split(/\r?\n/).includes('/config.json')) appendFileSync(localIgnore, '\n/config.json\n');
   const currentFiles = new Set(payloadFiles(packageRoot));
   const kept = [];
   for (const [rel, bytes] of Object.entries(saved)) {
