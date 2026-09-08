@@ -17,7 +17,7 @@
     "writes": [
       {
         "id": "node",
-        "path": "N/node.yaml"
+        "path": "N/index.yaml"
       },
       {
         "id": "evidence",

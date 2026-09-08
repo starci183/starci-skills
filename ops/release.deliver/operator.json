@@ -19,7 +19,7 @@
   "reads": [
     {
       "id": "target",
-      "path": "N/node.yaml",
+      "path": "N/index.yaml",
       "purpose": {
         "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
       }
@@ -49,7 +49,7 @@
   "writes": [
     {
       "id": "node",
-      "path": "N/node.yaml",
+      "path": "N/index.yaml",
       "fields": [
         "completion.inputDigest",
         "completion.evidence"
@@ -180,9 +180,9 @@
       "reads": [
         {
           "id": "target",
-          "path": "N/node.yaml",
+          "path": "N/index.yaml",
           "purpose": {
-            "en": "Read the existing selected N/node.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+            "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
           }
         },
         {
@@ -217,7 +217,7 @@
       "writes": [
         {
           "id": "node",
-          "path": "N/node.yaml",
+          "path": "N/index.yaml",
           "fields": [
             "state",
             "blocker",
@@ -391,9 +391,9 @@
       "reads": [
         {
           "id": "target",
-          "path": "N/node.yaml",
+          "path": "N/index.yaml",
           "purpose": {
-            "en": "Read the existing selected N/node.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+            "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
           }
         },
         {
@@ -435,7 +435,7 @@
       "writes": [
         {
           "id": "node",
-          "path": "N/node.yaml",
+          "path": "N/index.yaml",
           "fields": [
             "state",
             "blocker",
@@ -647,14 +647,14 @@
       "reads": [
         {
           "id": "target",
-          "path": "N/node.yaml",
+          "path": "N/index.yaml",
           "purpose": {
-            "en": "Read the existing selected N/node.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+            "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
           }
         },
         {
           "id": "architecture",
-          "path": ".work/<business>/architecture/**/node.yaml",
+          "path": ".work/<business>/architecture/**/index.yaml",
           "purpose": {
             "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
           }
@@ -698,7 +698,7 @@
       "writes": [
         {
           "id": "node",
-          "path": "N/node.yaml",
+          "path": "N/index.yaml",
           "fields": [
             "state",
             "blocker",

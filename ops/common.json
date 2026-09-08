@@ -2,6 +2,20 @@
   "schema": "starci/document@1",
   "sections": [
     {
+      "title": "Expandable business tree and local workflow tracking",
+      "blocks": [
+        "Each work folder has one index.yaml node; index is the node, not an extra directory listing.",
+        "Split by responsibility as needed: business, architecture, backend, frontend and uat each own nodes. Business can split into rules, journeys and acceptance; FE into draw/code; UAT into flows. Names and depth are flexible, not mandatory scaffolding.",
+        "A leaf has requirements, assertions and state. A parent keeps scope and derives progress from required children, never authored state/completion.",
+        "Extend existing nodes and preserve stable IDs, assets and evidence. New required work prevents parent done; unrelated completed branches remain intact. Scope or source changes invalidate only affected proof.",
+        "Several workflows may target the same work nodes; no duplicated business tree per run. Local workflow tracking is ignored by validation/digests and Git.",
+        "Declare semantic design/source files using node.assets with paths under own assets/. Their actual bytes contribute to node input binding.",
+        "Record output screenshots/videos in evidence assets with scope: node and paths under the primary owner assets/. Output evidence is not also declared as a semantic input, avoiding self-invalidating proof.",
+        "Source code remains in bound repositories; code/index.yaml tracks requirements, exact source references and completion.",
+        "Legacy index.yaml/node.md remains read compatibility; exactly one node file per work folder. Do not automatically migrate existing user work."
+      ]
+    },
+    {
       "title": "Mandatory lifecycle gates",
       "blocks": [
         "Every selected workflow follows workflows/gates.json. Missing .work routes to workspace-bootstrap; invalid .work is not overwritten. Preserve the original request and resume the same target workflow.",
@@ -37,14 +51,14 @@
       "title": "Path and field contract",
       "blocks": [
         "Paths below are templates, not discovered locations. Resolve `<business>`, `<piece>`, resource slugs and repository IDs from the selected workspace. Never persist literal angle-bracket placeholders or guess a path by similar name. `N` means the selected node directory, `E` means `N/evidence/<unique-evidence-id>`, `R` means `.work/_resources/<category>/<slug>`. Resolve symlinks and keep writes within the authorized roots.",
-        "Work metadata uses YAML 1.2 in workspace.yaml, node.yaml, resource.yaml and evidence/manifest.yaml. Put prose in node.description and domain data in extensions. YAML schemas are exported under .work/_schema. Legacy node.md remains read-only compatibility; do not create both node formats.",
+        "Work metadata uses YAML 1.2 in workspace.yaml, index.yaml, resource.yaml and evidence/manifest.yaml. Put prose in node.description and domain data in extensions. YAML schemas are exported under .work/_schema. Legacy node.md remains read-only compatibility; do not create both node formats.",
         "| Destination | Fields or content | Writer / invariant |",
         "| --- | --- | --- |",
         "| `.work/workspace.yaml` | `schema: work/workspace@1`, stable `id`; declared workspace extensions if needed | Initialize only if this workspace is new; do not replace an existing identity. |",
-        "| `N/node.yaml` front matter | `schema: work/node@1`, stable `id`, `kind`, `required`, `dependsOn`, `refs`, `assertions`; leaf `state` | Scope/graph fields belong to the selected scope/planning change. Consumer ops read them unchanged; `refs` contains resolvable node/resource IDs, not a copied document. |",
-        "| `N/node.yaml` body | Specific purpose, scope/exclusions, authority citations, observable done-when; the operator's domain tables | Current specification, not a transcript. IDs survive renames. Child directories define the tree. |",
-        "| `N/node.yaml` leaf metadata | `blocker` when blocked, `naReason` for `na`, `suspensionReason` for authored `suspended`, `completion` for accepted evidence | Use core schema shapes. Parents store no state/completion. `todo`, `doing`, `blocked`, `done`, `na`, `suspended` are persisted leaf states; freshness/rollup is also derived. Imported unapproved scope starts suspended with a concrete reason and no invented completion. |",
-        "| `N/node.yaml` `extensions.work3` | Domain-specific structured data explicitly described in the selected op; version/domain must be named if another consumer depends on it | Not a second progress ledger. Extension data is retained, but not automatically semantically certified by core. |",
+        "| `N/index.yaml` front matter | `schema: work/node@1`, stable `id`, `kind`, `required`, `dependsOn`, `refs`, `assertions`; leaf `state` | Scope/graph fields belong to the selected scope/planning change. Consumer ops read them unchanged; `refs` contains resolvable node/resource IDs, not a copied document. |",
+        "| `N/index.yaml` body | Specific purpose, scope/exclusions, authority citations, observable done-when; the operator's domain tables | Current specification, not a transcript. IDs survive renames. Child directories define the tree. |",
+        "| `N/index.yaml` leaf metadata | `blocker` when blocked, `naReason` for `na`, `suspensionReason` for authored `suspended`, `completion` for accepted evidence | Use core schema shapes. Parents store no state/completion. `todo`, `doing`, `blocked`, `done`, `na`, `suspended` are persisted leaf states; freshness/rollup is also derived. Imported unapproved scope starts suspended with a concrete reason and no invented completion. |",
+        "| `N/index.yaml` `extensions.work3` | Domain-specific structured data explicitly described in the selected op; version/domain must be named if another consumer depends on it | Not a second progress ledger. Extension data is retained, but not automatically semantically certified by core. |",
         "| `R/resource.yaml` | `schema: work/resource@1`, stable `id`, `kind`, `owner`, `revision`, `details`; optional `files:[{path}]` | One canonical shared resource. Files are normalized local paths relative to the resource directory; the core hashes actual bytes. No authored `sha256` field inside `files`. Update only owned source fields; runtime observations belong in evidence. |",
         "| `E/manifest.yaml` | `schema: work/evidence@1`, `id`, `nodeId`, `inputDigest`, `outcome`, `assertions:[{id,outcome,observation}]`, `assets:[{path,sha256}]`; applicable `provenance`, `codeRefs`, `extensions` | Write actual outcomes `pass`, `fail`, `not-run`, `inconclusive`. Every required assertion needs an actual observation. Assets use paths inside E and hash actual final bytes. |",
         "| `E/*` | Actual captured images, redacted tool output, test results, measurements and other files named by the op | Store durable evidence, not every conversational input/output. Do not overwrite a sealed evidence bundle. Keep failures needed to explain current defects. |",

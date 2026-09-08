@@ -17,14 +17,14 @@
   "reads": [
     {
       "id": "target",
-      "path": "N/node.yaml",
+      "path": "N/index.yaml",
       "purpose": {
         "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
       }
     },
     {
       "id": "business",
-      "path": ".work/<business>/business/**/node.yaml",
+      "path": ".work/<business>/business/**/index.yaml",
       "purpose": {
         "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
       }
@@ -68,7 +68,7 @@
   "writes": [
     {
       "id": "node",
-      "path": ".work/<business>/architecture/<piece>/node.yaml",
+      "path": ".work/<business>/architecture/<piece>/index.yaml",
       "fields": [
         "body: Observed system / Decision / Alternatives / Data ownership / Operations / API & events / Failure modes / Code scope / Verification / Open risks",
         "refs",

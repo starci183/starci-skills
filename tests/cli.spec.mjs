@@ -235,7 +235,7 @@ test('installed workspace.manage forward-test authors only scoped todo planning 
   assert.equal(result.resources.length, 0, 'no invented account/repository/environment resource');
   assert.match(tree.stdout, /draft\.functional \[todo\]/);
   const paths = snapshot(workRoot).map(item => item.path.replaceAll('\\', '/'));
-  assert.deepEqual(paths.filter(item => item.endsWith('node.yaml')).sort(), ['draft/business/acceptance/node.yaml', 'draft/business/functional/node.yaml', 'draft/node.yaml', 'draft/setup/node.yaml']);
+  assert.deepEqual(paths.filter(item => item.endsWith('index.yaml')).sort(), ['draft/business/acceptance/index.yaml', 'draft/business/functional/index.yaml', 'draft/index.yaml', 'draft/setup/index.yaml']);
   assert.ok(!paths.some(item => /(?:request\.json|response\.json|manifest\.yaml|completion|implementation|uat|runs|sessions)/i.test(item)));
   assert.equal(fs.existsSync(path.join(root, '.worktrees')), false);
   assert.equal(fs.existsSync(path.join(root, 'src')), false);

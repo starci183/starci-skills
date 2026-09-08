@@ -17,7 +17,7 @@
   "reads": [
     {
       "id": "target",
-      "path": "N/node.yaml",
+      "path": "N/index.yaml",
       "purpose": {
         "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
       }
@@ -61,7 +61,7 @@
   "writes": [
     {
       "id": "node",
-      "path": ".work/<business>/business/<piece>/node.yaml",
+      "path": ".work/<business>/business/<piece>/index.yaml",
       "fields": [
         "body: Objective / Glossary / Actors & permissions / FR / NFR / Business rules / Non-business constraints / State transitions / Acceptance / Decisions / Open questions",
         "refs",

@@ -1,0 +1,19 @@
+{
+  "schema": "starci/workspace-routing@1",
+  "source": "The host directory containing this .claude checkout and sibling .workspaces directory.",
+  "registry": ".workspaces/projects/<project>/work.json",
+  "rules": [
+    "Read the selected project's binding before resolving Work or target code. Preserve Source when entering another repository or worktree.",
+    "Resolve source-relative repository paths from Source, not from .claude or the current target checkout. Verify each actual Git remote against the declared repository before effects.",
+    "The project's backend repository owns .work. FE and other sources share that Work via the registry; do not create duplicate Work in the central registry or frontend.",
+    "Each backend project retains its own durable Work tree. .workspaces stores routing references, never business progress, evidence or workflow history.",
+    "If a binding or target is missing, inspect existing project route files and propose the exact mapping; never silently use an illustrative outputs workspace as project Work.",
+    "Use the resolved backend Work root for schema validation, workflow goals, local _workflows records, evidence and completion."
+  ],
+  "bindingShape": {
+    "schema": "starci/workspace-binding@1",
+    "project": "project identifier",
+    "repositories": "role -> {pathFromSource, gitRepository}",
+    "work": "{ownerRole: be, pathFromRepository: .work}"
+  }
+}

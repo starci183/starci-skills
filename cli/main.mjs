@@ -68,7 +68,7 @@ export function auditLegacy(root) {
       const stat = fs.lstatSync(absolute);
       if (stat.isSymbolicLink()) { entries.push({ path: relative, type: 'link', followed: false }); continue; }
       if (stat.isDirectory()) {
-        const excluded = ['.git', 'node_modules', '_local'].includes(name);
+        const excluded = ['.git', 'node_modules', '_local', '_workflows'].includes(name);
         entries.push({ path: relative, type: 'directory', excluded });
         if (!excluded) pending.push({ absolute, relative });
         continue;
@@ -102,8 +102,9 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       fs.mkdirSync(root);
       fs.writeFileSync(path.join(root, 'workspace.yaml'), stringifyYaml({ schema: 'work/workspace@1', id: args[2] }), { flag: 'wx' });
       fs.mkdirSync(path.join(root,'_schema'));
-      for(const name of ['work.schema','goal.schema'])fs.writeFileSync(path.join(root,'_schema',name+'.yaml'),stringifyYaml(JSON.parse(fs.readFileSync(path.resolve(moduleDir,'../schemas',name+'.json')))));
-      fs.writeFileSync(path.join(root, '.gitignore'), '_local/\n', { flag: 'wx' });
+      for(const name of ['work.schema'])fs.writeFileSync(path.join(root,'_schema',name+'.yaml'),stringifyYaml(JSON.parse(fs.readFileSync(path.resolve(moduleDir,'../schemas',name+'.json')))));
+      fs.writeFileSync(path.join(root,'_schema/work-layout.yaml'),stringifyYaml(JSON.parse(fs.readFileSync(path.resolve(moduleDir,'../schemas/work-layout.json')))));
+      fs.writeFileSync(path.join(root, '.gitignore'), '_local/\n_workflows/\n', { flag: 'wx' });
       emit({ ok: true, created: root, workspaceId: args[2], productWorkExecuted: false });
       return 0;
     }

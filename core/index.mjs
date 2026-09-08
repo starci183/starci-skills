@@ -76,14 +76,14 @@ function validate(root) {
     let entries;
     try { entries=fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)); } catch { issue('READ_DIRECTORY',rel(dir),'Cannot enumerate directory.'); return; }
     for (const ent of entries) {
-      if (ent.name === '_local' || ent.name === '_schema' || ent.name === '.git') continue;
+      if (ent.name === '_local' || ent.name === '_workflows' || ent.name === '_schema' || ent.name === '.git') continue;
       const p=path.join(dir,ent.name);
       if (ent.isSymbolicLink()) { issue('SYMLINK',rel(p),'Symlinks are not accepted in canonical workspace artifacts.'); continue; }
       if (ent.isDirectory()) { walk(p); continue; }
       let item;
-      if (ent.name === 'node.md' || ent.name === 'node.yaml') {
+      if (['index.yaml','node.yaml','node.md'].includes(ent.name)) {
         if (rel(p).split('/').slice(0,-1).some(part=>['evidence','assets','_resources'].includes(part.toLowerCase()))) { issue('LAYOUT',rel(p),'Nodes cannot be inside reserved evidence, assets or _resources directories.'); continue; }
-        if(fs.existsSync(path.join(dir,ent.name==='node.yaml'?'node.md':'node.yaml'))){issue('NODE_FORMAT_CONFLICT',rel(p),'Use one node format per directory');continue;}
+        if(['index.yaml','node.yaml','node.md'].filter(name=>fs.existsSync(path.join(dir,name))).length>1){issue('NODE_FORMAT_CONFLICT',rel(p),'Use one node format per directory');continue;}
         if ((item=read(p,ent.name==='node.md'))) {register(item,'node');item.children=[];nodes.push(item);}
       } else if (ent.name === 'resource.yaml') {
         if (!rel(p).startsWith('_resources/')) {issue('LAYOUT',rel(p),'Resources belong under _resources.');continue;}
@@ -144,7 +144,16 @@ function validate(root) {
     if (!n.body) issue('EMPTY_SPEC',n.path,'Body must describe scope and observable done-when.');
     n.depIds=stringList(n.meta.dependsOn,n.path,'dependsOn'); n.refIds=stringList(n.meta.refs,n.path,'refs');
     if(n.meta.assertions !== undefined) stringList(n.meta.assertions,n.path,'assertions');
-    n.specDigest=digest(canonicalJSON({metadata:Object.fromEntries(Object.entries(n.meta).filter(([k])=>!operational.has(k))),body:n.body}));
+    const ownedAssets=[];
+    if(n.meta.assets!==undefined){
+      if(!Array.isArray(n.meta.assets))issue('NODE_ASSETS',n.path,'Node input assets must be an array.');
+      else {const seen=new Set();for(const asset of n.meta.assets){
+        const value=asset?.path,parts=typeof value==='string'?value.split('/'):[];
+        if(!text(value)||!value.startsWith('assets/')||value.includes('\\')||value.includes(':')||parts.some(p=>!p||p==='.'||p==='..')||seen.has(value)){issue('NODE_ASSET_PATH',n.path,'Node assets must be unique normalized paths under own assets/.');continue;}seen.add(value);
+        try{let file=n.dir;for(const part of parts){file=path.join(file,part);if(fs.lstatSync(file).isSymbolicLink())throw Error('symlink');}if(!within(n.dir,fs.realpathSync(file))||!fs.statSync(file).isFile())throw Error('escape');ownedAssets.push({path:value,sha256:digest(fs.readFileSync(file))});}catch{issue('NODE_ASSET_UNREADABLE',n.path,'Node asset missing, non-file or unsafe.');}
+      }}
+    }
+    n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),metadata:Object.fromEntries(Object.entries(n.meta).filter(([k])=>!operational.has(k))),body:n.body}));
   }
   for (const n of nodes) {
     n.deps=n.depIds.map(id=>resolve(id,n,['node'])).filter(Boolean);
@@ -239,10 +248,13 @@ function validate(root) {
       if(!object(asset)||!text(asset.path)||!(/^[a-f0-9]{64}$/.test(asset.sha256??''))) {issue('ASSET',e.path,'Asset requires local relative path and lowercase SHA-256.');continue;}
       const parts=asset.path.split(/[\\/]/);
       if(path.isAbsolute(asset.path)||/^[A-Za-z]:|^[\\/]|:/.test(asset.path)||parts.includes('..')||parts.includes('.')||parts.includes('')) {issue('ASSET_ESCAPE',e.path,'Asset path must be a normalized relative local path without traversal.');continue;}
-      const target=path.resolve(e.dir,...parts);
+      if(asset.scope!==undefined&&!['node','evidence'].includes(asset.scope)){issue('ASSET_SCOPE',e.path,'Unknown asset ownership scope');continue;}
+      const assetRoot=asset.scope==='node'?e.node?.dir:e.dir;
+      if(!assetRoot||(asset.scope==='node'&&!asset.path.startsWith('assets/'))){issue('ASSET_SCOPE',e.path,'Node evidence must reference primary owner assets/');continue;}
+      const target=path.resolve(assetRoot,...parts);
       try {
-        let cursor=e.dir;for(const part of parts){cursor=path.join(cursor,part);if(fs.lstatSync(cursor).isSymbolicLink())throw new Error('symlink');}
-        if(!within(e.dir,fs.realpathSync(target))||!fs.statSync(target).isFile())throw new Error('escape');
+        let cursor=assetRoot;for(const part of parts){cursor=path.join(cursor,part);if(fs.lstatSync(cursor).isSymbolicLink())throw new Error('symlink');}
+        if(!within(assetRoot,fs.realpathSync(target))||!fs.statSync(target).isFile())throw new Error('escape');
         const bytes=fs.readFileSync(target);if(digest(bytes)!==asset.sha256)issue('ASSET_HASH',e.path,'Asset hash does not match current bytes.');
         if((bytes.length>=24 && bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) || (bytes.length>=4 && bytes[0]===255&&bytes[1]===216&&bytes.at(-2)===255&&bytes.at(-1)===217) || (bytes.length>=16 && bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP'))e.images++;
       } catch {issue('ASSET_UNREADABLE',e.path,'Asset missing, unreadable, non-file or symlink; external artifacts are unverified.');}

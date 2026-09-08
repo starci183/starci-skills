@@ -231,6 +231,13 @@
         },
         "description": {
           "type": "string"
+        },
+        "assets": {
+          "type": "array",
+          "description": "Semantic input files owned by this node under assets/. Current bytes bind dependent work; output proof files belong in evidence asset references instead.",
+          "items": {
+            "$ref": "#/$defs/nodeAsset"
+          }
         }
       },
       "allOf": [
@@ -297,6 +304,13 @@
         },
         "sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "scope": {
+          "enum": [
+            "evidence",
+            "node"
+          ],
+          "description": "Default evidence: relative to manifest directory. node: path must be within the primary evidence owner node assets/ directory."
         }
       }
     },
@@ -454,6 +468,19 @@
         },
         "extensions": {
           "type": "object"
+        }
+      }
+    },
+    "nodeAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^assets/"
         }
       }
     }

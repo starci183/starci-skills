@@ -1,0 +1,45 @@
+{
+  "schema": "starci/work-layout@1",
+  "format": "YAML 1.2",
+  "node": "index.yaml",
+  "identity": "stable metadata id; folder path is not identity",
+  "shape": {
+    "workspace": "workspace.yaml",
+    "schemas": "_schema/work.schema.yaml",
+    "resources": "_resources/<kind>/<id>/resource.yaml",
+    "businessTree": "<business>/<work-item>/**/index.yaml",
+    "nodeAssets": "<node>/assets/<file>",
+    "evidence": "<node>/evidence/<id>/manifest.yaml",
+    "localWorkflow": "_workflows/<run-id>/{goal,run}.yaml"
+  },
+  "rules": [
+    "Each work folder has one index.yaml node; index is the node, not an extra directory listing.",
+    "Split by responsibility as needed: business, architecture, backend, frontend and uat each own nodes. Business can split into rules, journeys and acceptance; FE into draw/code; UAT into flows. Names and depth are flexible, not mandatory scaffolding.",
+    "A leaf has requirements, assertions and state. A parent keeps scope and derives progress from required children, never authored state/completion.",
+    "Extend existing nodes and preserve stable IDs, assets and evidence. New required work prevents parent done; unrelated completed branches remain intact. Scope or source changes invalidate only affected proof.",
+    "Several workflows may target the same work nodes; no duplicated business tree per run. Local workflow tracking is ignored by validation/digests and Git.",
+    "Declare semantic design/source files using node.assets with paths under own assets/. Their actual bytes contribute to node input binding.",
+    "Record output screenshots/videos in evidence assets with scope: node and paths under the primary owner assets/. Output evidence is not also declared as a semantic input, avoiding self-invalidating proof.",
+    "Source code remains in bound repositories; code/index.yaml tracks requirements, exact source references and completion.",
+    "Legacy node.yaml/node.md remains read compatibility; exactly one node file per work folder. Do not automatically migrate existing user work."
+  ],
+  "example": {
+    "vps/create/": [
+      "index.yaml",
+      "business/index.yaml",
+      "business/rules/index.yaml",
+      "business/journeys/index.yaml",
+      "business/acceptance/index.yaml",
+      "architecture/index.yaml",
+      "backend/index.yaml",
+      "backend/code/index.yaml",
+      "frontend/index.yaml",
+      "frontend/assets/design.svg",
+      "frontend/code/index.yaml",
+      "uat/index.yaml",
+      "uat/flow1/index.yaml",
+      "uat/flow1/assets/video.webm",
+      "uat/flow2/index.yaml"
+    ]
+  }
+}

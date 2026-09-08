@@ -28,7 +28,7 @@ const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf
 // CLI must survive relocation: installed doctor fixtures copy this same declared payload.
 export const PAYLOAD = [...new Set(['package.json', ...pkg.files.map(ref => ref.replace(/\/$/, ''))])];
 const MANIFEST = '.starci-skills.json';
-const LOCAL_IGNORE = '.work/_local/';
+const LOCAL_IGNORES = ['.work/_local/','.work/_workflows/'];
 const ENTRY_MARKER = '<!-- starci:prompt-entry -->';
 const LEGACY_PROMPT_ENTRY = `${ENTRY_MARKER}
 For every user prompt, enter [StarCi](.claude/INDEX.md) before planning or target work and follow
@@ -211,8 +211,8 @@ function writeBootstraps(repo, log, plan) {
   }
   const ignore = path.join(repo, '.gitignore');
   const lines = existsSync(ignore) ? readFileSync(ignore, 'utf8').split(/\r?\n/) : [];
-  if (!lines.some((l) => l.trim() === LOCAL_IGNORE || l.trim() === '/' + LOCAL_IGNORE)) {
-    appendFileSync(ignore, `${lines.length && lines.at(-1) !== '' ? '\n' : ''}# StarCi Work: only local scratch is ignored; product evidence remains durable\n${LOCAL_IGNORE}\n`);
+  for(const LOCAL_IGNORE of LOCAL_IGNORES) if (!lines.some((l) => l.trim() === LOCAL_IGNORE || l.trim() === '/' + LOCAL_IGNORE)) {
+    appendFileSync(ignore, `${lines.length && lines.at(-1) !== '' ? '\n' : ''}# StarCi Work: local scratch and workflow tracking are ignored; product evidence remains durable\n${LOCAL_IGNORE}\n`);
     log(`added ${LOCAL_IGNORE} to .gitignore`);
   }
 }
@@ -409,7 +409,7 @@ const HELP = `${pkg.name} ${pkg.version}
   npx ${pkg.name} work <command> [arguments]
 
 init    copies the runtime into <repo>/.claude, adds the StarCi entry once to CLAUDE.md and AGENTS.md
-        while preserving custom instructions, and adds only .work/_local/ to .gitignore.
+        while preserving custom instructions, and ignores .work/_local/ and .work/_workflows/.
         Refuses a .claude it did not install unless --force; --no-bootstrap keeps host files unchanged.
 update  replaces current runtime paths; locally changed current files are kept unless --force.
         Retired manifest-owned unchanged files are removed; changed or unowned files are preserved.

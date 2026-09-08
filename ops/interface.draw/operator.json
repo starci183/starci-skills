@@ -19,14 +19,14 @@
   "reads": [
     {
       "id": "target",
-      "path": "N/node.yaml",
+      "path": "N/index.yaml",
       "purpose": {
-        "en": "Read the existing selected N/node.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+        "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
       }
     },
     {
       "id": "business",
-      "path": ".work/<business>/business/**/node.yaml",
+      "path": ".work/<business>/business/**/index.yaml",
       "purpose": {
         "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
       }
@@ -54,7 +54,7 @@
     },
     {
       "id": "architecture",
-      "path": ".work/<business>/architecture/**/node.yaml",
+      "path": ".work/<business>/architecture/**/index.yaml",
       "purpose": {
         "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
       }
@@ -84,7 +84,7 @@
   "writes": [
     {
       "id": "node",
-      "path": "N/node.yaml",
+      "path": "N/index.yaml",
       "fields": [
         "body: Brief / Regions / States / Assets / Direction decision / Implementation limits",
         "assertions"

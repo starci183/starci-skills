@@ -98,7 +98,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
     }
     for(const w of c.writes) {
       if(!Array.isArray(w.fields)||!w.fields.length||!w.fields.every(nonempty)) issue(errors,'WRITE_FIELDS',at,w.id+' has no field/content matrix');
-      if(!/^(?:N\/node\.yaml|E\/|\.work\/|repository:<repo-id>\/)/.test(w.path??'')) issue(errors,'WRITE_DESTINATION',at,'Write must target explicit .work node/resource/evidence or bound source repository');
+      if(!/^(?:N\/index\.yaml|E\/|\.work\/|repository:<repo-id>\/)/.test(w.path??'')) issue(errors,'WRITE_DESTINATION',at,'Write must target explicit .work node/resource/evidence or bound source repository');
       if(w.path?.startsWith('repository:')&&w.id!=='source') issue(errors,'SOURCE_SCOPE',at,'Product source writes need explicit source binding');
     }
     const usedReads=new Set(),usedWrites=new Set();

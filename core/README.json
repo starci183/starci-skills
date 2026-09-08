@@ -2,10 +2,17 @@
   "schema": "starci/document@1",
   "sections": [
     {
-      "title": "Current YAML layout",
+      "title": "Canonical expandable Work layout",
       "blocks": [
-        "Canonical Work uses workspace.yaml, node.yaml, resource.yaml and evidence/manifest.yaml with YAML 1.2 syntax. Node prose lives in description: |. _schema/work.schema.yaml and _schema/goal.schema.yaml are exported by init. Legacy node.md is accepted for read compatibility, but cannot coexist with node.yaml in one directory.",
-        "workflow/<run-id>/goal.yaml and run.yaml record the approved goal, original request, typed requests/responses, result and user decisions. Lifecycle gates require valid Work and explicit goal approval before effects, then explicit result acceptance before verified leaf completion. Schema/runs do not independently prove completion."
+        "Each work folder has one index.yaml node; index is the node, not an extra directory listing.",
+        "Split by responsibility as needed: business, architecture, backend, frontend and uat each own nodes. Business can split into rules, journeys and acceptance; FE into draw/code; UAT into flows. Names and depth are flexible, not mandatory scaffolding.",
+        "A leaf has requirements, assertions and state. A parent keeps scope and derives progress from required children, never authored state/completion.",
+        "Extend existing nodes and preserve stable IDs, assets and evidence. New required work prevents parent done; unrelated completed branches remain intact. Scope or source changes invalidate only affected proof.",
+        "Several workflows may target the same work nodes; no duplicated business tree per run. Local workflow tracking is ignored by validation/digests and Git.",
+        "Declare semantic design/source files using node.assets with paths under own assets/. Their actual bytes contribute to node input binding.",
+        "Record output screenshots/videos in evidence assets with scope: node and paths under the primary owner assets/. Output evidence is not also declared as a semantic input, avoiding self-invalidating proof.",
+        "Source code remains in bound repositories; code/index.yaml tracks requirements, exact source references and completion.",
+        "Legacy node.yaml/node.md remains read compatibility; exactly one node file per work folder. Do not automatically migrate existing user work."
       ]
     },
     {
@@ -18,7 +25,7 @@
     {
       "title": "Layout and identity",
       "blocks": [
-        "The argument is the `.work` directory, containing `workspace.yaml`. Resources live under `_resources/**/resource.yaml`. Arbitrary business directories contain `node.yaml`; the nearest ancestor node defines the parent. A parent cannot store state or completion. Evidence uses `evidence/<id>/manifest.yaml` under a node or business directory, referenced by stable metadata ID. Global IDs are unique across workspace, nodes, resources and evidence; directory names are not IDs. Intermediate folders without nodes are permitted. `evidence`, `assets` and `_resources` are reserved artifact/resource directory roles: a `node.yaml` or legacy `node.md` anywhere below them is rejected and never enters the completion tree. `_local` and `.git` are ignored. Canonical symlinks and path traversal are rejected; secrets stay outside this root, referenced by sealed provider aliases in resource details. Known plaintext credential fields are rejected recursively in every metadata type, including workspace extensions. This is a conservative key check, not comprehensive secret detection in arbitrary prose or disguised values. The validator does not fetch remote assets or resolve secrets."
+        "The argument is the `.work` directory, containing `workspace.yaml`. Resources live under `_resources/**/resource.yaml`. Arbitrary business directories contain `index.yaml`; the nearest ancestor node defines the parent. A parent cannot store state or completion. Evidence uses `evidence/<id>/manifest.yaml` under a node or business directory, referenced by stable metadata ID. Global IDs are unique across workspace, nodes, resources and evidence; directory names are not IDs. Intermediate folders without nodes are permitted. `evidence`, `assets` and `_resources` are reserved artifact/resource directory roles: a `index.yaml` or legacy `node.md` anywhere below them is rejected and never enters the completion tree. `_local`, `_workflows`, `_schema` and `.git` are ignored. Canonical symlinks and path traversal are rejected; secrets stay outside this root, referenced by sealed provider aliases in resource details. Known plaintext credential fields are rejected recursively in every metadata type, including workspace extensions. This is a conservative key check, not comprehensive secret detection in arbitrary prose or disguised values. The validator does not fetch remote assets or resolve secrets."
       ]
     },
     {

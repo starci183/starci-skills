@@ -37,8 +37,11 @@
   "work": {
     "format": "yaml-1.2",
     "schema": ".work/_schema/work.schema.yaml",
-    "node": "node.yaml",
-    "workflow": "<piece>/workflow/<run-id>/{goal,run}.yaml",
-    "approval": "goal-before-effects-and-result-before-done"
+    "node": "index.yaml",
+    "approval": "goal-before-effects-and-result-before-done",
+    "checklist": "<business>/<item>/**/index.yaml",
+    "evidence": "<business>/<item>/evidence/<id>/manifest.yaml",
+    "workflowState": "_workflows/<run-id>/{goal,run}.yaml (local only)",
+    "layout": "schemas/work-layout.json"
   }
 }
