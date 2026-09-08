@@ -37,5 +37,13 @@
     "create": "node scripts/plan.mjs create <filled-plan.yaml> <new-plan-directory>",
     "render": "node scripts/plan.mjs render <goal/index.yaml>"
   },
-  "presentation": "Mandatory Goal, areas table, ordered workflows table with input/output/criteria/estimate, exclusions, and pending approval. Translate display prose to config.language. Draft-only trials use the same bundle in an allowed scratch location."
+  "presentation": "Mandatory Goal, areas table, ordered workflows table with input/output/criteria/estimate, exclusions, and pending approval. Translate display prose to config.language. Draft-only trials use the same bundle in an allowed scratch location.",
+  "selection": {
+    "facts": "Each job requires selection.requestQuote (exact original request excerpt), codeChange, verification (none/unit-component/browser-uat), separateDeliverable.",
+    "backend": "Do not schedule implementation just to inspect API evidence.",
+    "frontend": "Includes draw/reuse and browser UAT; duplicate standalone jobs require explicit separate intent.",
+    "verification": "verify-flows is browser UAT, never a renamed unit/component check. Use review-code for inspecting existing implementation/test coverage.",
+    "scope": "Missing features do not authorize adding requirements. Record unresolved interpretations in openQuestions and resolve before approval.",
+    "trust": "Structural validators reject inconsistent declared facts; the coordinator must still compare them to user intent and evidence. Never assert semantic correctness solely from schema validity."
+  }
 }

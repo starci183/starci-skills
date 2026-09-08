@@ -4,7 +4,11 @@ test('Plan template requires concrete content and creates pending four-file bund
  const plan=JSON.parse(fs.readFileSync(new URL('../workflows/plan.template.json',import.meta.url)));assert.throws(()=>renderPlan(plan));
  Object.assign(plan,{id:'test-plan',requestId:'test-request',originalRequest:'Verify retry behavior',finalOutcome:'Retry recovers from a failed request'});
  for(const s of ['business','architecture','implementation','uat'])plan[s]={action:'reuse',outcome:'Verify existing behavior',targets:['retry']};
- Object.assign(plan.workflows[0],{id:'verify',workflow:'verify-flows',purpose:'Verify retry',input:'Existing implementation',output:'Observed browser result',criteria:['Retry works'],estimate:{minMinutes:5,maxMinutes:10,assumptions:'Local runtime available'}});
+ Object.assign(plan.workflows[0],{id:'verify',workflow:'verify-flows',purpose:'Verify retry',selection:{requestQuote:'Verify retry behavior',codeChange:false,verification:'browser-uat',separateDeliverable:false},input:'Existing implementation',output:'Observed browser result',criteria:['Retry works'],estimate:{minMinutes:5,maxMinutes:10,assumptions:'Local runtime available'}});
+ const wrongUat=structuredClone(plan);wrongUat.workflows[0].selection.verification='unit-component';assert.throws(()=>renderPlan(wrongUat),/browser UAT/);
+ const fakeBackend=structuredClone(plan);fakeBackend.workflows[0].workflow='implement-backend';assert.throws(()=>renderPlan(fakeBackend),/merely to inspect/);
+ const unrelated=structuredClone(plan);unrelated.workflows[0].selection.requestQuote='Add new filters';assert.throws(()=>renderPlan(unrelated),/request-bound/);
+ const duplicate=structuredClone(plan);duplicate.workflows.unshift({...structuredClone(plan.workflows[0]),id:'frontend',workflow:'implement-frontend',selection:{requestQuote:plan.originalRequest,codeChange:true,verification:'browser-uat',separateDeliverable:false}});duplicate.workflows[1].dependsOn=['frontend'];assert.throws(()=>renderPlan(duplicate),/separate retest/);
  const base=fs.mkdtempSync(path.join(os.tmpdir(),'plan-template-'));try{const dir=createBundle(plan,path.join(base,'test-plan'));
  assert.equal(parseYaml(fs.readFileSync(path.join(dir,'approval/index.yaml'),'utf8')).jobs.verify.status,'pending');
  assert.deepEqual(parseYaml(fs.readFileSync(path.join(dir,'run/index.yaml'),'utf8')).jobs.verify.requests,{});

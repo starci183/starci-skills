@@ -41,7 +41,14 @@
         "minMinutes": 0,
         "maxMinutes": 0,
         "assumptions": ""
+      },
+      "selection": {
+        "requestQuote": "",
+        "codeChange": false,
+        "verification": "none",
+        "separateDeliverable": false
       }
     }
-  ]
+  ],
+  "openQuestions": []
 }

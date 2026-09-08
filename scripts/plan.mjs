@@ -12,6 +12,7 @@ export function renderPlan(plan){
  for(const area of ['business','architecture','implementation','uat']){const v=plan[area];lines.push(`| ${area} | ${v.action} | ${clean(v.outcome)} | ${clean(v.targets.join(', '))} |`);}
  lines.push('','## Workflows','| Order | Workflow | Purpose | Input | Output | Criteria | Estimate |','| --- | --- | --- | --- | --- | --- | --- |');
  plan.workflows.forEach((j,i)=>lines.push(`| ${i+1} | ${j.workflow} | ${clean(j.purpose)} | ${clean(j.input)} | ${clean(j.output)} | ${clean(j.criteria.join('; '))} | ${j.estimate.minMinutes}–${j.estimate.maxMinutes} min; ${clean(j.estimate.assumptions)} |`));
+ lines.push('','## Open questions',(plan.openQuestions??[]).join('; ')||'None.');
  lines.push('','## Exclusions',plan.exclusions.join('; ')||'None.','','## Approval','Pending. Present this Plan and wait for an actual user decision.');return lines.join('\n')+'\n';
 }
 export function createBundle(plan,destination){
