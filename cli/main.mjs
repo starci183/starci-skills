@@ -136,7 +136,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       if(!checked.ok)throw Error(checked.errors.join('; '));
       if(command==='workflows')emit(catalog);
       else {
-        const selected=selectWorkflow(catalog,command==='workflow'?{workflowId:args[0]}:{intent:args[0]});
+        const selected=selectWorkflow(catalog,command==='workflow'?{workflowId:args[0],classification:{action:args[0],effectful:args[0]!=='analyze-request'},readOnly:args[0]==='analyze-request'}:{classification:{action:args[0],effectful:args[0]!=='analyze-request'},readOnly:args[0]==='analyze-request'});
         const definition=selected.id===frontend.id?frontend:jobs.workflows.find(w=>w.id===selected.id);
         emit({selection:selected,definition,executed:false});
       }

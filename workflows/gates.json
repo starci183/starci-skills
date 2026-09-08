@@ -1,11 +1,11 @@
 {
   "schema": "starci/workflow-gates@1",
-  "appliesTo": "every-workflow-including-direct-task",
+  "appliesTo": "every-workflow-including-selected-jobs",
   "entry": {
     "build": "ensure-current-before-read",
     "work": "required-valid-workspace",
     "missingWork": {
-      "route": "workspace-bootstrap",
+      "route": "prepare-work",
       "preserve": [
         "originalRequest",
         "scope",
@@ -15,7 +15,7 @@
       "resume": "same-workflow-same-scope-after-bootstrap-approval-and-proof"
     },
     "invalidWork": "stop-and-report-never-overwrite",
-    "bootstrapException": "workspace-bootstrap-alone-may-create-missing-work-after-its-goal-is-approved"
+    "bootstrapException": "prepare-work-alone-may-create-missing-work-after-its-goal-is-approved"
   },
   "goal": {
     "before": "any-operator-effects",

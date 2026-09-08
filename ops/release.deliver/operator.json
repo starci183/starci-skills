@@ -839,6 +839,16 @@
           }
         }
       ],
+      "dataCorrectionPolicy": {
+        "scope": "exact-authorized-records-or-source-owned-migration",
+        "schemaInspection": "required-before-mutation",
+        "preMutationReadback": "required",
+        "postMutationReadback": "required",
+        "recovery": "transaction-or-explicit-reviewed-recovery-plan",
+        "arbitraryCode": false,
+        "adHocSql": false,
+        "unknownOrPartial": "blocked"
+      },
       "placeholders": {
         "business": "Selected business slug",
         "repo-id": "Resolved repository resource ID",

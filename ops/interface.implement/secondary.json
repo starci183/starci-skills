@@ -25,7 +25,8 @@
         "scope-preserved",
         "business-unchanged",
         "api-compatible",
-        "checks-pass",
+        "backend-unit-pass",
+        "backend-e2e-pass",
         "implementation-quality",
         "commit-verified"
       ],
@@ -64,6 +65,10 @@
       "outputFields": [
         "codeRefs",
         "changedPaths",
+        "apiContract",
+        "runtime",
+        "qualityEvidence",
+        "testedCommit",
         "businessChanged",
         "apiCompatible"
       ]

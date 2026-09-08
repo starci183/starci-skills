@@ -48,17 +48,14 @@ test('operation selection cannot default, combine permissions or reuse a differe
   const changed=structuredClone(catalogue);changed.ops.find(o=>o.id==='release.deliver').contract.modePolicy.permissionUnion=true;
   assert.equal(validateCatalog(changed).ok,false);
 });
-test('job matrices bind real catalogue jobs with prior-row outputs and disjoint parallel scope',()=>{
+test('job matrices bind the sixteen bounded jobs and enforce matrix limits and operation modes',()=>{
   assert.deepEqual(validateJobMatrices(matrices,catalogue),{ok:true,errors:[]});
-  const maximum=matrices.workflows.find(w=>w.id==='three-independent-deliveries');
-  assert.deepEqual(maximum.matrix.map(row=>row.length),[3,3,3]);
+  assert.ok(matrices.workflows.every(w=>w.matrix.length<=3&&w.matrix.every(row=>row.length<=3)));
   const reject=change=>{const next=structuredClone(matrices);change(next);assert.equal(validateJobMatrices(next,catalogue).ok,false);};
-  reject(b=>b.workflows[0].matrix.push(b.workflows[0].matrix[0]));
-  reject(b=>b.workflows.find(w=>w.id==='three-independent-deliveries').matrix[0].push({...b.workflows.find(w=>w.id==='three-independent-deliveries').matrix[0][0],id:'fourth'}));
-  reject(b=>b.workflows.find(w=>w.id==='three-independent-deliveries').matrix[0][1].writeScopes=['a/backend']);
-  reject(b=>b.workflows.find(w=>w.id==='three-independent-deliveries').matrix[0][1].inputs.scope={cell:'aBackend',output:'apiContract'});
-  reject(b=>b.workflows[0].matrix[1][0].inputs.work.output='imaginaryOutput');
+  reject(b=>{const w=b.workflows[0];w.matrix=[w.matrix[0],w.matrix[0],w.matrix[0],w.matrix[0]];});
+  reject(b=>{const w=b.workflows[0];w.matrix[0]=[w.matrix[0][0],w.matrix[0][0],w.matrix[0][0],w.matrix[0][0]];});
+  reject(b=>b.workflows[0].matrix[0][0].inputs.request={parameter:'missing'});
   reject(b=>b.workflows[0].matrix[0][0].op='identity.provision');
-  reject(b=>delete b.workflows.find(w=>w.id==='publish-deploy').matrix[1][0].operation);
+  reject(b=>delete b.workflows.find(w=>w.id==='publish-code').matrix[0][0].operation);
   reject(b=>b.workflows[0].transition.advance='any-criterion-pass');
 });

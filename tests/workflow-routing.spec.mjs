@@ -14,32 +14,22 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=(dir,file)=>JSON.parse(fs.readFileSync(path.join(dir,file),'utf8'));
 const catalog=read(root,'workflows/catalog.json'),jobs=read(root,'workflows/jobs.json'),frontend=read(root,'workflows/frontend.json'),operators=read(root,'ops/catalog.json');
 const temp=t=>{const d=fs.mkdtempSync(path.join(os.tmpdir(),'starci-routing-'));t.after(()=>{assert.equal(path.dirname(d),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(d).startsWith('starci-routing-'));fs.rmSync(d,{recursive:true,force:true});});return d;};
-test('one StarCi skill discovers all ten valid workflows and no preset skill layer',()=>{
+test('one StarCi skill discovers all sixteen valid workflows and no preset skill layer',()=>{
   assert.match(fs.readFileSync(path.join(root,'SKILL.md'),'utf8'),/^name: starci$/m);
   assert.equal(fs.existsSync(path.join(root,'skills/catalog.json')),false);
-  assert.equal(catalog.workflows.length,10);
+  assert.equal(catalog.workflows.length,16);
   assert.deepEqual(validateWorkflowCatalog(catalog,jobs,frontend),{ok:true,errors:[]});
   assert.deepEqual(validateJobMatrices(jobs,operators),{ok:true,errors:[]});
 });
-test('unmatched direct work selects exactly task.execute; read-only and explicit choices are preserved',()=>{
-  for(const intent of ['small-fix','standalone-deploy','data-correction','unknown',undefined])assert.equal(selectWorkflow(catalog,{intent}).id,'direct-task');
-  assert.equal(selectWorkflow(catalog,{intent:'frontend-end-to-end'}).id,'frontend');
-  assert.equal(selectWorkflow(catalog,{workflowId:'publish-deploy'}).id,'publish-deploy');
-  assert.equal(selectWorkflow(catalog,{intent:'existing-business-design'}).id,'existing-work-design');
-  assert.equal(selectWorkflow(catalog,{intent:'fullstack-delivery'}).id,'fullstack-delivery');
-  assert.deepEqual(selectWorkflow(catalog,{readOnly:true}),{kind:'answer-or-inspect'});
-  assert.throws(()=>selectWorkflow(catalog,{workflowId:'typo'}));
-  const direct=jobs.workflows.find(w=>w.id==='direct-task');
-  assert.deepEqual(direct.matrix.map(row=>row.map(c=>c.op)),[['task.execute']]);
-});
+test('routing requires resolved classification and preserves explicit compatibility',()=>{assert.equal(selectWorkflow(catalog,{classification:{action:'correct-data',effectful:true}}).id,'correct-data');assert.equal(selectWorkflow(catalog,{classification:{action:'implement-frontend',effectful:true,requiresBackend:false}}).id,'implement-frontend');assert.deepEqual(selectWorkflow(catalog,{readOnly:true}),{kind:'answer-or-inspect'});assert.throws(()=>selectWorkflow(catalog,{workflowId:'publish-code',classification:{action:'deploy-release',effectful:true}}));assert.throws(()=>selectWorkflow(catalog,{workflowId:'unknown',classification:{action:'unknown',effectful:true}}));});
 test('routing rejects hidden workflow sources, missing entries and a multi-op fallback',()=>{
   const reject=change=>{const c=structuredClone(catalog),j=structuredClone(jobs);change(c,j);assert.equal(validateWorkflowCatalog(c,j,frontend).ok,false);};
   reject(c=>c.workflows[0].definition='../foreign.json');
   reject(c=>c.workflows.pop());
   reject(c=>c.workflows.push(c.workflows[0]));
-  reject(c=>c.fallback='publish-deploy');
+  reject(c=>c.fallback='correct-data');
   reject(c=>c.limits.columns=4);
-  reject((c,j)=>j.workflows.find(w=>w.id==='direct-task').matrix[0].push({op:'release.deliver'}));
+  {const j=structuredClone(jobs);j.workflows.find(w=>w.id==='correct-data').matrix[0].push({op:'release.deliver'});assert.equal(validateJobMatrices(j,operators).ok,false);}
 });
 test('direct task has no assumed Work/domain prerequisites and cannot grant itself unrestricted effects',()=>{
   const op=operators.ops.find(o=>o.id==='task.execute');assert.ok(op);
@@ -55,7 +45,7 @@ test('relocated CLI selects/displays workflows without creating Work or executin
   const installed=path.join(host,'.claude');
   assert.equal(fs.existsSync(path.join(installed,'skills/catalog.json')),false);
   const cli=path.join(installed,'bin/starci-skills.mjs');
-  for(const args of [['workflows'],['workflow','direct-task'],['route','small-fix']]){
+  for(const args of [['workflows'],['workflow','implement-backend'],['route','correct-data']]){
     const out=spawnSync(process.execPath,[cli,'work',...args],{cwd:host,encoding:'utf8',windowsHide:true});
     assert.equal(out.status,0,out.stderr);const result=JSON.parse(out.stdout);if(args[0]!=='workflows')assert.equal(result.executed,false);
   }

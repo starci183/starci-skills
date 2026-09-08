@@ -14,19 +14,11 @@
     ],
     "writes": [
       {
-        "id": "source",
-        "path": "repository:<repo-id>/<write-ceiling>"
-      },
-      {
         "id": "evidence",
         "path": "E/result.json + E/effects.json + E/verification.json + E/artifacts"
       }
     ],
-    "allowedEffects": [
-      "only request-authorized scoped source edits and local commits",
-      "only explicitly selected deployment or data corrections on verified targets",
-      "bounded checks, probes and recovery required by the selected job"
-    ],
+    "allowedEffects": [],
     "canAdvanceWorkflow": false,
     "maxSecondary": 3,
     "calls": [],

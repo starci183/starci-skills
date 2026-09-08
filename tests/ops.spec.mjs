@@ -143,6 +143,28 @@ test('all completion profiles refer to actually supported core profiles',()=>{
   const c=fresh();c.ops[0].completionProfile='fake-profile';c.ops[0].nodeKinds=['fake-profile'];c.ops[0].contract.completionProfile='fake-profile';
   assert.ok(validateCatalog(c,{profiles}).errors.some(e=>e.code==='UNKNOWN_PROFILE'));
 });
+
+test('request analysis cannot acquire source, runtime, release or data effects',()=>{
+  const catalog=fresh(), task=catalog.ops.find(o=>o.id==='task.execute').contract;
+  assert.deepEqual(task.sideEffects,[]);
+  assert.deepEqual(task.writes.map(w=>w.id),['evidence']);
+  for(const mutate of [
+    x=>x.sideEffects.push('source edit'),
+    x=>x.writes.push({id:'source',path:'repository:any',fields:['code'],content:{en:'Mutate code'}}),
+    x=>x.adHocPolicy.authority='request-bound-not-unrestricted',
+  ]){const changed=fresh();mutate(changed.ops.find(o=>o.id==='task.execute').contract);assert.equal(validateCatalog(changed).ok,false);}
+});
+
+test('data correction mode requires schema and readback recovery without arbitrary code',()=>{
+  const catalog=fresh(), mode=catalog.ops.find(o=>o.id==='release.deliver').contract.executionModes.migrate;
+  assert.equal(mode.dataCorrectionPolicy.arbitraryCode,false);
+  assert.equal(mode.dataCorrectionPolicy.adHocSql,false);
+  for(const mutate of [
+    x=>x.dataCorrectionPolicy.schemaInspection='optional',
+    x=>x.dataCorrectionPolicy.postMutationReadback='optional',
+    x=>x.dataCorrectionPolicy.arbitraryCode=true,
+  ]){const changed=fresh();mutate(changed.ops.find(o=>o.id==='release.deliver').contract.executionModes.migrate);assert.equal(validateCatalog(changed).ok,false);}
+});
 test('conditional reused domain references must resolve; a fabricated reference cannot pass',()=>{
   const c=fresh();const op=c.ops.find(o=>o.id==='backend.implement');
   assert.ok(op.supportingReferences.length>0);

@@ -1,7 +1,7 @@
 {
   "schema": "starci/workflow-catalog@1",
   "skill": "../SKILL.md",
-  "fallback": "direct-task",
+  "fallback": "none",
   "readOnly": "answer-or-inspect",
   "unknownExplicitWorkflow": "error",
   "limits": {
@@ -11,72 +11,114 @@
   },
   "workflows": [
     {
-      "id": "frontend",
-      "intent": "frontend-end-to-end",
-      "when": "Create/revise a visual direction, implement FE and verify its accepted UX flows.",
+      "id": "analyze-request",
+      "intent": "analyze-request",
+      "when": "Read-only discovery and classification with no mutation or completion claim.",
+      "definition": "jobs.json",
+      "execution": "read-only-analysis"
+    },
+    {
+      "id": "prepare-work",
+      "intent": "prepare-work",
+      "when": "Prepare or import canonical Work using one explicitly selected workspace mode.",
+      "definition": "jobs.json",
+      "execution": "explicit-coordinator"
+    },
+    {
+      "id": "define-business",
+      "intent": "define-business",
+      "when": "Complete the explicitly classified define business job.",
+      "definition": "jobs.json",
+      "execution": "explicit-coordinator"
+    },
+    {
+      "id": "design-architecture",
+      "intent": "design-architecture",
+      "when": "Complete the explicitly classified design architecture job.",
+      "definition": "jobs.json",
+      "execution": "explicit-coordinator"
+    },
+    {
+      "id": "design-interface",
+      "intent": "design-interface",
+      "when": "Complete the explicitly classified design interface job.",
+      "definition": "jobs.json",
+      "execution": "explicit-coordinator"
+    },
+    {
+      "id": "implement-backend",
+      "intent": "implement-backend",
+      "when": "Complete one backend job with unit, backend E2E and API handoff evidence.",
+      "definition": "jobs.json",
+      "execution": "explicit-coordinator"
+    },
+    {
+      "id": "implement-frontend",
+      "intent": "implement-frontend",
+      "when": "Complete one frontend job only after accepted backend evidence, including owned UAT.",
       "definition": "frontend.json",
       "execution": "frontend-gate"
     },
     {
-      "id": "source-to-work",
-      "intent": "source-import",
-      "when": "Reconstruct Work from selected existing source/worktrees and resolve business/architecture.",
+      "id": "verify-flows",
+      "intent": "verify-flows",
+      "when": "Run a standalone explicit flow retest without implying implementation.",
       "definition": "jobs.json",
       "execution": "explicit-coordinator"
     },
     {
-      "id": "new-work-design",
-      "intent": "new-work-design",
-      "when": "Create a new Work purpose and deliver business plus architecture.",
+      "id": "review-code",
+      "intent": "review-code",
+      "when": "Complete the explicitly classified review code job.",
       "definition": "jobs.json",
       "execution": "explicit-coordinator"
     },
     {
-      "id": "backend-delivery",
-      "intent": "backend-end-to-end",
-      "when": "Design, implement and independently accept a bounded backend API.",
+      "id": "publish-code",
+      "intent": "publish-code",
+      "when": "Complete the explicitly classified publish code job.",
       "definition": "jobs.json",
       "execution": "explicit-coordinator"
     },
     {
-      "id": "publish-deploy",
-      "intent": "publish-and-deploy",
-      "when": "Publish and deploy a verified delivery only when both effects are selected.",
+      "id": "deploy-release",
+      "intent": "deploy-release",
+      "when": "Complete the explicitly classified deploy release job.",
       "definition": "jobs.json",
       "execution": "explicit-coordinator"
     },
     {
-      "id": "three-independent-deliveries",
-      "intent": "three-independent-deliveries",
-      "when": "Deliver exactly three independent BE/FE/UAT pieces with disjoint mutable scope.",
+      "id": "operate-runtime",
+      "intent": "operate-runtime",
+      "when": "Complete the explicitly classified operate runtime job.",
       "definition": "jobs.json",
       "execution": "explicit-coordinator"
     },
     {
-      "id": "direct-task",
-      "intent": "unmatched-task",
-      "when": "Complete one ad hoc job from the request; small fixes, standalone deployments or data corrections may use this workflow.",
+      "id": "correct-data",
+      "intent": "correct-data",
+      "when": "Complete the explicitly classified correct data job.",
       "definition": "jobs.json",
       "execution": "explicit-coordinator"
     },
     {
-      "id": "workspace-bootstrap",
-      "intent": "ensure-workspace",
-      "when": "Create or bind the missing Work workspace within the original request scope, then resume the suspended workflow after user approval.",
+      "id": "update-knowledge",
+      "intent": "update-knowledge",
+      "when": "Complete the explicitly classified update knowledge job.",
       "definition": "jobs.json",
       "execution": "explicit-coordinator"
     },
     {
-      "id": "existing-work-design",
-      "intent": "existing-business-design",
-      "when": "Resolve current business requirements, then architecture, for an existing valid Work module before delivery.",
+      "id": "produce-content",
+      "intent": "produce-content",
+      "when": "Complete the explicitly classified produce content job.",
       "definition": "jobs.json",
       "execution": "explicit-coordinator"
     },
     {
-      "id": "fullstack-delivery",
-      "intent": "fullstack-delivery",
-      "when": "Implement an accepted architecture sequentially through backend, frontend and UAT.",
+      "id": "retire-scope",
+      "intent": "retire-scope",
+      "when": "Complete the explicitly classified retire scope job.",
       "definition": "jobs.json",
       "execution": "explicit-coordinator"
     }

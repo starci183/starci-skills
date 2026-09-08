@@ -116,3 +116,23 @@ test('six-op map is generated from the actual contracts and business journeys fe
   const output = {assets:{reviewedDrawIds:[],items:[]},flows:spec.journeys.map(j => ({...structuredClone(j),sourcePaths:['example/source.tsx']})),codeRefs:[{repository:'nivo-fe',commit:'a'.repeat(40)}],runtime:{environment:'synthetic',origin:'http://localhost:3000',build:'synthetic'}};
   assert.equal(validateFEHandoff(output, input.journeys, 'nivo-fe', 'synthetic'), true);
 });
+
+test('backend delivery cannot hand off before unit and backend E2E proof', () => {
+  const backend = JSON.parse(fs.readFileSync(new URL('../ops/backend.implement/operator.json', import.meta.url), 'utf8'));
+  assert.deepEqual(backend.qualityPolicy.checks, ['lint','typecheck','unit','backend-e2e','coverage','build','sonar']);
+  assert.equal(backend.qualityPolicy.unitGate, 'scoped-unit-pass-for-tested-revision');
+  assert.equal(backend.qualityPolicy.backendE2EGate, 'scoped-backend-e2e-pass-for-tested-revision');
+  assert.equal(backend.qualityPolicy.handoffBinding, 'api-contract-runtime-quality-evidence-and-tested-commit');
+  const support = JSON.parse(fs.readFileSync(new URL('../ops/interface.implement/secondary.json', import.meta.url), 'utf8')).calls[0];
+  for (const field of ['apiContract','runtime','qualityEvidence','testedCommit']) assert.ok(support.outputFields.includes(field));
+  for (const criterion of ['backend-unit-pass','backend-e2e-pass']) assert.ok(support.requiredCriteria.includes(criterion));
+  for (const mutate of [
+    contract => { contract.qualityPolicy.checks = contract.qualityPolicy.checks.filter(x => x !== 'backend-e2e'); },
+    contract => { delete contract.qualityPolicy.backendE2EGate; },
+    contract => { delete contract.qualityPolicy.handoffBinding; },
+  ]) {
+    const catalog = JSON.parse(fs.readFileSync(new URL('../ops/catalog.json', import.meta.url), 'utf8'));
+    mutate(catalog.ops.find(x => x.id === 'backend.implement').contract);
+    assert.equal(validateCatalog(catalog).ok, false);
+  }
+});

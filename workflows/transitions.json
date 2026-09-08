@@ -48,15 +48,17 @@
     "routes": {
       "invalid-response": "same",
       "criterion-failure": "same",
-      "product-defect": "implement",
+      "product-defect": "classify-owner",
       "design-conflict": "draw",
       "runtime-failure": "same",
       "cleanup-incomplete": "uat",
-      "missing-authority": "user"
+      "missing-authority": "user",
+      "frontend-defect": "implement",
+      "backend-defect": "backend-workflow"
     },
     "constraints": [
       "Repair only within existing source/resource authority; ask only for a genuinely missing decision or authority.",
-      "UAT does not secretly edit product code; a product defect reopens interface.implement, then fresh UAT.",
+      "UAT never edits product code. A frontend defect reopens interface.implement. A backend defect stops this workflow and requires a separately selected implement-backend run with accepted unit and backend E2E evidence before a fresh frontend workflow. Authorization, schema and business defects require owning-scope classification and cannot use FE secondary repair.",
       "Reopening a step archives that response and all downstream requests/responses before new mutation.",
       "Old evidence remains immutable and cannot certify changed code or a changed draw.",
       "Do not restart resource-creating actions while cleanup of the previous attempt remains unresolved.",

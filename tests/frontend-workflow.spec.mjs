@@ -117,13 +117,14 @@ test('relocated workflow executes without source checkout or native agent dispat
 test('AI repair reopens the existing FE cell and archives downstream acceptance without weakening criteria', t => {
   const x = fixture(t); advance(x.root, draw(x)); advance(x.root, implementation(x));
   const before = read(path.join(x.root, '2-implement.request.json'));
-  const result = repair(x.root, { reason: 'product-defect', observation: 'Synthetic UAT mismatch', method: 'Inspect integration and fix the owned API caller' });
+  const result = repair(x.root, { reason: 'frontend-defect', observation: 'Synthetic UAT mismatch', method: 'Inspect integration and fix the owned API caller' });
   assert.equal(result.step, 2); same(request(x.root), before);
   assert.equal(fs.existsSync(path.join(x.root, '3-uat.request.json')), false);
   assert.ok(fs.existsSync(path.join(x.root, 'attempts/attempt-1/2-implement.response.json')));
-  assert.equal(repair(x.root, { reason: 'product-defect', observation: 'Synthetic UAT mismatch', method: 'Inspect integration and fix the owned API caller' }).reason, 'no-progress');
+  assert.equal(repair(x.root, { reason: 'frontend-defect', observation: 'Synthetic UAT mismatch', method: 'Inspect integration and fix the owned API caller' }).reason, 'no-progress');
   advance(x.root, implementation(x)); assert.equal(request(x.root).step, 3);
 });
+test('backend defects leave the frontend run untouched and require accepted backend delivery',t=>{const x=fixture(t);advance(x.root,draw(x));advance(x.root,implementation(x));const before=read(path.join(x.root,'2-implement.response.json'));const result=repair(x.root,{reason:'backend-defect',observation:'Synthetic backend contract failure',method:'Run the owning backend workflow'});assert.equal(result.transition,'new-workflow');assert.equal(result.workflow,'implement-backend');assert.match(result.requirement,/unit and backend E2E proof/);same(read(path.join(x.root,'2-implement.response.json')),before);assert.equal(fs.existsSync(path.join(x.root,'attempts')),false);assert.equal(repair(x.root,{reason:'product-defect',observation:'Owner unknown',method:'Classify before mutation'}).reason,'defect-owner-unresolved');});
 test('FE waits for a scoped backend support response in the same cell and cannot bypass its gate', t => {
   const x = fixture(t); advance(x.root, draw(x));
   const input = { repository: 'repository:backend', paths: ['src/example.ts'], changeKind: 'api-integration', problem: 'Synthetic integration mismatch', businessRefs: x.input.context.business };

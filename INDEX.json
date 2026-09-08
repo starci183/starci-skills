@@ -36,7 +36,7 @@
   "gates": "workflows/gates.json",
   "work": {
     "format": "yaml-1.2",
-    "schema": ".work/_schema/work.schema.yaml",
+    "schema": "schemas/work.schema.json",
     "node": "index.yaml",
     "approval": "goal-before-effects-and-result-before-done",
     "checklist": "<business>/<item>/**/index.yaml",

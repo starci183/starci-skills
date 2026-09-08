@@ -293,6 +293,8 @@ export function repair(directory, diagnosis) {
     const state = replay(root);
     if (state.index === 3) fail('Completed run needs a newly selected workflow; do not silently reopen it');
     if (route === 'user') return { transition: 'blocked', reason: diagnosis.reason, observation: diagnosis.observation };
+    if (route === 'classify-owner') return { transition: 'blocked', reason:'defect-owner-unresolved', observation:diagnosis.observation };
+    if (route === 'backend-workflow') return { transition:'new-workflow', workflow:'implement-backend', reason:diagnosis.reason, requirement:'Complete and accept backend-owned unit and backend E2E proof, then start a fresh frontend workflow.' };
     let index = route === 'same' ? state.index : stages.indexOf(route);
     if (index < 0 || index > state.index) fail('Repair cannot skip forward');
     const attempts = path.join(root, 'attempts');

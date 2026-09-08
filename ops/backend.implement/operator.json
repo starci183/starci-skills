@@ -194,7 +194,7 @@
         "evidence"
       ],
       "action": {
-        "en": "Add/repair scoped tests; execute positive, denial, invalid-input and applicable race/reload regressions plus repository-required checks. Preserve raw failure and no-test/not-run status; repair only within this approved implementation goal. This implement op owns lint, typecheck, relevant tests/coverage, affected builds and Sonar. Resolve real repository scripts and CI thresholds; record command, source tree/commit, result and sanitized logs. For Sonar record the analysis/revision and actual server quality-gate result after processing; scanner submission alone is not pass. Fix scoped failures and rerun affected checks. A missing runner, token reference, coverage target or unavailable required Sonar gate is blocked/not-run, never pass; do not move this responsibility to architecture, business or UAT. Reuse existing authorization and keep secrets outside evidence."
+          "en": "Add or repair scoped unit tests, then execute the repository's backend unit gate and retain command, exit code, counts and sanitized output. Next execute the relevant backend E2E gate against the actual backend contract, persistence and authorization boundary; browser/frontend UAT is not backend E2E. Positive, denial, invalid-input and applicable race/reload cases must map to the selected operations. Unit success cannot substitute for E2E, and an unavailable runner, dependency, environment or required case is blocked/not-run rather than pass. After both gates pass, run required lint, typecheck, coverage, build and Sonar checks against the same source revision. Preserve failures, repair only within the approved goal, rerun affected gates, and never delegate this responsibility to frontend or UAT."
       }
     },
     {
@@ -210,7 +210,7 @@
         "apiDelivery"
       ],
       "action": {
-        "en": "Review diff, verify no unrelated changes, commit the piece when authorized and read back the real SHA/diff. Bind proof to actual tested bytes; fresh code needs fresh required evidence. Stop after delivery. Create the scoped local commit under the existing implementation authority after required checks pass, read back full SHA and committed diff, and return per-repository commit references. Preserve unrelated local changes; never stage everything, bypass hooks, push or invent an empty commit. If no code changed, return the verified existing commit and explain no change. Missing commit proof prevents a passing delivery. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts. For an explicitly requested running API handoff, verify the actual owned development runtime and produce api-contract.json and runtime.json for FE/API acceptance; missing required served proof blocks that handoff."
+          "en": "Review the diff and verify no unrelated changes. A passing backend delivery requires scoped unit and backend E2E evidence, every applicable quality gate, the exact tested source tree, API contract, authorization/error behavior, and runtime identity when the consumer requires a runnable API. Commit only when authorized, then read back the full SHA/diff and prove the tested tree corresponds to that commit; otherwise report uncommitted or no-change honestly. A frontend support response must return codeRefs, changedPaths, apiContract, runtime, qualityEvidence and testedCommit bound to the caller request. Missing or not-run unit/E2E proof, commit mismatch, or unavailable required served runtime blocks the handoff, so frontend cannot consume it as verified backend. Never bypass hooks, push, stage unrelated files or invent proof."
       }
     }
   ],
@@ -230,13 +230,13 @@
     {
       "id": "behavior",
       "requirement": {
-        "en": "Tests prove each declared operation facet including negative authorization and persistent state when promised; compile-only output cannot certify behavior."
+          "en": "Scoped unit tests and backend E2E tests both pass for each declared operation facet, including negative authorization and persistent state when promised. Compile-only, mocked-unit-only, frontend browser UAT, missing-runner or not-run output cannot certify backend behavior."
       }
     },
     {
       "id": "implementation-quality",
       "requirement": {
-        "en": "This implement op owns lint, typecheck, relevant tests/coverage, affected builds and Sonar. Resolve real repository scripts and CI thresholds; record command, source tree/commit, result and sanitized logs. For Sonar record the analysis/revision and actual server quality-gate result after processing; scanner submission alone is not pass. Fix scoped failures and rerun affected checks. A missing runner, token reference, coverage target or unavailable required Sonar gate is blocked/not-run, never pass; do not move this responsibility to architecture, business or UAT. Reuse existing authorization and keep secrets outside evidence."
+          "en": "This operator owns separate scoped unit and backend E2E gates plus lint, typecheck, coverage, affected builds and Sonar. Evidence records command, environment, tested source tree/full commit, exit and counts for each gate. Backend E2E must exercise the actual backend boundary and cannot be replaced by frontend browser UAT. Scanner submission without the processed server result, a missing runner/token/dependency, or any not-run required gate is blocked rather than pass."
       }
     }
   ],
@@ -293,12 +293,16 @@
     "checks": [
       "lint",
       "typecheck",
-      "tests",
+          "unit",
+          "backend-e2e",
       "coverage",
       "build",
       "sonar"
     ],
-    "requiredResult": "pass",
+      "requiredResult": "pass",
+      "unitGate": "scoped-unit-pass-for-tested-revision",
+      "backendE2EGate": "scoped-backend-e2e-pass-for-tested-revision",
+      "handoffBinding": "api-contract-runtime-quality-evidence-and-tested-commit",
     "sonarGate": "server-quality-gate-pass-for-tested-revision",
     "missingRunner": "blocked",
     "canDelegateResponsibility": false

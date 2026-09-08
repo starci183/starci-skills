@@ -13,10 +13,11 @@ export function validateJobMatrices(bundle, catalogue) {
   const operators=new Map(catalogue.ops.map(op=>[op.id,op.contract]));
   const ids=new Set();
   for(const workflow of bundle.workflows) {
-    if(!fields(workflow,['id','parameters','matrix','transition'])||!text(workflow.id)||ids.has(workflow.id)){fail('workflow','Invalid or duplicate workflow');continue;}
+    if(!fields(workflow,['id','parameters','matrix','transition'],['operations'])||!text(workflow.id)||ids.has(workflow.id)){fail('workflow','Invalid or duplicate workflow');continue;}
     ids.add(workflow.id);
     if(!Array.isArray(workflow.parameters)||!workflow.parameters.every(text)||!unique(workflow.parameters))fail(workflow.id,'Invalid parameters');
     if(!Array.isArray(workflow.matrix)||workflow.matrix.length<1||workflow.matrix.length>3){fail(workflow.id,'At most three sequential rows');continue;}
+    if(workflow.operations&&(!Array.isArray(workflow.operations)||!workflow.operations.length||!workflow.operations.every(text)||!unique(workflow.operations)))fail(workflow.id,'Invalid operation variants');
     const expectedTransition={request:'exact-cell-op-mode-inputs-criteria',response:'matching-request-digest-and-op-mode',advance:'all-required-criteria-pass-and-output-evidence-verified',missingOrFailed:'remain-in-cell',repair:'same-cell-same-acceptance-bounded-retry',evidence:'actual-artifacts-and-selected-work-completion-profile',dispatch:'explicit-coordinator-only'};
     if(!fields(workflow.transition,Object.keys(expectedTransition))||Object.entries(expectedTransition).some(([k,v])=>workflow.transition[k]!==v))fail(workflow.id,'Strict transition policy is required');
     const cells=new Map();
@@ -26,7 +27,7 @@ export function validateJobMatrices(bundle, catalogue) {
       for(const cell of row) {
         if(!fields(cell,['id','op','inputs','outputs','criteria','writeScopes'],['operation'])||!text(cell.id)||cells.has(cell.id)){fail(workflow.id,'Invalid or duplicate cell');continue;}
         cells.set(cell.id,{...cell,row:rowIndex});
-        try{selectOperation(operators.get(cell.op),cell.operation);}catch{fail(cell.id,'Unknown operator or invalid operation selection');}
+        try{if(workflow.operations)for(const operation of workflow.operations)selectOperation(operators.get(cell.op),operation);else selectOperation(operators.get(cell.op),cell.operation);}catch{fail(cell.id,'Unknown operator or invalid operation selection');}
         for(const key of ['outputs','criteria','writeScopes']) if(!Array.isArray(cell[key])||!cell[key].length||!cell[key].every(text)||!unique(cell[key]))fail(cell.id,'Invalid '+key);
         if(Array.isArray(cell.writeScopes))for(const scope of cell.writeScopes){if(!text(scope))continue;if(writes.some(s=>s===scope||s.startsWith(scope+'/')||scope.startsWith(s+'/')))fail(cell.id,'Parallel jobs overlap mutable ownership');writes.push(scope);}
       }

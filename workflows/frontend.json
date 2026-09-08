@@ -1,6 +1,6 @@
 {
   "schema": "starci/workflow@1",
-  "id": "frontend",
+  "id": "implement-frontend",
   "matrix": "matrix.json",
   "transitions": "transitions.json",
   "contracts": "contracts.json",
