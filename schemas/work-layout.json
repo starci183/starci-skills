@@ -9,7 +9,7 @@
     "nodeAssets": "<node>/assets/<file>",
     "uatFlow": "<module>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/}",
     "evidence": "<node>/evidence/<id>/manifest.yaml",
-    "workflowSession": "sibling .starci-workflows/<work-root>/<run-id>/{goal,run}.yaml",
+    "workflowSession": "sibling .starci/runs/<work-root>/<run-id>/{goal,run}.yaml",
     "moduleUI": "<module>/ui/{index.yaml,assets/<generated-design.png>}",
     "implementation": "<module>/implementation/{index.yaml,frontend/index.yaml,backend/index.yaml}",
     "frontendCaptures": "<module>/implementation/frontend/assets/<running-page-screenshot>"
@@ -30,7 +30,7 @@
     "All structured Work records and results use YAML. JSON and underscore-prefixed directories are rejected in canonical Work v2; central schemas stay in .claude.",
     "Repository and environment provenance is written directly in sourceRefs or the owning module record. refs and dependsOn remain stable technical node IDs for digest propagation.",
     "UAT accounts.yaml uses work/disposable-accounts@1 and may contain only synthetic disposable local role, username and password values. Images and video remain original binary assets.",
-    "Workflow session traces live beside .work in .starci-workflows and never enter canonical Work hashes.",
+    "Workflow session traces live beside .work in .starci/runs and never enter canonical Work hashes.",
     "Each module UI direction belongs to ui/index.yaml. Generated drawings and design PNGs belong under ui/assets and are declared in both ui.assets and top-level assets for byte binding.",
     "Implementation/index.yaml is a derived parent with no authored state, completion or implementation payload. Frontend and backend children separately describe actual source.",
     "Frontend assets contain screenshots of the running page, never source design PNGs. UAT screenshots and videos stay under the owning uat/<flow>/assets directory."

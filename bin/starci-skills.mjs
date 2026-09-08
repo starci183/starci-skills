@@ -29,7 +29,7 @@ const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf
 // CLI must survive relocation: installed doctor fixtures copy this same declared payload.
 export const PAYLOAD = [...new Set(['package.json', ...pkg.files.map(ref => ref.replace(/\/$/, ''))])];
 const MANIFEST = '.starci-skills.json';
-const LOCAL_IGNORES = ['.work/_local/','.work/_workflows/'];
+const LOCAL_IGNORES = ['.work/_local/','.work/_workflows/','.starci/'];
 const ENTRY_MARKER = '<!-- starci:prompt-entry -->';
 const LEGACY_PROMPT_ENTRY = `${ENTRY_MARKER}
 For every user prompt, enter [StarCi](.claude/INDEX.md) before planning or target work and follow
