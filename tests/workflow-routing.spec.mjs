@@ -14,10 +14,10 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=(dir,file)=>JSON.parse(fs.readFileSync(path.join(dir,file),'utf8'));
 const catalog=read(root,'workflows/catalog.json'),jobs=read(root,'workflows/jobs.json'),frontend=read(root,'workflows/frontend.json'),operators=read(root,'ops/catalog.json');
 const temp=t=>{const d=fs.mkdtempSync(path.join(os.tmpdir(),'starci-routing-'));t.after(()=>{assert.equal(path.dirname(d),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(d).startsWith('starci-routing-'));fs.rmSync(d,{recursive:true,force:true});});return d;};
-test('one StarCi skill discovers all eight valid workflows and no preset skill layer',()=>{
+test('one StarCi skill discovers all ten valid workflows and no preset skill layer',()=>{
   assert.match(fs.readFileSync(path.join(root,'SKILL.md'),'utf8'),/^name: starci$/m);
   assert.equal(fs.existsSync(path.join(root,'skills/catalog.json')),false);
-  assert.equal(catalog.workflows.length,8);
+  assert.equal(catalog.workflows.length,10);
   assert.deepEqual(validateWorkflowCatalog(catalog,jobs,frontend),{ok:true,errors:[]});
   assert.deepEqual(validateJobMatrices(jobs,operators),{ok:true,errors:[]});
 });
@@ -25,6 +25,8 @@ test('unmatched direct work selects exactly task.execute; read-only and explicit
   for(const intent of ['small-fix','standalone-deploy','data-correction','unknown',undefined])assert.equal(selectWorkflow(catalog,{intent}).id,'direct-task');
   assert.equal(selectWorkflow(catalog,{intent:'frontend-end-to-end'}).id,'frontend');
   assert.equal(selectWorkflow(catalog,{workflowId:'publish-deploy'}).id,'publish-deploy');
+  assert.equal(selectWorkflow(catalog,{intent:'existing-business-design'}).id,'existing-work-design');
+  assert.equal(selectWorkflow(catalog,{intent:'fullstack-delivery'}).id,'fullstack-delivery');
   assert.deepEqual(selectWorkflow(catalog,{readOnly:true}),{kind:'answer-or-inspect'});
   assert.throws(()=>selectWorkflow(catalog,{workflowId:'typo'}));
   const direct=jobs.workflows.find(w=>w.id==='direct-task');

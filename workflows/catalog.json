@@ -65,6 +65,20 @@
       "when": "Create or bind the missing Work workspace within the original request scope, then resume the suspended workflow after user approval.",
       "definition": "jobs.json",
       "execution": "explicit-coordinator"
+    },
+    {
+      "id": "existing-work-design",
+      "intent": "existing-business-design",
+      "when": "Resolve current business requirements, then architecture, for an existing valid Work module before delivery.",
+      "definition": "jobs.json",
+      "execution": "explicit-coordinator"
+    },
+    {
+      "id": "fullstack-delivery",
+      "intent": "fullstack-delivery",
+      "when": "Implement an accepted architecture sequentially through backend, frontend and UAT.",
+      "definition": "jobs.json",
+      "execution": "explicit-coordinator"
     }
   ],
   "gates": "gates.json"

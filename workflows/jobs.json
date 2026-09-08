@@ -854,6 +854,197 @@
         "evidence": "actual-artifacts-and-selected-work-completion-profile",
         "dispatch": "explicit-coordinator-only"
       }
+    },
+    {
+      "id": "existing-work-design",
+      "parameters": [
+        "workRef",
+        "intent",
+        "sourceRefs"
+      ],
+      "matrix": [
+        [
+          {
+            "id": "business",
+            "op": "business.decide",
+            "inputs": {
+              "work": {
+                "parameter": "workRef"
+              },
+              "intent": {
+                "parameter": "intent"
+              },
+              "source": {
+                "parameter": "sourceRefs"
+              }
+            },
+            "outputs": [
+              "businessSpec",
+              "journeys"
+            ],
+            "criteria": [
+              "intent-resolved",
+              "coverage-pass",
+              "work-valid"
+            ],
+            "writeScopes": [
+              "canonical-work/business"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "architecture",
+            "op": "architecture.decide",
+            "inputs": {
+              "business": {
+                "cell": "business",
+                "output": "businessSpec"
+              },
+              "journeys": {
+                "cell": "business",
+                "output": "journeys"
+              },
+              "source": {
+                "parameter": "sourceRefs"
+              }
+            },
+            "outputs": [
+              "architectureSpec",
+              "codeImpacts",
+              "serviceCalls"
+            ],
+            "criteria": [
+              "service-routing-resolved",
+              "security-covered",
+              "implementable",
+              "work-valid"
+            ],
+            "writeScopes": [
+              "canonical-work/architecture"
+            ]
+          }
+        ]
+      ],
+      "transition": {
+        "request": "exact-cell-op-mode-inputs-criteria",
+        "response": "matching-request-digest-and-op-mode",
+        "advance": "all-required-criteria-pass-and-output-evidence-verified",
+        "missingOrFailed": "remain-in-cell",
+        "repair": "same-cell-same-acceptance-bounded-retry",
+        "evidence": "actual-artifacts-and-selected-work-completion-profile",
+        "dispatch": "explicit-coordinator-only"
+      }
+    },
+    {
+      "id": "fullstack-delivery",
+      "parameters": [
+        "architectureSpec",
+        "codeImpacts",
+        "serviceCalls"
+      ],
+      "matrix": [
+        [
+          {
+            "id": "backend",
+            "op": "backend.implement",
+            "inputs": {
+              "architecture": {
+                "parameter": "architectureSpec"
+              },
+              "impacts": {
+                "parameter": "codeImpacts"
+              }
+            },
+            "outputs": [
+              "backendResult",
+              "apiContract"
+            ],
+            "criteria": [
+              "backend-quality",
+              "contract-pass",
+              "work-valid"
+            ],
+            "writeScopes": [
+              "backend-source",
+              "canonical-work/implementation/backend"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "frontend",
+            "op": "interface.implement",
+            "inputs": {
+              "backend": {
+                "cell": "backend",
+                "output": "backendResult"
+              },
+              "api": {
+                "cell": "backend",
+                "output": "apiContract"
+              },
+              "architecture": {
+                "parameter": "architectureSpec"
+              }
+            },
+            "outputs": [
+              "frontendResult",
+              "flows"
+            ],
+            "criteria": [
+              "frontend-quality",
+              "journeys-wired",
+              "work-valid"
+            ],
+            "writeScopes": [
+              "frontend-source",
+              "canonical-work/implementation/frontend"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "uat",
+            "op": "uat.verify",
+            "inputs": {
+              "frontend": {
+                "cell": "frontend",
+                "output": "frontendResult"
+              },
+              "flows": {
+                "cell": "frontend",
+                "output": "flows"
+              },
+              "backend": {
+                "cell": "backend",
+                "output": "backendResult"
+              }
+            },
+            "outputs": [
+              "uatResult"
+            ],
+            "criteria": [
+              "flow-pass",
+              "ux-observed",
+              "cleanup-pass",
+              "work-valid"
+            ],
+            "writeScopes": [
+              "canonical-work/uat"
+            ]
+          }
+        ]
+      ],
+      "transition": {
+        "request": "exact-cell-op-mode-inputs-criteria",
+        "response": "matching-request-digest-and-op-mode",
+        "advance": "all-required-criteria-pass-and-output-evidence-verified",
+        "missingOrFailed": "remain-in-cell",
+        "repair": "same-cell-same-acceptance-bounded-retry",
+        "evidence": "actual-artifacts-and-selected-work-completion-profile",
+        "dispatch": "explicit-coordinator-only"
+      }
     }
   ]
 }
