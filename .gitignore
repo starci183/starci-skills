@@ -17,3 +17,5 @@ resources/settings.json
 node_modules/
 __pycache__/
 /scheduled_tasks.lock
+
+# Production foundation bundles under .dist/ are tracked and checked against source.

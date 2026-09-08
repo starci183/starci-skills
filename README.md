@@ -2,8 +2,18 @@
 
 StarCi Skills is the `.claude` runtime of a repository: one entry (`SKILL.md`), operators with explicit boundaries,
 goal-derived workflows, one closed routing map and one tool registry. An agent in Claude Code or
-Codex reads `.claude/INDEX.md` through a one-paragraph bootstrap and follows its load order; the tree
+Codex reads its installed profile's entry through a short bootstrap and follows its load order; the tree
 does the rest. Documentation: <https://harness.starci.org/docs/>. Tiếng Việt: [README.vi.md](README.vi.md).
+
+## V3 operator development
+
+The [v3 foundation](.claude/README.md) contains modular work schemas, aliases and all operator
+sources. Each operator has request, response, validation, steps and criteria modules with local
+tests. Build production bundles with `python scripts/build.py`; install
+`tests/requirements-schema.txt` and run `python scripts/test_foundation.py` to check them.
+Generated `.dist/` bundles are tracked and shipped in the package. The existing orchestration
+engine continues to use its current contracts; the new bundles define the agent execution path
+and do not silently migrate existing session records.
 
 ## Install
 
@@ -11,7 +21,7 @@ does the rest. Documentation: <https://harness.starci.org/docs/>. Tiếng Việt
 npx @starci/skills init
 ```
 
-Run it at the root of the repository that will own the runtime. Under the default full profile, every prompt enters StarCi; follow-ups reuse the host session. It copies the tree into `./.claude`,
+Run it at the root of the repository that will own the runtime. New installations enter StarCi Lite, which classifies the request and routes substantial work to full StarCi. It copies the tree into `./.claude`,
 writes `CLAUDE.md` (read by Claude Code) and `AGENTS.md` (read by Codex) when they do not exist, appends the
 StarCi entry once to existing files while preserving their instructions, and
 adds `.worktrees/sessions/` to `.gitignore`, where sessions live. Commit `.claude/` with the repository:
@@ -22,7 +32,7 @@ straight from the Git branch when the registry has not yet listed a version:
 npx --package=github:starci183/starci-skills#main starci-skills init
 ```
 
-The default profile is full StarCi. To select the separate [StarCi Lite](skills/starci-lite/SKILL.md) entry, run `npx @starci/skills init --profile lite`, or explicitly switch an installed host with `update --profile lite`. Lite handles questions, documentation and bounded local fixes; complex features, formal public UAT and publication use the full entry. All full operators remain installed. Updates retain the selected profile unless overridden. The manifest records `profile` separately from `bootstrapProfile`: `--no-bootstrap` leaves host instructions unchanged and does not claim that their entry changed. Custom full-only instructions must be reconciled explicitly; the installer never removes them. Active full sessions keep their scope, evidence and gates.
+The default entry for a new installation is [StarCi Lite](skills/starci-lite/SKILL.md); it owns the impact-based classification. Use `npx @starci/skills init --profile full` to select the full entry explicitly, or `update --profile lite` to switch an existing host. All full operators remain installed. Updates retain the installed profile, including legacy full installations without profile metadata. The manifest records `profile` separately from `bootstrapProfile`: `--no-bootstrap` leaves host instructions unchanged and does not claim that their entry changed. Custom full-only instructions must be reconciled explicitly; the installer never removes them. Active full sessions keep their scope, evidence and gates.
 
 | Command | What it does |
 | --- | --- |

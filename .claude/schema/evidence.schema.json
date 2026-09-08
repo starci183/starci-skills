@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evidence",
+  "description": ".works/<workId>/evidence/<id>.json: artifact metadata. Existence, actual digest and evidentiary relevance require separate checks.",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "id", "workId", "workRevision", "path", "sha256", "mediaType", "description", "capturedBy", "capturedAt"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/version" },
+    "kind": { "const": "evidence" },
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "workId": { "$ref": "common.schema.json#/$defs/id" },
+    "workRevision": { "$ref": "common.schema.json#/$defs/revision" },
+    "path": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "sha256": { "$ref": "common.schema.json#/$defs/digest" },
+    "mediaType": { "$ref": "common.schema.json#/$defs/mediaType" },
+    "description": { "$ref": "common.schema.json#/$defs/text" },
+    "capturedBy": { "$ref": "common.schema.json#/$defs/actor" },
+    "capturedAt": { "$ref": "common.schema.json#/$defs/timestamp" }
+  }
+}

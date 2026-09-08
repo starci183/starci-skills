@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "id": "landing.compose",
+  "purpose": "Compose one landing-page contract from a credible business promise, canonical identity, Grammar family, section story, asset media, motion and audit evidence.",
+  "scope": "Read-only composition planning. Produces a landing composition artifact; it writes no frontend source, generates no final media, renders no candidate, starts no server and publishes no Grammar.",
+  "modules": { "request": "request.json", "response": "response.json", "validate": "validate.json", "step": "step.json", "criteria": "criteria.json" }
+}

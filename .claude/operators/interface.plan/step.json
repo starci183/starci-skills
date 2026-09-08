@@ -1,0 +1,20 @@
+{
+  "steps": [
+    { "id": "bind-surface-scope", "instruction": "Read the request and declared references. Extract the feature, every route or hosted surface shown, and any business journeys, states or operations. Ask when the feature or reference is missing.",
+      "reads": [{ "alias": "@workspaces/requests", "path": "<requestId>.json", "when": "always" }, { "alias": "@workspaces/inputs", "path": "<declared-input-path>", "when": "when reference or business files are declared" }, { "alias": "@workspaces/context", "path": "<declared-context-path>", "when": "when supporting references are declared" }],
+      "writes": [], "calls": [{ "alias": "@tools/fileread", "purpose": "Read the request and declared surface evidence.", "when": "always" }, { "alias": "@tools/imageview", "purpose": "Inspect actual reference pixels.", "when": "when an image reference is supplied" }], "checks": ["request-shape", "request-files"], "produces": ["Reference surface inventory"] },
+    { "id": "observe-frontend", "instruction": "Inspect routes, layouts, pages, modals and drawers at the bound frontend head. Record source evidence without treating existing implementation as product authority.",
+      "reads": [{ "alias": "@workspaces/fe", "path": "<declared-source-path>", "when": "for each relevant route or layout path" }], "writes": [],
+      "calls": [{ "alias": "@tools/fileread", "purpose": "Read frontend route and surface source.", "when": "always" }, { "alias": "@cli/git", "purpose": "Verify the frontend source head without mutation.", "when": "always" }], "checks": [], "produces": ["Observed frontend surface inventory"] },
+    { "id": "map-surfaces", "instruction": "Bind the exact Grammar and family references, choose the shared shell once, and map each page, modal and drawer exactly once with route or host, one goal, journey or secondary tier, dependencies, and a read/write data contract. Resolve all earlier unchecked surface entries or name the remaining defect.",
+      "reads": [{ "alias": "@workspaces/grammar", "path": "<declared-grammar-path>", "when": "when Grammar is bound" }, { "alias": "@workspaces/knowledge", "path": "<declared-knowledge-path>", "when": "for each bound family or composition reference" }, { "alias": "@workspaces/context", "path": "<declared-unchecked-path>", "when": "when unchecked coverage is supplied" }],
+      "writes": [{ "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/surface-map.md", "when": "after coverage is complete" }, { "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/units.json", "when": "after map rows are final" }],
+      "calls": [{ "alias": "@tools/fileread", "purpose": "Read exact bound Grammar and knowledge references.", "when": "when references are bound" }, { "alias": "@tools/sourcewrite", "purpose": "Persist the surface map and matching unit list.", "when": "after all map criteria are satisfied" }],
+      "checks": ["surface-coverage", "shell-once", "units-match-map", "data-contracts"], "produces": ["surface-map", "units"] },
+    { "id": "emit-surface-map", "instruction": "Write and validate the typed response after all map criteria pass. Report knowledge conflicts as blocked evidence; claim no design, implementation or runtime result.",
+      "reads": [{ "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/surface-map.md", "when": "when the map passes" }, { "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/units.json", "when": "when the map passes" }],
+      "writes": [{ "alias": "@workspaces/responses", "path": "<responseId>.json", "when": "always" }],
+      "calls": [{ "alias": "@tools/sourcewrite", "purpose": "Write the response record.", "when": "always" }, { "alias": "@cli/python", "purpose": "Run scripts/validate_operator.py for this bundle and records.", "when": "always" }, { "alias": "@tools/print", "purpose": "Present the accepted map and units.", "when": "after validation passes" }],
+      "checks": ["response-shape", "request-binding", "unique-outputs", "output-files", "observation-binding"], "produces": ["Response record"] }
+  ]
+}

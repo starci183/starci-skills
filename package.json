@@ -26,6 +26,8 @@
     "readiness/",
     "resources/",
     "scripts/",
+    ".dist/schema.json",
+    ".dist/alias.json",
     "templates/",
     "tests/evidence/20260906-workflow-topologies-public.md",
     "tests/evidence/20260906-runtime-bootstrap-preflight.md",
@@ -43,7 +45,9 @@
     "tests/evidence/20260907-goal-presentation-and-prior-waits.md",
     "tests/evidence/20260907-source-critique-and-early-admission.md",
     "tests/evidence/20260907-business-promise-revision.md",
-    "tests/evidence/20260907-delegated-restatement-review.md"
+    "tests/evidence/20260907-delegated-restatement-review.md",
+    ".dist/operators/",
+    "tests/requirements-schema.txt"
   ],
   "repository": {
     "type": "git",
@@ -63,6 +67,9 @@
   "scripts": {
     "test": "node scripts/validate-routing.mjs && node scripts/validate-resources.mjs && node scripts/validate-knowledge-citations.mjs && node scripts/validate-alias.mjs && node scripts/generate-alias-doc.mjs --check && node scripts/validate-operator.mjs && node scripts/validate-helper.mjs && node scripts/validate-defaults.mjs && node scripts/generate-operators-index.mjs --check && node scripts/generate-operator-briefs.mjs --check && node scripts/generate-helpers-index.mjs --check && node scripts/generate-helper-briefs.mjs --check && node scripts/validate-templates.mjs && node scripts/run-operator-self-tests.mjs && node --test scripts/*.spec.mjs && npm run docs:check",
     "docs:check": "node docs/scripts/generate-docs.mjs --check",
-    "sweep:presentation": "node scripts/sweep-presentation.mjs"
+    "sweep:presentation": "node scripts/sweep-presentation.mjs",
+    "build:foundation": "python scripts/build.py",
+    "check:foundation": "python scripts/build.py --check",
+    "test:foundation": "python scripts/test_foundation.py"
   }
 }

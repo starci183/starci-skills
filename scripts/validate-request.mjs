@@ -763,7 +763,7 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
         if (retiredPlanCell(state, `${request.step}/${request.parallel}`)) errors.push('PLAN_SUPERSEDED: this coordinate is retained history and cannot dispatch; use the current forecast');
       }
       recordedChoices = state.choices ?? {};
-      if (recordedChoices[request.decisionId]?.selectedBy === 'coordinator') {
+      if (['coordinator', policy.delegatedRestatement?.scopeReviewSource].filter(Boolean).includes(recordedChoices[request.decisionId]?.selectedBy)) {
         const { delegatedRestatementErrors } = await import('./restatement-delegation.mjs');
         const delegatedErrors = await delegatedRestatementErrors(root, dir, state, request, { phase });
         errors.push(...delegatedErrors); delegatedSelection = delegatedErrors.length === 0;
@@ -822,7 +822,7 @@ export async function validateRequest(root, dir, packages, { phase = currentRequ
       }
     } catch (e) { errors.push(`state.json: ${e.message}`); }
   }
-  errors.push(...selectionErrors(delegatedSelection ? { ...policy, selectionSource: 'coordinator' } : policy, request, recordedChoices));
+  errors.push(...selectionErrors(delegatedSelection ? { ...policy, selectionSource: recordedChoices[request.decisionId].selectedBy } : policy, request, recordedChoices));
   if (request.contractVersion === V22_CONTRACT) errors.push(...await frozenInputErrors(dir, request));
   errors.push(...await uiKnowledgeRequestErrors(root, dir, request, { phase }));
   if (request.contractVersion === V22_CONTRACT && ['interface.draw', 'interface.generate', 'interface.audit'].includes(request.operatorId)) {

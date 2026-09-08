@@ -1,0 +1,14 @@
+{
+  "machine": [
+    { "id": "request-shape", "check": "request-schema", "phase": "request" }, { "id": "request-files", "check": "input-files", "phase": "request" },
+    { "id": "response-shape", "check": "response-schema", "phase": "response" }, { "id": "request-binding", "check": "request-binding", "phase": "response" },
+    { "id": "unique-outputs", "check": "unique-output-ids", "phase": "response" }, { "id": "output-files", "check": "output-files", "phase": "response" },
+    { "id": "observation-binding", "check": "observation-references", "phase": "response" }
+  ],
+  "review": [
+    { "id": "coverage-complete", "instruction": "Verify exactly one seed unit exists for each flow named by the UAT plan and each required data family not already covered by a flow. No extra unit may pre-create the outcome under test." },
+    { "id": "namespace-isolation", "instruction": "Verify every unit has a unique namespace and no two units can share rows or cleanup ownership. Accounts are aliases only and no secret value appears." },
+    { "id": "seed-contract-complete", "instruction": "Verify each unit names at least one real target store plus attribution, representative volume, expected read-back, fixture refs and exact rollback. Targets must match bound backend entities, tables or collections." }
+  ],
+  "failurePolicy": "Record the exact uncovered family, namespace collision, invalid target or incomplete rollback. Revise only affected units, then reassess all coverage and isolation; never execute seeds during planning."
+}

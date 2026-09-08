@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "architecture.decide request",
+  "$ref": "works:request",
+  "properties": {
+    "operation": { "const": "architecture.decide" },
+    "inputs": { "properties": { "prompts": { "minItems": 1 } } }
+  },
+  "description": "Supply the objective, fixed constraints, tradeoff axes, requested alternative count and selection policy in inputs.prompts. Bind any business authority or prior decision as input files and supporting source evidence as context files. Missing fixed constraints or authority required to decide must be clarified."
+}

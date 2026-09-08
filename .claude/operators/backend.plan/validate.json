@@ -1,0 +1,17 @@
+{
+  "machine": [
+    { "id": "request-shape", "check": "request-schema", "phase": "request" },
+    { "id": "request-files", "check": "input-files", "phase": "request" },
+    { "id": "response-shape", "check": "response-schema", "phase": "response" },
+    { "id": "request-binding", "check": "request-binding", "phase": "response" },
+    { "id": "unique-outputs", "check": "unique-output-ids", "phase": "response" },
+    { "id": "output-files", "check": "output-files", "phase": "response" },
+    { "id": "observation-binding", "check": "observation-references", "phase": "response" }
+  ],
+  "review": [
+    { "id": "contract-partition", "instruction": "Compare the plan with the bound stack model. Every contract operation appears exactly once, no module invents an operation, and operations sharing neither writer nor store boundary are not collapsed together." },
+    { "id": "module-contracts", "instruction": "Verify every module has one goal grounded in the business dimensions it carries, a writer, stores, proof kinds, migration references, and no empty operation set." },
+    { "id": "dependency-order", "instruction": "Verify dependencies resolve, are acyclic, and place a module after each module whose written store it reads or whose migration it consumes. The human plan and units file must agree exactly." }
+  ],
+  "failurePolicy": "Record the omitted, duplicated or misordered operation. Repartition or reorder only affected modules and reassess the complete operation set; never fill an operation or edit the architecture contract."
+}

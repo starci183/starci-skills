@@ -1,0 +1,7 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"quality.verify request",
+  "$ref":"works:request",
+  "properties":{"operation":{"const":"quality.verify"},"expected":{"minItems":1},"inputs":{"properties":{"files":{"minItems":1}}}},
+  "description":"Bind at least one producer receipt, the exact source head, declared gate commands and configurations, effective coverage thresholds, lint scope and any unexpired owner-approved debt. All predecessor evidence must describe the same head."
+}

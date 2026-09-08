@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "interface.draw request",
+  "$ref": "works:request",
+  "properties": {
+    "operation": {
+      "const": "interface.draw"
+    },
+    "context": {
+      "required": [
+        "visual"
+      ]
+    }
+  },
+  "description": "Use the shared request envelope. inputs.prompts and inputs.files contain the drawing task and source material; context.notes and context.files contain supporting references. expected records the acceptance criteria. Resolve missing essential details before generation; do not invent product claims or facts."
+}

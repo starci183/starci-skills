@@ -228,7 +228,7 @@ Một luật người nêu bằng lời của họ được nói lại cho họ 
 `business.decide` và `architecture.decide` viết một `restatement` tối đa năm dòng bằng ngôn ngữ của
 người và dừng với `RESTATEMENT_UNCONFIRMED` cho tới khi đúng bản đọc có quyết định được giữ theo
 [chính sách restatement](resources/interaction.md#restatement-identity), gồm đường review trong scope
-được người uỷ quyền rõ ràng. Cách đọc đã sửa đến dưới dạng yêu cầu đã sửa và cùng nhánh đó
+do orchestrator chịu trách nhiệm và đường review được người uỷ quyền rõ ràng. Kiểm chính sách đó trước khi chuyển câu hỏi cho người. Cách đọc đã sửa đến dưới dạng yêu cầu đã sửa và cùng nhánh đó
 chạy lại. Mỗi lượt orchestrator kết thúc với người là một trong các dạng báo cáo mà
 `resources/interaction.json` khai — đã giao, đang chờ anh quyết, đang làm — bằng ngôn ngữ của người;
 bàn giao cho task hay phiên anh em là một nhánh `waiting` có điều kiện đánh thức, không bao giờ là kết thúc

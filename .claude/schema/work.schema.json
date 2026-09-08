@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Work",
+  "description": ".works/<id>/work.json: goal, declared scope, acceptance criteria and current lifecycle.",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "id", "revision", "goal", "status", "scope", "acceptanceCriteria", "createdAt", "updatedAt"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/version" },
+    "kind": { "const": "work" },
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "revision": { "$ref": "common.schema.json#/$defs/revision" },
+    "goal": { "$ref": "common.schema.json#/$defs/text" },
+    "status": { "type": "string", "enum": ["draft", "active", "blocked", "completed", "cancelled"] },
+    "scope": { "$ref": "common.schema.json#/$defs/scope" },
+    "acceptanceCriteria": { "$ref": "common.schema.json#/$defs/criteria" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "reason": { "$ref": "common.schema.json#/$defs/text" },
+    "completion": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidenceIds", "completedAt"],
+      "properties": {
+        "evidenceIds": { "$ref": "common.schema.json#/$defs/idList", "minItems": 1 },
+        "completedAt": { "$ref": "common.schema.json#/$defs/timestamp" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "completed" } }, "required": ["status"] },
+      "then": { "required": ["completion"] },
+      "else": { "properties": { "completion": false } }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["blocked", "cancelled"] } }, "required": ["status"] },
+      "then": { "required": ["reason"] }
+    }
+  ]
+}

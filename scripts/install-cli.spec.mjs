@@ -57,14 +57,14 @@ test('init installs the tree, writes both bootstraps and the sessions ignore, an
   try {
     const manifest = init({ dir: repo, force: false, bootstrap: true }, quiet);
     assert.equal(manifest.version, pkg.version);
+    assert.equal(manifest.profile, 'lite');
     for (const p of PAYLOAD) assert.ok(existsSync(path.join(repo, '.claude', p)), `${p} not installed`);
     assert.equal(readFileSync(path.join(repo, '.claude', 'package.json'), 'utf8'), readFileSync(path.join(root, 'package.json'), 'utf8'));
     for (const name of ['CLAUDE.md', 'AGENTS.md']) {
       const text = readFileSync(path.join(repo, name), 'utf8');
-      assert.match(text, /\.claude\/INDEX\.md/);
-      // Every prompt reaches the one entry; its protocol owns session and goal mechanics.
-      assert.match(text, /For every user prompt, enter \[StarCi\]\(\.claude\/INDEX\.md\)/);
-      assert.match(text, /Follow-up prompts reuse that host session/);
+      assert.match(text, /\.claude\/skills\/starci-lite\/SKILL\.md/);
+      assert.match(text, /For every user prompt, enter \[StarCi Lite\]/);
+      assert.match(text, /Existing full workflows keep their current session and gates/);
     }
     assert.match(readFileSync(path.join(repo, '.gitignore'), 'utf8'), /^\.worktrees\/sessions\/$/m);
     assert.equal(doctor({ dir: repo, quick: true }, quiet), 0);
@@ -128,7 +128,7 @@ test('update adds prompt routing once to an existing bootstrap without replacing
     update({ dir: repo, force: false }, quiet);
     const first = readFileSync(path.join(repo, 'AGENTS.md'), 'utf8');
     assert.ok(first.startsWith(custom), 'local instructions survive the entry upgrade');
-    assert.ok(first.includes('.claude/INDEX.md'), 'a pre-existing file without a StarCi link is also routed');
+    assert.ok(first.includes('.claude/skills/starci-lite/SKILL.md'), 'a pre-existing file without a StarCi link is also routed');
     assert.equal(first.split('<!-- starci:prompt-entry -->').length - 1, 1);
     update({ dir: repo, force: false }, quiet);
     assert.equal(readFileSync(path.join(repo, 'AGENTS.md'), 'utf8'), first, 'updating again does not append duplicate policy');
@@ -157,7 +157,7 @@ test('init adds entry to both existing host files while preserving their custom 
       const result = readFileSync(path.join(repo, name), 'utf8');
       assert.ok(result.startsWith(content), name);
       assert.equal(result.split('<!-- starci:prompt-entry -->').length - 1, 1);
-      assert.ok(result.includes('.claude/INDEX.md'));
+      assert.ok(result.includes('.claude/skills/starci-lite/SKILL.md'));
     }
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });

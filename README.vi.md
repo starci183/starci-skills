@@ -2,7 +2,7 @@
 
 StarCi Skills là runtime `.claude` của một repository: một cửa vào (`SKILL.md`), các operator có ranh giới rõ,
 workflow được lập từ goal đã xác nhận, một bản đồ routing đóng và một sổ tool. Agent trong Claude Code hay Codex đọc
-`.claude/INDEX.md` qua một đoạn bootstrap ngắn rồi theo đúng thứ tự nạp của nó; phần còn lại là việc của
+entry của profile đang cài qua một đoạn bootstrap ngắn rồi theo đúng thứ tự nạp của nó; phần còn lại là việc của
 cây. Tài liệu: <https://harness.starci.org/docs/vi>. Bản tiếng Anh là thẩm quyền khi chạy: [README.md](README.md).
 
 ## Cài đặt
@@ -11,7 +11,7 @@ cây. Tài liệu: <https://harness.starci.org/docs/vi>. Bản tiếng Anh là t
 npx @starci/skills init
 ```
 
-Chạy ở gốc repository sẽ sở hữu runtime. Với profile full mặc định, mọi prompt vào StarCi; follow-up giữ cùng host session. Lệnh chép cây vào `./.claude`, viết `CLAUDE.md` (Claude Code
+Chạy ở gốc repository sẽ sở hữu runtime. Bản cài mới vào StarCi Lite, phân loại yêu cầu và chuyển công việc cần quy trình đầy đủ sang full StarCi. Lệnh chép cây vào `./.claude`, viết `CLAUDE.md` (Claude Code
 đọc) và `AGENTS.md` (Codex đọc) khi chưa có; file đã có được thêm cửa vào StarCi một lần, giữ nguyên
 chỉ dẫn riêng. Lệnh thêm `.worktrees/sessions/` vào `.gitignore` vì phiên
 làm việc nằm ở đó. Hãy commit `.claude/` cùng repository: nó là source, không phải cache. Cần Node 20
@@ -21,7 +21,7 @@ trở lên; CLI không có dependency. Cùng CLI đó chạy thẳng từ nhánh
 npx --package=github:starci183/starci-skills#main starci-skills init
 ```
 
-Profile mặc định là StarCi đầy đủ. Chọn entry riêng [StarCi Lite](skills/starci-lite/SKILL.md) bằng `npx @starci/skills init --profile lite`, hoặc đổi rõ profile của host đã cài bằng `update --profile lite`. Lite xử lý câu hỏi, tài liệu và sửa nhỏ trong một repo; tính năng phức tạp, UAT công khai chính thức và publication dùng entry đầy đủ. Mọi operator đầy đủ vẫn được cài. Update giữ profile đã chọn nếu không có override. Manifest ghi riêng `profile` và `bootstrapProfile`: `--no-bootstrap` giữ nguyên chỉ dẫn host và không nhận là đã đổi entry. Chỉ dẫn riêng bắt buộc full phải được xử lý rõ; installer không xóa chúng. Session full đang chạy giữ scope, bằng chứng và gate.
+Entry mặc định của bản cài mới là [StarCi Lite](skills/starci-lite/SKILL.md); skill này sở hữu cách phân loại theo mức tác động. Chọn full bằng `npx @starci/skills init --profile full`, hoặc đổi host đã cài sang Lite bằng `update --profile lite`. Mọi operator đầy đủ vẫn được cài. Update giữ profile đang cài, kể cả bản full cũ chưa có metadata profile. Manifest ghi riêng `profile` và `bootstrapProfile`: `--no-bootstrap` giữ nguyên chỉ dẫn host và không nhận là đã đổi entry. Chỉ dẫn riêng bắt buộc full phải được xử lý rõ; installer không xóa chúng. Session full đang chạy giữ scope, bằng chứng và gate.
 
 | Lệnh | Việc nó làm |
 | --- | --- |

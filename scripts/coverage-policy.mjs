@@ -48,7 +48,7 @@ const samePath = (left, right) => {
 function readPolicy(root, branchDir, request) {
   const policy = request.requirements.coveragePolicy;
   const schema = JSON.parse(readFileSync(path.join(root, 'templates/kinds/coverage.schema.json'), 'utf8'));
-  const errors = validateAgainst({ ...schema, $ref: '#/$defs/policyEvidence' }, policy, 'coveragePolicy');
+  const errors = validateAgainst({ $defs: schema.$defs, $ref: '#/$defs/policyEvidence' }, policy, 'coveragePolicy');
   if (errors.length) fail(errors.join('; '));
   const plan = request.requirements.gates;
   const units = Array.isArray(plan) ? plan.filter(gate => gate.gate === 'unit-coverage') : [];

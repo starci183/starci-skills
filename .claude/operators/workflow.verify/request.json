@@ -1,0 +1,7 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"workflow.verify request",
+  "$ref":"works:request",
+  "properties":{"operation":{"const":"workflow.verify"},"expected":{"minItems":1},"inputs":{"properties":{"files":{"minItems":1,"maxItems":1}}}},
+  "description":"Supply exactly one digest-bound peer snapshot containing the frozen task set, exact child goals, owned scopes, coordinator done-when mapping, session evidence locations and repository heads. Ordinary messages are not accepted as proof."
+}

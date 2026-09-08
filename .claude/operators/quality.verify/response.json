@@ -1,0 +1,8 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","title":"quality.verify response","$ref":"works:response",
+  "description":"A done response identifies the frozen head and preserves each gate command, exit status, measured coverage, applicable debt and final verdict. Red gate results remain visible and cannot be narrated as passing.",
+  "allOf":[{"if":{"properties":{"status":{"const":"done"}},"required":["status"]},"then":{"properties":{"outputs":{"allOf":[
+    {"contains":{"properties":{"id":{"const":"quality-verification"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"gate-results"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}}
+  ]},"observations":{"not":{"contains":{"properties":{"result":{"const":"failed"}},"required":["result"]}}}}}}]
+}

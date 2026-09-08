@@ -1,7 +1,7 @@
 // The one recorded way to start a product's dev server for a runtime entry.
 //
-//   node scripts/serve-runtime.mjs <worktree> <port> --log <file> [--command "<cmd>"] [--route <config.json>] [--clean] [--wait <ms>]
-//   node scripts/serve-runtime.mjs --stop <pidfile>
+//   node scripts/serve-runtime.mjs <worktree> <port> --branch <invocation> --log <file> [--command "<cmd>"] [--route <config.json>] [--clean] [--wait <ms>]
+//   node scripts/serve-runtime.mjs --stop <pidfile> --branch <invocation>
 //   node scripts/serve-runtime.mjs --status <pidfile>
 //
 // The server is detached: it outlives the branch that started it, because the audit or the journey
@@ -116,6 +116,7 @@ export function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--log') out.log = path.resolve(argv[++i]);
+    else if (a === '--branch') out.branch = path.resolve(argv[++i]);
     else if (a === '--command') out.command = argv[++i];
     else if (a === '--route') out.route = path.resolve(argv[++i]);
     else if (a === '--stop') out.stop = path.resolve(argv[++i]);
@@ -296,10 +297,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const args = parseArgs(process.argv.slice(2));
   const emit = (value) => process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
   try {
+    if (!args.status) {
+      const { assertRuntimeOperationAuthority } = await import('./runtime-operation-authority.mjs');
+      await assertRuntimeOperationAuthority(args);
+    }
     if (args.stop) emit(await stop(args.stop));
     else if (args.status) {
       let r = readRecord(args.status);
-      if (r && !r.listenerPid && alive(r.pid)) r = await recordListener(args.status, { wait: 0 });
       emit(r ? { ...r, alive: recordAlive(r, alive) } : { alive: false });
     } else emit(await start(args));
   } catch (e) {

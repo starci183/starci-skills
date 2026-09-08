@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "business.decide response",
+  "$ref": "works:response",
+  "properties": { "outputs": { "items": { "properties": { "type": { "enum": ["text", "file"] } } } } },
+  "allOf": [{ "if": { "properties": { "status": { "const": "done" } }, "required": ["status"] }, "then": { "properties": {
+    "outputs": { "allOf": [
+      { "contains": { "properties": { "id": { "const": "business-promise-authority" }, "type": { "const": "file" }, "file": { "properties": { "mediaType": { "const": "text/markdown" } } } }, "required": ["id", "type", "file"] } },
+      { "contains": { "properties": { "id": { "const": "restatement" }, "type": { "const": "file" }, "file": { "properties": { "mediaType": { "const": "text/markdown" } } } }, "required": ["id", "type", "file"] } },
+      { "contains": { "properties": { "id": { "const": "claims" }, "type": { "const": "file" }, "file": { "properties": { "mediaType": { "const": "application/json" } } } }, "required": ["id", "type", "file"] } },
+      { "contains": { "properties": { "id": { "const": "coverage-matrix" }, "type": { "const": "file" }, "file": { "properties": { "mediaType": { "const": "application/json" } } } }, "required": ["id", "type", "file"] } },
+      { "contains": { "properties": { "id": { "const": "model" }, "type": { "const": "file" }, "file": { "properties": { "mediaType": { "const": "application/json" } } } }, "required": ["id", "type", "file"] } }
+    ] }, "observations": { "not": { "contains": { "properties": { "result": { "const": "failed" } }, "required": ["result"] } } }
+  } } }],
+  "description": "A done response contains the confirmed restatement, claims, complete coverage matrix, published model and authority receipt. Blocked or mismatch responses publish no model head."
+}

@@ -1,0 +1,32 @@
+Use case: ui-mockup
+Asset type: high-fidelity responsive product UI direction
+Primary request: Revise Image 1, the existing Nivo Accounting workbench desktop screen, into a polished mobile web layout for a single 390 CSS-pixel-wide viewport. Produce a straight-on full-page mobile interface screenshot, portrait and scrollable in intent, with no phone hardware or decorative background. Keep the same product, facts, actions, and calm accounting tone while reorganizing the information for thumb-friendly use.
+Input images: Image 1 is the edit target and visual baseline. Preserve its product identity and content semantics while changing the responsive layout.
+
+Mobile information architecture:
+1. Compact header with “Accounting workbench”, the green “Applied setup” status, and a small “Ledger v7” label.
+2. A strong balance card showing “VND 128,450,000” and “Current immutable balance”. Keep “Immutable snapshot (view-only)” with a lock icon, concise “As of 30 Sep 2026” context, a ledger-version field, and touch-friendly “View as of” / “Return to current” controls. Include “Audit details” as a secondary action.
+3. Surface the amber “1 pending” correction card early, with “Reclassify consulting fee”, “26 Sep 2026”, and “View all pending corrections”. State clearly and compactly that a pending proposal has no ledger effect until distinct approval.
+4. Make “Documents” the primary work list. Use horizontal filter chips/tabs “All (3)”, “Draft (1)”, “Submitted (1)”, “Approved (1)”, “Posted (1)”. Replace the desktop table with three stacked document cards, each with a file icon, filename, amount, month, classification, owner, update time, and colored status pill: “Invoice_0926.pdf” / “25,000,000” / Expense / Sep 2026 / Submitted / Business owner / 26 Sep 2026 10:15; “Bank_Statement_0926.xlsx” / “15,000,000” / Expense / Sep 2026 / Approved / Financial approver / 26 Sep 2026 14:32; “Utility_Bill_0926.pdf” / “2,500,000” / Expense / Sep 2026 / Posted / System / 26 Sep 2026 14:40. Include “View all documents”. Do not render a squeezed multi-column table.
+5. Follow with focused mobile action cards: “Add evidence document” with choose-file, classification, amount, accounting month, optional notes, and a full-width “Add document” button; “Propose correction” with “-5,000,000”, correction reason, and “Submit correction proposal”; “Reconciliation” with source balance “-128,450,000” and “Save reconciliation”; “Close period” for Sep 2026 with a visibly disabled “Close period” button.
+6. Finish with compact “Applied context” and “Accounting setup” disclosure cards. Preserve Immutable ledger / Ledger v7, As of / 30 Sep 2026 23:59, Owner / Business owner, Approver / Financial approver, Setup status / Applied, plus Verified owner continuity, Verified approver continuity, Applied configuration, and “View setup details”.
+
+Interaction and business semantics: retain only the supported accounting operations visible in the baseline and grounded contract. Documents progress Draft → Submitted → Approved → Posted. Approval is performed by the distinct financial approver; never imply self-approval or autonomous assistant approval. Posted ledger history is immutable. A correction proposal remains Pending with zero ledger effect until distinct approval appends a correction entry. Reconciliation is VND-scoped at the current ledger high-water and accepts signed or zero source amounts. Period close remains an owner action and is disabled in this shown state. Controls should look like native web inputs, tabs, buttons, status badges, and disclosure rows backed by live server data.
+
+Visual execution: 390 CSS-pixel mobile intent, single column, 16px side gutters, minimum 44px touch targets, readable 15–16px body type, clear 8px spacing rhythm, white background, white cards, 1px warm-gray borders, subtle radius and shadow, near-black headings, muted gray helper text, navy-blue primary buttons, outline secondary buttons, green success badges, blue submitted badge, amber pending accents. Keep dense information scannable without tiny text. Use no gradients, no illustrations, no extra metrics, no bottom navigation, no invented business actions, and no desktop sidebar.
+
+Preserve checklist (verbatim from request):
+- Preserve the Nivo Accounting workbench identity, restrained white card system, thin gray borders, compact sans-serif typography, dark navy primary actions, green applied/approved/posted states, and amber pending state.
+- Preserve the immutable view-only ledger model, Ledger v7, the VND balance, the as-of snapshot controls, and the separation between current and historical views.
+- Preserve the document lifecycle labels Draft, Submitted, Approved, and Posted, plus evidence intake, pending correction, correction proposal, reconciliation, period close, audit details, applied context, and accounting setup.
+- Preserve explicit four-eyes semantics: owner and financial approver remain distinct, approval is explicit, and no self-approval is implied.
+- Preserve the baseline sample amounts, dates, document names, classifications, owners, and status labels where they remain visible.
+- Preserve native-control and live-data intent; this image is a design direction, not evidence of implemented interaction.
+
+Change checklist (verbatim from request):
+- Recompose the interface for a single 390 CSS-pixel-wide mobile viewport with comfortable touch targets, a clear vertical reading order, and scrollable page depth.
+- Replace the seven-column desktop document table with stacked document cards under horizontally scrollable status filters; never squeeze the desktop table into the narrow viewport.
+- Move the desktop right rail into the main flow as compact mobile cards or disclosure sections, surfacing the one pending correction before lower-priority setup details.
+- Group long forms into focused mobile action cards with full-width inputs and buttons while keeping destructive or unavailable period close visibly disabled until its prerequisite state is met.
+
+Output constraints: one polished raster UI direction only; portrait mobile screenshot; preserve exact spelling of visible labels and filenames where possible; no watermark; no annotations outside the UI; no claim that this is implemented.

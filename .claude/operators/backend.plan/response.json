@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "backend.plan response",
+  "$ref": "works:response",
+  "properties": { "outputs": { "items": { "properties": { "type": { "enum": ["text", "file"] } } } } },
+  "allOf": [{
+    "if": { "properties": { "status": { "const": "done" } }, "required": ["status"] },
+    "then": { "properties": { "outputs": { "allOf": [
+      { "contains": { "properties": { "id": { "const": "backend-plan" }, "type": { "const": "file" }, "file": { "properties": { "mediaType": { "const": "text/markdown" } } } }, "required": ["id", "type", "file"] } },
+      { "contains": { "properties": { "id": { "const": "units" }, "type": { "const": "file" }, "file": { "properties": { "mediaType": { "const": "application/json" } } } }, "required": ["id", "type", "file"] } }
+    ] }, "observations": { "not": { "contains": { "properties": { "result": { "const": "failed" } }, "required": ["result"] } } } } }
+  }],
+  "description": "A done response contains a complete module partition and its matching machine-readable units. If any contract operation cannot be assigned, return mismatch with no partial plan."
+}

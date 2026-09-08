@@ -1,0 +1,7 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"git.publish request",
+  "$ref":"works:request",
+  "properties":{"operation":{"const":"git.publish"},"expected":{"minItems":1},"inputs":{"properties":{"files":{"minItems":3}}}},
+  "description":"Bind the verified workspace route, exact changes boundary, passing quality evidence, current remote observation and an existing approval for this boundary. An optional annotated tag must be explicitly named and authorized."
+}

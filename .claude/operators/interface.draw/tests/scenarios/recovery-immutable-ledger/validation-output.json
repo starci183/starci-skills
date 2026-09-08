@@ -1,0 +1,70 @@
+{
+  "operator": ".dist/operators/interface.draw.json",
+  "workRoot": ".claude/operators/interface.draw/tests/scenarios/recovery-immutable-ledger",
+  "dependencyPath": "C:/Users/Hi/Documents/Codex/2026-09-08/new-chat/work/schema-validation-deps",
+  "requestValidation": {
+    "machinePassed": true,
+    "passed": [
+      "request-shape",
+      "request-files",
+      "visual-inheritance"
+    ],
+    "failures": []
+  },
+  "rejectedResponseValidation": {
+    "responseId": "response-recovery-immutable-ledger-001",
+    "status": "mismatch",
+    "machinePassed": true,
+    "passed": [
+      "request-shape",
+      "request-files",
+      "response-shape",
+      "request-binding",
+      "unique-outputs",
+      "output-files",
+      "direction-png",
+      "visual-inheritance",
+      "generation-binding",
+      "prompt-content",
+      "observation-binding"
+    ],
+    "failures": []
+  },
+  "correctedResponseValidation": {
+    "responseId": "response-recovery-immutable-ledger-002",
+    "status": "done",
+    "machinePassed": true,
+    "passed": [
+      "request-shape",
+      "request-files",
+      "response-shape",
+      "request-binding",
+      "unique-outputs",
+      "output-files",
+      "direction-png",
+      "visual-inheritance",
+      "generation-binding",
+      "prompt-content",
+      "observation-binding"
+    ],
+    "failures": []
+  },
+  "reviewRequired": [
+    "brief-fidelity",
+    "visual-quality",
+    "implementation-feasibility",
+    "generation-provenance",
+    "visual-continuity"
+  ],
+  "manualReview": {
+    "attempt-001": "rejected",
+    "attempt-002": "accepted for this design-artifact scenario"
+  },
+  "budgets": {
+    "imageCallsUsed": 2,
+    "imageCallsAllowed": 2,
+    "responseRepairsUsed": 1,
+    "responseRepairsAllowed": 1,
+    "responseRepairNote": "The first draft mismatch response pointed observation evidenceIds at an output id. The validator requires evidence records there. The response metadata was repaired by using empty evidenceIds, matching the checked-in mismatch example; no prompt or image bytes changed."
+  }
+}

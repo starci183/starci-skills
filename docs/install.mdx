@@ -19,12 +19,13 @@ It does four things and reports each:
 1. copies the runtime paths into `./.claude` — `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`,
    `routing.json`, `alias/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`,
    `templates/`, `workflows/`;
-2. writes `CLAUDE.md`, which Claude Code reads, and `AGENTS.md`, which Codex reads, when they do not
-   exist. Both carry the same bootstrap: read `.claude/INDEX.md` completely and follow its load
-   order. An existing file that already routes there is kept; one that does not is reported, never
-   edited;
+2. writes `CLAUDE.md`, which Claude Code reads, and `AGENTS.md`, which Codex reads. New installations
+   enter `.claude/skills/starci-lite/SKILL.md` for impact-based classification; `--profile full`
+   selects `.claude/INDEX.md`. Existing custom instructions are preserved and the managed entry is
+   added or updated once. Conflicting custom full-only instructions require an explicit resolution
+   before switching to Lite;
 3. adds `.worktrees/sessions/` to `.gitignore`, because sessions live under
-   `<Source>/.worktrees/sessions/` and are never committed;
+   the declared project workflow owner and are never committed;
 4. writes `.claude/.starci-skills.json`, the manifest: the installed version and one hash per file.
 
 The package is also runnable straight from a git tag, which is the same tree at the same commit;
@@ -57,6 +58,10 @@ manifest — a file a person changed locally — is kept and listed; `--force` t
 of it. Files outside the runtime paths, such as a `tests/` folder or notes, are never touched. The
 manifest is rewritten afterwards.
 
+Updates retain the installed profile, including legacy full installations without profile metadata.
+Use `--profile lite` or `--profile full` for an explicit switch. Existing full sessions retain their
+scope and evidence; choosing Lite does not convert them into Lite work.
+
 ## Doctor
 
 ```bash
@@ -76,5 +81,6 @@ listed file or run `update --force` on it.
 | --- | --- | --- |
 | `--dir <repo>` | all | The repository root; default is the current directory. |
 | `--force` | `init`, `update` | `init`: replace the runtime paths inside a `.claude` this package did not install. `update`: take the package version of locally changed files. |
-| `--no-bootstrap` | `init` | Do not write `CLAUDE.md`, `AGENTS.md` or the `.gitignore` line. |
+| `--profile full\|lite` | `init`, `update` | Choose the entry explicitly. New installs default to Lite; existing installs retain their profile. |
+| `--no-bootstrap` | `init`, `update` | Do not write `CLAUDE.md`, `AGENTS.md` or the `.gitignore` line. |
 | `--quick` | `doctor` | Routing, alias and operators only. |

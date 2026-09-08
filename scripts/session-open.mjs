@@ -115,7 +115,8 @@ export async function openSession(sessionsRoot, input, { sourceRoot = path.dirna
     const reused = await findReusable(sessionsRoot, input.hostBinding);
     if (reused) {
       if (reused.state.runtimeRevision !== RUNTIME_REVISION) throw Error('WORKFLOW_RESET_REQUIRED: archive the old host ledger before opening a fresh current session');
-      const ownerErrors = workflowOwnerErrors(path.join(sourceRoot, '.claude'), reused.session, reused.state, { dispatch: true });
+      const authorityRoot = sameRoot(sourceRoot, path.dirname(root)) ? root : path.join(sourceRoot, '.claude');
+      const ownerErrors = workflowOwnerErrors(authorityRoot, reused.session, reused.state, { dispatch: true });
       if (ownerErrors.length) throw Error(ownerErrors.join('\n'));
       const existingMode = workflowTopologyMode(topologyPolicy, reused.state);
       if (existingMode === undefined) throw Error('WORKFLOW_RESET_REQUIRED: missing current topology; archive the old ledger and open a fresh session');

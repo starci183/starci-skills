@@ -35,7 +35,7 @@ Các gate này chỉ kiểm giao tiếp; qua gate không cấp quyền thực hi
 
 Các ví dụ là định hướng, không ép một định dạng cho mọi việc. Đọc contract và mode của operator: hiện expected so với actual, coverage và bước tiếp cạnh kết quả được chọn. Kết quả được chọn giúp đánh giá kết quả, kể cả lỗi quan trọng. Operator kiểm xong vẫn có thể kết luận đối tượng bị kiểm không đạt. Dry-run là đề xuất; reuse/no-op là trạng thái không đổi đã quan sát; rollback là khôi phục. Tổng quan kết quả phải hiện đủ dù chỉ nhúng một artifact đại diện.
 
-Sources: [Bằng chứng tương tác](../tests/evidence/20260904-interaction.md), [Review diễn giải được ủy quyền](../tests/evidence/20260907-delegated-restatement-review.md).
+Sources: [Bằng chứng tương tác](../tests/evidence/20260904-interaction.md), [Review diễn giải được ủy quyền](../tests/evidence/20260907-delegated-restatement-review.md), [Tiếp tục trong phạm vi đã duyệt](../tests/evidence/20260908-authorized-continuation.md).
 
 ## Danh tính lời nói lại
 
@@ -46,6 +46,18 @@ interaction bị chặn dùng đúng id đó. Digest chỉ chuẩn hóa xuống 
 lưu đáp án. Request vào lại gọi nhánh bị chặn và lựa chọn của nó; không dùng lời đọc của phiên bản
 mục tiêu khác. Lựa chọn và receipt trước giữ nguyên. Context invocation giữ lựa chọn tại lúc mở,
 vì vậy câu hỏi lịch sử đã được trả lời không bị hiểu là yêu cầu hỏi lại.
+
+Trước khi chuyển interaction bị chặn này cho người, áp dụng `interaction.json#delegatedRestatement`.
+Với diễn giải không đổi đã được cấp quyền, orchestrator sở hữu session ghi
+`node scripts/restatement-choice.mjs scope-review <blocked-branch> <review.json>` theo
+[restatement-delegated-review.schema.json](../templates/kinds/restatement-delegated-review.schema.json),
+với `selectedBy: orchestrator` và không có trường delegation hay coordinator. Đây là quyết định
+trong scope có trách nhiệm, không phải đáp án của người hay cấp quyền cho agent khác. Căn cứ được giữ
+gắn host sở hữu, đúng mission đã xác nhận và request/bản đọc niêm phong; gate review chung kiểm từng
+ánh xạ dòng, nhận định rõ ràng, loại trừ và không có thay đổi đáng kể. Đối chiếu diễn giải với thông
+điệp cấp quyền thật và scope đóng băng; hash gắn evidence chứ không chứng minh tương đương ngữ nghĩa.
+Nếu cách hiểu chưa rõ hoặc thay đổi đáng kể hành vi hay tác động, dùng đường hỏi người. Giữ nguyên
+quyết định đã có cho đúng bản đọc, không thay thế nó.
 
 Người dùng có thể uỷ quyền rõ ràng cho coordinator có danh tính để review bản đọc không đổi trong
 scope. Ghi grant bằng `node scripts/restatement-choice.mjs delegate <session> <grant.json>`, theo

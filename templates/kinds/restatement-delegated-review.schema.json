@@ -6,8 +6,6 @@
     "selected",
     "selectedBy",
     "sourceRef",
-    "delegationId",
-    "coordinatorSession",
     "requestHash",
     "restatementHash",
     "scopeHash",
@@ -21,7 +19,10 @@
       "const": "as-stated"
     },
     "selectedBy": {
-      "const": "coordinator"
+      "enum": [
+        "coordinator",
+        "orchestrator"
+      ]
     },
     "sourceRef": {
       "type": "string",
@@ -130,5 +131,32 @@
         "minLength": 1
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "selectedBy": {
+            "const": "coordinator"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "delegationId",
+          "coordinatorSession"
+        ]
+      },
+      "else": {
+        "properties": {
+          "delegationId": {
+            "const": null
+          },
+          "coordinatorSession": {
+            "const": null
+          }
+        }
+      }
+    }
+  ]
 }

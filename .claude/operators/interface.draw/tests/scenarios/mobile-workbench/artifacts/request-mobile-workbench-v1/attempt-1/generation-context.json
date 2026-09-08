@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "requestId": "request-mobile-workbench-v1",
+  "attemptId": "attempt-1",
+  "mode": "revise",
+  "baseline": {
+    "path": "context/baseline.png",
+    "sha256": "sha256:979c9221521f73caef2b6e340545e31d0d2f566f44e84e737391e2e8057a3934",
+    "mediaType": "image/png"
+  },
+  "prompt": {
+    "path": "artifacts/request-mobile-workbench-v1/attempt-1/generation-prompt.txt",
+    "sha256": "sha256:7ca559fc40965e37a0e7d4aa9471e82deb1f1c4bb1a81e33c0809145568ec4d1",
+    "mediaType": "text/plain"
+  },
+  "image": {
+    "path": "artifacts/request-mobile-workbench-v1/attempt-1/direction.png",
+    "sha256": "sha256:2a39bd221398a731f73a50d1d6738705437b31a6167f81a4d7f103580a1c892b",
+    "mediaType": "image/png"
+  }
+}

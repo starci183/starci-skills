@@ -17,6 +17,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { assertRuntimeUpdateCompatible } from '../scripts/runtime-compatibility.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
@@ -57,7 +58,9 @@ const LITE_BOOTSTRAP = BOOTSTRAP.replace(PROMPT_ENTRY, LITE_ENTRY)
   .replace('Read [\`<Source>/.claude/INDEX.md\`](.claude/INDEX.md) completely and follow its load order.',
     'Read [StarCi Lite](.claude/skills/starci-lite/SKILL.md) first; it routes complex work to the full entry.');
 function selectedProfile(opts, manifest) {
-  const profile = opts.profile ?? manifest?.profile ?? 'full';
+  // Missing profile metadata belongs to an existing full installation; only a new
+  // host receives the lightweight entry by default.
+  const profile = opts.profile ?? (manifest ? manifest.profile ?? 'full' : 'lite');
   if (!['full', 'lite'].includes(profile)) throw new Error('profile must be full or lite');
   return profile;
 }
@@ -182,6 +185,7 @@ export function init(opts, log = console.log) {
   if (existsSync(target) && readdirSync(target).length && !manifest && !opts.force) {
     throw new Error(`${target} exists and was not installed by ${pkg.name}; move it away or pass --force to replace the runtime paths inside it`);
   }
+  assertRuntimeUpdateCompatible({ sourceRoot: repo, installedRoot: target, incomingRoot: packageRoot });
   if (manifest) log(`re-installing over ${manifest.name}@${manifest.version} (use "update" to keep local changes)`);
   mkdirSync(target, { recursive: true });
   copyPayload(target);
@@ -202,6 +206,7 @@ export function update(opts, log = console.log) {
   const locallyChanged = Object.entries(before).filter(([rel, h]) => manifest.files[rel] && manifest.files[rel] !== h).map(([rel]) => rel);
   const locallyAdded = Object.keys(before).filter((rel) => !manifest.files[rel]);
   const saved = Object.fromEntries([...locallyChanged, ...locallyAdded].map((rel) => [rel, readFileSync(path.join(target, rel))]));
+  assertRuntimeUpdateCompatible({ sourceRoot: opts.dir, installedRoot: target, incomingRoot: packageRoot });
   copyPayload(target);
   const kept = [];
   if (!opts.force) {
@@ -260,8 +265,9 @@ init    copies the runtime into <repo>/.claude, adds the StarCi entry once to CL
 update  replaces the runtime paths with this version; a file changed locally is kept and listed
         (resources/settings.json is the person's own and is never part of the package)
         unless --force. Files outside the runtime paths are never touched.
-profile full is the default. Lite is an explicit separate entry for bounded work; all full operators
-        remain installed. Update retains the installed profile unless --profile explicitly changes it.
+profile lite is the default for new installations; its entry classifies work and routes complex
+        missions to full StarCi. All full operators remain installed. Explicit full selections and
+        existing installations retain their profile unless --profile explicitly changes it.
         Custom host rules are preserved; --no-bootstrap leaves their entry routing under your control.
         Active full workflows retain their existing scope, evidence and gates.
 doctor  runs the tree's own validators on the installed copy and reports local drift.

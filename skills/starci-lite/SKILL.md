@@ -1,18 +1,18 @@
 ---
 name: starci-lite
-description: Make small, local code or documentation changes with a compact scope, focused verification, and a short handoff. Use for bounded maintenance; route multi-repository features, important business flows, security, data migrations, and release work to full StarCi when available.
+description: Answer repository questions and make bounded, low-impact code or documentation changes with focused verification. Route multi-repository features, important business flows, security, accounting, migrations, runtime and publication work to full StarCi when available.
 ---
 
 # StarCi Lite
 
-Use a short work loop for a small change in one known repository. This is a separate entry, not a reduced set of full StarCi receipts. Do not claim full workflow, audit or UAT completion from Lite evidence.
+Use this entry to classify new work, answer questions directly and run a short work loop for a small change in one known repository. Preserve an explicit full selection, the installed profile and an active full session. This is a separate entry, not a reduced set of full StarCi receipts. Do not claim full workflow, audit or UAT completion from Lite evidence.
 
 ## Choose the amount of process
 
 - For a question or explanation, answer directly. Read source only when the answer needs it. Do not create a session, plan, worker or receipt merely to answer.
 - For a typo, documentation edit or isolated presentation adjustment, state the intended edit briefly, inspect the relevant files, edit and check the result. No formal session is needed when the host permits Lite.
 - For a small behavior fix, identify the observable failure, affected route or API, source boundary and proof needed. Keep this in the conversation; use the existing issue or change description if durable context is useful.
-- Use full StarCi for a feature spanning repositories, an important end-to-end business journey, permission or tenant isolation changes, accounting/payment behavior, destructive data changes, migration, infrastructure, publication or deployment. A small diff can still have a large impact.
+- Use full StarCi for a feature spanning repositories, an important end-to-end business journey, permission or tenant isolation changes, accounting/payment behavior, destructive data changes, migration, infrastructure, runtime operation, publication or deployment. A small diff can still have a large impact.
 
 If the request is clearly authorized and the repository and scope are known, proceed. Ask only when ambiguity changes the target, behavior, external effects or acceptance criteria. An increased scope requires reclassification before the additional writes, not an extra approval for an already authorized step.
 

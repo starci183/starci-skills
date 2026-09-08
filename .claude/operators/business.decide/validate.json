@@ -1,0 +1,15 @@
+{
+  "machine": [
+    { "id": "request-shape", "check": "request-schema", "phase": "request" }, { "id": "request-files", "check": "input-files", "phase": "request" },
+    { "id": "response-shape", "check": "response-schema", "phase": "response" }, { "id": "request-binding", "check": "request-binding", "phase": "response" },
+    { "id": "unique-outputs", "check": "unique-output-ids", "phase": "response" }, { "id": "output-files", "check": "output-files", "phase": "response" },
+    { "id": "observation-binding", "check": "observation-references", "phase": "response" }
+  ],
+  "review": [
+    { "id": "restatement-confirmed", "instruction": "Verify the promise was restated in the requester's language, quotes the source promise verbatim, and was explicitly confirmed before claims, matrix or model were authored. A correction becomes a new bound request." },
+    { "id": "claims-grounded", "instruction": "Verify intent, fact, assumption and contradiction are separated; each fact cites role, source path, line range and frozen head; examples and screenshots are not promoted to truth; unresolved contradictions block." },
+    { "id": "coverage-closed", "instruction": "Verify every declared dimension and every discovered consumer appears exactly once. Mandatory actor eligibility, offer entry, read entry, purchase side effect, settlement, idempotency, entitlement consumer and denial are not marked not-applicable; each enforcing row rests on a fact claim; legacy create, read and settle are disposed separately when present." },
+    { "id": "publication-legal", "instruction": "Verify target is pending, in-progress or rejected; lineage transition is legal and matches prior and new state; feature id, claims fingerprint and coverage fingerprint agree across receipt and model; publication is lease-protected, content-addressed and updates only this feature head. A blocked response publishes nothing." }
+  ],
+  "failurePolicy": "Record the exact unsupported claim, missing dimension or consumer, contradiction, invalid transition or publication conflict. Repair only the responsible analysis step and reassess; never publish over a failed criterion or repeat a completed external write."
+}

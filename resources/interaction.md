@@ -35,7 +35,7 @@ proposed questions. These gates validate communication only; passing them author
 
 The examples are guidance, not a format assigned to every job. Read the operator contract and mode: show expected versus actual, scope coverage and the next action alongside the chosen result. The selected result is useful for judging the outcome, including diagnostic failures. A verifier may be done while its subject fails. Dry-run is proposed; reuse/no-op is an observed unchanged state; rollback is restoration. The full result summary must remain visible even when only one representative artifact is embedded.
 
-Sources: [Interaction evidence](../tests/evidence/20260904-interaction.md), [Delegated restatement review](../tests/evidence/20260907-delegated-restatement-review.md).
+Sources: [Interaction evidence](../tests/evidence/20260904-interaction.md), [Delegated restatement review](../tests/evidence/20260907-delegated-restatement-review.md), [Authorized continuation](../tests/evidence/20260908-authorized-continuation.md).
 
 ## Restatement identity
 
@@ -47,6 +47,18 @@ receipt and its evidence inventory before retaining the answer. A resumed reques
 branch and its choice; it cannot reuse a reading from another mission version. The former choice and
 receipt stay unchanged. The invocation context preserves the choices available when it opened, so
 an answered historical question is not mistaken for a new request to ask again.
+
+Before forwarding this blocked interaction to the user, apply `interaction.json#delegatedRestatement`.
+For an already authorized unchanged interpretation, the owning orchestrator records
+`node scripts/restatement-choice.mjs scope-review <blocked-branch> <review.json>` using
+[restatement-delegated-review.schema.json](../templates/kinds/restatement-delegated-review.schema.json)
+with `selectedBy: orchestrator` and no delegation or coordinator fields. This is an accountable
+within-scope decision, not a user answer or a grant to another agent. Its retained basis binds the
+owning host, exact confirmed mission and sealed request/reading; the shared review gate checks every
+line mapping, explicit judgment, exclusions and absence of material changes. Review the interpretation
+against the actual authorizing message and frozen scope; hashes bind evidence and do not prove
+semantic equivalence. If the interpretation remains unresolved or materially changes behavior or
+effects, use the user path. Preserve an existing exact decision instead of replacing it.
 
 An actual user may explicitly delegate review of unchanged in-scope readings to a named coordinator.
 Record that grant with `node scripts/restatement-choice.mjs delegate <session> <grant.json>`,

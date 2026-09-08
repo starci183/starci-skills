@@ -55,8 +55,11 @@ function clause(mission,pointer,rule){
 }
 async function reviewBinding(root,session,state,branch,review,{fresh=true}={}){
  schema(root,'delegated-review',review);const rule=policy(root),scope={sessionId:state.id,missionVersion:review.goalVersion,scopeHash:review.scopeHash};
- const record=approved(session,state,scope,root),grant=grantOf(root,session,state,review.delegationId,scope,{fresh});
- if(path.resolve(review.coordinatorSession)!==path.resolve(grant.grant.coordinatorSession)||(fresh&&realpathSync(review.coordinatorSession)!==grant.coordinator.session))fail('decision was not reviewed by the delegated coordinator');
+ const record=approved(session,state,scope,root),withinScope=review.selectedBy===rule.scopeReviewSource;
+ const grant=withinScope ? {grant:{operators:rule.operators},coordinator:{session:realpathSync(session),sessionId:state.id,hostBinding:state.hostBinding}} : grantOf(root,session,state,review.delegationId,scope,{fresh});
+ if(withinScope){
+  if(!state.hostBinding?.hostId||!state.hostBinding?.kind)fail('scope review requires the owning host identity');
+ }else if(path.resolve(review.coordinatorSession)!==path.resolve(grant.grant.coordinatorSession)||(fresh&&realpathSync(review.coordinatorSession)!==grant.coordinator.session))fail('decision was not reviewed by the delegated coordinator');
  const request=json(path.join(branch,'request/request.json')),response=json(path.join(branch,'response/response.json')),cell=`${request.step}/${request.parallel}`,attempt=state.attempts?.[cell];
  if(!grant.grant.operators.includes(request.operatorId)||request.exchange||request.expected?.goalVersion!==review.goalVersion)fail('operator or mission is outside the delegation');
  if(attempt?.status!=='blocked'||attempt.id!==request.attempt.id||response.stop!=='RESTATEMENT_UNCONFIRMED'||response.status!=='blocked')fail('review needs the exact accepted blocked reading');
@@ -74,23 +77,31 @@ async function reviewBinding(root,session,state,branch,review,{fresh=true}={}){
  return{decisionId,request,grant};
 }
 export async function recordDelegatedRestatementReview(root,branch,review){
+ if(review?.selectedBy!=='coordinator')fail('delegated-review requires the actual coordinator decision');
+ return recordReview(root,branch,review);
+}
+export async function recordScopeRestatementReview(root,branch,review){
+ if(review?.selectedBy!==policy(root).scopeReviewSource)fail('scope-review requires the owning orchestrator decision, never a user answer');
+ return recordReview(root,branch,review);
+}
+async function recordReview(root,branch,review){
  branch=path.resolve(branch);const session=path.dirname(path.dirname(branch));
  return mutateSession(session,async state=>{
   const binding=await reviewBinding(root,session,state,branch,review);
   const {validateStep}=await import('./validate-step.mjs');const checked=await validateStep(root,branch,{operator:true,requestPhase:'accept'});if(checked.errors.length)fail(checked.errors.join('\n'));
   const rule=policy(root),value={version:1,review,mission:state.missionSnapshots[review.goalVersion],coordinator:binding.grant.coordinator};
   const existing=state.choices?.[binding.decisionId];
-  if(existing){if(existing.selectedBy!=='coordinator'||!same(readContext(session,existing.basis,rule.reviewContext),value))fail('preserve the original answer or delegated decision');return{decisionId:binding.decisionId,...existing};}
-  const basis=await retainContext(session,rule.reviewContext,value),choice={selected:review.selected,selectedBy:'coordinator',sourceRef:review.sourceRef,basis};
+  if(existing){if(existing.selectedBy!==review.selectedBy||!same(readContext(session,existing.basis,rule.reviewContext),value))fail('preserve the original answer or reviewed decision');return{decisionId:binding.decisionId,...existing};}
+  const basis=await retainContext(session,rule.reviewContext,value),choice={selected:review.selected,selectedBy:review.selectedBy,sourceRef:review.sourceRef,basis};
   state.choices??={};state.choices[binding.decisionId]=choice;return{decisionId:binding.decisionId,...choice};
  });
 }
 export async function delegatedRestatementErrors(root,branch,state,request,{phase='predispatch'}={}){
- const choice=state.choices?.[request.decisionId];if(choice?.selectedBy!=='coordinator')return[];
+ const choice=state.choices?.[request.decisionId];if(!['coordinator',policy(root).scopeReviewSource].includes(choice?.selectedBy))return[];
  try{
   if(!request.resume||request.exchange||!String(request.decisionId).startsWith('restatement:'))fail('delegation authorizes only a same-scope restatement continuation');
   const session=path.dirname(path.dirname(branch)),rule=policy(root),record=readContext(session,choice.basis,rule.reviewContext);
-  if(!same(record.mission,state.missionSnapshots?.[request.expected?.goalVersion])||choice.selected!=='as-stated'||choice.sourceRef!==record.review.sourceRef||record.review.selectedBy!=='coordinator')fail('decision differs from the retained coordinator review');
+  if(!same(record.mission,state.missionSnapshots?.[request.expected?.goalVersion])||choice.selected!=='as-stated'||choice.sourceRef!==record.review.sourceRef||record.review.selectedBy!==choice.selectedBy)fail('decision differs from the retained scope or coordinator review');
   const previous=path.join(session,`step-${request.resume.step}/parallel-${request.resume.parallel}`);
   const binding=await reviewBinding(root,session,state,previous,record.review,{fresh:phase!=='accept'});
   if(binding.decisionId!==request.decisionId||request.operatorId!==binding.request.operatorId||request.expected?.goalVersion!==record.review.goalVersion||request.selectedOption!==choice.selected)fail('decision cannot be reused for a different reading/operator/goal');

@@ -19,11 +19,12 @@ việc và báo từng việc:
 1. chép các đường dẫn runtime vào `./.claude` — `INDEX.md`, `INDEX.vi.md`, `SKILL.md`, `SKILL.vi.md`,
    `routing.json`, `alias/`, `knowledge/`, `operators/`, `readiness/`, `resources/`, `scripts/`,
    `templates/`, `workflows/`;
-2. viết `CLAUDE.md`, file Claude Code đọc, và `AGENTS.md`, file Codex đọc, khi chúng chưa có. Cả hai
-   mang cùng một đoạn bootstrap: đọc trọn `.claude/INDEX.md` và theo thứ tự nạp của nó. File đã có và
-   đã trỏ về đó thì được giữ nguyên; file chưa trỏ thì được báo, không bao giờ bị sửa;
+2. viết `CLAUDE.md`, file Claude Code đọc, và `AGENTS.md`, file Codex đọc. Bản cài mới vào
+   `.claude/skills/starci-lite/SKILL.md` để phân loại theo tác động; `--profile full` chọn
+   `.claude/INDEX.md`. Chỉ dẫn riêng được giữ nguyên, entry do installer quản lý chỉ được thêm hoặc
+   cập nhật một lần. Chỉ dẫn riêng bắt buộc full cần được xử lý rõ trước khi chuyển sang Lite;
 3. thêm `.worktrees/sessions/` vào `.gitignore`, vì phiên làm việc nằm dưới
-   `<Source>/.worktrees/sessions/` và không bao giờ được commit;
+   workflow owner đã khai báo của dự án và không bao giờ được commit;
 4. ghi `.claude/.starci-skills.json`, tức manifest: phiên bản đã cài và một hash cho mỗi file.
 
 Gói cũng chạy thẳng được từ một tag git, vẫn là cây đó ở đúng commit đó; dùng cách này khi registry
@@ -55,6 +56,10 @@ npx @starci/skills update
 đã sửa tay, được giữ lại và liệt kê; `--force` lấy bản của gói cho file đó. File ngoài các đường dẫn
 runtime, như thư mục `tests/` hay ghi chú, không bao giờ bị đụng. Manifest được ghi lại sau đó.
 
+Update giữ profile đang cài, kể cả bản full cũ chưa có metadata profile. Dùng `--profile lite` hoặc
+`--profile full` để chuyển rõ ràng. Session full đang chạy giữ scope và bằng chứng; chọn Lite không
+chuyển session đó thành công việc Lite.
+
 ## Doctor
 
 ```bash
@@ -74,5 +79,6 @@ vụ sẽ chạy trên đó không phải cây mà validator chấp nhận; hãy
 | --- | --- | --- |
 | `--dir <repo>` | tất cả | Gốc repository; mặc định là thư mục hiện tại. |
 | `--force` | `init`, `update` | `init`: thay các đường dẫn runtime bên trong một `.claude` không do gói này cài. `update`: lấy bản của gói cho file đã sửa tay. |
-| `--no-bootstrap` | `init` | Không viết `CLAUDE.md`, `AGENTS.md` hay dòng `.gitignore`. |
+| `--profile full\|lite` | `init`, `update` | Chọn entry rõ ràng. Bản cài mới mặc định Lite; bản đã cài giữ profile. |
+| `--no-bootstrap` | `init`, `update` | Không viết `CLAUDE.md`, `AGENTS.md` hay dòng `.gitignore`. |
 | `--quick` | `doctor` | Chỉ routing, alias và operator. |

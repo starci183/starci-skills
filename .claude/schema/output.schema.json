@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Response output",
+  "description": "One produced output. Text is inline; commits identify a repository and full object ID; images and other files bind persisted artifacts. Output metadata alone does not prove correctness or publication.",
+  "oneOf": [
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "text", "format"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/id" },
+        "type": { "const": "text" },
+        "text": { "$ref": "common.schema.json#/$defs/text" },
+        "format": { "type": "string", "enum": ["plain", "markdown"] }
+      }
+    },
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "repository", "sha"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/id" },
+        "type": { "const": "commit" },
+        "repository": { "$ref": "common.schema.json#/$defs/text" },
+        "sha": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+        "message": { "$ref": "common.schema.json#/$defs/text" }
+      }
+    },
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "file", "alt"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/id" },
+        "type": { "const": "image" },
+        "file": {
+          "$ref": "common.schema.json#/$defs/file",
+          "properties": { "mediaType": { "pattern": "^image/" } }
+        },
+        "alt": { "$ref": "common.schema.json#/$defs/text" }
+      }
+    },
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "file", "description"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/id" },
+        "type": { "const": "file" },
+        "file": { "$ref": "common.schema.json#/$defs/file" },
+        "description": { "$ref": "common.schema.json#/$defs/text" }
+      }
+    }
+  ]
+}

@@ -80,3 +80,33 @@ test('opaque source annotations follow only matching schema branches and cannot 
   assert.deepEqual(validateAgainst(schema, { kind: 'content', value: '../literal' }), []);
   assert.ok(validateAgainst(schema, { kind: 'reference', value: '../escape' }).some(e => e.includes('traversal')));
 });
+import { readFileSync } from 'node:fs';
+
+const readSchema = path => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'));
+test('actual request goal enforces sibling shape alongside oneOf', () => {
+  const rule = readSchema('templates/step/request.schema.json').properties.goal;
+  for (const good of [{ doneWhen: 0 }, { prerequisite: '1/2' }]) assert.deepEqual(validateAgainst(rule, good), []);
+  for (const bad of [{ doneWhen: '0' }, { doneWhen: -1, extra: true }, { prerequisite: 123 }, {}, [], { doneWhen: 0, prerequisite: '1/2' }]) assert.ok(validateAgainst(rule, bad).length, JSON.stringify(bad));
+});
+test('actual runtime identity enforces required and property constraints alongside anyOf', () => {
+  const schema = readSchema('readiness/initialization/runtime/owner.schema.json');
+  const rule = { ...schema.$defs.identity, $defs: schema.$defs };
+  assert.ok(validateAgainst(rule, { realm: 'x' }).length);
+});
+test('all combinators and local ref siblings are conjunctive', () => {
+  assert.ok(validateAgainst({ oneOf: [{ type: 'integer' }], anyOf: [{ const: 2 }] }, 1).length);
+  assert.ok(validateAgainst({ $defs: { n: { type: 'integer' } }, $ref: '#/$defs/n', minimum: 2 }, 1).length);
+  assert.ok(validateAgainst({ type: 'array', maxItems: 512, anyOf: [{ maxItems: 1024 }] }, Array(600).fill(1)).length);
+});
+test('unsupported assertions fail closed even in inactive branches and definitions', () => {
+  for (const schema of [{ not: { const: 1 } }, { anyOf: [{ type: 'integer' }, { contains: {} }] }, { $defs: { unused: { patternProperties: {} } } }, { format: 'email' }, { items: [] }, { $ref: '#/$defs/missing' }]) assert.ok(validateAgainst(schema, 1).some(e => /schema|unsupported/.test(e)));
+});
+test('boolean schemas and JSON structural equality follow schema semantics', () => {
+  assert.deepEqual(validateAgainst(true, 1), []);
+  assert.ok(validateAgainst(false, 1).length);
+  assert.ok(validateAgainst({ items: false }, [1]).length);
+  assert.ok(validateAgainst({ if: true, then: false }, 1).length);
+  assert.deepEqual(validateAgainst({ const: { a: 1, b: 2 } }, { b: 2, a: 1 }), []);
+  assert.deepEqual(validateAgainst({ enum: [{ a: 1 }] }, { a: 1 }), []);
+  assert.ok(validateAgainst({ uniqueItems: true }, [{ a: 1, b: 2 }, { b: 2, a: 1 }]).length);
+});

@@ -224,7 +224,7 @@ A rule a person states in their own words is restated to them before anything is
 `business.decide` and `architecture.decide` write a `restatement` of at most five lines in the
 person's language and stop with `RESTATEMENT_UNCONFIRMED` until the exact reading has a retained
 decision under [the restatement policy](resources/interaction.md#restatement-identity), including
-its explicitly delegated in-scope review path. A corrected reading arrives as the corrected
+its accountable within-scope continuation and explicitly delegated review paths. Check that policy before forwarding a question. A corrected reading arrives as the corrected
 requirement and the same branch runs again. Every turn the orchestrator ends with a person is one of
 the report shapes `resources/interaction.json` declares — delivered, blocked on you, working — in the
 person's language; a hand-off to a peer task or session is a waiting branch with a wake condition, never the

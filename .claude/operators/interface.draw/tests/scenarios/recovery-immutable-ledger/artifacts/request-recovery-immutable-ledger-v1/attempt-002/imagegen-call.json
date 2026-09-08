@@ -1,0 +1,17 @@
+{
+  "callOrdinal": 2,
+  "execution": "real built-in image_gen edit",
+  "status": "completed",
+  "promptPath": "artifacts/request-recovery-immutable-ledger-v1/attempt-002/generation-prompt.txt",
+  "referencedImagePaths": [
+    "context/baseline.png",
+    "artifacts/request-recovery-immutable-ledger-v1/attempt-001/direction.png"
+  ],
+  "referenceRoles": {
+    "context/baseline.png": "authoritative edit target and selected baseline",
+    "artifacts/request-recovery-immutable-ledger-v1/attempt-001/direction.png": "rejected secondary defect reference only"
+  },
+  "toolReturnedSource": "C:/Users/Hi/.codex/generated_images/01a07e3b-9ddf-7930-a130-68cb66782f27/exec-da907210-f2d6-46ae-af20-921505933da0.png",
+  "persistedResult": "artifacts/request-recovery-immutable-ledger-v1/attempt-002/direction.png",
+  "note": "Recovery call retained the original baseline as authoritative and used the rejected candidate only to identify the defect to remove."
+}

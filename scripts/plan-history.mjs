@@ -260,7 +260,8 @@ export async function editForecast(root, session, state, original, edit, top) {
       // The awaited kind owns the return route; its sealed review binding is checked at admission.
     } else if (response.stop === 'RESTATEMENT_UNCONFIRMED') {
       const decisionId = response.interaction?.decisionId, choice = state.choices?.[decisionId];
-      if (choice?.selectedBy === 'coordinator') {
+      const reviewSource=JSON.parse(readFileSync(path.join(root,'resources/interaction.json'))).delegatedRestatement?.scopeReviewSource;
+      if (['coordinator',reviewSource].filter(Boolean).includes(choice?.selectedBy)) {
         const { delegatedRestatementErrors } = await import('./restatement-delegation.mjs');
         const [step, parallel] = sourceCell.split('/').map(Number);
         const projected = { ...originalRequest, decisionId, selectedOption: choice.selected, resume: { step, parallel, token: decisionId } };

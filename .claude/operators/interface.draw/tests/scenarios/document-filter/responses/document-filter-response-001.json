@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "kind": "response",
+  "id": "document-filter-response-001",
+  "workId": "document-filter",
+  "workRevision": 1,
+  "requestId": "document-filter-001",
+  "status": "done",
+  "outputs": [
+    {
+      "id": "direction",
+      "type": "image",
+      "file": {
+        "path": "artifacts/document-filter-001/attempt-1/direction.png",
+        "sha256": "sha256:6302c1d2c2c1a2172584884ecb4c8ccd98450253cc69a2274c4e931237040b83",
+        "mediaType": "image/png"
+      },
+      "alt": "Nivo Accounting workbench with a compact document file-name search, classification filter, accounting-month filter, and Clear filters action above the document table."
+    },
+    {
+      "id": "generation-prompt",
+      "type": "file",
+      "file": {
+        "path": "artifacts/document-filter-001/attempt-1/generation-prompt.txt",
+        "sha256": "sha256:9712126e44c935b897b1e0e78635f3875f38501a856bae74fedade64ff1836f4",
+        "mediaType": "text/plain"
+      },
+      "description": "Exact prompt submitted to the built-in image generation tool for attempt-1."
+    },
+    {
+      "id": "generation-context",
+      "type": "file",
+      "file": {
+        "path": "artifacts/document-filter-001/attempt-1/generation-context.json",
+        "sha256": "sha256:9204a5b90021ae7008b82d0a6177b429b7e78e6c214fb9f663543f58936d8235",
+        "mediaType": "application/json"
+      },
+      "description": "Retained binding of request, baseline, exact prompt, and generated PNG for attempt-1."
+    },
+    {
+      "id": "rationale",
+      "type": "text",
+      "text": "The filter row sits immediately below the existing status tabs, making file-name, classification, and accounting-month refinement discoverable without creating a competing workflow. The row reuses the baseline's native control styling and dark-blue interaction color, while the existing tabs continue to filter status. The ledger stays visibly locked and view-only, and all unrelated panels remain present. Pixel review found the requested labels readable and the 1536 x 1024 composition coherent. The ICU-style plural literal under Pending corrections is inherited from the baseline rather than introduced by this direction. Interaction behavior remains a later native-implementation requirement.",
+      "format": "plain"
+    }
+  ],
+  "observations": [
+    {
+      "criterionId": "document-filter-control",
+      "result": "passed",
+      "evidenceIds": [],
+      "note": "Pixel inspection confirms Search file name, Classification, Accounting month, and Clear filters in one compact row beneath the existing status tabs."
+    },
+    {
+      "criterionId": "source-supported-fields",
+      "result": "passed",
+      "evidenceIds": [],
+      "note": "The visible controls map only to backend-supported file_name, classification, period_key, and the existing status tabs."
+    },
+    {
+      "criterionId": "visual-continuity",
+      "result": "passed",
+      "evidenceIds": [],
+      "note": "Side-by-side baseline review confirms the two-column shell, typography, blue palette, immutable ledger semantics, three document rows, and unrelated panels remain materially intact."
+    },
+    {
+      "criterionId": "desktop-legibility",
+      "result": "passed",
+      "evidenceIds": [],
+      "note": "The actual 1536 x 1024 PNG is readable and polished; native interaction behavior is outside what a static direction can verify."
+    }
+  ],
+  "createdAt": "2026-09-08T06:45:58+07:00",
+  "feedbackRound": 0,
+  "criteriaResults": [
+    {
+      "criterionId": "brief-fidelity",
+      "result": "passed",
+      "outputIds": [
+        "direction"
+      ],
+      "note": "Actual PNG reinspection confirms the requested file-name search, classification, month and Clear filters row beneath status tabs."
+    },
+    {
+      "criterionId": "visual-quality",
+      "result": "passed",
+      "outputIds": [
+        "direction"
+      ],
+      "note": "Labels, controls, document rows and amounts are legible at 1536x1024. Card spacing and navy action hierarchy remain coherent. The raw ICU literal in Pending corrections is inherited baseline debt outside this bounded change."
+    },
+    {
+      "criterionId": "implementation-feasibility",
+      "result": "passed",
+      "outputIds": [
+        "direction"
+      ],
+      "note": "The output depicts native inputs, selects, buttons and document data. It remains a design direction; interactivity, accessibility and backend behavior require implementation and separate verification."
+    },
+    {
+      "criterionId": "generation-provenance",
+      "result": "passed",
+      "outputIds": [
+        "direction",
+        "generation-prompt",
+        "generation-context"
+      ],
+      "note": "The scenario execution report records real built-in ImageGen calls. The retained exact prompt and generation context bind this actual PNG and supplied baseline; hashes verify these bytes, not provider identity independently."
+    },
+    {
+      "criterionId": "visual-continuity",
+      "result": "passed",
+      "outputIds": [
+        "direction"
+      ],
+      "note": "Comparison with the supplied baseline confirms white cards, thin gray borders, navy actions, desktop two-column structure and unrelated accounting panels. The request-selected baseline remains authoritative."
+    }
+  ]
+}

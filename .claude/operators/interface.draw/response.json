@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "interface.draw response",
+  "$ref": "works:response",
+  "properties": {
+    "outputs": {
+      "items": {
+        "properties": {
+          "type": {
+            "enum": [
+              "text",
+              "file",
+              "image"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "description": "A done response contains the direction PNG, exact prompt file and inline rationale. Additional assets or review files may be included. Non-done responses explain their reason and may retain partial outputs.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "done"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outputs": {
+            "allOf": [
+              {
+                "contains": {
+                  "properties": {
+                    "id": {
+                      "const": "direction"
+                    },
+                    "type": {
+                      "const": "image"
+                    },
+                    "file": {
+                      "properties": {
+                        "mediaType": {
+                          "const": "image/png"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "type",
+                    "file"
+                  ]
+                }
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "id": {
+                      "const": "generation-prompt"
+                    },
+                    "type": {
+                      "const": "file"
+                    },
+                    "file": {
+                      "properties": {
+                        "mediaType": {
+                          "const": "text/plain"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "type",
+                    "file"
+                  ]
+                }
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "id": {
+                      "const": "rationale"
+                    },
+                    "type": {
+                      "const": "text"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "type"
+                  ]
+                }
+              },
+              {
+                "contains": {
+                  "properties": {
+                    "id": {
+                      "const": "generation-context"
+                    },
+                    "type": {
+                      "const": "file"
+                    },
+                    "file": {
+                      "properties": {
+                        "mediaType": {
+                          "const": "application/json"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "type",
+                    "file"
+                  ]
+                }
+              }
+            ]
+          },
+          "observations": {
+            "not": {
+              "contains": {
+                "properties": {
+                  "result": {
+                    "const": "failed"
+                  }
+                },
+                "required": [
+                  "result"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

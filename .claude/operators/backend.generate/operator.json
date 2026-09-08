@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "backend.generate",
+  "purpose": "Implement one bounded backend outcome from supplied authority and source context, then prove the contract and changed-file boundary.",
+  "scope": "Backend source only. The request must identify the behavior authority, mutable paths, protected paths, and required proof commands. The operator may edit the bound backend checkout and record artifacts; it does not apply migrations to shared environments, publish, merge, deploy, or invent business rules.",
+  "modules": {
+    "request": "request.json",
+    "response": "response.json",
+    "validate": "validate.json",
+    "step": "step.json",
+    "criteria": "criteria.json"
+  }
+}
