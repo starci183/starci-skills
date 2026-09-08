@@ -30,8 +30,8 @@
   },
   "counts": {
     "skills": 1,
-    "workflows": 8,
-    "ops": 14
+    "publicWorkflows": 16,
+    "operators": 14
   },
   "gates": "workflows/gates.json",
   "work": {
@@ -41,7 +41,11 @@
     "approval": "goal-before-effects-and-result-before-done",
     "checklist": "<business>/<item>/**/index.yaml",
     "evidence": "<business>/<item>/evidence/<id>/manifest.yaml",
-    "workflowState": "_workflows/<run-id>/{goal,run}.yaml (local only)",
+    "workflowState": "<backend>/.starci/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}",
     "layout": "schemas/work-layout.json"
+  },
+  "executionModes": {
+    "default": "planned",
+    "explicitFlash": "workflows/flash.json"
   }
 }

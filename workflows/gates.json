@@ -65,5 +65,10 @@
     "workflow": "sibling .starci/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}-local-only",
     "manyWorkflows": "reuse-workTargets-and-contribute-evidence-to-the-same-nodes",
     "completion": "all-required-node-assertions-and-user-acceptance-not-workflow-status"
+  },
+  "explicitFlash": {
+    "contract": "flash.json",
+    "mode": "outside-full-workflow-lifecycle",
+    "selection": "Only explicit per-request flash with eligible local scope; never fabricate Plan approval or a workflow completion receipt."
   }
 }

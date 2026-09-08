@@ -1,3 +1,4 @@
+import {validateFlashPolicy} from '../workflows/flash.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -12,6 +13,8 @@ const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const json = x => JSON.stringify(x) + '\n';
 export function buildFiles() {
   const stale = generate({ check: true }); if (stale.length) throw Error('Regenerate operator outputs before build: ' + stale.join(', '));
+  const flash=validateFlashPolicy(JSON.parse(fs.readFileSync(path.join(root,'workflows/flash.json'))));
+  if(!flash.ok)throw Error('Invalid flash policy: '+flash.errors.join('; '));
   const files = new Map();
   files.set('config.example.json', fs.readFileSync(path.join(root,'config.example.json')));
   files.set('basic-ops.json', fs.readFileSync(path.join(root, 'ops/basic-ops.json')));
