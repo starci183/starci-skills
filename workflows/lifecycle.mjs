@@ -74,14 +74,29 @@ export function acceptDelivery(run,receipt){bound(run);requireThat(run.status===
 export function markWorkDone(run,completions){bound(run);requireThat(run.status==='accepted'&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'User acceptance is required before Work done');requireThat(run.approvals.some(a=>a.phase==='acceptance'&&a.digest===run.resultDigest&&a.actor==='user'&&a.approved),'Missing bound user acceptance');const before=validateWorkspace(run.workRoot);requireThat(before.ok,'Work must be valid before completion');requireThat(same(Object.keys(completions).sort(),[...run.goal.workTargets].sort()),'Completion cannot target other Work nodes');const writes=[];for(const [id,completion]of Object.entries(completions)){const node=before.nodes.find(n=>n.id===id);requireThat(node&&node.children.length===0,'Only selected leaf nodes can be marked; parents derive done');const file=path.resolve(run.workRoot,node.path);requireThat(inside(fs.realpathSync(run.workRoot),fs.realpathSync(file)),'Node escapes Work');const original=fs.readFileSync(file,'utf8');let meta,body='';if(file.endsWith('.md')){const m=original.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/);requireThat(m,'Malformed legacy node');meta=parseYaml(m[1]);body=m[2];}else meta=parseYaml(original);meta.state='done';meta.completion=completion;const bytes=file.endsWith('.md')?'---\n'+stringifyYaml(meta)+'---\n'+body:stringifyYaml(meta);writes.push({file,original,bytes});}
  try{for(const w of writes){requireThat(fs.readFileSync(w.file,'utf8')===w.original,'Concurrent node change');fs.writeFileSync(w.file,w.bytes);}const verified=validateWorkspace(run.workRoot);requireThat(verified.ok&&run.goal.workTargets.every(id=>verified.nodes.find(n=>n.id===id)?.effectiveState==='done'),'Completion proof failed; Work done rolled back');return {...run,status:'done'};}catch(error){for(const w of writes)if(fs.readFileSync(w.file,'utf8')===w.bytes)fs.writeFileSync(w.file,w.original);throw error;}}
 export {digest as workflowDigest};
-export function saveRun(run,runId=run.goal.id){
- bound(run);requireThat(workStatus(run.workRoot).status==='ready','A valid Work root is required before local tracking');
- requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(runId),'Unsafe workflow run ID');
- const sessions=path.join(path.dirname(run.workRoot),'.starci/runs',path.basename(run.workRoot)),dir=path.join(sessions,runId);
- for(const file of [path.dirname(sessions),sessions,dir,path.join(dir,'goal.yaml'),path.join(dir,'run.yaml')])requireThat(!fs.existsSync(file)||!fs.lstatSync(file).isSymbolicLink(),'Local tracking cannot follow symlinks');
- const goalFile=path.join(dir,'goal.yaml');
- if(fs.existsSync(goalFile))requireThat(parseYaml(fs.readFileSync(goalFile,'utf8')).goalDigest===run.goalDigest,'Run ID already belongs to another goal; use a new run ID');
- fs.mkdirSync(dir,{recursive:true});
- fs.writeFileSync(goalFile,stringifyYaml({...run.goal,goalDigest:run.goalDigest,workRoot:run.workRoot,repositoryRoots:run.repositories}));
- fs.writeFileSync(path.join(dir,'run.yaml'),stringifyYaml(run));return dir;
+export function saveRun(run,planId=run.presentation?.scope.id??run.goal.id){
+ bound(run);workStatus(run.workRoot);
+ requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(planId),'Unsafe Plan ID');
+ const base=path.dirname(run.workRoot),dir=path.join(base,'.starci','plans',planId);
+ const paths=['index.yaml','goal/index.yaml','approval/index.yaml','run/index.yaml'];
+ for(const relative of ['.starci','.starci/plans','.starci/plans/'+planId,...paths.map(p=>'.starci/plans/'+planId+'/'+p)]){
+  let file=path.join(base,relative);while(file!==base){requireThat(!fs.existsSync(file)||!fs.lstatSync(file).isSymbolicLink(),'Local Plan cannot follow symlinks');file=path.dirname(file);}
+ }
+ const read=relative=>fs.existsSync(path.join(dir,relative))?parseYaml(fs.readFileSync(path.join(dir,relative),'utf8')):null;
+ const oldGoal=read('goal/index.yaml'),jobId=run.presentation?.jobId??run.goal.id;
+ const plan=run.presentation?.scope??null,planDigest=plan?validatePlan(plan,catalog).digest:run.goalDigest;
+ requireThat(!oldGoal||oldGoal.planDigest===planDigest||(!oldGoal.plan&&oldGoal.jobs?.[jobId]?.goalDigest===run.goalDigest),'Plan changed; present a revised Plan instead of overwriting an existing bundle');
+ const goals=oldGoal?.jobs??{},approvals=read('approval/index.yaml')?.jobs??{},runs=read('run/index.yaml')?.jobs??{};
+ requireThat(!goals[jobId]||goals[jobId].goalDigest===run.goalDigest,'Job goal changed; revise and reapprove before replacing execution');
+ goals[jobId]={goal:run.goal,goalDigest:run.goalDigest,scopeDigest:run.scopeDigest,workRoot:run.workRoot,repositories:run.repositories};
+ approvals[jobId]={status:run.approvals.length?'recorded':'pending',presentation:run.presentation?{messageId:run.presentation.messageId,goalDigest:run.goalDigest,planDigest}:null,receipts:run.approvals};
+ const {goal,presentation,approvals:receipts,repositories,workRoot,...execution}=run;runs[jobId]=execution;
+ const documents={
+  'index.yaml':{schema:'starci/plan-index@1',id:planId,goal:'goal/index.yaml',approval:'approval/index.yaml',run:'run/index.yaml'},
+  'goal/index.yaml':{schema:'starci/plan-goal@1',planDigest,plan,jobs:goals},
+  'approval/index.yaml':{schema:'starci/plan-approval@1',planDigest,jobs:approvals},
+  'run/index.yaml':{schema:'starci/plan-run@1',planDigest,jobs:runs}
+ };
+ for(const [relative,doc]of Object.entries(documents)){const file=path.join(dir,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(doc));}
+ return dir;
 }

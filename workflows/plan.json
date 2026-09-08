@@ -22,6 +22,13 @@
   "changes": "Business, service, authorization, schema, targets or effect-ceiling changes invalidate the affected approval and require a revised user-facing goal.",
   "cleanup": "Keep unfinished or failed scope/session drafts for resumption. After all jobs are accepted and canonical Work proof validates, remove only this scope's temporary files and owned sessions. Preserve current product evidence in Work; Git tracks product history. Never recursively delete a shared session root.",
   "legacy": "Already running jobs without a presented goal must pause and present their current changes and revised scope; never manufacture retroactive approval.",
-  "sessions": "<backend-repository>/.starci/runs/<work-root>/<run-id>/{goal,run}.yaml",
-  "ownership": "Backend owns .starci and canonical .work; frontend resolves them through workspace bindings. Keep .starci local and ignored by Git."
+  "ownership": "Backend owns .starci and canonical .work; frontend resolves them through workspace bindings. Keep .starci local and ignored by Git.",
+  "files": {
+    "index.yaml": "Stable Plan ID and relative pointers only; no duplicate execution state.",
+    "goal/index.yaml": "The whole ordered Plan plus exact current workflow goals, their bindings and digests. No history.",
+    "approval/index.yaml": "Pending or actual user decision receipts for each presented goal/result; bind message provenance and hashes. Never infer approval from a task request.",
+    "run/index.yaml": "Current job states, requests, accepted responses, typed handoffs and evidence references. Preserve every completed producer needed by later jobs. No attempt history."
+  },
+  "storage": "One backend-owned .starci/plans/<plan-id>/ bundle. All workflows in the same Plan share this directory; never create a separate runs tree or a new Plan per workflow.",
+  "recovery": "Incomplete writes or mismatched Plan digests block resumption; never treat file presence as approval. Keep unfinished bundles. Goal revisions require renewed approval, not overwriting a running goal."
 }
