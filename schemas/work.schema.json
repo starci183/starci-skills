@@ -192,12 +192,15 @@
           "description": "Direct repository name or path; example nivo-backend."
         },
         "revision": {
-          "$ref": "#/$defs/string",
-          "description": "Exact inspected or implemented revision."
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
+          "description": "Exact inspected or implemented full lowercase Git SHA (40 or 64 hex characters)."
         },
         "path": {
-          "$ref": "#/$defs/string",
-          "description": "Repository-relative source or evidence path."
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!/)(?!.*[\\\\:\\x00-\\x1f])(?!(?:.*/)?\\.{1,2}(?:/|$))[^/]+(?:/[^/]+)*$",
+          "description": "Normalized repository-relative source or evidence path using forward slashes; no absolute paths, traversal, empty segments, backslashes, drive/stream colon or control characters."
         },
         "lineRange": {
           "$ref": "#/$defs/string",
@@ -211,7 +214,7 @@
           "$ref": "#/$defs/string"
         }
       },
-      "description": "Direct source observation at an exact repository revision and path; no resource manifest is involved."
+      "description": "Direct source observation at an exact repository revision and path; no resource manifest is involved. Each observed structured specification source binds to an entry on its owning node by repository, path and revision."
     },
     "businessSpec": {
       "type": "object",

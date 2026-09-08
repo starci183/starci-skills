@@ -7,7 +7,7 @@
         "Canonical Work v2 uses workspace.yaml and one index.yaml per active node. Module nodes may own compact business SRS, architecture SDS, implementation or UAT structures.",
         "Only leaves author uninvestigate, todo or done. Parents derive progress. Stable dependsOn and refs edges propagate semantic changes without rewriting stored state or evidence.",
         "All structured records and results use YAML. JSON and underscore-prefixed directories are rejected. Central schema and workflow sessions remain outside .work.",
-        "Source provenance is direct through sourceRefs. UAT flows collocate index.yaml, exact disposable accounts.yaml, assets and optional seed/delete scripts.",
+        "Source provenance is direct through sourceRefs, with full lowercase 40/64-hex revision and normalized repository-relative path. Observed extensions.work3.specification.sources on work/node@2 bind to the owning node's sourceRefs by repository/path/revision; missing paths and conflicting revisions fail without requiring legacy resource manifests. work/node@1 retains its resource/revision checks. This metadata binding does not inspect Git objects or source files. UAT flows collocate index.yaml, exact disposable accounts.yaml, assets and optional seed/delete scripts.",
         "UI ownership is explicit: module/ui/index.yaml owns design direction and generated PNGs under ui/assets. A thin implementation parent derives state from separate frontend and backend implementation leaves. Frontend assets are running-page screenshots; each UAT flow owns its own screenshots and video."
       ]
     },

@@ -1,7 +1,7 @@
 {
   "schema": "starci/specification-contract@1",
   "payloadSchema": "starci/specification@1",
-  "storage": ".work/<business>/{business,architecture}/<piece>/node.md#extensions.work3.specification",
+  "storage": ".work/<business>/{business,architecture}/<piece>/index.yaml#extensions.work3.specification (legacy work/node@1 may use node.md)",
   "statuses": [
     "draft",
     "blocked",
@@ -139,6 +139,7 @@
     "implementationChecks"
   ],
   "semantics": {
+    "sourceBinding": "For work/node@2, each observed source binds to the owning node's direct sourceRefs by exact repository, normalized relative path and full revision. Another path, ancestor/sibling citation or repository resource cannot substitute for the owning citation. Conflicting revisions for the same repository/path fail. Legacy work/node@1 retains its referenced repository resource/revision binding. No source file or Git object is read by this metadata check; the operator verifies source truth. Accepted-intent and proposal citations are not observed code and do not require a sourceRefs duplicate.",
     "scope": "Impact inventory is not a grant to edit every listed file. Only accepted change rows may become implementation ceilings; preserve/review rows remain protected/read-only.",
     "truth": "Observed source is not approved intent. Proposed checks are not executed evidence.",
     "quality": "Lint/typecheck/tests/coverage/build/Sonar are owned and run by interface.implement or backend.implement.",

@@ -257,6 +257,12 @@ function validate(root) {
       if (n.meta.state === 'done' && spec?.status !== 'pass') issue('SPECIFICATION_NOT_ACCEPTED', n.path, 'Draft or blocked specification cannot complete a node.');
       for (const source of Array.isArray(spec?.sources) ? spec.sources : []) {
         if (source?.kind !== 'observed') continue;
+        if (n.meta.schema === 'work/node@2') {
+          const bindings = (Array.isArray(n.meta.sourceRefs) ? n.meta.sourceRefs : []).filter(ref => object(ref) && ref.repository === source.repository && ref.path === source.path);
+          if (!bindings.length) issue('SPECIFICATION_SOURCE_UNBOUND', n.path, 'Observed source needs an owning-node sourceRefs entry with the same repository and path.');
+          else if (bindings.some(ref => ref.revision !== source.revision)) issue('SPECIFICATION_SOURCE_STALE', n.path, 'Observed source revision must match every owning-node sourceRefs entry for that repository and path.');
+          continue;
+        }
         const resource = n.effectiveRefs.find(r => r.type === 'resource' && r.meta.id === source.repository && r.meta.kind === 'repository');
         if (!resource) issue('SPECIFICATION_SOURCE_UNBOUND', n.path, 'Observed source repository must be a bound repository resource.');
         else if (resource.meta.revision !== source.revision) issue('SPECIFICATION_SOURCE_STALE', n.path, 'Source citation revision must match the bound repository revision.');
