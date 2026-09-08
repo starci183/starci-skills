@@ -4,15 +4,15 @@
     "en": "Produce and inspect the requested visual direction for one business-grounded surface."
   },
   "nodeKinds": [
-    "architecture"
+    "ui"
   ],
-  "completionProfile": "architecture",
+  "completionProfile": "ui",
   "sideEffects": [
     "requested local/generated design assets"
   ],
   "graphPolicy": {
     "mode": "read-only",
-    "location": ".work node dependsOn/refs and resource files",
+    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -33,7 +33,7 @@
     },
     {
       "id": "design",
-      "path": ".work/_resources/design/<resource>/resource.yaml + selected architecture/interface node",
+      "path": "N/index.yaml + N/assets/*",
       "purpose": {
         "en": "Read exact brand/source assets, surface anatomy, current design system, imagery rights/provenance and accepted references; consult available image/design skill when used."
       }
@@ -86,11 +86,12 @@
       "id": "node",
       "path": "N/index.yaml",
       "fields": [
-        "description: Brief / Regions / States / Assets / Direction decision / Implementation limits",
+        "ui: {status,intent,surfaces,states,accessibility,responsive,assets,observations,gaps}",
+        "assets:[{path}]",
         "assertions"
       ],
       "content": {
-        "en": "Specify actor/task, content authority, hierarchy, region anatomy, native controls, asset purpose/medium, responsive constraints and acceptance mapping. Record actual selected direction or unresolved material choice."
+        "en": "Write the selected UI direction to module/ui/index.yaml as readable block YAML. Generated design PNGs belong under ui/assets and every ui.assets path is also declared in top-level assets for byte binding."
       }
     },
     {
@@ -113,7 +114,7 @@
     },
     {
       "id": "handoff",
-      "path": "E/response.json",
+      "path": "E/response.yaml",
       "fields": [
         "schema",
         "requestId",
@@ -134,28 +135,28 @@
     },
     {
       "id": "designSource",
-      "path": ".work/_resources/design/<resource>/resource.yaml + .work/_resources/design/<resource>/assets/<asset>",
+      "path": "N/assets/direction.png",
       "fields": [
-        "files:[{path}]",
-        "details: accepted direction identity / source provenance"
+        "ui.assets:[{path,role,provenance}]",
+        "assets:[{path}]"
       ],
       "content": {
-        "en": "Write the selected approved art-direction asset as a canonical source input, with files paths relative to its resource.yaml directory. The core hashes actual bytes; do not author a sha256 field in files. Preserve the selected node graph: if its design resource/ref is missing, report the scope gap instead of silently adding a dependency. Generated/captured evidence images are not automatically design authority."
+        "en": "Store generated or accepted design PNGs under module/ui/assets. Do not place them under frontend implementation or UAT."
       }
     },
     {
       "id": "draws",
-      "path": "E/draws.json",
+      "path": "E/draws.yaml",
       "fields": [
         "draws"
       ],
       "content": {
-        "en": "Always emit the complete reviewed draws array, including standalone execution, with image artifact IDs and screen/state/viewport mappings. Use the same draws shape as the named frontend workflow; accepted resource assets remain canonical semantic inputs."
+        "en": "Emit the reviewed draw mapping as readable YAML beside the UI node; image bytes remain in N/assets."
       }
     },
     {
       "id": "matrixHandoff",
-      "path": "E/job-result.json",
+      "path": "E/job-result.yaml",
       "fields": [
         "requestId",
         "requestDigest",
@@ -278,17 +279,17 @@
     }
   ],
   "placeholders": {
-    "business": "Selected business slug / slug nghiệp vụ đã chọn",
-    "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-    "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-    "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-    "environment": "Resolved environment resource slug / slug environment đã resolve",
-    "identity": "Selected actor resource slug / slug actor đã chọn",
-    "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-    "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-    "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-    "piece": "Stable selected piece slug / slug piece đã chọn",
-    "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-    "screen": "Selected surface/state slug / slug screen-state đã chọn"
+    "business": "Selected business slug",
+    "repo-id": "Resolved direct repository name or path",
+    "bound-paths": "Inspected source read set",
+    "write-ceiling": "Explicit owned source paths",
+    "environment": "Resolved environment label",
+    "identity": "Selected actor label",
+    "fixture": "Selected fixture path",
+    "resource": "Selected owned asset name",
+    "asset": "Actual selected source asset filename/format",
+    "piece": "Stable selected piece slug",
+    "flow": "Selected UAT journey slug",
+    "screen": "Selected surface/state slug"
   }
 }

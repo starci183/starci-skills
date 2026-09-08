@@ -23,7 +23,7 @@ export function validateWorkspace(root) {
   catch { return {ok:false,errors:[{code:'MALFORMED_WORKSPACE',path:'.',message:'Malformed or unreadable workspace; no completion can be certified.'}],warnings:[],nodes:[],resources:[]}; }
 }
 function validate(root) {
-  const errors = [], warnings = [], nodes = [], resources = [], evidence = [], ids = new Map();
+  const errors = [], warnings = [], nodes = [], resources = [], evidence = [], jsonFiles = [], accountFiles = [], reservedDirectories = [], ids = new Map();
   const issue = (code, p, message) => errors.push({code, path:p, message});
   const warn = (code, p, message) => warnings.push({code, path:p, message});
   let absolute;
@@ -71,6 +71,7 @@ function validate(root) {
       if(Number.isInteger(shape.minLength)&&value.length<shape.minLength)issue('SCHEMA_VALUE',p,'Metadata text is shorter than the published minimum.');
       if(shape.pattern&&!new RegExp(shape.pattern,'u').test(value))issue('SCHEMA_VALUE',p,'Metadata text does not match its published pattern.');
     }
+    if(typeof value==='number'&&Number.isFinite(shape.minimum)&&value<shape.minimum)issue('SCHEMA_VALUE',p,'Metadata number is below the published minimum.');
     if(Array.isArray(value)){
       if(Number.isInteger(shape.minItems)&&value.length<shape.minItems)issue('SCHEMA_VALUE',p,'Metadata list is shorter than the published minimum.');
       if(shape.uniqueItems&&new Set(value.map(canonicalJSON)).size!==value.length)issue('SCHEMA_VALUE',p,'Metadata list must contain unique values.');
@@ -80,25 +81,34 @@ function validate(root) {
     if(!object(value))return;
     for(const key of shape.required??[])if(!Object.hasOwn(value,key))issue('SCHEMA_VALUE',p,`Metadata object is missing required field ${key}.`);
     for(const [key,v]of Object.entries(value)) {
-      if(shape.additionalProperties===false&&!Object.hasOwn(shape.properties??{},key))issue('UNKNOWN_FIELD',p,'Unknown reserved metadata field; correct its spelling or place extension data inside extensions/resource.details.');
+      if(shape.additionalProperties===false&&!Object.hasOwn(shape.properties??{},key))issue('UNKNOWN_FIELD',p,`Unknown reserved metadata field ${key}; correct its spelling or place extension data inside extensions/resource.details.`);
       else if(Object.hasOwn(shape.properties??{},key))checkKeys(v,shape.properties[key],p);
     }
   }
   const workspace=read(path.join(absolute,'workspace.yaml'));
   if (workspace) register(workspace,'workspace');
+  function hasCanonicalNode(dir){
+    try{return fs.readdirSync(dir,{withFileTypes:true}).some(ent=>{if(ent.name==='.git'||ent.name.startsWith('_'))return false;const p=path.join(dir,ent.name);if(ent.isDirectory())return hasCanonicalNode(p);if(ent.name!=='index.yaml')return false;try{return /(?:^|\n)\s*schema:\s*work\/node@2(?:\s|$)/.test(fs.readFileSync(p,'utf8'));}catch{return false;}});}catch{return false;}
+  }
+  const canonicalV2=hasCanonicalNode(absolute);
   function walk(dir) {
     let entries;
     try { entries=fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)); } catch { issue('READ_DIRECTORY',rel(dir),'Cannot enumerate directory.'); return; }
     for (const ent of entries) {
-      if (ent.name === '_local' || ent.name === '_workflows' || ent.name === '_schema' || ent.name === '.git') continue;
+      if (ent.name === '.git') continue;
       const p=path.join(dir,ent.name);
       if (ent.isSymbolicLink()) { issue('SYMLINK',rel(p),'Symlinks are not accepted in canonical workspace artifacts.'); continue; }
-      if (ent.isDirectory()) { walk(p); continue; }
+      if (ent.isDirectory()) {
+        if(ent.name.startsWith('_')){if(canonicalV2)reservedDirectories.push(rel(p));else if(!['_local','_workflows','_schema','_archive'].includes(ent.name))walk(p);}
+        else walk(p);
+        continue;
+      }
       let item;
-      if (['index.md','index.yaml','node.yaml','node.md'].includes(ent.name)) {
+      if(ent.name.toLowerCase().endsWith('.json'))jsonFiles.push(p);
+      if(ent.name==='accounts.yaml')accountFiles.push(p);
+      if (['index.yaml','node.yaml','node.md'].includes(ent.name)) {
         if (rel(p).split('/').slice(0,-1).some(part=>['evidence','assets','_resources'].includes(part.toLowerCase()))) { issue('LAYOUT',rel(p),'Nodes cannot be inside reserved evidence, assets or _resources directories.'); continue; }
-        if(['index.md','index.yaml','node.yaml','node.md'].filter(name=>fs.existsSync(path.join(dir,name))).length>1){issue('NODE_FORMAT_CONFLICT',rel(p),'Use one node format per directory');continue;}
-        if ((item=read(p,ent.name.endsWith('.md')))) {register(item,'node');item.children=[];nodes.push(item);}
+        if ((item=read(p,ent.name.endsWith('.md')))) {register(item,'node');if(item.meta.schema==='work/node@2'&&ent.name!=='index.yaml')issue('CANONICAL_FORMAT',item.path,'work/node@2 is canonical YAML index.yaml only.');item.children=[];nodes.push(item);}
       } else if (ent.name === 'resource.yaml') {
         if (!rel(p).startsWith('_resources/')) {issue('LAYOUT',rel(p),'Resources belong under _resources.');continue;}
         if ((item=read(p))) {register(item,'resource');resources.push(item);}
@@ -108,6 +118,11 @@ function validate(root) {
     }
   }
   walk(absolute);
+  const nodesByDirectory=new Map();for(const n of nodes){const items=nodesByDirectory.get(n.dir)??[];items.push(n);nodesByDirectory.set(n.dir,items);}for(const [dir,items] of nodesByDirectory)if(items.length>1)issue('NODE_FORMAT_CONFLICT',rel(dir),'A Work folder must contain exactly one node metadata file.');
+  if(canonicalV2){
+    for(const p of reservedDirectories)issue('RESERVED_DIRECTORY',p,'Canonical Work v2 keeps no underscore-prefixed directories; collocate owned YAML records and assets with their node.');
+    for(const p of jsonFiles)issue('JSON_ARTIFACT',rel(p),'Canonical Work records and results use YAML; JSON files are not accepted inside Work.');
+  }
   const stringList = (v,p,label,required=false) => {
     if (v === undefined && !required) return [];
     if (!Array.isArray(v) || v.some(x=>!text(x)) || new Set(v).size!==v.length || (required && !v.length)) {issue('LIST',p,`${label} must be ${required?'a nonempty':'an'} array of unique nonempty strings.`);return [];}
@@ -150,12 +165,21 @@ function validate(root) {
     r.specDigest=digest(canonicalJSON({metadata:r.meta,files:files.sort((a,b)=>a.path.localeCompare(b.path))}));
   }
   const operational = new Set(Object.entries(metadataSchema.$defs.node.properties).filter(([,shape])=>shape['x-operational']===true).map(([key])=>key));
+  const ownedAccounts = new Set();
   for (const n of nodes) {
     const candidates=nodes.filter(a=>a!==n && within(a.dir,n.dir) && a.dir!==n.dir).sort((a,b)=>b.dir.length-a.dir.length);
     n.parent=candidates[0]??null;if(n.parent)n.parent.children.push(n);
     if (!text(n.meta.kind)) issue('NODE_KIND',n.path,'kind is required.');
     if (typeof n.meta.required !== 'boolean') issue('REQUIRED',n.path,'required must be boolean.');
-    if (!n.body) issue('EMPTY_SPEC',n.path,'Body must describe scope and observable done-when.');
+    const structured=['businessOverview','business','architecture','ui','implementation','uat'].filter(key=>n.meta[key]!==undefined);
+    if(structured.length>1)issue('MODULE_SPEC',n.path,'A module node owns at most one business, architecture, UI, implementation or UAT specification.');
+    if(n.meta.business!==undefined&&n.meta.kind!=='business')issue('MODULE_SPEC_OWNER',n.path,'business belongs to a business node.');
+    if(n.meta.businessOverview!==undefined&&(n.meta.kind!=='business-overview'||n.path!=='business/index.yaml'))issue('MODULE_SPEC_OWNER',n.path,'businessOverview belongs only to the product-level business/index.yaml node with kind business-overview.');
+    if(n.meta.architecture!==undefined&&n.meta.kind!=='architecture')issue('MODULE_SPEC_OWNER',n.path,'architecture belongs to an architecture node.');
+    if(n.meta.ui!==undefined&&n.meta.kind!=='ui')issue('MODULE_SPEC_OWNER',n.path,'ui belongs to a UI node.');
+    if(n.meta.implementation!==undefined&&n.meta.kind!=='implementation')issue('MODULE_SPEC_OWNER',n.path,'implementation belongs to an implementation node.');
+    if(n.meta.uat!==undefined&&n.meta.kind!=='uat')issue('MODULE_SPEC_OWNER',n.path,'uat belongs to a uat node.');
+    if (!n.body && !structured.length) issue('EMPTY_SPEC',n.path,'Node must have concise description text or one structured module specification.');
     n.depIds=stringList(n.meta.dependsOn,n.path,'dependsOn'); n.refIds=stringList(n.meta.refs,n.path,'refs');
     if(n.meta.assertions !== undefined) stringList(n.meta.assertions,n.path,'assertions');
     if(n.meta.schema==='work/node@2'){
@@ -163,6 +187,12 @@ function validate(root) {
       if(n.meta.activity!==undefined&&!['idle','investigating','implementing','verifying'].includes(n.meta.activity))issue('ACTIVITY',n.path,'Unknown activity.');
       if(n.meta.blockers!==undefined)stringList(n.meta.blockers,n.path,'blockers');
       if(n.meta.investigation!==undefined&&(!object(n.meta.investigation)||!/^[a-f0-9]{64}$/.test(n.meta.investigation.contextDigest??'')))issue('INVESTIGATION',n.path,'Investigation needs the exact reviewed contextDigest.');
+      if(n.meta.history!==undefined)issue('CURRENT_ONLY',n.path,'Canonical Work v2 stores current specification and status only; Git retains history.');
+      if(n.meta.ui!==undefined){
+        if(path.basename(n.dir)!=='ui')issue('UI_LAYOUT',n.path,'A module UI specification belongs in module/ui/index.yaml.');
+        const states=new Set((n.meta.ui.states??[]).map(s=>String(s?.name??'').toLowerCase()));for(const required of ['loading','empty','error','interaction'])if(!states.has(required))issue('UI_STATE_COVERAGE',n.path,`UI specification must describe the ${required} state.`);
+      }
+      if(n.meta.implementation!==undefined&&!['frontend','backend'].includes(path.basename(n.dir)))issue('IMPLEMENTATION_LAYOUT',n.path,'Structured implementation belongs in separate implementation/frontend or implementation/backend leaf nodes.');
     }
     const ownedAssets=[];
     if(n.meta.assets!==undefined){
@@ -173,13 +203,31 @@ function validate(root) {
         try{let file=n.dir;for(const part of parts){file=path.join(file,part);if(fs.lstatSync(file).isSymbolicLink())throw Error('symlink');}if(!within(n.dir,fs.realpathSync(file))||!fs.statSync(file).isFile())throw Error('escape');ownedAssets.push({path:value,sha256:digest(fs.readFileSync(file))});}catch{issue('NODE_ASSET_UNREADABLE',n.path,'Node asset missing, non-file or unsafe.');}
       }}
     }
-    n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),metadata:Object.fromEntries(Object.entries(n.meta).filter(([k])=>!operational.has(k)&&!(n.meta.schema==='work/node@2'&&k==='description'))),body:n.body}));
+    if(n.meta.ui!==undefined){const declared=new Set((n.meta.assets??[]).map(a=>a?.path));for(const asset of n.meta.ui.assets??[]){if(!declared.has(asset?.path))issue('UI_ASSET_BINDING',n.path,'Every ui.assets path must also appear in top-level assets so its current bytes bind the UI specification.');if(!/\.png$/i.test(asset?.path??''))issue('UI_ASSET_FORMAT',n.path,'Generated UI design assets use PNG files under ui/assets.');}}
+    const localFiles=[];
+    for(const value of Object.values(n.meta.uat?.localFiles??{})){
+      if(!text(value)||path.isAbsolute(value)||value.includes('\\')||value.includes(':')||value.split('/').some(part=>!part||part==='.'||part==='..')){issue('LOCAL_FILE_PATH',n.path,'UAT local files must be normalized relative paths beside the owning index.yaml.');continue;}
+      try{const file=path.resolve(n.dir,value);if(!within(n.dir,file)||fs.lstatSync(file).isSymbolicLink()||!fs.statSync(file).isFile())throw Error('unsafe');localFiles.push({path:value,sha256:digest(fs.readFileSync(file))});}catch{issue('LOCAL_FILE_UNREADABLE',n.path,'A declared UAT local file is missing, unreadable, non-file or unsafe.');}
+    }
+    const accountsPath=path.join(n.dir,'accounts.yaml');
+    if(fs.existsSync(accountsPath)){
+      ownedAccounts.add(path.resolve(accountsPath));
+      if(n.meta.schema!=='work/node@2'||n.meta.kind!=='uat'||n.meta.uat?.localFiles?.accounts!=='accounts.yaml')issue('ACCOUNTS_OWNER',rel(accountsPath),'accounts.yaml is allowed only beside its owning Work v2 UAT index.yaml and must be declared as uat.localFiles.accounts.');
+      else try{
+        const accounts=parseYaml(fs.readFileSync(accountsPath,'utf8'));
+        const validAccount=a=>object(a)&&Object.keys(a).sort().join(',')==='password,role,username'&&text(a.role)&&text(a.username)&&text(a.password);
+        if(!object(accounts)||Object.keys(accounts).sort().join(',')!=='accounts,disposable,schema'||accounts.schema!=='work/disposable-accounts@1'||accounts.disposable!==true||!Array.isArray(accounts.accounts)||accounts.accounts.length===0||!accounts.accounts.every(validAccount))throw Error('schema');
+      }catch{issue('ACCOUNTS_SCHEMA',rel(accountsPath),'Disposable accounts must match work/disposable-accounts@1 exactly: disposable true and nonempty role, username and password strings only.');}
+    }
+    n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),...(localFiles.length?{localFiles:localFiles.sort((a,b)=>a.path.localeCompare(b.path))}:{}),metadata:Object.fromEntries(Object.entries(n.meta).filter(([k])=>!operational.has(k)&&!(n.meta.schema==='work/node@2'&&k==='description'))),body:n.body}));
   }
+  if(canonicalV2)for(const p of accountFiles)if(!ownedAccounts.has(path.resolve(p)))issue('ACCOUNTS_OWNER',rel(p),'accounts.yaml is allowed only beside its owning Work v2 UAT index.yaml and must be declared as uat.localFiles.accounts.');
   for (const n of nodes) {
     n.deps=n.depIds.map(id=>resolve(id,n,['node'])).filter(Boolean);
     n.refs=n.refIds.map(id=>resolve(id,n,['node','resource'])).filter(Boolean);
     if (n.children.length) {
       if ('state' in n.meta || 'completion' in n.meta) issue('BRANCH_STATE',n.path,'Branches must not store state or completion.');
+      if(n.meta.schema==='work/node@2'&&n.meta.kind==='implementation'&&n.meta.implementation!==undefined)issue('IMPLEMENTATION_PARENT',n.path,'The implementation parent is thin and derives status from frontend/backend children; it carries no implementation payload.');
     } else {
       if (!metadataSchema.$defs.node.properties.state.enum.includes(n.meta.state)) issue('STATE',n.path,'Leaf state must be one of the states published by work/node@1.');
       if(n.meta.schema==='work/node@2'&&!['uninvestigate','todo','done'].includes(n.meta.state))issue('STATE',n.path,'Version 2 has exactly uninvestigate, todo and done.');

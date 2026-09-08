@@ -32,11 +32,11 @@
       },
       {
         "id": "evidence",
-        "path": "E/manifest.yaml + E/draws-review.json + E/input-map.md + E/regression.json when repair + E/tests.json + E/render.png + E/render-review.md + E/runtime.json + E/lineage.json + E/result.md"
+        "path": "N/assets/running-page.png"
       },
       {
         "id": "handoff",
-        "path": "E/response.json"
+        "path": "E/response.yaml"
       },
       {
         "id": "flows",
@@ -44,7 +44,7 @@
       },
       {
         "id": "matrixHandoff",
-        "path": "E/job-result.json"
+        "path": "E/job-result.yaml"
       },
       {
         "id": "assetManifest",

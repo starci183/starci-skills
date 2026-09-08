@@ -10,7 +10,7 @@
   "sideEffects": [],
   "graphPolicy": {
     "mode": "selected-scope-only",
-    "location": ".work node dependsOn/refs and resource files",
+    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -63,16 +63,15 @@
       "id": "node",
       "path": ".work/<business>/business/<piece>/index.yaml",
       "fields": [
-        "description: Objective / Glossary / Actors & permissions / FR / NFR / Business rules / Non-business constraints / State transitions / Acceptance / Decisions / Open questions",
+        "business",
+        "sourceRefs",
         "refs",
         "assertions",
-        "extensions.work3.decisions",
         "dependsOn",
-        "required",
-        "extensions.work3.specification"
+        "required"
       ],
       "content": {
-        "en": "FR rows: ID, actor, trigger, preconditions, input/schema, normal action/output, failure/denial, postcondition, priority, source and AC refs. NFR rows: metric, numeric target when decided, unit, workload, percentile/window, environment, measurement method and source; undecided targets stay unknown. BR rows: condition, decision, authority, affected transitions and exceptions. Technical/contractual constraints are separate from domain policy. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof. Store full structured requirements, ordered flows, codeImpacts, serviceImpacts, security, acceptance, sources, decisions and handoff in extensions.work3.specification. Keep reserved core metadata unchanged; .work is the canonical root."
+        "en": "Before module SRS work, capture the overall product in .work/business/index.yaml as businessOverview block prose using purpose, customerUnderstanding, desiredOutcome, scope and openQuestions in the customer’s natural language. Then write one compact module-level business object with purpose, inputs/outputs, scope/exclusions, actors, AI authority boundaries, functional requirements, data/states, flows, exceptions, rules, non-functional requirements, acceptance criteria and unresolved questions. Unknown numeric targets remain unresolved rather than invented. Keep citations in sourceRefs and graph bindings in refs/dependsOn; do not create per-clause nodes or IDs."
       }
     },
     {
@@ -95,7 +94,7 @@
     },
     {
       "id": "matrixHandoff",
-      "path": "E/job-result.json",
+      "path": "E/job-result.yaml",
       "fields": [
         "requestId",
         "requestDigest",
@@ -246,17 +245,17 @@
     }
   ],
   "placeholders": {
-    "business": "Selected business slug / slug nghiệp vụ đã chọn",
-    "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-    "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-    "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-    "environment": "Resolved environment resource slug / slug environment đã resolve",
-    "identity": "Selected actor resource slug / slug actor đã chọn",
-    "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-    "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-    "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-    "piece": "Stable selected piece slug / slug piece đã chọn",
-    "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-    "screen": "Selected surface/state slug / slug screen-state đã chọn"
+    "business": "Selected business slug",
+    "repo-id": "Resolved direct repository name or path",
+    "bound-paths": "Inspected source read set",
+    "write-ceiling": "Explicit owned source paths",
+    "environment": "Resolved environment label",
+    "identity": "Selected actor label",
+    "fixture": "Selected fixture path",
+    "resource": "Selected owned asset name",
+    "asset": "Actual selected source asset filename/format",
+    "piece": "Stable selected piece slug",
+    "flow": "Selected UAT journey slug",
+    "screen": "Selected surface/state slug"
   }
 }

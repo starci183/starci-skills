@@ -1,23 +1,15 @@
 {
   "schema": "starci/specification-policy@1",
   "storage": ".work",
-  "payload": "extensions.work3.specification",
+  "payload": "architecture + sourceRefs on one module-level work/node@2 index.yaml",
   "sourceTruth": "observed-not-approved-intent",
   "requiredSections": [
-    "sources",
-    "requirements",
-    "flows",
-    "codeImpacts",
-    "serviceImpacts",
-    "security",
-    "acceptance",
-    "decisions",
-    "handoff",
-    "serviceCalls",
-    "patternDecisions",
-    "securityReview",
-    "journeys",
-    "journeyCoverage"
+    "status",
+    "target",
+    "observations",
+    "gaps",
+    "target.saga",
+    "target.cqrs"
   ],
   "qualityExecutionOwner": [
     "interface.implement",
@@ -120,7 +112,7 @@
         "evidence"
       ],
       "action": {
-        "en": "Validate .work and requirement→flow→code/service→security→AC coverage. Write the JSON specification into extensions.work3.specification before review digest, with actual source-map/review evidence. Output code/service impact, contracts, security controls and verification plan to backend/FE implement; unresolved required ownership/compatibility decisions block handoff. No secondary is defined; do not invent calls. Design completion does not complete implementation or UAT. Require serviceCalls, patternDecisions and securityReview JSON and reject unresolved routing/pattern/security blockers before handoff. Record documentation citations separately from source evidence; a passing structural validator cannot prove a deployed endpoint or security control."
+        "en": "Validate the compact module architecture and current .work graph. Canonical index.yaml must contain target ownership, call chain, contracts, data/transaction/concurrency/security design, plus concrete Saga and CQRS designs. Put observed facts in observations and sourceRefs; record missing runtime mechanisms in gaps rather than claiming they exist. Architecture completion does not complete implementation or UAT."
       }
     }
   ],

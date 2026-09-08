@@ -1,20 +1,20 @@
 {
   "schema": "starci/specification-policy@1",
   "storage": ".work",
-  "payload": "extensions.work3.specification",
+  "payload": "business + sourceRefs on one module-level work/node@2 index.yaml",
   "sourceTruth": "observed-not-approved-intent",
   "requiredSections": [
-    "sources",
-    "requirements",
+    "module",
+    "purpose",
+    "scope",
+    "actors",
+    "functionalRequirements",
+    "dataAndStates",
     "flows",
-    "codeImpacts",
-    "serviceImpacts",
-    "security",
-    "acceptance",
-    "decisions",
-    "handoff",
-    "journeys",
-    "journeyCoverage"
+    "businessRules",
+    "nonFunctionalRequirements",
+    "acceptanceCriteria",
+    "unresolvedQuestions"
   ],
   "qualityExecutionOwner": [
     "interface.implement",
@@ -99,7 +99,7 @@
         "node"
       ],
       "action": {
-        "en": "Assign stable requirement/flow/AC IDs and Given/When/Then expectations, proof owner and instrument. Record decisions to implement/preserve/defer/not-applicable with authority and revisit condition. Store the full JSON payload in extensions.work3.specification and real dependencies/refs in core fields, not hidden prose. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned."
+        "en": "Write one compact module-level business object in canonical index.yaml. Use plain requirement titles and behavior, ordered actor/action/systemResponse flow steps, measurable nonFunctionalRequirements and Given/When/Then acceptanceCriteria. Keep unknown targets in unresolvedQuestions instead of inventing an SLA. Put observed repository citations in sourceRefs and graph bindings in refs/dependsOn; do not create per-clause IDs or hide the SRS in Markdown description."
       }
     },
     {

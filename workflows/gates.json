@@ -61,7 +61,7 @@
   "approvalTrust": "Receipts must come from actual user messages. This local validator binds receipts but cannot authenticate a human; the coordinator must never fabricate approvals.",
   "storage": {
     "business": "persistent-expandable-work-tree-with-stable-node-ids-and-done",
-    "workflow": ".work/_workflows/<run-id>/{goal,run}.yaml-local-only",
+    "workflow": "sibling .starci-workflows/<work-root>/<run-id>/{goal,run}.yaml-local-only",
     "manyWorkflows": "reuse-workTargets-and-contribute-evidence-to-the-same-nodes",
     "completion": "all-required-node-assertions-and-user-acceptance-not-workflow-status"
   }

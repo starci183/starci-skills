@@ -63,16 +63,15 @@
           "id": "node",
           "path": ".work/<business>/business/<piece>/index.yaml",
           "fields": [
-            "description: Objective / Glossary / Actors & permissions / FR / NFR / Business rules / Non-business constraints / State transitions / Acceptance / Decisions / Open questions",
+            "business",
+            "sourceRefs",
             "refs",
             "assertions",
-            "extensions.work3.decisions",
             "dependsOn",
-            "required",
-            "extensions.work3.specification"
+            "required"
           ],
           "content": {
-            "en": "FR rows: ID, actor, trigger, preconditions, input/schema, normal action/output, failure/denial, postcondition, priority, source and AC refs. NFR rows: metric, numeric target when decided, unit, workload, percentile/window, environment, measurement method and source; undecided targets stay unknown. BR rows: condition, decision, authority, affected transitions and exceptions. Technical/contractual constraints are separate from domain policy. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof. Store full structured requirements, ordered flows, codeImpacts, serviceImpacts, security, acceptance, sources, decisions and handoff in extensions.work3.specification. Keep reserved core metadata unchanged; .work is the canonical root."
+            "en": "Before module SRS work, capture the overall product in .work/business/index.yaml as businessOverview block prose using purpose, customerUnderstanding, desiredOutcome, scope and openQuestions in the customer’s natural language. Then write one compact module-level business object with purpose, inputs/outputs, scope/exclusions, actors, AI authority boundaries, functional requirements, data/states, flows, exceptions, rules, non-functional requirements, acceptance criteria and unresolved questions. Unknown numeric targets remain unresolved rather than invented. Keep citations in sourceRefs and graph bindings in refs/dependsOn; do not create per-clause nodes or IDs."
           }
         },
         {
@@ -95,7 +94,7 @@
         },
         {
           "id": "matrixHandoff",
-          "path": "E/job-result.json",
+          "path": "E/job-result.yaml",
           "fields": [
             "requestId",
             "requestDigest",
@@ -310,15 +309,15 @@
           "id": "node",
           "path": ".work/<business>/architecture/<piece>/index.yaml",
           "fields": [
-            "description: Observed system / Decision / Alternatives / Data ownership / Operations / API & events / Failure modes / Code scope / Verification / Open risks",
+            "architecture",
+            "sourceRefs",
             "refs",
             "dependsOn",
             "assertions",
-            "required",
-            "extensions.work3.specification"
+            "required"
           ],
           "content": {
-            "en": "For each operation specify caller, owner/writer, transport, request/response/errors, authorization, stores, transaction, idempotency/concurrency, event ordering, migrations and acceptance IDs. Code scope rows name repository ID, existing/proposed path, symbol/module, create/modify/delete intent, responsibility, callers, protected paths, tests and prerequisites. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof. Store full structured requirements, ordered flows, codeImpacts, serviceImpacts, security, acceptance, sources, decisions and handoff in extensions.work3.specification. Keep reserved core metadata unchanged; .work is the canonical root."
+            "en": "Write one compact module-level architecture object with observed/proposed status, target service ownership, call chain, contracts, data ownership, transaction/concurrency/security controls, mandatory Saga and CQRS designs, observations and explicit gaps. A target design does not claim its mechanisms already exist; cite current code only in sourceRefs and observations."
           }
         },
         {
@@ -522,7 +521,7 @@
         },
         {
           "id": "design",
-          "path": ".work/_resources/design/<resource>/resource.yaml + selected architecture/interface node",
+          "path": "N/index.yaml + N/assets/*",
           "purpose": {
             "en": "Read exact brand/source assets, surface anatomy, current design system, imagery rights/provenance and accepted references; consult available image/design skill when used."
           }
@@ -575,11 +574,12 @@
           "id": "node",
           "path": "N/index.yaml",
           "fields": [
-            "description: Brief / Regions / States / Assets / Direction decision / Implementation limits",
+            "ui: {status,intent,surfaces,states,accessibility,responsive,assets,observations,gaps}",
+            "assets:[{path}]",
             "assertions"
           ],
           "content": {
-            "en": "Specify actor/task, content authority, hierarchy, region anatomy, native controls, asset purpose/medium, responsive constraints and acceptance mapping. Record actual selected direction or unresolved material choice."
+            "en": "Write the selected UI direction to module/ui/index.yaml as readable block YAML. Generated design PNGs belong under ui/assets and every ui.assets path is also declared in top-level assets for byte binding."
           }
         },
         {
@@ -602,7 +602,7 @@
         },
         {
           "id": "handoff",
-          "path": "E/response.json",
+          "path": "E/response.yaml",
           "fields": [
             "schema",
             "requestId",
@@ -623,28 +623,28 @@
         },
         {
           "id": "designSource",
-          "path": ".work/_resources/design/<resource>/resource.yaml + .work/_resources/design/<resource>/assets/<asset>",
+          "path": "N/assets/direction.png",
           "fields": [
-            "files:[{path}]",
-            "details: accepted direction identity / source provenance"
+            "ui.assets:[{path,role,provenance}]",
+            "assets:[{path}]"
           ],
           "content": {
-            "en": "Write the selected approved art-direction asset as a canonical source input, with files paths relative to its resource.yaml directory. The core hashes actual bytes; do not author a sha256 field in files. Preserve the selected node graph: if its design resource/ref is missing, report the scope gap instead of silently adding a dependency. Generated/captured evidence images are not automatically design authority."
+            "en": "Store generated or accepted design PNGs under module/ui/assets. Do not place them under frontend implementation or UAT."
           }
         },
         {
           "id": "draws",
-          "path": "E/draws.json",
+          "path": "E/draws.yaml",
           "fields": [
             "draws"
           ],
           "content": {
-            "en": "Always emit the complete reviewed draws array, including standalone execution, with image artifact IDs and screen/state/viewport mappings. Use the same draws shape as the named frontend workflow; accepted resource assets remain canonical semantic inputs."
+            "en": "Emit the reviewed draw mapping as readable YAML beside the UI node; image bytes remain in N/assets."
           }
         },
         {
           "id": "matrixHandoff",
-          "path": "E/job-result.json",
+          "path": "E/job-result.yaml",
           "fields": [
             "requestId",
             "requestDigest",
@@ -820,14 +820,14 @@
         },
         {
           "id": "draws",
-          "path": "draws: imageRef[] from selected approved images + their canonical design resources/assets",
+          "path": "selected UI node index.yaml + its owned assets/*",
           "purpose": {
             "en": "Receive draws as one ordered array of actual image references, including a one-image array when only one image is supplied; never treat a single scalar or a caption as the array. Resolve each supplied image from its attachment, local asset or existing design resource without requiring the user to author metadata. Open and visually inspect every image. Record a stable reference, source revision/hash when available, screen, state, viewport and role for each entry in the input map; infer only observable mappings and label unknowns. The selected array is not an alternatives vote: unclear alternatives, approval or contradictory images require a scoped decision. Preserve every entry and its relation to other images; never use only the first image or silently omit inconvenient states. An empty array is allowed only when the selected scope explicitly has no draw input; a missing required array or unreadable image blocks the affected piece. Canonical design refs/files must already be declared where required by the selected graph; report a binding gap rather than changing the graph."
           }
         },
         {
           "id": "design",
-          "path": ".work/_resources/design/<resource>/resource.yaml + accepted direction evidence",
+          "path": "selected UI node index.yaml + its owned assets/*",
           "purpose": {
             "en": "Read the actual installed component API/tokens and accepted surface/direction/state map; only require a separate visual direction if this task selected one."
           }
@@ -897,7 +897,7 @@
         },
         {
           "id": "evidence",
-          "path": "E/manifest.yaml + E/draws-review.json + E/input-map.md + E/regression.json when repair + E/tests.json + E/render.png + E/render-review.md + E/runtime.json + E/lineage.json + E/result.md",
+          "path": "N/assets/running-page.png",
           "fields": [
             "id",
             "nodeId",
@@ -915,7 +915,7 @@
         },
         {
           "id": "handoff",
-          "path": "E/response.json",
+          "path": "E/response.yaml",
           "fields": [
             "schema",
             "requestId",
@@ -949,7 +949,7 @@
         },
         {
           "id": "matrixHandoff",
-          "path": "E/job-result.json",
+          "path": "E/job-result.yaml",
           "fields": [
             "requestId",
             "requestDigest",
@@ -1031,7 +1031,7 @@
             "assetManifest"
           ],
           "action": {
-            "en": "Implement the mapped screens and shared layout once using actual installed components, tokens and repository conventions. Apply scoped creation, refinement or the smallest defect repair; retain cross-image consistency, responsive behavior, keyboard and focus. Follow applicable knowledge even where literal image copying would violate it; unresolved material design conflicts remain blocked. Account for every asset visible in every input draw. Reuse a verified matching asset or create/generate the required asset, inspect it and integrate its actual source file. Claude with no image-generation capability may reserve a blank decorative slot with a deferred brief; never use invented URLs, broken images or label pending art complete. Functional asset requirements remain blocking. Record E/assets.json even when the reviewed draws need no distinct assets."
+            "en": "Implement the mapped screens and shared layout once using actual installed components, tokens and repository conventions. Apply scoped creation, refinement or the smallest defect repair; retain cross-image consistency, responsive behavior, keyboard and focus. Follow applicable knowledge even where literal image copying would violate it; unresolved material design conflicts remain blocked. Account for every asset visible in every input draw. Reuse a verified matching asset or create/generate the required asset, inspect it and integrate its actual source file. Claude with no image-generation capability may reserve a blank decorative slot with a deferred brief; never use invented URLs, broken images or label pending art complete. Functional asset requirements remain blocking. Record E/assets.json even when the reviewed draws need no distinct assets. Write the frontend source summary only to implementation/frontend/index.yaml. Store only running-page screenshots in implementation/frontend/assets; design PNGs remain in ui/assets and UAT captures remain with their flow."
           }
         },
         {

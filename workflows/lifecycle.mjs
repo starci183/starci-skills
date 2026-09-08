@@ -64,13 +64,11 @@ export {digest as workflowDigest};
 export function saveRun(run,runId=run.goal.id){
  bound(run);requireThat(workStatus(run.workRoot).status==='ready','A valid Work root is required before local tracking');
  requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(runId),'Unsafe workflow run ID');
- const dir=path.join(run.workRoot,'_workflows',runId);
- for(const file of [path.join(run.workRoot,'_workflows'),dir,path.join(dir,'goal.yaml'),path.join(dir,'run.yaml'),path.join(run.workRoot,'.gitignore')])requireThat(!fs.existsSync(file)||!fs.lstatSync(file).isSymbolicLink(),'Local tracking cannot follow symlinks');
+ const sessions=path.join(path.dirname(run.workRoot),'.starci-workflows',path.basename(run.workRoot)),dir=path.join(sessions,runId);
+ for(const file of [path.dirname(sessions),sessions,dir,path.join(dir,'goal.yaml'),path.join(dir,'run.yaml')])requireThat(!fs.existsSync(file)||!fs.lstatSync(file).isSymbolicLink(),'Local tracking cannot follow symlinks');
  const goalFile=path.join(dir,'goal.yaml');
  if(fs.existsSync(goalFile))requireThat(parseYaml(fs.readFileSync(goalFile,'utf8')).goalDigest===run.goalDigest,'Run ID already belongs to another goal; use a new run ID');
  fs.mkdirSync(dir,{recursive:true});
- const ignore=path.join(run.workRoot,'.gitignore'),text=fs.existsSync(ignore)?fs.readFileSync(ignore,'utf8'):'';
- if(!text.split(/\r?\n/).some(line=>['_workflows/','/_workflows/'].includes(line.trim())))fs.writeFileSync(ignore,text+(text&&!text.endsWith('\n')?'\n':'')+'_workflows/\n');
  fs.writeFileSync(goalFile,stringifyYaml({...run.goal,goalDigest:run.goalDigest,workRoot:run.workRoot,repositoryRoots:run.repositories}));
  fs.writeFileSync(path.join(dir,'run.yaml'),stringifyYaml(run));return dir;
 }

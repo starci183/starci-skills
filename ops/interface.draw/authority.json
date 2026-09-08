@@ -28,19 +28,19 @@
       },
       {
         "id": "handoff",
-        "path": "E/response.json"
+        "path": "E/response.yaml"
       },
       {
         "id": "designSource",
-        "path": ".work/_resources/design/<resource>/resource.yaml + .work/_resources/design/<resource>/assets/<asset>"
+        "path": "N/assets/direction.png"
       },
       {
         "id": "draws",
-        "path": "E/draws.json"
+        "path": "E/draws.yaml"
       },
       {
         "id": "matrixHandoff",
-        "path": "E/job-result.json"
+        "path": "E/job-result.yaml"
       }
     ],
     "allowedEffects": [

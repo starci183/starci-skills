@@ -15,7 +15,7 @@
   ],
   "graphPolicy": {
     "mode": "read-only",
-    "location": ".work node dependsOn/refs and resource files",
+    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -64,14 +64,14 @@
     },
     {
       "id": "draws",
-      "path": "draws: imageRef[] from selected approved images + their canonical design resources/assets",
+      "path": "selected UI node index.yaml + its owned assets/*",
       "purpose": {
         "en": "Receive draws as one ordered array of actual image references, including a one-image array when only one image is supplied; never treat a single scalar or a caption as the array. Resolve each supplied image from its attachment, local asset or existing design resource without requiring the user to author metadata. Open and visually inspect every image. Record a stable reference, source revision/hash when available, screen, state, viewport and role for each entry in the input map; infer only observable mappings and label unknowns. The selected array is not an alternatives vote: unclear alternatives, approval or contradictory images require a scoped decision. Preserve every entry and its relation to other images; never use only the first image or silently omit inconvenient states. An empty array is allowed only when the selected scope explicitly has no draw input; a missing required array or unreadable image blocks the affected piece. Canonical design refs/files must already be declared where required by the selected graph; report a binding gap rather than changing the graph."
       }
     },
     {
       "id": "design",
-      "path": ".work/_resources/design/<resource>/resource.yaml + accepted direction evidence",
+      "path": "selected UI node index.yaml + its owned assets/*",
       "purpose": {
         "en": "Read the actual installed component API/tokens and accepted surface/direction/state map; only require a separate visual direction if this task selected one."
       }
@@ -141,7 +141,7 @@
     },
     {
       "id": "evidence",
-      "path": "E/manifest.yaml + E/draws-review.json + E/input-map.md + E/regression.json when repair + E/tests.json + E/render.png + E/render-review.md + E/runtime.json + E/lineage.json + E/result.md",
+      "path": "N/assets/running-page.png",
       "fields": [
         "id",
         "nodeId",
@@ -159,7 +159,7 @@
     },
     {
       "id": "handoff",
-      "path": "E/response.json",
+      "path": "E/response.yaml",
       "fields": [
         "schema",
         "requestId",
@@ -193,7 +193,7 @@
     },
     {
       "id": "matrixHandoff",
-      "path": "E/job-result.json",
+      "path": "E/job-result.yaml",
       "fields": [
         "requestId",
         "requestDigest",
@@ -275,7 +275,7 @@
         "assetManifest"
       ],
       "action": {
-        "en": "Implement the mapped screens and shared layout once using actual installed components, tokens and repository conventions. Apply scoped creation, refinement or the smallest defect repair; retain cross-image consistency, responsive behavior, keyboard and focus. Follow applicable knowledge even where literal image copying would violate it; unresolved material design conflicts remain blocked. Account for every asset visible in every input draw. Reuse a verified matching asset or create/generate the required asset, inspect it and integrate its actual source file. Claude with no image-generation capability may reserve a blank decorative slot with a deferred brief; never use invented URLs, broken images or label pending art complete. Functional asset requirements remain blocking. Record E/assets.json even when the reviewed draws need no distinct assets."
+        "en": "Implement the mapped screens and shared layout once using actual installed components, tokens and repository conventions. Apply scoped creation, refinement or the smallest defect repair; retain cross-image consistency, responsive behavior, keyboard and focus. Follow applicable knowledge even where literal image copying would violate it; unresolved material design conflicts remain blocked. Account for every asset visible in every input draw. Reuse a verified matching asset or create/generate the required asset, inspect it and integrate its actual source file. Claude with no image-generation capability may reserve a blank decorative slot with a deferred brief; never use invented URLs, broken images or label pending art complete. Functional asset requirements remain blocking. Record E/assets.json even when the reviewed draws need no distinct assets. Write the frontend source summary only to implementation/frontend/index.yaml. Store only running-page screenshots in implementation/frontend/assets; design PNGs remain in ui/assets and UAT captures remain with their flow."
       }
     },
     {
@@ -453,18 +453,18 @@
     }
   ],
   "placeholders": {
-    "business": "Selected business slug / slug nghiệp vụ đã chọn",
-    "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-    "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-    "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-    "environment": "Resolved environment resource slug / slug environment đã resolve",
-    "identity": "Selected actor resource slug / slug actor đã chọn",
-    "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-    "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-    "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-    "piece": "Stable selected piece slug / slug piece đã chọn",
-    "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-    "screen": "Selected surface/state slug / slug screen-state đã chọn"
+    "business": "Selected business slug",
+    "repo-id": "Resolved direct repository name or path",
+    "bound-paths": "Inspected source read set",
+    "write-ceiling": "Explicit owned source paths",
+    "environment": "Resolved environment label",
+    "identity": "Selected actor label",
+    "fixture": "Selected fixture path",
+    "resource": "Selected owned asset name",
+    "asset": "Actual selected source asset filename/format",
+    "piece": "Stable selected piece slug",
+    "flow": "Selected UAT journey slug",
+    "screen": "Selected surface/state slug"
   },
   "commitPolicy": {
     "mode": "scoped-local-commit",

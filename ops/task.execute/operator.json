@@ -14,7 +14,7 @@
   ],
   "graphPolicy": {
     "mode": "read-only",
-    "location": ".work node dependsOn/refs and resource files",
+    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },

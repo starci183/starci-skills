@@ -12,7 +12,7 @@
   ],
   "graphPolicy": {
     "mode": "read-only",
-    "location": ".work node dependsOn/refs and resource files",
+    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -139,18 +139,18 @@
     }
   ],
   "placeholders": {
-    "business": "Selected business slug / slug nghiệp vụ đã chọn",
-    "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-    "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-    "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-    "environment": "Resolved environment resource slug / slug environment đã resolve",
-    "identity": "Selected actor resource slug / slug actor đã chọn",
-    "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-    "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-    "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-    "piece": "Stable selected piece slug / slug piece đã chọn",
-    "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-    "screen": "Selected surface/state slug / slug screen-state đã chọn"
+    "business": "Selected business slug",
+    "repo-id": "Resolved direct repository name or path",
+    "bound-paths": "Inspected source read set",
+    "write-ceiling": "Explicit owned source paths",
+    "environment": "Resolved environment label",
+    "identity": "Selected actor label",
+    "fixture": "Selected fixture path",
+    "resource": "Selected owned asset name",
+    "asset": "Actual selected source asset filename/format",
+    "piece": "Stable selected piece slug",
+    "flow": "Selected UAT journey slug",
+    "screen": "Selected surface/state slug"
   },
   "modePolicy": {
     "selection": "required-exactly-one",
@@ -173,7 +173,7 @@
       ],
       "graphPolicy": {
         "mode": "selected-scope-only",
-        "location": ".work node dependsOn/refs and resource files",
+        "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
         "prerequisiteState": "done",
         "dispatch": "never"
       },
@@ -241,7 +241,7 @@
             "extensions.work3.nativeGoal: actual returned current-task goal reference only"
           ],
           "content": {
-            "en": "Write the parent purpose with no state. The one setup leaf .work/<business>/setup/index.yaml is N for this op, kind business, with only scope-review assertions. All planned confirmed business/architecture/code/UAT leaves remain todo. Source-generated scope awaiting confirmation is uninvestigate; unresolved impediments use blockers[], and non-applicable scope stays outside required leaves. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. Repository binding is an internal part of this complete preparation job, not a separate prerequisite node. Declare only genuinely selected downstream business targets with expected assertions, todo; do not invent accepted business intent. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
+            "en": "Capture the customer-language product overview first in .work/business/index.yaml using readable block prose for purpose, customerUnderstanding, desiredOutcome, scope and openQuestions; it does not approve inferred module requirements. Write other parent purpose with no state. The one setup leaf .work/<business>/setup/index.yaml is N for this op, kind business, with only scope-review assertions. All planned confirmed business/architecture/code/UAT leaves remain todo. Source-generated scope awaiting confirmation is uninvestigate; unresolved impediments use blockers[], and non-applicable scope stays outside required leaves. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. Repository binding is an internal part of this complete preparation job, not a separate prerequisite node. Declare only genuinely selected downstream business targets with expected assertions, todo; do not invent accepted business intent. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
           }
         },
         {
@@ -411,18 +411,18 @@
         }
       ],
       "placeholders": {
-        "business": "Selected business slug / slug nghiệp vụ đã chọn",
-        "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-        "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-        "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-        "environment": "Resolved environment resource slug / slug environment đã resolve",
-        "identity": "Selected actor resource slug / slug actor đã chọn",
-        "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-        "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-        "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-        "piece": "Stable selected piece slug / slug piece đã chọn",
-        "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-        "screen": "Selected surface/state slug / slug screen-state đã chọn"
+        "business": "Selected business slug",
+        "repo-id": "Resolved repository resource ID",
+        "bound-paths": "Inspected source read set",
+        "write-ceiling": "Explicit owned source paths",
+        "environment": "Resolved environment resource slug",
+        "identity": "Selected actor resource slug",
+        "fixture": "Selected fixture resource slug",
+        "resource": "Selected owned resource slug",
+        "asset": "Actual selected source asset filename/format",
+        "piece": "Stable selected piece slug",
+        "flow": "Selected UAT journey slug",
+        "screen": "Selected surface/state slug"
       }
     },
     "import": {
@@ -441,7 +441,7 @@
       ],
       "graphPolicy": {
         "mode": "selected-scope-only",
-        "location": ".work node dependsOn/refs and resource files",
+        "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
         "prerequisiteState": "done",
         "dispatch": "never"
       },
@@ -527,7 +527,7 @@
             "description: Pilot boundary / Observed source mapping / Approved intent / Candidate scope / Unknowns"
           ],
           "content": {
-            "en": "N is the operations migration-review leaf, with inventory/preservation/import assertions; the business parent has no state/completion. Every newly imported business/architecture/implementation/UAT leaf starts state:uninvestigate with activity:idle and no completion, even if old notes say done. Assign stable IDs, observed source citations versus candidate requirements, and only approved graph scope. Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its business-review and workflow-review targets before consumers run; their expected assertions remain bounded to intent review and imported graph integrity, never product completion. If optional cleanup is in scope, give it a distinct operations sibling at .work/<business>/cleanup/index.yaml, never a child of N, with exact deletion assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn an incomplete parent done. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
+            "en": "N is the operations migration-review leaf, with inventory/preservation/import assertions; the business parent has no state/completion. Capture the current customer-language product overview in .work/business/index.yaml before module SRS import. Every newly imported business/architecture/ui/implementation/UAT leaf starts state:uninvestigate with activity:idle and no completion, even if old notes say done. Assign stable IDs, observed source citations versus candidate requirements, and only approved graph scope. Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its business-review and workflow-review targets before consumers run; their expected assertions remain bounded to intent review and imported graph integrity, never product completion. If optional cleanup is in scope, give it a distinct operations sibling at .work/<business>/cleanup/index.yaml, never a child of N, with exact deletion assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn an incomplete parent done. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
           }
         },
         {
@@ -747,19 +747,19 @@
         }
       ],
       "placeholders": {
-        "business": "Selected business slug / slug nghiệp vụ đã chọn",
-        "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-        "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-        "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-        "environment": "Resolved environment resource slug / slug environment đã resolve",
-        "identity": "Selected actor resource slug / slug actor đã chọn",
-        "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-        "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-        "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-        "piece": "Stable selected piece slug / slug piece đã chọn",
-        "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-        "screen": "Selected surface/state slug / slug screen-state đã chọn",
-        "retirement-target": "Exact inventoried old directory relative to the bound repository, verified within the selected ceiling / thư mục cũ inventory chính xác tương đối repo trong ceiling"
+        "business": "Selected business slug",
+        "repo-id": "Resolved repository resource ID",
+        "bound-paths": "Inspected source read set",
+        "write-ceiling": "Explicit owned source paths",
+        "environment": "Resolved environment resource slug",
+        "identity": "Selected actor resource slug",
+        "fixture": "Selected fixture resource slug",
+        "resource": "Selected owned resource slug",
+        "asset": "Actual selected source asset filename/format",
+        "piece": "Stable selected piece slug",
+        "flow": "Selected UAT journey slug",
+        "screen": "Selected surface/state slug",
+        "retirement-target": "Exact inventoried old directory relative to the bound repository, verified within the selected ceiling"
       },
       "migrationPolicy": {
         "scope": "one-selected-business",

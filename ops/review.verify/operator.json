@@ -12,7 +12,7 @@
   ],
   "graphPolicy": {
     "mode": "read-only",
-    "location": ".work node dependsOn/refs and resource files",
+    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -139,19 +139,19 @@
     }
   ],
   "placeholders": {
-    "business": "Selected business slug / slug nghiệp vụ đã chọn",
-    "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-    "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-    "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-    "environment": "Resolved environment resource slug / slug environment đã resolve",
-    "identity": "Selected actor resource slug / slug actor đã chọn",
-    "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-    "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-    "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-    "piece": "Stable selected piece slug / slug piece đã chọn",
-    "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-    "screen": "Selected surface/state slug / slug screen-state đã chọn",
-    "gate": "Declared repository gate ID / ID gate repo đã khai"
+    "business": "Selected business slug",
+    "repo-id": "Resolved direct repository name or path",
+    "bound-paths": "Inspected source read set",
+    "write-ceiling": "Explicit owned source paths",
+    "environment": "Resolved environment label",
+    "identity": "Selected actor label",
+    "fixture": "Selected fixture path",
+    "resource": "Selected owned asset name",
+    "asset": "Actual selected source asset filename/format",
+    "piece": "Stable selected piece slug",
+    "flow": "Selected UAT journey slug",
+    "screen": "Selected surface/state slug",
+    "gate": "Declared repository gate ID"
   },
   "modePolicy": {
     "selection": "required-exactly-one",
@@ -172,7 +172,7 @@
       "sideEffects": [],
       "graphPolicy": {
         "mode": "read-only",
-        "location": ".work node dependsOn/refs and resource files",
+        "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
         "prerequisiteState": "done",
         "dispatch": "never"
       },
@@ -311,19 +311,19 @@
         }
       ],
       "placeholders": {
-        "business": "Selected business slug / slug nghiệp vụ đã chọn",
-        "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-        "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-        "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-        "environment": "Resolved environment resource slug / slug environment đã resolve",
-        "identity": "Selected actor resource slug / slug actor đã chọn",
-        "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-        "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-        "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-        "piece": "Stable selected piece slug / slug piece đã chọn",
-        "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-        "screen": "Selected surface/state slug / slug screen-state đã chọn",
-        "gate": "Declared repository gate ID / ID gate repo đã khai"
+        "business": "Selected business slug",
+        "repo-id": "Resolved repository resource ID",
+        "bound-paths": "Inspected source read set",
+        "write-ceiling": "Explicit owned source paths",
+        "environment": "Resolved environment resource slug",
+        "identity": "Selected actor resource slug",
+        "fixture": "Selected fixture resource slug",
+        "resource": "Selected owned resource slug",
+        "asset": "Actual selected source asset filename/format",
+        "piece": "Stable selected piece slug",
+        "flow": "Selected UAT journey slug",
+        "screen": "Selected surface/state slug",
+        "gate": "Declared repository gate ID"
       }
     },
     "business": {
@@ -338,7 +338,7 @@
       "sideEffects": [],
       "graphPolicy": {
         "mode": "read-only",
-        "location": ".work node dependsOn/refs and resource files",
+        "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
         "prerequisiteState": "done",
         "dispatch": "never"
       },
@@ -522,18 +522,18 @@
         }
       ],
       "placeholders": {
-        "business": "Selected business slug / slug nghiệp vụ đã chọn",
-        "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-        "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-        "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-        "environment": "Resolved environment resource slug / slug environment đã resolve",
-        "identity": "Selected actor resource slug / slug actor đã chọn",
-        "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-        "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-        "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-        "piece": "Stable selected piece slug / slug piece đã chọn",
-        "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-        "screen": "Selected surface/state slug / slug screen-state đã chọn"
+        "business": "Selected business slug",
+        "repo-id": "Resolved repository resource ID",
+        "bound-paths": "Inspected source read set",
+        "write-ceiling": "Explicit owned source paths",
+        "environment": "Resolved environment resource slug",
+        "identity": "Selected actor resource slug",
+        "fixture": "Selected fixture resource slug",
+        "resource": "Selected owned resource slug",
+        "asset": "Actual selected source asset filename/format",
+        "piece": "Stable selected piece slug",
+        "flow": "Selected UAT journey slug",
+        "screen": "Selected surface/state slug"
       }
     },
     "workflow": {
@@ -548,7 +548,7 @@
       "sideEffects": [],
       "graphPolicy": {
         "mode": "read-only",
-        "location": ".work node dependsOn/refs and resource files",
+        "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
         "prerequisiteState": "done",
         "dispatch": "never"
       },
@@ -719,18 +719,18 @@
         }
       ],
       "placeholders": {
-        "business": "Selected business slug / slug nghiệp vụ đã chọn",
-        "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-        "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-        "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-        "environment": "Resolved environment resource slug / slug environment đã resolve",
-        "identity": "Selected actor resource slug / slug actor đã chọn",
-        "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-        "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-        "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-        "piece": "Stable selected piece slug / slug piece đã chọn",
-        "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-        "screen": "Selected surface/state slug / slug screen-state đã chọn"
+        "business": "Selected business slug",
+        "repo-id": "Resolved repository resource ID",
+        "bound-paths": "Inspected source read set",
+        "write-ceiling": "Explicit owned source paths",
+        "environment": "Resolved environment resource slug",
+        "identity": "Selected actor resource slug",
+        "fixture": "Selected fixture resource slug",
+        "resource": "Selected owned resource slug",
+        "asset": "Actual selected source asset filename/format",
+        "piece": "Stable selected piece slug",
+        "flow": "Selected UAT journey slug",
+        "screen": "Selected surface/state slug"
       }
     },
     "visual": {
@@ -747,7 +747,7 @@
       ],
       "graphPolicy": {
         "mode": "read-only",
-        "location": ".work node dependsOn/refs and resource files",
+        "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
         "prerequisiteState": "done",
         "dispatch": "never"
       },
@@ -966,18 +966,18 @@
         }
       ],
       "placeholders": {
-        "business": "Selected business slug / slug nghiệp vụ đã chọn",
-        "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-        "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-        "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-        "environment": "Resolved environment resource slug / slug environment đã resolve",
-        "identity": "Selected actor resource slug / slug actor đã chọn",
-        "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-        "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-        "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-        "piece": "Stable selected piece slug / slug piece đã chọn",
-        "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-        "screen": "Selected surface/state slug / slug screen-state đã chọn"
+        "business": "Selected business slug",
+        "repo-id": "Resolved repository resource ID",
+        "bound-paths": "Inspected source read set",
+        "write-ceiling": "Explicit owned source paths",
+        "environment": "Resolved environment resource slug",
+        "identity": "Selected actor resource slug",
+        "fixture": "Selected fixture resource slug",
+        "resource": "Selected owned resource slug",
+        "asset": "Actual selected source asset filename/format",
+        "piece": "Stable selected piece slug",
+        "flow": "Selected UAT journey slug",
+        "screen": "Selected surface/state slug"
       }
     },
     "api": {
@@ -994,7 +994,7 @@
       ],
       "graphPolicy": {
         "mode": "read-only",
-        "location": ".work node dependsOn/refs and resource files",
+        "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
         "prerequisiteState": "done",
         "dispatch": "never"
       },
@@ -1219,18 +1219,18 @@
         }
       ],
       "placeholders": {
-        "business": "Selected business slug / slug nghiệp vụ đã chọn",
-        "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
-        "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
-        "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
-        "environment": "Resolved environment resource slug / slug environment đã resolve",
-        "identity": "Selected actor resource slug / slug actor đã chọn",
-        "fixture": "Selected fixture resource slug / slug fixture đã chọn",
-        "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
-        "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
-        "piece": "Stable selected piece slug / slug piece đã chọn",
-        "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
-        "screen": "Selected surface/state slug / slug screen-state đã chọn"
+        "business": "Selected business slug",
+        "repo-id": "Resolved repository resource ID",
+        "bound-paths": "Inspected source read set",
+        "write-ceiling": "Explicit owned source paths",
+        "environment": "Resolved environment resource slug",
+        "identity": "Selected actor resource slug",
+        "fixture": "Selected fixture resource slug",
+        "resource": "Selected owned resource slug",
+        "asset": "Actual selected source asset filename/format",
+        "piece": "Stable selected piece slug",
+        "flow": "Selected UAT journey slug",
+        "screen": "Selected surface/state slug"
       }
     }
   }
