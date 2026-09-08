@@ -19,7 +19,7 @@
   "reads": [
     {
       "id": "target",
-      "path": "N/index.yaml",
+      "path": "N/index.md",
       "purpose": {
         "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
       }
@@ -49,7 +49,7 @@
   "writes": [
     {
       "id": "node",
-      "path": "N/index.yaml",
+      "path": "N/index.md",
       "fields": [
         "completion.inputDigest",
         "completion.evidence"
@@ -187,7 +187,7 @@
         },
         {
           "id": "target",
-          "path": "N/index.yaml",
+          "path": "N/index.md",
           "purpose": {
             "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
           }
@@ -229,7 +229,7 @@
         },
         {
           "id": "node",
-          "path": ".work/<business>/index.yaml + .work/<business>/setup/index.yaml + selected child directories/index.yaml",
+          "path": ".work/<business>/index.md + .work/<business>/setup/index.md + selected child directories/index.md",
           "fields": [
             "id",
             "kind",
@@ -241,7 +241,7 @@
             "extensions.work3.nativeGoal: actual returned current-task goal reference only"
           ],
           "content": {
-            "en": "Write the parent purpose with no state. The one setup leaf .work/<business>/setup/index.yaml is N for this op, kind business, with only scope-review assertions. All planned business/architecture/code/UAT leaves remain todo, or explicit blocked/na with real reasons. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. Repository binding is an internal part of this complete preparation job, not a separate prerequisite node. Declare only genuinely selected downstream business targets with expected assertions, todo; do not invent accepted business intent. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
+            "en": "Write the parent purpose with no state. The one setup leaf .work/<business>/setup/index.md is N for this op, kind business, with only scope-review assertions. All planned confirmed business/architecture/code/UAT leaves remain todo. Source-generated scope awaiting confirmation is uninvestigate; unresolved impediments use blockers[], and non-applicable scope stays outside required leaves. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. Repository binding is an internal part of this complete preparation job, not a separate prerequisite node. Declare only genuinely selected downstream business targets with expected assertions, todo; do not invent accepted business intent. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
           }
         },
         {
@@ -448,7 +448,7 @@
       "reads": [
         {
           "id": "target",
-          "path": "N/index.yaml",
+          "path": "N/index.md",
           "purpose": {
             "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
           }
@@ -511,7 +511,7 @@
         },
         {
           "id": "node",
-          "path": ".work/<business>/index.yaml + .work/<business>/migration/index.yaml + optional .work/<business>/cleanup/index.yaml + selected imported child directories/index.yaml",
+          "path": ".work/<business>/index.md + .work/<business>/migration/index.md + optional .work/<business>/cleanup/index.md + selected imported child directories/index.md",
           "fields": [
             "schema",
             "id",
@@ -521,12 +521,13 @@
             "refs",
             "assertions",
             "state",
-            "suspensionReason",
+            "activity",
+            "blockers",
             "completion",
             "body: Pilot boundary / Observed source mapping / Approved intent / Candidate scope / Unknowns"
           ],
           "content": {
-            "en": "N is the operations migration-review leaf, with inventory/preservation/import assertions; the business parent has no state/completion. Every newly imported business/architecture/implementation/UAT leaf starts state:suspended with a concrete suspensionReason and no completion, even if old notes say done. Assign stable IDs, observed source citations versus candidate requirements, and only approved graph scope. Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its business-review and workflow-review targets before consumers run; their expected assertions remain bounded to intent review and imported graph integrity, never product completion. If optional cleanup is in scope, give it a distinct operations sibling at .work/<business>/cleanup/index.yaml, never a child of N, with exact deletion assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn an incomplete parent done. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
+            "en": "N is the operations migration-review leaf, with inventory/preservation/import assertions; the business parent has no state/completion. Every newly imported business/architecture/implementation/UAT leaf starts state:uninvestigate with activity:idle and no completion, even if old notes say done. Assign stable IDs, observed source citations versus candidate requirements, and only approved graph scope. Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its business-review and workflow-review targets before consumers run; their expected assertions remain bounded to intent review and imported graph integrity, never product completion. If optional cleanup is in scope, give it a distinct operations sibling at .work/<business>/cleanup/index.md, never a child of N, with exact deletion assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn an incomplete parent done. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
           }
         },
         {
@@ -649,7 +650,7 @@
             "resources"
           ],
           "action": {
-            "en": "Author the selected candidate tree and canonical source resources. Imported leaves are suspended with a specific suspensionReason until their own selected review/implementation/UAT proof; do not add completion. Preserve approved existing nodes. Declare only actual selected graph edges and preset review targets when explicitly requested; unresolved edges are recorded as unknown rather than invented IDs."
+            "en": "Author the selected candidate tree and canonical source resources. Imported leaves are uninvestigate with activity:idle until their own selected review/implementation/UAT proof; do not add completion. Preserve approved existing nodes. Declare only actual selected graph edges and preset review targets when explicitly requested; unresolved edges are recorded as unknown rather than invented IDs."
           }
         },
         {
@@ -683,7 +684,7 @@
             "matrixHandoff"
           ],
           "action": {
-            "en": "Finalize semantic scope/resources first, obtain the real inputDigest, then verify imported IDs/refs/assertions, preservation hashes and all suspended states. Write only observed migration evidence and migration-review completion after verification. Keep product children suspended and cleanup truth explicit; commit only selected documentation when authorized, record actual commit separately in evidence, then stop. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+            "en": "Finalize semantic scope/resources first, obtain the real inputDigest, then verify imported IDs/refs/assertions, preservation hashes and all uninvestigate states. Write only observed migration evidence and migration-review completion after verification. Keep product children uninvestigate and cleanup truth explicit; commit only selected documentation when authorized, record actual commit separately in evidence, then stop. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
           }
         }
       ],
@@ -707,9 +708,9 @@
           }
         },
         {
-          "id": "suspension",
+          "id": "investigation-state",
           "requirement": {
-            "en": "Imported product leaves are stored suspended with suspensionReason and without completion; they cannot satisfy done-only dependencies or receive migration evidence as product acceptance."
+            "en": "Imported product leaves are stored uninvestigate with activity:idle and without completion; they cannot satisfy done-only dependencies or receive migration evidence as product acceptance."
           }
         },
         {
@@ -762,8 +763,8 @@
       },
       "migrationPolicy": {
         "scope": "one-selected-business",
-        "importState": "suspended",
-        "reasonField": "suspensionReason",
+        "importState": "uninvestigate",
+        "initialActivity": "idle",
         "importCompletion": "forbidden",
         "intentAuthority": "approved-intent-not-inferred-source",
         "cleanup": "explicit-exact-preserved-inactive-only",

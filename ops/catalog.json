@@ -11,7 +11,7 @@
         "architecture"
       ],
       "writeScope": [
-        ".work/<business>/architecture/<piece>/index.yaml",
+        ".work/<business>/architecture/<piece>/index.md",
         "E/manifest.yaml + E/source-map.json + E/design-review.md",
         "E/job-result.json"
       ],
@@ -42,14 +42,14 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
               "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
             }
           },
           {
             "id": "business",
-            "path": ".work/<business>/business/**/index.yaml",
+            "path": ".work/<business>/business/**/index.md",
             "purpose": {
               "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
             }
@@ -93,7 +93,7 @@
         "writes": [
           {
             "id": "node",
-            "path": ".work/<business>/architecture/<piece>/index.yaml",
+            "path": ".work/<business>/architecture/<piece>/index.md",
             "fields": [
               "body: Observed system / Decision / Alternatives / Data ownership / Operations / API & events / Failure modes / Code scope / Verification / Open risks",
               "refs",
@@ -447,7 +447,7 @@
         "implementation"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "repository:<repo-id>/<write-ceiling>",
         "E/manifest.yaml + E/tests.json + E/test-output.txt + E/lineage.json + E/result.md",
         "E/job-result.json",
@@ -490,21 +490,21 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
-              "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+              "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
             }
           },
           {
             "id": "business",
-            "path": ".work/<business>/business/**/index.yaml",
+            "path": ".work/<business>/business/**/index.md",
             "purpose": {
               "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
             }
           },
           {
             "id": "architecture",
-            "path": ".work/<business>/architecture/**/index.yaml",
+            "path": ".work/<business>/architecture/**/index.md",
             "purpose": {
               "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
             }
@@ -534,7 +534,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "state",
               "blocker",
@@ -782,7 +782,7 @@
         "business"
       ],
       "writeScope": [
-        ".work/<business>/business/<piece>/index.yaml",
+        ".work/<business>/business/<piece>/index.md",
         "E/manifest.yaml + E/coverage-review.md",
         "E/job-result.json"
       ],
@@ -808,7 +808,7 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
               "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
             }
@@ -852,7 +852,7 @@
         "writes": [
           {
             "id": "node",
-            "path": ".work/<business>/business/<piece>/index.yaml",
+            "path": ".work/<business>/business/<piece>/index.md",
             "fields": [
               "body: Objective / Glossary / Actors & permissions / FR / NFR / Business rules / Non-business constraints / State transitions / Acceptance / Decisions / Open questions",
               "refs",
@@ -1180,7 +1180,7 @@
         "implementation"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "repository:<repo-id>/<write-ceiling>",
         "E/manifest.yaml + E/content-review.md + E/source-map.json + E/example-tests.json when executable + E/media-review.md when generated + E/result.md",
         "E/job-result.json"
@@ -1213,14 +1213,14 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
-              "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+              "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
             }
           },
           {
             "id": "business",
-            "path": ".work/<business>/business/**/index.yaml",
+            "path": ".work/<business>/business/**/index.md",
             "purpose": {
               "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
             }
@@ -1257,7 +1257,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "state",
               "blocker",
@@ -1448,7 +1448,7 @@
         "architecture"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "E/manifest.yaml + E/direction.png or actual requested format + E/prompt.txt + E/visual-review.md",
         "E/response.json",
         ".work/_resources/design/<resource>/resource.yaml + .work/_resources/design/<resource>/assets/<asset>",
@@ -1490,14 +1490,14 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
-              "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+              "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
             }
           },
           {
             "id": "business",
-            "path": ".work/<business>/business/**/index.yaml",
+            "path": ".work/<business>/business/**/index.md",
             "purpose": {
               "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
             }
@@ -1525,7 +1525,7 @@
           },
           {
             "id": "architecture",
-            "path": ".work/<business>/architecture/**/index.yaml",
+            "path": ".work/<business>/architecture/**/index.md",
             "purpose": {
               "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
             }
@@ -1555,7 +1555,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "body: Brief / Regions / States / Assets / Direction decision / Implementation limits",
               "assertions"
@@ -1773,7 +1773,7 @@
         "implementation"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "repository:<repo-id>/<write-ceiling>",
         "E/manifest.yaml + E/draws-review.json + E/input-map.md + E/regression.json when repair + E/tests.json + E/render.png + E/render-review.md + E/runtime.json + E/lineage.json + E/result.md",
         "E/response.json",
@@ -1830,21 +1830,21 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
-              "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+              "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
             }
           },
           {
             "id": "business",
-            "path": ".work/<business>/business/**/index.yaml",
+            "path": ".work/<business>/business/**/index.md",
             "purpose": {
               "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
             }
           },
           {
             "id": "architecture",
-            "path": ".work/<business>/architecture/**/index.yaml",
+            "path": ".work/<business>/architecture/**/index.md",
             "purpose": {
               "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
             }
@@ -1923,7 +1923,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "state",
               "blocker",
@@ -2329,7 +2329,7 @@
         "implementation"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "repository:<repo-id>/<write-ceiling>",
         "E/manifest.yaml + E/rule-review.md + E/validation.json + E/lineage.json + E/result.md",
         "E/job-result.json"
@@ -2362,9 +2362,9 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
-              "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+              "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
             }
           },
           {
@@ -2399,7 +2399,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "state",
               "blocker",
@@ -2572,7 +2572,7 @@
         "operations"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "E/manifest.yaml + E/result.json",
         "E/job-result.json"
       ],
@@ -2602,7 +2602,7 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
               "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
             }
@@ -2632,7 +2632,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "completion.inputDigest",
               "completion.evidence"
@@ -2763,9 +2763,9 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
@@ -2800,7 +2800,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -2974,9 +2974,9 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
@@ -3018,7 +3018,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -3230,14 +3230,14 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
                 "id": "architecture",
-                "path": ".work/<business>/architecture/**/index.yaml",
+                "path": ".work/<business>/architecture/**/index.md",
                 "purpose": {
                   "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
                 }
@@ -3281,7 +3281,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -3449,7 +3449,7 @@
         "operations"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "E/manifest.yaml + E/result.json",
         "E/job-result.json"
       ],
@@ -3484,7 +3484,7 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
               "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
             }
@@ -3514,7 +3514,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "completion.inputDigest",
               "completion.evidence"
@@ -3644,9 +3644,9 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
@@ -3681,7 +3681,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -3810,14 +3810,14 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
                 "id": "business",
-                "path": ".work/<business>/business/**/index.yaml",
+                "path": ".work/<business>/business/**/index.md",
                 "purpose": {
                   "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
                 }
@@ -3854,7 +3854,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -4020,9 +4020,9 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
@@ -4064,7 +4064,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -4219,14 +4219,14 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
                 "id": "business",
-                "path": ".work/<business>/business/**/index.yaml",
+                "path": ".work/<business>/business/**/index.md",
                 "purpose": {
                   "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
                 }
@@ -4277,7 +4277,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -4466,14 +4466,14 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
                 "id": "business",
-                "path": ".work/<business>/business/**/index.yaml",
+                "path": ".work/<business>/business/**/index.md",
                 "purpose": {
                   "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
                 }
@@ -4531,7 +4531,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -4710,7 +4710,7 @@
         "operations"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "E/manifest.yaml + E/result.json",
         "E/job-result.json"
       ],
@@ -4740,7 +4740,7 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
               "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
             }
@@ -4770,7 +4770,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "completion.inputDigest",
               "completion.evidence"
@@ -4901,9 +4901,9 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
@@ -4945,7 +4945,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -5114,9 +5114,9 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
@@ -5158,7 +5158,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -5366,9 +5366,9 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
-                  "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+                  "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
                 }
               },
               {
@@ -5403,7 +5403,7 @@
             "writes": [
               {
                 "id": "node",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "fields": [
                   "state",
                   "blocker",
@@ -5577,7 +5577,7 @@
         "operations"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "E/manifest.yaml + E/retirement-inventory.json + E/retention-check.json + E/removal.json only when selected + E/result.md",
         "E/job-result.json"
       ],
@@ -5607,7 +5607,7 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
               "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
             }
@@ -5651,7 +5651,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "state",
               "blocker",
@@ -6065,7 +6065,7 @@
         "uat.ux"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "repository:<repo-id>/<write-ceiling>",
         ".work/_resources/identities/<identity>/resource.yaml + .work/_resources/fixtures/<fixture>/resource.yaml",
         "E/manifest.yaml + E/run-ledger.json + E/script-review.md + E/seed.json + E/flows.json + E/ux-checks.json + E/walk.json + E/screens/*.png + E/videos/* + E/readback.json + E/runtime.json + E/cleanup.json + E/costs.json + E/result.md",
@@ -6106,14 +6106,14 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
-              "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+              "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
             }
           },
           {
             "id": "business",
-            "path": ".work/<business>/business/**/index.yaml",
+            "path": ".work/<business>/business/**/index.md",
             "purpose": {
               "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
             }
@@ -6134,7 +6134,7 @@
           },
           {
             "id": "flows",
-            "path": "request flows[] + selected .work/<business>/uat/<flow>/**/index.yaml",
+            "path": "request flows[] + selected .work/<business>/uat/<flow>/**/index.md",
             "purpose": {
               "en": "Read the finite ordered flows array from the accepted FE E/flows.json or its exact selected workflow request. Preserve the FE commit/runtime binding; a different served build requires reconciliation before execution. Do not regenerate or weaken business expectations. Each selected flow maps to an existing target and specifies entry, actor role, ordered actions, expected business outcomes, observed-feedback checks, fixture needs, effects and cleanup. Preserve array order and step order; no flow fan-out or successor dispatch. Material missing expectations are resolved before mutation, not guessed from current behavior."
             }
@@ -6192,7 +6192,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "state",
               "blocker",
@@ -6544,7 +6544,7 @@
         "operations"
       ],
       "writeScope": [
-        "N/index.yaml",
+        "N/index.md",
         "E/manifest.yaml + E/result.json",
         "E/job-result.json"
       ],
@@ -6574,7 +6574,7 @@
         "reads": [
           {
             "id": "target",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "purpose": {
               "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
             }
@@ -6604,7 +6604,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "completion.inputDigest",
               "completion.evidence"
@@ -6742,7 +6742,7 @@
               },
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
                   "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
                 }
@@ -6784,7 +6784,7 @@
               },
               {
                 "id": "node",
-                "path": ".work/<business>/index.yaml + .work/<business>/setup/index.yaml + selected child directories/index.yaml",
+                "path": ".work/<business>/index.md + .work/<business>/setup/index.md + selected child directories/index.md",
                 "fields": [
                   "id",
                   "kind",
@@ -6796,7 +6796,7 @@
                   "extensions.work3.nativeGoal: actual returned current-task goal reference only"
                 ],
                 "content": {
-                  "en": "Write the parent purpose with no state. The one setup leaf .work/<business>/setup/index.yaml is N for this op, kind business, with only scope-review assertions. All planned business/architecture/code/UAT leaves remain todo, or explicit blocked/na with real reasons. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. Repository binding is an internal part of this complete preparation job, not a separate prerequisite node. Declare only genuinely selected downstream business targets with expected assertions, todo; do not invent accepted business intent. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
+                  "en": "Write the parent purpose with no state. The one setup leaf .work/<business>/setup/index.md is N for this op, kind business, with only scope-review assertions. All planned confirmed business/architecture/code/UAT leaves remain todo. Source-generated scope awaiting confirmation is uninvestigate; unresolved impediments use blockers[], and non-applicable scope stays outside required leaves. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. Repository binding is an internal part of this complete preparation job, not a separate prerequisite node. Declare only genuinely selected downstream business targets with expected assertions, todo; do not invent accepted business intent. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
                 }
               },
               {
@@ -7003,7 +7003,7 @@
             "reads": [
               {
                 "id": "target",
-                "path": "N/index.yaml",
+                "path": "N/index.md",
                 "purpose": {
                   "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
                 }
@@ -7066,7 +7066,7 @@
               },
               {
                 "id": "node",
-                "path": ".work/<business>/index.yaml + .work/<business>/migration/index.yaml + optional .work/<business>/cleanup/index.yaml + selected imported child directories/index.yaml",
+                "path": ".work/<business>/index.md + .work/<business>/migration/index.md + optional .work/<business>/cleanup/index.md + selected imported child directories/index.md",
                 "fields": [
                   "schema",
                   "id",
@@ -7076,12 +7076,13 @@
                   "refs",
                   "assertions",
                   "state",
-                  "suspensionReason",
+                  "activity",
+                  "blockers",
                   "completion",
                   "body: Pilot boundary / Observed source mapping / Approved intent / Candidate scope / Unknowns"
                 ],
                 "content": {
-                  "en": "N is the operations migration-review leaf, with inventory/preservation/import assertions; the business parent has no state/completion. Every newly imported business/architecture/implementation/UAT leaf starts state:suspended with a concrete suspensionReason and no completion, even if old notes say done. Assign stable IDs, observed source citations versus candidate requirements, and only approved graph scope. Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its business-review and workflow-review targets before consumers run; their expected assertions remain bounded to intent review and imported graph integrity, never product completion. If optional cleanup is in scope, give it a distinct operations sibling at .work/<business>/cleanup/index.yaml, never a child of N, with exact deletion assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn an incomplete parent done. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
+                  "en": "N is the operations migration-review leaf, with inventory/preservation/import assertions; the business parent has no state/completion. Every newly imported business/architecture/implementation/UAT leaf starts state:uninvestigate with activity:idle and no completion, even if old notes say done. Assign stable IDs, observed source citations versus candidate requirements, and only approved graph scope. Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its business-review and workflow-review targets before consumers run; their expected assertions remain bounded to intent review and imported graph integrity, never product completion. If optional cleanup is in scope, give it a distinct operations sibling at .work/<business>/cleanup/index.md, never a child of N, with exact deletion assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn an incomplete parent done. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
                 }
               },
               {
@@ -7204,7 +7205,7 @@
                   "resources"
                 ],
                 "action": {
-                  "en": "Author the selected candidate tree and canonical source resources. Imported leaves are suspended with a specific suspensionReason until their own selected review/implementation/UAT proof; do not add completion. Preserve approved existing nodes. Declare only actual selected graph edges and preset review targets when explicitly requested; unresolved edges are recorded as unknown rather than invented IDs."
+                  "en": "Author the selected candidate tree and canonical source resources. Imported leaves are uninvestigate with activity:idle until their own selected review/implementation/UAT proof; do not add completion. Preserve approved existing nodes. Declare only actual selected graph edges and preset review targets when explicitly requested; unresolved edges are recorded as unknown rather than invented IDs."
                 }
               },
               {
@@ -7238,7 +7239,7 @@
                   "matrixHandoff"
                 ],
                 "action": {
-                  "en": "Finalize semantic scope/resources first, obtain the real inputDigest, then verify imported IDs/refs/assertions, preservation hashes and all suspended states. Write only observed migration evidence and migration-review completion after verification. Keep product children suspended and cleanup truth explicit; commit only selected documentation when authorized, record actual commit separately in evidence, then stop. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+                  "en": "Finalize semantic scope/resources first, obtain the real inputDigest, then verify imported IDs/refs/assertions, preservation hashes and all uninvestigate states. Write only observed migration evidence and migration-review completion after verification. Keep product children uninvestigate and cleanup truth explicit; commit only selected documentation when authorized, record actual commit separately in evidence, then stop. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
                 }
               }
             ],
@@ -7262,9 +7263,9 @@
                 }
               },
               {
-                "id": "suspension",
+                "id": "investigation-state",
                 "requirement": {
-                  "en": "Imported product leaves are stored suspended with suspensionReason and without completion; they cannot satisfy done-only dependencies or receive migration evidence as product acceptance."
+                  "en": "Imported product leaves are stored uninvestigate with activity:idle and without completion; they cannot satisfy done-only dependencies or receive migration evidence as product acceptance."
                 }
               },
               {
@@ -7317,8 +7318,8 @@
             },
             "migrationPolicy": {
               "scope": "one-selected-business",
-              "importState": "suspended",
-              "reasonField": "suspensionReason",
+              "importState": "uninvestigate",
+              "initialActivity": "idle",
               "importCompletion": "forbidden",
               "intentAuthority": "approved-intent-not-inferred-source",
               "cleanup": "explicit-exact-preserved-inactive-only",

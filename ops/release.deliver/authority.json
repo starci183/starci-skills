@@ -15,7 +15,7 @@
     "writes": [
       {
         "id": "node",
-        "path": "N/index.yaml"
+        "path": "N/index.md"
       },
       {
         "id": "evidence",
@@ -51,7 +51,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "state",
               "blocker",
@@ -116,7 +116,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "state",
               "blocker",
@@ -200,7 +200,7 @@
         "writes": [
           {
             "id": "node",
-            "path": "N/index.yaml",
+            "path": "N/index.md",
             "fields": [
               "state",
               "blocker",

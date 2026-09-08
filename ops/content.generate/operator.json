@@ -20,14 +20,14 @@
   "reads": [
     {
       "id": "target",
-      "path": "N/index.yaml",
+      "path": "N/index.md",
       "purpose": {
-        "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+        "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
       }
     },
     {
       "id": "business",
-      "path": ".work/<business>/business/**/index.yaml",
+      "path": ".work/<business>/business/**/index.md",
       "purpose": {
         "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
       }
@@ -64,7 +64,7 @@
   "writes": [
     {
       "id": "node",
-      "path": "N/index.yaml",
+      "path": "N/index.md",
       "fields": [
         "state",
         "blocker",

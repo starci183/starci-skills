@@ -67,9 +67,9 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
     if(!c.graphPolicy||!['read-only','selected-scope-only'].includes(c.graphPolicy.mode)||c.graphPolicy.prerequisiteState!=='done'||c.graphPolicy.dispatch!=='never'||c.graphPolicy.location!=='.work node dependsOn/refs and resource files') issue(errors,'GRAPH_POLICY',at,'Graph authority must live in .work, require done prerequisites and never dispatch automatically');
     if(c.graphPolicy?.mode==='read-only'&&c.writes.some(w=>w.id==='node'&&w.fields?.some(f=>['dependsOn','refs','required'].includes(f)))) issue(errors,'CONSUMER_GRAPH_WRITE',at,'A consumer op cannot silently rewrite scope/input graph fields');
     if(c.migrationPolicy) {
-      const expected={scope:'one-selected-business',importState:'suspended',reasonField:'suspensionReason',importCompletion:'forbidden',intentAuthority:'approved-intent-not-inferred-source',cleanup:'explicit-exact-preserved-inactive-only',registeredWorktreeRemoval:'git-without-force'};
-      if(!c.migrationPolicy||Object.entries(expected).some(([key,value])=>c.migrationPolicy[key]!==value)||c.graphPolicy?.mode!=='selected-scope-only') issue(errors,'MIGRATION_POLICY',at,'Migration imports one unapproved suspended scope and permits only exact preserved inactive authorized cleanup');
-      if(!c.reads.some(r=>r.id==='inventory')||!c.reads.some(r=>r.id==='custody')||!c.writes.some(w=>w.id==='node'&&w.fields?.includes('suspensionReason'))||!c.writes.some(w=>w.id==='resources'&&w.fields?.includes('files:[{path}]'))||!['source','preservation','suspension','cleanup'].every(id=>c.proofs.some(p=>p.id===id))) issue(errors,'MIGRATION_BINDING',at,'Migration requires actual inventory/custody, suspended source resources and independent preservation/import/cleanup proofs');
+      const expected={scope:'one-selected-business',importState:'uninvestigate',initialActivity:'idle',importCompletion:'forbidden',intentAuthority:'approved-intent-not-inferred-source',cleanup:'explicit-exact-preserved-inactive-only',registeredWorktreeRemoval:'git-without-force'};
+      if(!c.migrationPolicy||Object.entries(expected).some(([key,value])=>c.migrationPolicy[key]!==value)||c.graphPolicy?.mode!=='selected-scope-only') issue(errors,'MIGRATION_POLICY',at,'Migration imports one unapproved uninvestigate scope and permits only exact preserved inactive authorized cleanup');
+      if(!c.reads.some(r=>r.id==='inventory')||!c.reads.some(r=>r.id==='custody')||!c.writes.some(w=>w.id==='node'&&w.fields?.includes('activity')&&w.fields?.includes('blockers'))||!c.writes.some(w=>w.id==='resources'&&w.fields?.includes('files:[{path}]'))||!['source','preservation','investigation-state','cleanup'].every(id=>c.proofs.some(p=>p.id===id))) issue(errors,'MIGRATION_BINDING',at,'Migration requires actual inventory/custody, uninvestigate source scope and independent preservation/import/cleanup proofs');
     }
     if(['business.decide','architecture.decide'].includes(at)) {
       if(c.specificationPolicy?.storage!=='.work'||c.specificationPolicy?.payload!=='extensions.work3.specification'||!c.writes.some(w=>w.fields.includes('extensions.work3.specification'))||!c.proofs.some(p=>p.id==='impact-security-coverage')) issue(errors,'SPECIFICATION_POLICY',at,'Planning must own a schema-bound .work specification with impact/security coverage');
@@ -98,7 +98,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
     }
     for(const w of c.writes) {
       if(!Array.isArray(w.fields)||!w.fields.length||!w.fields.every(nonempty)) issue(errors,'WRITE_FIELDS',at,w.id+' has no field/content matrix');
-      if(!/^(?:N\/index\.yaml|E\/|\.work\/|repository:<repo-id>\/)/.test(w.path??'')) issue(errors,'WRITE_DESTINATION',at,'Write must target explicit .work node/resource/evidence or bound source repository');
+      if(!/^(?:N\/index\.md|E\/|\.work\/|repository:<repo-id>\/)/.test(w.path??'')) issue(errors,'WRITE_DESTINATION',at,'Write must target explicit .work node/resource/evidence or bound source repository');
       if(w.path?.startsWith('repository:')&&w.id!=='source') issue(errors,'SOURCE_SCOPE',at,'Product source writes need explicit source binding');
     }
     const usedReads=new Set(),usedWrites=new Set();

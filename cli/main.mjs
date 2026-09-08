@@ -13,6 +13,7 @@ Usage:
   work validate <work-root>
   work tree <work-root>
   work impact <work-root> <node-or-resource-id>
+  work stale <work-root>
   work ops
   work op <op-id>
   work workflows
@@ -114,6 +115,14 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       directory(args[0]);
       const { impactWorkspace } = await import('../core/index.mjs');
       const result = impactWorkspace(path.resolve(args[0]), args[1]);
+      emit(result);
+      return result.ok ? 0 : 1;
+    }
+    if (command === 'stale') {
+      exactArgs(args, 1);
+      directory(args[0]);
+      const { staleWorkspace } = await import('../core/index.mjs');
+      const result = staleWorkspace(path.resolve(args[0]));
       emit(result);
       return result.ok ? 0 : 1;
     }

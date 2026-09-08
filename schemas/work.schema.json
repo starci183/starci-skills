@@ -164,7 +164,10 @@
       ],
       "properties": {
         "schema": {
-          "const": "work/node@1"
+          "enum": [
+            "work/node@1",
+            "work/node@2"
+          ]
         },
         "id": {
           "$ref": "#/$defs/id"
@@ -177,6 +180,7 @@
         },
         "state": {
           "enum": [
+            "uninvestigate",
             "todo",
             "doing",
             "blocked",
@@ -238,6 +242,43 @@
           "items": {
             "$ref": "#/$defs/nodeAsset"
           }
+        },
+        "activity": {
+          "enum": [
+            "idle",
+            "investigating",
+            "implementing",
+            "verifying"
+          ],
+          "x-operational": true
+        },
+        "blockers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/string"
+          },
+          "x-operational": true
+        },
+        "investigation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contextDigest"
+          ],
+          "properties": {
+            "contextDigest": {
+              "$ref": "#/$defs/digest"
+            }
+          },
+          "x-operational": true
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "x-operational": true
         }
       },
       "allOf": [
@@ -256,6 +297,29 @@
             "required": [
               "suspensionReason"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "schema": {
+                "const": "work/node@2"
+              }
+            },
+            "required": [
+              "schema"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "uninvestigate",
+                  "todo",
+                  "done"
+                ]
+              }
+            }
           }
         }
       ]
