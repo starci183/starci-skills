@@ -18,7 +18,7 @@
     "writes": [
       {
         "id": "node",
-        "path": ".work/<business>/architecture/<piece>/index.md"
+        "path": ".work/<business>/architecture/<piece>/index.yaml"
       },
       {
         "id": "evidence",

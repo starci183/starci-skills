@@ -15,7 +15,7 @@
     "writes": [
       {
         "id": "node",
-        "path": "N/index.md"
+        "path": "N/index.yaml"
       },
       {
         "id": "evidence",
@@ -63,7 +63,7 @@
           },
           {
             "id": "node",
-            "path": ".work/<business>/index.md + .work/<business>/setup/index.md + selected child directories/index.md",
+            "path": ".work/<business>/index.yaml + .work/<business>/setup/index.yaml + selected child directories/index.yaml",
             "fields": [
               "id",
               "kind",
@@ -71,11 +71,11 @@
               "dependsOn",
               "refs",
               "assertions",
-              "body: Purpose / Scope / Done when / Decisions / Unknowns",
+              "description: Purpose / Scope / Done when / Decisions / Unknowns",
               "extensions.work3.nativeGoal: actual returned current-task goal reference only"
             ],
             "content": {
-              "en": "Write the parent purpose with no state. The one setup leaf .work/<business>/setup/index.md is N for this op, kind business, with only scope-review assertions. All planned confirmed business/architecture/code/UAT leaves remain todo. Source-generated scope awaiting confirmation is uninvestigate; unresolved impediments use blockers[], and non-applicable scope stays outside required leaves. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. Repository binding is an internal part of this complete preparation job, not a separate prerequisite node. Declare only genuinely selected downstream business targets with expected assertions, todo; do not invent accepted business intent. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
+              "en": "Write the parent purpose with no state. The one setup leaf .work/<business>/setup/index.yaml is N for this op, kind business, with only scope-review assertions. All planned confirmed business/architecture/code/UAT leaves remain todo. Source-generated scope awaiting confirmation is uninvestigate; unresolved impediments use blockers[], and non-applicable scope stays outside required leaves. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. Repository binding is an internal part of this complete preparation job, not a separate prerequisite node. Declare only genuinely selected downstream business targets with expected assertions, todo; do not invent accepted business intent. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
             }
           },
           {
@@ -162,7 +162,7 @@
           },
           {
             "id": "node",
-            "path": ".work/<business>/index.md + .work/<business>/migration/index.md + optional .work/<business>/cleanup/index.md + selected imported child directories/index.md",
+            "path": ".work/<business>/index.yaml + .work/<business>/migration/index.yaml + optional .work/<business>/cleanup/index.yaml + selected imported child directories/index.yaml",
             "fields": [
               "schema",
               "id",
@@ -175,10 +175,10 @@
               "activity",
               "blockers",
               "completion",
-              "body: Pilot boundary / Observed source mapping / Approved intent / Candidate scope / Unknowns"
+              "description: Pilot boundary / Observed source mapping / Approved intent / Candidate scope / Unknowns"
             ],
             "content": {
-              "en": "N is the operations migration-review leaf, with inventory/preservation/import assertions; the business parent has no state/completion. Every newly imported business/architecture/implementation/UAT leaf starts state:uninvestigate with activity:idle and no completion, even if old notes say done. Assign stable IDs, observed source citations versus candidate requirements, and only approved graph scope. Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its business-review and workflow-review targets before consumers run; their expected assertions remain bounded to intent review and imported graph integrity, never product completion. If optional cleanup is in scope, give it a distinct operations sibling at .work/<business>/cleanup/index.md, never a child of N, with exact deletion assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn an incomplete parent done. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
+              "en": "N is the operations migration-review leaf, with inventory/preservation/import assertions; the business parent has no state/completion. Every newly imported business/architecture/implementation/UAT leaf starts state:uninvestigate with activity:idle and no completion, even if old notes say done. Assign stable IDs, observed source citations versus candidate requirements, and only approved graph scope. Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its business-review and workflow-review targets before consumers run; their expected assertions remain bounded to intent review and imported graph integrity, never product completion. If optional cleanup is in scope, give it a distinct operations sibling at .work/<business>/cleanup/index.yaml, never a child of N, with exact deletion assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn an incomplete parent done. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
             }
           },
           {

@@ -19,7 +19,7 @@
   "reads": [
     {
       "id": "target",
-      "path": "N/index.md",
+      "path": "N/index.yaml",
       "purpose": {
         "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
       }
@@ -49,7 +49,7 @@
   "writes": [
     {
       "id": "node",
-      "path": "N/index.md",
+      "path": "N/index.yaml",
       "fields": [
         "completion.inputDigest",
         "completion.evidence"
@@ -180,9 +180,9 @@
       "reads": [
         {
           "id": "target",
-          "path": "N/index.md",
+          "path": "N/index.yaml",
           "purpose": {
-            "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+            "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
           }
         },
         {
@@ -224,7 +224,7 @@
       "writes": [
         {
           "id": "node",
-          "path": "N/index.md",
+          "path": "N/index.yaml",
           "fields": [
             "state",
             "blocker",
@@ -393,9 +393,9 @@
       "reads": [
         {
           "id": "target",
-          "path": "N/index.md",
+          "path": "N/index.yaml",
           "purpose": {
-            "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+            "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
           }
         },
         {
@@ -437,7 +437,7 @@
       "writes": [
         {
           "id": "node",
-          "path": "N/index.md",
+          "path": "N/index.yaml",
           "fields": [
             "state",
             "blocker",
@@ -645,9 +645,9 @@
       "reads": [
         {
           "id": "target",
-          "path": "N/index.md",
+          "path": "N/index.yaml",
           "purpose": {
-            "en": "Read the existing selected N/index.md, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+            "en": "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
           }
         },
         {
@@ -682,7 +682,7 @@
       "writes": [
         {
           "id": "node",
-          "path": "N/index.md",
+          "path": "N/index.yaml",
           "fields": [
             "state",
             "blocker",

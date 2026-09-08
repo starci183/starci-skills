@@ -48,7 +48,7 @@ function validate(root) {
       try { meta=parseYaml(source); } catch { issue('UNSUPPORTED_METADATA',rel(p),'Invalid YAML 1.2 metadata; duplicate keys, custom tags and aliases are not accepted.'); return null; }
       if (!object(meta)) { issue('METADATA_OBJECT',rel(p),'Metadata must be an object.'); return null; }
       if(!markdown){if(meta.description!==undefined&&typeof meta.description!=='string'){issue('DESCRIPTION',rel(p),'description must be text');return null;}body=(meta.description??'').replace(/\r\n/g,'\n').trim();}
-      return {meta,body,path:rel(p),file:p,dir:path.dirname(p)};
+      return {meta,body,markdown,path:rel(p),file:p,dir:path.dirname(p)};
     } catch { issue('READ',rel(p),'Cannot read metadata.'); return null; }
   }
   function register(item,type) {
@@ -63,8 +63,22 @@ function validate(root) {
   }
   function checkKeys(value,shape,p) {
     if(shape.$ref) {const target=shape.$ref.slice(2).split('/').reduce((v,k)=>v[k.replaceAll('~1','/').replaceAll('~0','~')],metadataSchema);checkKeys(value,target,p);return;}
-    if(Array.isArray(value)&&shape.items)value.forEach(v=>checkKeys(v,shape.items,p));
+    const matchesType=type=>type==='object'?object(value):type==='array'?Array.isArray(value):type==='integer'?Number.isInteger(value):type==='null'?value===null:typeof value===type;
+    if(shape.type&&!matchesType(shape.type)){issue('SCHEMA_VALUE',p,`Metadata value must have schema type ${shape.type}.`);return;}
+    if(Object.hasOwn(shape,'const')&&canonicalJSON(value)!==canonicalJSON(shape.const))issue('SCHEMA_VALUE',p,'Metadata value does not match its required schema constant.');
+    if(Array.isArray(shape.enum)&&!shape.enum.some(item=>canonicalJSON(item)===canonicalJSON(value)))issue('SCHEMA_VALUE',p,'Metadata value is outside its published enum.');
+    if(typeof value==='string'){
+      if(Number.isInteger(shape.minLength)&&value.length<shape.minLength)issue('SCHEMA_VALUE',p,'Metadata text is shorter than the published minimum.');
+      if(shape.pattern&&!new RegExp(shape.pattern,'u').test(value))issue('SCHEMA_VALUE',p,'Metadata text does not match its published pattern.');
+    }
+    if(Array.isArray(value)){
+      if(Number.isInteger(shape.minItems)&&value.length<shape.minItems)issue('SCHEMA_VALUE',p,'Metadata list is shorter than the published minimum.');
+      if(shape.uniqueItems&&new Set(value.map(canonicalJSON)).size!==value.length)issue('SCHEMA_VALUE',p,'Metadata list must contain unique values.');
+      if(shape.items)value.forEach(v=>checkKeys(v,shape.items,p));
+      return;
+    }
     if(!object(value))return;
+    for(const key of shape.required??[])if(!Object.hasOwn(value,key))issue('SCHEMA_VALUE',p,`Metadata object is missing required field ${key}.`);
     for(const [key,v]of Object.entries(value)) {
       if(shape.additionalProperties===false&&!Object.hasOwn(shape.properties??{},key))issue('UNKNOWN_FIELD',p,'Unknown reserved metadata field; correct its spelling or place extension data inside extensions/resource.details.');
       else if(Object.hasOwn(shape.properties??{},key))checkKeys(v,shape.properties[key],p);
@@ -145,7 +159,7 @@ function validate(root) {
     n.depIds=stringList(n.meta.dependsOn,n.path,'dependsOn'); n.refIds=stringList(n.meta.refs,n.path,'refs');
     if(n.meta.assertions !== undefined) stringList(n.meta.assertions,n.path,'assertions');
     if(n.meta.schema==='work/node@2'){
-      if(n.meta.description!==undefined)issue('DUPLICATE_BODY',n.path,'Version 2 uses Markdown body, not description metadata.');
+      if(n.markdown&&n.meta.description!==undefined)issue('DUPLICATE_BODY',n.path,'Markdown nodes use their prose body; do not duplicate it in description metadata.');
       if(n.meta.activity!==undefined&&!['idle','investigating','implementing','verifying'].includes(n.meta.activity))issue('ACTIVITY',n.path,'Unknown activity.');
       if(n.meta.blockers!==undefined)stringList(n.meta.blockers,n.path,'blockers');
       if(n.meta.investigation!==undefined&&(!object(n.meta.investigation)||!/^[a-f0-9]{64}$/.test(n.meta.investigation.contextDigest??'')))issue('INVESTIGATION',n.path,'Investigation needs the exact reviewed contextDigest.');
@@ -159,7 +173,7 @@ function validate(root) {
         try{let file=n.dir;for(const part of parts){file=path.join(file,part);if(fs.lstatSync(file).isSymbolicLink())throw Error('symlink');}if(!within(n.dir,fs.realpathSync(file))||!fs.statSync(file).isFile())throw Error('escape');ownedAssets.push({path:value,sha256:digest(fs.readFileSync(file))});}catch{issue('NODE_ASSET_UNREADABLE',n.path,'Node asset missing, non-file or unsafe.');}
       }}
     }
-    n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),metadata:Object.fromEntries(Object.entries(n.meta).filter(([k])=>!operational.has(k))),body:n.body}));
+    n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),metadata:Object.fromEntries(Object.entries(n.meta).filter(([k])=>!operational.has(k)&&!(n.meta.schema==='work/node@2'&&k==='description'))),body:n.body}));
   }
   for (const n of nodes) {
     n.deps=n.depIds.map(id=>resolve(id,n,['node'])).filter(Boolean);

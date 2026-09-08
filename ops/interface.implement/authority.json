@@ -24,7 +24,7 @@
     "writes": [
       {
         "id": "node",
-        "path": "N/index.md"
+        "path": "N/index.yaml"
       },
       {
         "id": "source",

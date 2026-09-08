@@ -19,7 +19,7 @@
   "reads": [
     {
       "id": "target",
-      "path": "N/index.md",
+      "path": "N/index.yaml",
       "purpose": {
         "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
       }
@@ -63,7 +63,7 @@
   "writes": [
     {
       "id": "node",
-      "path": "N/index.md",
+      "path": "N/index.yaml",
       "fields": [
         "state",
         "blocker",
