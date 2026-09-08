@@ -1,0 +1,1241 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "target",
+    "route",
+    "changeLevel",
+    "business",
+    "surface",
+    "content",
+    "references",
+    "grammar",
+    "regions",
+    "imageryPlan",
+    "unresolved",
+    "concepts",
+    "comparisonRequest",
+    "sourceFiles",
+    "visual"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "route": {
+      "type": "string",
+      "minLength": 1
+    },
+    "changeLevel": {
+      "enum": [
+        "new",
+        "reconstruct"
+      ]
+    },
+    "business": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose",
+        "actors",
+        "journey"
+      ],
+      "properties": {
+        "purpose": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "source",
+            "statement"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "fact",
+                "intent",
+                "example",
+                "unknown"
+              ]
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref",
+                "sha256"
+              ],
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                }
+              }
+            },
+            "statement": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "actors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "description"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "description": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "source",
+                  "statement"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "fact",
+                      "intent",
+                      "example",
+                      "unknown"
+                    ]
+                  },
+                  "source": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "ref",
+                      "sha256"
+                    ],
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      }
+                    }
+                  },
+                  "statement": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "journey": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "actor",
+              "action",
+              "outcome"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "actor": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "action": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "source",
+                  "statement"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "fact",
+                      "intent",
+                      "example",
+                      "unknown"
+                    ]
+                  },
+                  "source": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "ref",
+                      "sha256"
+                    ],
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      }
+                    }
+                  },
+                  "statement": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "outcome": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "source",
+                  "statement"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "fact",
+                      "intent",
+                      "example",
+                      "unknown"
+                    ]
+                  },
+                  "source": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "ref",
+                      "sha256"
+                    ],
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      }
+                    }
+                  },
+                  "statement": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "states",
+        "information",
+        "viewports"
+      ],
+      "properties": {
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "description"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "description": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "source",
+                  "statement"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "fact",
+                      "intent",
+                      "example",
+                      "unknown"
+                    ]
+                  },
+                  "source": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "ref",
+                      "sha256"
+                    ],
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      }
+                    }
+                  },
+                  "statement": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "information": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "description"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "description": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "source",
+                  "statement"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "fact",
+                      "intent",
+                      "example",
+                      "unknown"
+                    ]
+                  },
+                  "source": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "ref",
+                      "sha256"
+                    ],
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      }
+                    }
+                  },
+                  "statement": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "viewports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "width",
+              "height"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "content": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "value",
+          "source"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "kind": {
+            "enum": [
+              "fact",
+              "intent",
+              "example",
+              "unknown"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ref",
+              "sha256"
+            ],
+            "properties": {
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "usage",
+          "source",
+          "limitation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "usage": {
+            "enum": [
+              "instruction",
+              "inspiration",
+              "brand-asset"
+            ]
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ref",
+              "sha256"
+            ],
+            "properties": {
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              }
+            }
+          },
+          "limitation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "grammar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "version",
+        "manifestHash",
+        "adoption"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifestHash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "adoption": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "region",
+              "component",
+              "authority",
+              "limits"
+            ],
+            "properties": {
+              "region": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "component": {
+                "type": "string",
+                "minLength": 1
+              },
+              "authority": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "ref",
+                  "sha256"
+                ],
+                "properties": {
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "limits": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "regions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "journey",
+          "states",
+          "information",
+          "content",
+          "acceptance"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "journey": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "minItems": 1
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "minItems": 1
+          },
+          "information": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "minItems": 1
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "minItems": 1
+          },
+          "acceptance": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "imageryPlan": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "region",
+          "purpose",
+          "subject",
+          "style",
+          "coherence",
+          "reuse",
+          "medium",
+          "source",
+          "prominence",
+          "placement",
+          "responsive",
+          "accessibility",
+          "delivery"
+        ],
+        "properties": {
+          "region": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "purpose": {
+            "enum": [
+              "brand",
+              "meaning",
+              "explanation",
+              "differentiation",
+              "onboarding",
+              "feedback",
+              "atmosphere"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "style": {
+            "type": "string",
+            "minLength": 1
+          },
+          "coherence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reuse": {
+            "enum": [
+              "existing",
+              "generate",
+              "not-needed"
+            ]
+          },
+          "medium": {
+            "enum": [
+              "raster",
+              "svg",
+              "icon-registry",
+              "live-ui",
+              "live-data"
+            ]
+          },
+          "source": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref",
+                "sha256"
+              ],
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                }
+              }
+            },
+            "minItems": 0
+          },
+          "prominence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "placement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "responsive": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accessibility": {
+            "type": "string",
+            "minLength": 1
+          },
+          "delivery": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "unresolved": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "necessary",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "necessary": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "concepts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "centralIdea",
+          "story",
+          "tone",
+          "artStyle",
+          "hierarchy",
+          "imageryLanguage",
+          "business",
+          "grammar"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "centralIdea": {
+            "type": "string",
+            "minLength": 1
+          },
+          "story": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tone": {
+            "type": "string",
+            "minLength": 1
+          },
+          "artStyle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "hierarchy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "imageryLanguage": {
+            "type": "string",
+            "minLength": 1
+          },
+          "business": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "minItems": 1
+          },
+          "grammar": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "minItems": 1
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "comparisonRequest": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selectedBy",
+            "sourceRef",
+            "statement",
+            "source"
+          ],
+          "properties": {
+            "selectedBy": {
+              "const": "user"
+            },
+            "sourceRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "statement": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref",
+                "sha256"
+              ],
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sourceFiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256",
+          "status"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "observed",
+              "absent"
+            ]
+          }
+        }
+      }
+    },
+    "visual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assets",
+        "elements"
+      ],
+      "properties": {
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "region",
+              "subject",
+              "medium",
+              "transparency",
+              "transparentAreas",
+              "reference",
+              "preservedAreas"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "region": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "subject": {
+                "type": "string",
+                "minLength": 1
+              },
+              "medium": {
+                "enum": [
+                  "raster",
+                  "svg"
+                ]
+              },
+              "transparency": {
+                "enum": [
+                  "required",
+                  "opaque"
+                ]
+              },
+              "transparentAreas": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "bounds"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "bounds": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "y": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "width": {
+                          "type": "number",
+                          "minimum": 1
+                        },
+                        "height": {
+                          "type": "number",
+                          "minimum": 1
+                        }
+                      }
+                    }
+                  }
+                },
+                "minItems": 0
+              },
+              "reference": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "ref",
+                  "sha256"
+                ],
+                "properties": {
+                  "ref": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "preservedAreas": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "bounds"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "bounds": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "y": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "width": {
+                          "type": "number",
+                          "minimum": 1
+                        },
+                        "height": {
+                          "type": "number",
+                          "minimum": 1
+                        }
+                      }
+                    }
+                  }
+                },
+                "minItems": 0
+              }
+            }
+          },
+          "minItems": 0
+        },
+        "elements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "region",
+              "kind",
+              "purpose",
+              "asset",
+              "registry",
+              "connects",
+              "anatomy",
+              "dimensions",
+              "responsive",
+              "motion"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "region": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "kind": {
+                "enum": [
+                  "content",
+                  "control",
+                  "asset",
+                  "icon",
+                  "connector"
+                ]
+              },
+              "purpose": {
+                "type": "string",
+                "minLength": 1
+              },
+              "asset": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registry": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "name",
+                      "meaning",
+                      "source"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "meaning": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "source": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "ref",
+                          "sha256"
+                        ],
+                        "properties": {
+                          "ref": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "connects": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*$"
+                },
+                "minItems": 0
+              },
+              "anatomy": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dimensions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "viewport",
+                    "width",
+                    "height"
+                  ],
+                  "properties": {
+                    "viewport": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "width": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "height": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    }
+                  }
+                },
+                "minItems": 1
+              },
+              "responsive": {
+                "type": "string",
+                "minLength": 1
+              },
+              "motion": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "minItems": 1
+        }
+      }
+    }
+  }
+}

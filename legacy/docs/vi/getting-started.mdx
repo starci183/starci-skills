@@ -1,0 +1,198 @@
+---
+title: "Bắt đầu"
+description: "Một nhiệm vụ chạy như thế nào: workspace.bind, chuỗi vẽ từ nhiệm vụ, request.json, layout nhánh, hai validator, mã dừng và chạy lại."
+---
+
+# Một nhiệm vụ chạy như thế nào
+
+Bản cài mới dùng [StarCi Lite](https://github.com/starci183/starci-skills/blob/main/skills/starci-lite/SKILL.md)
+để phân loại yêu cầu. Chuỗi dưới đây áp dụng khi phân loại hoặc profile của host yêu cầu full StarCi;
+câu hỏi và công việc Lite có phạm vi nhỏ không tạo các hồ sơ chính thức này.
+
+Một nhiệm vụ là một lượt đi qua cây, từ yêu cầu của một người tới một ranh giới đã publish, hoặc tới
+một câu hỏi mà chỉ người mới trả lời được. Không bước nào dưới đây là lời khuyên tuỳ nghi: mỗi bước
+là một luật đã ghi trong `SKILL.md`, `workflows/README.md` hoặc `resources/orchestrator.json`.
+
+## 1. Đóng băng phạm vi
+
+`SKILL.md` mở đầu bằng việc đóng băng một phạm vi nhiệm vụ: "đơn vị, đích, phần bao gồm và phần loại
+trừ, các gốc được ghi, hiệu ứng ra bên ngoài, và thứ sẽ được tính là bằng chứng. Hai cách đọc làm đổi
+bất kỳ điểm nào trong số đó là một câu hỏi tập trung, không phải một phỏng đoán."
+
+## 2. Bind workspace
+
+`workspace.bind` chạy cho mọi nhiệm vụ có đọc hoặc ghi source đã route. Không thứ gì khác được phép
+tự tìm checkout, và một thư mục trùng tên không bao giờ là thẩm quyền route. Nó trả về một receipt
+route có kiểu: danh tính checkout đã xác minh, head nguồn chính xác, và binding runtime đóng mà nhiệm
+vụ được phép tiêu thụ. Xem [`workspace.bind`](/vi/reference/operators/workspace-bind).
+
+## 3. Vẽ chuỗi
+
+Không tra cứu gì. Người xác nhận goal của nhiệm vụ — gồm gì, không gồm gì, và những dòng "xong khi"
+kết thúc nó — rồi `scripts/plan-chain.mjs` suy chuỗi từ các dòng đó qua bảng `## Đầu vào`,
+`## Context` và `## Kế tiếp` của các operator: mọi input bắt buộc do một bậc trước sinh ra, mọi vai
+được bind, audit và đi thử nằm giữa bề mặt đã áp và lần publish của nó, một `<domain>.plan` đứng
+trước operator mà nhiều dòng gọi tên để các đơn vị toả ra mỗi đơn vị một agent mù, tối đa ba nhánh một
+bậc. Kế hoạch được in ra hai dòng cho mỗi nhánh, và `scripts/validate-chain.mjs` chấp nhận nó trước
+khi bước 4 bắt đầu; chỗ mập mờ trong các bảng là một lời từ chối gọi tên nó, không phải phỏng đoán.
+Xem [Chuỗi](/vi/concepts/chain).
+
+## 4. Một agent, một operator
+
+Một lần gọi một operator là một agent, được tạo mới trên đúng profile mà `operator.json` của nó gọi
+tên, chỉ với những quyền và những alias mà bảng Context của nó khai. Tối đa ba agent chạy cùng lúc.
+Một agent không bao giờ khởi động agent khác; một trao đổi lồng — một lượt phản biện, một lượt
+review — là một agent mới toanh do orchestrator sinh ra cho nhánh đang tạm dừng. Xem
+[Tài nguyên](/vi/concepts/resources).
+
+## 5. `request.json`
+
+Orchestrator ghi `request/request.json` của nhánh và kiểm nó bằng `scripts/validate-request.mjs`
+trước khi agent khởi động. Cổng vào là
+[`templates/step/request.schema.json`](https://github.com/starci183/starci-skills/blob/main/templates/step/request.schema.json),
+mang `operatorId`, `step`, `parallel`, `sessionId`, danh sách `contexts` mỗi mục kèm `head` đã đóng
+băng, `requirements` theo bảng Yêu cầu của operator, `inputs` — mỗi input là một đường dẫn tường minh
+từ gốc phiên tới file mà một nhánh trước đã sinh — và `resume`.
+
+## 6. Layout nhánh
+
+Không có gì được thiết kế, ghi hay commit bên ngoài một phiên: hành động đầu tiên của một nhiệm vụ là
+thư mục phiên và một `request.json` đã hợp lệ. Trước khi bất kỳ file nào ngoài thư mục phiên bị đọc để
+sửa, và trước khi bất kỳ file nào ngoài thư mục phiên bị ghi, `state.json` và
+`step-1/parallel-1/request/request.json` đã có và `validate-request` xanh trên chúng. Một agent phát
+hiện mình đang sửa hay công bố nguồn được route mà không có `step-N/parallel-M` nào dưới một phiên thì
+dừng với `SESSION_MISSING` và báo lại — nó không viết phiên sau đó, vì một phiên viết sau khi việc đã
+xong là ghi chép việc chứ không phải chặn việc.
+
+Gốc phiên là `<Source>/.worktrees/sessions/<sessionId>/`, với `state.json` nằm cạnh các bậc. Một
+nhánh là `step-<N>/parallel-<M>/`, và `parallel-1` luôn tồn tại:
+
+```text
+step-<N>/parallel-<M>/
+  request/request.json                cổng vào; orchestrator ghi
+  response/response.json              cổng ra; thứ duy nhất định tuyến đọc
+  response/response.md                kind tài liệu của operator
+  response/<other>.md                 khi operator có thêm một cái
+  response/data/<name>.json           các kind máy đọc
+  response/artifacts/<file>           phần còn lại
+  <exchange>/request/ và response/    một trao đổi lồng
+```
+
+Đường dẫn được viết khác nhau tuỳ chỗ: trong `inputs` của `request.json` thì tính từ gốc phiên
+(`step-1/parallel-1/response/response.md`); trong `fields` của `response.json` và trong bảng Đầu ra
+của operator thì tính từ chính nhánh đó (`response/response.md`).
+
+## 7. Hai validator, rồi mới định tuyến
+
+```text
+request/request.json -> validate-request.mjs -> agent ghi response/ -> validate-response.mjs + validate.mjs của operator -> định tuyến
+```
+
+`validate-response.mjs` kiểm cổng chung và nạp contract của từng kind; `validate.mjs` của operator
+kiểm những gì chỉ operator đó kiểm được. Sau đó định tuyến mới nhìn `response.json`:
+
+- `done` đẩy chuỗi sang bậc kế tiếp mà kế hoạch gọi tên;
+- `waiting` chạy trao đổi lồng mà response đang chờ, rồi khôi phục chính agent đó, trong khi các nhánh
+  anh em vẫn chạy;
+- `blocked` đọc `stop`.
+
+"Response trượt một trong hai validator thì không định tuyến. Văn xuôi trong `response.md` không định
+tuyến. Chỉ một trường đã validate của `response.json` mới định tuyến."
+
+## 8. Mã dừng
+
+Nhánh bị chặn mang theo một mã. Mã được tra trong sổ gộp — `operators/errors.json` cho các mã nhiều
+operator dùng chung, cộng `errors.json` riêng của operator — để lấy `domain`, và domain đó được giải
+trong `routing.json` thành một trong bốn loại: `operator` gọi operator được nêu tên, `resume` vào lại
+chính operator đó ở một bậc mới, `user` dừng và báo người phải quyết gì, `external` dừng và báo thứ
+gì bên ngoài runtime phải đổi. Mã có cách xử lý `fallback` thì không chặn: agent làm đúng hành động
+đã ghi, ghi lại dưới `## Fallbacks taken`, rồi chạy tiếp. Xem [Mã dừng](/vi/concepts/stop-codes) và
+[sổ mã đầy đủ](/vi/reference/stop-codes).
+
+## 9. Chạy lại
+
+Nhánh bị chặn nằm lại trên đĩa làm bằng chứng. Nó vào lại chính operator đó như một agent mới ở
+`step-(N+1)/parallel-1`, với `request.json.resume` gọi tên bậc và nhánh đã bị chặn. Một lần chạy lại
+không mang thêm bằng chứng, ràng buộc, kiểm kê hay phê duyệt mới thì dừng với `NO_PROGRESS`, và
+`SKILL.md` nói rõ điều đó nghĩa là gì: cùng một input đã đâm vào cùng một bức tường, hãy báo bức
+tường thay vì thử lại.
+
+## 10. Runtime mà một phiên được audit trên đó
+
+Không thứ nào ở trên cần một sản phẩm đang chạy, cho tới lúc phải nhìn một bề mặt hay đi một hành
+trình. Khi cần, runtime không do operator đang cần nó khởi động: `runtime.serve` sở hữu nó, và nó
+leo một cái thang, mỗi lần gọi một bậc, mỗi bậc được chứng thực trước khi thử bậc kế.
+
+| Bậc | Nó làm gì |
+| --- | --- |
+| `stack-up` | Dựng hạ tầng mà môi trường khai và chờ các probe sẵn sàng |
+| `locate` | Phân giải các role của project ra checkout đã route qua workspace route, không bao giờ theo tên thư mục |
+| `start-role` | Khởi động server của một role từ worktree tích hợp, backend trước frontend |
+| `serve` | Merge commit của một phiên vào nhánh tích hợp và cho server chạy kết quả đó |
+| `restart` / `reset` | Khởi động lại đúng head đó, hoặc xoá cache build trước; cả hai đều phải gọi đích danh |
+| `stop` | Kill đúng pid entry đã ghi và nhả lease |
+
+Nhánh nó phục vụ mới là mấu chốt. Một sản phẩm có một nhánh tích hợp và một server trên một cổng cố
+định, và một phiên không được phát server riêng: `serve` merge commit của phiên vào rồi khởi động lại
+đúng server đó, nên head đang phục vụ mang việc của mọi phiên đã xin. Giữ cổng cố định là thứ giữ cho
+redirect URI của identity client, danh sách origin của backend và mọi callback đã đăng ký còn đúng;
+giữ một nhánh là thứ khiến hai thay đổi gặp nhau sớm, ngay lúc tích hợp, nơi một xung đột chỉ tốn năm
+phút của một con người thay vì chặn một lần publish đã xong.
+
+Có hai hệ quả nên biết trước khi đọc một biên bản. Người tiêu thụ không bao giờ hỏi head đang phục vụ
+có bằng commit mình vừa áp không — nó hỏi commit của mình có phải tổ tiên của head đó không, và cả hai
+được in cạnh nhau. Và một phiên hỏi trong lúc phiên khác đang merge thì được xếp hàng sau lease và được
+cho biết vị trí, chứ không được phát một server thứ hai trên một cổng khác.
+
+## 11. Khi nào UAT chạy
+
+`uat.verify` lái một sản phẩm thật như một người thật, và nó là bằng chứng duy nhất không suy ra được
+từ bất cứ thứ gì khác, nên đáng nói thẳng khi nào nó chạy và khi nào sự vắng mặt của nó là thành thật.
+
+Nó chạy mỗi khi dòng "xong khi" của nhiệm vụ gọi tên nó, và planner tự thêm nó vào mọi chuỗi có ghi
+source frontend dưới `mode: apply` rồi tới `git.publish`: luật dòng dài. Nhiệm vụ có nhiều hành trình
+thì chạy `uat.plan` trước, gọi tên mỗi hành trình một luồng, rồi `uat.verify` mỗi luồng một lần, tối
+đa ba lượt cùng lúc. Nhiệm vụ chỉ có backend không nợ lượt đi thử nào, và nói vậy bằng cách không nêu
+bề mặt nào.
+
+Trong một chuỗi như vậy, đúng hai thứ phải tới từ bên ngoài:
+
+- một người đã yêu cầu, đích danh — `requestedBy`, `feature` và `flow` không có mặc định, nên cửa vào
+  lấy chúng từ nhiệm vụ đã xác nhận và nhánh thà từ chối chứ không bịa ra người yêu cầu;
+- cả hai giấy thông hành lấy tại commit đã ghim — `frontend-surface-audit` và `quality-verification` —
+  cộng biên nhận `route` mà lượt chạy lái vào endpoint của nó.
+
+Mọi thứ còn lại lượt chạy tự làm ra. **Hồ sơ thiếu thì tạo ra, không phải báo lỗi.** Một luồng chưa ai
+chạy thì chưa có thư mục, chưa có tài liệu luồng, chưa có seed, chưa có tài khoản và chưa có bản tham
+chiếu đã duyệt, và không thứ nào trong đó chặn được cái gì:
+
+- tài liệu luồng và seed được phác từ khuôn đi kèm cây rồi nêu trong biên nhận là bản nháp, vì một
+  luồng đã phác là thành thật còn một luồng vắng mặt mới là một lần dừng;
+- tài khoản do `identity.provision` cấp theo danh tính mà sổ đăng ký runtime khai cho route đã bind, mật
+  khẩu đặt từ thông tin đăng nhập niêm phong dùng chung giải theo tên. Một luồng gọi các vai của nó
+  bằng alias và mỗi alias có tài khoản riêng, theo từng môi trường, trong `accounts.<env>.json`.
+  `IDENTITY_MISSING` là lần bàn giao xin điều đó, không phải một phán quyết;
+- lượt chạy đầu tiên để lại một bản ứng viên dưới `snapshots/`, và chỉ một con người mới nâng nó lên.
+
+Thông tin đăng nhập là một cái tên ở mọi nơi nó được ghi xuống. Giá trị của nó tới được body của lời
+gọi quản trị tới provider, hoặc ô của một form đăng ký hay đăng nhập trong trình duyệt đang được điều
+khiển, và không đâu khác — không file, không fixture, không lệnh được ghi lại, không ảnh chụp, không
+biên nhận. Việc chụp chỉ bắt đầu sau khi cú chuyển hướng đăng nhập đã tới nơi, và các validator quét cả
+thư mục luồng chứ không tin vào lời hứa.
+
+Hai mã dừng trên lối này là thành thật, và chỉ có hai: một provider, file niêm phong hay kho dữ liệu
+hoàn toàn không tới được là `PROVISIONING_UNAVAILABLE`, và một entry không khai danh tính nào là
+`INVALID_INPUT` nêu tên trường còn thiếu. Một route trả về màn hình đăng nhập không phải
+`RUNTIME_UNAVAILABLE`: nó đang phục vụ, thứ còn thiếu là một danh tính.
+
+Thư mục luồng có đúng một hình dạng — `flow.md`, `accounts.<env>.json`, `seed/`, `snapshots/`,
+`runs/<runId>/` với `runId` là `<yyyymmdd-HHMMss>-<commit7>`, `latest.json` và `history.md` — và
+`templates/uat/README.md` là hợp đồng của nó. Repo chủ theo dõi thư mục ấy, nên bằng chứng của một lượt
+chạy đi cùng sản phẩm; chỉ thư mục phiên bên cạnh mới bị bỏ qua.
+
+## 12. Kết thúc phiên
+
+Thư mục phiên do orchestrator tạo trước khi agent đầu tiên khởi động và bị xoá khi `git.publish` xong
+việc. Thứ sống sót là những gì các bậc đã publish — commit, business head, cặp UAT, các lần chạy từ
+xa — cùng bất kỳ bản ghi audit nào chủ sở hữu đã chép ra trước. Một phiên bị chặn giữ lại thư mục và
+nhánh phiên của nó để chạy lại.

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "uat.plan request",
+  "$ref": "works:request",
+  "properties": { "operation": { "const": "uat.plan" }, "inputs": { "properties": { "prompts": { "minItems": 1 } } } },
+  "description": "State the mission goal, feature, environment, access mode, fixture mode and source roles in inputs.prompts. Bind an optional surface map in inputs.files and existing flow/template evidence in context.files. Credentials are referenced by alias only."
+}

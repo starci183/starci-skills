@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only interface.fix emits. Same entry shape as operators/errors.json, scope implicit. Shared codes come from operators/errors.json: INVALID_INPUT, SOURCE_DRIFT and NO_PROGRESS for every operator; SESSION_MISSING, OWNER_CONFLICT, RESOLUTION_STALE and WRITE_REJECTED with a scope list that names interface.generate beside this operator. FIX_TOO_LARGE hands to the interface domain, which routing answers with interface.generate: a finding bigger than a fix is a surface generated again.",
+  "codes": {
+    "FIX_TOO_LARGE": {
+      "domain": "interface",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The smallest repair of the finding is bigger than a fix: it touches more paths than the orchestrator's fix size allows, creates or deletes a path, or needs a value the resolution inventory does not publish, so it is a layout or a value decision and not a repair.",
+        "vi": "Sửa nhỏ nhất cho phát hiện vẫn lớn hơn một fix: nó chạm nhiều path hơn cỡ fix của orchestrator cho phép, tạo hay xoá một path, hoặc cần một giá trị mà kho resolution không công bố, nên đó là một quyết định bố cục hay giá trị chứ không phải một lần sửa."
+      },
+      "resume": {
+        "en": "Generate the surface again from a new direction; the finding travels with the request as the audit or UAT receipt that raised it.",
+        "vi": "Sinh lại bề mặt từ một hướng mới; phát hiện đi cùng request dưới dạng biên nhận audit hay UAT đã nêu nó."
+      }
+    }
+  }
+}

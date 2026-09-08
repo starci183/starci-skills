@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 9,
+  "id": "landing.compose",
+  "domain": "interface",
+  "job": "Compose one landing-page contract from the business promise, Grammar family and visual identity: decide Grammar adoption, section storytelling, asset medium, motion and audit evidence without writing source or generating assets.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-reviewer",
+    "grammarBound": true,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read",
+      "@tools/websearch": "bounded"
+    }
+  },
+  "primaryOutput": "landing-composition"
+}

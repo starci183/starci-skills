@@ -1,0 +1,1957 @@
+{
+  "$defs": {
+    "common": {
+      "$defs": {
+        "actor": {
+          "additionalProperties": false,
+          "description": "Recorded actor identity, not host-authenticated authority.",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "kind": {
+              "enum": [
+                "user",
+                "agent",
+                "tool",
+                "system"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        "criteria": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/criterion"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "criterion": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            }
+          },
+          "required": [
+            "id",
+            "description"
+          ],
+          "type": "object"
+        },
+        "digest": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "file": {
+          "additionalProperties": false,
+          "description": "A staged file relative to the work directory. The consumer verifies its actual bytes against sha256.",
+          "properties": {
+            "mediaType": {
+              "$ref": "#/$defs/common/$defs/mediaType"
+            },
+            "path": {
+              "$ref": "#/$defs/common/$defs/relativePath"
+            },
+            "sha256": {
+              "$ref": "#/$defs/common/$defs/digest"
+            }
+          },
+          "required": [
+            "path",
+            "sha256",
+            "mediaType"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        },
+        "idList": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/id"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "mediaType": {
+          "pattern": "^[a-zA-Z0-9!#$&^_.+-]+/[a-zA-Z0-9!#$&^_.+-]+$",
+          "type": "string"
+        },
+        "relativePath": {
+          "description": "A slash-separated file path relative to the work directory; no absolute path, dot segment, parent traversal, drive prefix or backslash.",
+          "not": {
+            "pattern": "(^|/)\\.\\.?(/|$)"
+          },
+          "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "properties": {
+            "excluded": {
+              "items": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "included": {
+              "items": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "included",
+            "excluded"
+          ],
+          "type": "object"
+        },
+        "text": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "const": 1,
+          "type": "integer"
+        }
+      }
+    },
+    "context": {
+      "additionalProperties": false,
+      "description": "Supporting notes and reference files used to understand the task, separate from its inputs. Empty collections explicitly mean no extra context. Context does not grant additional execution authority.",
+      "properties": {
+        "files": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/file"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array"
+        },
+        "visual": {
+          "$ref": "#/$defs/visual"
+        }
+      },
+      "required": [
+        "notes",
+        "files"
+      ],
+      "title": "Request context",
+      "type": "object"
+    },
+    "decision": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/decisions/<id>.json: an attributed decision on an exact work revision and subject digest. Identity and authority are not authenticated by this schema.",
+      "properties": {
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "decidedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "decision"
+        },
+        "outcome": {
+          "enum": [
+            "approved",
+            "rejected",
+            "changes-requested"
+          ],
+          "type": "string"
+        },
+        "rationale": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "sourceRef": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "subject": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "kind": {
+              "enum": [
+                "work",
+                "request",
+                "response",
+                "evidence"
+              ],
+              "type": "string"
+            },
+            "sha256": {
+              "$ref": "#/$defs/common/$defs/digest"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "sha256"
+          ],
+          "type": "object"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "subject",
+        "outcome",
+        "decidedBy",
+        "sourceRef",
+        "rationale",
+        "createdAt"
+      ],
+      "title": "Decision",
+      "type": "object"
+    },
+    "evidence": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/evidence/<id>.json: artifact metadata. Existence, actual digest and evidentiary relevance require separate checks.",
+      "properties": {
+        "capturedAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "capturedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "description": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "evidence"
+        },
+        "mediaType": {
+          "$ref": "#/$defs/common/$defs/mediaType"
+        },
+        "path": {
+          "$ref": "#/$defs/common/$defs/relativePath"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "sha256": {
+          "$ref": "#/$defs/common/$defs/digest"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "path",
+        "sha256",
+        "mediaType",
+        "description",
+        "capturedBy",
+        "capturedAt"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "image-generation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "baseline": {
+                "$ref": "#/$defs/common/$defs/file",
+                "properties": {
+                  "mediaType": {
+                    "pattern": "^image/"
+                  }
+                }
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "new"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "baseline": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "attemptId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "baseline": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/common/$defs/file"
+            }
+          ]
+        },
+        "image": {
+          "$ref": "#/$defs/common/$defs/file",
+          "properties": {
+            "mediaType": {
+              "const": "image/png"
+            }
+          }
+        },
+        "mode": {
+          "enum": [
+            "new",
+            "extend",
+            "revise"
+          ]
+        },
+        "prompt": {
+          "$ref": "#/$defs/common/$defs/file",
+          "properties": {
+            "mediaType": {
+              "const": "text/plain"
+            }
+          }
+        },
+        "requestId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "attemptId",
+        "mode",
+        "baseline",
+        "prompt",
+        "image"
+      ],
+      "title": "Retained image generation context",
+      "type": "object"
+    },
+    "index": {
+      "description": "Version 1 of the proposed .works document format. A document must match exactly one kind. This contract does not migrate or reinterpret legacy session records.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/work"
+        },
+        {
+          "$ref": "#/$defs/request"
+        },
+        {
+          "$ref": "#/$defs/response"
+        },
+        {
+          "$ref": "#/$defs/evidence"
+        },
+        {
+          "$ref": "#/$defs/decision"
+        }
+      ],
+      "title": "Works document contract"
+    },
+    "inputs": {
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "properties": {
+            "prompts": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "files": {
+              "minItems": 1
+            }
+          }
+        }
+      ],
+      "description": "The prompts and files the request asks the skill to act on. At least one prompt or file is required.",
+      "properties": {
+        "files": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/file"
+          },
+          "type": "array"
+        },
+        "prompts": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "prompts",
+        "files"
+      ],
+      "title": "Request inputs",
+      "type": "object"
+    },
+    "output": {
+      "description": "One produced output. Text is inline; commits identify a repository and full object ID; images and other files bind persisted artifacts. Output metadata alone does not prove correctness or publication.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "enum": [
+                "plain",
+                "markdown"
+              ],
+              "type": "string"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "text": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "type": {
+              "const": "text"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "text",
+            "format"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "message": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "repository": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "sha": {
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
+              "type": "string"
+            },
+            "type": {
+              "const": "commit"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "repository",
+            "sha"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "alt": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "file": {
+              "$ref": "#/$defs/common/$defs/file",
+              "properties": {
+                "mediaType": {
+                  "pattern": "^image/"
+                }
+              }
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "type": {
+              "const": "image"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "file",
+            "alt"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "file": {
+              "$ref": "#/$defs/common/$defs/file"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "type": {
+              "const": "file"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "file",
+            "description"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Response output"
+    },
+    "request": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/requests/<id>.json: prompts and files to act on, with supporting context kept separate, against one work revision. This record alone grants no execution permission.",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/context"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "expected": {
+          "$ref": "#/$defs/common/$defs/criteria"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "kind": {
+          "const": "request"
+        },
+        "operation": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "operation",
+        "expected",
+        "inputs",
+        "context",
+        "requestedBy",
+        "createdAt"
+      ],
+      "title": "Request",
+      "type": "object"
+    },
+    "response": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "done"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outputs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "mismatch",
+                  "blocked",
+                  "waiting"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ],
+      "description": ".works/<workId>/responses/<id>.json: typed outputs produced for one request. Optional verification observations describe their checks separately; delivering an output is not a claim that the work is proved complete.",
+      "properties": {
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "criteriaResults": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "criterionId": {
+                "$ref": "#/$defs/common/$defs/id"
+              },
+              "note": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "outputIds": {
+                "$ref": "#/$defs/common/$defs/idList"
+              },
+              "result": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "not-checked"
+                ]
+              }
+            },
+            "required": [
+              "criterionId",
+              "result",
+              "outputIds",
+              "note"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "feedbackRound": {
+          "description": "Completed feedback-and-repair rounds for this request. Initial candidate is round zero; the caller maintains truthful history.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "response"
+        },
+        "observations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "criterionId": {
+                "$ref": "#/$defs/common/$defs/id"
+              },
+              "evidenceIds": {
+                "$ref": "#/$defs/common/$defs/idList"
+              },
+              "note": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "result": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "not-checked"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "criterionId",
+              "result",
+              "evidenceIds",
+              "note"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/output"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "requestId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "status": {
+          "enum": [
+            "done",
+            "mismatch",
+            "blocked",
+            "waiting"
+          ],
+          "type": "string"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "requestId",
+        "status",
+        "outputs",
+        "createdAt"
+      ],
+      "title": "Response",
+      "type": "object"
+    },
+    "visual": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "not": {
+              "required": [
+                "baselinePath"
+              ]
+            }
+          },
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "extend",
+                  "revise"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "preserve": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "baselinePath"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "baselinePath": {
+          "$ref": "#/$defs/common/$defs/relativePath"
+        },
+        "change": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "mode": {
+          "enum": [
+            "new",
+            "extend",
+            "revise"
+          ]
+        },
+        "preserve": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "mode",
+        "preserve",
+        "change"
+      ],
+      "title": "Visual context",
+      "type": "object"
+    },
+    "work": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "completion": false
+            }
+          },
+          "if": {
+            "properties": {
+              "status": {
+                "const": "completed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "completion"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "blocked",
+                  "cancelled"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ],
+      "description": ".works/<id>/work.json: goal, declared scope, acceptance criteria and current lifecycle.",
+      "properties": {
+        "acceptanceCriteria": {
+          "$ref": "#/$defs/common/$defs/criteria"
+        },
+        "completion": {
+          "additionalProperties": false,
+          "properties": {
+            "completedAt": {
+              "$ref": "#/$defs/common/$defs/timestamp"
+            },
+            "evidenceIds": {
+              "$ref": "#/$defs/common/$defs/idList",
+              "minItems": 1
+            }
+          },
+          "required": [
+            "evidenceIds",
+            "completedAt"
+          ],
+          "type": "object"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "goal": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "work"
+        },
+        "reason": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "revision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "scope": {
+          "$ref": "#/$defs/common/$defs/scope"
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "active",
+            "blocked",
+            "completed",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "revision",
+        "goal",
+        "status",
+        "scope",
+        "acceptanceCriteria",
+        "createdAt",
+        "updatedAt"
+      ],
+      "title": "Work",
+      "type": "object"
+    }
+  },
+  "aliases": {
+    "@cli/curl": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "curl"
+      },
+      "kind": "cli",
+      "note": "On Windows resolve the curl executable (curl.exe), not a PowerShell alias with different argument semantics. A native web-fetch capability is not this CLI alias.",
+      "params": [],
+      "purpose": "Probe an HTTP endpoint using the curl executable.",
+      "resolvesTo": "executable:curl",
+      "scheme": "cli://curl",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/docker": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "docker"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Inspect or operate containers and images through Docker CLI.",
+      "resolvesTo": "executable:docker",
+      "scheme": "cli://docker",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/python": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "python"
+      },
+      "kind": "cli",
+      "note": "Resolve Python 3 from the active environment: python, python3, or py -3 as appropriate; record the selected executable and any launcher arguments.",
+      "params": [],
+      "purpose": "Run declared Python scripts.",
+      "resolvesTo": "executable:python",
+      "scheme": "cli://python",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/shell": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "<session-shell>"
+      },
+      "kind": "cli",
+      "note": "Resolve to the session shell (PowerShell, bash or another declared shell); do not assume bash on Windows. Arguments remain separate data until encoded for that shell.",
+      "params": [],
+      "purpose": "Run a declared command in the active session shell.",
+      "resolvesTo": "executable:<session-shell>",
+      "scheme": "cli://shell",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@tools/fileread": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "fileread"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Read declared workspace files and directories through the active session.",
+      "resolvesTo": "session:fileread",
+      "scheme": "tool://fileread",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Read, Glob and Grep"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex file reads"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/print": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "print"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Present text and artifacts in the conversation using the host rendering capabilities.",
+      "resolvesTo": "session:print",
+      "scheme": "tool://print",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "the session's file and render hand-off, which displays an image or an HTML page in the conversation and falls back to the path or the URL"
+        },
+        "openai": {
+          "supported": true,
+          "via": "the absolute path or the URL printed into the conversation, with the image inline where the client renders one"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/sourcewrite": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "sourcewrite"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Edit files within the declared write scope through the active session.",
+      "resolvesTo": "session:sourcewrite",
+      "scheme": "tool://sourcewrite",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Write and Edit"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex file edits"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@workspaces/artifacts": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Produced files, including images, documents and other deliverables.",
+      "resolvesTo": "<Workspace>/.works/<workId>/artifacts/",
+      "scheme": "workspace://artifacts",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/context": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Supporting reference files for a request.",
+      "resolvesTo": "<Workspace>/.works/<workId>/context/",
+      "scheme": "workspace://context",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/inputs": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Files supplied as the subject of a request.",
+      "resolvesTo": "<Workspace>/.works/<workId>/inputs/",
+      "scheme": "workspace://inputs",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/requests": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Requests with separate inputs and context.",
+      "resolvesTo": "<Workspace>/.works/<workId>/requests/",
+      "scheme": "workspace://requests",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/responses": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Responses declaring produced outputs and execution status.",
+      "resolvesTo": "<Workspace>/.works/<workId>/responses/",
+      "scheme": "workspace://responses",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "zone": "workspaces"
+    }
+  },
+  "criteria": {
+    "history": "Record round zero declaration, authority, inventory, holder, desired and observed states, exact command effect and final probe. Each retry begins with fresh probe and holder observation; prior effects remain recorded.",
+    "items": [
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-shape"
+        },
+        "expect": "The request schema passes.",
+        "id": "request-shape",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-service-operation",
+          "instruction": "Request a corrected service request."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-files"
+        },
+        "expect": "Declaration, authority and service-entry files match digests.",
+        "id": "request-files",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-service-operation",
+          "instruction": "Request exact missing or drifted service evidence."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "response-shape"
+        },
+        "expect": "The response schema and service receipt pass.",
+        "id": "response-shape",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-service-result",
+          "instruction": "Repair response metadata from observed service evidence."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-binding"
+        },
+        "expect": "The response binds this request and revision.",
+        "id": "request-binding",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-service-result",
+          "instruction": "Correct response binding."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "unique-outputs"
+        },
+        "expect": "Service output identifiers are unique.",
+        "id": "unique-outputs",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-service-result",
+          "instruction": "Remove duplicate declarations."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "output-files"
+        },
+        "expect": "The service receipt is present, scoped and digest-bound.",
+        "id": "output-files",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-service-result",
+          "instruction": "Re-read the actual receipt and correct metadata."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "observation-binding"
+        },
+        "expect": "Observations reference request criteria and current evidence.",
+        "id": "observation-binding",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-service-result",
+          "instruction": "Correct evidence references."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "declared-service-authority"
+        },
+        "expect": "One declared service and existing authority cover the exact desired state.",
+        "id": "declared-service-authority",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-service-operation",
+          "instruction": "Request exact person approval when the declaration or service holder requires it."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "service-inventory-safety"
+        },
+        "expect": "Pre-effect probe, pid and port holder are recorded and foreign owners remain untouched.",
+        "id": "service-inventory-safety",
+        "onFail": {
+          "action": "block",
+          "fromStep": "inventory-service",
+          "instruction": "Report the foreign or uncertain holder; do not move its port or process."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "desired-observed-separation"
+        },
+        "expect": "Observed up or down is proved by the declared probe and holder state, not command exit.",
+        "id": "desired-observed-separation",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "observe-after-service-effect",
+          "instruction": "Record the failed probe or held port and reassess after targeted authorized repair."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "attestation-and-noop"
+        },
+        "expect": "Attested is read-only and already-matching desired state records a proved no-op.",
+        "id": "attestation-and-noop",
+        "onFail": {
+          "action": "block",
+          "fromStep": "evaluate-service",
+          "instruction": "Report the unauthorized command or false mutation claim; do not hide it as a no-op."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "no-duplicate-service-effect"
+        },
+        "expect": "Start or stop is never repeated while prior completion is uncertain.",
+        "id": "no-duplicate-service-effect",
+        "onFail": {
+          "action": "block",
+          "fromStep": "observe-after-service-effect",
+          "instruction": "Stop and require a fresh authoritative probe and holder inventory."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "capability-unavailable"
+        },
+        "expect": "Declaration, process, container and probe capabilities are available.",
+        "id": "missing-capability",
+        "onFail": {
+          "action": "block",
+          "fromStep": "bind-service-operation",
+          "instruction": "Return the missing capability; do not substitute another service mechanism."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "essential-input-missing"
+        },
+        "expect": "Service row, desired state, authority and probe are complete.",
+        "id": "missing-essential-input",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-service-operation",
+          "instruction": "Ask for the exact missing declared service input."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "transient-execution-failure"
+        },
+        "expect": "Service effect completion is known from fresh probe and holder observation.",
+        "id": "transient-service-effect",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "observe-after-service-effect",
+          "instruction": "Probe and inventory first; never blindly repeat start or stop."
+        }
+      }
+    ],
+    "limits": {
+      "feedbackRounds": 2
+    },
+    "stopWhen": "Stop after two feedback rounds, repeated probe failure, missing approval, foreign holder, unavailable capability or unobservable uncertain effect. Done requires declared probe proof of the requested state."
+  },
+  "id": "service.operate",
+  "purpose": "Bring one environment-declared auxiliary service to its requested state and prove that state from the service's own probe while recording its holder.",
+  "request": {
+    "$ref": "#/$defs/request",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Bind one environment declaration and service row, desired up, down or attested state, current service entry, probe and holder observation, and existing declaration or person approval. Credentials appear only as custody names.",
+    "properties": {
+      "expected": {
+        "minItems": 1
+      },
+      "inputs": {
+        "properties": {
+          "files": {
+            "minItems": 1
+          }
+        }
+      },
+      "operation": {
+        "const": "service.operate"
+      }
+    },
+    "title": "service.operate request"
+  },
+  "response": {
+    "$ref": "#/$defs/response",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "done"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "observations": {
+              "not": {
+                "contains": {
+                  "properties": {
+                    "result": {
+                      "const": "failed"
+                    }
+                  },
+                  "required": [
+                    "result"
+                  ]
+                }
+              }
+            },
+            "outputs": {
+              "contains": {
+                "properties": {
+                  "file": {
+                    "properties": {
+                      "mediaType": {
+                        "const": "application/json"
+                      }
+                    }
+                  },
+                  "id": {
+                    "const": "service-receipt"
+                  },
+                  "type": {
+                    "const": "file"
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "file"
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "done"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "criteriaResults": {
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "declared-service-authority"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "service-inventory-safety"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "desired-observed-separation"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "attestation-and-noop"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "no-duplicate-service-effect"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                }
+              ],
+              "items": {
+                "properties": {
+                  "outputIds": {
+                    "minItems": 1
+                  },
+                  "result": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "maxItems": 5,
+              "minItems": 5
+            },
+            "observations": {
+              "items": {
+                "properties": {
+                  "result": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "criteriaResults",
+            "feedbackRound",
+            "observations"
+          ]
+        }
+      }
+    ],
+    "description": "A done response contains one service receipt binding the declaration and authority, desired and observed states, declared probe, holder when up, port-free proof when down, and whether the action was a proved no-op.",
+    "properties": {
+      "criteriaResults": {
+        "items": {
+          "properties": {
+            "criterionId": {
+              "enum": [
+                "declared-service-authority",
+                "service-inventory-safety",
+                "desired-observed-separation",
+                "attestation-and-noop",
+                "no-duplicate-service-effect"
+              ]
+            }
+          }
+        }
+      },
+      "feedbackRound": {
+        "maximum": 2
+      }
+    },
+    "title": "service.operate response"
+  },
+  "schemaVersion": 1,
+  "scope": "One declared service and state. It does not operate the product runtime, invent services, move ports, stop foreign processes, infer approval, or record credential values. Attestation is read-only.",
+  "step": {
+    "steps": [
+      {
+        "calls": [
+          {
+            "alias": "@tools/fileread",
+            "purpose": "Read the exact service declaration and authority.",
+            "when": "always"
+          }
+        ],
+        "checks": [
+          "request-shape",
+          "request-files"
+        ],
+        "id": "bind-service-operation",
+        "instruction": "Read the request, one environment declaration and current service entry. Bind the exact service row, kind, declared command, probe, desired state, holder policy, port and existing declaration or person approval. Resolve credentials only by custody name.",
+        "produces": [
+          "Authorized declared service binding."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/requests",
+            "path": "<requestId>.json",
+            "when": "always"
+          },
+          {
+            "alias": "@workspaces/inputs",
+            "path": "<declared-input-path>",
+            "when": "for every input file"
+          },
+          {
+            "alias": "@workspaces/context",
+            "path": "<credential-custody-reference>",
+            "when": "when the declared command needs a credential"
+          }
+        ],
+        "writes": []
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/curl",
+            "purpose": "Read the declared service probe.",
+            "when": "for an HTTP probe"
+          },
+          {
+            "alias": "@cli/shell",
+            "purpose": "Read process and port-holder state.",
+            "when": "always"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist inventory and lease observation.",
+            "when": "always"
+          }
+        ],
+        "checks": [],
+        "id": "inventory-service",
+        "instruction": "Acquire the service lease and inspect the declared probe, process or container, pid and port holder before action. Record product-route port collisions as findings and never move the port or stop a foreign holder.",
+        "produces": [
+          "Service inventory and holder evidence."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/context",
+            "path": "<current-service-entry>",
+            "when": "always"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/service-inventory.json",
+            "when": "always"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/docker",
+            "purpose": "Run the declared container-backed service command.",
+            "when": "when required for a container service"
+          },
+          {
+            "alias": "@cli/shell",
+            "purpose": "Run the exact declared host service command.",
+            "when": "when required for a host service"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist the exact attempted effect without credential values.",
+            "when": "when a command runs"
+          }
+        ],
+        "checks": [],
+        "id": "apply-service-state",
+        "instruction": "For attested, run no command. For up or down, reuse already-matching state or run exactly the declared command once under the lease. Change nothing when ownership is foreign or state is uncertain, and never operate a product runtime entry.",
+        "produces": [
+          "Service effect evidence when moved."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/service-inventory.json",
+            "when": "always"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/service-effect.json",
+            "when": "when a command runs"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/curl",
+            "purpose": "Run the declared functional probe.",
+            "when": "for an HTTP probe"
+          },
+          {
+            "alias": "@cli/shell",
+            "purpose": "Read the final process and port state.",
+            "when": "always"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist final observed state and holder.",
+            "when": "always"
+          }
+        ],
+        "checks": [],
+        "id": "observe-after-service-effect",
+        "instruction": "After action or uncertain completion, re-run the declared probe and holder inventory before any retry. Up is proven only by an answering probe plus recorded pid; down only by a free declared port. Release the lease after observation.",
+        "produces": [
+          "Final service observation."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/<service-evidence>",
+            "when": "always"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/service-observation.json",
+            "when": "always"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist the service receipt only from observed state.",
+            "when": "after evaluation"
+          }
+        ],
+        "checks": [
+          "declared-service-authority",
+          "service-inventory-safety",
+          "desired-observed-separation",
+          "attestation-and-noop",
+          "no-duplicate-service-effect"
+        ],
+        "id": "evaluate-service",
+        "instruction": "Compare declaration, authority, inventory, desired state, command evidence and final probe. Record a proved no-op for already-matching state, no mutation for attested, and concrete defects for any unproved state.",
+        "produces": [
+          "service-receipt",
+          "Concrete failed-criterion feedback or passing review results."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/<service-evidence>",
+            "when": "always"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/service-receipt.json",
+            "when": "after evaluation"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Write the service response.",
+            "when": "always"
+          },
+          {
+            "alias": "@cli/python",
+            "purpose": "Validate request and response records.",
+            "when": "always"
+          },
+          {
+            "alias": "@tools/print",
+            "purpose": "Present desired and observed service state.",
+            "when": "when evaluated"
+          }
+        ],
+        "checks": [
+          "response-shape",
+          "request-binding",
+          "unique-outputs",
+          "output-files",
+          "observation-binding"
+        ],
+        "id": "record-service-result",
+        "instruction": "Write and validate the response with actual hashes, observations and review results. Present requested and observed states with the proving probe; never assert state from command exit alone.",
+        "produces": [
+          "A validated service response."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/service-receipt.json",
+            "when": "when produced"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/responses",
+            "path": "<responseId>.json",
+            "when": "always"
+          }
+        ]
+      }
+    ]
+  },
+  "validate": {
+    "failurePolicy": "Report the exact declaration, authority, holder or probe defect and use targeted reassessment. Re-observe service state before retries and block foreign, unauthorized or uncertain effects.",
+    "machine": [
+      {
+        "check": "request-schema",
+        "id": "request-shape",
+        "phase": "request"
+      },
+      {
+        "check": "input-files",
+        "id": "request-files",
+        "phase": "request"
+      },
+      {
+        "check": "response-schema",
+        "id": "response-shape",
+        "phase": "response"
+      },
+      {
+        "check": "request-binding",
+        "id": "request-binding",
+        "phase": "response"
+      },
+      {
+        "check": "unique-output-ids",
+        "id": "unique-outputs",
+        "phase": "response"
+      },
+      {
+        "check": "output-files",
+        "id": "output-files",
+        "phase": "response"
+      },
+      {
+        "check": "observation-references",
+        "id": "observation-binding",
+        "phase": "response"
+      }
+    ],
+    "review": [
+      {
+        "id": "declared-service-authority",
+        "instruction": "Confirm exactly one service row supplies kind, command, probe, desired state, holder policy and port, and existing declaration or person approval covers this exact state before any command."
+      },
+      {
+        "id": "service-inventory-safety",
+        "instruction": "Record the current probe, process or container, pid and port holder before action. Never move a port, stop a foreign holder or operate a product runtime entry."
+      },
+      {
+        "id": "desired-observed-separation",
+        "instruction": "Keep requested and observed states separate. Up requires the declared probe to answer and its pid to be recorded; down requires the declared port to be free; command exit or logs alone prove neither."
+      },
+      {
+        "id": "attestation-and-noop",
+        "instruction": "Attested performs no mutation. A service already in the desired state records a proved no-op; a moved service records the exact declared command without credential values."
+      },
+      {
+        "id": "no-duplicate-service-effect",
+        "instruction": "After uncertain command completion, re-probe and re-inventory before deciding whether another action is safe. Never blindly repeat start or stop."
+      }
+    ]
+  }
+}

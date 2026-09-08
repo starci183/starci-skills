@@ -1,0 +1,1870 @@
+{
+  "$defs": {
+    "common": {
+      "$defs": {
+        "actor": {
+          "additionalProperties": false,
+          "description": "Recorded actor identity, not host-authenticated authority.",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "kind": {
+              "enum": [
+                "user",
+                "agent",
+                "tool",
+                "system"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        "criteria": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/criterion"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "criterion": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            }
+          },
+          "required": [
+            "id",
+            "description"
+          ],
+          "type": "object"
+        },
+        "digest": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "file": {
+          "additionalProperties": false,
+          "description": "A staged file relative to the work directory. The consumer verifies its actual bytes against sha256.",
+          "properties": {
+            "mediaType": {
+              "$ref": "#/$defs/common/$defs/mediaType"
+            },
+            "path": {
+              "$ref": "#/$defs/common/$defs/relativePath"
+            },
+            "sha256": {
+              "$ref": "#/$defs/common/$defs/digest"
+            }
+          },
+          "required": [
+            "path",
+            "sha256",
+            "mediaType"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        },
+        "idList": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/id"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "mediaType": {
+          "pattern": "^[a-zA-Z0-9!#$&^_.+-]+/[a-zA-Z0-9!#$&^_.+-]+$",
+          "type": "string"
+        },
+        "relativePath": {
+          "description": "A slash-separated file path relative to the work directory; no absolute path, dot segment, parent traversal, drive prefix or backslash.",
+          "not": {
+            "pattern": "(^|/)\\.\\.?(/|$)"
+          },
+          "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "properties": {
+            "excluded": {
+              "items": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "included": {
+              "items": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "included",
+            "excluded"
+          ],
+          "type": "object"
+        },
+        "text": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "const": 1,
+          "type": "integer"
+        }
+      }
+    },
+    "context": {
+      "additionalProperties": false,
+      "description": "Supporting notes and reference files used to understand the task, separate from its inputs. Empty collections explicitly mean no extra context. Context does not grant additional execution authority.",
+      "properties": {
+        "files": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/file"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array"
+        },
+        "visual": {
+          "$ref": "#/$defs/visual"
+        }
+      },
+      "required": [
+        "notes",
+        "files"
+      ],
+      "title": "Request context",
+      "type": "object"
+    },
+    "decision": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/decisions/<id>.json: an attributed decision on an exact work revision and subject digest. Identity and authority are not authenticated by this schema.",
+      "properties": {
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "decidedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "decision"
+        },
+        "outcome": {
+          "enum": [
+            "approved",
+            "rejected",
+            "changes-requested"
+          ],
+          "type": "string"
+        },
+        "rationale": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "sourceRef": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "subject": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "kind": {
+              "enum": [
+                "work",
+                "request",
+                "response",
+                "evidence"
+              ],
+              "type": "string"
+            },
+            "sha256": {
+              "$ref": "#/$defs/common/$defs/digest"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "sha256"
+          ],
+          "type": "object"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "subject",
+        "outcome",
+        "decidedBy",
+        "sourceRef",
+        "rationale",
+        "createdAt"
+      ],
+      "title": "Decision",
+      "type": "object"
+    },
+    "evidence": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/evidence/<id>.json: artifact metadata. Existence, actual digest and evidentiary relevance require separate checks.",
+      "properties": {
+        "capturedAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "capturedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "description": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "evidence"
+        },
+        "mediaType": {
+          "$ref": "#/$defs/common/$defs/mediaType"
+        },
+        "path": {
+          "$ref": "#/$defs/common/$defs/relativePath"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "sha256": {
+          "$ref": "#/$defs/common/$defs/digest"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "path",
+        "sha256",
+        "mediaType",
+        "description",
+        "capturedBy",
+        "capturedAt"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "image-generation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "baseline": {
+                "$ref": "#/$defs/common/$defs/file",
+                "properties": {
+                  "mediaType": {
+                    "pattern": "^image/"
+                  }
+                }
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "new"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "baseline": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "attemptId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "baseline": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/common/$defs/file"
+            }
+          ]
+        },
+        "image": {
+          "$ref": "#/$defs/common/$defs/file",
+          "properties": {
+            "mediaType": {
+              "const": "image/png"
+            }
+          }
+        },
+        "mode": {
+          "enum": [
+            "new",
+            "extend",
+            "revise"
+          ]
+        },
+        "prompt": {
+          "$ref": "#/$defs/common/$defs/file",
+          "properties": {
+            "mediaType": {
+              "const": "text/plain"
+            }
+          }
+        },
+        "requestId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "attemptId",
+        "mode",
+        "baseline",
+        "prompt",
+        "image"
+      ],
+      "title": "Retained image generation context",
+      "type": "object"
+    },
+    "index": {
+      "description": "Version 1 of the proposed .works document format. A document must match exactly one kind. This contract does not migrate or reinterpret legacy session records.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/work"
+        },
+        {
+          "$ref": "#/$defs/request"
+        },
+        {
+          "$ref": "#/$defs/response"
+        },
+        {
+          "$ref": "#/$defs/evidence"
+        },
+        {
+          "$ref": "#/$defs/decision"
+        }
+      ],
+      "title": "Works document contract"
+    },
+    "inputs": {
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "properties": {
+            "prompts": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "files": {
+              "minItems": 1
+            }
+          }
+        }
+      ],
+      "description": "The prompts and files the request asks the skill to act on. At least one prompt or file is required.",
+      "properties": {
+        "files": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/file"
+          },
+          "type": "array"
+        },
+        "prompts": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "prompts",
+        "files"
+      ],
+      "title": "Request inputs",
+      "type": "object"
+    },
+    "output": {
+      "description": "One produced output. Text is inline; commits identify a repository and full object ID; images and other files bind persisted artifacts. Output metadata alone does not prove correctness or publication.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "enum": [
+                "plain",
+                "markdown"
+              ],
+              "type": "string"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "text": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "type": {
+              "const": "text"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "text",
+            "format"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "message": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "repository": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "sha": {
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
+              "type": "string"
+            },
+            "type": {
+              "const": "commit"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "repository",
+            "sha"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "alt": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "file": {
+              "$ref": "#/$defs/common/$defs/file",
+              "properties": {
+                "mediaType": {
+                  "pattern": "^image/"
+                }
+              }
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "type": {
+              "const": "image"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "file",
+            "alt"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "file": {
+              "$ref": "#/$defs/common/$defs/file"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "type": {
+              "const": "file"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "file",
+            "description"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Response output"
+    },
+    "request": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/requests/<id>.json: prompts and files to act on, with supporting context kept separate, against one work revision. This record alone grants no execution permission.",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/context"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "expected": {
+          "$ref": "#/$defs/common/$defs/criteria"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "kind": {
+          "const": "request"
+        },
+        "operation": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "operation",
+        "expected",
+        "inputs",
+        "context",
+        "requestedBy",
+        "createdAt"
+      ],
+      "title": "Request",
+      "type": "object"
+    },
+    "response": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "done"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outputs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "mismatch",
+                  "blocked",
+                  "waiting"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ],
+      "description": ".works/<workId>/responses/<id>.json: typed outputs produced for one request. Optional verification observations describe their checks separately; delivering an output is not a claim that the work is proved complete.",
+      "properties": {
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "criteriaResults": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "criterionId": {
+                "$ref": "#/$defs/common/$defs/id"
+              },
+              "note": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "outputIds": {
+                "$ref": "#/$defs/common/$defs/idList"
+              },
+              "result": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "not-checked"
+                ]
+              }
+            },
+            "required": [
+              "criterionId",
+              "result",
+              "outputIds",
+              "note"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "feedbackRound": {
+          "description": "Completed feedback-and-repair rounds for this request. Initial candidate is round zero; the caller maintains truthful history.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "response"
+        },
+        "observations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "criterionId": {
+                "$ref": "#/$defs/common/$defs/id"
+              },
+              "evidenceIds": {
+                "$ref": "#/$defs/common/$defs/idList"
+              },
+              "note": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "result": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "not-checked"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "criterionId",
+              "result",
+              "evidenceIds",
+              "note"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/output"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "requestId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "status": {
+          "enum": [
+            "done",
+            "mismatch",
+            "blocked",
+            "waiting"
+          ],
+          "type": "string"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "requestId",
+        "status",
+        "outputs",
+        "createdAt"
+      ],
+      "title": "Response",
+      "type": "object"
+    },
+    "visual": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "not": {
+              "required": [
+                "baselinePath"
+              ]
+            }
+          },
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "extend",
+                  "revise"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "preserve": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "baselinePath"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "baselinePath": {
+          "$ref": "#/$defs/common/$defs/relativePath"
+        },
+        "change": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "mode": {
+          "enum": [
+            "new",
+            "extend",
+            "revise"
+          ]
+        },
+        "preserve": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "mode",
+        "preserve",
+        "change"
+      ],
+      "title": "Visual context",
+      "type": "object"
+    },
+    "work": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "completion": false
+            }
+          },
+          "if": {
+            "properties": {
+              "status": {
+                "const": "completed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "completion"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "blocked",
+                  "cancelled"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ],
+      "description": ".works/<id>/work.json: goal, declared scope, acceptance criteria and current lifecycle.",
+      "properties": {
+        "acceptanceCriteria": {
+          "$ref": "#/$defs/common/$defs/criteria"
+        },
+        "completion": {
+          "additionalProperties": false,
+          "properties": {
+            "completedAt": {
+              "$ref": "#/$defs/common/$defs/timestamp"
+            },
+            "evidenceIds": {
+              "$ref": "#/$defs/common/$defs/idList",
+              "minItems": 1
+            }
+          },
+          "required": [
+            "evidenceIds",
+            "completedAt"
+          ],
+          "type": "object"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "goal": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "work"
+        },
+        "reason": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "revision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "scope": {
+          "$ref": "#/$defs/common/$defs/scope"
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "active",
+            "blocked",
+            "completed",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "revision",
+        "goal",
+        "status",
+        "scope",
+        "acceptanceCriteria",
+        "createdAt",
+        "updatedAt"
+      ],
+      "title": "Work",
+      "type": "object"
+    }
+  },
+  "aliases": {
+    "@cli/git": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "git"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Inspect or change Git repository state.",
+      "resolvesTo": "executable:git",
+      "scheme": "cli://git",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/python": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "python"
+      },
+      "kind": "cli",
+      "note": "Resolve Python 3 from the active environment: python, python3, or py -3 as appropriate; record the selected executable and any launcher arguments.",
+      "params": [],
+      "purpose": "Run declared Python scripts.",
+      "resolvesTo": "executable:python",
+      "scheme": "cli://python",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/shell": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "<session-shell>"
+      },
+      "kind": "cli",
+      "note": "Resolve to the session shell (PowerShell, bash or another declared shell); do not assume bash on Windows. Arguments remain separate data until encoded for that shell.",
+      "params": [],
+      "purpose": "Run a declared command in the active session shell.",
+      "resolvesTo": "executable:<session-shell>",
+      "scheme": "cli://shell",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@tools/fileread": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "fileread"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Read declared workspace files and directories through the active session.",
+      "resolvesTo": "session:fileread",
+      "scheme": "tool://fileread",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Read, Glob and Grep"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex file reads"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/sourcewrite": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "sourcewrite"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Edit files within the declared write scope through the active session.",
+      "resolvesTo": "session:sourcewrite",
+      "scheme": "tool://sourcewrite",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Write and Edit"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex file edits"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@workspaces/artifacts": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Produced files, including images, documents and other deliverables.",
+      "resolvesTo": "<Workspace>/.works/<workId>/artifacts/",
+      "scheme": "workspace://artifacts",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/be": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "checkout",
+      "params": [],
+      "purpose": "The explicitly bound backend checkout; unavailable when the project has no backend role.",
+      "resolvesTo": "<Backend>/",
+      "scheme": "workspace://be",
+      "writers": [
+        "backend.generate"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/context": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Supporting reference files for a request.",
+      "resolvesTo": "<Workspace>/.works/<workId>/context/",
+      "scheme": "workspace://context",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/inputs": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Files supplied as the subject of a request.",
+      "resolvesTo": "<Workspace>/.works/<workId>/inputs/",
+      "scheme": "workspace://inputs",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/knowledge": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [],
+      "purpose": "Knowledge published by the selected skill runtime.",
+      "resolvesTo": "<Runtime>/knowledge/",
+      "scheme": "workspace://knowledge",
+      "writers": [
+        "knowledge.repair"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/requests": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Requests with separate inputs and context.",
+      "resolvesTo": "<Workspace>/.works/<workId>/requests/",
+      "scheme": "workspace://requests",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/responses": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Responses declaring produced outputs and execution status.",
+      "resolvesTo": "<Workspace>/.works/<workId>/responses/",
+      "scheme": "workspace://responses",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "zone": "workspaces"
+    }
+  },
+  "criteria": {
+    "history": "Keep each assessment and concise concrete feedback under the request attempt. Preserve raw proof evidence and accepted outputs. A repair changes only the failed source or record and reruns dependent checks; an unchanged repeated failure stops.",
+    "items": [
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-shape"
+        },
+        "expect": "The request has the shared shape and names backend.generate.",
+        "id": "criterion-request-shape",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-contract",
+          "instruction": "Identify the invalid request field and ask for a corrected request."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-files"
+        },
+        "expect": "Every declared authority and context file exists with its recorded digest.",
+        "id": "criterion-request-files",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-contract",
+          "instruction": "Name the missing or changed file; do not implement from unverified authority."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "response-shape"
+        },
+        "expect": "The response satisfies the operator response contract.",
+        "id": "criterion-response-shape",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "commit-and-record",
+          "instruction": "Repair only the response fields from verified source and artifact facts."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-binding"
+        },
+        "expect": "The response binds this request and work revision.",
+        "id": "criterion-request-binding",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "commit-and-record",
+          "instruction": "Correct the response binding without reusing another request's outputs."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "unique-outputs"
+        },
+        "expect": "Each output identifier is unique.",
+        "id": "criterion-unique-outputs",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "commit-and-record",
+          "instruction": "Remove duplicate declarations while retaining the one bound to actual evidence."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "output-files"
+        },
+        "expect": "Every file output stays in the request artifact scope and matches its digest.",
+        "id": "criterion-output-files",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "prove-outcome",
+          "instruction": "Re-read actual bytes and repair the artifact or metadata; never bless changed bytes by replacing a digest alone."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "observation-binding"
+        },
+        "expect": "Observations name request criteria and valid evidence records.",
+        "id": "criterion-observation-binding",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "commit-and-record",
+          "instruction": "Correct observation references from existing verified evidence."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "contract-fidelity"
+        },
+        "expect": "Implemented behavior matches the frozen contract without invented business rules.",
+        "id": "criterion-contract-fidelity",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "implement-outcome",
+          "instruction": "List the exact operation or rule mismatch and repair only that implementation; ask if authority is absent."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "source-boundary"
+        },
+        "expect": "The diff is complete, digest-bound and contained by mutable and protected paths.",
+        "id": "criterion-source-boundary",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "implement-outcome",
+          "instruction": "Name each out-of-bound or unaccounted path and restore or repair only those paths."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "behavior-proof"
+        },
+        "expect": "Every required behavior proof actually ran and passed without weakening.",
+        "id": "criterion-behavior-proof",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "prove-outcome",
+          "instruction": "Report the failing command and behavior, repair its owning source, then rerun that proof and all dependent proofs."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "capability-unavailable"
+        },
+        "expect": "Required source, Git and command capabilities are available.",
+        "id": "criterion-capability",
+        "onFail": {
+          "action": "block",
+          "fromStep": "implement-outcome",
+          "instruction": "Return blocked with the exact unavailable capability and unfinished proof."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "essential-input-missing"
+        },
+        "expect": "Business authority, contract, boundary and proof definitions are sufficient.",
+        "id": "criterion-essential-input",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-contract",
+          "instruction": "Ask only for the missing authoritative input that changes implementation."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "transient-execution-failure"
+        },
+        "expect": "Transient execution failures are resolved without duplicating source commits.",
+        "id": "criterion-transient-failure",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "prove-outcome",
+          "instruction": "Inspect Git and artifact state first; retry only the incomplete idempotent command and never create a duplicate commit."
+        }
+      }
+    ],
+    "limits": {
+      "feedbackRounds": 2
+    },
+    "stopWhen": "Return done only after every machine and review criterion passes and criteriaResults records acceptance. Otherwise return waiting, blocked or mismatch with the latest concrete feedback; stop after two feedback rounds or an unchanged repeated failure."
+  },
+  "id": "backend.generate",
+  "purpose": "Implement one bounded backend outcome from supplied authority and source context, then prove the contract and changed-file boundary.",
+  "request": {
+    "$ref": "#/$defs/request",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Use inputs.prompts for the outcome, exact mutable and protected path boundaries, contract operations, business authority, sibling conventions, and proof commands. Use inputs.files for authoritative plans or contracts and context.files for supporting source observations. Missing authority or an ambiguous write ceiling is essential-input-missing.",
+    "properties": {
+      "expected": {
+        "minItems": 2
+      },
+      "operation": {
+        "const": "backend.generate"
+      }
+    },
+    "title": "backend.generate request"
+  },
+  "response": {
+    "$ref": "#/$defs/response",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "done"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "observations": {
+              "not": {
+                "contains": {
+                  "properties": {
+                    "result": {
+                      "const": "failed"
+                    }
+                  },
+                  "required": [
+                    "result"
+                  ]
+                }
+              }
+            },
+            "outputs": {
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "source-commit"
+                      },
+                      "type": {
+                        "const": "commit"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "mutation-report"
+                      },
+                      "type": {
+                        "const": "file"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "file"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "id": {
+                        "const": "proof-report"
+                      },
+                      "type": {
+                        "const": "file"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "file"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "done"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "criteriaResults": {
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "criterion-contract-fidelity"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "criterion-source-boundary"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "criterion-behavior-proof"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                }
+              ],
+              "items": {
+                "properties": {
+                  "outputIds": {
+                    "minItems": 1
+                  },
+                  "result": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "observations": {
+              "items": {
+                "properties": {
+                  "result": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "criteriaResults",
+            "feedbackRound",
+            "observations"
+          ]
+        }
+      }
+    ],
+    "description": "A done response identifies one backend commit plus persisted mutation and proof reports. Non-done responses retain verified outputs and state the unresolved condition.",
+    "properties": {
+      "criteriaResults": {
+        "items": {
+          "properties": {
+            "criterionId": {
+              "enum": [
+                "criterion-contract-fidelity",
+                "criterion-source-boundary",
+                "criterion-behavior-proof"
+              ]
+            }
+          }
+        }
+      },
+      "feedbackRound": {
+        "maximum": 2
+      },
+      "outputs": {
+        "items": {
+          "properties": {
+            "type": {
+              "enum": [
+                "text",
+                "file",
+                "commit"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "title": "backend.generate response"
+  },
+  "schemaVersion": 1,
+  "scope": "Backend source only. The request must identify the behavior authority, mutable paths, protected paths, and required proof commands. The operator may edit the bound backend checkout and record artifacts; it does not apply migrations to shared environments, publish, merge, deploy, or invent business rules.",
+  "step": {
+    "steps": [
+      {
+        "calls": [
+          {
+            "alias": "@tools/fileread",
+            "purpose": "Read only the request, declared authority, proof definitions and bounded backend source.",
+            "when": "always"
+          }
+        ],
+        "checks": [
+          "request-shape",
+          "request-files"
+        ],
+        "id": "bind-contract",
+        "instruction": "Read the exact request and declared authority. Freeze the requested backend outcome, contract operations, business decisions, sibling conventions, mutable paths, protected paths and proof commands before editing. Ask for missing authority or an ambiguous boundary.",
+        "produces": [
+          "A frozen implementation and proof boundary."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/requests",
+            "path": "<requestId>.json",
+            "when": "always"
+          },
+          {
+            "alias": "@workspaces/inputs",
+            "path": "<declared-input-path>",
+            "when": "when an input file is declared"
+          },
+          {
+            "alias": "@workspaces/context",
+            "path": "<declared-context-path>",
+            "when": "when supporting context is declared"
+          },
+          {
+            "alias": "@workspaces/be",
+            "path": "<declared-source-path>",
+            "when": "when inspecting current source and sibling conventions"
+          }
+        ],
+        "writes": []
+      },
+      {
+        "calls": [
+          {
+            "alias": "@tools/fileread",
+            "purpose": "Inspect current backend artifacts before deciding whether a write is needed.",
+            "when": "always"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Apply the smallest authorized backend source change.",
+            "when": "when source differs from the frozen contract"
+          }
+        ],
+        "checks": [],
+        "id": "implement-outcome",
+        "instruction": "Inspect each contract operation and reuse conforming code. Create missing behavior or repair the smallest invalid set using only supplied business authority and observed sibling conventions. Refuse contract widening and all protected paths. Do not apply a migration to an environment.",
+        "produces": [
+          "Bounded backend source changes."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/be",
+            "path": "<declared-source-path>",
+            "when": "always"
+          },
+          {
+            "alias": "@workspaces/knowledge",
+            "path": "patterns/be/<declared-pattern-path>",
+            "when": "when a backend pattern reference is declared"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/be",
+            "path": "<declared-mutable-path>",
+            "when": "only after the boundary and authority are frozen"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/shell",
+            "purpose": "Run only the proof commands declared by the request in the bound backend checkout.",
+            "when": "for each declared proof"
+          },
+          {
+            "alias": "@cli/git",
+            "purpose": "Measure the bounded diff and obtain before and after object identities.",
+            "when": "after source changes"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist raw proof and mutation evidence without changing its outcome.",
+            "when": "after measurement"
+          }
+        ],
+        "checks": [
+          "contract-fidelity",
+          "source-boundary",
+          "behavior-proof"
+        ],
+        "id": "prove-outcome",
+        "instruction": "Run every declared proof unchanged. Record command, working directory, exit code and relevant raw output. Read persisted behavior back where the contract requires it. A failed or unavailable proof stays failed; do not suppress, replace or weaken it.",
+        "produces": [
+          "mutation-report",
+          "proof-report"
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/be",
+            "path": "<declared-proof-scope>",
+            "when": "always"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/proof-report.json",
+            "when": "after proofs run"
+          },
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/mutation-report.json",
+            "when": "after the diff is measured"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/git",
+            "purpose": "Create one local commit for the declared backend source set and verify its tree.",
+            "when": "after proofs pass"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Write the response record and any targeted metadata repair.",
+            "when": "always"
+          },
+          {
+            "alias": "@cli/python",
+            "purpose": "Run the compiled operator validator against this request, response and work root.",
+            "when": "before returning"
+          }
+        ],
+        "checks": [
+          "response-shape",
+          "request-binding",
+          "unique-outputs",
+          "output-files",
+          "observation-binding"
+        ],
+        "id": "commit-and-record",
+        "instruction": "Commit the complete declared source set once. Re-read the committed tree and bind the response to this request and work revision. Validate the response and criteria results. If feedback identifies a defect, amend only the targeted source or report, rerun dependent proofs, and reassess before returning done.",
+        "produces": [
+          "source-commit",
+          "A criteria-gated response record."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/be",
+            "path": "<declared-mutable-path>",
+            "when": "before and after commit"
+          },
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/mutation-report.json",
+            "when": "always"
+          },
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/proof-report.json",
+            "when": "always"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/responses",
+            "path": "<responseId>.json",
+            "when": "after all criteria pass or a stop status is known"
+          }
+        ]
+      }
+    ]
+  },
+  "validate": {
+    "failurePolicy": "Produce, validate, inspect, give concrete failing-check feedback, repair only the affected source or record, and reassess. A done response requires every criteria result to pass within the finite feedback budget.",
+    "machine": [
+      {
+        "check": "request-schema",
+        "id": "request-shape",
+        "phase": "request"
+      },
+      {
+        "check": "input-files",
+        "id": "request-files",
+        "phase": "request"
+      },
+      {
+        "check": "response-schema",
+        "id": "response-shape",
+        "phase": "response"
+      },
+      {
+        "check": "request-binding",
+        "id": "request-binding",
+        "phase": "response"
+      },
+      {
+        "check": "unique-output-ids",
+        "id": "unique-outputs",
+        "phase": "response"
+      },
+      {
+        "check": "output-files",
+        "id": "output-files",
+        "phase": "response"
+      },
+      {
+        "check": "observation-references",
+        "id": "observation-binding",
+        "phase": "response"
+      }
+    ],
+    "review": [
+      {
+        "id": "contract-fidelity",
+        "instruction": "Compare every implemented operation, writer, store, transaction, idempotency rule, event and migration reference with the supplied frozen authority. Reject invented business behavior or a weakened proof."
+      },
+      {
+        "id": "source-boundary",
+        "instruction": "Inspect the actual diff. Every changed path must be inside the declared mutable ceiling and outside protected paths; the mutation report must carry accurate before and after digests."
+      },
+      {
+        "id": "behavior-proof",
+        "instruction": "Read the raw proof commands, exit codes and outputs. Require coverage of declared success, validation, authorization, persistence and failure behavior; a command that did not run is not passing evidence."
+      }
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 9,
+  "note": "Operator ids a release retired, each with the operators that produce its kinds today. Read only where another session's frozen producer is met through an imported slot: validate-response (origin mode) finds the package whose Outputs table judges the origin's declared kinds, producer-import#validateImportedInput checks the imported kind is one a successor declares, validate-chain#readImportedSlots credits the kinds a slot carries. A retired id never runs: routing, plan-chain and the Next tables know nothing of it.",
+  "ids": {
+    "frontend.direction.decide": [
+      "interface.generate"
+    ],
+    "frontend.presentation.resolve": [
+      "interface.generate"
+    ],
+    "frontend.source.apply": [
+      "interface.generate"
+    ],
+    "frontend.surface.audit": [
+      "interface.audit"
+    ],
+    "backend.source.apply": [
+      "backend.generate"
+    ],
+    "library.source.apply": [
+      "library.update"
+    ],
+    "dependency.update": [
+      "library.update"
+    ],
+    "platform.operate": [
+      "identity.provision",
+      "data.seed",
+      "runtime.serve"
+    ]
+  }
+}

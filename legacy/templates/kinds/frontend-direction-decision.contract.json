@@ -1,0 +1,152 @@
+{
+  "kind": "frontend-direction-decision",
+  "title": "^# frontend-direction-decision — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Decision$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Direction id",
+        "Target",
+        "Intent",
+        "Change level",
+        "Owner ceiling",
+        "Classification",
+        "Presentation delta",
+        "Selection policy",
+        "Selected candidate"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Surface class$",
+      "table": "| Class | Why |",
+      "exactRows": 1,
+      "cell": {
+        "Class": "^`[a-z][a-z0-9-]*`$",
+        "Why": "\\S"
+      }
+    },
+    {
+      "heading": "^## Observed$",
+      "table": "| Item | Evidence |",
+      "minRows": 1,
+      "cell": {
+        "Evidence": "^`[^`]+@[0-9a-f]{7,40}`$"
+      }
+    },
+    {
+      "heading": "^## UI contract$",
+      "table": "| Element | Kind | Responsibility |",
+      "minRows": 1,
+      "cell": {
+        "Kind": "^(region|action|state|responsive|content|accessibility)$",
+        "Responsibility": "\\S"
+      }
+    },
+    {
+      "heading": "^## Coverage$",
+      "table": "| Concern | Enumerated |",
+      "rows": [
+        "Actions",
+        "Regions",
+        "States",
+        "Responsive"
+      ],
+      "cell": {
+        "Enumerated": "\\S"
+      }
+    },
+    {
+      "heading": "^## References$",
+      "table": "| Standard | Class | URL | What is borrowed | Limitation |",
+      "cell": {
+        "Standard": "\\S",
+        "Class": "^`[a-z0-9][a-z0-9-]*`$",
+        "URL": "^(https?://\\S+|—)$",
+        "What is borrowed": "\\S",
+        "Limitation": "\\S"
+      }
+    },
+    {
+      "heading": "^## Images$",
+      "table": "| Slot | Why | Claim | File |",
+      "cell": {
+        "File": "^(`response/artifacts/images/[A-Za-z0-9_.-]+`|—)$"
+      }
+    },
+    {
+      "heading": "^## Falsification$",
+      "table": "| Attack | Candidate | Verdict | Evidence |",
+      "minRows": 1,
+      "cell": {
+        "Candidate": "^`[a-z0-9][a-z0-9-]*`$",
+        "Verdict": "^(holds|fails)$",
+        "Evidence": "\\S"
+      }
+    },
+    {
+      "heading": "^## Candidate limits$",
+      "table": "| Candidate | Criterion | Candidate says |",
+      "cell": {
+        "Candidate": "^`[a-z0-9][a-z0-9-]*`$",
+        "Criterion": "^`(TASTE-([1-9]|1[0-2])|UX-([1-9]|1[01]))`$",
+        "Candidate says": "\\S"
+      }
+    },
+    {
+      "heading": "^## Scores$",
+      "table": "| Candidate | Viewport | Criterion | Score | Verdict |",
+      "cell": {
+        "Candidate": "^`[a-z0-9][a-z0-9-]*`$",
+        "Viewport": "^[a-z0-9][a-z0-9-]*$",
+        "Criterion": "^`(TASTE-([1-9]|1[0-2])|UX-([1-9]|1[01]))`$",
+        "Score": "^[1-5]$",
+        "Verdict": "^(pass|fail)$"
+      }
+    },
+    {
+      "heading": "^## Why not the others$",
+      "table": "| Candidate | Rejected because |",
+      "cell": {
+        "Candidate": "^`[a-z0-9][a-z0-9-]*`$",
+        "Rejected because": "\\S"
+      }
+    },
+    {
+      "heading": "^## Selected capture$",
+      "table": "| Candidate | Source | Viewport | Screenshot |",
+      "cell": {
+        "Candidate": "^`[a-z0-9][a-z0-9-]*`$",
+        "Source": "^https?://\\S+$",
+        "Viewport": "^[a-z0-9][a-z0-9-]*$",
+        "Screenshot": "^`response/artifacts/[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9-]*\\.png`$"
+      }
+    },
+    {
+      "heading": "^## Findings answered$",
+      "table": "| Finding | How |",
+      "cell": {
+        "Finding": "^`f[0-9a-f]{12}`$",
+        "How": "\\S"
+      }
+    },
+    {
+      "heading": "^## Printed$",
+      "table": "| Artifact | Why |",
+      "cell": {
+        "Artifact": "^(`[^`]+`|https?://\\S+)$",
+        "Why": "\\S"
+      }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |",
+      "cell": {
+        "Code": "^`[A-Z][A-Z0-9_]+`$"
+      }
+    }
+  ]
+}

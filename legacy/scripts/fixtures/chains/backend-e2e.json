@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "backend-e2e",
+  "when": {
+    "en": "A backend delivery that already stands must be exercised as a client on more than one journey of its API: the head is served once, and each journey runs the repository's own end-to-end suite on its own branch, on its own namespace, so one journey's rows are never another's. The chain ends with the run records in a person's hands rather than with a publish, because nothing here writes source. api.verify has no api.plan sibling, so a second journey is a second branch rather than a unit of one fanned-out branch; a plan that enumerates API flows binds them as units instead, and that needs uat.plan to hand over to api.verify.",
+    "vi": "Một bản giao backend đã đứng vững phải được vận hành như một client trên hơn một hành trình của API của nó: head được phục vụ một lần, và mỗi hành trình chạy chính bộ kiểm end-to-end của repository trên nhánh riêng, trên namespace riêng, để hàng của hành trình này không bao giờ là hàng của hành trình kia. Chuỗi kết thúc bằng các hồ sơ lượt chạy trong tay một con người chứ không bằng một lần publish, bởi ở đây không gì ghi mã nguồn. api.verify không có anh em api.plan, nên hành trình thứ hai là một nhánh thứ hai chứ không phải một đơn vị của một nhánh toả ra; một plan liệt kê các luồng API thì ràng chúng như units, và điều đó cần uat.plan bàn giao sang api.verify."
+  },
+  "mission": {
+    "goal": "the delivered API is exercised as a client on every journey the feature promises",
+    "doneWhen": [
+      {
+        "evidence": "the enrolment journey passes the delivery's end-to-end suite as a client",
+        "producedBy": "api.verify"
+      },
+      {
+        "evidence": "the payment journey passes the delivery's end-to-end suite as a client",
+        "producedBy": "api.verify"
+      }
+    ]
+  },
+  "options": {
+    "roles": [
+      "be"
+    ]
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#be"
+    ],
+    [
+      "runtime.serve"
+    ],
+    [
+      "api.verify"
+    ],
+    [
+      "api.verify"
+    ]
+  ],
+  "ends": "user",
+  "rewrite": "New at 2.0.4. The chain is derived from two done-when lines for one operator whose domain has no plan sibling: the planner makes a second branch after the first rather than a fan-out. runtime.serve is pulled in because api.verify requires platform-operation-receipt and runtime.serve is the only operator whose primary output it is."
+}

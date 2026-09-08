@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "backend.plan request",
+  "$ref": "works:request",
+  "properties": {
+    "operation": { "const": "backend.plan" },
+    "inputs": { "properties": { "files": { "minItems": 1 } } }
+  },
+  "description": "Bind the architecture-decision receipt and its stack model in inputs.files. State the feature id and planning goal in inputs.prompts. The architecture operation set is frozen and cannot be widened by this operator."
+}

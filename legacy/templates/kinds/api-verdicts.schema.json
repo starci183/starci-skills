@@ -1,0 +1,105 @@
+{
+  "$id": "kind:api-verdicts",
+  "description": "The three lanes an API walk judges apart, each on its own evidence: contract, that every case the runner named held; data, that every record the run wrote lies inside the seed's namespace and none outside it, read back through the API; lifecycle, that the namespace was verified read-only and then deleted, and nothing else was. There is no fourth lane and no lane may be omitted. The record also carries where the run was appended, so a reader finds the history without opening the flow folder first.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runId",
+    "commit",
+    "servedHead",
+    "namespace",
+    "flowRoot",
+    "resultRef",
+    "latestRef",
+    "historyRef",
+    "lanes",
+    "records",
+    "cleanup"
+  ],
+  "properties": {
+    "runId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "servedHead": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "namespace": { "$ref": "#/$defs/namespace" },
+    "flowRoot": {
+      "description": "The flow directory on this machine, so the appended record can be read back where it was written.",
+      "type": "string",
+      "minLength": 1
+    },
+    "resultRef": {
+      "description": "The run record this result was appended as. The API history of a flow lives beside the browser history and never inside it.",
+      "type": "string",
+      "pattern": "^\\.worktrees/e2e/[a-z0-9][a-z0-9-]*/runs/[A-Za-z0-9._-]+/result\\.json$"
+    },
+    "latestRef": {
+      "description": "The pointer file that names the newest API run. It is a file holding a run id, never a symlink.",
+      "type": "string",
+      "pattern": "^\\.worktrees/e2e/[a-z0-9][a-z0-9-]*/latest\\.json$"
+    },
+    "historyRef": {
+      "description": "The one-line-per-run history of this flow's API walks, appended to and never rewritten.",
+      "type": "string",
+      "pattern": "^\\.worktrees/e2e/[a-z0-9][a-z0-9-]*/history\\.md$"
+    },
+    "lanes": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lane", "verdict", "evidenceRefs", "statement"],
+        "properties": {
+          "lane": { "enum": ["contract", "data", "lifecycle"] },
+          "verdict": { "enum": ["pass", "fail"] },
+          "evidenceRefs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "statement": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "records": {
+      "description": "Every record this run's suite created, read back through the API as a client reads it, with whether it lies inside the run namespace. A record outside it is a leak: the suite wrote where the flow does not own the rows, and no cleanup this operator may perform can take it back.",
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "store", "inNamespace", "readBackRef"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "store": { "type": "string", "minLength": 1 },
+          "inNamespace": { "type": "boolean" },
+          "readBackRef": {
+            "description": "The API read that proved the record stands: the route the client called and where its answer is recorded. A record proved by a direct store query is not proved as a client sees it.",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "cleanup": {
+      "description": "Cleanup deletes the run namespace and nothing else; a run record is history and is never deleted.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["performed", "verifiedReadOnly", "namespace", "runRecordsDeleted"],
+      "properties": {
+        "performed": { "type": "boolean" },
+        "verifiedReadOnly": {
+          "description": "Verification read and did not write. A verification that wrote is a second run of the suite wearing a checker's clothes.",
+          "const": true
+        },
+        "namespace": { "$ref": "#/$defs/namespace" },
+        "runRecordsDeleted": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "namespace": { "type": "string", "pattern": "^uat-[A-Za-z0-9._-]+$" }
+  }
+}

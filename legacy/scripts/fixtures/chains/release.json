@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "release",
+  "when": {
+    "en": "A published head must reach production: verify it, deploy it, and prove the steady state; recovery and rollback are inside release.deploy.",
+    "vi": "Một head đã publish phải lên production: kiểm, deploy và chứng minh trạng thái ổn định; phục hồi và rollback nằm trong release.deploy."
+  },
+  "mission": {
+    "goal": "the published head runs in production",
+    "doneWhen": [
+      {
+        "evidence": "the published head is deployed and holds its steady state",
+        "producedBy": "release.deploy"
+      }
+    ]
+  },
+  "options": {
+    "roles": [
+      "be"
+    ]
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#be"
+    ],
+    [
+      "quality.verify"
+    ],
+    [
+      "release.deploy"
+    ]
+  ],
+  "ends": "release.deploy",
+  "rewrite": "Unchanged operators. The be binding comes from the mission roles: release.deploy reads the route as an optional Input, so no table pulls the bind in on its own."
+}

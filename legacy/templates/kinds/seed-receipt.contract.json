@@ -1,0 +1,28 @@
+{
+  "kind": "seed-receipt",
+  "title": "^# seed-receipt — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Binding$",
+      "table": "| Field | Value |",
+      "rows": ["Operator", "Step", "Flow", "Environment", "Route", "Account", "Operation", "Approval", "Namespace", "Seed fingerprint", "Drafted"],
+      "cell": { "Value": "\\S" }
+    },
+    {
+      "heading": "^## Records$",
+      "table": "| Id | Store | Attribution | Rollback |",
+      "cell": { "Id": "\\S", "Store": "\\S", "Attribution": "^(owner|prefix|limitation)$", "Rollback": "^(yes|no)$" }
+    },
+    {
+      "heading": "^## Checks$",
+      "table": "| Check | Status | Evidence |",
+      "minRows": 1,
+      "cell": { "Check": "^`(store-reachable|rows-attributable|expected-state|rollback-listed)`$", "Status": "^(passed|failed)$", "Evidence": "\\S" }
+    },
+    {
+      "heading": "^## Findings$",
+      "table": "| Code | Statement |",
+      "cell": { "Code": "^`(SEED_DRAFTED|SEED_ALREADY_APPLIED|SEED_LIMITATION|SEED_ROLLED_BACK|SHARED_ROW_REFUSED)`$", "Statement": "\\S" }
+    }
+  ]
+}

@@ -1,0 +1,193 @@
+{
+  "$id": "kind:banked-mission",
+  "description": "One mission waiting in a product's bank, at @worktrees/banked/<product>/<missionId>/mission.json beside the mission.md a person reads. It carries the whole goal block a session needs — `goalDraft` is copied into state.json.mission unchanged, so its shape is that of templates/step/state.schema.json#mission — the routes and environment the mission runs against, and at least one evidence ref. The evidence ref is what makes a banked mission a proposal about this product rather than an idea: it names the unchecked entry, the finding, the walk or e2e run, the source file or the person's note the mission was drafted from, and a mission with none is refused (BANK_UNGROUNDED). What has become of the mission — its order, its status, what it waits for, how urgent it is — lives in queue.json and not here, so the bank has one home for its order and one for its content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "missionId",
+    "product",
+    "title",
+    "routes",
+    "env",
+    "evidenceRefs",
+    "goalDraft"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 9
+    },
+    "missionId": {
+      "$ref": "#/$defs/missionId"
+    },
+    "product": {
+      "$ref": "#/$defs/productId"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "the one line the person picks the mission by, in the display language"
+    },
+    "why": {
+      "type": "string",
+      "maxLength": 1200,
+      "description": "what the evidence refs showed, in the helper's own words; the mission.md repeats it and states it nowhere else"
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "description": "the roles of the product this mission binds (the route ids of @workspaces/<project>/<role>); a chain is planned at open time and pins nothing here"
+    },
+    "env": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "the environment whose declaration authorises what the mission touches"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/evidenceRef"
+      }
+    },
+    "acceptance": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 400
+      },
+      "description": "what the person will read the delivery against, beyond the done-when lines; it is a reading aid and never a done-when line in disguise, because only a done-when line names a producing operator"
+    },
+    "tierHint": {
+      "enum": [
+        "journey",
+        "secondary"
+      ],
+      "description": "what the unchecked ledger suggested this mission's coverage is: a mission drafted from an open journey entry is hinted journey, one drafted from a secondary entry is hinted secondary. It is a hint the plan reads and overrides; the tier itself is decided by the plan against the confirmed done-when journey (templates/kinds/units.schema.json)"
+    },
+    "bankedBy": {
+      "$ref": "#/$defs/bankedBy"
+    },
+    "goalDraft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "language",
+        "goal",
+        "includes",
+        "excludes",
+        "doneWhen",
+        "sourceRef"
+      ],
+      "description": "the goal block, in the shape state.json.mission takes it: the session copies it, prints it and — under a current bank approval — does not wait for an answer",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "includes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "excludes": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "doneWhen": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "evidence",
+              "producedBy"
+            ],
+            "properties": {
+              "evidence": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "producedBy": {
+                "type": "string",
+                "pattern": "^[a-z]+(?:\\.[a-z]+)+$"
+              }
+            }
+          }
+        },
+        "sourceRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "productId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "missionId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "evidenceRef": {
+      "type": "string",
+      "pattern": "^(?:unchecked|finding|uat|e2e|note|source|fe|be):[^\\s]{1,240}$",
+      "description": "one observation the mission was drafted from, as <scheme>:<ref>. The schemes are closed and each names a reader the tree already has: `unchecked` an entry id of @worktrees/unchecked, `finding` an id of knowledge/findings, `uat` and `e2e` a run under @worktrees/uat or @worktrees/e2e, `source` a path in a bound checkout, `fe` and `be` the same in the named role's route, `note` a reference to something the person wrote."
+    },
+    "bankedBy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "helper",
+        "runId"
+      ],
+      "properties": {
+        "helper": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "runId": {
+          "type": "string",
+          "pattern": "^[0-9]{8}-[0-9]{6}(?:-[A-Za-z0-9._-]+)?$"
+        }
+      }
+    }
+  }
+}

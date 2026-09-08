@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only uat.plan emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, NO_PROGRESS) come from operators/errors.json. FLOW_UNDEFINED is the operator's own defect and routes to itself: a goal may name a journey in a person's words, and it is this operator that turns words into an entry route.",
+  "codes": {
+    "FLOW_UNDEFINED": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A journey the goal names has no entry route: neither the surface map nor an existing flow folder shows where it starts, so no walker could press its first control. The reason names every such journey in one paragraph.",
+        "vi": "Một hành trình goal gọi tên không có route vào: bản đồ bề mặt lẫn thư mục luồng có sẵn đều không cho thấy nó bắt đầu ở đâu, nên không walker nào bấm được control đầu tiên của nó. Phần reason nêu mọi hành trình như vậy trong một đoạn."
+      },
+      "resume": {
+        "en": "Bind a surface map that names the entry, or name the entry route in the goal, and run the same plan again; a re-entry that names the same flows is NO_PROGRESS.",
+        "vi": "Ràng một bản đồ bề mặt nêu lối vào, hoặc nêu route vào ngay trong goal, rồi chạy lại cùng bản kế hoạch; một lần vào lại gọi tên cùng những luồng là NO_PROGRESS."
+      }
+    }
+  }
+}

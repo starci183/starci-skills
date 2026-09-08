@@ -1,0 +1,813 @@
+// Proves validate.mjs on a synthetic session branch: one conforming audit over two matrix entries
+// (one all-pass entry, one entry whose application-owned node fails and routes back to resolve) with
+// a taste lens that ships; the same audit with a taste lens that is fix-first and routes to
+// direction; the density criterion below the representative seeded volume (blocked, routed to seed),
+// data-bound at that volume, and a criterion the person accepted from the printed sheet; one blocked
+// on EVIDENCE_MISSING with nothing captured; and one mutation per law, each of which must fail with
+// a line that names the defect.
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { validateAuditStep } from './validate.mjs';
+import { writeUiKnowledgeFixture } from '../../scripts/ui-knowledge-fixture.mjs';
+
+const WIDE = 'wide-light-loaded';
+const NARROW = 'narrow-light-loaded';
+const MAIN = 'body>main';
+const SECTION = 'body>main>section';
+const CAP = (id) => `response/data/captures/${id}.json`;
+const SHOT = (id) => `response/artifacts/${id}.png`;
+const SURFACES = [{ id: 'plan-picker', type: 'page', route: '/plans', matrixIds: [WIDE, NARROW] }];
+const scope = (over = {}) => ({ mode: 'primary-surfaces', surfaces: structuredClone(SURFACES), deferredStates: [], coverageClaim: 'selected-surfaces', ...over });
+
+const capture = (id) => ({
+  matrixId: id,
+  viewport: id === WIDE ? [1440, 900] : [390, 844],
+  scheme: 'light',
+  state: 'loaded',
+  nodes: [
+    { path: MAIN, owner: 'app', claims: ['GAP-5'], measured: { gap: id === WIDE ? '1.5rem' : '1rem' } },
+    { path: SECTION, owner: 'grammar', claims: ['PADDING-4'], measured: { padding: '1rem' } },
+  ],
+});
+
+// The taste lens: twelve scored criteria, each with the measurement its own rule names, and the
+// arithmetic of TASTE-13 over them. `taste()` ships at a flat 4; `tasteFixFirst()` fails TASTE-2,
+// one of the five gating criteria, and drops the mean to 3.83.
+const TASTE_MEASURED = {
+  'TASTE-1': 'the plan title outweighs the next candidate by 40%',
+  'TASTE-2': 'the tallest content-free band measures 32px and separates two regions',
+  'TASTE-3': 'every stacked text block resolves to x=32; both gutters measure 24px',
+  'TASTE-4': 'region 48px > section 24px > row 16px at both viewports',
+  'TASTE-5': 'one accent-filled call to action; four hues, all palette roles',
+  'TASTE-6': 'three sizes and two weights per region; the paragraph measures 62 characters',
+  'TASTE-7': 'two radius steps, one family; the deepest nesting is two cards',
+  'TASTE-8': 'one image, carrying the promise subject, lighter than the focal element',
+  'TASTE-9': 'content and action rectangles sum to 63% of the captured area',
+  'TASTE-10': 'skeleton, empty and error hold the same regions at the same ranks',
+  'TASTE-11': 'every target measures at least 44x44; hover moves nothing',
+  'TASTE-12': 'sorted into the class the direction named',
+};
+const TASTE_RULES = Object.keys(TASTE_MEASURED);
+const BT = String.fromCharCode(96);
+const VOID_BAND = 'a tinted band 180px tall whose only occupant is a decorative artwork';
+const taste = () => ({
+  entries: TASTE_RULES.map((rule) => ({ rule, measured: TASTE_MEASURED[rule], score: 4, verdict: 'pass', routeTo: 'none' })),
+  mean: 4,
+  verdict: 'ship',
+});
+// TASTE-9 Case 5 and 6 and TASTE-13 Case 6 and 7: the density criterion measured below the flow's
+// representative seeded volume (blocked, routed to seed), data-bound at that volume (kept out of the
+// verdict), and a criterion the person accepted from the printed sheet (closed by that choice).
+const withDensity = (measured, routeTo) => { const lens = taste(); lens.entries[8] = { rule: 'TASTE-9', measured, score: 2, verdict: 'fail', routeTo }; lens.mean = 4; return lens; };
+const tasteBelowVolume = () => ({ ...withDensity('below-volume: 3 records served where the seed places 24', 'seed'), verdict: 'blocked' });
+const tasteDataBound = () => ({ ...withDensity('data-bound at representative volume: 24 records fill 41% of a console band', 'none'), verdict: 'ship' });
+const tastePersonAccepted = (branch = 'step-3/parallel-1') => { const lens = taste(); lens.entries[1] = { rule: 'TASTE-2', measured: `person-accepted by ${branch}: ${VOID_BAND}`, score: 2, verdict: 'fail', routeTo: 'none' }; lens.mean = 4; lens.verdict = 'ship'; return lens; };
+const tasteFixFirst = () => {
+  const lens = taste();
+  lens.entries[1] = { rule: 'TASTE-2', measured: VOID_BAND, score: 2, verdict: 'fail', routeTo: 'direction' };
+  lens.mean = 3.83;
+  lens.verdict = 'fix-first';
+  return lens;
+};
+
+// TASTE-13 Case 9: the three anchors of the calibration set, scored in the same round, each inside
+// its band. `anchor-low` at 3 is one point outside its band, which the tolerance the set publishes
+// still accepts; 4 is beyond it.
+const CALIBRATION = [
+  { anchor: 'anchor-low', lens: 'taste', score: 2 },
+  { anchor: 'anchor-mid', lens: 'taste', score: 3 },
+  { anchor: 'anchor-high', lens: 'taste', score: 4 },
+];
+const CALIBRATION_ROWS = (scored = CALIBRATION) => scored.map((s) => `| ${BT}${s.anchor}${BT} | taste ${{ 'anchor-low': '1–2', 'anchor-mid': '3–3', 'anchor-high': '4–5' }[s.anchor]} | ${s.score} |`).join(String.fromCharCode(10));
+
+const verdicts = (lens = taste, calibration = CALIBRATION) => ({
+  auditScope: scope(),
+  calibration,
+  entries: [
+    {
+      matrixId: WIDE,
+      surfaceClass: 'console',
+      taste: lens(),
+      results: [
+        { path: MAIN, owner: 'app', rule: 'GAP-5', measured: '1.5rem', verdict: 'pass', routeTo: 'none' },
+        { path: SECTION, owner: 'grammar', rule: 'PADDING-4', measured: '1rem', verdict: 'pass', routeTo: 'none' },
+      ],
+    },
+    {
+      matrixId: NARROW,
+      surfaceClass: 'console',
+      taste: lens(),
+      results: [
+        { path: MAIN, owner: 'app', rule: 'GAP-5', measured: '1rem', verdict: 'fail', routeTo: 'resolve' },
+        { path: SECTION, owner: 'grammar', rule: 'PADDING-4', measured: '1rem', verdict: 'pass', routeTo: 'none' },
+      ],
+    },
+  ],
+});
+
+const tasteTable = (lens) => lens.entries.map((r) => `| ${BT}${r.rule}${BT} | ${r.measured} | ${r.score} | ${r.verdict} |`).join(String.fromCharCode(10));
+
+// Every rule this audit judges belongs to a topic, and each topic closes itself; the receipt copies
+// those verdicts rather than recomputing them.
+const verdictTable = (lens) => [
+  ['presentation', 'fail', 'resolve'],
+  ['composition', 'blocked', 'none'],
+  ['responsive', 'blocked', 'none'],
+  ['motion', 'blocked', 'none'],
+  ['accessibility', 'blocked', 'none'],
+  ['contrast', 'blocked', 'none'],
+  ['render-truth', 'blocked', 'none'],
+  ['taste', lens.verdict, lens.verdict === 'ship' ? 'none' : lens.verdict === 'blocked' ? 'seed' : 'direction'],
+].map(([topic, verdict, route]) => `| ${BT}${topic}${BT} | ${verdict} | ${route} |`).join(String.fromCharCode(10));
+
+const PRINTED = [
+  `| http://127.0.0.1:60000/ | the served sheet, handed over when the verdict was recorded |`,
+  `| ${BT}${SHOT(NARROW)}${BT} | the worst-scoring capture of the taste topic |`,
+];
+
+const APPLIED = '3'.repeat(40);
+const SERVED = '7'.repeat(40);
+const PROFILE = '.worktrees/sessions/s-test/browser';
+const FAMILY = '0.4.7';
+const served = (over = {}) => ({ applied: APPLIED, servedBranch: 'uat', servedHead: SERVED, contains: 'yes', profile: PROFILE, familyObserved: FAMILY, familyResolved: FAMILY, ...over });
+
+const responseMd = (lens = taste(), printed = PRINTED, surface = served(), { calibrationRows = CALIBRATION_ROWS(), rankedRows = '' } = {}) => `# frontend-surface-audit — plan-picker
+
+## Served surface
+
+| Field | Value |
+| --- | --- |
+| Applied commit | \`${surface.applied}\` |
+| Served branch | \`${surface.servedBranch}\` |
+| Served head | \`${surface.servedHead}\` |
+| Contains applied commit | ${surface.contains} |
+| Browser profile | \`${surface.profile}\` |
+| Family version observed | \`${surface.familyObserved}\` |
+| Family version resolved against | \`${surface.familyResolved}\` |
+
+## Surface class
+
+| Class | Declared by |
+| --- | --- |
+| \`console\` | \`frontend-direction-decision\`, whose coverage names the class every banded rule reads |
+
+## Matrix
+
+| Matrix | Viewport | Scheme | State | Screenshot |
+| --- | --- | --- | --- | --- |
+| \`${WIDE}\` | 1440x900 | light | loaded | \`${SHOT(WIDE)}\` |
+| \`${NARROW}\` | 390x844 | light | loaded | \`${SHOT(NARROW)}\` |
+
+## Verdicts by owner
+
+| Matrix | Owner | Node | Rule | Measured | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| \`${WIDE}\` | app | \`${MAIN}\` | \`GAP-5\` | 1.5rem | pass |
+| \`${WIDE}\` | grammar | \`${SECTION}\` | \`PADDING-4\` | 1rem | pass |
+| \`${NARROW}\` | app | \`${MAIN}\` | \`GAP-5\` | 1rem | fail |
+| \`${NARROW}\` | grammar | \`${SECTION}\` | \`PADDING-4\` | 1rem | pass |
+
+## Taste
+
+| Rule | Measured | Score | Verdict |
+| --- | --- | --- | --- |
+${tasteTable(lens)}
+
+- Mean: ${lens.mean.toFixed(2)}
+- Verdict: ${lens.verdict}
+
+## Calibration
+
+| Anchor | Expected | Scored |
+| --- | --- | --- |
+${calibrationRows}
+
+## Ranked against
+
+| Sheet | Why |
+| --- | --- |
+${rankedRows}
+
+## Verdict
+
+| Topic | Verdict | Route |
+| --- | --- | --- |
+${verdictTable(lens)}
+
+## Coverage gaps
+
+| Topic | Missing state |
+| --- | --- |
+
+## Regressions
+
+| Matrix | Node | Rule | Measured | Routes to |
+| --- | --- | --- | --- | --- |
+| \`${NARROW}\` | \`${MAIN}\` | \`GAP-5\` | 1rem | resolve |
+
+## Grammar gaps
+
+| Component | Rule | What the family lacks |
+| --- | --- | --- |
+
+## Printed
+
+| Artifact | Why |
+| --- | --- |
+${printed.join(String.fromCharCode(10))}
+
+## Fallbacks taken
+
+| Code | Action |
+| --- | --- |
+`;
+
+const requestJson = ({ extra = {}, contexts = [] } = {}) => ({
+  schemaVersion: 9,
+  operatorId: 'interface.audit',
+  step: 4,
+  parallel: 1,
+  sessionId: 's-test',
+  contexts: [{ alias: '@knowledge/ui/proof', head: null }, { alias: '@knowledge/grammars/starci', head: null }, { alias: '@workspaces/fe', head: 'e'.repeat(40) }, { alias: '@worktrees/sessions/central-runtime', head: null }, ...contexts],
+  requirements: { feature: 'fixture-feature', auditScope: { surfaces: structuredClone(SURFACES) }, matrix: [], readinessProbe: 'route-served', resume: null, ...extra },
+  inputs: {
+    'frontend-source-application': 'step-3/parallel-1/response/response.md',
+    'frontend-presentation-resolution': 'step-3/parallel-1/response/resolution.md',
+    'frontend-direction-decision': 'step-3/parallel-1/response/direction.md',
+    route: 'step-1/parallel-1/response/data/route.json',
+  },
+  resume: null,
+});
+
+const responseJson = ({ status = 'done', stop, fields, next = ['interface.fix'], reason } = {}) => ({
+  schemaVersion: 9,
+  operatorId: 'interface.audit',
+  step: 4,
+  parallel: 1,
+  status,
+  ...(stop ? { stop } : {}),
+  ...(reason ? { reason } : {}),
+  fallbacks: [],
+  fields: fields ?? {
+    'frontend-surface-audit': 'response/response.md',
+    verdicts: 'response/data/verdicts.json',
+    capture: [CAP(WIDE), CAP(NARROW)],
+    screenshot: [SHOT(WIDE), SHOT(NARROW)],
+  },
+  commits: [],
+  next,
+});
+
+// The direction decision this audit reads: its selection policy and the scores the printed sheet
+// showed the person, with `failing` naming the criteria the selected candidate was shown failing.
+const decisionMd = ({ policy = 'approval-required', selected = 'one-column', failing = [], presentationDelta = 'app-owned' } = {}) => [
+  '# frontend-direction-decision — plan-picker',
+  '',
+  '## Decision',
+  '',
+  '| Field | Value |',
+  '| --- | --- |',
+  `| Direction id | ${BT}plan-picker${BT} |`,
+  `| Selection policy | ${BT}${policy}${BT} |`,
+  `| Presentation delta | ${BT}${presentationDelta}${BT} |`,
+  `| Selected candidate | ${BT}${selected}${BT} |`,
+  '',
+  '## Scores',
+  '',
+  '| Candidate | Viewport | Criterion | Score | Verdict |',
+  '| --- | --- | --- | --- | --- |',
+  ...TASTE_RULES.map((rule) => `| ${BT}${selected}${BT} | wide | ${BT}${rule}${BT} | ${failing.includes(rule) ? 2 : 4} | ${failing.includes(rule) ? 'fail' : 'pass'} |`),
+  '',
+].join(String.fromCharCode(10));
+
+function writeBranch(files, { decisionClass = 'console', decision = {}, coverageStates = [] } = {}) {
+  files = structuredClone(files);
+  const request = files['request/request.json'];
+  const result = files['response/data/verdicts.json'];
+  if (files['response/response.md']) {
+    const recorded = result?.auditScope ?? scope();
+    const inventory = request.requirements.auditScope?.surfaces ?? [];
+    const prefix = '## Audit scope\n\n| Field | Value |\n| --- | --- |\n| Mode | ' + recorded.mode + ' |\n| Selected surfaces | ' + inventory.filter((surface) => surface.priority !== 'deferred').map((surface) => surface.id).join(', ') + ' |\n| Coverage claim | ' + recorded.coverageClaim + ' |\n| Deferred states | ' + (recorded.deferredStates.join(', ') || '—') + ' |\n\n';
+    files['response/response.md'] = files['response/response.md'].replace('## Surface class', prefix + '## Surface class');
+  }
+  const session = mkdtempSync(path.join(tmpdir(), 'fe-audit-session-'));
+  const branch = path.join(session, 'step-4', 'parallel-1');
+  for (const d of ['request', 'response/data/captures', 'response/artifacts']) mkdirSync(path.join(branch, d), { recursive: true });
+  // One interface.generate branch produced the direction, the resolution and the application this
+  // audit reads; the three receipts sit side by side in its response/.
+  const generated = path.join(session, 'step-3', 'parallel-1', 'response');
+  mkdirSync(path.join(generated, 'data'), { recursive: true });
+  writeFileSync(path.join(generated, 'direction.md'), decisionMd(decision));
+  writeFileSync(path.join(generated, 'resolution.md'), '# frontend-presentation-resolution — plan-picker\n');
+  writeFileSync(path.join(generated, 'response.md'), '# frontend-source-application — plan-picker\n');
+  // The class this audit carries is the one the direction decided; the coverage beside that receipt
+  // is where it is read from, and a decision written before the class was declared carries none.
+  mkdirSync(path.join(session, 'step-1', 'parallel-1', 'response', 'data'), { recursive: true });
+  writeFileSync(path.join(session, 'step-1', 'parallel-1', 'response', 'data', 'route.json'), JSON.stringify({ project: 'starci-academy', role: 'fe', sourceHead: 'e'.repeat(40) }, null, 2));
+  writeFileSync(
+    path.join(generated, 'data', 'coverage.json'),
+    JSON.stringify({ directionId: 'plan-picker', ...(decisionClass ? { surfaceClass: decisionClass } : {}), actions: [], regions: [], states: coverageStates, responsive: [] }, null, 2),
+  );
+  writeFileSync(path.join(session, 'state.json'), JSON.stringify({ id: 's-test', project: 'starci-academy', startedAt: '2026-09-03T00:00:00Z', requestHashes: {}, chain: [['3/1'], ['4/1']], steps: { '3/1': 'interface.generate', '4/1': 'interface.audit' }, current: '4/1', status: 'running' }));
+  for (const [name, content] of Object.entries(files)) {
+    if (content === null) continue;
+    mkdirSync(path.dirname(path.join(branch, name)), { recursive: true });
+    writeFileSync(path.join(branch, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+  if (files['response/response.json']?.status === 'done') {
+    writeUiKnowledgeFixture(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'), branch, ['@knowledge/ui/composition', '@knowledge/ui/presentation', '@knowledge/ui/proof', '@knowledge/grammars/<family>'], `response/data/captures/${WIDE}.json`);
+  }
+  return { branch, session };
+}
+
+const baseline = () => ({
+  'request/request.json': requestJson(),
+  'response/response.json': responseJson(),
+  'response/response.md': responseMd(),
+  'response/data/verdicts.json': verdicts(),
+  [CAP(WIDE)]: capture(WIDE),
+  [CAP(NARROW)]: capture(NARROW),
+  [SHOT(WIDE)]: 'PNG',
+  [SHOT(NARROW)]: 'PNG',
+});
+
+async function expectValid(files, label, options) {
+  const { branch, session } = writeBranch(files, options);
+  const { errors } = await validateAuditStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.deepEqual(errors, [], `${label} should be valid`);
+}
+async function expectError(files, needle, label, options) {
+  const { branch, session } = writeBranch(files, options);
+  const { errors } = await validateAuditStep(branch);
+  rmSync(session, { recursive: true, force: true });
+  assert.ok(errors.some((e) => e.includes(needle)), `${label}: expected an error containing "${needle}", got:\n${errors.join('\n') || '(none)'}`);
+}
+const mutate = (change) => { const v = verdicts(); change(v); return { ...baseline(), 'response/data/verdicts.json': v }; };
+
+// The same audit under a taste lens that fails TASTE-2: the composition is decided again, and the
+// checkout's own gates wait, so next names direction and never quality.verify.
+const fixFirst = (extra = {}) => ({
+  ...baseline(),
+  'response/data/verdicts.json': verdicts(tasteFixFirst),
+  'response/response.md': responseMd(tasteFixFirst()),
+  'response/response.json': responseJson({ next: ['interface.fix', 'interface.generate'] }),
+  ...extra,
+});
+
+await expectValid(baseline(), 'two entries: one all-pass, one application-owned failure routed back to resolve');
+await expectValid(fixFirst(), 'the canon lane holds where it can and the taste lens is fix-first, routed to direction');
+await expectValid({ 'request/request.json': requestJson(), 'response/response.json': responseJson({ status: 'blocked', stop: 'EVIDENCE_MISSING', next: [], fields: {} }) }, 'blocked on EVIDENCE_MISSING with nothing captured');
+await expectValid({ 'request/request.json': requestJson(), 'response/response.json': responseJson({ status: 'blocked', stop: 'IDENTITY_MISSING', next: [], fields: {} }) }, 'a guarded route with no account yet: handed to provisioning, not reported as an unavailable runtime');
+
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { mystery: 1 } }) }, 'requirements.mystery is not a field', 'undeclared requirement');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { matrix: [{ matrixId: WIDE }] } }) }, 'the request narrowed the matrix without it', 'entry judged outside the narrowed matrix');
+await expectError(mutate((v) => { v.entries[1].results[0].routeTo = 'none'; }), 'fails and routes nowhere', 'failure that routes nowhere');
+await expectError(mutate((v) => { v.entries[1].results[0].routeTo = 'grammar-gap'; }), 'application-owned and its failure must route to resolve', 'application failure sent to the family');
+await expectError(mutate((v) => { v.entries[1].results[1].verdict = 'fail'; v.entries[1].results[1].routeTo = 'resolve'; }), "a failure there is a grammar-gap, never a resolve loop", 'Grammar failure sent into the resolve loop');
+await expectError(mutate((v) => { v.entries[0].results[0].routeTo = 'resolve'; }), 'passes and still routes to resolve', 'passing node that routes somewhere');
+await expectError(mutate((v) => { v.entries[1].results[0].rule = 'GAP-4'; }), 'which that node never claimed', 'judged on a rule nobody claimed');
+await expectError(mutate((v) => { v.entries[0].results[0].measured = '2rem'; }), 'which the capture did not measure', 'judged against a value nobody measured');
+await expectError(mutate((v) => { v.entries[0].results[0].owner = 'grammar'; }), 'in the capture', 'owner differs from the capture');
+await expectError(mutate((v) => { v.entries[0].results.push({ path: 'body>footer', owner: 'app', rule: 'GAP-1', measured: '0.25rem', verdict: 'pass', routeTo: 'none' }); }), 'was never measured there', 'verdict without a measurement');
+await expectError(mutate((v) => { v.entries[0].results = [v.entries[0].results[0]]; }), 'and no verdict judges it', 'claim left unjudged');
+await expectError(mutate((v) => { v.entries.push({ ...v.entries[0] }); }), 'is judged twice', 'one entry judged twice');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ fields: { 'frontend-surface-audit': 'response/response.md', verdicts: 'response/data/verdicts.json', capture: [CAP(WIDE), CAP(NARROW)], screenshot: [SHOT(WIDE)] } }) }, 'has verdicts and no screenshot', 'entry without a screenshot');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ next: ['quality.verify'] }) }, 'so next names interface.fix', 'failure that never reaches the fix');
+await expectError({ ...baseline(), [CAP(NARROW)]: { ...capture(NARROW), viewport: [1440, 900] } }, 'in the capture', 'receipt and capture disagree on the viewport');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace('| 1rem | fail |', '| 1rem | pass |') }, 'is pass here and fail in the verdicts', 'receipt hides a failure');
+const dropRegression = (text) => text.split(String.fromCharCode(10)).filter((l) => !l.startsWith('| `narrow-light-loaded` | `body>main`')).join(String.fromCharCode(10));
+await expectError({ ...baseline(), 'response/response.md': dropRegression(responseMd()) }, 'Regressions has 0 rows, the verdicts carry 1 failures', 'regression dropped from the receipt');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace('## Grammar gaps', '## Gaps') }, 'missing section ^## Grammar gaps$', 'receipt section renamed');
+await expectError({ ...baseline(), 'response/data/verdicts.json': null, 'response/response.json': responseJson({ fields: { 'frontend-surface-audit': 'response/response.md', capture: [CAP(WIDE), CAP(NARROW)], screenshot: [SHOT(WIDE), SHOT(NARROW)] } }) }, 'required output verdicts is not in fields', 'missing required output');
+await expectError({ ...baseline(), [CAP(WIDE)]: { ...capture(WIDE), viewport: [10, 10] } }, 'viewport', 'capture schema');
+await expectError({ ...baseline(), 'response/response.json': responseJson({ status: 'blocked', stop: 'MADE_UP_CODE', next: [] }) }, 'not a registered code', 'unknown stop code');
+
+// The taste lens.
+await expectError(mutate((v) => { delete v.entries[0].taste; }), 'carries no taste block', 'a done audit that publishes only the canon lens');
+await expectError(mutate((v) => { v.entries[0].taste.entries.splice(6, 1); }), 'leaves TASTE-7 unscored', 'a criterion left out of the lens');
+await expectError(mutate((v) => { v.entries[0].taste.mean = 5; }), 'the twelve scores average 4.00', 'a mean nobody computed');
+await expectError(mutate((v) => { v.entries[0].taste.verdict = 'fix-first'; }), 'TASTE-13 makes it ship', 'a verdict TASTE-13 does not produce');
+await expectError(mutate((v) => { v.entries[0].taste.entries[0].verdict = 'fail'; v.entries[0].taste.entries[0].routeTo = 'resolve'; }), 'routeTo', 'a taste failure sent into the resolve loop');
+await expectError(mutate((v) => { v.entries[0].taste.entries[0].verdict = 'fail'; }), 'a taste failure routes to direction, never to resolve', 'a taste failure that routes nowhere');
+await expectError(fixFirst({ 'response/response.json': responseJson({ next: ['interface.fix', 'quality.verify'] }) }), 'quality.verify follows a ship', 'a fix-first surface sent to the gates');
+await expectError(fixFirst({ 'response/response.json': responseJson({ next: ['interface.fix'] }) }), 'the taste lens is fix-first, so next names interface.generate', 'a fix-first lens that never reaches the generator');
+await expectError(fixFirst({ 'response/response.md': responseMd() }), 'TASTE-2 is pass here and fail in the verdicts', 'receipt hides a taste failure');
+
+// The calibration set (TASTE-13 Case 9): the three anchors scored in the same round, inside their
+// bands within the tolerance the set publishes; a drifting anchor, a missing anchor, a lens scored
+// with no anchors, or a receipt that hides the scores it took, is CALIBRATION_OFF; and the sheets
+// the lens was ranked among are the selected surfaces of the scope and nothing outside it.
+const calibrated = (scored) => ({ ...baseline(), 'response/data/verdicts.json': verdicts(taste, scored), 'response/response.md': responseMd(taste(), PRINTED, served(), { calibrationRows: CALIBRATION_ROWS(scored) }) });
+const withLow = (score) => CALIBRATION.map((s) => (s.anchor === 'anchor-low' ? { ...s, score } : s));
+await expectValid(calibrated(withLow(3)), 'the low anchor one point outside its band, inside the tolerance the set publishes');
+await expectError(calibrated(withLow(4)), 'outside its band 1–2 by more than the tolerance 1', 'an auditor whose low anchor drifted two points: the round is CALIBRATION_OFF');
+await expectError(calibrated(CALIBRATION.slice(0, 2)), 'anchor-high is not scored for the taste lens', 'a round that scored two anchors of three');
+await expectError(mutate((v) => { delete v.calibration; }), 'no anchor of the calibration set is scored for it', 'a taste lens scored with no anchors at all');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served(), { calibrationRows: '' }) }, '## Calibration carries no row', 'a receipt that scored the anchors and does not say so');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served(), { calibrationRows: CALIBRATION_ROWS(withLow(1)) }) }, 'anchor-low scores 1 here and 2 in the verdicts', 'a receipt whose anchor score differs from the verdicts');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served(), { calibrationRows: CALIBRATION_ROWS().replace('taste 1–2', 'taste 1–3') }) }, 'the calibration set publishes taste 1–2', 'a receipt that widened an anchor band');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served(), { rankedRows: `| ${BT}checkout${BT} | a sheet from another feature |` }) }, 'not a selected surface of this scope', 'a taste lens ranked against a sheet outside its scope');
+await expectValid({ 'request/request.json': requestJson(), 'response/response.json': responseJson({ status: 'blocked', stop: 'CALIBRATION_OFF', next: [], fields: {} }) }, 'blocked on CALIBRATION_OFF: the anchors drifted and the auditor re-enters');
+const twoSurfaces = [{ id: 'plan-picker', type: 'page', route: '/plans', matrixIds: [WIDE] }, { id: 'plan-detail', type: 'page', route: '/plans/detail', matrixIds: [NARROW] }];
+const twoSurfaceFiles = (rankedRows) => ({ ...baseline(), 'request/request.json': requestJson({ extra: { auditScope: { surfaces: structuredClone(twoSurfaces) } } }), 'response/data/verdicts.json': { ...verdicts(), auditScope: scope({ surfaces: structuredClone(twoSurfaces) }) }, 'response/response.md': responseMd(taste(), PRINTED, served(), { rankedRows }) });
+await expectValid(twoSurfaceFiles(`| ${BT}plan-picker${BT} | scored in the same round on the same scale |\n| ${BT}plan-detail${BT} | scored in the same round on the same scale |`), 'two selected surfaces ranked against each other in one round');
+await expectError(twoSurfaceFiles(''), 'Ranked against omits plan-picker', 'a taste lens over two surfaces that never says which sheets it placed them among');
+
+// The surface class and the per-topic verdict rows.
+await expectError(mutate((v) => { v.entries[1].surfaceClass = 'landing'; }), 'one surface has one class', 'two classes over one surface');
+await expectError(mutate((v) => { delete v.entries[0].surfaceClass; }), 'surfaceClass', 'an entry with no declared class');
+await expectError(baseline(), 'declares no surface class', 'a direction decision written before the class was declared', { decisionClass: null });
+await expectError(baseline(), "the entries carry console and the direction's coverage declares landing", 'an audit that banded the surface by a class the direction never decided', { decisionClass: 'landing' });
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| ${BT}presentation${BT} | fail | resolve |`, `| ${BT}presentation${BT} | pass | none |`) }, 'Verdict records pass for presentation', 'a Verdict row that hides a failing topic');
+await expectError({ ...baseline(), 'response/response.md': responseMd().replace(`| ${BT}contrast${BT} | blocked | none |`, `| ${BT}contrast${BT} | pass | none |`) }, 'Verdict records pass for contrast', 'a topic passed on evidence nobody took');
+
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), [`| ${BT}${SHOT(NARROW)}${BT} | the worst-scoring capture of the taste topic |`]) }, 'names no served sheet', 'a verdict recorded without the sheet ever reaching the person');
+
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served({ contains: 'no' })) }, 'the served head must contain the applied commit', 'a surface measured on a head that never carried this work');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served({ profile: '—' })) }, 'names the browser profile this session drove', 'an audit that never says whose browser it drove');
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served({ servedHead: 'HEAD' })) }, 'as a full commit', 'a served head nobody could compare');
+
+// The family a served head renders can drift from the one the delivery was resolved against even
+// when the source ancestry is clean (main carried a newer dependency forward). The receipt names both
+// versions in ## Served surface always, and when they differ, names both again in the measured
+// evidence of whichever verdict the drift could have flipped.
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, served({ familyObserved: 'latest' })) }, 'as a family version', 'a family version nobody could compare');
+const driftedServed = served({ familyObserved: '0.4.8', familyResolved: '0.4.7' });
+await expectError({ ...baseline(), 'response/response.md': responseMd(taste(), PRINTED, driftedServed) }, 'a version drift the receipt does not name', 'a family version drift never named in any verdict\'s own evidence');
+const driftNamedMd = responseMd(taste(), PRINTED, driftedServed)
+  .replace('| `narrow-light-loaded` | app | `body>main` | `GAP-5` | 1rem | fail |', '| `narrow-light-loaded` | app | `body>main` | `GAP-5` | 1rem — family 0.4.8 observed, resolved against 0.4.7 | fail |')
+  .replace('| `narrow-light-loaded` | `body>main` | `GAP-5` | 1rem | resolve |', '| `narrow-light-loaded` | `body>main` | `GAP-5` | 1rem — family 0.4.8 observed, resolved against 0.4.7 | resolve |');
+await expectValid({ ...baseline(), 'response/response.md': driftNamedMd }, 'a family version drift named in Served surface and in the verdict evidence it could have flipped');
+
+// A composition or taste verdict is never closed by asking: an open one routes to direction, which
+// scores the candidates and decides or proves the tie, so a user route over it is refused outright.
+const wallToPerson = {
+  ...baseline(),
+  'response/data/verdicts.json': verdicts(tasteFixFirst),
+  'response/response.md': responseMd(tasteFixFirst()),
+  'response/response.json': responseJson({ status: 'blocked', stop: 'NO_PROGRESS', next: [], reason: 'the same head was measured again with no delta', fields: { 'frontend-surface-audit': 'response/response.md', verdicts: 'response/data/verdicts.json', capture: [CAP(WIDE), CAP(NARROW)], screenshot: [SHOT(WIDE), SHOT(NARROW)] } }),
+};
+await expectError(wallToPerson, 'this audit asks nobody', 'a fix-first taste verdict handed to a person');
+
+// The density criterion and data volume (TASTE-9 Case 5 and 6, TASTE-13 Case 6), and a criterion
+// the person accepted from the printed sheet (TASTE-13 Case 7).
+const lensBranch = (lens, next) => ({ ...baseline(), 'response/data/verdicts.json': verdicts(lens), 'response/response.md': responseMd(lens()), 'response/response.json': responseJson({ next }) });
+const SEEDED = ['interface.fix', 'data.seed'];
+const SHIPPED = ['interface.fix', 'quality.verify'];
+await expectValid(lensBranch(tasteBelowVolume, SEEDED), 'density measured below the representative seeded volume: the lens is blocked and hands to the operator that seeds');
+await expectValid(lensBranch(tasteDataBound, SHIPPED), 'density data-bound at representative volume: left out of the verdict, the lens ships');
+await expectValid(lensBranch(tastePersonAccepted, SHIPPED), 'a criterion the person accepted from the printed sheet: closed by that choice, the lens ships and quality follows', { decision: { failing: ['TASTE-2'] } });
+await expectError(lensBranch(tasteBelowVolume, ['interface.fix', 'interface.generate']), 'does not name interface.generate', 'a density below volume sent to direction');
+await expectError(lensBranch(tasteBelowVolume, ['interface.fix']), 'next names data.seed', 'a density below volume that never asks for the seed');
+await expectError(lensBranch(() => { const l = tasteBelowVolume(); l.entries[8].routeTo = 'direction'; return l; }, SEEDED), 'never to direction and never to a person', 'a below-volume row routed to direction');
+await expectError(lensBranch(() => { const l = taste(); l.entries[0] = { rule: 'TASTE-1', measured: 'below-volume: the title', score: 2, verdict: 'fail', routeTo: 'seed' }; l.verdict = 'blocked'; return l; }, SEEDED), 'only the density criterion', 'a volume marker on a criterion that does not depend on data');
+await expectError(lensBranch(() => ({ ...tasteDataBound(), verdict: 'fix-first' }), ['interface.fix', 'interface.generate']), 'TASTE-13 makes it ship', 'a data-bound density recorded as fix-first');
+await expectError(lensBranch(() => tastePersonAccepted('nowhere'), SHIPPED), 'names no decision branch', 'a person-accepted row that names no decision', { decision: { failing: ['TASTE-2'] } });
+await expectError(lensBranch(() => tastePersonAccepted('step-9/parallel-9'), SHIPPED), 'not the decision this audit reads', 'a person-accepted row naming another decision', { decision: { failing: ['TASTE-2'] } });
+await expectError(lensBranch(tastePersonAccepted, SHIPPED), 'was not shown failing', 'a person-accepted criterion the chosen candidate was never shown failing', { decision: { failing: [] } });
+await expectError(lensBranch(tastePersonAccepted, SHIPPED), 'took by itself', 'a person-accepted row over a decision the operator took automatically', { decision: { policy: 'automatic', failing: ['TASTE-2'] } });
+
+// A refine that composed nothing (the direction declares Presentation delta none): the reference
+// criterion does not apply and reads `n/a` out of the arithmetic (TASTE-12 Case 5), and the lens
+// itself is the prior audit's, cited under ## Calibration as inherited — so no anchors are owed, the
+// verdicts carry none, and a fix-first carried this way lets the checkout's gates run.
+const REFINE = { decision: { presentationDelta: 'none' } };
+const INHERITED_ROW = `| ${BT}inherited${BT} | taste step-3/parallel-1 | — |`;
+const notApplicable = (over = {}) => {
+  const lens = taste();
+  lens.entries[11] = { rule: 'TASTE-12', measured: `${'n/a'}: the direction declares Presentation delta none, so this delivery composed nothing to sort`, score: null, verdict: 'pass', routeTo: 'none' };
+  return { ...lens, mean: 4, verdict: 'ship', ...over };
+};
+const refineFiles = (lens, { calibrationRows = INHERITED_ROW, calibration = undefined, next = ['interface.fix', 'quality.verify'] } = {}) => ({
+  ...baseline(),
+  'response/data/verdicts.json': { ...verdicts(lens, calibration), ...(calibration === undefined ? { calibration: undefined } : {}) },
+  'response/response.md': responseMd(lens(), PRINTED, served(), { calibrationRows }).replace('| null | pass |', '| — | pass |'),
+  'response/response.json': responseJson({ next }),
+});
+await expectValid(refineFiles(notApplicable), 'a refine: the reference criterion reads n/a out of the mean, and the lens is inherited from the audit that scored the composition', REFINE);
+// The same lens fix-first on a criterion the earlier composition owns: the finding stands where it was
+// raised, so this branch may hand to the gates instead of opening a direction round it did not cause.
+const refineFixFirst = () => { const lens = notApplicable(); lens.entries[1] = { rule: 'TASTE-2', measured: VOID_BAND, score: 2, verdict: 'fail', routeTo: 'direction' }; lens.mean = 3.82; lens.verdict = 'fix-first'; return lens; };
+await expectValid(refineFiles(refineFixFirst), 'a fix-first lens inherited by a refine hands to the gates: the composition it judges is not the one this branch delivered', REFINE);
+await expectError(refineFiles(refineFixFirst, { calibrationRows: CALIBRATION_ROWS(), calibration: CALIBRATION, next: ['interface.fix', 'quality.verify'] }), 'the taste lens is fix-first, so next names interface.generate', 'a refine that scored the lens itself and still skipped the direction round');
+await expectError(refineFiles(notApplicable), 'a delivery that composed something is scored on the sheets it composed', 'an app-owned delivery inheriting a lens it owes anchors for');
+await expectError(refineFiles(notApplicable, { calibrationRows: `| ${BT}inherited${BT} | taste 1–2 | — |` }), 'names no branch it was scored in', 'an inherited lens with no branch behind it', REFINE);
+await expectError(refineFiles(notApplicable, { calibrationRows: `| ${BT}inherited${BT} | taste step-4/parallel-1 | — |` }), 'which is this branch', 'a lens inherited from itself', REFINE);
+await expectError(refineFiles(notApplicable, { calibration: CALIBRATION, calibrationRows: `${INHERITED_ROW}` }), 'an inherited lens took no anchors of its own', 'an inherited lens with anchor scores beside it', REFINE);
+
+// The unchecked ledger is addressed by the feature this audit belongs to, so a request that names
+// none has nowhere to write what it deferred (scripts/record-unchecked.mjs, validate-session).
+await expectError({ ...baseline(), 'request/request.json': (() => { const r = requestJson(); delete r.requirements.feature; return r; })() }, 'required field feature has no value', 'an audit that defers coverage and names no ledger to address');
+await expectValid(refineFiles(notApplicable, { calibrationRows: CALIBRATION_ROWS(), calibration: CALIBRATION }), 'a refine that scores its own lens on its own anchors: inheriting is a permission, not an obligation', REFINE);
+await expectError(refineFiles(() => { const l = notApplicable(); l.entries[11] = { ...l.entries[11], score: 4 }; return l; }), 'passes nothing and routes nowhere', 'a criterion that does not apply and still carries a score', REFINE);
+await expectError(refineFiles(() => { const l = notApplicable(); l.entries[0] = { rule: 'TASTE-1', measured: 'n/a: not looked at', score: null, verdict: 'pass', routeTo: 'none' }; return l; }), 'only the reference criterion TASTE-12 stops applying', 'another criterion marked as not applying', REFINE);
+{
+  // Under an app-owned delta the criterion applies: TASTE-12 is scored like the other eleven.
+  const files = refineFiles(notApplicable, { calibrationRows: CALIBRATION_ROWS(), calibration: CALIBRATION });
+  await expectError(files, 'a delivery that composed something is sorted into the class its own references name', 'a criterion marked n/a while the delivery composed');
+}
+
+// The matrix paragraph and TASTE-13 Case 8: a state the direction's coverage declares (`empty`) was
+// never captured, so composition, accessibility and taste — the topics whose rules read across
+// states — are `blocked` over it, even though every result and criterion judged inside the captured
+// matrix passed; the receipt records the covered subset under ## Matrix and names what was missing
+// under ## Coverage gaps, and next may not carry on to quality.verify or back to direction over a
+// gap that is not a composition finding.
+const coverageGapTaste = taste();
+const coverageGapMd = ({ tasteVerdictLine = 'blocked', tasteRoute = 'none', gapRows = '| `composition` | empty |\n| `accessibility` | empty |\n| `taste` | empty |' } = {}) => `# frontend-surface-audit — plan-picker
+
+## Served surface
+
+| Field | Value |
+| --- | --- |
+| Applied commit | ${BT}${APPLIED}${BT} |
+| Served branch | ${BT}uat${BT} |
+| Served head | ${BT}${SERVED}${BT} |
+| Contains applied commit | yes |
+| Browser profile | ${BT}${PROFILE}${BT} |
+| Family version observed | ${BT}${FAMILY}${BT} |
+| Family version resolved against | ${BT}${FAMILY}${BT} |
+
+## Surface class
+
+| Class | Declared by |
+| --- | --- |
+| ${BT}console${BT} | ${BT}frontend-direction-decision${BT}, whose coverage names the class every banded rule reads |
+
+## Matrix
+
+| Matrix | Viewport | Scheme | State | Screenshot |
+| --- | --- | --- | --- | --- |
+| ${BT}${WIDE}${BT} | 1440x900 | light | loaded | ${BT}${SHOT(WIDE)}${BT} |
+| ${BT}${NARROW}${BT} | 390x844 | light | loaded | ${BT}${SHOT(NARROW)}${BT} |
+
+## Verdicts by owner
+
+| Matrix | Owner | Node | Rule | Measured | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| ${BT}${WIDE}${BT} | app | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1.5rem | pass |
+| ${BT}${WIDE}${BT} | grammar | ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | 1rem | pass |
+| ${BT}${NARROW}${BT} | app | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1rem | fail |
+| ${BT}${NARROW}${BT} | grammar | ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | 1rem | pass |
+
+## Taste
+
+| Rule | Measured | Score | Verdict |
+| --- | --- | --- | --- |
+${tasteTable(coverageGapTaste)}
+
+- Mean: ${coverageGapTaste.mean.toFixed(2)}
+- Verdict: ${tasteVerdictLine}
+
+## Calibration
+
+| Anchor | Expected | Scored |
+| --- | --- | --- |
+${CALIBRATION_ROWS()}
+
+## Ranked against
+
+| Sheet | Why |
+| --- | --- |
+
+## Verdict
+
+| Topic | Verdict | Route |
+| --- | --- | --- |
+| ${BT}presentation${BT} | fail | resolve |
+| ${BT}composition${BT} | blocked | none |
+| ${BT}responsive${BT} | blocked | none |
+| ${BT}motion${BT} | blocked | none |
+| ${BT}accessibility${BT} | blocked | none |
+| ${BT}contrast${BT} | blocked | none |
+| ${BT}render-truth${BT} | blocked | none |
+| ${BT}taste${BT} | ${tasteVerdictLine} | ${tasteRoute} |
+
+## Coverage gaps
+
+| Topic | Missing state |
+| --- | --- |
+${gapRows}
+
+## Regressions
+
+| Matrix | Node | Rule | Measured | Routes to |
+| --- | --- | --- | --- | --- |
+| ${BT}${NARROW}${BT} | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1rem | resolve |
+
+## Grammar gaps
+
+| Component | Rule | What the family lacks |
+| --- | --- | --- |
+
+## Printed
+
+| Artifact | Why |
+| --- | --- |
+${PRINTED.join(String.fromCharCode(10))}
+
+## Fallbacks taken
+
+| Code | Action |
+| --- | --- |
+`;
+const coverageGapFiles = (over = {}, next = ['interface.fix']) => ({
+  ...baseline(),
+  'request/request.json': requestJson({ extra: { auditScope: { mode: 'exhaustive', surfaces: structuredClone(SURFACES) } } }),
+  'response/data/verdicts.json': { ...verdicts(() => coverageGapTaste), auditScope: scope({ mode: 'exhaustive', coverageClaim: 'incomplete' }) },
+  'response/response.md': coverageGapMd(over),
+  'response/response.json': responseJson({ next }),
+});
+const EMPTY_STATE = { coverageStates: [{ meaning: 'empty', carrier: 'the offer region' }] };
+await expectValid(coverageGapFiles(), 'a matrix narrowed against a declared state: composition, accessibility and taste are blocked and the receipt names the missing state', EMPTY_STATE);
+await expectError(coverageGapFiles({ tasteVerdictLine: 'ship', tasteRoute: 'none' }), 'TASTE-13 makes the surface blocked', 'a taste lens recorded ship over a matrix that never captured a declared state', EMPTY_STATE);
+await expectError({ ...coverageGapFiles(), 'response/response.md': coverageGapMd().replace('| `taste` | blocked | none |', '| `taste` | fix-first | direction |') }, "Verdict records fix-first for taste; its own rule made it blocked", 'a state-reading topic recorded fix-first over a matrix gap', EMPTY_STATE);
+await expectError({ ...coverageGapFiles(), 'response/response.md': coverageGapMd({ gapRows: '' }) }, 'Coverage gaps omits', 'a matrix gap left unnamed under ## Coverage gaps', EMPTY_STATE);
+await expectError({ ...coverageGapFiles(), 'response/response.md': coverageGapMd({ gapRows: '| `presentation` | empty |' }) }, 'which this branch\'s coverage and captures do not bear out', 'a Coverage gaps row for a topic that does not read states', EMPTY_STATE);
+await expectError(coverageGapFiles({}, ['interface.fix', 'quality.verify']), 'quality.verify follows only once every topic ships or passes', 'a narrowed round claiming to close the loop into quality.verify', EMPTY_STATE);
+await expectError(coverageGapFiles({}, ['interface.fix', 'interface.generate']), 'a matrix gap is not a composition finding', 'a narrowed round sent to direction as if it were a composition finding', EMPTY_STATE);
+
+// A deferral leaves coverage unchecked, and that is lawful only over a state the mission's journey does not
+// need. `offline` is such a state; the four journeyStates the scope schema publishes are not.
+const OFFLINE_STATE = { coverageStates: [{ meaning: 'offline', carrier: 'the offer region' }] };
+const DEFERRAL = { state: 'offline', reason: 'the offline condition is outside every done-when line of this mission' };
+const deferredTaste = (state = 'offline') => () => {
+  const lens = taste();
+  lens.entries[9] = { rule: 'TASTE-10', measured: `deferred secondary state: ${state}`, score: null, verdict: 'deferred', routeTo: 'none' };
+  return lens;
+};
+const primaryDeferred = (over = {}, state = 'offline') => ({
+  ...baseline(),
+  'response/data/verdicts.json': { ...verdicts(deferredTaste(state)), auditScope: scope({ deferredStates: [state], deferrals: [{ state, reason: DEFERRAL.reason }], ...over }) },
+  'response/response.md': responseMd(deferredTaste(state)()).replace('| null | deferred |', '| — | deferred |'),
+  'response/response.json': responseJson({ next: ['interface.fix', 'quality.verify'] }),
+});
+await expectValid(primaryDeferred(), 'default primary scope defers a secondary state with its reason and permits independent quality gates', OFFLINE_STATE);
+await expectError(primaryDeferred({ coverageClaim: 'full-state-matrix' }), 'coverage claim must be selected-surfaces', 'primary audit falsely claiming full-state coverage', OFFLINE_STATE);
+await expectError({ ...primaryDeferred(), 'response/data/verdicts.json': { ...verdicts(), auditScope: scope({ deferredStates: ['offline'], deferrals: [DEFERRAL] }) } }, 'state-comparison criterion must be deferred', 'unobserved secondary states falsely given a passing score', OFFLINE_STATE);
+await expectError(primaryDeferred({ deferrals: [] }), 'auditScope.deferrals gives no reason for it', 'a state deferred with no reason to carry into the ledger', OFFLINE_STATE);
+await expectError(primaryDeferred({ deferrals: [DEFERRAL, { state: 'stale', reason: 'x' }] }), 'auditScope.deferrals names stale, which this audit did not defer', 'a reason for a state nothing deferred', OFFLINE_STATE);
+await expectError(primaryDeferred({}, 'empty'), 'UNCHECKED_UNLAWFUL', 'a journey unit deferring the state a reader meets when there is nothing to show', EMPTY_STATE);
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { auditScope: { surfaces: [...SURFACES, { id: 'results', type: 'page', route: '/results', matrixIds: ['results-wide'] }] } } }) }, 'selected surface entry results-wide was not fully audited', 'one of several selected primary pages omitted');
+const deferredDrawer = { id: 'details', type: 'drawer', route: '/plans#details', priority: 'deferred', matrixIds: [] };
+const drawerInventory = [...structuredClone(SURFACES), deferredDrawer];
+await expectValid({ ...baseline(), 'request/request.json': requestJson({ extra: { auditScope: { surfaces: drawerInventory } } }), 'response/data/verdicts.json': { ...verdicts(), auditScope: scope({ surfaces: drawerInventory }) } }, 'deferred drawer stays visible without blocking primary scope');
+await expectError({ ...baseline(), 'request/request.json': requestJson({ extra: { auditScope: { mode: 'exhaustive', surfaces: drawerInventory } } }) }, 'deferred surfaces carry no captured matrix and are unavailable in exhaustive mode', 'exhaustive audit hiding a deferred drawer');
+
+const familyFinding = (routeTo = 'grammar-gap', next = ['workspace.bind']) => {
+  const files = baseline();
+  const data = files['response/data/verdicts.json'];
+  data.entries[1].results[0].verdict = 'pass'; data.entries[1].results[0].routeTo = 'none';
+  data.entries[1].results[1].verdict = 'fail'; data.entries[1].results[1].routeTo = routeTo;
+  let md = files['response/response.md'];
+  md = md.replace(`| ${BT}${NARROW}${BT} | app | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1rem | fail |`, `| ${BT}${NARROW}${BT} | app | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1rem | pass |`);
+  md = md.replace(`| ${BT}${NARROW}${BT} | grammar | ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | 1rem | pass |`, `| ${BT}${NARROW}${BT} | grammar | ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | 1rem | fail |`);
+  md = md.replace('| `presentation` | fail | resolve |', `| ${BT}presentation${BT} | fail | ${routeTo} |`);
+  md = md.replace(`| ${BT}${NARROW}${BT} | ${BT}${MAIN}${BT} | ${BT}GAP-5${BT} | 1rem | resolve |`, `| ${BT}${NARROW}${BT} | ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | 1rem | ${routeTo} |`);
+  md = md.replace('| Component | Rule | What the family lacks |\n| --- | --- | --- |', `| Component | Rule | What the family lacks |\n| --- | --- | --- |\n| ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | existing published padding behavior differs from its measured contract |`);
+  files['response/response.md'] = md;
+  files['response/response.json'] = responseJson({ next });
+  return files;
+};
+await expectValid(familyFinding(), 'existing library behavior routes to its owner binding without asking');
+await expectError(familyFinding('grammar-gap', ['interface.audit']), 'first routes to workspace.bind', 'Grammar repair cannot wait for a person to publish then audit itself');
+await expectError(familyFinding('grammar-gap', ['workspace.bind', 'quality.verify']), 'cannot self-loop, pass quality, or skip', 'Grammar repair cannot claim quality completion');
+await expectError(familyFinding('grammar-gap', ['library.update']), 'first routes to workspace.bind', 'Grammar repair cannot skip owner binding');
+await expectError(familyFinding('flow-owner', ['workspace.bind']), 'Grammar-owned; existing behavior routes', 'Grammar failure cannot hide behind unrelated owner');
+await expectValid(familyFinding('direction', ['interface.generate']), 'genuine new family presentation tier preserves direction choice');
+await expectError(familyFinding('direction', ['workspace.bind']), 'new Grammar presentation direction or tier routes', 'new tier cannot become automatic behavior repair');
+const noFamilyEvidence = familyFinding();
+noFamilyEvidence['response/response.md'] = noFamilyEvidence['response/response.md'].replace(`| ${BT}${SECTION}${BT} | ${BT}PADDING-4${BT} | existing published padding behavior differs from its measured contract |`, '');
+await expectError(noFamilyEvidence, 'Grammar gaps must preserve', 'owner handoff needs the observed family gap');
+const repairToPerson = familyFinding();
+repairToPerson['response/response.json'] = responseJson({ status: 'blocked', stop: 'NO_PROGRESS', next: [], reason: 'wait for a person to publish the library repair' });
+await expectError(repairToPerson, 'not handed to a person to publish', 'existing authorized library behavior repair cannot be handed to the user');
+
+// Mode playwright: one walk per matrix entry, written by the auditor and run by the runner; the
+// screenshot the audit measures came from that run and the capture says which step took it. Each
+// mutation below is one way a screenshot nobody drove could have read like a driven one.
+const { walkFingerprint, stepControl, stepOwnControl } = await import('../../scripts/validate-walk.mjs');
+const ROUTE = 'http://127.0.0.1:60000/plans';
+const WALK_REF = (id) => `response/data/walks/${id}/walk.json`;
+const RESULT_REF = (id) => `response/data/walks/${id}/walk-result.json`;
+const MEAS_REF = (id) => `response/artifacts/${id}.measurements.json`;
+// The runner's record at the capture step: the two nodes the capture judges, with the gap and the
+// padding the browser computed, in the shape of capture-measurements.schema.json.
+const measuredElement = (ref, tag, over = {}) => ({
+  ref, tag, bbox: { x: 0, y: 0, width: 1440, height: 900 },
+  computed: { fontSize: '16px', fontWeight: '400', lineHeight: '24px', color: 'rgb(0, 0, 0)', backgroundColor: 'rgb(255, 255, 255)', minHeight: '0px', padding: { top: '0px', right: '0px', bottom: '0px', left: '0px' }, margin: { top: '0px', right: '0px', bottom: '0px', left: '0px' }, gap: { row: 'normal', column: 'normal' }, borderRadius: '0px', border: { top: '0px none rgb(0, 0, 0)', right: '0px none rgb(0, 0, 0)', bottom: '0px none rgb(0, 0, 0)', left: '0px none rgb(0, 0, 0)' }, overflow: { x: 'visible', y: 'visible' }, display: 'block', visibility: 'visible', ...over },
+  contrast: 21, text: '',
+});
+const measurementsDoc = (id) => ({
+  schemaVersion: 9, capture: id, viewport: id === WIDE ? [1440, 900] : [390, 844], deviceScaleFactor: 1, colorScheme: 'light',
+  elements: [measuredElement(MAIN, 'main', { gap: { row: id === WIDE ? '1.5rem' : '1rem', column: '0px' } }), measuredElement(SECTION, 'section', { padding: { top: '1rem', right: '1rem', bottom: '1rem', left: '1rem' } })],
+});
+// The verdicts of a driven audit: every presentation result cites the element and value it read.
+const cite = (ref, property, value) => ({ ref, property, value });
+const drivenVerdicts = () => {
+  const v = verdicts();
+  v.entries[0].results[0].measurement = cite(MAIN, 'computed.gap.row', '1.5rem');
+  v.entries[0].results[1].measurement = cite(SECTION, 'computed.padding.top', '1rem');
+  v.entries[1].results[0].measurement = cite(MAIN, 'computed.gap.row', '1rem');
+  v.entries[1].results[1].measurement = cite(SECTION, 'computed.padding.top', '1rem');
+  return v;
+};
+const auditWalk = (id) => ({
+  schemaVersion: 9, id, flow: 'plan-picker',
+  entry: { route: ROUTE, viewport: { width: id === WIDE ? 1440 : 390, height: id === WIDE ? 900 : 844, deviceScaleFactor: 1 }, colorScheme: 'light', reducedMotion: 'reduce', locale: 'en' },
+  account: null,
+  steps: [
+    { id: 'open', action: 'goto', target: null, value: ROUTE },
+    { id: 'loaded', action: 'expect', target: { role: 'heading', name: 'Plans' }, expect: { visible: true } },
+    { id: 'shot', action: 'capture', target: null, capture: { name: id } },
+  ],
+});
+const auditResult = (w) => ({
+  schemaVersion: 9, mode: 'playwright', walkRef: WALK_REF(w.id), walkFingerprint: walkFingerprint(Buffer.from(JSON.stringify(w, null, 2))), route: ROUTE,
+  outcome: 'pass', startedAt: '2026-09-03T00:10:00Z', finishedAt: '2026-09-03T00:10:05Z',
+  driver: { playwright: '1.0.0', browser: 'chromium', browserVersion: '100.0.0.0', headless: true, context: { fresh: true, viewport: [w.entry.viewport.width, w.entry.viewport.height], deviceScaleFactor: 1, colorScheme: 'light', reducedMotion: 'reduce', locale: 'en' } },
+  steps: w.steps.map((s) => ({ id: s.id, action: s.action, control: stepOwnControl(w, s.id), outcome: 'pass', url: ROUTE, ms: 1 })),
+  firstFailure: null,
+  captures: [{ name: w.id, stepId: 'shot', screenshotRef: SHOT(w.id), axRef: `response/artifacts/${w.id}.ax.txt`, domRef: `response/artifacts/${w.id}.dom.json`, measurementsRef: MEAS_REF(w.id) }],
+});
+const drivenCapture = (w, over = {}) => ({ ...capture(w.id), driver: { mode: 'playwright', walkRef: WALK_REF(w.id), resultRef: RESULT_REF(w.id), stepId: 'shot', control: stepControl(w, 'shot'), measurementsRef: MEAS_REF(w.id), ...over } });
+function drivenFiles({ walks = [auditWalk(WIDE), auditWalk(NARROW)], captures = {}, verdictsDoc = drivenVerdicts(), measurements = {} } = {}) {
+  const files = baseline();
+  files['response/response.json'] = responseJson({ fields: { 'frontend-surface-audit': 'response/response.md', verdicts: 'response/data/verdicts.json', capture: [CAP(WIDE), CAP(NARROW)], screenshot: [SHOT(WIDE), SHOT(NARROW)], 'uat-walk': walks.map((w) => WALK_REF(w.id)), 'walk-result': walks.map((w) => RESULT_REF(w.id)) } });
+  files['response/data/verdicts.json'] = verdictsDoc;
+  for (const w of walks) { files[WALK_REF(w.id)] = w; files[RESULT_REF(w.id)] = auditResult(w); files[CAP(w.id)] = captures[w.id] ?? drivenCapture(w); files[MEAS_REF(w.id)] = measurements[w.id] ?? measurementsDoc(w.id); }
+  return files;
+}
+await expectValid(drivenFiles(), 'two entries, each captured by the runner from its own walk at its own viewport, every presentation result citing the ref and value it read');
+// A capture is not a measurement: under mode playwright a presentation, contrast, accessibility or
+// responsive result cites the runner's record — ref and value — and a number the runner did not
+// record is refused, whatever the capture's own measured cell says.
+await expectError(drivenFiles({ verdictsDoc: verdicts() }), 'cites no measurement', 'a driven audit whose presentation results state numbers with no citation');
+await expectError(drivenFiles({ verdictsDoc: (() => { const v = drivenVerdicts(); v.entries[0].results[0].measurement = cite(MAIN, 'computed.gap.row', '2rem'); return v; })() }), 'the runner recorded "1.5rem"; the value is the runner\'s', 'a citation whose value the runner never recorded');
+await expectError(drivenFiles({ verdictsDoc: (() => { const v = drivenVerdicts(); v.entries[0].results[0].measurement = cite('body>footer', 'computed.gap.row', '1.5rem'); return v; })() }), 'a citation names an element the runner measured', 'a citation of an element the record does not carry');
+await expectError(drivenFiles({ verdictsDoc: (() => { const v = drivenVerdicts(); v.entries[0].results[0].measurement = cite(MAIN, 'computed.gap', '1.5rem'); return v; })() }), 'carries no single value for', 'a citation of a group, not a value');
+await expectError(drivenFiles({ verdictsDoc: (() => { const v = drivenVerdicts(); v.entries[1].results[0].measurement = cite(MAIN, 'computed.padding.top', '0px'); return v; })(), captures: { [NARROW]: (() => { const c = drivenCapture(auditWalk(NARROW)); c.nodes[0].measured.gap = '0.5rem'; return c; })() } }), 'the number a verdict states is the one it cites', 'a verdict stating one number while citing another');
+await expectError(drivenFiles({ measurements: { [WIDE]: { ...measurementsDoc(WIDE), elements: [{ ref: MAIN, tag: 'main' }] } } }), 'elements[0].bbox: required', 'a measurements record that lost its shape is refused at the walk gate');
+{
+  const files = drivenFiles();
+  delete files[MEAS_REF(NARROW)];
+  await expectError(files, 'which is not on disk; a capture the runner measured keeps its record beside the screenshot', 'a result that names a record nobody wrote');
+}
+await expectError(drivenFiles({ captures: { [WIDE]: drivenCapture(auditWalk(WIDE), { measurementsRef: MEAS_REF(NARROW) }) } }), 'the record is the runner\'s', 'a capture naming another entry\'s measurements');
+await expectError(mutate((v) => { v.entries[0].results[0].measurement = cite(MAIN, 'computed.gap.row', '1.5rem'); }), 'only a presentation, contrast, accessibility, responsive result of a capture the runner drove reads from a capture-measurements record', 'a citation on a capture no runner drove');
+{
+  const w = auditWalk(WIDE); w.steps[1].target = { css: 'h1' };
+  await expectError(drivenFiles({ walks: [w, auditWalk(NARROW)] }), 'no unique allowed schema branch', 'a walk whose target is a selector');
+}
+{
+  const w = auditWalk(WIDE); w.steps.splice(2, 0, { id: 'jump', action: 'goto', target: null, value: `${ROUTE}/compare` });
+  await expectError(drivenFiles({ walks: [w, auditWalk(NARROW)] }), 'the walk navigates once, at step 1', 'a walk that navigates by address bar mid-flow');
+}
+await expectError(drivenFiles({ captures: { [WIDE]: drivenCapture(auditWalk(WIDE), { control: 'button "Compare plans"' }) } }), 'the control is copied from the walk, never written by the agent', 'a capture whose control differs from the walk step');
+await expectError(drivenFiles({ captures: { [WIDE]: drivenCapture(auditWalk(WIDE), { stepId: 'loaded' }) } }), `is not the capture step named ${WIDE}`, 'a capture that names a step which took no screenshot');
+await expectError(drivenFiles({ captures: { [NARROW]: capture(NARROW) } }), 'this capture carries no driver', 'a receipt that records mode playwright with one screenshot the runner did not take');
+{
+  const files = drivenFiles();
+  delete files[WALK_REF(NARROW)];
+  await expectError(files, 'a capture without its walk is refused', 'a capture whose walk is not on disk');
+}
+{
+  const files = drivenFiles();
+  delete files[RESULT_REF(NARROW)];
+  await expectError(files, 'a capture whose walk nobody ran is refused', 'a walk with no result beside it');
+}
+await expectError(drivenFiles({ captures: { [WIDE]: { ...drivenCapture(auditWalk(WIDE)), viewport: [1280, 800] } } }), 'the walk ran at 1440x900', 'a capture claiming a viewport the walk did not run');
+
+// The runner's own records of the page stand beside every driven screenshot, and a page that draws an
+// inline icon or runs a framework in development carries URLs of its own. The origin sweep reads what
+// the agent wrote (scripts/validate-walk.mjs#PAGE_RECORD), so such a receipt validates rather than
+// tripping the gate once per captured page.
+const PAGE_HTML = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg> https://react.dev/link/switch-to-createroot';
+const withPageRecords = (files) => {
+  for (const id of [WIDE, NARROW]) {
+    files[`response/artifacts/${id}.dom.json`] = JSON.stringify({ url: ROUTE, title: 'Plans', html: PAGE_HTML }, null, 2);
+    files[`response/artifacts/${id}.ax.txt`] = `- heading "Plans"${String.fromCharCode(10)}- link "Docs" /url: https://react.dev/link/x`;
+  }
+  return files;
+};
+await expectValid(withPageRecords(drivenFiles()), 'the runner\'s DOM and accessibility records of a page carrying an inline SVG namespace and a framework link');
+await expectError(withPageRecords(drivenFiles({ captures: { [WIDE]: { ...drivenCapture(auditWalk(WIDE)), nodes: [{ path: MAIN, owner: 'app', claims: ['GAP-5'], measured: { gap: '1.5rem', href: 'https://evil.example/collect' } }, capture(WIDE).nodes[1]] } } })), 'foreign-url', 'a capture record the agent wrote that names another origin');
+
+// And the ledger records it: the receipt the operator's own validator accepts is the one
+// scripts/record-findings.mjs appends from, so a driven audit's findings reach the family's ledger.
+{
+  const { recordFindings } = await import('../../scripts/record-findings.mjs');
+  const files = withPageRecords(drivenFiles());
+  const { branch, session } = writeBranch(files);
+  const ledgerDir = path.join(session, 'ledger');
+  const recorded = await recordFindings(branch, { ledgerDir });
+  assert.equal(recorded.family, 'starci');
+  assert.ok(recorded.appended >= 1, 'the failing verdict of a driven audit reaches the ledger');
+  rmSync(session, { recursive: true, force: true });
+}
+
+process.stdout.write('interface.audit self-test: scope, owner routing, evidence, walk, measurement citation and mutation checks passed\n');

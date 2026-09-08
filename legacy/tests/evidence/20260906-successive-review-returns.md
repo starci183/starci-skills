@@ -1,0 +1,7 @@
+# Successive nested review returns
+
+On 2026-09-06, the Chatbot workflow held a sealed waiting architecture 15/1 and its sealed waiting successor 16/1. Both exact nested critiques were matched and selected return. The ordinary resolver correctly reported no terminal settlement and no proof errors. Committing the approved resume of 16/1 nevertheless failed PLAN_BUSY: its temporary busy projection deleted 16/1, breaking the verified earlier 15/1-to-16/1 relationship.
+
+The busy gate now checks the intact original state. A selected, validated review re-entry derives a transaction-only set from the exact source and already verified successor edges leading to it. This set does not mark an attempt terminal or settled, cannot include an unrelated waiting obligation, and is never persisted as execution proof.
+
+The isolated lifecycle test accepts two successive returned reviews, commits and opens a third replacement, accepts its fresh KEEP critique, resumes and concludes the replacement, and then accepts an unrelated reading and commits its answered re-entry. It checks immutable parent bytes, forged ancestor identity, missing seals, wrong child hashes, unrelated waits, workers, leases and duplicate successors. The actual consumer comparison is read-only: ordinary busy remains true; selected resume busy becomes false; only 16/1 and 15/1 are transactionally included; settled remains empty. This evidence concerns runtime admission, not product completion or UAT.

@@ -1,0 +1,265 @@
+{
+  "aliases": {
+    "@workspaces": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Workspace>/",
+      "scheme": "workspace://root",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [
+        "git.publish",
+        "runtime.serve"
+      ],
+      "purpose": "The explicitly selected project workspace.",
+      "zone": "workspaces"
+    },
+    "@workspaces/fe": {
+      "params": [],
+      "kind": "checkout",
+      "resolvesTo": "<Frontend>/",
+      "scheme": "workspace://fe",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [
+        "interface.fix",
+        "interface.generate",
+        "library.update"
+      ],
+      "purpose": "The explicitly bound frontend checkout; unavailable when the project has no frontend role.",
+      "zone": "workspaces"
+    },
+    "@workspaces/be": {
+      "params": [],
+      "kind": "checkout",
+      "resolvesTo": "<Backend>/",
+      "scheme": "workspace://be",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [
+        "backend.generate"
+      ],
+      "purpose": "The explicitly bound backend checkout; unavailable when the project has no backend role.",
+      "zone": "workspaces"
+    },
+    "@workspaces/works": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Workspace>/.works/",
+      "scheme": "workspace://works",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [],
+      "purpose": "Work-record storage under the selected workspace.",
+      "zone": "workspaces"
+    },
+    "@workspaces/work": {
+      "params": [
+        "workId"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Workspace>/.works/<workId>/",
+      "scheme": "workspace://work",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [],
+      "purpose": "One work record and its associated files.",
+      "zone": "workspaces"
+    },
+    "@workspaces/requests": {
+      "params": [
+        "workId"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Workspace>/.works/<workId>/requests/",
+      "scheme": "workspace://requests",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [],
+      "purpose": "Requests with separate inputs and context.",
+      "zone": "workspaces"
+    },
+    "@workspaces/responses": {
+      "params": [
+        "workId"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Workspace>/.works/<workId>/responses/",
+      "scheme": "workspace://responses",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "purpose": "Responses declaring produced outputs and execution status.",
+      "zone": "workspaces"
+    },
+    "@workspaces/inputs": {
+      "params": [
+        "workId"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Workspace>/.works/<workId>/inputs/",
+      "scheme": "workspace://inputs",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [],
+      "purpose": "Files supplied as the subject of a request.",
+      "zone": "workspaces"
+    },
+    "@workspaces/context": {
+      "params": [
+        "workId"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Workspace>/.works/<workId>/context/",
+      "scheme": "workspace://context",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [],
+      "purpose": "Supporting reference files for a request.",
+      "zone": "workspaces"
+    },
+    "@workspaces/evidence": {
+      "params": [
+        "workId"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Workspace>/.works/<workId>/evidence/",
+      "scheme": "workspace://evidence",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [],
+      "purpose": "Evidence records naming artifact paths and digests.",
+      "zone": "workspaces"
+    },
+    "@workspaces/decisions": {
+      "params": [
+        "workId"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Workspace>/.works/<workId>/decisions/",
+      "scheme": "workspace://decisions",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [
+        "architecture.decide",
+        "business.decide",
+        "business.reconcile"
+      ],
+      "purpose": "Decisions bound to exact subjects.",
+      "zone": "workspaces"
+    },
+    "@workspaces/artifacts": {
+      "params": [
+        "workId"
+      ],
+      "kind": "dir",
+      "resolvesTo": "<Workspace>/.works/<workId>/artifacts/",
+      "scheme": "workspace://artifacts",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "purpose": "Produced files, including images, documents and other deliverables.",
+      "zone": "workspaces"
+    },
+    "@workspaces/skills": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Runtime>/",
+      "scheme": "workspace://skills",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [],
+      "purpose": "The explicitly bound skill runtime directory.",
+      "zone": "workspaces"
+    },
+    "@workspaces/schema": {
+      "params": [],
+      "kind": "file",
+      "resolvesTo": "<Runtime>/.dist/schema.json",
+      "scheme": "workspace://schema",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [],
+      "purpose": "The compiled work-record schema.",
+      "zone": "workspaces"
+    },
+    "@workspaces/alias": {
+      "params": [],
+      "kind": "file",
+      "resolvesTo": "<Runtime>/.dist/alias.json",
+      "scheme": "workspace://alias",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [],
+      "purpose": "The compiled alias registry.",
+      "zone": "workspaces"
+    },
+    "@workspaces/knowledge": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Runtime>/knowledge/",
+      "scheme": "workspace://knowledge",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [
+        "knowledge.repair"
+      ],
+      "purpose": "Knowledge published by the selected skill runtime.",
+      "zone": "workspaces"
+    },
+    "@workspaces/grammar": {
+      "params": [],
+      "kind": "dir",
+      "resolvesTo": "<Grammar>/",
+      "scheme": "workspace://grammar",
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "writers": [],
+      "purpose": "The explicitly resolved grammar package directory; unavailable when no grammar package is bound.",
+      "zone": "workspaces"
+    }
+  }
+}

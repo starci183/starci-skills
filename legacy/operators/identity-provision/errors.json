@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only identity.provision emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, AUTHORITY_DRIFT, PROVISIONING_UNAVAILABLE) come from operators/errors.json. A provider, sealed file or store that cannot be reached is PROVISIONING_UNAVAILABLE; an account that was created and does not sign in is this operator's own IDENTITY_UNPROVEN.",
+  "codes": {
+    "IDENTITY_UNPROVEN": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A check of the identity proof set failed after the account was created or the credential rotated: the account does not sign in with the credential resolved by name, the rotated credential does not work or the old one still does, or something written carries a credential value. An unproved identity is not a provisioned one.",
+        "vi": "Một phép kiểm trong bộ proof danh tính hỏng sau khi tài khoản được tạo hay credential được xoay: tài khoản không đăng nhập được bằng credential giải theo tên, credential đã xoay không dùng được hay cái cũ vẫn dùng được, hoặc thứ gì đó đã viết mang giá trị credential. Một danh tính chưa chứng minh được thì chưa phải đã cấp."
+      },
+      "resume": {
+        "en": "Repair the account at the provider or the sealed credential it is set from, then provision again; never ask a person to sign in on the flow's behalf.",
+        "vi": "Sửa tài khoản tại provider hay credential niêm phong mà nó được đặt từ, rồi cấp lại; không bao giờ nhờ người đăng nhập thay luồng."
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "backend.generate request",
+  "$ref": "works:request",
+  "properties": {
+    "operation": { "const": "backend.generate" },
+    "expected": { "minItems": 2 }
+  },
+  "description": "Use inputs.prompts for the outcome, exact mutable and protected path boundaries, contract operations, business authority, sibling conventions, and proof commands. Use inputs.files for authoritative plans or contracts and context.files for supporting source observations. Missing authority or an ambiguous write ceiling is essential-input-missing."
+}

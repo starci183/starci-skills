@@ -1,0 +1,276 @@
+{
+  "$id": "kind:verdicts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entries"
+  ],
+  "properties": {
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "matrixId",
+          "surfaceClass",
+          "results"
+        ],
+        "properties": {
+          "matrixId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "surfaceClass": {
+            "description": "The class the coverage declared, from the vocabulary COVERAGE-1 Case 7 publishes. Every banded threshold lives in the proof topic that owns the measure; this name only says which surface the topics are looking at.",
+            "enum": [
+              "console",
+              "form",
+              "landing",
+              "catalog",
+              "reader"
+            ]
+          },
+          "taste": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "entries",
+              "mean",
+              "verdict"
+            ],
+            "properties": {
+              "entries": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "rule",
+                    "measured",
+                    "score",
+                    "verdict",
+                    "routeTo"
+                  ],
+                  "properties": {
+                    "rule": {
+                      "type": "string",
+                      "pattern": "^TASTE-[0-9]+$"
+                    },
+                    "measured": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "score": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 1,
+                      "maximum": 5
+                    },
+                    "verdict": {
+                      "enum": [
+                        "pass",
+                        "fail",
+                        "deferred"
+                      ]
+                    },
+                    "routeTo": {
+                      "enum": [
+                        "direction",
+                        "seed",
+                        "none"
+                      ]
+                    }
+                  }
+                }
+              },
+              "mean": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "verdict": {
+                "description": "TASTE-13 computes ship or fix-first; blocked is what a topic takes when its evidence never arrived, and blocked is never reported as a pass or as a failure.",
+                "enum": [
+                  "ship",
+                  "fix-first",
+                  "blocked"
+                ]
+              }
+            }
+          },
+          "results": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 512,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "owner",
+                "rule",
+                "measured",
+                "verdict",
+                "routeTo"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "owner": {
+                  "enum": [
+                    "app",
+                    "grammar"
+                  ]
+                },
+                "rule": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9-]*-(?:[0-9]+|[A-Z][A-Z0-9-]*)$"
+                },
+                "measured": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "measurement": {
+                  "description": "Under @tools/browsercontrol mode playwright, the runner's number this result was judged on: the ref of one element of the entry's capture-measurements record, the dotted property read from it (computed.fontSize, bbox.height, contrast, computed.padding.top, ...) and the value as recorded. Required there for every result of a measurable lane — presentation, contrast, accessibility, responsive — so a receipt states no number the runner did not record; the validator resolves it against the record the walk-result names.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ref",
+                    "property",
+                    "value"
+                  ],
+                  "properties": {
+                    "ref": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "property": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z]+(\\.[a-zA-Z]+)*$"
+                    },
+                    "value": {
+                      "type": [
+                        "string",
+                        "number",
+                        "null"
+                      ]
+                    }
+                  }
+                },
+                "verdict": {
+                  "enum": [
+                    "pass",
+                    "fail"
+                  ]
+                },
+                "routeTo": {
+                  "description": "For a failed Grammar-owned claim: grammar-gap binds the library owner to repair existing published behavior; direction requests a new presentation direction or tier through frontend.direction.decide. Neither permits an app CSS workaround.",
+                  "enum": [
+                    "resolve",
+                    "direction",
+                    "seed",
+                    "flow-owner",
+                    "grammar-gap",
+                    "none"
+                  ]
+                }
+              }
+            }
+          },
+          "topics": {
+            "description": "One entry per proof topic this audit judged. The verdict is the one the topic's own closing rule computed; nothing downstream recomputes it.",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "topic",
+                "verdict",
+                "routeTo"
+              ],
+              "properties": {
+                "topic": {
+                  "enum": [
+                    "presentation",
+                    "composition",
+                    "responsive",
+                    "motion",
+                    "accessibility",
+                    "contrast",
+                    "render-truth",
+                    "taste"
+                  ]
+                },
+                "verdict": {
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "ship",
+                    "fix-first",
+                    "blocked"
+                  ]
+                },
+                "routeTo": {
+                  "enum": [
+                    "resolve",
+                    "direction",
+                    "flow-owner",
+                    "grammar-gap",
+                    "none"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "auditScope": {
+      "type": "object",
+      "description": "Selection and coverage limits validated against audit-scope by interface.audit; downstream receipts preserve this scope."
+    },
+    "calibration": {
+      "description": "The anchor scores the auditor took in the same round it scored the surface, one per anchor of the calibration set and per lens the verdicts score (TASTE-13 Case 9). The anchors, their bands and the tolerance are read from knowledge/ui/proof/calibration/calibration.json; this file carries only what was scored. Empty when the receipt inherits the lens from an earlier audit: an inherited lens took no anchors of its own.",
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "anchor",
+          "lens",
+          "score"
+        ],
+        "properties": {
+          "anchor": {
+            "type": "string",
+            "pattern": "^anchor-[a-z]+$"
+          },
+          "lens": {
+            "enum": [
+              "taste",
+              "ux"
+            ]
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          }
+        }
+      }
+    }
+  }
+}

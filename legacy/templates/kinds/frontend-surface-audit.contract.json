@@ -1,0 +1,154 @@
+{
+  "kind": "frontend-surface-audit",
+  "title": "^# frontend-surface-audit — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    {
+      "heading": "^## Served surface$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Applied commit",
+        "Served branch",
+        "Served head",
+        "Contains applied commit",
+        "Browser profile",
+        "Family version observed",
+        "Family version resolved against"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Audit scope$",
+      "table": "| Field | Value |",
+      "rows": [
+        "Mode",
+        "Selected surfaces",
+        "Coverage claim",
+        "Deferred states"
+      ],
+      "cell": {
+        "Value": "\\S"
+      }
+    },
+    {
+      "heading": "^## Surface class$",
+      "table": "| Class | Declared by |",
+      "exactRows": 1,
+      "cell": {
+        "Class": "^`(console|form|landing|catalog|reader)`$",
+        "Declared by": "\\S"
+      }
+    },
+    {
+      "heading": "^## Matrix$",
+      "table": "| Matrix | Viewport | Scheme | State | Screenshot |",
+      "minRows": 1,
+      "cell": {
+        "Matrix": "^`[a-z0-9][a-z0-9-]*`$",
+        "Viewport": "^[0-9]{3,4}x[0-9]{3,4}$",
+        "Scheme": "^(light|dark)$",
+        "Screenshot": "^`response/artifacts/[A-Za-z0-9_.-]+[.]png`$"
+      }
+    },
+    {
+      "heading": "^## Verdicts by owner$",
+      "table": "| Matrix | Owner | Node | Rule | Measured | Verdict |",
+      "minRows": 1,
+      "cell": {
+        "Owner": "^(app|grammar)$",
+        "Node": "^`[^`]+`$",
+        "Rule": "^`[A-Z][A-Z0-9-]*-(?:[0-9]+|[A-Z][A-Z0-9-]*)`$",
+        "Verdict": "^(pass|fail)$",
+        "Matrix": "^`[a-z0-9][a-z0-9-]*`$"
+      }
+    },
+    {
+      "heading": "^## Taste$",
+      "table": "| Rule | Measured | Score | Verdict |",
+      "minRows": 12,
+      "cell": {
+        "Rule": "^`TASTE-([1-9]|1[0-2])`$",
+        "Measured": "\\S",
+        "Score": "^(?:[1-5]|—)$",
+        "Verdict": "^(pass|fail|deferred)$"
+      }
+    },
+    {
+      "heading": "^## Calibration$",
+      "table": "| Anchor | Expected | Scored |",
+      "cell": {
+        "Anchor": "^`(anchor-[a-z]+|inherited)`$",
+        "Expected": "^(taste|ux) ([1-5]–[1-5]|step-[0-9]+/parallel-[0-9]+)$",
+        "Scored": "^([1-5]|—)$"
+      }
+    },
+    {
+      "heading": "^## Ranked against$",
+      "table": "| Sheet | Why |",
+      "cell": {
+        "Sheet": "^`[a-z0-9][a-z0-9-]*`$",
+        "Why": "\\S"
+      }
+    },
+    {
+      "heading": "^## Verdict$",
+      "table": "| Topic | Verdict | Route |",
+      "exactRows": 8,
+      "rows": [
+        "presentation",
+        "composition",
+        "responsive",
+        "motion",
+        "accessibility",
+        "contrast",
+        "render-truth",
+        "taste"
+      ],
+      "cell": {
+        "Topic": "^`(presentation|composition|responsive|motion|accessibility|contrast|render-truth|taste)`$",
+        "Verdict": "^(pass|fail|ship|fix-first|blocked)$",
+        "Route": "^(resolve|direction|seed|flow-owner|grammar-gap|none)$"
+      }
+    },
+    {
+      "heading": "^## Coverage gaps$",
+      "table": "| Topic | Missing state |",
+      "cell": {
+        "Topic": "^`(presentation|composition|responsive|motion|accessibility|contrast|render-truth|taste)`$",
+        "Missing state": "\\S"
+      }
+    },
+    {
+      "heading": "^## Regressions$",
+      "table": "| Matrix | Node | Rule | Measured | Routes to |",
+      "cell": {
+        "Node": "^`[^`]+`$",
+        "Routes to": "^(resolve|grammar-gap|direction)$",
+        "Matrix": "^`[a-z0-9][a-z0-9-]*`$"
+      }
+    },
+    {
+      "heading": "^## Grammar gaps$",
+      "table": "| Component | Rule | What the family lacks |",
+      "cell": {
+        "What the family lacks": "\\S"
+      }
+    },
+    {
+      "heading": "^## Printed$",
+      "table": "| Artifact | Why |",
+      "cell": {
+        "Artifact": "^(`[^`]+`|https?://\\S+)$",
+        "Why": "\\S"
+      }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |",
+      "cell": {
+        "Code": "^`[A-Z][A-Z0-9_]+`$"
+      }
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "kind": "request",
+  "id": "document-filter-001",
+  "workId": "document-filter",
+  "workRevision": 1,
+  "operation": "interface.draw",
+  "expected": [
+    {
+      "id": "document-filter-control",
+      "description": "The Documents panel visibly includes a clear, usable filter row for file name, classification, and accounting month, while the existing status tabs remain available."
+    },
+    {
+      "id": "source-supported-fields",
+      "description": "The filter labels use document fields supported by Nivo source: file_name, classification, period_key, and status."
+    },
+    {
+      "id": "visual-continuity",
+      "description": "The existing desktop layout, typography, blue palette, immutable ledger meaning, and unrelated panels remain visually intact."
+    },
+    {
+      "id": "desktop-legibility",
+      "description": "The generated PNG is a polished desktop dashboard direction with readable controls and no invented operational claims."
+    }
+  ],
+  "inputs": {
+    "prompts": [
+      "Extend the supplied Nivo Accounting workbench desktop dashboard with a clearly usable document search/filter control. Use only fields supported by the Nivo accounting source: file name, classification, accounting month (period_key), and the existing status tabs. Preserve the current application layout, typography, blue palette, ledger's immutable/read-only meaning, and all unrelated panels."
+    ],
+    "files": []
+  },
+  "context": {
+    "notes": [
+      "The backend accounting workbench query exposes document rows with file_name, classification, amount_minor, currency, period_key, status, context_version_id, context_digest, and context_snapshot. The existing status tabs already cover status, so the added row should focus on file-name search plus classification and month filters.",
+      "A narrow search of nivo-fe/apps/app/src and nivo-fe/packages found no matching Accounting workbench implementation or GraphQL operation; the bound baseline is therefore the visual source of truth for continuity, while nivo-backend is the source of truth for supported data fields.",
+      "This is a design artifact only; controls are visual specifications for later native implementation."
+    ],
+    "files": [
+      {
+        "path": "context/baseline.png",
+        "sha256": "sha256:979c9221521f73caef2b6e340545e31d0d2f566f44e84e737391e2e8057a3934",
+        "mediaType": "image/png"
+      }
+    ],
+    "visual": {
+      "mode": "extend",
+      "baselinePath": "context/baseline.png",
+      "preserve": [
+        "Preserve the full 1536 x 1024 desktop canvas and existing two-column Accounting workbench layout.",
+        "Preserve the existing application typography, white surfaces, fine gray borders, spacing system, and dark navy-to-blue action palette.",
+        "Preserve the Current ledger panel and its immutable snapshot (view-only) meaning, lock icon, ledger version controls, balance, and applied setup details.",
+        "Preserve the existing Documents status tabs and the three visible document rows with their current data and status badges.",
+        "Preserve Add evidence document, Reconciliation, Close period, Applied context, Pending corrections, Propose correction, and Accounting setup panels without changing their content or purpose."
+      ],
+      "change": [
+        "Add one compact filter row inside the Documents panel between the existing status tabs and the document table.",
+        "Add a file-name search input labeled by placeholder text Search file name with a leading magnifying-glass icon.",
+        "Add a Classification select set to All classifications and an Accounting month select set to All months.",
+        "Add a small Clear filters action aligned with the filter controls so the reset behavior is discoverable.",
+        "Keep the filter controls visibly native, keyboard-friendly, and proportioned so the table remains easy to scan at the supplied desktop viewport."
+      ]
+    }
+  },
+  "requestedBy": {
+    "kind": "user",
+    "id": "scenario-user"
+  },
+  "createdAt": "2026-09-08T06:40:25+07:00"
+}

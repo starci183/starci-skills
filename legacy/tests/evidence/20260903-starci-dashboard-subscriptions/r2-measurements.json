@@ -1,0 +1,964 @@
+{
+  "r2-subscriptions-1280-light": {
+    "url": "http://localhost:3000/vi/subscriptions",
+    "scroll": {
+      "scrollWidth": 1280,
+      "clientWidth": 1280
+    },
+    "rail": {
+      "gridTemplateColumns": "808px 384px",
+      "collapsedOrder": "rail-first",
+      "railWidth": "wide",
+      "rect": {
+        "x": 32,
+        "y": 226.7,
+        "w": 1216,
+        "h": 845.63
+      },
+      "children": [
+        {
+          "cls": "starci-core-primary-region",
+          "order": "0",
+          "rect": {
+            "x": 32,
+            "y": 226.7,
+            "w": 808,
+            "h": 845.63
+          }
+        },
+        {
+          "cls": "starci-core-rail-region",
+          "order": "0",
+          "rect": {
+            "x": 864,
+            "y": 226.7,
+            "w": 384,
+            "h": 261
+          }
+        }
+      ]
+    },
+    "surfaceCard": {
+      "rect": {
+        "x": 32,
+        "y": 262.7,
+        "w": 808,
+        "h": 645.63
+      },
+      "padding": "0px",
+      "radius": "24px"
+    },
+    "accordionCard": {
+      "rect": {
+        "x": 32,
+        "y": 968.33,
+        "w": 808,
+        "h": 104
+      },
+      "padding": "0px",
+      "radius": "0px"
+    },
+    "surfaceCardInner": {
+      "rect": {
+        "x": 32,
+        "y": 262.7,
+        "w": 808,
+        "h": 645.63
+      },
+      "padding": "0px",
+      "radius": "16px"
+    },
+    "accordionCardInner": {
+      "rect": {
+        "x": 32,
+        "y": 968.33,
+        "w": 808,
+        "h": 104
+      },
+      "padding": "0px",
+      "radius": "16px"
+    },
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Mở toàn bộ hành trình học với StarCi Pro"
+      },
+      {
+        "tag": "H2",
+        "text": "Bạn nhận được gì"
+      },
+      {
+        "tag": "H2",
+        "text": "Thông tin cần biết"
+      },
+      {
+        "tag": "H3",
+        "text": "AI được tính như thế nào?"
+      },
+      {
+        "tag": "H3",
+        "text": "Thanh toán và kích hoạt"
+      },
+      {
+        "tag": "H2",
+        "text": "StarCi Pro"
+      }
+    ],
+    "nav": {
+      "position": "sticky",
+      "top": "0px",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 79
+      }
+    },
+    "navTargets": [
+      {
+        "tag": "BUTTON",
+        "label": "StarCiAcademy",
+        "w": 44.94,
+        "h": 62
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Trang chủ",
+        "w": 91.31,
+        "h": 36
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Khóa học",
+        "w": 88.81,
+        "h": 36
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Liên hệ",
+        "w": 72.89,
+        "h": 36
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Tìm kiếm",
+        "w": 164.3,
+        "h": 44
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Đổi ngôn ngữ",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "tag": "INPUT",
+        "label": "Chuyển sang tối",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Giỏ hàng",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Tài khoản",
+        "w": 44,
+        "h": 44
+      }
+    ],
+    "allTargets": [
+      {
+        "tag": "BUTTON",
+        "label": "Trang chủ",
+        "w": 91.31,
+        "h": 36
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Khóa học",
+        "w": 88.81,
+        "h": 36
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Liên hệ",
+        "w": 72.89,
+        "h": 36
+      },
+      {
+        "tag": "INPUT",
+        "label": "Chuyển sang tối",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "BUTTON",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "BUTTON",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      }
+    ],
+    "pressableField": {
+      "rect": {
+        "x": 875.7,
+        "y": 17,
+        "w": 164.3,
+        "h": 44
+      },
+      "height": "44px",
+      "minHeight": "44px",
+      "width": "164.297px",
+      "minWidth": "44px",
+      "radius": "12px"
+    },
+    "overflow": []
+  },
+  "r2-subscriptions-1280-dark": {
+    "url": "http://localhost:3000/vi/subscriptions",
+    "scroll": {
+      "scrollWidth": 1280,
+      "clientWidth": 1280
+    },
+    "rail": {
+      "gridTemplateColumns": "808px 384px",
+      "collapsedOrder": "rail-first",
+      "railWidth": "wide",
+      "rect": {
+        "x": 32,
+        "y": 226.7,
+        "w": 1216,
+        "h": 390
+      },
+      "children": [
+        {
+          "cls": "starci-core-primary-region",
+          "order": "0",
+          "rect": {
+            "x": 32,
+            "y": 226.7,
+            "w": 808,
+            "h": 390
+          }
+        },
+        {
+          "cls": "starci-core-rail-region",
+          "order": "0",
+          "rect": {
+            "x": 864,
+            "y": 226.7,
+            "w": 384,
+            "h": 261
+          }
+        }
+      ]
+    },
+    "surfaceCard": {
+      "rect": {
+        "x": 32,
+        "y": 262.7,
+        "w": 808,
+        "h": 190
+      },
+      "padding": "0px",
+      "radius": "24px"
+    },
+    "accordionCard": {
+      "rect": {
+        "x": 32,
+        "y": 512.7,
+        "w": 808,
+        "h": 104
+      },
+      "padding": "0px",
+      "radius": "0px"
+    },
+    "surfaceCardInner": {
+      "rect": {
+        "x": 32,
+        "y": 262.7,
+        "w": 808,
+        "h": 190
+      },
+      "padding": "0px",
+      "radius": "16px"
+    },
+    "accordionCardInner": {
+      "rect": {
+        "x": 32,
+        "y": 512.7,
+        "w": 808,
+        "h": 104
+      },
+      "padding": "0px",
+      "radius": "16px"
+    },
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Mở toàn bộ hành trình học với StarCi Pro"
+      },
+      {
+        "tag": "H2",
+        "text": "Bạn nhận được gì"
+      },
+      {
+        "tag": "H2",
+        "text": "Thông tin cần biết"
+      },
+      {
+        "tag": "H3",
+        "text": "AI được tính như thế nào?"
+      },
+      {
+        "tag": "H3",
+        "text": "Thanh toán và kích hoạt"
+      },
+      {
+        "tag": "H2",
+        "text": "StarCi Pro"
+      }
+    ],
+    "nav": {
+      "position": "sticky",
+      "top": "0px",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 79
+      }
+    },
+    "navTargets": [
+      {
+        "tag": "BUTTON",
+        "label": "StarCiAcademy",
+        "w": 44.94,
+        "h": 62
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Trang chủ",
+        "w": 91.31,
+        "h": 36
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Khóa học",
+        "w": 88.81,
+        "h": 36
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Liên hệ",
+        "w": 72.89,
+        "h": 36
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Tìm kiếm",
+        "w": 164.3,
+        "h": 44
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Đổi ngôn ngữ",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "tag": "INPUT",
+        "label": "Chuyển sang sáng",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Giỏ hàng",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Tài khoản",
+        "w": 44,
+        "h": 44
+      }
+    ],
+    "allTargets": [
+      {
+        "tag": "BUTTON",
+        "label": "Trang chủ",
+        "w": 91.31,
+        "h": 36
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Khóa học",
+        "w": 88.81,
+        "h": 36
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Liên hệ",
+        "w": 72.89,
+        "h": 36
+      },
+      {
+        "tag": "INPUT",
+        "label": "Chuyển sang sáng",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "BUTTON",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "BUTTON",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      }
+    ],
+    "pressableField": {
+      "rect": {
+        "x": 875.7,
+        "y": 17,
+        "w": 164.3,
+        "h": 44
+      },
+      "height": "44px",
+      "minHeight": "44px",
+      "width": "164.297px",
+      "minWidth": "44px",
+      "radius": "12px"
+    },
+    "overflow": []
+  },
+  "r2-subscriptions-390-light": {
+    "url": "http://localhost:3000/vi/subscriptions",
+    "scroll": {
+      "scrollWidth": 390,
+      "clientWidth": 390
+    },
+    "rail": {
+      "gridTemplateColumns": "358px",
+      "collapsedOrder": "rail-first",
+      "railWidth": "wide",
+      "rect": {
+        "x": 16,
+        "y": 278,
+        "w": 358,
+        "h": 1091.38
+      },
+      "children": [
+        {
+          "cls": "starci-core-primary-region",
+          "order": "0",
+          "rect": {
+            "x": 16,
+            "y": 563,
+            "w": 358,
+            "h": 806.38
+          }
+        },
+        {
+          "cls": "starci-core-rail-region",
+          "order": "-1",
+          "rect": {
+            "x": 16,
+            "y": 278,
+            "w": 358,
+            "h": 261
+          }
+        }
+      ]
+    },
+    "surfaceCard": {
+      "rect": {
+        "x": 16,
+        "y": 599,
+        "w": 358,
+        "h": 606.38
+      },
+      "padding": "0px",
+      "radius": "24px"
+    },
+    "accordionCard": {
+      "rect": {
+        "x": 16,
+        "y": 1265.38,
+        "w": 358,
+        "h": 104
+      },
+      "padding": "0px",
+      "radius": "0px"
+    },
+    "surfaceCardInner": {
+      "rect": {
+        "x": 16,
+        "y": 599,
+        "w": 358,
+        "h": 606.38
+      },
+      "padding": "0px",
+      "radius": "16px"
+    },
+    "accordionCardInner": {
+      "rect": {
+        "x": 16,
+        "y": 1265.38,
+        "w": 358,
+        "h": 104
+      },
+      "padding": "0px",
+      "radius": "16px"
+    },
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Mở toàn bộ hành trình học với StarCi Pro"
+      },
+      {
+        "tag": "H2",
+        "text": "Bạn nhận được gì"
+      },
+      {
+        "tag": "H2",
+        "text": "Thông tin cần biết"
+      },
+      {
+        "tag": "H3",
+        "text": "AI được tính như thế nào?"
+      },
+      {
+        "tag": "H3",
+        "text": "Thanh toán và kích hoạt"
+      },
+      {
+        "tag": "H2",
+        "text": "StarCi Pro"
+      }
+    ],
+    "nav": {
+      "position": "sticky",
+      "top": "0px",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 390,
+        "h": 79
+      }
+    },
+    "navTargets": [
+      {
+        "tag": "BUTTON",
+        "label": "StarCiAcademy",
+        "w": 44.94,
+        "h": 62
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Điều hướng và tiện ích",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Giỏ hàng",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Tài khoản",
+        "w": 44,
+        "h": 44
+      }
+    ],
+    "allTargets": [
+      {
+        "tag": "BUTTON",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "BUTTON",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      }
+    ],
+    "pressableField": {
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "height": "36px",
+      "minHeight": "44px",
+      "width": "100%",
+      "minWidth": "44px",
+      "radius": "12px"
+    },
+    "overflow": []
+  },
+  "r2-subscriptions-390-dark": {
+    "url": "http://localhost:3000/vi/subscriptions",
+    "scroll": {
+      "scrollWidth": 390,
+      "clientWidth": 390
+    },
+    "rail": {
+      "gridTemplateColumns": "358px",
+      "collapsedOrder": "rail-first",
+      "railWidth": "wide",
+      "rect": {
+        "x": 16,
+        "y": 278,
+        "w": 358,
+        "h": 889
+      },
+      "children": [
+        {
+          "cls": "starci-core-primary-region",
+          "order": "0",
+          "rect": {
+            "x": 16,
+            "y": 563,
+            "w": 358,
+            "h": 604
+          }
+        },
+        {
+          "cls": "starci-core-rail-region",
+          "order": "-1",
+          "rect": {
+            "x": 16,
+            "y": 278,
+            "w": 358,
+            "h": 261
+          }
+        }
+      ]
+    },
+    "surfaceCard": {
+      "rect": {
+        "x": 16,
+        "y": 599,
+        "w": 358,
+        "h": 404
+      },
+      "padding": "0px",
+      "radius": "24px"
+    },
+    "accordionCard": {
+      "rect": {
+        "x": 16,
+        "y": 1063,
+        "w": 358,
+        "h": 104
+      },
+      "padding": "0px",
+      "radius": "0px"
+    },
+    "surfaceCardInner": {
+      "rect": {
+        "x": 16,
+        "y": 599,
+        "w": 358,
+        "h": 404
+      },
+      "padding": "0px",
+      "radius": "16px"
+    },
+    "accordionCardInner": {
+      "rect": {
+        "x": 16,
+        "y": 1063,
+        "w": 358,
+        "h": 104
+      },
+      "padding": "0px",
+      "radius": "16px"
+    },
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Mở toàn bộ hành trình học với StarCi Pro"
+      },
+      {
+        "tag": "H2",
+        "text": "Bạn nhận được gì"
+      },
+      {
+        "tag": "H2",
+        "text": "Thông tin cần biết"
+      },
+      {
+        "tag": "H3",
+        "text": "AI được tính như thế nào?"
+      },
+      {
+        "tag": "H3",
+        "text": "Thanh toán và kích hoạt"
+      },
+      {
+        "tag": "H2",
+        "text": "StarCi Pro"
+      }
+    ],
+    "nav": {
+      "position": "sticky",
+      "top": "0px",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 390,
+        "h": 79
+      }
+    },
+    "navTargets": [
+      {
+        "tag": "BUTTON",
+        "label": "StarCiAcademy",
+        "w": 44.94,
+        "h": 62
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Điều hướng và tiện ích",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Giỏ hàng",
+        "w": 44,
+        "h": 44
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Tài khoản",
+        "w": 44,
+        "h": 44
+      }
+    ],
+    "allTargets": [
+      {
+        "tag": "BUTTON",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "BUTTON",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      },
+      {
+        "tag": "DIV",
+        "label": "",
+        "w": 1,
+        "h": 1
+      }
+    ],
+    "pressableField": {
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "height": "36px",
+      "minHeight": "44px",
+      "width": "100%",
+      "minWidth": "44px",
+      "radius": "12px"
+    },
+    "overflow": []
+  },
+  "r2-authentication-390-light": {
+    "url": "http://localhost:3000/vi/authentication?authState=sign-in",
+    "scroll": {
+      "scrollWidth": 390,
+      "clientWidth": 390
+    },
+    "surfaceCard": {
+      "rect": {
+        "x": 16,
+        "y": 148,
+        "w": 358,
+        "h": 548
+      },
+      "padding": "0px",
+      "radius": "24px"
+    },
+    "accordionCard": null,
+    "surfaceCardInner": {
+      "rect": {
+        "x": 16,
+        "y": 148,
+        "w": 358,
+        "h": 548
+      },
+      "padding": "0px",
+      "radius": "16px"
+    },
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Đăng nhập"
+      }
+    ],
+    "nav": {
+      "position": "static",
+      "top": "auto",
+      "rect": {
+        "x": 32,
+        "y": 164,
+        "w": 326,
+        "h": 56
+      }
+    },
+    "navTargets": [],
+    "allTargets": [
+      {
+        "tag": "BUTTON",
+        "label": "Đăng nhập với Google",
+        "w": 326,
+        "h": 40
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Đăng nhập với GitHub",
+        "w": 326,
+        "h": 40
+      },
+      {
+        "tag": "INPUT",
+        "label": "",
+        "w": 326,
+        "h": 40
+      },
+      {
+        "tag": "INPUT",
+        "label": "",
+        "w": 326,
+        "h": 40
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Hiện mật khẩu",
+        "w": 16,
+        "h": 16
+      },
+      {
+        "tag": "INPUT",
+        "label": "Ghi nhớ đăng nhập",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Quên mật khẩu?",
+        "w": 112.11,
+        "h": 20
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Đăng nhập",
+        "w": 326,
+        "h": 40
+      },
+      {
+        "tag": "BUTTON",
+        "label": "Đăng ký",
+        "w": 56.81,
+        "h": 20
+      }
+    ],
+    "overflow": []
+  }
+}

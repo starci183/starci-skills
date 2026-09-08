@@ -1,0 +1,330 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v9/readiness/initialization/stacks/environment.schema.json",
+  "title": "Environment declaration",
+  "description": "`<Source>/.stacks/<env>/environment.json`: what one environment of the installation declares about itself. The folder's presence is what names the environment — an `env` requirement is checked against the folder, never against a list. This file declares who authorises each operation class, which auxiliary services the environment runs beside its product routes, and which nonsecret migration targets it owns. Authority for a platform operation comes from the environment's declaration, not from a per-run approval, whenever the declaration marks that operation's class `declared`; a class marked `person` needs an approval id. A request's `approval` therefore accepts either an approval id or a reference to this file — its path and the hash of its bytes, in the shape `$defs.reference` gives — and the reference is an approval only for a class this declaration marks `declared`, in this environment. A class the declaration omits takes the default `$defs.defaults` gives for its `production` value: a non-production environment authorises identity provisioning, seeding, the shared runtime's rungs, the stack's bring-up, its own declared services and outbound quality uploads by declaration and keeps release with a person; a production environment keeps every class with a person. Any declaration may tighten a class to `person`; a production declaration may not loosen `release`, and this schema refuses one that tries. Silence remains silence: a request with no `approval` is not one whose environment answered.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "env",
+    "production"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": 9
+    },
+    "env": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "The environment this file declares; it is the folder the file lives in, and the two must agree."
+    },
+    "production": {
+      "type": "boolean",
+      "description": "Whether people are served from this environment. It selects which column of `$defs.defaults` an omitted class takes, and it is what forbids loosening `release`."
+    },
+    "services": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "The auxiliary services this environment runs beside its product routes — an observability stack, a code-quality service, a tunnel to a served runtime — enumerated here and nowhere else, so the operator that brings one up takes the service the declaration names and never one a request invented. A service is addressed by its `id`; readiness asks one question per declared service and the service operator runs one of them per branch. An environment that declares none has no such service, which is a fact and not a gap.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "desired",
+          "command",
+          "probe",
+          "holder"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "The name a request and a receipt address this service by; unique within the declaration."
+          },
+          "kind": {
+            "enum": [
+              "observability",
+              "sonar",
+              "tunnel",
+              "other"
+            ],
+            "description": "What the service is for, which is what tells a reader why the chain needs it: metrics and logs, the code-quality service a gate posts to, a tunnel that carries a served runtime outward, or anything else the environment owns."
+          },
+          "desired": {
+            "enum": [
+              "up",
+              "down"
+            ],
+            "description": "The state this environment wants the service in when nothing asks otherwise. A request may ask for the other state or for `attested`, and the receipt records both what was asked and what was observed."
+          },
+          "command": {
+            "$ref": "#/$defs/commandRef",
+            "description": "The declared command that brings the service up and takes it down. It is a reference the environment publishes, never a shell line typed into a request, so what runs is what the environment declared."
+          },
+          "probe": {
+            "$ref": "#/$defs/serviceProbe"
+          },
+          "holder": {
+            "$ref": "#/$defs/authority",
+            "description": "`declared`: this declaration is the approval for operating this one service. `person`: the environment keeps this service with a person, and an operator asked to move it stops for them."
+          },
+          "publicPort": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "description": "The port this service binds when it is up, where the environment fixes one. A port a product route is already projected onto is a collision the readiness check reports rather than a port either side may move."
+          }
+        }
+      }
+    },
+    "migrationTargets": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Nonsecret connection identities this environment owns for migration releases. A release plan pins these declaration bytes and matches one complete entry; its own env, target or credential reference cannot declare ownership. Entries are maintained by the environment owner before release preparation, never created or loosened by the migration executor. Their presence does not change release authorization.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "project",
+          "target",
+          "connectionRef",
+          "connection"
+        ],
+        "properties": {
+          "project": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "connectionRef": {
+            "type": "string",
+            "pattern": "^secret-ref://[A-Za-z0-9][A-Za-z0-9_./-]*$"
+          },
+          "connectionFingerprint": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "description": "The environment owner's canonical full connection commitment, prepared privately using the runner protocol. Required when username is sealed: the full hash includes the resolved username, while the declaration carries only its custody reference. The migration executor never creates or replaces this commitment."
+          },
+          "connection": {
+            "$ref": "#/$defs/migrationConnection"
+          }
+        },
+        "if": {
+          "properties": {
+            "connection": {
+              "required": [
+                "usernameRef"
+              ]
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "connectionFingerprint"
+          ]
+        }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per operation class, who authorises it in this environment. A class absent here takes its default; a class present here may tighten the default to `person`, and a non-production declaration may loosen one to `declared`.",
+      "properties": {
+        "identity-provisioning": {
+          "$ref": "#/$defs/authority",
+          "description": "Creating a flow's account at the environment's identity provider and writing its record of names."
+        },
+        "seed": {
+          "$ref": "#/$defs/authority",
+          "description": "Applying a flow's scoped fixtures to the environment's data."
+        },
+        "runtime": {
+          "$ref": "#/$defs/authority",
+          "description": "The shared runtime's server rungs and its registry: locating, starting, serving, restarting, resetting and stopping the one server of a route, and attesting its entry."
+        },
+        "stack-up": {
+          "$ref": "#/$defs/authority",
+          "description": "Bringing up the environment's declared infrastructure."
+        },
+        "service": {
+          "$ref": "#/$defs/authority",
+          "description": "Operating one auxiliary service this declaration names under `services`: bringing it up, taking it down, or attesting it where it stands. A service whose own `holder` is `person` stays with a person whatever this class says."
+        },
+        "external-upload": {
+          "$ref": "#/$defs/authority",
+          "description": "Sending repository source or metadata to a service outside the machine — a code-quality scanner, a hosted analyser — as a gate of quality.verify. A host that reviews outbound uploads reads this class as the declaration's answer."
+        },
+        "release": {
+          "$ref": "#/$defs/authority",
+          "description": "Deploying a release to this environment. Never `declared` where `production` is true."
+        }
+      }
+    }
+  },
+  "if": {
+    "required": [
+      "production"
+    ],
+    "properties": {
+      "production": {
+        "const": true
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "authorization": {
+        "properties": {
+          "release": {
+            "const": "person"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "migrationConnection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "driver",
+        "host",
+        "port",
+        "database",
+        "schema"
+      ],
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "username"
+              ]
+            },
+            {
+              "required": [
+                "usernameRef"
+              ]
+            }
+          ]
+        }
+      ],
+      "description": "The effective database identity with its username either explicitly nonsecret or represented only by sealed custody. Strings are exact, without hostname alias folding; the effective schema is explicit. A sealed username stays private and enters only the full connection commitment during preparation and connection verification. The runner resolves its actual configuration, verifies database, schema and username against the connected server before effects, and fingerprints the full identity using the runner protocol. Credential values, connection URLs and userinfo are forbidden.",
+      "properties": {
+        "driver": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "host": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_:.-]+$",
+          "maxLength": 255
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+        },
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+        },
+        "username": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+        },
+        "usernameRef": {
+          "type": "string",
+          "pattern": "^secret-ref://[A-Za-z0-9][A-Za-z0-9_./-]*$"
+        }
+      }
+    },
+    "commandRef": {
+      "type": "string",
+      "pattern": "^command-ref://[A-Za-z0-9][A-Za-z0-9_./-]*$",
+      "description": "A command the environment publishes, named rather than spelled out, so the thing that runs is the thing the environment declared and a request can neither widen it nor add an argument to it."
+    },
+    "serviceProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How a service is proved to answer: one endpoint to request, or one port to connect to, never both. The probe is what turns `up` from an assertion into an observation, and the same probe read the other way is what proves a `down`.",
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "url"
+              ]
+            },
+            {
+              "required": [
+                "port"
+              ]
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "pattern": "^https?://[A-Za-z0-9][A-Za-z0-9_.:/-]*$"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    },
+    "authority": {
+      "enum": [
+        "declared",
+        "person"
+      ],
+      "description": "`declared`: this declaration is the approval, and a request names it by `$defs.reference`. `person`: an approval id is required, and a declaration reference is refused for the class."
+    },
+    "defaults": {
+      "description": "What a class the declaration omits is read as, by `production`. These two rows are the only place the defaults live; a validator reads them from here.",
+      "production": {
+        "identity-provisioning": "person",
+        "seed": "person",
+        "runtime": "person",
+        "stack-up": "person",
+        "service": "person",
+        "external-upload": "person",
+        "release": "person"
+      },
+      "non-production": {
+        "identity-provisioning": "declared",
+        "seed": "declared",
+        "runtime": "declared",
+        "stack-up": "declared",
+        "service": "declared",
+        "external-upload": "declared",
+        "release": "person"
+      }
+    },
+    "reference": {
+      "type": "string",
+      "pattern": "^\\.stacks/([a-z0-9]+(?:-[a-z0-9]+)*)/environment\\.json#(sha256:[0-9a-f]{64})$",
+      "description": "How a request's `approval` names this declaration: the file's path from the host repository root, `#`, and the sha256 of its bytes. The hash is what binds the approval to one exact declaration; a declaration edited after the request was written no longer matches it, which is authority drift and not a quieter approval."
+    }
+  }
+}

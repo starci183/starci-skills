@@ -1,0 +1,106 @@
+# interface.draw
+
+## Việc
+
+Vẽ concept PNG của một bề mặt dựa trên nghiệp vụ trước khi lập trình frontend; giữ đúng hướng PNG được chốt làm handoff có kiểu.
+
+## Xong khi
+
+Xong khi `frontend-art-direction` gắn brief đã đóng băng, PNG và nguồn prompt thật, cách áp dụng Grammar cùng hướng đã chốt để hiển thị trước khi lập trình frontend.
+
+## Đầu vào vẽ và concept
+
+Đóng băng request/art-direction-brief.json theo [art-direction-brief.schema.json](../../templates/kinds/art-direction-brief.schema.json): mục đích nghiệp vụ, actor, journey, action, outcome, state và nội dung phải có nguồn thật. Phân biệt fact, intent đã duyệt, example và unknown; thiếu đầu vào cần thiết thì không gọi ImageGen. Reference không cấp quyền bịa feature, metric hay testimonial.
+
+Concept nêu ý chính/câu chuyện, tone, art style, hierarchy và ngôn ngữ hình ảnh thống nhất, gắn journey và Grammar adoption. Mỗi region có imagery plan: mục đích, subject, coherence, reuse, medium, độ nổi bật, vị trí, responsive/accessibility và delivery. Brand/atmosphere là mục đích hợp lệ; có thể dùng nhiều hình xuyên các section, không ép hero-only hay tối thiểu hoá asset. Table/control/data vẫn là UI thật; full-page PNG không phải website phẳng. Asset dùng riêng có spec và provenance.
+
+## Một thẩm quyền hướng thiết kế
+
+Grammar sở hữu geometry, token và icon contract; sửa concept không phù hợp trước khi chốt, không override CSS tuỳ ý. Prompt ImageGen giữ toàn bộ frozen brief cùng concept cụ thể. [art-direction.mjs](../../scripts/art-direction.mjs) kiểm bytes PNG, kích thước, provenance prompt và region mapping. Hash không chứng minh chất lượng ngữ nghĩa hay rằng một người thật đã xem ảnh.
+
+## Chốt hướng và hiển thị
+
+Mặc định đúng một PNG: receipt done, in ảnh inline rồi tiếp tục FE, không hỏi chọn và không bịa user choice. Chỉ compare được người yêu cầu rõ mới tạo nhiều hướng theo option bounds của interaction policy. Sheet chưa được chọn giữ blocked DIRECTION_CHOICE_REQUIRED và tier-choice thật. Chạy node scripts/art-direction.mjs present <branch>, hiển thị đúng Markdown embed PNG; answer <branch> <actual-answer.json> ghi selectedBy:user, sourceRef, presentationSourceRef và presentationHash. Resume giữ decision id và đúng PNG đã chọn, không vẽ lại.
+
+Sau khi hiện PNG mặc định hoặc đã chọn, chạy shown <branch> <display.json> với sourceRef của message và presentationHash. Link-only, HTML hay thumbnail asset không thay thế PNG đầy đủ. Operator chỉ ghi response của nhánh, không sửa FE source, mở implementation server hay đổi owner backend/coordination.
+
+## Tiêu chí hình ảnh tường minh
+
+Trước ImageGen, visual contract của brief liệt kê từng phần tử bắt buộc và từng asset dùng riêng bằng identity ổn định. Ghi control native, icon có nghĩa cụ thể và glyph của registry đã bind, connector do code sở hữu với đúng identity hai đầu. Đóng băng anatomy, khoảng width/height theo viewport, bố cục responsive và ý định motion thường/giảm chuyển động. Grid lặp hợp lệ nếu đó là composition đã khai báo. Candidate đánh dấu từng phần tử trong PNG thật; một strip không thay được các subject độc lập đã khai báo.
+
+Asset tách nền phải giữ reference trước xử lý cùng vùng kín cần trong suốt và vùng subject cần bảo toàn. Một điểm trong suốt hoặc alpha minimum không chứng minh tách nền sạch. [art-direction-adoption](../../templates/kinds/art-direction-adoption.schema.json) yêu cầu composite đen, trắng, màu tương phản và nhận xét rõ về nền ngoài, vùng kín, subject, silhouette, cạnh. [art-visual-proof.mjs](../../scripts/art-visual-proof.mjs) kiểm tra composite được tạo đúng từ pixel asset và đủ identity; reviewer phải so hình với reference đã giữ. Hash không phán được mặt, chất liệu trắng, cạnh nhỏ hay vùng kín có bị xoá sai hay không.
+
+## Context
+
+| Alias | Bind | Bắt buộc |
+| --- | --- | --- |
+| `@workspaces/fe` | Đúng source head theo route và bề mặt hiện có hoặc bằng chứng chưa tồn tại | yes |
+| `@grammar/core` | Geometry, props và quyền sở hữu token của component đã publish | yes |
+| `@knowledge/ui/composition` | Toàn bộ manifest composition và Cases áp dụng | yes |
+| `@knowledge/ui/presentation` | Quy tắc trình bày do ứng dụng sở hữu đã publish | yes |
+| `@knowledge/ui/proof` | Tiêu chí phản biện ảnh tĩnh; hình vẽ không chứng minh hành vi | yes |
+| `@knowledge/grammars/<family>` | Family/version đã resolve, ngôn ngữ hình ảnh và quy tắc áp dụng | yes |
+
+## Đầu vào
+
+| Kind | Từ đâu | Bắt buộc |
+| --- | --- | --- |
+| `business-promise-authority` | business.decide; mô hình nghiệp vụ đã duyệt khi bề mặt dùng nó | no |
+| `backend-source-application` | backend.generate; contract dữ liệu/hành động thật khi được bind | no |
+| `architecture-decision` | architecture.decide; ranh giới đã duyệt khi liên quan | no |
+| `landing-composition` | landing.compose; đúng contract chỉ đọc về section, owner và imagery khi có | no |
+| `surface-map` | interface.plan; khung toàn feature và đúng bề mặt được chọn | no |
+| `frontend-art-direction` | interface.draw; bundle phương án không đổi khi tiếp tục lựa chọn thật | no |
+
+## Yêu cầu
+
+| Field | Kiểu | Mặc định | Hỏi |
+| --- | --- | --- | --- |
+| `target` | id | — | Đúng định danh bề mặt |
+| `changeLevel` | enum: new, reconstruct | new | Tạo bề mặt mới hoặc thiết kế lại bề mặt hiện có |
+| `compare` | enum: no, yes | no | Yêu cầu rõ của người dùng để so concept PNG; mặc định một PNG, không chờ chọn |
+| `selectionPolicy` | enum: automatic, approval-required | automatic | automatic cho một PNG mặc định; approval-required chỉ khi yêu cầu rõ compare=yes |
+| `resume` | token | null | Sheet hướng đang blocked khi người dùng trả lại lựa chọn |
+
+## Các bước
+
+| # | Bước | Tham số | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Kiểm brief vẽ nghiệp vụ đã đóng băng và đúng binding source/Grammar | `target`, `changeLevel` | request/request.json, request/art-direction-brief.json, @workspaces/fe, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Đọc mục đích nghiệp vụ, actor, action, state và nội dung; phân biệt fact, intent, example và đầu vào chưa rõ | — | input business-promise-authority, input backend-source-application, input architecture-decision, input surface-map, input landing-composition khi có, brief đã đóng băng | — | `EVIDENCE_MISSING` |
+| 3 | Bind Grammar rồi xét concept và imagery plan theo tiêu chí nghiệp vụ của từng region trước khi vẽ | — | @tools/registry, @grammar/core, @knowledge/ui/composition, @knowledge/ui/presentation, @knowledge/ui/proof, @knowledge/grammars/<family> | `knowledge-coverage`, `family-understanding` | `INVALID_INPUT` |
+| 4 | Sinh hướng PNG từ toàn bộ brief đã đóng băng và concept cụ thể, giữ đúng prompt và nguồn ImageGen thật | — | @tools/imagegen, concept và imagery plan đã đóng băng | `art-direction-png`, `art-direction-prompt` | `EVIDENCE_MISSING` |
+| 5 | Xem PNG để tìm mâu thuẫn nghiệp vụ, khả năng áp dụng Grammar, hierarchy, imagery hữu ích và giới hạn responsive; giữ spec asset dùng riêng | — | PNG thật, @tools/fileread, nghiệp vụ và Grammar adoption đã đóng băng | `frontend-art-direction` | `INVALID_INPUT` |
+| 6 | Xuất PNG mặc định hoặc sheet so sánh được yêu cầu rõ để hiện inline trong Operator Result và nhận lựa chọn thật; khi `resume` giữ PNG đã chọn, không vẽ lại | `resume`, `compare`, `selectionPolicy` | bundle phương án đã seal, @tools/print, state.json.choices | `response/response.json` | `DIRECTION_CHOICE_REQUIRED` |
+
+## Đầu ra
+
+| Kind | File | Kiểu | Bắt buộc |
+| --- | --- | --- | --- |
+| `frontend-art-direction` | `response/data/art-direction.json` | data | yes |
+| `art-direction-png` | `response/artifacts/<candidate>.png` | artifact | yes |
+| `art-direction-prompt` | `response/artifacts/<candidate>.prompt.txt` | artifact | yes |
+| `knowledge-coverage` | `response/data/knowledge-coverage.json` | data | no |
+| `family-understanding` | `response/data/family-understanding.json` | data | no |
+
+## Operator Result
+
+Hiện nguyên PNG thật inline trước phần giải thích và trước mã frontend. Sheet blocked hiện mọi hướng được đưa ra cùng lựa chọn chưa có câu trả lời. Kết quả done nhúng PNG đã chốt đầu tiên. Link ảnh, prompt chữ, preview HTML hay thumbnail asset không thay thế được.
+
+## Dừng
+
+| Code | Xử lý |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `SOURCE_DRIFT` | terminate |
+| `EVIDENCE_MISSING` | terminate |
+| `NO_PROGRESS` | terminate |
+| `DIRECTION_CHOICE_REQUIRED` | fallback |
+
+## Kế tiếp
+
+| Khi | Operator |
+| --- | --- |
+| Đúng PNG đã chốt và cách áp dụng Grammar đã publish sẵn sàng để triển khai | `interface.generate` |
+| Người dùng thật cần chọn trong các concept đã hiển thị | `user` |
+| Artifact thiết kế được yêu cầu đã hoàn tất và không có yêu cầu triển khai | `user` |

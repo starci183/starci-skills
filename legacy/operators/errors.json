@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes shared by more than one operator. `scope` is the list of operator ids that may emit the code, or [\"*\"] for every operator. A code only one operator emits lives in that operator's own operators/<id>/errors.json with the same entry shape and no scope; scripts/errors-registry.mjs merges both into one registry and refuses a code defined twice. A code has exactly one disposition: `terminate` ends the step with response.json status blocked and stop = code; `fallback` performs the named action, records it under `## Fallbacks taken` in response.md, and continues. `unless` is the only way a disposition changes: it names one Requirements param and the value that flips the code to `then`. `domain` is the routing.json domain the code hands to; `self` means the emitting operator's own domain (a resume). A runtime that meets a code the merged registry does not list terminates with UNKNOWN_STOP. `writer` says who writes the code into response.json: `agent` (the default) or `orchestrator`, for a code the runtime writes on the agent's behalf when the agent produced no valid receipt; an orchestrator-written code is read from this registry, never from an operator's Stops table.",
+  "codes": {
+    "AUTHORITY_DRIFT": {
+      "scope": [
+        "runtime.serve",
+        "identity.provision",
+        "data.seed",
+        "uat.verify",
+        "api.verify"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The approval — an approval id, or the environment declaration it references, whose content hash has moved — no longer matches what the operation asked for.",
+        "vi": "Phê duyệt — một id phê duyệt, hay bản khai báo môi trường mà nó tham chiếu với hash nội dung đã đổi — không còn khớp với điều thao tác đã yêu cầu."
+      },
+      "resume": {
+        "en": "Bring a fresh approval for this exact operation: a new id, or the declaration's current reference.",
+        "vi": "Mang một phê duyệt mới cho đúng thao tác này: một id mới, hoặc tham chiếu hiện hành của bản khai báo."
+      }
+    },
+    "INVALID_INPUT": {
+      "scope": [
+        "*"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "request.json fails the gate or the operator's Requirements.",
+        "vi": "request.json không qua gate hoặc bảng Yêu cầu của operator."
+      },
+      "resume": {
+        "en": "Correct request.json.",
+        "vi": "Sửa request.json."
+      }
+    },
+    "SOURCE_DRIFT": {
+      "scope": [
+        "*"
+      ],
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The observed checkout head differs from the head request.json froze.",
+        "vi": "Head quan sát được của checkout khác head mà request.json đã đóng băng."
+      },
+      "resume": {
+        "en": "The orchestrator freezes the head again.",
+        "vi": "Orchestrator đóng băng head lại."
+      }
+    },
+    "NO_PROGRESS": {
+      "scope": [
+        "*"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A resume adds no evidence, constraint, inventory, or approval delta.",
+        "vi": "Lần chạy lại không thêm bằng chứng, ràng buộc, inventory hay phê duyệt nào."
+      },
+      "resume": {
+        "en": "Bring a real delta.",
+        "vi": "Mang một delta thật."
+      }
+    },
+    "EVIDENCE_MISSING": {
+      "scope": [
+        "*"
+      ],
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A claim about the system has no file, line, or head behind it.",
+        "vi": "Một khẳng định về hệ thống không có file, dòng hay head nào đứng sau."
+      },
+      "resume": {
+        "en": "Add the evidence.",
+        "vi": "Bổ sung bằng chứng."
+      }
+    },
+    "UNKNOWN_STOP": {
+      "scope": [
+        "*"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The runtime met a code the merged registry does not list.",
+        "vi": "Runtime gặp một mã mà sổ gộp không có."
+      },
+      "resume": {
+        "en": "Register the code or fix the operator.",
+        "vi": "Đăng ký mã hoặc sửa operator."
+      },
+      "writer": "orchestrator"
+    },
+    "OWNER_CONFLICT": {
+      "scope": [
+        "backend.generate",
+        "interface.generate",
+        "interface.fix"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A node that must be mutated lies inside a protected ref, or outside every owner boundary where the operator's law allows no widening, or the owner sets overlap.",
+        "vi": "Một node cần sửa nằm trong protected ref, hoặc ngoài mọi ranh giới owner ở nơi luật của operator không cho phép mở rộng, hoặc hai tập owner chồng nhau."
+      },
+      "resume": {
+        "en": "Correct the owner authority: widen the boundary, release the protection, or split the owner sets.",
+        "vi": "Sửa thẩm quyền owner: nới ranh giới, bỏ bảo vệ, hoặc tách hai tập owner."
+      }
+    },
+    "ROUTE_UNVERIFIED": {
+      "scope": [
+        "interface.generate",
+        "git.publish"
+      ],
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The project or the routed frontend checkout identity is not verified.",
+        "vi": "Danh tính project hoặc checkout frontend được route chưa được xác minh."
+      },
+      "resume": {
+        "en": "Bind the route again.",
+        "vi": "Bind lại route."
+      }
+    },
+    "UNKNOWN_RULE": {
+      "scope": [
+        "interface.generate",
+        "interface.audit"
+      ],
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "An identifier outside the bound rule inventory was reached for.",
+        "vi": "Một identifier ngoài kho luật đã bind bị với tới."
+      },
+      "resume": {
+        "en": "Bind the topic that publishes it, or correct the identifier.",
+        "vi": "Bind topic publish nó, hoặc sửa lại identifier."
+      }
+    },
+    "RUNTIME_UNAVAILABLE": {
+      "scope": [
+        "interface.audit",
+        "uat.verify",
+        "api.verify"
+      ],
+      "domain": "runtime",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The endpoint does not serve the bound route, or the surface never reaches readiness.",
+        "vi": "Endpoint không phục vụ route đã bind, hoặc bề mặt không bao giờ sẵn sàng."
+      },
+      "resume": {
+        "en": "Whoever runs the service serves the bound route; this operator never starts one.",
+        "vi": "Người vận hành dịch vụ cho route đã bind chạy; operator này không bao giờ tự khởi động."
+      }
+    },
+    "APPROVAL_REQUIRED": {
+      "scope": [
+        "business.decide",
+        "business.reconcile",
+        "migration.release",
+        "release.deploy"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The transition or the release needs an approval that no request bound.",
+        "vi": "Chuyển trạng thái hoặc release cần một phê duyệt mà request chưa ràng."
+      },
+      "resume": {
+        "en": "A person supplies the approval.",
+        "vi": "Người cấp phê duyệt."
+      }
+    },
+    "SESSION_MISSING": {
+      "scope": [
+        "backend.generate",
+        "interface.generate",
+        "interface.fix",
+        "git.publish"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Source was designed, written or published outside a session: the branch has no step-N/parallel-M under a session folder with state.json and a validated request.json, or the session branch being published carries no done source-application response whose commits contain its head, or a frontend chain with an audit step has no frontend-surface-audit response with its screenshots.",
+        "vi": "Nguồn được thiết kế, ghi hay công bố bên ngoài một phiên: nhánh không nằm trong step-N/parallel-M dưới thư mục phiên có state.json và request.json đã hợp lệ, hoặc nhánh phiên đem công bố không có response source-application nào ở trạng thái done mà commits chứa head của nó, hoặc một chuỗi frontend có bước audit lại không có response frontend-surface-audit kèm ảnh chụp."
+      },
+      "resume": {
+        "en": "Create the session first — state.json and step-1/parallel-1/request/request.json, green under validate-request — and run the operators that owe the receipt; a session cannot be reconstructed after the fact.",
+        "vi": "Tạo phiên trước — state.json và step-1/parallel-1/request/request.json, xanh dưới validate-request — rồi chạy các operator còn nợ biên nhận; một phiên không thể dựng lại sau khi việc đã xong."
+      }
+    },
+    "RESOLUTION_STALE": {
+      "scope": [
+        "interface.generate",
+        "interface.fix"
+      ],
+      "domain": "resolution",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The resolution the write reads is not the one it was frozen for: the inventory's tree fingerprint no longer matches the resolved tree beside it, or the inventory the request bound cannot be read at all.",
+        "vi": "Resolution mà lần ghi đọc không phải resolution nó được đóng băng cho: fingerprint cây của inventory không còn khớp cây đã resolve bên cạnh, hoặc inventory mà request bind không đọc được."
+      },
+      "resume": {
+        "en": "Bind the current resolution, or generate the surface again so the tree and its inventory are frozen together.",
+        "vi": "Bind resolution hiện tại, hoặc sinh lại bề mặt để cây và inventory của nó được đóng băng cùng nhau."
+      }
+    },
+    "WRITE_REJECTED": {
+      "scope": [
+        "interface.generate",
+        "interface.fix"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A file or a value the write would produce lies outside what was authorized, the presentation sweep of the projection found something, or the committed tree is not the resolved tree.",
+        "vi": "Một file hay một giá trị lần ghi sẽ tạo ra nằm ngoài phần đã được uỷ quyền, lượt quét trình bày trên bản chiếu thấy gì đó, hoặc cây đã commit không phải cây đã resolve."
+      },
+      "resume": {
+        "en": "Declare a corrected write set, or publish a resolution that carries the value.",
+        "vi": "Khai lại write set cho đúng, hoặc publish một resolution có mang giá trị đó."
+      }
+    },
+    "BRANCH_POLICY_VIOLATION": {
+      "scope": [
+        "git.publish",
+        "workspace.bind"
+      ],
+      "domain": "workspace",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The checkout is on a branch the routed Git policy forbids for this operation.",
+        "vi": "Checkout đang ở nhánh mà chính sách Git của route cấm với thao tác này."
+      },
+      "resume": {
+        "en": "Move to a permitted branch or change the routed policy.",
+        "vi": "Chuyển sang nhánh được phép hoặc đổi chính sách của route."
+      }
+    },
+    "PROVISIONING_UNAVAILABLE": {
+      "scope": [
+        "runtime.serve",
+        "identity.provision",
+        "data.seed",
+        "uat.verify"
+      ],
+      "domain": "control-panel",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The identity provider, the sealed credential or the store a UAT identity needs cannot be reached, so the account can be neither created nor used. A record that is merely absent is created; this code is for a dependency that is not there at all.",
+        "vi": "Không tới được nhà cung cấp danh tính, bí mật niêm phong hay kho dữ liệu mà một danh tính UAT cần, nên tài khoản không tạo được mà cũng không dùng được. Hồ sơ chỉ đơn giản là chưa có thì được tạo ra; mã này dành cho một phụ thuộc hoàn toàn không tồn tại."
+      },
+      "resume": {
+        "en": "Restore the provider, the sealed file or the store; never ask a person to sign in or to paste a credential.",
+        "vi": "Khôi phục provider, file niêm phong hay kho dữ liệu; không bao giờ nhờ người đăng nhập hay dán thông tin đăng nhập."
+      }
+    },
+    "IDENTITY_MISSING": {
+      "scope": [
+        "data.seed",
+        "interface.audit",
+        "uat.verify"
+      ],
+      "domain": "identity",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The route requires an identity to reach the surface and no account record exists for this flow yet. It is a hand-off and not a verdict: the operator that owns identity provisions the account, and this branch is re-entered with it.",
+        "vi": "Route đòi một danh tính mới tới được bề mặt, mà luồng này chưa có hồ sơ tài khoản nào. Đây là một lần bàn giao, không phải một phán quyết: operator sở hữu danh tính sẽ cấp tài khoản, rồi nhánh này được vào lại cùng nó."
+      },
+      "resume": {
+        "en": "The identity operator provisions the flow's account against the registry entry, and this branch runs again with it.",
+        "vi": "Operator danh tính cấp tài khoản của luồng theo entry trong registry, rồi nhánh này chạy lại cùng tài khoản đó."
+      }
+    },
+    "RECEIPT_MISSING": {
+      "scope": [
+        "*"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "writer": "orchestrator",
+      "meaning": {
+        "en": "The agent exited and its branch still carries the running skeleton the orchestrator wrote at dispatch: no done, blocked or waiting receipt replaced it, so the work it narrated has no record the chain can route on.",
+        "vi": "Agent đã thoát mà nhánh vẫn mang khung running do orchestrator ghi lúc dispatch: không có receipt done, blocked hay waiting nào thay thế, nên việc nó kể lại không có bản ghi nào để chuỗi định tuyến."
+      },
+      "resume": {
+        "en": "The orchestrator sends one follow-up to the same agent naming the skeleton; a second exit without a receipt terminates the branch with this code and a person reads the transcript.",
+        "vi": "Orchestrator gửi đúng một follow-up cho cùng agent nêu tên khung; lần thoát thứ hai không có receipt sẽ kết thúc nhánh bằng mã này và một người đọc transcript."
+      }
+    },
+    "BUDGET_EXHAUSTED": {
+      "scope": [
+        "*"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "writer": "orchestrator",
+      "meaning": {
+        "en": "The session reached the step cap or the same-operator cap its budget declares, and no recorded choice raised it: more of the same chain is not progress until a person narrows, continues or stops it.",
+        "vi": "Phiên đã chạm trần số bước hoặc trần cùng-operator mà budget khai báo, và không có lựa chọn nào đã ghi nâng trần đó: chạy thêm cùng chuỗi không phải tiến triển cho đến khi một người thu hẹp, tiếp tục hay dừng."
+      },
+      "resume": {
+        "en": "A person answers the typed budget choice (narrow, continue, stop); the choice is recorded in state.json.choices and the next request carries it.",
+        "vi": "Một người trả lời lựa chọn budget có kiểu (thu hẹp, tiếp tục, dừng); lựa chọn được ghi vào state.json.choices và request kế tiếp mang nó."
+      }
+    },
+    "KNOWLEDGE_QUESTION": {
+      "scope": [
+        "interface.plan",
+        "landing.compose",
+        "interface.generate",
+        "interface.fix",
+        "interface.audit",
+        "interface.draw"
+      ],
+      "domain": "knowledge",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A bound rule and Case were applicable but conflict with concrete task, reference or rendered evidence. The finding belongs to the knowledge owner, not to an application workaround or an unvalidated preference.",
+        "vi": "Một luật và Case đã bind thực sự áp dụng nhưng mâu thuẫn với bằng chứng cụ thể từ tác vụ, tham chiếu hay bản render. Phát hiện thuộc owner knowledge, không thuộc cách vá application hay sở thích chưa kiểm chứng."
+      },
+      "resume": {
+        "en": "Emit a typed knowledge-question, repair it through knowledge.repair, rebind the exact manifest, then rerun the same operation on the same surface and reference.",
+        "vi": "Phát knowledge-question có kiểu, sửa qua knowledge.repair, bind lại manifest chính xác, rồi chạy lại cùng operation trên cùng bề mặt và tham chiếu."
+      }
+    },
+    "RESTATEMENT_UNCONFIRMED": {
+      "scope": [
+        "business.decide",
+        "architecture.decide"
+      ],
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The operator consumed a rule stated in a person's own words and restated it in plain language, and the person has not yet confirmed or corrected that restatement: designing on an unconfirmed reading is how a chain spends hours on the wrong promise.",
+        "vi": "Operator đã tiêu thụ một luật do người nói bằng lời của họ và nói lại bằng ngôn ngữ thường, mà người đó chưa xác nhận hay sửa lại bản nói lại ấy: thiết kế trên một cách đọc chưa xác nhận là cách một chuỗi tiêu hàng giờ cho một lời hứa sai."
+      },
+      "resume": {
+        "en": "The person selects as-stated or corrected on the restatement choice; a corrected reading arrives as the corrected requirement in the re-entry request, and the same branch runs again.",
+        "vi": "Người chọn as-stated hay corrected trên lựa chọn restatement; cách đọc đã sửa đến dưới dạng yêu cầu đã sửa trong request vào lại, và cùng nhánh đó chạy lại."
+      }
+    },
+    "DIRECTION_CHOICE_REQUIRED": {
+      "domain": "caller",
+      "disposition": "fallback",
+      "meaning": {
+        "en": "Under automatic, several candidates survive and the scores prove none dominant. Under approval-required, material tier or direction alternatives await the user's choice; scores inform the recommendation, not the selection.",
+        "vi": "Dưới automatic, nhiều phương án sống sót và bảng điểm không cho thấy phương án trội. Dưới approval-required, các tier hoặc hướng khác nhau về bản chất chờ người dùng chọn; điểm hỗ trợ đề xuất, không thay lựa chọn."
+      },
+      "fallback": {
+        "en": "Among the tied top scorers, select the candidate that introduces the fewest new nodes; the scores stay under ## Scores and the pick under ## Decision.",
+        "vi": "Trong các phương án hoà điểm dẫn đầu, chọn phương án thêm ít node mới nhất; bảng điểm giữ dưới ## Scores và lựa chọn ghi dưới ## Decision."
+      },
+      "unless": {
+        "param": "selectionPolicy",
+        "equals": "approval-required",
+        "then": "terminate"
+      },
+      "resume": {
+        "en": "The person supplies approval naming one candidate.",
+        "vi": "Người nhập approval gọi tên một phương án."
+      },
+      "scope": [
+        "interface.generate",
+        "interface.draw"
+      ]
+    }
+  }
+}

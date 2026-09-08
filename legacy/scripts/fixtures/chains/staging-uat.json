@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "staging-uat",
+  "when": {
+    "en": "A delivery that is already published must be verified on another stack before it is released: the same head is observed and walked there, and the chain ends with the two receipts in a person's hands rather than with a deployment.",
+    "vi": "Một bản giao đã publish phải được kiểm trên một stack khác trước khi release: cùng một head được quan sát và đi qua ở đó, và chuỗi kết thúc bằng hai biên nhận trong tay một con người chứ không bằng một lần deploy."
+  },
+  "mission": {
+    "goal": "a published head is observed and walked on the staging stack",
+    "doneWhen": [
+      {
+        "evidence": "the published head passes the audit on the staging stack",
+        "producedBy": "interface.audit"
+      },
+      {
+        "evidence": "a person's journey completes on the staging stack",
+        "producedBy": "uat.verify"
+      }
+    ]
+  },
+  "options": {
+    "requirements": {
+      "interface.generate": {
+        "intent": "modify",
+        "changeLevel": "refine",
+        "mode": "dry"
+      },
+      "interface.audit": {
+        "env": "staging"
+      },
+      "uat.verify": {
+        "env": "staging"
+      }
+    }
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#be",
+      "workspace.bind#fe"
+    ],
+    [
+      "interface.generate"
+    ],
+    [
+      "interface.audit"
+    ],
+    [
+      "quality.verify"
+    ],
+    [
+      "uat.verify"
+    ]
+  ],
+  "ends": "user",
+  "rewrite": "frontend trio (mode dry) → interface.generate (mode dry); frontend.surface.audit → interface.audit. No publish, so the long-flow law does not reach it; no runtime.serve, because the staging stack already serves the head."
+}

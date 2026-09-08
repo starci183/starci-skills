@@ -6,6 +6,13 @@ Prompt → named skill/mode → selected business pieces → bounded operations 
 
 [Runtime/storage guide](v3/README.md) · [Vietnamese](README.vi.md)
 
+## Preserved legacy workspace
+
+The [legacy foundation workspace](legacy/.claude/README.md) preserves the modular schemas,
+aliases, 29 operators, criteria feedback loops and their tests for continued editing.
+Its complete prior runtime and compiled bundles remain under `legacy/`; the active Work3
+entry and npm payload above remain separate. Build it with `python legacy/scripts/build.py`.
+
 ## Development candidate
 
 This is `3.0.0-alpha.2` source. Version edits do not publish/activate it; do not assume registry/latest or an existing host has this candidate. Node 20+, no external runtime dependencies.

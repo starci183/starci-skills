@@ -1,0 +1,11 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","title":"uat.verify response","$ref":"works:response",
+  "description":"A done response preserves the frozen flow snapshot, per-case browser evidence, screenshots with credential fields masked, exactly three lane verdicts and exact namespace cleanup proof.",
+  "allOf":[{"if":{"properties":{"status":{"const":"done"}},"required":["status"]},"then":{"properties":{"outputs":{"allOf":[
+    {"contains":{"properties":{"id":{"const":"uat-flow-verification"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"uat-snapshot"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"uat-captures"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"uat-verdicts"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"uat-screenshots"},"type":{"const":"image"},"file":{"properties":{"mediaType":{"const":"image/png"}}}},"required":["id","type","file"]}}
+  ]},"observations":{"not":{"contains":{"properties":{"result":{"const":"failed"}},"required":["result"]}}}}}}]
+}

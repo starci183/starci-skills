@@ -1,0 +1,82 @@
+{
+  "$id": "kind:capture-measurements",
+  "description": "What scripts/browser-walk.mjs measured of the rendered page at one capture step, written beside the screenshot as response/artifacts/<capture>.measurements.json and named by the walk-result's capture record (measurementsRef). A capture is not a measurement: the screenshot, the accessibility snapshot and the DOM record carry no computed value, and under @tools/browsercontrol mode playwright the agent may run no browser code, so every number a measurable proof lane judges — a font size, a target's height, a contrast ratio, a gap — is read from this record and nowhere else. The runner computes it in one page-side evaluation of a self-contained function: one entry per element the accessibility tree exposes plus every element carrying an id, a data-contract or a data-testid, in document order, capped at elements.maxItems (elements that carry an id, a data-contract or a data-testid, or expose an interactive, heading, landmark, image, dialog or status role are kept first when the page exceeds the cap). ref is the element's role and accessible name spelled as a walk target is (`<role> \"<name>\"`, with ` nth=<n>` when the pair repeats), else a stable CSS path from body; contrast is the WCAG ratio of the computed color over the effective background (the nearest non-transparent background up the tree, composited), rounded to two decimals, null when either colour cannot be resolved.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "capture", "viewport", "deviceScaleFactor", "colorScheme", "elements"],
+  "properties": {
+    "schemaVersion": { "const": 9 },
+    "capture": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "The capture step's name; the screenshot of the same name is the frame these numbers describe." },
+    "viewport": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer", "minimum": 240 } },
+    "deviceScaleFactor": { "type": "number", "minimum": 1 },
+    "colorScheme": { "enum": ["light", "dark"] },
+    "elements": {
+      "type": "array",
+      "maxItems": 2048,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ref", "tag", "bbox", "computed", "contrast", "text"],
+        "properties": {
+          "ref": { "type": "string", "minLength": 1, "maxLength": 400 },
+          "tag": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "bbox": {
+            "description": "getBoundingClientRect in CSS pixels, rounded to two decimals.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y", "width", "height"],
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number", "minimum": 0 },
+              "height": { "type": "number", "minimum": 0 }
+            }
+          },
+          "computed": {
+            "description": "getComputedStyle values as the browser resolves them. backgroundColor is the effective one — the element's own when opaque, else the nearest opaque ancestor's, composited through any translucent layer between; the page canvas counts as white.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fontSize", "fontWeight", "lineHeight", "color", "backgroundColor", "minHeight", "padding", "margin", "gap", "borderRadius", "border", "overflow", "display", "visibility"],
+            "properties": {
+              "fontSize": { "type": "string" },
+              "fontWeight": { "type": "string" },
+              "lineHeight": { "type": "string" },
+              "color": { "type": "string" },
+              "backgroundColor": { "type": "string" },
+              "minHeight": { "type": "string" },
+              "padding": { "$ref": "#/$defs/sides" },
+              "margin": { "$ref": "#/$defs/sides" },
+              "gap": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["row", "column"],
+                "properties": { "row": { "type": "string" }, "column": { "type": "string" } }
+              },
+              "borderRadius": { "type": "string" },
+              "border": { "$ref": "#/$defs/sides" },
+              "overflow": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["x", "y"],
+                "properties": { "x": { "type": "string" }, "y": { "type": "string" } }
+              },
+              "display": { "type": "string" },
+              "visibility": { "type": "string" }
+            }
+          },
+          "contrast": { "oneOf": [{ "type": "null" }, { "type": "number", "minimum": 1, "maximum": 21 }] },
+          "dataContract": { "description": "The data-contract attribute split on whitespace; present only on an element that carries one.", "type": "array", "maxItems": 64, "items": { "type": "string", "minLength": 1 } },
+          "text": { "description": "The element's rendered text, whitespace collapsed, the first 80 characters.", "type": "string", "maxLength": 80 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sides": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["top", "right", "bottom", "left"],
+      "properties": { "top": { "type": "string" }, "right": { "type": "string" }, "bottom": { "type": "string" }, "left": { "type": "string" } }
+    }
+  }
+}

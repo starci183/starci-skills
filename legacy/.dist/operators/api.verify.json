@@ -1,0 +1,1976 @@
+{
+  "$defs": {
+    "common": {
+      "$defs": {
+        "actor": {
+          "additionalProperties": false,
+          "description": "Recorded actor identity, not host-authenticated authority.",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "kind": {
+              "enum": [
+                "user",
+                "agent",
+                "tool",
+                "system"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        "criteria": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/criterion"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "criterion": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            }
+          },
+          "required": [
+            "id",
+            "description"
+          ],
+          "type": "object"
+        },
+        "digest": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "file": {
+          "additionalProperties": false,
+          "description": "A staged file relative to the work directory. The consumer verifies its actual bytes against sha256.",
+          "properties": {
+            "mediaType": {
+              "$ref": "#/$defs/common/$defs/mediaType"
+            },
+            "path": {
+              "$ref": "#/$defs/common/$defs/relativePath"
+            },
+            "sha256": {
+              "$ref": "#/$defs/common/$defs/digest"
+            }
+          },
+          "required": [
+            "path",
+            "sha256",
+            "mediaType"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        },
+        "idList": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/id"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "mediaType": {
+          "pattern": "^[a-zA-Z0-9!#$&^_.+-]+/[a-zA-Z0-9!#$&^_.+-]+$",
+          "type": "string"
+        },
+        "relativePath": {
+          "description": "A slash-separated file path relative to the work directory; no absolute path, dot segment, parent traversal, drive prefix or backslash.",
+          "not": {
+            "pattern": "(^|/)\\.\\.?(/|$)"
+          },
+          "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "properties": {
+            "excluded": {
+              "items": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "included": {
+              "items": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "included",
+            "excluded"
+          ],
+          "type": "object"
+        },
+        "text": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "const": 1,
+          "type": "integer"
+        }
+      }
+    },
+    "context": {
+      "additionalProperties": false,
+      "description": "Supporting notes and reference files used to understand the task, separate from its inputs. Empty collections explicitly mean no extra context. Context does not grant additional execution authority.",
+      "properties": {
+        "files": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/file"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array"
+        },
+        "visual": {
+          "$ref": "#/$defs/visual"
+        }
+      },
+      "required": [
+        "notes",
+        "files"
+      ],
+      "title": "Request context",
+      "type": "object"
+    },
+    "decision": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/decisions/<id>.json: an attributed decision on an exact work revision and subject digest. Identity and authority are not authenticated by this schema.",
+      "properties": {
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "decidedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "decision"
+        },
+        "outcome": {
+          "enum": [
+            "approved",
+            "rejected",
+            "changes-requested"
+          ],
+          "type": "string"
+        },
+        "rationale": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "sourceRef": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "subject": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "kind": {
+              "enum": [
+                "work",
+                "request",
+                "response",
+                "evidence"
+              ],
+              "type": "string"
+            },
+            "sha256": {
+              "$ref": "#/$defs/common/$defs/digest"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "sha256"
+          ],
+          "type": "object"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "subject",
+        "outcome",
+        "decidedBy",
+        "sourceRef",
+        "rationale",
+        "createdAt"
+      ],
+      "title": "Decision",
+      "type": "object"
+    },
+    "evidence": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/evidence/<id>.json: artifact metadata. Existence, actual digest and evidentiary relevance require separate checks.",
+      "properties": {
+        "capturedAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "capturedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "description": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "evidence"
+        },
+        "mediaType": {
+          "$ref": "#/$defs/common/$defs/mediaType"
+        },
+        "path": {
+          "$ref": "#/$defs/common/$defs/relativePath"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "sha256": {
+          "$ref": "#/$defs/common/$defs/digest"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "path",
+        "sha256",
+        "mediaType",
+        "description",
+        "capturedBy",
+        "capturedAt"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "image-generation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "baseline": {
+                "$ref": "#/$defs/common/$defs/file",
+                "properties": {
+                  "mediaType": {
+                    "pattern": "^image/"
+                  }
+                }
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "new"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "baseline": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "attemptId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "baseline": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/common/$defs/file"
+            }
+          ]
+        },
+        "image": {
+          "$ref": "#/$defs/common/$defs/file",
+          "properties": {
+            "mediaType": {
+              "const": "image/png"
+            }
+          }
+        },
+        "mode": {
+          "enum": [
+            "new",
+            "extend",
+            "revise"
+          ]
+        },
+        "prompt": {
+          "$ref": "#/$defs/common/$defs/file",
+          "properties": {
+            "mediaType": {
+              "const": "text/plain"
+            }
+          }
+        },
+        "requestId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "attemptId",
+        "mode",
+        "baseline",
+        "prompt",
+        "image"
+      ],
+      "title": "Retained image generation context",
+      "type": "object"
+    },
+    "index": {
+      "description": "Version 1 of the proposed .works document format. A document must match exactly one kind. This contract does not migrate or reinterpret legacy session records.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/work"
+        },
+        {
+          "$ref": "#/$defs/request"
+        },
+        {
+          "$ref": "#/$defs/response"
+        },
+        {
+          "$ref": "#/$defs/evidence"
+        },
+        {
+          "$ref": "#/$defs/decision"
+        }
+      ],
+      "title": "Works document contract"
+    },
+    "inputs": {
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "properties": {
+            "prompts": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "files": {
+              "minItems": 1
+            }
+          }
+        }
+      ],
+      "description": "The prompts and files the request asks the skill to act on. At least one prompt or file is required.",
+      "properties": {
+        "files": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/file"
+          },
+          "type": "array"
+        },
+        "prompts": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "prompts",
+        "files"
+      ],
+      "title": "Request inputs",
+      "type": "object"
+    },
+    "output": {
+      "description": "One produced output. Text is inline; commits identify a repository and full object ID; images and other files bind persisted artifacts. Output metadata alone does not prove correctness or publication.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "enum": [
+                "plain",
+                "markdown"
+              ],
+              "type": "string"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "text": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "type": {
+              "const": "text"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "text",
+            "format"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "message": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "repository": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "sha": {
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
+              "type": "string"
+            },
+            "type": {
+              "const": "commit"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "repository",
+            "sha"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "alt": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "file": {
+              "$ref": "#/$defs/common/$defs/file",
+              "properties": {
+                "mediaType": {
+                  "pattern": "^image/"
+                }
+              }
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "type": {
+              "const": "image"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "file",
+            "alt"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "file": {
+              "$ref": "#/$defs/common/$defs/file"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "type": {
+              "const": "file"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "file",
+            "description"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Response output"
+    },
+    "request": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/requests/<id>.json: prompts and files to act on, with supporting context kept separate, against one work revision. This record alone grants no execution permission.",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/context"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "expected": {
+          "$ref": "#/$defs/common/$defs/criteria"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "kind": {
+          "const": "request"
+        },
+        "operation": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "operation",
+        "expected",
+        "inputs",
+        "context",
+        "requestedBy",
+        "createdAt"
+      ],
+      "title": "Request",
+      "type": "object"
+    },
+    "response": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "done"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outputs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "mismatch",
+                  "blocked",
+                  "waiting"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ],
+      "description": ".works/<workId>/responses/<id>.json: typed outputs produced for one request. Optional verification observations describe their checks separately; delivering an output is not a claim that the work is proved complete.",
+      "properties": {
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "criteriaResults": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "criterionId": {
+                "$ref": "#/$defs/common/$defs/id"
+              },
+              "note": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "outputIds": {
+                "$ref": "#/$defs/common/$defs/idList"
+              },
+              "result": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "not-checked"
+                ]
+              }
+            },
+            "required": [
+              "criterionId",
+              "result",
+              "outputIds",
+              "note"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "feedbackRound": {
+          "description": "Completed feedback-and-repair rounds for this request. Initial candidate is round zero; the caller maintains truthful history.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "response"
+        },
+        "observations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "criterionId": {
+                "$ref": "#/$defs/common/$defs/id"
+              },
+              "evidenceIds": {
+                "$ref": "#/$defs/common/$defs/idList"
+              },
+              "note": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "result": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "not-checked"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "criterionId",
+              "result",
+              "evidenceIds",
+              "note"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/output"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "requestId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "status": {
+          "enum": [
+            "done",
+            "mismatch",
+            "blocked",
+            "waiting"
+          ],
+          "type": "string"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "requestId",
+        "status",
+        "outputs",
+        "createdAt"
+      ],
+      "title": "Response",
+      "type": "object"
+    },
+    "visual": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "not": {
+              "required": [
+                "baselinePath"
+              ]
+            }
+          },
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "extend",
+                  "revise"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "preserve": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "baselinePath"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "baselinePath": {
+          "$ref": "#/$defs/common/$defs/relativePath"
+        },
+        "change": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "mode": {
+          "enum": [
+            "new",
+            "extend",
+            "revise"
+          ]
+        },
+        "preserve": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "mode",
+        "preserve",
+        "change"
+      ],
+      "title": "Visual context",
+      "type": "object"
+    },
+    "work": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "completion": false
+            }
+          },
+          "if": {
+            "properties": {
+              "status": {
+                "const": "completed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "completion"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "blocked",
+                  "cancelled"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ],
+      "description": ".works/<id>/work.json: goal, declared scope, acceptance criteria and current lifecycle.",
+      "properties": {
+        "acceptanceCriteria": {
+          "$ref": "#/$defs/common/$defs/criteria"
+        },
+        "completion": {
+          "additionalProperties": false,
+          "properties": {
+            "completedAt": {
+              "$ref": "#/$defs/common/$defs/timestamp"
+            },
+            "evidenceIds": {
+              "$ref": "#/$defs/common/$defs/idList",
+              "minItems": 1
+            }
+          },
+          "required": [
+            "evidenceIds",
+            "completedAt"
+          ],
+          "type": "object"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "goal": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "work"
+        },
+        "reason": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "revision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "scope": {
+          "$ref": "#/$defs/common/$defs/scope"
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "active",
+            "blocked",
+            "completed",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "revision",
+        "goal",
+        "status",
+        "scope",
+        "acceptanceCriteria",
+        "createdAt",
+        "updatedAt"
+      ],
+      "title": "Work",
+      "type": "object"
+    }
+  },
+  "aliases": {
+    "@cli/curl": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "curl"
+      },
+      "kind": "cli",
+      "note": "On Windows resolve the curl executable (curl.exe), not a PowerShell alias with different argument semantics. A native web-fetch capability is not this CLI alias.",
+      "params": [],
+      "purpose": "Probe an HTTP endpoint using the curl executable.",
+      "resolvesTo": "executable:curl",
+      "scheme": "cli://curl",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/git": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "git"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Inspect or change Git repository state.",
+      "resolvesTo": "executable:git",
+      "scheme": "cli://git",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/python": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "python"
+      },
+      "kind": "cli",
+      "note": "Resolve Python 3 from the active environment: python, python3, or py -3 as appropriate; record the selected executable and any launcher arguments.",
+      "params": [],
+      "purpose": "Run declared Python scripts.",
+      "resolvesTo": "executable:python",
+      "scheme": "cli://python",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/shell": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "<session-shell>"
+      },
+      "kind": "cli",
+      "note": "Resolve to the session shell (PowerShell, bash or another declared shell); do not assume bash on Windows. Arguments remain separate data until encoded for that shell.",
+      "params": [],
+      "purpose": "Run a declared command in the active session shell.",
+      "resolvesTo": "executable:<session-shell>",
+      "scheme": "cli://shell",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@tools/fileread": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "fileread"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Read declared workspace files and directories through the active session.",
+      "resolvesTo": "session:fileread",
+      "scheme": "tool://fileread",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Read, Glob and Grep"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex file reads"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/print": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "print"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Present text and artifacts in the conversation using the host rendering capabilities.",
+      "resolvesTo": "session:print",
+      "scheme": "tool://print",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "the session's file and render hand-off, which displays an image or an HTML page in the conversation and falls back to the path or the URL"
+        },
+        "openai": {
+          "supported": true,
+          "via": "the absolute path or the URL printed into the conversation, with the image inline where the client renders one"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/sourcewrite": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "sourcewrite"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Edit files within the declared write scope through the active session.",
+      "resolvesTo": "session:sourcewrite",
+      "scheme": "tool://sourcewrite",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Write and Edit"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex file edits"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@workspaces/artifacts": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Produced files, including images, documents and other deliverables.",
+      "resolvesTo": "<Workspace>/.works/<workId>/artifacts/",
+      "scheme": "workspace://artifacts",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/be": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "checkout",
+      "params": [],
+      "purpose": "The explicitly bound backend checkout; unavailable when the project has no backend role.",
+      "resolvesTo": "<Backend>/",
+      "scheme": "workspace://be",
+      "writers": [
+        "backend.generate"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/context": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Supporting reference files for a request.",
+      "resolvesTo": "<Workspace>/.works/<workId>/context/",
+      "scheme": "workspace://context",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/inputs": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Files supplied as the subject of a request.",
+      "resolvesTo": "<Workspace>/.works/<workId>/inputs/",
+      "scheme": "workspace://inputs",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/requests": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Requests with separate inputs and context.",
+      "resolvesTo": "<Workspace>/.works/<workId>/requests/",
+      "scheme": "workspace://requests",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/responses": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Responses declaring produced outputs and execution status.",
+      "resolvesTo": "<Workspace>/.works/<workId>/responses/",
+      "scheme": "workspace://responses",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "zone": "workspaces"
+    }
+  },
+  "criteria": {
+    "history": "Record the initial API run as round zero and each targeted reassessment as the next round. Preserve raw runner output and immutable prior run records; record concrete failed case, lane, namespace or provenance defects before retry.",
+    "items": [
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-shape"
+        },
+        "expect": "The request schema passes.",
+        "id": "request-shape",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-api-run",
+          "instruction": "Request a corrected API verification request; do not run against an invalid envelope."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-files"
+        },
+        "expect": "Every declared input file exists and matches its digest.",
+        "id": "request-files",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-api-run",
+          "instruction": "Request the exact missing or changed prerequisite evidence."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "response-shape"
+        },
+        "expect": "The response schema and required API outputs pass.",
+        "id": "response-shape",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-api-result",
+          "instruction": "Repair response metadata from existing evidence; never manufacture a case or verdict."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-binding"
+        },
+        "expect": "The response binds this request and work revision.",
+        "id": "request-binding",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-api-result",
+          "instruction": "Bind the response to the exact request and revision that produced the artifacts."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "unique-outputs"
+        },
+        "expect": "Output identifiers are unique.",
+        "id": "unique-outputs",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-api-result",
+          "instruction": "Remove duplicate output declarations without discarding distinct evidence."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "output-files"
+        },
+        "expect": "Every output file is scoped, present and digest-bound.",
+        "id": "output-files",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-api-result",
+          "instruction": "Re-read actual files and correct paths or hashes; do not bless changed bytes."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "observation-binding"
+        },
+        "expect": "Observations reference declared request criteria and evidence.",
+        "id": "observation-binding",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-api-result",
+          "instruction": "Correct observation references to actual evidence for this work revision."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "attested-client-run"
+        },
+        "expect": "The repository-owned suite ran externally against the exact attested served head.",
+        "id": "attested-client-run",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "probe-attested-endpoint",
+          "instruction": "Record the exact endpoint, command or ancestry defect; rerun only against corrected bound evidence."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "api-lane-integrity"
+        },
+        "expect": "Every runner case is retained and contract, data and lifecycle lanes pass independently.",
+        "id": "api-lane-integrity",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "run-repository-suite",
+          "instruction": "Record exact failing or missing cases, repair outside this verifier, then run the unchanged repository suite under a new attempt."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "api-namespace-cleanup"
+        },
+        "expect": "All writes stayed in the run namespace, were read through the API and exactly that namespace was removed.",
+        "id": "api-namespace-cleanup",
+        "onFail": {
+          "action": "block",
+          "fromStep": "evaluate-api-run",
+          "instruction": "Report the leaked or unproved record and stop; never broaden cleanup to erase a foreign record."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "api-append-only-secret-safety"
+        },
+        "expect": "The run is append-only and persisted evidence contains no credential value.",
+        "id": "api-append-only-secret-safety",
+        "onFail": {
+          "action": "block",
+          "fromStep": "evaluate-api-run",
+          "instruction": "Report the conflicting run identity or exposed artifact and do not rewrite history."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "capability-unavailable"
+        },
+        "expect": "Required suite, Git, HTTP and file capabilities are available.",
+        "id": "missing-capability",
+        "onFail": {
+          "action": "block",
+          "fromStep": "bind-api-run",
+          "instruction": "Return the missing capability; do not substitute a different suite or endpoint."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "essential-input-missing"
+        },
+        "expect": "Attested runtime, suite, namespace and authority evidence are complete.",
+        "id": "missing-essential-input",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-api-run",
+          "instruction": "Ask for the one essential missing binding before executing cases."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "transient-execution-failure"
+        },
+        "expect": "Suite and cleanup effects have known outcomes.",
+        "id": "transient-api-execution",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "evaluate-api-run",
+          "instruction": "Observe suite output and namespace state first; never rerun a suite or cleanup whose completion is uncertain."
+        }
+      }
+    ],
+    "limits": {
+      "feedbackRounds": 2
+    },
+    "stopWhen": "Stop after two feedback rounds, on recurring defects, leaked scope, credential exposure, missing capability or unresolved essential input. Return done only when all criteria pass; never overwrite a run or duplicate an uncertain suite or cleanup effect."
+  },
+  "id": "api.verify",
+  "purpose": "Run the repository-owned end-to-end API suite as an external client against one attested runtime and publish the runner cases, three independent lane verdicts, namespace cleanup proof and raw output.",
+  "request": {
+    "$ref": "#/$defs/request",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Bind the attested runtime entry, frozen backend head, repository-owned suite command, authorized environment, flow namespace, optional account and seed receipts, and append-only run identity as declared inputs. The request must never contain a credential value or authorize source edits.",
+    "properties": {
+      "expected": {
+        "minItems": 1
+      },
+      "inputs": {
+        "properties": {
+          "files": {
+            "minItems": 1
+          }
+        }
+      },
+      "operation": {
+        "const": "api.verify"
+      }
+    },
+    "title": "api.verify request"
+  },
+  "response": {
+    "$ref": "#/$defs/response",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "done"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "observations": {
+              "not": {
+                "contains": {
+                  "properties": {
+                    "result": {
+                      "const": "failed"
+                    }
+                  },
+                  "required": [
+                    "result"
+                  ]
+                }
+              }
+            },
+            "outputs": {
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "file": {
+                        "properties": {
+                          "mediaType": {
+                            "const": "application/json"
+                          }
+                        }
+                      },
+                      "id": {
+                        "const": "api-verification"
+                      },
+                      "type": {
+                        "const": "file"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "file"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "file": {
+                        "properties": {
+                          "mediaType": {
+                            "const": "application/json"
+                          }
+                        }
+                      },
+                      "id": {
+                        "const": "api-cases"
+                      },
+                      "type": {
+                        "const": "file"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "file"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "file": {
+                        "properties": {
+                          "mediaType": {
+                            "const": "application/json"
+                          }
+                        }
+                      },
+                      "id": {
+                        "const": "api-verdicts"
+                      },
+                      "type": {
+                        "const": "file"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "file"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "file": {
+                        "properties": {
+                          "mediaType": {
+                            "const": "text/plain"
+                          }
+                        }
+                      },
+                      "id": {
+                        "const": "api-output"
+                      },
+                      "type": {
+                        "const": "file"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "file"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "done"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "criteriaResults": {
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "attested-client-run"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "api-lane-integrity"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "api-namespace-cleanup"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "api-append-only-secret-safety"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                }
+              ],
+              "items": {
+                "properties": {
+                  "outputIds": {
+                    "minItems": 1
+                  },
+                  "result": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "maxItems": 4,
+              "minItems": 4
+            },
+            "observations": {
+              "items": {
+                "properties": {
+                  "result": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "criteriaResults",
+            "feedbackRound",
+            "observations"
+          ]
+        }
+      }
+    ],
+    "description": "A done response retains the repository runner's raw output, every reported case, exactly three separately judged lane verdicts, API read-back and exact namespace cleanup proof. A run that reached cases remains append-only even when it failed.",
+    "properties": {
+      "criteriaResults": {
+        "items": {
+          "properties": {
+            "criterionId": {
+              "enum": [
+                "attested-client-run",
+                "api-lane-integrity",
+                "api-namespace-cleanup",
+                "api-append-only-secret-safety"
+              ]
+            }
+          }
+        }
+      },
+      "feedbackRound": {
+        "maximum": 2
+      }
+    },
+    "title": "api.verify response"
+  },
+  "schemaVersion": 1,
+  "scope": "Verification only. The operator starts no runtime, authors no cases, changes no delivery source and touches only the request-authorized test namespace. Run records are append-only and credentials remain referenced by name.",
+  "step": {
+    "steps": [
+      {
+        "calls": [
+          {
+            "alias": "@tools/fileread",
+            "purpose": "Read only the request and declared evidence.",
+            "when": "always"
+          },
+          {
+            "alias": "@cli/git",
+            "purpose": "Verify pinned-to-served ancestry without changing Git state.",
+            "when": "always"
+          }
+        ],
+        "checks": [
+          "request-shape",
+          "request-files"
+        ],
+        "id": "bind-api-run",
+        "instruction": "Read the request and declared evidence. Bind the frozen backend commit, repository-owned suite command, attested endpoint and served head, authorization, account by credential name, seed namespace and new run identity. Confirm the served head contains the pinned commit. Do not derive another endpoint or author a case.",
+        "produces": [
+          "A frozen API run binding and prerequisite classification."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/requests",
+            "path": "<requestId>.json",
+            "when": "always"
+          },
+          {
+            "alias": "@workspaces/inputs",
+            "path": "<declared-input-path>",
+            "when": "for every declared input file"
+          },
+          {
+            "alias": "@workspaces/be",
+            "path": "<declared-suite-and-config-path>",
+            "when": "when the backend checkout is bound"
+          }
+        ],
+        "writes": []
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/curl",
+            "purpose": "Probe the exact attested API endpoint.",
+            "when": "always"
+          }
+        ],
+        "checks": [],
+        "id": "probe-attested-endpoint",
+        "instruction": "Probe the exact attested endpoint before running cases. Resolve credentials only at the suite boundary and never persist values. Stop if the endpoint, authority, account, seed or suite is unavailable.",
+        "produces": [
+          "Endpoint readiness observation."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/context",
+            "path": "<attested-runtime-path>",
+            "when": "always"
+          }
+        ],
+        "writes": []
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/shell",
+            "purpose": "Run the exact declared API suite command.",
+            "when": "when prerequisites pass"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist the runner's unmodified output.",
+            "when": "when the suite starts"
+          }
+        ],
+        "checks": [],
+        "id": "run-repository-suite",
+        "instruction": "Run the repository-owned command as an external client against the bound endpoint and namespace. Retain the complete runner output and exit status. Do not alter the suite or product source.",
+        "produces": [
+          "api-output"
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/be",
+            "path": "<declared-suite-path>",
+            "when": "always"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/api-output.txt",
+            "when": "when the suite starts"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/curl",
+            "purpose": "Read back and remove only records in the bound run namespace.",
+            "when": "when the suite created namespace data"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist case and lane evidence.",
+            "when": "when evidence exists"
+          }
+        ],
+        "checks": [
+          "attested-client-run",
+          "api-lane-integrity",
+          "api-namespace-cleanup",
+          "api-append-only-secret-safety"
+        ],
+        "id": "evaluate-api-run",
+        "instruction": "Copy every runner-reported case, read created records back through the API, judge contract, data and lifecycle lanes separately, then delete exactly the run namespace. Produce concrete defects and targeted repair instructions for failed criteria; never invent missing case evidence.",
+        "produces": [
+          "api-cases",
+          "api-verdicts",
+          "Concrete failed-criterion feedback or passing review results."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/api-output.txt",
+            "when": "when the suite ran"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/api-cases.json",
+            "when": "when case output exists"
+          },
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/api-verdicts.json",
+            "when": "when lane evaluation is possible"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Write immutable verification and response records.",
+            "when": "always"
+          },
+          {
+            "alias": "@cli/python",
+            "purpose": "Run scripts/validate_operator.py against the request and response.",
+            "when": "always"
+          },
+          {
+            "alias": "@tools/print",
+            "purpose": "Present case and lane results with raw evidence references.",
+            "when": "when a result is available"
+          }
+        ],
+        "checks": [
+          "response-shape",
+          "request-binding",
+          "unique-outputs",
+          "output-files",
+          "observation-binding"
+        ],
+        "id": "record-api-result",
+        "instruction": "Write an append-only verification record and response with actual artifact hashes, observations and review results. Never overwrite an earlier run. Validate the records and present only a fully passing result as done.",
+        "produces": [
+          "api-verification",
+          "A validated response record."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/<produced-artifact>",
+            "when": "for each produced artifact"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/api-verification.json",
+            "when": "when a verdict exists"
+          },
+          {
+            "alias": "@workspaces/responses",
+            "path": "<responseId>.json",
+            "when": "always"
+          }
+        ]
+      }
+    ]
+  },
+  "validate": {
+    "failurePolicy": "Evaluate machine and review criteria after producing evidence. Record concrete defects, repair only the failed criterion within the bounded feedback loop, rerun affected checks, and return done only when every criterion passes.",
+    "machine": [
+      {
+        "check": "request-schema",
+        "id": "request-shape",
+        "phase": "request"
+      },
+      {
+        "check": "input-files",
+        "id": "request-files",
+        "phase": "request"
+      },
+      {
+        "check": "response-schema",
+        "id": "response-shape",
+        "phase": "response"
+      },
+      {
+        "check": "request-binding",
+        "id": "request-binding",
+        "phase": "response"
+      },
+      {
+        "check": "unique-output-ids",
+        "id": "unique-outputs",
+        "phase": "response"
+      },
+      {
+        "check": "output-files",
+        "id": "output-files",
+        "phase": "response"
+      },
+      {
+        "check": "observation-references",
+        "id": "observation-binding",
+        "phase": "response"
+      }
+    ],
+    "review": [
+      {
+        "id": "attested-client-run",
+        "instruction": "Confirm the exact repository-owned suite ran as an external client against the attested endpoint and served head containing the pinned commit; reject bespoke cases, substituted commands and inferred runtime addresses."
+      },
+      {
+        "id": "api-lane-integrity",
+        "instruction": "Match every case to raw runner output and judge contract, data and lifecycle separately. A named case that failed, was skipped or produced no evidence cannot pass."
+      },
+      {
+        "id": "api-namespace-cleanup",
+        "instruction": "Verify every created record carries the run namespace, was read back through the API, and cleanup deleted exactly that namespace without touching pre-existing or foreign records."
+      },
+      {
+        "id": "api-append-only-secret-safety",
+        "instruction": "Confirm the run identity is new, prior records remain unchanged, and neither output nor command evidence contains credential values."
+      }
+    ]
+  }
+}

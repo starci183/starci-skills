@@ -1,0 +1,403 @@
+{
+  "$id": "kind:goal-discovery",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "stage",
+    "repositories",
+    "impacts",
+    "destinations",
+    "unresolved",
+    "lanes"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "stage": {
+      "enum": [
+        "handoff",
+        "implement",
+        "publish",
+        "deploy"
+      ]
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "project",
+          "repository",
+          "routeRef",
+          "head"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "repository": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "routeRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "head": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      }
+    },
+    "impacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "role",
+          "routes",
+          "code",
+          "behavior",
+          "tags",
+          "evidence"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          },
+          "code": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "minItems": 1
+          },
+          "behavior": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "tags": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "feature",
+                "business",
+                "architecture",
+                "backend",
+                "data",
+                "api",
+                "interface",
+                "browser",
+                "runtime",
+                "tooling",
+                "documentation"
+              ]
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "minItems": 1
+          },
+          "producer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sessionId", "impactId", "mission"],
+            "properties": {
+              "sessionId": { "type": "string", "pattern": "^(?!central-runtime$)(?!.*\\.\\.)[a-z0-9][a-z0-9.-]{0,127}$" },
+              "impactId": { "type": "string", "minLength": 1 },
+              "mission": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ref", "hash"],
+                "properties": {
+                  "ref": { "type": "string", "pattern": "^runtime/history/missions/[a-f0-9]{64}\\.json$" },
+                  "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "destinations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "kind",
+          "target"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "kind": {
+            "enum": [
+              "artifact",
+              "branch",
+              "environment"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      }
+    },
+    "unresolved": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1000
+      }
+    },
+    "lanes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "reason"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "planned",
+              "not-applicable"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          },
+          "verification": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          }
+        }
+      }
+    },
+    "architecture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodes",
+        "edges"
+      ],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "label",
+              "owner",
+              "role",
+              "status",
+              "evidence"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$",
+                "maxLength": 64
+              },
+              "kind": {
+                "enum": [
+                  "ui",
+                  "api",
+                  "service",
+                  "data",
+                  "external"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "owner": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "role": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "enum": [
+                  "discovered",
+                  "proposed",
+                  "unverified"
+                ]
+              },
+              "evidence": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                }
+              }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "to",
+              "label",
+              "status",
+              "evidence"
+            ],
+            "properties": {
+              "from": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$",
+                "maxLength": 64
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$",
+                "maxLength": 64
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "status": {
+                "enum": [
+                  "discovered",
+                  "proposed",
+                  "unverified"
+                ]
+              },
+              "evidence": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

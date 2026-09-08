@@ -1,0 +1,12 @@
+{
+  "kind": "content-brief",
+  "title": "^# content-brief — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    { "heading": "^## Binding$", "table": "| Field | Value |", "rows": ["Unit", "Objective", "Audience", "Fingerprint"], "cell": { "Value": "\\S" } },
+    { "heading": "^## Learner inputs$", "table": "| Input | Statement |", "cell": { "Statement": "\\S" } },
+    { "heading": "^## Outcomes$", "table": "| Outcome | Statement |", "minRows": 1, "cell": { "Outcome": "^`[a-z0-9][a-z0-9-]*`$", "Statement": "\\S" } },
+    { "heading": "^## Claims$", "table": "| Claim | Statement |", "minRows": 1, "cell": { "Claim": "^`[a-z0-9][a-z0-9-]*`$", "Statement": "\\S" } },
+    { "heading": "^## Examples$", "table": "| Example | Statement |", "cell": { "Statement": "\\S" } },
+    { "heading": "^## Dispositions$", "table": "| Kind | Target | Statement |", "cell": { "Kind": "^(add|change|remove)$", "Statement": "\\S" } }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only interface.plan emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, NO_PROGRESS, EVIDENCE_MISSING) come from operators/errors.json. MAP_INCOMPLETE is the operator's own defect and routes to itself: the caller supplied the reference and the source, and it was this operator that failed to name what they show.",
+  "codes": {
+    "MAP_INCOMPLETE": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A route or host the source or the reference shows is named by no Map row. The map would send the generators out with a page missing, and the page nobody planned is the page nobody generates; the reason names every such route or host in one paragraph.",
+        "vi": "Một route hay host mà source hay tham chiếu cho thấy không được dòng Map nào gọi tên. Bản đồ sẽ đưa các generator đi mà thiếu một trang, và trang không ai lên kế hoạch là trang không ai sinh; phần reason nêu mọi route hay host như vậy trong một đoạn."
+      },
+      "resume": {
+        "en": "Name the route or host as its own unit with a goal line, or record under the map why it lies outside the feature, and run the same map again; a re-entry that names the same units is NO_PROGRESS.",
+        "vi": "Gọi tên route hay host ấy thành đơn vị riêng với một dòng goal, hoặc ghi dưới bản đồ vì sao nó nằm ngoài tính năng, rồi chạy lại cùng bản đồ; một lần vào lại gọi tên cùng những đơn vị là NO_PROGRESS."
+      }
+    }
+  }
+}

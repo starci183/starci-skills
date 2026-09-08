@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "library-maintenance",
+  "when": {
+    "en": "An explicitly authorized existing owner package needs a behavior repair and next patch version. Bind its owner checkout, reproduce the regression, repair and release through library.update and verify the package. Product presentation changes still follow the interface chain. Consumer integration, surface audit and UAT follow after the verified package is consumed; a package proof is never a consumer delivery claim.",
+    "vi": "Package hiện có của owner đã được giao sửa hành vi và tăng patch kế tiếp. Bind checkout owner, tái hiện regression, sửa và phát hành qua library.update rồi kiểm package. Thay đổi presentation sản phẩm vẫn theo chuỗi interface. Tích hợp consumer, audit bề mặt và UAT theo sau khi package đã kiểm được tiêu thụ; bằng chứng package không phải xác nhận bàn giao consumer."
+  },
+  "mission": {
+    "goal": "the owner package repairs one behavior and ships its next patch",
+    "doneWhen": [
+      {
+        "evidence": "the package is repaired, released at its next patch and consumed",
+        "producedBy": "library.update"
+      },
+      {
+        "evidence": "the checkout gates pass at the consumed head",
+        "producedBy": "quality.verify"
+      }
+    ]
+  },
+  "options": {
+    "roles": [
+      "fe"
+    ]
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#fe"
+    ],
+    [
+      "library.update"
+    ],
+    [
+      "quality.verify"
+    ]
+  ],
+  "ends": "user",
+  "rewrite": "library.source.apply → library.update (the fold of library.source.apply and dependency.update: bump, publish, consume in one operator)."
+}

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Retained image generation context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "attemptId",
+    "mode",
+    "baseline",
+    "prompt",
+    "image"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/version"
+    },
+    "requestId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "attemptId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "mode": {
+      "enum": [
+        "new",
+        "extend",
+        "revise"
+      ]
+    },
+    "baseline": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "common.schema.json#/$defs/file"
+        }
+      ]
+    },
+    "prompt": {
+      "$ref": "common.schema.json#/$defs/file",
+      "properties": {
+        "mediaType": {
+          "const": "text/plain"
+        }
+      }
+    },
+    "image": {
+      "$ref": "common.schema.json#/$defs/file",
+      "properties": {
+        "mediaType": {
+          "const": "image/png"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "new"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "then": {
+        "properties": {
+          "baseline": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "baseline": {
+            "$ref": "common.schema.json#/$defs/file",
+            "properties": {
+              "mediaType": {
+                "pattern": "^image/"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

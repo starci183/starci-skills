@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "kind": "fixture-tests",
+  "runs": [
+    {
+      "task": "normalize-label",
+      "repeat": "1",
+      "model": "fixture-model",
+      "reasoning": "fixture",
+      "environment": "fixture-environment",
+      "baselineSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "promptSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "skillRevision": "fixture-revision",
+      "outcome": "delivered",
+      "evidence": [
+        "synthetic://test-only"
+      ],
+      "inputTokens": 120,
+      "outputTokens": 40,
+      "cachedInputTokens": null,
+      "elapsedMs": 500,
+      "interventions": 0,
+      "harnessRetries": 1,
+      "regressions": 0,
+      "id": "full-1",
+      "profile": "full"
+    },
+    {
+      "task": "normalize-label",
+      "repeat": "1",
+      "model": "fixture-model",
+      "reasoning": "fixture",
+      "environment": "fixture-environment",
+      "baselineSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "promptSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "skillRevision": "fixture-revision",
+      "outcome": "delivered",
+      "evidence": [
+        "synthetic://test-only"
+      ],
+      "inputTokens": 100,
+      "outputTokens": 40,
+      "cachedInputTokens": null,
+      "elapsedMs": 400,
+      "interventions": 0,
+      "harnessRetries": 1,
+      "regressions": 0,
+      "id": "lite-1",
+      "profile": "lite"
+    },
+    {
+      "task": "normalize-label",
+      "repeat": "2",
+      "model": "fixture-model",
+      "reasoning": "fixture",
+      "environment": "fixture-environment",
+      "baselineSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "promptSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "skillRevision": "fixture-revision",
+      "outcome": "correct-refusal",
+      "evidence": [
+        "synthetic://test-only"
+      ],
+      "inputTokens": null,
+      "outputTokens": 40,
+      "cachedInputTokens": null,
+      "elapsedMs": 500,
+      "interventions": 0,
+      "harnessRetries": 1,
+      "regressions": 0,
+      "id": "lite-refusal",
+      "profile": "lite"
+    }
+  ]
+}

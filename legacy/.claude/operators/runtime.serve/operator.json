@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "id": "runtime.serve",
+  "purpose": "Climb one requested rung of the runtime ladder for one bound product route, preserve its fixed port and integration branch, and attest the resulting entry from live probes.",
+  "scope": "One route and one rung: stack-up, locate, start-role, serve, restart, reset or stop. Effects require existing authority; foreign holders are never reclaimed; integration uses merge commits and gates the merged head without rebase or force.",
+  "modules": {"request":"request.json","response":"response.json","validate":"validate.json","step":"step.json","criteria":"criteria.json"}
+}

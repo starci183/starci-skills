@@ -1,0 +1,28 @@
+{
+  "kind": "service-receipt",
+  "title": "^# service-receipt — [a-z0-9]+(?:-[a-z0-9]+)*$",
+  "sections": [
+    {
+      "heading": "^## Binding$",
+      "table": "| Field | Value |",
+      "rows": ["Operator", "Step", "Environment", "Service", "Kind", "Desired", "Observed", "Endpoint", "Holder", "Approval"],
+      "cell": { "Value": "\\S" }
+    },
+    {
+      "heading": "^## Checks$",
+      "table": "| Check | Status | Evidence |",
+      "minRows": 1,
+      "cell": { "Check": "^`(service-declared|command-run|probe-answered|port-free|holder-recorded)`$", "Status": "^(passed|failed)$", "Evidence": "\\S" }
+    },
+    {
+      "heading": "^## Fallbacks taken$",
+      "table": "| Code | Action |",
+      "cell": { "Code": "^`[A-Z][A-Z0-9_]+`$", "Action": "\\S" }
+    },
+    {
+      "heading": "^## Findings$",
+      "table": "| Code | Statement |",
+      "cell": { "Code": "^`(SERVICE_ALREADY_IN_STATE|SERVICE_OBSERVED_ONLY|SERVICE_PORT_SHARED|SERVICE_LIMITATION)`$", "Statement": "\\S" }
+    }
+  ]
+}

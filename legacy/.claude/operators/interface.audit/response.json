@@ -1,0 +1,10 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","title":"interface.audit response","$ref":"works:response",
+  "description":"A done response contains the frozen audit report, measured captures, actual PNG screenshots and topic verdicts. Measurements and verdicts remain distinct; a screenshot alone never establishes conformance.",
+  "allOf":[{"if":{"properties":{"status":{"const":"done"}},"required":["status"]},"then":{"properties":{"outputs":{"allOf":[
+    {"contains":{"properties":{"id":{"const":"frontend-surface-audit"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"audit-captures"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"audit-screenshots"},"type":{"const":"image"},"file":{"properties":{"mediaType":{"const":"image/png"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"audit-verdicts"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}}
+  ]},"observations":{"not":{"contains":{"properties":{"result":{"const":"failed"}},"required":["result"]}}}}}}]
+}

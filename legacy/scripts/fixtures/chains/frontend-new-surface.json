@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "id": "frontend-new-surface",
+  "when": {
+    "en": "A page, flow, or surface that does not exist yet must be created; the person named the target route and its business promise is known or will be decided first.",
+    "vi": "Một trang, luồng hay bề mặt chưa tồn tại cần được tạo; người dùng nêu route đích, lời hứa nghiệp vụ đã có hoặc sẽ được quyết trước."
+  },
+  "mission": {
+    "goal": "a new surface exists, is proven and is published",
+    "doneWhen": [
+      {
+        "evidence": "the promise the surface carries is published",
+        "producedBy": "business.decide"
+      },
+      {
+        "evidence": "the surface is committed on the session branch",
+        "producedBy": "interface.generate"
+      },
+      {
+        "evidence": "the committed head is served on the product port",
+        "producedBy": "runtime.serve"
+      },
+      {
+        "evidence": "the served surface passes the audit with its screenshots kept",
+        "producedBy": "interface.audit"
+      },
+      {
+        "evidence": "a person's journey completes on the served surface",
+        "producedBy": "uat.verify"
+      },
+      {
+        "evidence": "the session branch is merged and pushed",
+        "producedBy": "git.publish"
+      }
+    ]
+  },
+  "options": {
+    "requirements": {
+      "business.decide": {
+        "mode": "model"
+      },
+      "interface.generate": {
+        "intent": "create",
+        "changeLevel": "new",
+        "mode": "apply"
+      }
+    }
+  },
+  "example": [
+    [
+      "environment.preflight"
+    ],
+    [
+      "workspace.bind#be",
+      "workspace.bind#fe"
+    ],
+    [
+      "business.decide"
+    ],
+    [
+      "interface.generate"
+    ],
+    [
+      "runtime.serve"
+    ],
+    [
+      "interface.audit"
+    ],
+    [
+      "quality.verify"
+    ],
+    [
+      "uat.verify"
+    ],
+    [
+      "git.publish"
+    ]
+  ],
+  "ends": "git.publish",
+  "rewrite": "frontend.direction.decide + frontend.presentation.resolve + frontend.source.apply → interface.generate; the post-write workspace.bind (runtimeNeed consume) → runtime.serve; frontend.surface.audit → interface.audit."
+}

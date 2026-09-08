@@ -1,0 +1,46 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { validateAgainst } from './json-schema.mjs';
+import { buildKnowledgeManifest, frozenKnowledgeManifestErrors, knowledgeCoverageErrors, manifestEntities } from './knowledge-manifest.mjs';
+
+const root = mkdtempSync(path.join(tmpdir(), 'knowledge-manifest-'));
+const branch = path.join(root, 'session', 'step-1', 'parallel-1');
+mkdirSync(path.join(root, 'knowledge/ui/composition'), { recursive: true });
+mkdirSync(path.join(root, 'knowledge/grammars/starci'), { recursive: true });
+mkdirSync(path.join(branch, 'request'), { recursive: true });
+mkdirSync(path.join(branch, 'response/data'), { recursive: true });
+mkdirSync(path.join(root, 'templates/kinds'), { recursive: true });
+writeFileSync(path.join(root, 'templates/kinds/knowledge-manifest.schema.json'), readFileSync(path.resolve('templates/kinds/knowledge-manifest.schema.json')));
+writeFileSync(path.join(root, 'knowledge/ui/composition/layout.md'), '# Layout\n\n## LAYOUT-1 — Regions\n\n| Case | When |\n| --- | --- |\n| Case 1 | always |\n');
+writeFileSync(path.join(root, 'knowledge/ui/composition/layout.vi.md'), '# ignored mirror');
+writeFileSync(path.join(root, 'knowledge/grammars/starci/family.md'), '# Family\n');
+writeFileSync(path.join(root, 'knowledge/grammars/starci/family.vi.md'), '# Family VI\n');
+writeFileSync(path.join(root, 'knowledge/ui/INDEX.md'), '# UI index\n');
+writeFileSync(path.join(root, 'knowledge/ui/INDEX.vi.md'), '# UI index VI\n');
+writeFileSync(path.join(root, 'knowledge/grammars/INDEX.md'), '# Grammar index\n');
+writeFileSync(path.join(root, 'knowledge/grammars/INDEX.vi.md'), '# Grammar index VI\n');
+const bindings = ['@knowledge/ui/composition', '@knowledge/grammars/<family>'];
+const manifest = buildKnowledgeManifest(root, bindings, { family: 'starci' });
+assert.deepEqual(manifest.files.map((file) => file.path), ['knowledge/grammars/INDEX.md', 'knowledge/grammars/INDEX.vi.md', 'knowledge/grammars/starci/family.md', 'knowledge/grammars/starci/family.vi.md', 'knowledge/ui/composition/layout.md', 'knowledge/ui/composition/layout.vi.md', 'knowledge/ui/INDEX.md', 'knowledge/ui/INDEX.vi.md']);
+assert.ok(manifestEntities(manifest).some(({ key }) => key === 'case:LAYOUT-1/Case 1'));
+writeFileSync(path.join(branch, 'request/knowledge-manifest.json'), JSON.stringify(manifest));
+const coverage = () => ({ schemaVersion: 10, manifestFingerprint: manifest.fingerprint, items: manifestEntities(manifest).map(({ key, source, kind }) => ({ key, applicability: 'applicable', actual: `evaluated ${key}`, evidence: [kind === 'file' ? source : 'response/data/proof.json'] })) });
+const coverageSchema = JSON.parse(readFileSync(path.resolve('templates/kinds/knowledge-coverage.schema.json'), 'utf8'));
+assert.deepEqual(validateAgainst(coverageSchema, coverage()), [], 'canonical manifest keys must pass the coverage schema');
+for (const key of ['case:', 'case: Case 1', 'case:Case 1 ', 'case:Case\n1', 'case:Case 1\n', 'case:Case\t1', 'unknown:Case 1']) {
+  const invalid = coverage(); invalid.items[0].key = key;
+  assert.ok(validateAgainst(coverageSchema, invalid).length, `malformed coverage key must refuse: ${JSON.stringify(key)}`);
+}
+writeFileSync(path.join(branch, 'response/data/proof.json'), '{}');
+writeFileSync(path.join(branch, 'response/data/knowledge-coverage.json'), JSON.stringify(coverage()));
+assert.deepEqual(knowledgeCoverageErrors({ root, branchDir: branch, bindings, family: 'starci' }), []);
+const partial = coverage(); partial.items.pop();
+writeFileSync(path.join(branch, 'response/data/knowledge-coverage.json'), JSON.stringify(partial));
+assert.ok(knowledgeCoverageErrors({ root, branchDir: branch, bindings, family: 'starci' }).some((error) => error.includes('exact frozen set')));
+writeFileSync(path.join(branch, 'response/data/knowledge-coverage.json'), JSON.stringify(coverage()));
+writeFileSync(path.join(root, 'knowledge/ui/composition/layout.md'), '# changed\n');
+assert.ok(knowledgeCoverageErrors({ root, branchDir: branch, bindings, family: 'starci' }).some((error) => error.includes('stale or incomplete')));
+assert.deepEqual(frozenKnowledgeManifestErrors({ root, branchDir: branch, bindings, family: 'starci' }), []);
+rmSync(root, { recursive: true, force: true });

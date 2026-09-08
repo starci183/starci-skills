@@ -1,0 +1,17 @@
+{
+  "$id": "kind:library-proof", "type": "object", "additionalProperties": false,
+  "required": ["phase", "planHash", "base", "head", "command", "commandHash", "files", "exitCode", "outputRef", "outputHash", "startedAt", "finishedAt"],
+  "properties": {
+    "phase": {"type": "string", "pattern": "^[a-z][a-z-]*$"},
+    "planHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "base": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "command": {"type": "object"},
+    "commandHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "files": {"type": "object", "additionalProperties": {"type": ["string", "null"]}},
+    "exitCode": {"type": "integer"},
+    "outputRef": {"type": "string", "pattern": "^response/artifacts/proofs/[a-z][a-z-]*\\.log$"},
+    "outputHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "startedAt": {"type": "string"}, "finishedAt": {"type": "string"}
+  }
+}

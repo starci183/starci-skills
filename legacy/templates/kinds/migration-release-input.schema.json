@@ -1,0 +1,154 @@
+{
+  "$id": "kind:migration-release-input",
+  "description": "Exactly one JSON object on stdin of the pinned source-owned runner. No argv or shell command is accepted. Inspect is read-only. Apply independently rechecks expected against the actual connection, full journal and complete pending set immediately before effects; unknown or missing fields are rejected. Fingerprint algorithms are defined by migration-release-runner.schema.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operation",
+    "planSha256",
+    "sourceHead",
+    "connectionRef",
+    "connectionFingerprint",
+    "migrations",
+    "journal",
+    "expected"
+  ],
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "relative": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*$",
+      "maxLength": 1024
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/relative"
+        },
+        "sha256": {
+          "$ref": "#/$defs/hash"
+        }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "sourceHead": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "connectionRef": {
+      "type": "string",
+      "pattern": "^secret-ref://[A-Za-z0-9][A-Za-z0-9_./-]*$"
+    },
+    "connectionFingerprint": {
+      "$ref": "#/$defs/hash"
+    },
+    "migrations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/name"
+          },
+          "path": {
+            "$ref": "#/$defs/relative"
+          },
+          "sha256": {
+            "$ref": "#/$defs/hash"
+          }
+        }
+      }
+    },
+    "journal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "table",
+        "allowInitialization"
+      ],
+      "properties": {
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "table": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "allowInitialization": {
+          "type": "boolean"
+        }
+      }
+    },
+    "operation": {
+      "enum": [
+        "inspect",
+        "apply"
+      ]
+    },
+    "planSha256": {
+      "$ref": "#/$defs/hash"
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journalExists",
+        "journal",
+        "journalFingerprint",
+        "pending"
+      ],
+      "properties": {
+        "journalExists": {
+          "type": "boolean"
+        },
+        "journal": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/name"
+          }
+        },
+        "journalFingerprint": {
+          "$ref": "#/$defs/hash"
+        },
+        "pending": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/name"
+          }
+        }
+      }
+    }
+  }
+}

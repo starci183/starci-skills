@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only service.operate emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, NO_PROGRESS) come from operators/errors.json. SERVICE_UNAVAILABLE is not one of these: that code belongs to runtime.serve, where it names a product endpoint an entry declared and a provider must restore; a service this operator moved and could not prove is its own, resumes itself, and is SERVICE_UNPROVEN.",
+  "codes": {
+    "SERVICE_UNPROVEN": {
+      "domain": "service",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The service is not observably in the state that was asked for: an `up` whose declared probe does not answer, or a `down` whose port is still held. A state nobody proved is not a state the service is in, and the receipt asserts nothing about it.",
+        "vi": "Dịch vụ không quan sát được là đang ở trạng thái đã yêu cầu: một `up` mà probe đã khai không trả lời, hay một `down` mà cổng vẫn bị giữ. Một trạng thái không ai chứng minh được thì không phải trạng thái dịch vụ đang ở, và biên nhận không khẳng định gì về nó."
+      },
+      "resume": {
+        "en": "Repair what the declared command starts, or correct the probe the declaration publishes, then ask for the same state again; the probe is never dropped to make the state pass.",
+        "vi": "Sửa thứ mà lệnh đã khai khởi động, hay sửa probe mà bản khai báo công bố, rồi xin lại đúng trạng thái ấy; không bao giờ bỏ probe đi để trạng thái qua được."
+      }
+    },
+    "SERVICE_APPROVAL_REQUIRED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The environment keeps this service with a person: its own `holder` is `person`, or the declaration marks the `service` class `person` and the request bound the declaration instead of an approval id, or the reference it bound is no longer the declaration on disk. Nothing was started, stopped or attested.",
+        "vi": "Môi trường giữ dịch vụ này với một con người: chính `holder` của nó là `person`, hoặc bản khai báo đánh dấu lớp `service` là `person` mà request lại ràng bản khai báo thay cho một id phê duyệt, hoặc tham chiếu nó ràng không còn là bản khai báo trên đĩa. Không có gì được khởi động, dừng hay chứng thực."
+      },
+      "resume": {
+        "en": "A person supplies the approval id for this exact service and state, or the environment declares the service `declared`; a service kept with a person is never moved on silence.",
+        "vi": "Một người cấp id phê duyệt cho đúng dịch vụ và trạng thái này, hoặc môi trường khai dịch vụ ấy là `declared`; một dịch vụ giữ với người không bao giờ bị dời trên sự im lặng."
+      }
+    }
+  }
+}

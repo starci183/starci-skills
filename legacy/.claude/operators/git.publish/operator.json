@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "id": "git.publish",
+  "purpose": "Publish one approved Git boundary from the exact commit quality verified, using hooks, non-force fast-forward semantics and remote read-back proof.",
+  "scope": "One approved repository boundary and target ref. It decides nothing about the change, never rebases or force-pushes, never bypasses hooks, and creates a tag only when the request explicitly authorizes that exact annotated tag.",
+  "modules": {"request":"request.json","response":"response.json","validate":"validate.json","step":"step.json","criteria":"criteria.json"}
+}

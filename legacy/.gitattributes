@@ -1,0 +1,8 @@
+# One line ending everywhere: the tree is hashed, diffed and fingerprinted as bytes.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.woff2 binary
+
+# Retained scenario bytes are SHA-256 evidence. Preserve their exact line endings.
+.claude/operators/interface.draw/tests/scenarios/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

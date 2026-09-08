@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 9,
+  "id": "interface.draw",
+  "domain": "interface",
+  "job": "Draw and retain business-grounded frontend PNG concepts and the actual selected direction before source implementation.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": true,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read",
+      "@tools/imagegen": "judged",
+      "@tools/print": "decision-points",
+      "@tools/registry": "read"
+    }
+  },
+  "primaryOutput": "frontend-art-direction"
+}

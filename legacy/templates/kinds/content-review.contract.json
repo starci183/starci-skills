@@ -1,0 +1,11 @@
+{
+  "kind": "content-review",
+  "title": "^# content-review — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    { "heading": "^## Execution$", "table": "| Field | Value |", "rows": ["Reviewer execution", "Inherited turns", "Producer rationale", "Round"], "cell": { "Value": "\\S" } },
+    { "heading": "^## Received$", "table": "| Artifact | Kind |", "minRows": 1, "cell": { "Artifact": "\\S", "Kind": "^(brief|article|image|prompt|track|assertions)$" } },
+    { "heading": "^## Scores$", "table": "| Dimension | Score |", "exactRows": 7, "cell": { "Dimension": "^(correctness|pedagogy|interview-value|language|visual-fidelity|code-quality|e2e-proof)$", "Score": "^([0-9]{1,2}|100|—)$" } },
+    { "heading": "^## Findings$", "table": "| Owning stage | Severity | Statement | Evidence |", "cell": { "Owning stage": "^(brief|write|image|code|e2e|critique)$", "Severity": "^(error|improvement)$", "Evidence": "\\S" } },
+    { "heading": "^## Verdict$", "table": "| Field | Value |", "rows": ["Verdict"], "cell": { "Value": "\\S" } }
+  ]
+}

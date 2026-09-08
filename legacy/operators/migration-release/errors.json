@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only migration.release emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, APPROVAL_REQUIRED) come from operators/errors.json. release.deploy keeps MIGRATION_BLOCKED for the migrate step of an image rollout; the frozen-plan release has its own two codes here.",
+  "codes": {
+    "MIGRATION_PLAN_INVALID": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The frozen migration plan does not agree with what is on disk: its digest, the environment declaration it pinned, its one migration target, one of its three producers, the checkout head, or a pinned runner, configuration or migration file differs. Nothing runs against a plan that describes another source.",
+        "vi": "Plan migration đã đóng băng không khớp với thứ trên đĩa: digest của nó, bản khai báo môi trường nó ghim, migration target duy nhất của nó, một trong ba producer, head checkout, hay một runner, cấu hình hoặc tệp migration đã ghim khác đi. Không gì chạy trên một plan mô tả một source khác."
+      },
+      "resume": {
+        "en": "Freeze the plan again against the checkout and declaration as they stand, with its producers re-bound.",
+        "vi": "Đóng băng lại plan theo checkout và bản khai báo như đang có, với các producer được ràng lại."
+      }
+    },
+    "MIGRATION_FAILED": {
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The source-owned runner failed, returned output outside its closed schema, refused its own compare-and-set, or the replay did not prove a no-op. No partial effect is retried and no down migration runs; the journal stays exactly as the runner left it.",
+        "vi": "Runner do source sở hữu thất bại, trả output ngoài schema đóng của nó, từ chối chính compare-and-set của nó, hoặc replay không chứng minh được no-op. Không tác động dở dang nào được thử lại và không down migration nào chạy; journal giữ đúng như runner để lại."
+      },
+      "resume": {
+        "en": "The backend owner repairs the runner or the migration and proves it again; the release re-enters with a plan frozen on the repaired head.",
+        "vi": "Chủ backend sửa runner hay migration và chứng minh lại; release vào lại với plan đóng băng trên head đã sửa."
+      }
+    }
+  }
+}

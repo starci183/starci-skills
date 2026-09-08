@@ -1,0 +1,165 @@
+{
+  "$id": "kind:architecture-source-review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "parent",
+    "alias",
+    "head",
+    "tree",
+    "repository",
+    "constraints",
+    "tradeoffAxes",
+    "files"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "parent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionId",
+        "step",
+        "parallel",
+        "attemptId",
+        "requestHash",
+        "currentStateHash",
+        "modelHash"
+      ],
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "step": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parallel": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attemptId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requestHash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "currentStateHash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "modelHash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "alias": {
+      "const": "@workspaces/be"
+    },
+    "head": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "tree": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "constraints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "statement"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "fixed-intent",
+              "measurable",
+              "preference",
+              "assumption",
+              "unknown"
+            ]
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "tradeoffAxes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "blob",
+          "sha256",
+          "chunks"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "blob": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "chunks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 8192,
+              "x-content": "source-text"
+            }
+          }
+        }
+      }
+    }
+  },
+  "review": {
+    "snapshotRef": "request/source-review.json",
+    "analysisRows": [
+      "Independent alternative",
+      "Trade-offs",
+      "Uncertainty"
+    ],
+    "rule": "A fresh nested critique receives the frozen source snapshot and selected model, never the author rationale. Source citations in each attack bind to snapshot paths. The reviewer evaluates an independently considered alternative on the parent tradeoff axes and reports uncertainty. This gate authenticates inputs and coverage, not the quality of reasoning."
+  }
+}

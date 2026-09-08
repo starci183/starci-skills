@@ -1,0 +1,11 @@
+{
+  "kind": "content-generation-receipt",
+  "title": "^# content-generation-receipt — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    { "heading": "^## Binding$", "table": "| Field | Value |", "rows": ["Unit", "Brief fingerprint", "Verdict", "Round", "Source head"], "cell": { "Value": "\\S" } },
+    { "heading": "^## Editions$", "table": "| Language | Article | Outcomes covered |", "minRows": 1, "cell": { "Language": "^[a-z]{2}(?:-[A-Z]{2})?$", "Article": "\\S", "Outcomes covered": "\\S" } },
+    { "heading": "^## Approved artifacts$", "table": "| Artifact | Stage |", "cell": { "Artifact": "\\S", "Stage": "^(brief|write|image|code|e2e|review)$" } },
+    { "heading": "^## Findings$", "table": "| Code | Stage | Ref | Statement |", "cell": { "Code": "^`(STAGE_DISABLED|DISPOSITION_APPLIED|REVISION_REQUIRED|PRODUCER_RATIONALE_WITHHELD)`$", "Stage": "^(brief|write|image|code|e2e|review)$", "Statement": "\\S" } },
+    { "heading": "^## Fallbacks taken$", "table": "| Code | Action |", "cell": { "Code": "^`[A-Z][A-Z0-9_]*`$", "Action": "\\S" } }
+  ]
+}

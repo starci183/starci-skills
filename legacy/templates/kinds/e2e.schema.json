@@ -1,0 +1,63 @@
+{
+  "$id": "kind:e2e",
+  "title": "What the generated code did when it was actually built and run: one build record per track, one run record per executable check, and the contract fingerprint taken before and after the repair loop.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["unitId", "contractFingerprintBefore", "contractFingerprintAfter", "iterations", "maxIterations", "tracks", "runs"],
+  "properties": {
+    "unitId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "contractFingerprintBefore": { "$ref": "#/$defs/fingerprint" },
+    "contractFingerprintAfter": { "$ref": "#/$defs/fingerprint" },
+    "iterations": { "type": "integer", "minimum": 1, "maximum": 20 },
+    "maxIterations": { "type": "integer", "minimum": 1, "maximum": 20 },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["language", "sourceRef", "buildCommand", "exitCode"],
+        "properties": {
+          "language": { "$ref": "#/$defs/implementationLanguage" },
+          "sourceRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "buildCommand": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "exitCode": { "type": "integer", "minimum": 0, "maximum": 255 }
+        }
+      }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["language", "command", "exitCode", "assertions"],
+        "properties": {
+          "language": { "$ref": "#/$defs/implementationLanguage" },
+          "command": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "exitCode": { "type": "integer", "minimum": 0, "maximum": 255 },
+          "assertions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "held"],
+              "properties": {
+                "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+                "held": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "implementationLanguage": { "type": "string", "pattern": "^[a-z][a-z0-9+#.-]*$" }
+  }
+}

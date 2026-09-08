@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "id": "uat.plan",
+  "purpose": "Plan one executable UAT flow per user journey, with entry route, bounded steps, access mode, fixture prerequisites, assertions and coverage tier.",
+  "scope": "Read-only UAT planning. Produces a human plan, machine case sheet and units; it opens no browser, signs in nowhere, provisions no account, creates no fixture and carries no credentials.",
+  "modules": { "request": "request.json", "response": "response.json", "validate": "validate.json", "step": "step.json", "criteria": "criteria.json" }
+}

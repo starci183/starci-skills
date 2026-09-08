@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only business.reconcile emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, EVIDENCE_MISSING, APPROVAL_REQUIRED) come from operators/errors.json. RECONCILIATION_DISCREPANCY moved here from business.decide with the step that emits it; HEAD_NOT_RECONCILABLE is the one stop this operator adds, because a head that is absent or in the wrong state is decided by a person through business.decide, never invented here.",
+  "codes": {
+    "HEAD_NOT_RECONCILABLE": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "No head is published for the feature, or the published head is in a state from which the target state is not a legal transition; there is nothing here to compare delivered source against.",
+        "vi": "Chưa có head nào được publish cho feature, hoặc head đã publish đang ở trạng thái mà trạng thái đích không phải một chuyển trạng thái hợp lệ; ở đây không có gì để đối chiếu source đã giao với."
+      },
+      "resume": {
+        "en": "Decide and publish the promise through business.decide first, or ask for a transition the published head admits.",
+        "vi": "Quyết và publish lời hứa qua business.decide trước, hoặc xin một chuyển trạng thái mà head đã publish cho phép."
+      }
+    },
+    "RECONCILIATION_DISCREPANCY": {
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Delivered source differs from the frozen coverage matrix on at least one dimension, and no head is republished over a known gap.",
+        "vi": "Source đã giao khác với ma trận phủ đã đóng băng ở ít nhất một chiều, và không head nào được publish lại trên một khoảng trống đã biết."
+      },
+      "resume": {
+        "en": "Correct the source, or revise the matrix through business.decide.",
+        "vi": "Sửa source, hoặc sửa lại ma trận qua business.decide."
+      }
+    }
+  }
+}

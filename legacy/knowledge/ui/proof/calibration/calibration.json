@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 9,
+  "note": "The calibration set: three anchor sheets and the band each is expected to score in, read by the operator that scores the taste lens (TASTE-13 Case 9) before it scores a surface. An auditor scores every anchor in the same round it scores the surface; an anchor scored more than `tolerance` points outside its band voids the round, because a score from a scale nobody proved is not comparable with another sheet's. The bands are stated here once; a gate reads them from this file and carries no copy. The `ux` band covers the criteria a still render answers and stands for whichever receipt scores that lens from a capture.",
+  "tolerance": 1,
+  "lenses": {
+    "taste": "TASTE-13",
+    "ux": "UX-12"
+  },
+  "anchors": [
+    {
+      "id": "anchor-low",
+      "file": "anchor-low.html",
+      "bands": { "taste": [1, 2], "ux": [1, 2] },
+      "why": "no single largest element, a 180px band whose only occupant is an ornament, four filled accents, drifting left edges, five type sizes, a half-empty grid row, module names as labels and bare numbers"
+    },
+    {
+      "id": "anchor-mid",
+      "file": "anchor-mid.html",
+      "bands": { "taste": [3, 3], "ux": [3, 3] },
+      "why": "edges aligned, one radius family, three type sizes and warnings marked, but the title barely outranks its sections, two filled accents compete, one number carries no unit and the empty state explains without offering the action"
+    },
+    {
+      "id": "anchor-high",
+      "file": "anchor-high.html",
+      "bands": { "taste": [4, 5], "ux": [4, 5] },
+      "why": "one focal point a scale step above every section, monotonic rhythm, one accent on one action, every number with its unit, warnings visibly distinct, a designed empty state with the action that ends it, and the primary action pinned within reach when narrow"
+    }
+  ]
+}

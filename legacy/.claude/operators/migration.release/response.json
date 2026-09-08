@@ -1,0 +1,8 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","title":"migration.release response","$ref":"works:response",
+  "description":"A done response retains the migration disposition and proof that the frozen plan is wholly applied, replay has no pending work and every earlier journal row remains unchanged. Execution logs are optional for proved no-ops.",
+  "allOf":[{"if":{"properties":{"status":{"const":"done"}},"required":["status"]},"then":{"properties":{"outputs":{"allOf":[
+    {"contains":{"properties":{"id":{"const":"migration-release"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"migration-release-proof"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}}
+  ]},"observations":{"not":{"contains":{"properties":{"result":{"const":"failed"}},"required":["result"]}}}}}}]
+}

@@ -1,0 +1,2097 @@
+{
+  "$defs": {
+    "common": {
+      "$defs": {
+        "actor": {
+          "additionalProperties": false,
+          "description": "Recorded actor identity, not host-authenticated authority.",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "kind": {
+              "enum": [
+                "user",
+                "agent",
+                "tool",
+                "system"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        "criteria": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/criterion"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "criterion": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            }
+          },
+          "required": [
+            "id",
+            "description"
+          ],
+          "type": "object"
+        },
+        "digest": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "file": {
+          "additionalProperties": false,
+          "description": "A staged file relative to the work directory. The consumer verifies its actual bytes against sha256.",
+          "properties": {
+            "mediaType": {
+              "$ref": "#/$defs/common/$defs/mediaType"
+            },
+            "path": {
+              "$ref": "#/$defs/common/$defs/relativePath"
+            },
+            "sha256": {
+              "$ref": "#/$defs/common/$defs/digest"
+            }
+          },
+          "required": [
+            "path",
+            "sha256",
+            "mediaType"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "type": "string"
+        },
+        "idList": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/id"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "mediaType": {
+          "pattern": "^[a-zA-Z0-9!#$&^_.+-]+/[a-zA-Z0-9!#$&^_.+-]+$",
+          "type": "string"
+        },
+        "relativePath": {
+          "description": "A slash-separated file path relative to the work directory; no absolute path, dot segment, parent traversal, drive prefix or backslash.",
+          "not": {
+            "pattern": "(^|/)\\.\\.?(/|$)"
+          },
+          "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "properties": {
+            "excluded": {
+              "items": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "included": {
+              "items": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "included",
+            "excluded"
+          ],
+          "type": "object"
+        },
+        "text": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "version": {
+          "const": 1,
+          "type": "integer"
+        }
+      }
+    },
+    "context": {
+      "additionalProperties": false,
+      "description": "Supporting notes and reference files used to understand the task, separate from its inputs. Empty collections explicitly mean no extra context. Context does not grant additional execution authority.",
+      "properties": {
+        "files": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/file"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array"
+        },
+        "visual": {
+          "$ref": "#/$defs/visual"
+        }
+      },
+      "required": [
+        "notes",
+        "files"
+      ],
+      "title": "Request context",
+      "type": "object"
+    },
+    "decision": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/decisions/<id>.json: an attributed decision on an exact work revision and subject digest. Identity and authority are not authenticated by this schema.",
+      "properties": {
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "decidedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "decision"
+        },
+        "outcome": {
+          "enum": [
+            "approved",
+            "rejected",
+            "changes-requested"
+          ],
+          "type": "string"
+        },
+        "rationale": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "sourceRef": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "subject": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "kind": {
+              "enum": [
+                "work",
+                "request",
+                "response",
+                "evidence"
+              ],
+              "type": "string"
+            },
+            "sha256": {
+              "$ref": "#/$defs/common/$defs/digest"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "sha256"
+          ],
+          "type": "object"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "subject",
+        "outcome",
+        "decidedBy",
+        "sourceRef",
+        "rationale",
+        "createdAt"
+      ],
+      "title": "Decision",
+      "type": "object"
+    },
+    "evidence": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/evidence/<id>.json: artifact metadata. Existence, actual digest and evidentiary relevance require separate checks.",
+      "properties": {
+        "capturedAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "capturedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "description": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "evidence"
+        },
+        "mediaType": {
+          "$ref": "#/$defs/common/$defs/mediaType"
+        },
+        "path": {
+          "$ref": "#/$defs/common/$defs/relativePath"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "sha256": {
+          "$ref": "#/$defs/common/$defs/digest"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "path",
+        "sha256",
+        "mediaType",
+        "description",
+        "capturedBy",
+        "capturedAt"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "image-generation": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "baseline": {
+                "$ref": "#/$defs/common/$defs/file",
+                "properties": {
+                  "mediaType": {
+                    "pattern": "^image/"
+                  }
+                }
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "new"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "baseline": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "attemptId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "baseline": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/common/$defs/file"
+            }
+          ]
+        },
+        "image": {
+          "$ref": "#/$defs/common/$defs/file",
+          "properties": {
+            "mediaType": {
+              "const": "image/png"
+            }
+          }
+        },
+        "mode": {
+          "enum": [
+            "new",
+            "extend",
+            "revise"
+          ]
+        },
+        "prompt": {
+          "$ref": "#/$defs/common/$defs/file",
+          "properties": {
+            "mediaType": {
+              "const": "text/plain"
+            }
+          }
+        },
+        "requestId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "attemptId",
+        "mode",
+        "baseline",
+        "prompt",
+        "image"
+      ],
+      "title": "Retained image generation context",
+      "type": "object"
+    },
+    "index": {
+      "description": "Version 1 of the proposed .works document format. A document must match exactly one kind. This contract does not migrate or reinterpret legacy session records.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/work"
+        },
+        {
+          "$ref": "#/$defs/request"
+        },
+        {
+          "$ref": "#/$defs/response"
+        },
+        {
+          "$ref": "#/$defs/evidence"
+        },
+        {
+          "$ref": "#/$defs/decision"
+        }
+      ],
+      "title": "Works document contract"
+    },
+    "inputs": {
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "properties": {
+            "prompts": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "files": {
+              "minItems": 1
+            }
+          }
+        }
+      ],
+      "description": "The prompts and files the request asks the skill to act on. At least one prompt or file is required.",
+      "properties": {
+        "files": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/file"
+          },
+          "type": "array"
+        },
+        "prompts": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "prompts",
+        "files"
+      ],
+      "title": "Request inputs",
+      "type": "object"
+    },
+    "output": {
+      "description": "One produced output. Text is inline; commits identify a repository and full object ID; images and other files bind persisted artifacts. Output metadata alone does not prove correctness or publication.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "enum": [
+                "plain",
+                "markdown"
+              ],
+              "type": "string"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "text": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "type": {
+              "const": "text"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "text",
+            "format"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "message": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "repository": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "sha": {
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
+              "type": "string"
+            },
+            "type": {
+              "const": "commit"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "repository",
+            "sha"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "alt": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "file": {
+              "$ref": "#/$defs/common/$defs/file",
+              "properties": {
+                "mediaType": {
+                  "pattern": "^image/"
+                }
+              }
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "type": {
+              "const": "image"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "file",
+            "alt"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "$ref": "#/$defs/common/$defs/text"
+            },
+            "file": {
+              "$ref": "#/$defs/common/$defs/file"
+            },
+            "id": {
+              "$ref": "#/$defs/common/$defs/id"
+            },
+            "type": {
+              "const": "file"
+            }
+          },
+          "required": [
+            "id",
+            "type",
+            "file",
+            "description"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Response output"
+    },
+    "request": {
+      "additionalProperties": false,
+      "description": ".works/<workId>/requests/<id>.json: prompts and files to act on, with supporting context kept separate, against one work revision. This record alone grants no execution permission.",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/context"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "expected": {
+          "$ref": "#/$defs/common/$defs/criteria"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "kind": {
+          "const": "request"
+        },
+        "operation": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/common/$defs/actor"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "operation",
+        "expected",
+        "inputs",
+        "context",
+        "requestedBy",
+        "createdAt"
+      ],
+      "title": "Request",
+      "type": "object"
+    },
+    "response": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "done"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outputs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "mismatch",
+                  "blocked",
+                  "waiting"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ],
+      "description": ".works/<workId>/responses/<id>.json: typed outputs produced for one request. Optional verification observations describe their checks separately; delivering an output is not a claim that the work is proved complete.",
+      "properties": {
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "criteriaResults": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "criterionId": {
+                "$ref": "#/$defs/common/$defs/id"
+              },
+              "note": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "outputIds": {
+                "$ref": "#/$defs/common/$defs/idList"
+              },
+              "result": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "not-checked"
+                ]
+              }
+            },
+            "required": [
+              "criterionId",
+              "result",
+              "outputIds",
+              "note"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "feedbackRound": {
+          "description": "Completed feedback-and-repair rounds for this request. Initial candidate is round zero; the caller maintains truthful history.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "response"
+        },
+        "observations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "criterionId": {
+                "$ref": "#/$defs/common/$defs/id"
+              },
+              "evidenceIds": {
+                "$ref": "#/$defs/common/$defs/idList"
+              },
+              "note": {
+                "$ref": "#/$defs/common/$defs/text"
+              },
+              "result": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "not-checked"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "criterionId",
+              "result",
+              "evidenceIds",
+              "note"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/output"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "requestId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "status": {
+          "enum": [
+            "done",
+            "mismatch",
+            "blocked",
+            "waiting"
+          ],
+          "type": "string"
+        },
+        "workId": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "workId",
+        "workRevision",
+        "requestId",
+        "status",
+        "outputs",
+        "createdAt"
+      ],
+      "title": "Response",
+      "type": "object"
+    },
+    "visual": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "not": {
+              "required": [
+                "baselinePath"
+              ]
+            }
+          },
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "extend",
+                  "revise"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "preserve": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "baselinePath"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "baselinePath": {
+          "$ref": "#/$defs/common/$defs/relativePath"
+        },
+        "change": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "mode": {
+          "enum": [
+            "new",
+            "extend",
+            "revise"
+          ]
+        },
+        "preserve": {
+          "items": {
+            "$ref": "#/$defs/common/$defs/text"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "mode",
+        "preserve",
+        "change"
+      ],
+      "title": "Visual context",
+      "type": "object"
+    },
+    "work": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "completion": false
+            }
+          },
+          "if": {
+            "properties": {
+              "status": {
+                "const": "completed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "completion"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "blocked",
+                  "cancelled"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ],
+      "description": ".works/<id>/work.json: goal, declared scope, acceptance criteria and current lifecycle.",
+      "properties": {
+        "acceptanceCriteria": {
+          "$ref": "#/$defs/common/$defs/criteria"
+        },
+        "completion": {
+          "additionalProperties": false,
+          "properties": {
+            "completedAt": {
+              "$ref": "#/$defs/common/$defs/timestamp"
+            },
+            "evidenceIds": {
+              "$ref": "#/$defs/common/$defs/idList",
+              "minItems": 1
+            }
+          },
+          "required": [
+            "evidenceIds",
+            "completedAt"
+          ],
+          "type": "object"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        },
+        "goal": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "id": {
+          "$ref": "#/$defs/common/$defs/id"
+        },
+        "kind": {
+          "const": "work"
+        },
+        "reason": {
+          "$ref": "#/$defs/common/$defs/text"
+        },
+        "revision": {
+          "$ref": "#/$defs/common/$defs/revision"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/common/$defs/version"
+        },
+        "scope": {
+          "$ref": "#/$defs/common/$defs/scope"
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "active",
+            "blocked",
+            "completed",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/common/$defs/timestamp"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "id",
+        "revision",
+        "goal",
+        "status",
+        "scope",
+        "acceptanceCriteria",
+        "createdAt",
+        "updatedAt"
+      ],
+      "title": "Work",
+      "type": "object"
+    }
+  },
+  "aliases": {
+    "@cli/curl": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "curl"
+      },
+      "kind": "cli",
+      "note": "On Windows resolve the curl executable (curl.exe), not a PowerShell alias with different argument semantics. A native web-fetch capability is not this CLI alias.",
+      "params": [],
+      "purpose": "Probe an HTTP endpoint using the curl executable.",
+      "resolvesTo": "executable:curl",
+      "scheme": "cli://curl",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/docker": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "docker"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Inspect or operate containers and images through Docker CLI.",
+      "resolvesTo": "executable:docker",
+      "scheme": "cli://docker",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/git": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "git"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Inspect or change Git repository state.",
+      "resolvesTo": "executable:git",
+      "scheme": "cli://git",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/python": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "python"
+      },
+      "kind": "cli",
+      "note": "Resolve Python 3 from the active environment: python, python3, or py -3 as appropriate; record the selected executable and any launcher arguments.",
+      "params": [],
+      "purpose": "Run declared Python scripts.",
+      "resolvesTo": "executable:python",
+      "scheme": "cli://python",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/shell": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "<session-shell>"
+      },
+      "kind": "cli",
+      "note": "Resolve to the session shell (PowerShell, bash or another declared shell); do not assume bash on Windows. Arguments remain separate data until encoded for that shell.",
+      "params": [],
+      "purpose": "Run a declared command in the active session shell.",
+      "resolvesTo": "executable:<session-shell>",
+      "scheme": "cli://shell",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@tools/fileread": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "fileread"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Read declared workspace files and directories through the active session.",
+      "resolvesTo": "session:fileread",
+      "scheme": "tool://fileread",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Read, Glob and Grep"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex file reads"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/print": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "print"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Present text and artifacts in the conversation using the host rendering capabilities.",
+      "resolvesTo": "session:print",
+      "scheme": "tool://print",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "the session's file and render hand-off, which displays an image or an HTML page in the conversation and falls back to the path or the URL"
+        },
+        "openai": {
+          "supported": true,
+          "via": "the absolute path or the URL printed into the conversation, with the image inline where the client renders one"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/sourcewrite": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "sourcewrite"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Edit files within the declared write scope through the active session.",
+      "resolvesTo": "session:sourcewrite",
+      "scheme": "tool://sourcewrite",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Write and Edit"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex file edits"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@workspaces": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [],
+      "purpose": "The explicitly selected project workspace.",
+      "resolvesTo": "<Workspace>/",
+      "scheme": "workspace://root",
+      "writers": [
+        "git.publish",
+        "runtime.serve"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/artifacts": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Produced files, including images, documents and other deliverables.",
+      "resolvesTo": "<Workspace>/.works/<workId>/artifacts/",
+      "scheme": "workspace://artifacts",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/context": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Supporting reference files for a request.",
+      "resolvesTo": "<Workspace>/.works/<workId>/context/",
+      "scheme": "workspace://context",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/inputs": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Files supplied as the subject of a request.",
+      "resolvesTo": "<Workspace>/.works/<workId>/inputs/",
+      "scheme": "workspace://inputs",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/requests": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Requests with separate inputs and context.",
+      "resolvesTo": "<Workspace>/.works/<workId>/requests/",
+      "scheme": "workspace://requests",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/responses": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Responses declaring produced outputs and execution status.",
+      "resolvesTo": "<Workspace>/.works/<workId>/responses/",
+      "scheme": "workspace://responses",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "zone": "workspaces"
+    }
+  },
+  "criteria": {
+    "history": "Record round zero desired state and inventory fingerprint, lease order, fixed-port holders, exact delta, integration provenance and post-effect checks. Every retry begins with fresh inventory and preserves prior effect transcripts.",
+    "items": [
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-shape"
+        },
+        "expect": "The request schema passes.",
+        "id": "request-shape",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-runtime-rung",
+          "instruction": "Request a corrected runtime request."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-files"
+        },
+        "expect": "Desired-state, authority, route and inventory evidence match digests.",
+        "id": "request-files",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-runtime-rung",
+          "instruction": "Request exact missing or drifted runtime evidence."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "response-shape"
+        },
+        "expect": "The response schema and runtime outputs pass.",
+        "id": "response-shape",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-runtime-result",
+          "instruction": "Repair response metadata from observed runtime artifacts."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "request-binding"
+        },
+        "expect": "The response binds this request and revision.",
+        "id": "request-binding",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-runtime-result",
+          "instruction": "Correct response binding."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "unique-outputs"
+        },
+        "expect": "Runtime output identifiers are unique.",
+        "id": "unique-outputs",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-runtime-result",
+          "instruction": "Remove duplicate declarations."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "output-files"
+        },
+        "expect": "Runtime evidence is present, scoped and digest-bound.",
+        "id": "output-files",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-runtime-result",
+          "instruction": "Re-read actual delta, checks and receipt files; correct metadata only."
+        }
+      },
+      {
+        "check": {
+          "kind": "machine",
+          "ref": "observation-binding"
+        },
+        "expect": "Observations reference request criteria and current evidence.",
+        "id": "observation-binding",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "record-runtime-result",
+          "instruction": "Correct evidence references."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "runtime-authority-inventory"
+        },
+        "expect": "One rung, route, desired-state digest, effect ceiling, capability and authority bind pre-effect inventory.",
+        "id": "runtime-authority-inventory",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-runtime-rung",
+          "instruction": "Name the missing authority, capability or mismatched inventory binding."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "fixed-port-holder-safety"
+        },
+        "expect": "The route keeps its fixed port and no foreign or uncertain holder is reclaimed.",
+        "id": "fixed-port-holder-safety",
+        "onFail": {
+          "action": "block",
+          "fromStep": "inventory-runtime-entry",
+          "instruction": "Report the port and holder; only its owner may release it."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "integration-merge-integrity"
+        },
+        "expect": "Serve preserves merge provenance, owned conflict scope and passed merged-head gates.",
+        "id": "integration-merge-integrity",
+        "onFail": {
+          "action": "block",
+          "fromStep": "execute-runtime-rung",
+          "instruction": "Report exact conflict or gate failure; repair must arrive as a new session head."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "rung-delta-integrity"
+        },
+        "expect": "Inventory, allowed effects, mutations and checks match exactly one selected rung.",
+        "id": "rung-delta-integrity",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "inventory-runtime-entry",
+          "instruction": "Re-observe and derive a narrower exact delta; do not expand mutable scope."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "runtime-attestation"
+        },
+        "expect": "All rung checks and declared endpoint probes prove the recorded generation and served head.",
+        "id": "runtime-attestation",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "observe-after-runtime-effect",
+          "instruction": "Record exact failed probe or check and reassess after targeted authorized repair."
+        }
+      },
+      {
+        "check": {
+          "kind": "review",
+          "ref": "no-duplicate-runtime-effect"
+        },
+        "expect": "Restart, reset, merge and stop effects are never repeated while completion is uncertain.",
+        "id": "no-duplicate-runtime-effect",
+        "onFail": {
+          "action": "block",
+          "fromStep": "observe-after-runtime-effect",
+          "instruction": "Stop and require authoritative entry, process and head observation before any effect."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "capability-unavailable"
+        },
+        "expect": "Registry, Git, process, container and probe capabilities needed by the rung are available.",
+        "id": "missing-capability",
+        "onFail": {
+          "action": "block",
+          "fromStep": "bind-runtime-rung",
+          "instruction": "Return the missing capability; do not substitute a wider mechanism."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "essential-input-missing"
+        },
+        "expect": "Route, rung, desired state, authority, fixed ports and inventory are complete.",
+        "id": "missing-essential-input",
+        "onFail": {
+          "action": "ask",
+          "fromStep": "bind-runtime-rung",
+          "instruction": "Ask for the exact missing binding before effects."
+        }
+      },
+      {
+        "check": {
+          "kind": "event",
+          "ref": "transient-execution-failure"
+        },
+        "expect": "Every runtime effect has known completion.",
+        "id": "transient-runtime-effect",
+        "onFail": {
+          "action": "retry",
+          "fromStep": "observe-after-runtime-effect",
+          "instruction": "Observe and re-inventory the entry, process, port and served head first; never blindly repeat the effect."
+        }
+      }
+    ],
+    "limits": {
+      "feedbackRounds": 2
+    },
+    "stopWhen": "Stop after two feedback rounds, repeated rung failure, port conflict, missing authority, failed merged-head gate, unavailable capability or unobservable uncertain effect. Never rebase, force or reclaim a foreign port."
+  },
+  "id": "runtime.serve",
+  "purpose": "Climb one requested rung of the runtime ladder for one bound product route, preserve its fixed port and integration branch, and attest the resulting entry from live probes.",
+  "request": {
+    "$ref": "#/$defs/request",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Bind one route key, one runtime-ladder rung, fixed port claims, the desired-state digest and allowed effects, current inventory, registry capability custody and existing environment authority. A serve request also binds the session commit and changed-file ownership.",
+    "properties": {
+      "expected": {
+        "minItems": 1
+      },
+      "inputs": {
+        "properties": {
+          "files": {
+            "minItems": 1
+          }
+        }
+      },
+      "operation": {
+        "const": "runtime.serve"
+      }
+    },
+    "title": "runtime.serve request"
+  },
+  "response": {
+    "$ref": "#/$defs/response",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "done"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "observations": {
+              "not": {
+                "contains": {
+                  "properties": {
+                    "result": {
+                      "const": "failed"
+                    }
+                  },
+                  "required": [
+                    "result"
+                  ]
+                }
+              }
+            },
+            "outputs": {
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "file": {
+                        "properties": {
+                          "mediaType": {
+                            "const": "application/json"
+                          }
+                        }
+                      },
+                      "id": {
+                        "const": "platform-operation-receipt"
+                      },
+                      "type": {
+                        "const": "file"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "file"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "file": {
+                        "properties": {
+                          "mediaType": {
+                            "const": "application/json"
+                          }
+                        }
+                      },
+                      "id": {
+                        "const": "runtime-delta"
+                      },
+                      "type": {
+                        "const": "file"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "file"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "file": {
+                        "properties": {
+                          "mediaType": {
+                            "const": "application/json"
+                          }
+                        }
+                      },
+                      "id": {
+                        "const": "runtime-checks"
+                      },
+                      "type": {
+                        "const": "file"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "file"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "done"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "criteriaResults": {
+              "allOf": [
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "runtime-authority-inventory"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "fixed-port-holder-safety"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "integration-merge-integrity"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "rung-delta-integrity"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "runtime-attestation"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                },
+                {
+                  "contains": {
+                    "properties": {
+                      "criterionId": {
+                        "const": "no-duplicate-runtime-effect"
+                      }
+                    },
+                    "required": [
+                      "criterionId"
+                    ]
+                  }
+                }
+              ],
+              "items": {
+                "properties": {
+                  "outputIds": {
+                    "minItems": 1
+                  },
+                  "result": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "maxItems": 6,
+              "minItems": 6
+            },
+            "observations": {
+              "items": {
+                "properties": {
+                  "result": {
+                    "const": "passed"
+                  }
+                }
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "criteriaResults",
+            "feedbackRound",
+            "observations"
+          ]
+        }
+      }
+    ],
+    "description": "A done response retains the inventory and applied delta, complete rung check set, route entry, fixed port, generation and attested served head. A proved already-converged result includes paired observations and no mutation.",
+    "properties": {
+      "criteriaResults": {
+        "items": {
+          "properties": {
+            "criterionId": {
+              "enum": [
+                "runtime-authority-inventory",
+                "fixed-port-holder-safety",
+                "integration-merge-integrity",
+                "rung-delta-integrity",
+                "runtime-attestation",
+                "no-duplicate-runtime-effect"
+              ]
+            }
+          }
+        }
+      },
+      "feedbackRound": {
+        "maximum": 2
+      }
+    },
+    "title": "runtime.serve response"
+  },
+  "schemaVersion": 1,
+  "scope": "One route and one rung: stack-up, locate, start-role, serve, restart, reset or stop. Effects require existing authority; foreign holders are never reclaimed; integration uses merge commits and gates the merged head without rebase or force.",
+  "step": {
+    "steps": [
+      {
+        "calls": [
+          {
+            "alias": "@tools/fileread",
+            "purpose": "Read desired state, authority and inventory evidence.",
+            "when": "always"
+          },
+          {
+            "alias": "@cli/git",
+            "purpose": "Read routed checkout and commit provenance.",
+            "when": "for locate or serve"
+          }
+        ],
+        "checks": [
+          "request-shape",
+          "request-files"
+        ],
+        "id": "bind-runtime-rung",
+        "instruction": "Read the request and declared current inventory. Bind one route key, one ladder rung, fixed port claims, desired-state digest, allowed effects, mutable ceiling, capability custody, environment authority, and session commit plus owned paths for serve. No declaration grants itself authority.",
+        "produces": [
+          "Authorized runtime rung binding."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/requests",
+            "path": "<requestId>.json",
+            "when": "always"
+          },
+          {
+            "alias": "@workspaces/inputs",
+            "path": "<declared-input-path>",
+            "when": "for every input file"
+          },
+          {
+            "alias": "@workspaces/context",
+            "path": "<authority-or-capability-reference>",
+            "when": "when declared"
+          }
+        ],
+        "writes": []
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/shell",
+            "purpose": "Read process and socket state.",
+            "when": "always"
+          },
+          {
+            "alias": "@cli/git",
+            "purpose": "Read branch, head and ancestry.",
+            "when": "for locate or serve"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist inventory and lease observation.",
+            "when": "always"
+          }
+        ],
+        "checks": [],
+        "id": "inventory-runtime-entry",
+        "instruction": "Re-observe the route entry, process, generation, served head, configuration, health and every fixed-port holder before effects. Classify reusable, missing, invalid, foreign or uncertain state and acquire the declared lease order.",
+        "produces": [
+          "Runtime inventory and port-holder map."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/context",
+            "path": "<declared-runtime-entry>",
+            "when": "always"
+          },
+          {
+            "alias": "@workspaces",
+            "path": "<routed-checkout-path>",
+            "when": "for locate or serve"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/runtime-inventory.json",
+            "when": "always"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/git",
+            "purpose": "Merge and verify the integration head without rebase or force.",
+            "when": "for serve"
+          },
+          {
+            "alias": "@cli/docker",
+            "purpose": "Operate declared runtime infrastructure.",
+            "when": "for stack-up, start-role, restart, reset or stop when container-backed"
+          },
+          {
+            "alias": "@cli/shell",
+            "purpose": "Run declared role, gate and process commands.",
+            "when": "when required by the selected rung"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist the exact allowed and applied delta.",
+            "when": "always"
+          }
+        ],
+        "checks": [],
+        "id": "execute-runtime-rung",
+        "instruction": "Perform only the selected rung's allowed delta under the lease. Reuse already-converged state. For serve, merge the session commit into the fixed integration branch without rebase or force, resolve only owned rule-covered hunks, gate the merged head, then operate the one detached server. Never reclaim a foreign port.",
+        "produces": [
+          "runtime-delta"
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/runtime-inventory.json",
+            "when": "always"
+          },
+          {
+            "alias": "@workspaces",
+            "path": "<routed-checkout-path>",
+            "when": "when the rung needs a checkout"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces",
+            "path": "<routed-integration-checkout-path>",
+            "when": "only for the serve rung's integration merge"
+          },
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/runtime-delta.json",
+            "when": "always"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@cli/curl",
+            "purpose": "Probe every declared runtime endpoint.",
+            "when": "unless the selected rung is stop"
+          },
+          {
+            "alias": "@cli/shell",
+            "purpose": "Re-observe process and port state.",
+            "when": "always"
+          },
+          {
+            "alias": "@cli/git",
+            "purpose": "Re-observe integration head and ancestry.",
+            "when": "for serve"
+          },
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist observed rung checks.",
+            "when": "always"
+          }
+        ],
+        "checks": [],
+        "id": "observe-after-runtime-effect",
+        "instruction": "After any mutation or uncertain result, re-inventory the entry, process, port and served head before further commands. Probe every declared endpoint and collect the rung's complete check set. A converged no-op uses paired read-only observations and records zero mutations.",
+        "produces": [
+          "runtime-checks"
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/runtime-delta.json",
+            "when": "always"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/runtime-checks.json",
+            "when": "always"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Persist the attested runtime receipt.",
+            "when": "after evaluation"
+          }
+        ],
+        "checks": [
+          "runtime-authority-inventory",
+          "fixed-port-holder-safety",
+          "integration-merge-integrity",
+          "rung-delta-integrity",
+          "runtime-attestation",
+          "no-duplicate-runtime-effect"
+        ],
+        "id": "evaluate-runtime",
+        "instruction": "Compare authority, inventory, fixed ports, integration provenance, delta and attestation. Produce exact defects and a receipt only when every required rung check passes; uncertain effects remain observed and never blindly repeated.",
+        "produces": [
+          "platform-operation-receipt",
+          "Concrete failed-criterion feedback or passing review results."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/<runtime-evidence>",
+            "when": "always"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/platform-operation-receipt.json",
+            "when": "after evaluation"
+          }
+        ]
+      },
+      {
+        "calls": [
+          {
+            "alias": "@tools/sourcewrite",
+            "purpose": "Write the runtime response.",
+            "when": "always"
+          },
+          {
+            "alias": "@cli/python",
+            "purpose": "Validate request and response records.",
+            "when": "always"
+          },
+          {
+            "alias": "@tools/print",
+            "purpose": "Present the attested route, generation and served head.",
+            "when": "when proved"
+          }
+        ],
+        "checks": [
+          "response-shape",
+          "request-binding",
+          "unique-outputs",
+          "output-files",
+          "observation-binding"
+        ],
+        "id": "record-runtime-result",
+        "instruction": "Write and validate the response with exact hashes, observations and review results. Present the route as serving only from passed endpoint and rung evidence; stop results show the released holder instead.",
+        "produces": [
+          "A validated runtime response."
+        ],
+        "reads": [
+          {
+            "alias": "@workspaces/artifacts",
+            "path": "<requestId>/<attemptId>/<produced-artifact>",
+            "when": "always"
+          }
+        ],
+        "writes": [
+          {
+            "alias": "@workspaces/responses",
+            "path": "<responseId>.json",
+            "when": "always"
+          }
+        ]
+      }
+    ]
+  },
+  "validate": {
+    "failurePolicy": "Turn failed checks into exact inventory, port, integration or probe defects. Repair within two rounds, re-observe before effect retries, and block wider or unauthorized changes.",
+    "machine": [
+      {
+        "check": "request-schema",
+        "id": "request-shape",
+        "phase": "request"
+      },
+      {
+        "check": "input-files",
+        "id": "request-files",
+        "phase": "request"
+      },
+      {
+        "check": "response-schema",
+        "id": "response-shape",
+        "phase": "response"
+      },
+      {
+        "check": "request-binding",
+        "id": "request-binding",
+        "phase": "response"
+      },
+      {
+        "check": "unique-output-ids",
+        "id": "unique-outputs",
+        "phase": "response"
+      },
+      {
+        "check": "output-files",
+        "id": "output-files",
+        "phase": "response"
+      },
+      {
+        "check": "observation-references",
+        "id": "observation-binding",
+        "phase": "response"
+      }
+    ],
+    "review": [
+      {
+        "id": "runtime-authority-inventory",
+        "instruction": "Confirm route, rung, desired-state digest, mutable ceiling, allowed effects, capability custody, inventory fingerprint and environment authority were bound before any effect."
+      },
+      {
+        "id": "fixed-port-holder-safety",
+        "instruction": "Confirm the route keeps its declared fixed port, every holder is identified, and no foreign or uncertain process is stopped or reconfigured to reclaim a port."
+      },
+      {
+        "id": "integration-merge-integrity",
+        "instruction": "For serve, verify the session commit is contained in the served head, integration uses merge or valid fast-forward without rebase or force, conflicts touch only owned hunks under closed rules, and gates pass on the merged head."
+      },
+      {
+        "id": "rung-delta-integrity",
+        "instruction": "Match inventory, requested effects, applied mutations and check set to the selected runtime rung. Already-converged results have paired read-only proof and zero mutations."
+      },
+      {
+        "id": "runtime-attestation",
+        "instruction": "Probe every declared endpoint and bind the answering process, generation, integration branch and served head. A missing or failed rung check cannot be described as serving."
+      },
+      {
+        "id": "no-duplicate-runtime-effect",
+        "instruction": "On uncertain completion, inventory the entry, process and served head again before any command. Reuse converged state and never blindly repeat restart, reset, merge or stop."
+      }
+    ]
+  }
+}

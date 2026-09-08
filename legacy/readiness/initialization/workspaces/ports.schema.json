@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starci.dev/v9/readiness/initialization/workspaces/ports.schema.json",
+  "title": "Workspace port projection",
+  "description": "The two documents of the port projection: the shared config that owns the steps, and one projection per project. Endpoints are derived from them and never typed. The canonical port of a service is `serviceBasePort + applicationSlot * slotStep + projectOffset`, where the service base is the routed backend's declared port service, `applicationSlot` is the entry `applications` gives the application, and `projectOffset` is this project's `offset`. That port is fixed, and keeping it fixed is the point: an identity client's redirect URIs, a backend's allowed origins and every callback registered at any provider are declared against it, so a runtime that moved a port to make room for a second session would break the sign-in of the first. Two sessions on one product are served by merging their work into one integration branch on that one port, in turn. `sessionSlots` is the escape hatch for a project that genuinely needs a second concurrent server, and it is zero unless somebody opts in.",
+  "oneOf": [
+    { "$ref": "#/$defs/config" },
+    { "$ref": "#/$defs/projection" }
+  ],
+  "$defs": {
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "slotStep"],
+      "description": "`<Source>/.workspaces/ports/config.json`: the steps every project projection is read against. Both numbers live here and nowhere else; a rule, an operator or a gate that needs one names this document.",
+      "properties": {
+        "$schema": { "type": "string", "minLength": 1 },
+        "version": { "const": 1 },
+        "slotStep": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The distance between two application slots of the same project."
+        },
+        "sessionSlotStep": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 100,
+          "description": "The distance between two session slots of the same application, used only where a project opted in to `sessionSlots`. A config that omits it is read at 100. The invariant that keeps the two ladders apart is `sessionSlots * sessionSlotStep <= slotStep` and `offset < sessionSlotStep`: an opted-in session slot can never land on the next application's port, and no project's offset can land on another project's session slot."
+        }
+      }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "project", "offset", "applications"],
+      "description": "`<Source>/.workspaces/ports/<project>.json`: one project's place on the ladder.",
+      "properties": {
+        "$schema": { "type": "string", "minLength": 1 },
+        "version": { "const": 1 },
+        "project": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99,
+          "description": "This project's offset from every service base. It is bounded below `sessionSlotStep` so that one project's opted-in session slots can never be another project's canonical ports."
+        },
+        "applications": {
+          "type": "object",
+          "description": "The application slots this project publishes: the name a route names, and the slot it occupies.",
+          "propertyNames": { "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "sessionSlots": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 0,
+          "description": "How many additional concurrent servers this project opts in to, beyond the one on the canonical port. Zero is the default and the answer for every product that has not proved it needs more: sessions share one server through the integration branch, which costs one build cache and never moves a port a provider was configured against. A project that raises this accepts a second server on the canonical port plus one `sessionSlotStep`, and accepts registering that port wherever its ports are declared."
+        }
+      }
+    }
+  }
+}

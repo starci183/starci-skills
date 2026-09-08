@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 9,
+  "id": "interface.audit",
+  "domain": "interface",
+  "job": "Observe the selected primary surfaces at the served route across their frozen audit matrix, measure every node that carries a claim, and judge each measurement against the published proof rules by the owner of the node it stands on.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-reviewer",
+    "grammarBound": true,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read",
+      "@tools/websearch": "bounded",
+      "@tools/visualize": "html",
+      "@tools/browsercontrol": "required",
+      "@tools/http": "probe",
+      "@tools/host": "loopback",
+      "@tools/secrets": "resolve-by-name",
+      "@tools/print": "decision-points"
+    }
+  },
+  "primaryOutput": "frontend-surface-audit"
+}

@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "rule": "Resolve impacts and handoff contracts before freezing the goal. Every lane has a justified disposition. Applicable lanes follow their data dependencies; the stage grants only the named extent of work. A handoff describes future implementation and proof, and never claims those operations ran. Authorizing excerpts are an auditable claim about the user's actual words, never an agent-written substitute for them.",
+  "authorityFields": [
+    "goal",
+    "impact",
+    "destination",
+    "stage",
+    "verification"
+  ],
+  "stages": {
+    "handoff": [
+      "environment.preflight",
+      "workspace.bind",
+      "business.decide",
+      "architecture.decide",
+      "backend.plan",
+      "interface.plan",
+      "data.plan",
+      "uat.plan",
+      "workflow.verify",
+      "interface.draw"
+    ],
+    "implement": [],
+    "publish": [],
+    "deploy": []
+  },
+  "lanes": {
+    "business": {
+      "when": [
+        "feature",
+        "business"
+      ],
+      "after": [],
+      "plan": [
+        "business.decide"
+      ],
+      "execute": [
+        "business.decide"
+      ]
+    },
+    "architecture": {
+      "when": [
+        "architecture",
+        "data",
+        "api"
+      ],
+      "after": [
+        "business"
+      ],
+      "plan": [
+        "architecture.decide"
+      ],
+      "execute": [
+        "architecture.decide"
+      ]
+    },
+    "backend": {
+      "when": [
+        "backend",
+        "data",
+        "api"
+      ],
+      "after": [
+        "architecture"
+      ],
+      "plan": [
+        "backend.plan"
+      ],
+      "execute": [
+        "backend.generate"
+      ]
+    },
+    "data": {
+      "when": [
+        "data"
+      ],
+      "after": [
+        "backend"
+      ],
+      "plan": [
+        "data.plan"
+      ],
+      "execute": [
+        "data.seed"
+      ]
+    },
+    "api": {
+      "when": [
+        "backend",
+        "api"
+      ],
+      "after": [
+        "backend",
+        "data"
+      ],
+      "plan": [],
+      "execute": [
+        "api.verify"
+      ]
+    },
+    "interface": {
+      "when": [
+        "interface"
+      ],
+      "after": [
+        "business",
+        "architecture"
+      ],
+      "plan": [
+        "interface.plan"
+      ],
+      "execute": [
+        "interface.generate"
+      ]
+    },
+    "audit": {
+      "when": [
+        "interface"
+      ],
+      "after": [
+        "interface"
+      ],
+      "plan": [],
+      "execute": [
+        "interface.audit"
+      ]
+    },
+    "uat": {
+      "when": [
+        "interface",
+        "browser"
+      ],
+      "after": [
+        "api",
+        "audit",
+        "data"
+      ],
+      "plan": [
+        "uat.plan"
+      ],
+      "execute": [
+        "uat.verify"
+      ]
+    },
+    "quality": {
+      "when": [
+        "feature",
+        "backend",
+        "data",
+        "api",
+        "interface",
+        "runtime",
+        "tooling"
+      ],
+      "after": [
+        "backend",
+        "interface"
+      ],
+      "plan": [],
+      "execute": [
+        "quality.verify"
+      ]
+    },
+    "reconciliation": {
+      "when": [
+        "feature",
+        "business"
+      ],
+      "after": [
+        "api",
+        "uat",
+        "quality"
+      ],
+      "plan": [],
+      "execute": [
+        "business.reconcile"
+      ]
+    }
+  },
+  "stageTerms": {
+    "deploy": [
+      "deploy",
+      "production",
+      "staging",
+      "triển khai môi trường"
+    ],
+    "implement": [
+      "implement",
+      "build",
+      "fix",
+      "triển khai",
+      "thực hiện",
+      "sửa"
+    ],
+    "publish": [
+      "publish",
+      "push",
+      "merge",
+      "xuất bản",
+      "đẩy",
+      "hợp nhất"
+    ],
+    "handoff": [
+      "handoff",
+      "brainstorm",
+      "planning",
+      "plan",
+      "bàn giao",
+      "lên kế hoạch",
+      "lập kế hoạch",
+      "thiết kế"
+    ]
+  }
+}

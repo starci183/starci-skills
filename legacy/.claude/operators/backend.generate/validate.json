@@ -1,0 +1,17 @@
+{
+  "machine": [
+    { "id": "request-shape", "check": "request-schema", "phase": "request" },
+    { "id": "request-files", "check": "input-files", "phase": "request" },
+    { "id": "response-shape", "check": "response-schema", "phase": "response" },
+    { "id": "request-binding", "check": "request-binding", "phase": "response" },
+    { "id": "unique-outputs", "check": "unique-output-ids", "phase": "response" },
+    { "id": "output-files", "check": "output-files", "phase": "response" },
+    { "id": "observation-binding", "check": "observation-references", "phase": "response" }
+  ],
+  "review": [
+    { "id": "contract-fidelity", "instruction": "Compare every implemented operation, writer, store, transaction, idempotency rule, event and migration reference with the supplied frozen authority. Reject invented business behavior or a weakened proof." },
+    { "id": "source-boundary", "instruction": "Inspect the actual diff. Every changed path must be inside the declared mutable ceiling and outside protected paths; the mutation report must carry accurate before and after digests." },
+    { "id": "behavior-proof", "instruction": "Read the raw proof commands, exit codes and outputs. Require coverage of declared success, validation, authorization, persistence and failure behavior; a command that did not run is not passing evidence." }
+  ],
+  "failurePolicy": "Produce, validate, inspect, give concrete failing-check feedback, repair only the affected source or record, and reassess. A done response requires every criteria result to pass within the finite feedback budget."
+}

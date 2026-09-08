@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "id": "environment.preflight",
+  "purpose": "Inspect all mission prerequisites once and report every ready, wall or skipped check across declarations, checkouts, identity custody, runtime, host, approvals and services.",
+  "scope": "Read-only readiness inspection. Produces a complete report even when blocked; it repairs no route, checkout, dependency, identity, runtime, service, port, approval or credential state.",
+  "modules": { "request": "request.json", "response": "response.json", "validate": "validate.json", "step": "step.json", "criteria": "criteria.json" }
+}

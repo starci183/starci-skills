@@ -1,0 +1,12 @@
+{
+  "$id": "kind:library-source-application", "type": "object", "additionalProperties": false,
+  "required": ["packageName", "base", "commit", "planHash", "files", "proofs"],
+  "properties": {
+    "packageName": {"type": "string"},
+    "base": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "planHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "files": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["path", "before", "after"], "properties": {"path": {"type": "string"}, "before": {"type": ["string", "null"]}, "after": {"type": "string"}}}},
+    "proofs": {"type": "array", "minItems": 4, "uniqueItems": true, "items": {"type": "string", "pattern": "^response/data/proofs/[a-z][a-z-]*\\.json$"}}
+  }
+}

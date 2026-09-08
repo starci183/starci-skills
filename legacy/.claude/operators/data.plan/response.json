@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "data.plan response",
+  "$ref": "works:response",
+  "properties": { "outputs": { "items": { "properties": { "type": { "enum": ["text", "file"] } } } } },
+  "allOf": [{ "if": { "properties": { "status": { "const": "done" } }, "required": ["status"] }, "then": { "properties": {
+    "outputs": { "allOf": [
+      { "contains": { "properties": { "id": { "const": "seed-plan" }, "type": { "const": "file" }, "file": { "properties": { "mediaType": { "const": "text/markdown" } } } }, "required": ["id", "type", "file"] } },
+      { "contains": { "properties": { "id": { "const": "units" }, "type": { "const": "file" }, "file": { "properties": { "mediaType": { "const": "application/json" } } } }, "required": ["id", "type", "file"] } }
+    ] },
+    "observations": { "not": { "contains": { "properties": { "result": { "const": "failed" } }, "required": ["result"] } } }
+  } } }],
+  "description": "A done response contains a complete seed plan and matching unit list. An undefined family or flow returns mismatch without a partial plan."
+}

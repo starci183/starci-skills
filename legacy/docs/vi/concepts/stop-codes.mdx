@@ -1,0 +1,55 @@
+---
+title: "Mã dừng"
+description: "Cách một nhánh bị chặn được định kiểu, cách một mã giải qua routing.json, và fallback nghĩa là gì."
+---
+
+# Mã dừng
+
+Một operator không kể lể về thất bại. Nó dừng với một mã, và chỉ mã đó quyết định chuyện gì xảy ra
+tiếp theo.
+
+## Mã nằm ở đâu
+
+Sổ mã được gộp từ hai nơi: `operators/errors.json` giữ những mã nhiều operator dùng chung, mỗi mã kèm
+danh sách phạm vi, còn từng `operators/<id>/errors.json` giữ những mã operator đó sở hữu. Một mã mang
+`domain`, một cách xử lý, một nghĩa, và — khi nó fallback — đúng hành động phải làm cùng điều một
+người có thể làm thay.
+
+## Hai cách xử lý
+
+> Một mã có đúng một cách xử lý: **terminate** kết thúc nhánh ở trạng thái blocked; **fallback** làm
+> đúng hành động đã ghi, ghi lại dưới `## Fallbacks taken` trong `response.md`, rồi chạy tiếp.
+> `unless` gọi tên đúng một tham số Yêu cầu mà giá trị của nó đảo cách xử lý.
+
+`CHOICE_REQUIRED` của `architecture.decide` là ví dụ rõ nhất cho cả hai nửa: nó fallback bằng cách
+chọn phương án điểm cao nhất và ghi lại bảng điểm, *trừ khi* `selectionPolicy` là
+`approval-required`, khi đó nó terminate và một người chọn.
+
+## Một mã terminate định tuyến ra sao
+
+Runtime đọc `domain` của mã và giải domain đó trong `routing.json`, nơi có bốn loại:
+
+| Loại | Runtime làm gì |
+| --- | --- |
+| `operator` | Gọi operator được nêu tên |
+| `resume` | Gọi lại chính operator đó với phần delta mà resume token đòi |
+| `user` | Dừng. Một người sở hữu việc này và phải quyết hoặc publish |
+| `external` | Dừng. Chướng ngại nằm ngoài runtime, không operator nào gỡ được |
+
+`self` ở cột domain nghĩa là domain của chính operator phát mã — tức chạy lại.
+
+## Bản đồ là đóng
+
+`routing.json` được kiểm đối chiếu với bảng Dừng của các operator: mọi domain mà một mã dừng bàn giao
+tới đều có đúng một tuyến, và không tuyến nào gọi tên một domain mà không mã nào chạm đến. Thiếu một
+tuyến là lỗi build, không phải chuyện cân nhắc. Runtime gặp một mã không có trong sổ gộp thì dừng với
+`UNKNOWN_STOP`.
+
+## Những mã mọi operator dùng chung
+
+`EVIDENCE_MISSING`, `INVALID_INPUT`, `NO_PROGRESS`, `SOURCE_DRIFT` và `UNKNOWN_STOP` có phạm vi `*`.
+`NO_PROGRESS` là mã kết thúc một vòng lặp: một lần chạy lại không thêm bằng chứng, ràng buộc, kiểm kê
+hay phê duyệt nào là đã đâm vào cùng bức tường, và `SKILL.md` yêu cầu báo bức tường thay vì thử lại.
+
+Bảng đầy đủ — mọi mã, phạm vi, domain, cách xử lý, nghĩa, fallback và cách chạy lại — được sinh ở
+[Tham chiếu → Mã dừng](/vi/reference/stop-codes).

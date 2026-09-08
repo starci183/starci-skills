@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only landing.compose emits. Shared INVALID_INPUT, SOURCE_DRIFT, EVIDENCE_MISSING, NO_PROGRESS and KNOWLEDGE_QUESTION remain in operators/errors.json.",
+  "codes": {
+    "LANDING_PROMISE_MISSING": {
+      "domain": "business",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Neither a business-promise-authority input nor a concrete promise requirement says what the landing must make credible.",
+        "vi": "Không có đầu vào business-promise-authority hay yêu cầu promise cụ thể nói landing phải làm điều gì trở nên đáng tin."
+      },
+      "resume": {
+        "en": "Publish the business promise or supply the concrete promise this landing communicates.",
+        "vi": "Publish business promise hoặc cung cấp lời hứa cụ thể mà landing truyền đạt."
+      }
+    },
+    "VISUAL_IDENTITY_MISSING": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The request names no usable visual identity evidence, so an image or motion brief would invent the brand.",
+        "vi": "Yêu cầu không nêu bằng chứng visual identity dùng được, nên brief ảnh hoặc motion sẽ tự bịa thương hiệu."
+      },
+      "resume": {
+        "en": "Supply the canonical identity asset, brand system or an explicit identity description.",
+        "vi": "Cung cấp asset nhận diện chuẩn, brand system hoặc mô tả nhận diện rõ ràng."
+      }
+    },
+    "COMPOSITION_INCOMPLETE": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The contract leaves a section without Grammar ownership, a narrative event, an asset decision, motion fallback or audit evidence.",
+        "vi": "Contract để một section thiếu ownership Grammar, narrative event, quyết định asset, motion fallback hoặc bằng chứng audit."
+      },
+      "resume": {
+        "en": "Complete the same composition contract and rerun it; source generation does not fill planning gaps.",
+        "vi": "Hoàn tất cùng composition contract rồi chạy lại; source generation không lấp khoảng trống lập kế hoạch."
+      }
+    }
+  }
+}

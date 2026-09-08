@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only generate-banks emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT) come from operators/errors.json, which stays their one home. Every helper stop hands to the person: a helper runs outside any chain, so there is nothing to route it into and no operator to resume it — the domain is caller and the disposition is terminate.",
+  "codes": {
+    "PRODUCT_UNROUTED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The product names no route declaration under @workspaces/projects, so there is nothing to draft a mission against: a bank whose missions name roles that do not exist cannot be planned when it opens.",
+        "vi": "Sản phẩm không có khai báo route nào dưới @workspaces/projects, nên không có gì để phác nhiệm vụ lên: một kho mà các nhiệm vụ gọi tên những role không tồn tại thì lúc mở ra không lập kế hoạch được."
+      },
+      "resume": {
+        "en": "Declare the product's routes, or name a product that has them, and run the helper again.",
+        "vi": "Khai báo route của sản phẩm, hoặc nêu tên một sản phẩm đã có route, rồi chạy lại helper."
+      }
+    },
+    "BANK_EMPTY": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "Nothing the reading covers is open: no unchecked entry, no unanswered finding, no failed case and no promise the models carry that a delivery does not reach. Nothing is written, because an empty bank is a fact about the product rather than a bank.",
+        "vi": "Không có gì đang mở trong phạm vi lần đọc: không mục chưa kiểm, không finding chưa trả lời, không case hỏng và không lời hứa nào của model mà bàn giao chưa chạm tới. Không ghi gì cả, vì kho rỗng là một sự thật về sản phẩm chứ không phải một cái kho."
+      },
+      "resume": {
+        "en": "Name the notes or the evidence the bank should answer, or widen the reading, and run the helper again.",
+        "vi": "Nêu ghi chú hay bằng chứng mà kho phải trả lời, hoặc mở rộng phạm vi đọc, rồi chạy lại helper."
+      }
+    },
+    "BANK_UNGROUNDED": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "A drafted mission names no evidence ref. It is refused rather than banked with a plausible reason, because the person approves a bank once and the harness then runs every mission in it.",
+        "vi": "Một nhiệm vụ được phác không gọi tên evidence ref nào. Nó bị từ chối chứ không được nhập kho kèm một lý do nghe hợp lý, vì người chỉ duyệt kho một lần rồi harness chạy mọi nhiệm vụ trong đó."
+      },
+      "resume": {
+        "en": "Give the mission the observation it came from, or drop it from the bank, and run the helper again.",
+        "vi": "Cho nhiệm vụ ấy quan sát mà nó sinh ra từ đó, hoặc bỏ nó khỏi kho, rồi chạy lại helper."
+      }
+    }
+  }
+}

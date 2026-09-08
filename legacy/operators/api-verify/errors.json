@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only api.verify emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, SOURCE_DRIFT, NO_PROGRESS, AUTHORITY_DRIFT, RUNTIME_UNAVAILABLE) come from operators/errors.json, and an endpoint that does not serve the bound route keeps its one home there rather than gaining a second under this domain. No code asks a person for a credential, and no code reports a suite as merely absent: a flow whose folder does not exist yet has its API history created, and only a case the runner reported failing, an endpoint nobody serves, or a record written outside the run namespace blocks.",
+  "codes": {
+    "API_CASE_FAILED": {
+      "domain": "backend",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The suite reported a case that did not hold, or named a case and ran nothing; a case that proved nothing is not a pass, and the delivery owns the answer.",
+        "vi": "Bộ kiểm báo một case không đứng vững, hoặc gọi tên một case rồi không chạy gì; một case không chứng minh được gì thì không phải là đạt, và người giao mã sở hữu câu trả lời."
+      },
+      "resume": {
+        "en": "The delivery owner repairs the behaviour the case names and the suite is run again under a new runId.",
+        "vi": "Người sở hữu bản giao sửa hành vi mà case gọi tên rồi chạy lại bộ kiểm dưới một runId mới."
+      }
+    },
+    "API_NAMESPACE_LEAK": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "The suite wrote a record outside the namespace the seed placed, so this run touched a row the flow does not own and no cleanup it may perform can take it back.",
+        "vi": "Bộ kiểm ghi một bản ghi ngoài namespace mà seed đã đặt, nên lượt chạy này chạm vào một hàng luồng không sở hữu, và không lần dọn dẹp nào nó được phép làm lấy lại được."
+      },
+      "resume": {
+        "en": "Correct the fixture boundary the seed declares, or the case that writes past it, before the suite is run again.",
+        "vi": "Sửa ranh giới fixture mà seed khai báo, hoặc case ghi vượt ra ngoài nó, trước khi chạy lại bộ kiểm."
+      }
+    }
+  }
+}

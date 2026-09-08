@@ -1,0 +1,65 @@
+{
+  "steps": [
+    {
+      "id": "bind-contract",
+      "instruction": "Read the request, architecture decision, stack model and optional business authority. Freeze the exact operation ids, writers, stores, migrations and business dimensions. Missing architecture authority requires clarification.",
+      "reads": [
+        { "alias": "@workspaces/requests", "path": "<requestId>.json", "when": "always" },
+        { "alias": "@workspaces/inputs", "path": "<declared-input-path>", "when": "for each declared contract or authority file" }
+      ],
+      "writes": [],
+      "calls": [{ "alias": "@tools/fileread", "purpose": "Read and bind the frozen contract inputs.", "when": "always" }],
+      "checks": ["request-shape", "request-files"],
+      "produces": ["Frozen operation inventory"]
+    },
+    {
+      "id": "inspect-boundaries",
+      "instruction": "Inspect each declared writer path and its existing store boundary at the bound backend head. Treat source as boundary evidence, never as permission to alter the frozen operation contract.",
+      "reads": [{ "alias": "@workspaces/be", "path": "<declared-writer-path>", "when": "for every writer in the stack model" }],
+      "writes": [],
+      "calls": [
+        { "alias": "@tools/fileread", "purpose": "Inspect declared writer folders and store access.", "when": "always" },
+        { "alias": "@cli/git", "purpose": "Verify the backend source head without mutation.", "when": "always" }
+      ],
+      "checks": [],
+      "produces": ["Observed writer and store boundaries"]
+    },
+    {
+      "id": "partition-modules",
+      "instruction": "Assign every operation to exactly one module grouped by shared writer and store boundary. Give each nonempty module its goal, stores, proof kinds and migration refs. If any operation has no valid module, return mismatch naming it and emit no partial plan.",
+      "reads": [
+        { "alias": "@workspaces/inputs", "path": "<stack-model-path>", "when": "always" },
+        { "alias": "@workspaces/be", "path": "<declared-writer-path>", "when": "when checking a module boundary" }
+      ],
+      "writes": [{ "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/backend-plan.md", "when": "after a complete partition exists" }],
+      "calls": [{ "alias": "@tools/sourcewrite", "purpose": "Write the complete human-readable module plan.", "when": "after every operation is assigned" }],
+      "checks": ["contract-partition", "module-contracts"],
+      "produces": ["backend-plan"]
+    },
+    {
+      "id": "order-and-serialize",
+      "instruction": "Order modules by data and migration dependencies, reject cycles, and write one module unit per plan row with identical id and goal plus resolved dependsOn ids.",
+      "reads": [{ "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/backend-plan.md", "when": "always" }],
+      "writes": [{ "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/units.json", "when": "always" }],
+      "calls": [{ "alias": "@tools/sourcewrite", "purpose": "Persist the ordered unit list.", "when": "always" }],
+      "checks": ["dependency-order"],
+      "produces": ["units"]
+    },
+    {
+      "id": "emit-plan",
+      "instruction": "Write the typed response only after the complete partition and order pass. Report evidence limits without claiming generated source or proof execution.",
+      "reads": [
+        { "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/backend-plan.md", "when": "when the partition passes" },
+        { "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/units.json", "when": "when the order passes" }
+      ],
+      "writes": [{ "alias": "@workspaces/responses", "path": "<responseId>.json", "when": "always" }],
+      "calls": [
+        { "alias": "@tools/sourcewrite", "purpose": "Write the response record.", "when": "always" },
+        { "alias": "@cli/python", "purpose": "Run scripts/validate_operator.py for this bundle and records.", "when": "always" },
+        { "alias": "@tools/print", "purpose": "Present the accepted plan and units.", "when": "after validation passes" }
+      ],
+      "checks": ["response-shape", "request-binding", "unique-outputs", "output-files", "observation-binding"],
+      "produces": ["Response record"]
+    }
+  ]
+}

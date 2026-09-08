@@ -1,0 +1,276 @@
+# quality.verify
+
+## Việc
+
+Kiểm định một delivery có ranh giới bằng cách chạy các cổng đã khai trên một biên bản tiền nhiệm còn
+nguyên vẹn tại một head đã đóng băng, rồi trả về đúng phán quyết đo được, không sửa gì cả.
+
+## Xong khi
+
+Xong khi `quality-verification` nêu một phán quyết đo được, pass hoặc fail, trên một delivery mà mọi
+biên nhận tiền nhiệm đều gọi tên head đóng băng, với một `gate-result` cho mỗi gate đã khai mang
+lệnh, exit code, bằng chứng và phân loại của nó, `coverage` giữ nguyên mọi ngưỡng đã cấu hình và đã
+yêu cầu bên cạnh giá trị đo được mỗi khi gate unit đã chạy, mọi gate đỏ được phân loại về chủ của nó
+hoặc được một khoản nợ đã duyệt còn hiệu lực phủ, mọi dòng chủ đề của scorecard được chép nguyên vẹn
+từ biên nhận đã tính nó, và `audit-scope` được nhận vào chép nguyên vẹn khi audit có mang.
+
+## Một delivery, một head, ít nhất một biên bản của người sản xuất
+
+Ba Đầu vào là ba hình dạng mà một delivery có thể tới: một bản hiện thực backend, một bản áp source
+frontend, và bản ghi `changes` nêu những path nào đã dịch chuyển cùng những cổng và bề mặt chúng chạm
+tới. Từng cái đều không bắt buộc, nhưng phải có ít nhất một, vì một lần kiểm định không có biên bản
+của người sản xuất thì chẳng có head nào để đóng băng và chẳng có delivery nào để đo. Mọi biên bản
+tiền nhiệm phải báo cùng một source head, và head đó phải là head mà `request/request.json` đã đóng
+băng; hai tiền nhiệm trên hai head khác nhau mô tả hai delivery khác nhau, và gác hợp của chúng là đo
+một thứ không ai xây. Đó là `PREDECESSOR_MIXED`, bị từ chối trước khi có lệnh nào chạy thay vì lộ ra
+về sau dưới dạng một lỗi cổng khó hiểu. Một tiền nhiệm có fingerprint không còn khớp source đã đóng
+băng là `PREDECESSOR_STALE`. Một tiền nhiệm làm ra dưới `mode: dry` cũng vậy: nó không mang commit nào
+và mô tả một bản kế hoạch chứ không phải một delivery, bản ghi thay đổi của nó ghi `nothing written`
+và ô `Commit` của biên nhận ghi `—`, nên nó bị từ chối ở bước 2 trước khi có lệnh nào chạy, bởi một
+bản kế hoạch không có head nào để đứng lên và gác head gốc là công bố một phán quyết xanh về đoạn code
+chưa ai viết. Điều tiền nhiệm đã quyết được tiêu thụ nguyên vẹn: operator này không
+bao giờ lập lại kế hoạch delivery, mở lại ranh giới của nó, hay có ý kiến về việc thay đổi ấy hay dở.
+
+## Head được xác nhận ngay trong cổng vào
+
+Không có bước xác nhận head riêng, vì một head được xác nhận ở chỗ nào khác cổng vào là một head còn
+kịp trôi trước lệnh đầu tiên. Người sản xuất đã viết delivery trên nhánh phiên `session/<sessionId>`
+của checkout đã route, trong một git worktree dựng từ head đã đóng băng, và commit đúng một lần. Vì
+thế `request/request.json` ghim `@workspaces/be` hoặc `@workspaces/fe` tại đúng commit sha đó trong
+`contexts[].head`, và bước 1 xác nhận head quan sát được bằng đúng nó trước khi bất kỳ điều gì khác
+xảy ra; khác nhau là `SOURCE_DRIFT`. Commit mà biên bản tiền nhiệm ghi phải bằng chính head đó, vì
+một biên bản mô tả một commit mà các cổng không đứng trên là `PREDECESSOR_STALE`. Mọi cổng chạy bên
+trong worktree của nhánh phiên ấy, không bao giờ trên nhánh người ta đang checkout, nên một kết quả
+cổng gọi tên đúng một commit mà ai đó có thể checkout lại.
+
+## Cổng đỏ là một phán quyết, không phải một mã dừng
+
+Quality đo. Nó không sửa, không thiết kế lại, không phân loại lại, không mặc cả. Một cổng hỏng sinh
+ra một phán quyết đỏ gọi tên cái hỏng và phân loại của nó, và phán quyết ấy quay về người chủ có thể
+sửa; nhánh là `done`, không phải `blocked`, vì operator đã làm đúng việc được giao. Chỉ khi hoàn toàn
+không đạt tới được phán quyết nào thì mới là một mã dừng. Operator không đụng vào source sản phẩm,
+không chỉnh lệnh cổng hay cấu hình của nó để đổi kết quả, và không thay một kiểm khó bằng một kiểm dễ.
+
+## Kết quả cổng là đo được, không phải kể lại
+
+Mọi cổng đã chạy mang theo tham chiếu lệnh, mã thoát và bằng chứng của nó, trong file riêng dưới
+`response/data/gates/`. Một file cho một cổng là thứ khiến kết quả cổng trích dẫn được một mình: người
+đọc sau mở `lint.json` và thấy một lệnh, một mã thoát, một phân loại, không phải đọc vòng quanh một
+bó. Pass nghĩa là mã thoát bằng không kèm bằng chứng bên cạnh; fail nghĩa là mã thoát khác không kèm
+bằng chứng và một phân loại. Phân loại được đọc từ chẩn đoán có cấu trúc sau khi lệnh đã chạy, không
+bao giờ chọn trước: `in-boundary` khi chủ delivery sửa được, `boundary-drift` khi sửa nó là đổi một
+ranh giới đã duyệt, `flaky` khi cùng source cùng môi trường cho hai kết quả mâu thuẫn, và
+`external-blocker` khi môi trường hay một phụ thuộc chặn hẳn phán quyết. Chạy lại tồn tại để phân
+biệt bốn thứ đó. Nó không bao giờ tồn tại để biến một lỗi chưa giải thích được thành pass. Không cổng
+nào bị bỏ, bịt, thay hay dời bằng `passWithNoTests`, và một lần chạy không có test nào không phải là
+pass. Mọi file cổng ghi cùng một source head, vì hai cổng đứng trên hai head là đã đo hai delivery.
+
+## Hai sự thật về codebase này
+
+Sonar chỉ đo new code. Cổng đã ghim được thu hẹp theo thay đổi, nên một kết quả Sonar xanh là phát
+biểu về cái diff chứ không phải về dự án, và dự án bên dưới vẫn có thể đỏ. Dưới mặc định `new-code`
+của `sonarScope`, một kết quả Sonar pass được ghi kèm phát hiện `SONAR_NEW_CODE_ONLY`; thiếu nó thì
+người đọc sau hiểu cổng xanh là sức khỏe dự án, đúng cái hiểu sai mà operator này sinh ra để chặn.
+
+Lint mặc định cũng được chấm như vậy. Dưới `lintScope` `changed`, kết quả lint ghi số lỗi ở base, số lỗi bản
+giao thêm vào trong các file nó sửa hay tạo, và số file đã chấm; cổng pass đúng khi bản giao không thêm lỗi
+nào, và base vốn đã đỏ được ghi thành `LINT_BASELINE_RED` chứ không tính cho bản giao, vì một cổng toàn repo
+trên một base không ai dọn sẽ từ chối mọi bản giao mãi mãi mà không nói gì về bản giao này. `overall` chấm
+cả checkout, cho nhiệm vụ mà mục tiêu chính là base.
+
+End-to-end không bao giờ chạy trừ khi có người yêu cầu trong chính lần gọi này, nên
+`explicitE2eRequest` mặc định là false. Ngược lại cổng được ghi là `skipped-not-requested` kèm phát
+hiện `E2E_NOT_REQUESTED`: không lệnh, không mã thoát, không bằng chứng, và không hàm ý nào rằng hành
+vi đã được chứng minh. Lập kế hoạch cổng e2e mà không có yêu cầu ấy là đầu vào không hợp lệ.
+
+## Một delivery frontend vừa được biên dịch vừa được quét
+
+Format, lint, typecheck và build đo xem source có đúng dạng hay không. Không cổng nào trong số đó đo
+được một class đáp xuống node nào, nên một trang chồng `flex-col items-start sm:flex-row` lên một đối
+tượng Grammar có CSS tự sở hữu phần gập vẫn biên dịch sạch, lint sạch, rồi lên sản phẩm. Cổng
+`presentation-sweep` bịt đúng lỗ hổng ấy: `node scripts/sweep-presentation.mjs` chạy trên write set đã
+giao và trả về các phát hiện `APP_OVERRIDE`, `APP_REIMPLEMENTATION`, `OFF_SCALE` và `SHELL_GEOMETRY`
+kèm file, dòng và token vi phạm. Nó được lên kế hoạch mỗi khi delivery mang một
+`frontend-source-application`, và một request khai delivery frontend mà thiếu nó là đầu vào không hợp
+lệ. `interface.generate` chạy đúng lượt quét ấy trên bản chiếu trước khi ghi; cổng này chạy nó trên
+thứ thực sự đã giao, vì hai cái chỉ là một cây khi không có gì trục trặc ở giữa. Một phát hiện ở đây
+là cổng đỏ nên là một phán quyết chứ không phải một mã dừng: nó quay về chủ frontend đúng như một bài
+test hỏng.
+
+## Coverage giữ mọi ngưỡng được cấu hình và yêu cầu
+
+Statement, line, function và branch giữ phần trăm đo được cùng ngưỡng riêng. Mỗi ngưỡng là phần trăm
+cao nhất được cấu hình hoặc yêu cầu cho chỉ số đó. Số không được khai tường minh là một ngưỡng số;
+`null` nghĩa là cả hai nguồn đều không khai ngưỡng và được ghi là `unconfigured` với `—` trong biên
+nhận. Ngưỡng vắng mặt không cung cấp phần trăm nào và không thể xóa một lỗi unit đã đo được. Một chỉ
+số dưới ngưỡng số làm cổng unit thành fail và ghi `COVERAGE_BELOW_THRESHOLD`; nó không bao giờ là
+một ghi chú bên cạnh một kết quả xanh.
+
+`coveragePolicy` ghim báo cáo cấu hình có hiệu lực nguyên bản cùng digest của nó vào lệnh, cấu hình
+và source head của cổng unit. Nó bắt buộc khi có ngưỡng null hoặc request không ghim tường minh
+ngưỡng số cho cả bốn chỉ số; báo cáo được cung cấp luôn phải được kiểm. Báo cáo phải theo định dạng
+được hỗ trợ và giữ mọi ngưỡng áp dụng; cấu hình không đọc được, mơ hồ hoặc không được hỗ trợ không
+phải bằng chứng về sự vắng mặt. Báo cáo được thu bằng các đối số và môi trường ảnh hưởng đến cấu
+hình của cổng đã đo, chỉ thêm tùy chọn xuất báo cáo. Validator đọc artifact ấy mà không thực thi
+cấu hình. Biên nhận dùng chính sách này ghi đủ bốn giá trị đo, ngưỡng và verdict đúng như dữ liệu
+coverage của nó.
+
+## Nợ phải tường minh và có chủ
+
+Một cổng chỉ được ở lại màu đỏ khi có bản ghi nợ được chủ duyệt phủ lên nó, nêu khoản nợ, cổng, phê
+duyệt, chủ và hạn, và chỉ khi phê duyệt ấy còn sống tại đúng thời điểm cổng được đo. Phê duyệt hết hạn
+không phải là nợ, và một khoản nợ đặt lên cổng đã pass là bản ghi của hư không; cả hai bị từ chối bằng
+`DEBT_UNAPPROVED`. Nợ chỉ phủ được lỗi `in-boundary`, loại mà chủ delivery sửa được; lỗi
+`boundary-drift` thuộc về người sở hữu ranh giới và không thể khất ở đây. `declaredDebts` mặc định là
+danh sách rỗng, nên mang một cổng đỏ luôn là việc có người cố ý làm.
+
+## Scorecard là thứ được chép, không phải thứ được chấm lại
+
+Các cổng nói delivery có đúng hình dạng không. Chúng không nói bề mặt có đẹp, có với tới được, có thật
+và có dùng được hay không, và những câu ấy đã được trả lời bởi chính các operator quan sát sản phẩm
+đang chạy: `interface.audit` đóng lại tám topic proof trên bộ chụp của nó, còn `uat.verify`
+đóng topic trải nghiệm trên lượt chạy của nó. Operator này đọc cả hai biên nhận và viết một bảng
+`## Verdict`: mỗi topic một hàng, mỗi verdict và mỗi đường đi đều chép từ biên nhận đã tính ra nó. Nó
+không được chấm lại một topic, không được lấy trung bình qua các hàng, và không được thay một phép đo
+nó chưa từng thực hiện bằng phán đoán của chính mình.
+
+Bản giao không chạm bề mặt nào thì không nợ phán quyết bề mặt nào. Khi request không bind checkout
+`@workspaces/fe` — bản giao chỉ có backend — mọi hàng topic bề mặt ghi `not-applicable` với route `none`, và
+phán quyết do các cổng quyết định; request có bind checkout frontend thì không được ghi `not-applicable` cho
+bất cứ gì, vì audit và lượt đi thử nó nợ chính là thứ hàng đó sao chép.
+
+Dòng dưới bảng ấy là toàn bộ câu trả lời. Một hàng thiếu, hay `blocked`, làm cả bảng thành `blocked`,
+vì một topic không ai quan sát thì chưa xứng với cả đạt lẫn hỏng. Một hàng `fail` hay `fix-first` làm
+cả bảng thành `fix-first`, và biên nhận gọi tên hàng ấy cùng đường đi nó mang. Chỉ khi mọi hàng đều
+ship hay đạt thì mới là `ship`. Hai hàng hỏng thì cả hai đều được báo kèm đường đi riêng; gộp chúng
+thành một phán quyết hợp nhất, hay chỉ báo cái đầu tiên, là giấu mất người chủ thứ hai.
+
+## Phán quyết
+
+`pass` đòi mọi cổng bắt buộc đã pass, hoặc đã fail `in-boundary` dưới một khoản nợ đã khai. Mọi hình
+dạng khác là `fail`, kể cả một cổng bắt buộc bị môi trường chặn: cổng không đo được không phải cổng đã
+qua. Một cổng không bắt buộc mà fail thì được ghi lại và tự nó không làm phán quyết đỏ, đó chính là lý
+do `required` tồn tại, và nó là khai báo của kế hoạch cổng chứ không bao giờ là phán đoán của operator.
+
+## Luồng attempt cụ thể
+
+Các row của operator này được gate bởi hợp đồng attempt expected/actual dùng chung trong `scripts/attempt-gate.mjs`.
+
+| Trạng thái quan sát | Hành động | Kiểm actual | Nhánh kế tiếp |
+| --- | --- | --- | --- |
+| result hiện hành đúng head/command/config | tái dùng sau khi đọc lại evidence và exit | mọi fingerprint, threshold match | chép measurement |
+| result thiếu | chạy declared gate | thu command, exit, diagnostic, evidence; chưa chạy không là pass | so threshold đóng băng |
+| result stale hoặc sai | loại và chạy lại nếu khả dụng | ghi lý do evidence cũ không dùng | verdict đỏ handoff source owner; verifier không sửa |
+| retry gate không ổn định | attempt và transcript mới | phân loại lý do rerun có giới hạn | fail không đổi lặp lại route owner |
+
+## Ranh giới
+
+Context chỉ đọc. Operator chỉ ghi vào `response/` của nhánh mình: một file `gate-result` cho mỗi cổng
+dưới `response/data/gates/`, `data/coverage.json`, `response.md` và `response.json`. Nó không sửa
+source sản phẩm, cấu hình hay lệnh cổng; không thiết kế lại, sửa chữa hay phân loại một lỗi đã đo
+thành pass; không chạy bộ end-to-end khi không được hỏi; không thêm, làm yếu, bỏ, bịt hay thay một
+cổng đã khai; không đọc phán quyết mức dự án ra từ một quality gate chỉ đo new code; và không mang một
+khoản nợ không ai duyệt hoặc đã hết hạn.
+
+Gate result giữ nhánh đo thực trong sessionBranch. Giá trị ngoài session cần input changes do runtime.serve đã hoàn tất phát ra tại đúng nhánh tích hợp và head merge; delta producer và diff Git thật đều được kiểm. Không đổi nhãn bằng chứng tích hợp thành nhánh session.
+
+## Context
+
+| Alias | Bind | Bắt buộc |
+| --- | --- | --- |
+| `@workspaces/<project>/<role>/gates` | lệnh cổng đã ghim, cấu hình và ngưỡng chúng mang; là nghĩa của "cùng một cổng" qua các lần chạy | có |
+| `@workspaces/be` | checkout backend đã route tại commit đã ghim, chủ thể mọi cổng đo khi delivery là backend | không |
+| `@workspaces/fe` | checkout frontend đã route tại commit đã ghim, chủ thể mọi cổng đo khi delivery là frontend | không |
+| `@worktrees/debts` | bản ghi nợ được chủ duyệt và hạn của chúng; một cổng đỏ chỉ được mang từ đây | không |
+
+## Đầu vào
+
+| Kind | Từ đâu | Bắt buộc |
+| --- | --- | --- |
+| `backend-source-application` | `backend.generate`, delivery backend cần kiểm định | không |
+| `frontend-source-application` | `interface.generate`, delivery frontend cần kiểm định | không |
+| `changes` | `backend.generate`, `interface.generate`, `library.update` hoặc lượt phục vụ hoàn tất của `runtime.serve`, những path đã dịch chuyển cùng cổng và bề mặt chúng nêu | không |
+| `frontend-surface-audit` | `interface.audit`, tám topic proof nó đã đóng ở cùng head | không |
+| `uat-flow-verification` | `uat.verify`, topic trải nghiệm nó đã đóng ở cùng head | không |
+| `service-receipt` | `service.operate`, dịch vụ Sonar mà gate `sonar` gửi lên; vắng mặt khi gate ấy không nằm trong kế hoạch | không |
+
+## Yêu cầu
+
+| Field | Kiểu | Mặc định | Hỏi |
+| --- | --- | --- | --- |
+| `gates` | list of `{gate, commandRef, configRef, required}` | the routed gate plan | Chạy những cổng đã ghim nào, mỗi cổng một lần, trong format, lint, typecheck, build, unit-coverage, integration, e2e, sonar và presentation-sweep |
+| `thresholds` | object or list of `{statements, lines, functions, branches}` | [] | Ngưỡng phần trăm được yêu cầu cho từng chỉ số có tên; áp ngưỡng cao nhất được cấu hình hoặc yêu cầu |
+| `coveragePolicy` | object `{format, sourceHead, commandRef, configRef, evidenceRef, evidenceSha256}` | null | Bằng chứng cấu hình có hiệu lực đã đóng băng cho các ngưỡng coverage |
+| `explicitE2eRequest` | choice | false | false trừ khi có người yêu cầu bộ end-to-end trong chính lần gọi này; chỉ khi đó mới true |
+| `sonarScope` | choice | new-code | new-code hoặc overall; phải khớp với việc sonar có nằm trong kế hoạch cổng hay không |
+| `lintScope` | choice | changed | `changed` chấm bản giao — số lỗi nó thêm trong các file nó sửa hay tạo, so với base, base đỏ sẵn ghi thành `LINT_BASELINE_RED`; `overall` chấm cả checkout |
+| `declaredDebts` | list of `{debtId, gate, approvalRef, ownerRef, expiresAt}` | [] | Những khoản nợ được chủ duyệt cho phép một cổng có tên ở lại màu đỏ |
+| `resume` | token | null | Token của nhánh bị chặn khi vào lại sau một mã dừng |
+
+## Các bước
+
+| # | Bước | Tham số | Đọc | Ghi | Dừng với |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Kiểm cổng vào, xác nhận head đã đóng băng và resume | `resume` | `request/request.json`, @workspaces/be hoặc @workspaces/fe tại commit mà request đã ghim, @tools/git | — | `INVALID_INPUT`, `SOURCE_DRIFT`, `NO_PROGRESS` |
+| 2 | Tiêu thụ tiền nhiệm nguyên vẹn | — | Đầu vào `backend-source-application`, `frontend-source-application` và `changes` tại fingerprint của chúng, cùng commit mà mỗi cái đã ghi | — | `PREDECESSOR_MIXED`, `PREDECESSOR_STALE` |
+| 3 | Kiểm prior evidence theo exact head, command, configuration; chỉ tái dùng result hiện hành đầy đủ, chạy gate thiếu, và chạy lại evidence stale hoặc invalid theo thứ tự | `gates`, `explicitE2eRequest`, `sonarScope`, `lintScope` | @workspaces/<project>/<role>/gates, @workspaces/be hoặc @workspaces/fe là chủ thể mỗi cổng đo, @tools/http | `response/data/gates/<gate>.json`, @tools/shell | `GATE_UNAVAILABLE` |
+| 4 | Áp chính sách coverage | `thresholds`, `coveragePolicy` | artifact cấu hình có hiệu lực đã đóng băng, `response/data/gates/<gate>.json` của cổng unit | `response/data/coverage.json` | — |
+| 5 | Phân loại failure từ diagnostic thành transient retry, source-owner repair, boundary hoặc external; giữ transcript và không sửa source ở đây | — | `response/data/gates/<gate>.json` của mọi cổng đỏ | — | — |
+| 6 | Áp nợ đã được duyệt | `declaredDebts` | @worktrees/debts, `response/data/gates/<gate>.json` | — | `DEBT_UNAPPROVED` |
+| 7 | Chép verdict của từng topic từ biên nhận đã tính ra nó | — | đầu vào `frontend-surface-audit` và `uat-flow-verification` ở cùng head đã ghim | — | `PREDECESSOR_MIXED` |
+| 8 | Tính phán quyết cổng và scorecard, viết biên bản và phát | — | mọi thứ ở trên | `response/response.md`, `response/response.json`, `audit-scope` | — |
+
+Một cổng hoàn toàn không chạy được ở môi trường này là `GATE_UNAVAILABLE` khi nó bắt buộc; một cổng
+không bắt buộc bị môi trường chặn được ghi là `external-blocker` và phán quyết hấp thụ nó. Không có mã
+sửa chữa, vì sửa chữa không phải việc của operator này: một lỗi `in-boundary` quay về dưới dạng phán
+quyết đỏ tới người chủ sửa được nó, và delivery đã sửa quay lại thành một head mới với fingerprint
+tiền nhiệm mới. Một lần resume chỉ dùng lại quan sát có fingerprint không đổi và tiêu thụ đúng phần
+delta; một lần resume không thêm tiền nhiệm, cổng, nợ hay thay đổi source nào là `NO_PROGRESS`, vì
+cùng một fingerprint không thể cho một câu trả lời khác.
+
+
+Khi đầu vào audit có phạm vi, chạy `node scripts/audit-scope.mjs <branch>` để chép nguyên
+`verdicts.auditScope` vào `response/data/audit-scope.json` và liệt kê kind `audit-scope` trong
+response. Biên nhận có `## Audit scope` với bảng `Field | Value` ghi Mode, Coverage claim và
+Deferred states đúng nguyên bản. Kết quả chỉ có nghĩa trong phạm vi ấy; state deferred không trở
+thành đạt vì gate hoặc UAT đạt. Các gate chất lượng và các case UAT đã đóng băng giữ nguyên.
+
+## Đầu ra
+
+| Kind | File | Kiểu | Bắt buộc |
+| --- | --- | --- | --- |
+| `quality-verification` | `response/response.md` | md | có |
+| `gate-result` | `response/data/gates/<gate>.json` | data | có |
+| `coverage` | `response/data/coverage.json` | data | không |
+| `audit-scope` | `response/data/audit-scope.json` | data | không |
+
+## Operator Result
+
+In **Operator Result** là bảng gate trong `response/response.md`, link từng kết quả bắt buộc `response/data/gates/<gate>.json` và `response/data/coverage.json` khi có. Hoàn tất việc kiểm có thể cho một verdict fail hợp lệ: gate fail, bị skip và chưa chạy phải tách biệt, luôn hiện, còn bộ gate đỏ hay chưa đủ không bao giờ được trình bày như quality đã pass.
+
+## Dừng
+
+| Code | Xử lý |
+| --- | --- |
+| `INVALID_INPUT` | terminate |
+| `SOURCE_DRIFT` | terminate |
+| `NO_PROGRESS` | terminate |
+| `PREDECESSOR_MIXED` | terminate |
+| `PREDECESSOR_STALE` | terminate |
+| `GATE_UNAVAILABLE` | terminate |
+| `DEBT_UNAPPROVED` | terminate |
+
+## Kế tiếp
+
+| Khi | Operator |
+| --- | --- |
+| một cổng backend hỏng trong ranh giới và chủ backend phải sửa | `backend.generate` |
+| một cổng frontend hỏng trong ranh giới và chủ frontend phải áp bản sửa | `interface.generate` |
+| phán quyết xanh và delivery sẵn sàng để publish | `git.publish` |
+| phán quyết xanh và head đã publish phải tới được một môi trường | `release.deploy` |
+| các gate xanh và lời hứa phải được đối chiếu với source đã giao | `business.reconcile` |
+| các gate xanh và có người yêu cầu đi thử hành trình | `uat.verify` |
+| các gate xanh và bản giao giờ phải được vận hành như một client đối với runtime đang phục vụ | `api.verify` |
+| các gate xanh và nhiệm vụ nêu hơn một hành trình, nên các luồng được gọi tên trước khi mỗi nhánh đi một luồng | `uat.plan` |
+| điều phối đã chấp nhận bộ kiểm thử tích hợp và cần kết thúc các workflow được phân công | `workflow.verify` |
+| gate kỹ thuật của đúng source đã pass và bề mặt theo PNG còn cần bằng chứng render cuối | `interface.audit` |

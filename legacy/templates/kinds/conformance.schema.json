@@ -1,0 +1,15 @@
+{
+  "$id": "kind:conformance",
+  "title": "One measured verdict for one declared facet of one operation; the file is named <operationId>.<facet>.json so silence about a facet is a missing file rather than a missing sentence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operationId", "facet", "verdict", "evidenceRef", "statement", "contractFingerprint"],
+  "properties": {
+    "operationId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "facet": { "enum": ["transport", "writer", "store", "transaction", "idempotency", "migration", "exception-identity", "authorization", "concurrency"] },
+    "verdict": { "enum": ["conforms", "widened", "narrowed"] },
+    "evidenceRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "statement": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "contractFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "$id": "kind:migration-release-runner",
+  "description": "Closed stdout of the source-owned migration runner. Inspect is read-only; apply compares expected connection, journal existence, journal identities and pending identities again before effects. Arrays are sorted class names. No SQL, credentials, arbitrary commands or bootstrap output enter this protocol.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operation",
+    "planSha256",
+    "sourceHead",
+    "connectionFingerprint",
+    "journalExistsBefore",
+    "journalExistsAfter",
+    "journalBefore",
+    "journalAfter",
+    "pendingBefore",
+    "pendingAfter",
+    "applied",
+    "journalFingerprintBefore",
+    "journalFingerprintAfter",
+    "preservedJournalFingerprint"
+  ],
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "names": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "operation": {
+      "enum": [
+        "inspect",
+        "apply"
+      ]
+    },
+    "planSha256": {
+      "$ref": "#/$defs/hash"
+    },
+    "sourceHead": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "connectionFingerprint": {
+      "$ref": "#/$defs/hash",
+      "description": "sha256 over UTF-8 JSON.stringify({driver,host,port,database,schema,username}) in exactly that key order, with exact string values and integer port, without a trailing newline. The descriptor is the environment-authorized identity actually observed by the runner; URLs, userinfo and credential values are excluded."
+    },
+    "journalExistsBefore": {
+      "type": "boolean"
+    },
+    "journalExistsAfter": {
+      "type": "boolean"
+    },
+    "journalBefore": {
+      "$ref": "#/$defs/names"
+    },
+    "journalAfter": {
+      "$ref": "#/$defs/names"
+    },
+    "pendingBefore": {
+      "$ref": "#/$defs/names"
+    },
+    "pendingAfter": {
+      "$ref": "#/$defs/names"
+    },
+    "applied": {
+      "$ref": "#/$defs/names"
+    },
+    "journalFingerprintBefore": {
+      "$ref": "#/$defs/hash",
+      "description": "sha256 over UTF-8 JSON.stringify(rows), without a trailing newline. Each row has keys id,timestamp,name in that order; rows are sorted by numeric id. id is a positive safe integer and timestamp a nonnegative safe integer. Decimal integer strings or bigint values are accepted only if exact and within Number.MAX_SAFE_INTEGER; unsafe conversion is refused. IDs and names are unique. Empty or absent journals hash []; existence is recorded separately."
+    },
+    "journalFingerprintAfter": {
+      "$ref": "#/$defs/hash",
+      "description": "The same canonical full-row journal fingerprint as journalFingerprintBefore, measured after execution."
+    },
+    "preservedJournalFingerprint": {
+      "$ref": "#/$defs/hash",
+      "description": "The canonical fingerprint of after-readback rows whose IDs belonged to the before journal, sorted by numeric id; it must equal journalFingerprintBefore. Inspect preserves its entire journal. Missing or rewritten prior rows therefore fail even when their names still appear."
+    }
+  }
+}

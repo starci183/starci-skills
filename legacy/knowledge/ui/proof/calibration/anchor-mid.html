@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calibration anchor — mid</title>
+<style>
+  /* Anchor: mid. The same overview surface, composed so that nothing is wrong and nothing is
+     convincing: the edges align and one radius family holds, but the title barely outranks its
+     sections, a second filled accent competes with the first, a number carries no unit, and the
+     empty state explains without offering the action that ends it. Plain HTML and CSS. */
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #f6f7f9; color: #1f2328; }
+  .top { display: flex; align-items: center; gap: 24px; padding: 16px 32px; background: #fff; border-bottom: 1px solid #e3e5e8; }
+  .top h1 { font-size: 20px; font-weight: 600; margin: 0; }
+  .top nav a { font-size: 14px; color: #3b4652; margin-right: 16px; text-decoration: none; }
+  .wrap { padding: 32px; }
+  h2 { font-size: 18px; font-weight: 600; margin: 32px 0 16px; }
+  h2:first-child { margin-top: 0; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .card { background: #fff; border: 1px solid #e3e5e8; border-radius: 8px; padding: 16px; }
+  .card .k { font-size: 13px; color: #5b6570; }
+  .card .v { font-size: 26px; font-weight: 600; margin-top: 4px; }
+  .card .note { font-size: 13px; margin-top: 8px; color: #5b6570; }
+  .actions { display: flex; gap: 12px; margin-top: 16px; }
+  .btn { padding: 8px 16px; border-radius: 6px; font-size: 14px; border: 1px solid #c9ced4; background: #fff; color: #1f2328; }
+  .btn.primary { background: #2456c8; border-color: #2456c8; color: #fff; }
+  .list { margin: 0; padding: 0; list-style: none; background: #fff; border: 1px solid #e3e5e8; border-radius: 8px; }
+  .list li { padding: 12px 16px; border-bottom: 1px solid #eceef1; font-size: 14px; display: flex; justify-content: space-between; }
+  .list li:last-child { border-bottom: 0; }
+  .list li.warn { border-left: 3px solid #d97706; }
+  .empty { background: #fff; border: 1px dashed #c9ced4; border-radius: 8px; padding: 40px; text-align: center; color: #5b6570; font-size: 14px; }
+</style>
+</head>
+<body>
+  <header class="top">
+    <h1>Operations</h1>
+    <nav><a href="#orders">Orders</a><a href="#customers">Customers</a><a href="#releases">Releases</a></nav>
+  </header>
+
+  <main class="wrap">
+    <h2>Today</h2>
+    <section class="grid">
+      <div class="card"><div class="k">Orders placed</div><div class="v">1,284</div><div class="note">+4% against yesterday</div></div>
+      <div class="card"><div class="k">Revenue</div><div class="v">98,213</div><div class="note">settled</div></div>
+      <div class="card"><div class="k">Median latency</div><div class="v">342 ms</div><div class="note">last hour</div></div>
+      <div class="card"><div class="k">Open incidents</div><div class="v">2</div><div class="note">1 acknowledged</div></div>
+    </section>
+
+    <div class="actions">
+      <button class="btn primary">Create release</button>
+      <button class="btn primary">Export report</button>
+      <button class="btn">Refresh</button>
+    </div>
+
+    <h2>Alerts</h2>
+    <ul class="list">
+      <li class="warn"><span>Payment provider timeouts rising</span><span>2 in 10 min</span></li>
+      <li><span>Disk usage on primary store</span><span>91%</span></li>
+      <li class="warn"><span>Certificate for the public host expires</span><span>in 3 days</span></li>
+    </ul>
+
+    <h2>Scheduled jobs</h2>
+    <section class="empty">Nothing is scheduled for today. Jobs appear here once a release is planned.</section>
+  </main>
+</body>
+</html>

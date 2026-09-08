@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "id": "workspace.bind",
+  "purpose": "Resolve one declared project role to its exact hydrated checkout, verify Git identity and mutation readiness, and return a typed route receipt without binding a runtime.",
+  "scope": "Reads declared route and checkout state and writes only binding artifacts and a response. It does not guess routes, repair hydration, change branches, clean trees, manage runtimes, claim ports, provision accounts or expose credentials.",
+  "modules": { "request": "request.json", "response": "response.json", "validate": "validate.json", "step": "step.json", "criteria": "criteria.json" }
+}

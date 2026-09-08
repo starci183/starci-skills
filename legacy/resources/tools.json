@@ -1,0 +1,317 @@
+{
+  "schemaVersion": 9,
+  "note": "The closed registry of tools an operator may call, addressed as @tools/<id> in a Steps table. A tool is what an operator is allowed to do beyond reading aliases; an alias is what it may read. Each tool lists the modes an operator may declare in operator.json → resources.tools, and how each runtime provides it, so the same operator.md runs on Codex and on Claude without a second home for the rule. A runtime that does not support a tool cannot run an operator that declares it in a mode other than never; the processor then runs the profile equivalent on a runtime that does, or reports the gap. A tool absent from this file does not exist for an operator.",
+  "runtimes": {
+    "openai": "Codex (desktop app or CLI) running an OpenAI profile from resources/agents/profiles/openai.json",
+    "claude": "Claude Code (desktop app or CLI) running a Claude profile from resources/agents/profiles/claude.json"
+  },
+  "tools": {
+    "fileread": {
+      "purpose": "Read files and directories at the aliases the Context table names, at the frozen head.",
+      "modes": {
+        "never": "the operator reads nothing on disk",
+        "context-aliases": "only locations the Context table resolves to"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "Codex file reads"
+        },
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Read, Glob and Grep"
+        }
+      }
+    },
+    "sourcewrite": {
+      "purpose": "Write files inside a routed checkout or an authority root.",
+      "modes": {
+        "never": "the operator writes no file outside its own response/",
+        "declared-write-set": "only the paths the request declared, only on the session branch or the authority root the alias names, only values the bound receipts already contain"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "Codex file edits"
+        },
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Write and Edit"
+        }
+      }
+    },
+    "git": {
+      "purpose": "Read and change repository state: heads, branches, worktrees, commits, merges, pushes.",
+      "modes": {
+        "never": "no git at all",
+        "read": "rev-parse, status, log, diff, show; nothing that writes",
+        "commit-session-branch": "create or reuse the session/<sessionId> worktree from the frozen head and commit the declared write set there exactly once; never the person's branch",
+        "merge-and-push": "merge the session branch into the target (fast-forward, or a merge commit with the gates re-run), push without force, remove the session worktree and branch; never rebase, never force, never --no-verify",
+        "merge-into-integration-branch": "create or reuse the product integration worktree from the mainline and merge a session branch or the mainline into it as a merge commit, so two sessions meet at integration time; never push, never rebase, never force, never delete a branch"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "git through the Codex shell"
+        },
+        "claude": {
+          "supported": true,
+          "via": "git through the Claude Code Bash tool"
+        }
+      }
+    },
+    "shell": {
+      "purpose": "Run declared commands: gates, builds, proofs, hooks, deployment plans.",
+      "modes": {
+        "never": "the operator runs no command",
+        "declared-commands": "only the commands the route, the contract, or the manifest pins, with their output captured as evidence"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "the Codex shell"
+        },
+        "claude": {
+          "supported": true,
+          "via": "the Claude Code Bash tool"
+        }
+      }
+    },
+    "websearch": {
+      "purpose": "Read public web pages to close one named gap in the evidence; results are references with URLs, never authority.",
+      "modes": {
+        "never": "the operator does not search",
+        "bounded": "the operator searches only for the gap the step names and records every source it used with its URL"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "Codex web search"
+        },
+        "claude": {
+          "supported": true,
+          "via": "Claude Code WebSearch and WebFetch"
+        }
+      }
+    },
+    "imagegen": {
+      "purpose": "Produce artwork: a digital image from an image model, made to one stated claim. Rendering HTML is the visualize tool, not this one.",
+      "modes": {
+        "never": "the operator produces no artwork",
+        "judged": "the operator decides on its own, from the direction, whether a region reads empty enough to need artwork, records why, and never decorates",
+        "required": "artwork is a step of the job"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "the OpenAI image model available to the Codex session"
+        },
+        "claude": {
+          "supported": false,
+          "via": "none; a judged step records that no artwork could be made and the branch continues; a required step blocks with the operator's own code"
+        }
+      }
+    },
+    "visualize": {
+      "purpose": "Render HTML for a person to look at: direction candidates, audit sheets, alternative comparisons, previews. No model grant is involved.",
+      "modes": {
+        "never": "the operator renders nothing",
+        "html": "the operator writes HTML under response/artifacts/ and links it from response.md"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "files written by the Codex session"
+        },
+        "claude": {
+          "supported": true,
+          "via": "files written by the Claude Code session"
+        }
+      }
+    },
+    "browsercontrol": {
+      "purpose": "Drive a real browser against a served route: navigate, act, capture screenshots and DOM measurements.",
+      "modes": {
+        "never": "the operator opens no browser",
+        "required": "the operator's evidence comes from a driven browser; its Steps name the mode the browser is driven in, and a receipt that records mode playwright is held to that mode's law by the operator's validator",
+        "playwright": "the operator writes a declarative walk (the data kind uat-walk: role-and-name targets only, the entry route once at step 1, a credential by name) and the tree's runner scripts/browser-walk.mjs executes it: one Playwright and one Chromium installed once at the host, outside the tree, at <hostRoot>/.tools/playwright (install below); Chromium headless; one fresh browser context per run carrying the walk's own storage, cookies, viewport, deviceScaleFactor, colorScheme and reducedMotion, never a person's profile; every step's control is copied from the walk, the first failed step ends the run with nothing retried and no locator guessed, and the runner writes walk-result, the per-step ledger (each step labelled with the control it itself named, null when it named none), a screenshot with an accessibility snapshot, a DOM record and a capture-measurements record per capture — the runner's one page-side measurement of boxes, computed styles, effective backgrounds and contrast, which is the only source a measurable proof lane may cite a number from under this mode — and a trace; a credential the runner filled is masked in every screenshot, and every password field’s value reads as a mask in the DOM record and the accessibility snapshot before either is written, so a refused sign-in — whose form still holds what was typed into it — is a state a walk can capture rather than one the secret sweep refuses"
+      },
+      "install": {
+        "path": ".tools/playwright",
+        "browsersPath": ".tools/playwright/browsers",
+        "note": "Relative to the host root, the parent of the runtime tree (scripts/validate-request.mjs#hostRootOf). A plain npm project holding playwright, with PLAYWRIGHT_BROWSERS_PATH set to browsersPath so the browser binaries live beside the package and not in a person's cache. environment.preflight reports host.playwright as a wall when it is absent; the runner exits with the same wording.",
+        "command": "npm init -y && npm i playwright && npx playwright install chromium"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "mode required: Codex computer use, which opens the person's own Chrome, on a dedicated browser profile (the shared UAT identity), never the person's logged-in profile; mode playwright: node scripts/browser-walk.mjs <walk.json> <response dir> through the shell of the Codex session (the tree ships the runner; nothing is written ad hoc)"
+        },
+        "claude": {
+          "supported": true,
+          "via": "mode required: the in-app Browser pane, or Claude in Chrome when the task needs the person's sessions; mode playwright: node scripts/browser-walk.mjs <walk.json> <response dir> through the shell of the Claude Code session (the tree ships the runner; nothing is written ad hoc)"
+        }
+      },
+      "script": "scripts/browser-walk.mjs"
+    },
+    "http": {
+      "purpose": "Probe an endpoint: readiness, health, a served route, a GraphQL typename, a status page.",
+      "modes": {
+        "never": "no probes",
+        "probe": "GET or HEAD against the endpoints the runtime registry or the manifest names, with the observed status recorded"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "curl through the Codex shell"
+        },
+        "claude": {
+          "supported": true,
+          "via": "curl through Bash, or WebFetch for a public URL"
+        }
+      }
+    },
+    "registry": {
+      "purpose": "Read a package registry — a published package, its version, its files — and publish one packed release to it.",
+      "modes": {
+        "never": "no registry reads",
+        "read": "npm view and the installed package in node_modules; nothing is published",
+        "publish": "read, and publish one packed release of the owner package to the registry the package manifest names, exactly the tarball the receipt digests, under that manifest's own publishConfig, with the credential resolved by name through @tools/secrets and never printed; never a version the registry already serves, and the served version and the integrity it serves are read back and compared with the receipt before any publication is recorded"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "npm view, and npm publish for mode publish, through the Codex shell"
+        },
+        "claude": {
+          "supported": true,
+          "via": "npm view, and npm publish for mode publish, through Bash"
+        }
+      }
+    },
+    "container": {
+      "purpose": "Inspect or operate containers and images: compose services, GHCR images by digest.",
+      "modes": {
+        "never": "no container operations",
+        "read": "inspect, logs, digests",
+        "operate": "start, stop, roll out, roll back the services the approved plan names"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "docker and the GHCR API through the Codex shell"
+        },
+        "claude": {
+          "supported": true,
+          "via": "docker and the GHCR API through Bash"
+        }
+      }
+    },
+    "ci": {
+      "purpose": "Observe or dispatch continuous-integration runs.",
+      "modes": {
+        "never": "no CI access",
+        "read": "list and read runs and their logs",
+        "dispatch": "trigger the workflow the release manifest names"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "gh through the Codex shell"
+        },
+        "claude": {
+          "supported": true,
+          "via": "gh through Bash"
+        }
+      }
+    },
+    "objectstorage": {
+      "purpose": "Read or write objects in the content store (MinIO): curriculum, style references, published units.",
+      "modes": {
+        "never": "no object store access",
+        "read": "read the objects the unit names",
+        "write": "publish the objects the unit produced, under a person's approval"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "the MinIO client or its HTTP API through the Codex shell"
+        },
+        "claude": {
+          "supported": true,
+          "via": "the MinIO client or its HTTP API through Bash"
+        }
+      }
+    },
+    "secrets": {
+      "purpose": "Resolve a sealed credential by name at the moment it is used; never read, print or store its value. The value may enter the request body of the call that consumes it or the field of a form in a driven browser, and nowhere else: not a file, not a fixture, not a recorded command, not a screenshot, not a log and not a receipt.",
+      "modes": {
+        "never": "no credential is resolved",
+        "resolve-by-name": "the name comes from device-state or the selected route; identity provisioning first passes resources/identity.json through its fixed consuming helper. Decryption happens in the tool that consumes it; the value reaches only a request body or a browser form, never response/, a capture, a generic file-read result or diagnostic output"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "SOPS and age through the Codex shell"
+        },
+        "claude": {
+          "supported": true,
+          "via": "SOPS and age through Bash"
+        }
+      }
+    },
+    "database": {
+      "purpose": "Read or write the product database for verification: seeds, fixtures, is_uat records.",
+      "modes": {
+        "never": "no database access",
+        "read": "select only",
+        "namespaced-write": "insert and delete only rows carrying the run namespace and is_uat=true"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "psql or the service's API through the Codex shell"
+        },
+        "claude": {
+          "supported": true,
+          "via": "psql or the service's API through Bash"
+        }
+      }
+    },
+    "host": {
+      "purpose": "Serve a folder of static HTML on the loopback interface so a person can open it in a browser. The port is tried from 60000 upward to 60100 and the first free one wins; the receipt records the URL, the port, the folder and the pid under response/artifacts/host.json, and the server is stopped when the branch ends or is resumed. It never binds 0.0.0.0, so nothing it serves leaves the machine.",
+      "modes": {
+        "never": "the operator serves nothing",
+        "loopback": "the operator serves one folder on 127.0.0.1 at the first free port from 60000 to 60100 and records host.json"
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "node scripts/host-artifacts.mjs <folder> through the shell of the Codex session (the tree ships the server; nothing is written ad hoc)"
+        },
+        "claude": {
+          "supported": true,
+          "via": "node scripts/host-artifacts.mjs <folder> through the shell of the Claude Code session (the tree ships the server; nothing is written ad hoc)"
+        }
+      },
+      "script": "scripts/host-artifacts.mjs"
+    },
+    "print": {
+      "purpose": "Hand an artifact to the person in the conversation, rendered when the client can (image, HTML) and as a path or URL otherwise, at the moment a decision or a verdict needs their eyes. A run that produced the artifact and said nothing served nobody: the artifact reaches the person where they are reading, not where the branch happened to write it.",
+      "modes": {
+        "never": "the operator hands the person nothing",
+        "decision-points": "before a decision or a verdict is recorded, the operator hands the person every artifact that decision or verdict rests on, and lists the same artifact in the receipt under `## Printed` with why it was printed; a receipt whose table is empty where the operator printed something is a defect its own validator refuses. Apply resources/interaction.json before communicating any question. For a visual tier choice, print one rendered candidate per typed option, served through @tools/host with a capture per viewport; the stop's `reason` names the sheet URL and asks one question. Scores inform the recommendation. Prose alternatives do not replace rendered evidence; the operator's validator refuses a visual choice whose `## Printed` holds fewer rendered candidates than its options, or none. A diagnostic owner route carries no question by itself. Printing and the communication policy grant no operational authorization."
+      },
+      "support": {
+        "openai": {
+          "supported": true,
+          "via": "the absolute path or the URL printed into the conversation, with the image inline where the client renders one"
+        },
+        "claude": {
+          "supported": true,
+          "via": "the session's file and render hand-off, which displays an image or an HTML page in the conversation and falls back to the path or the URL"
+        }
+      }
+    }
+  }
+}

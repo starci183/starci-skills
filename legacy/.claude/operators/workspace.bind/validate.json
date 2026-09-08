@@ -1,0 +1,15 @@
+{
+  "machine": [
+    { "id": "request-shape", "check": "request-schema", "phase": "request" }, { "id": "request-files", "check": "input-files", "phase": "request" },
+    { "id": "response-shape", "check": "response-schema", "phase": "response" }, { "id": "request-binding", "check": "request-binding", "phase": "response" },
+    { "id": "unique-outputs", "check": "unique-output-ids", "phase": "response" }, { "id": "output-files", "check": "output-files", "phase": "response" },
+    { "id": "observation-binding", "check": "observation-references", "phase": "response" }
+  ],
+  "review": [
+    { "id": "route-authority", "instruction": "Verify the selected checkout resolves from the exact declared project-role route and its hydrated projection. Similar names, sibling directories, current working directory and URLs are not authority; a near match is only a suggestion." },
+    { "id": "git-policy", "instruction": "Verify declaration and request policy agree, the observed branch is permitted, the source head is exact, and dirt is absent except within declared write roots on an allowed session branch. Any dirt on the canonical mutation branch blocks." },
+    { "id": "install-safety", "instruction": "Inspect node_modules as absent, own directory or junction with resolved target. An external shared junction requires explicit shared-install intent and must never be recursively deleted by this operator." },
+    { "id": "receipt-boundary", "instruction": "Verify route and receipt agree on declaration digest, hydrated identity, checkout, branch, head, installed-tree state and derived mutation readiness. Confirm no endpoint, port, PID, credential value or runtime lifecycle claim appears." }
+  ],
+  "failurePolicy": "Record the exact declaration, hydration, branch, dirt or install-tree defect and its owner action. Reinspect only after the underlying state changes; never repair or repeatedly probe unchanged invalid state."
+}

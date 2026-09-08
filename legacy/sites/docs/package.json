@@ -1,0 +1,25 @@
+{
+  "name": "starci-skills-docs",
+  "version": "1.0.2",
+  "private": true,
+  "description": "Nextra site that renders .claude/docs",
+  "scripts": {
+    "generate": "node ../../docs/scripts/generate-docs.mjs",
+    "check": "node ../../docs/scripts/generate-docs.mjs --check",
+    "sync": "node scripts/sync-content.mjs",
+    "predev": "npm run generate && npm run sync",
+    "dev": "next dev",
+    "prebuild": "npm run generate && npm run sync",
+    "build": "next build"
+  },
+  "dependencies": {
+    "next": "14.2.35",
+    "nextra": "3.3.1",
+    "nextra-theme-docs": "3.3.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema","title":"runtime.serve response","$ref":"works:response",
+  "description":"A done response retains the inventory and applied delta, complete rung check set, route entry, fixed port, generation and attested served head. A proved already-converged result includes paired observations and no mutation.",
+  "allOf":[{"if":{"properties":{"status":{"const":"done"}},"required":["status"]},"then":{"properties":{"outputs":{"allOf":[
+    {"contains":{"properties":{"id":{"const":"platform-operation-receipt"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"runtime-delta"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}},
+    {"contains":{"properties":{"id":{"const":"runtime-checks"},"type":{"const":"file"},"file":{"properties":{"mediaType":{"const":"application/json"}}}},"required":["id","type","file"]}}
+  ]},"observations":{"not":{"contains":{"properties":{"result":{"const":"failed"}},"required":["result"]}}}}}}]
+}

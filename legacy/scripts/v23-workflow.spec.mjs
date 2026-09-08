@@ -1,0 +1,120 @@
+import { execFileSync } from 'node:child_process';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync, renameSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { openSession, confirmSession, discoverSession } from './session-open.mjs';
+import { completeDeliveryMission, authorityErrors, scopeErrors, scopeHash, deliveryTargets, deliveryRequestErrors, scopeBindingErrors } from './mission-scope.mjs';
+import { resolveWorkflowOwner, workflowOwnerErrors } from './workflow-root.mjs';
+import { mutateSession } from './session-lock.mjs';
+import { loadOperatorPackages } from './operator-md.mjs';
+import { loadOperatorGraph, validateChain } from './validate-chain.mjs';
+import { planChain } from './plan-chain.mjs';
+import { declareOwner, discoveryFor, answerFor } from './v23-test-fixture.mjs';
+import { validateAgainst } from './json-schema.mjs';
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const mission = discovery => completeDeliveryMission({ version: 1, language: 'en', goal: 'Deliver bounded module behavior', target: 'declared module', includes: ['bounded behavior'], excludes: [], outputs: ['reviewable delivery'], doneWhen: [{ evidence: 'the promise is decided', producedBy: 'business.decide' }], verification: 'positive and negative module journeys', sourceRef: 'user:opening', discovery });
+function fixture(run) { const base = mkdtempSync(path.join(tmpdir(), 'starci v23 relocated ')); return Promise.resolve().then(() => run(base)).finally(() => rmSync(base, { recursive: true, force: true })); }
+
+test('old execution cannot migrate or replay; retirement stays denied after moving the folder', async () => fixture(async base => {
+  const source = path.join(base,'Source'), owner = path.join(base,'Project');mkdirSync(source);mkdirSync(owner);mkdirSync(path.join(source,'.claude'));
+  declareOwner(source,'sample',owner);
+  const session = path.join(owner,'.worktrees/sessions/old-one');mkdirSync(session,{recursive:true});
+  const old = { contractVersion:'starci/v2.2',id:'old-one',project:'sample',attempts:{},workerSlots:[],leases:{} };
+  const file=path.join(session,'state.json');writeFileSync(file,JSON.stringify(old));const bytes=readFileSync(file);
+  assert.ok(workflowOwnerErrors(path.join(source,'.claude'),session,old).some(error=>error.includes('WORKFLOW_RESET_REQUIRED')));
+  await assert.rejects(()=>mutateSession(session,state=>{state.runtimeRevision=3;}),/WORKFLOW_RESET_REQUIRED/);
+  assert.deepEqual(readFileSync(file),bytes);
+  writeFileSync(path.join(session,'retirement.json'),JSON.stringify({version:1,status:'retired',executionAllowed:false}));
+  const retired=path.join(base,'retired-history');renameSync(session,retired);
+  await assert.rejects(()=>mutateSession(retired,()=>{}),/WORKFLOW_RETIRED/);
+  const fresh=await openSession(path.join(owner,'.worktrees/sessions'),{sessionId:'old-one',project:'sample',hostBinding:{kind:'codex-task',hostId:'fresh-host',worktree:owner,sourcePromptRef:'user:opening'},mission:mission(discoveryFor('sample'))},{sourceRoot:source});
+  const state=JSON.parse(readFileSync(path.join(fresh.session,'state.json')));
+  assert.equal(state.runtimeRevision,3);assert.equal(state.upgrade,undefined);assert.deepEqual(state.attempts,{});assert.deepEqual(state.chain,[]);
+  assert.deepEqual(readFileSync(path.join(retired,'state.json')),bytes);
+  const schema=JSON.parse(readFileSync(path.join(ROOT,'templates/step/state.schema.json')));
+  assert.ok(validateAgainst(schema,{...state,upgrade:{from:retired}}).some(error=>error.includes('unexpected property')));
+  writeFileSync(path.join(fresh.session,'relocation.json'),'{}');
+  await assert.rejects(()=>mutateSession(fresh.session,()=>{}),/WORKFLOW_RELOCATED/);
+}));
+test('a vague prompt cannot become an exact opening-scope answer; displayed scope answer seals each reviewed field', () => {
+  const value = mission(discoveryFor('sample'));
+  const vague = { ...answerFor(value), kind: 'opening-scope', sourceRef: value.sourceRef, statement: 'please do it', coverage: { goal: 'please do it', impact: 'please do it', destination: 'please do it', stage: 'please do it', verification: 'please do it' } };
+  assert.ok(authorityErrors(value, vague).some(error => error.includes('opening-scope impact')));
+  const answer = answerFor(value); assert.deepEqual(authorityErrors(value, answer), []);
+  delete answer.presentedScopeHash; assert.ok(authorityErrors(value, answer).some(error => error.includes('previously presented')));
+  value.discovery.unresolved.push('Which data owner enforces the rule?'); assert.ok(authorityErrors(value, answerFor(value)).some(error => error.includes('GOAL_UNRESOLVED')));
+});
+test('a complete Vietnamese opening scope preserves authorization through a recorded goal paraphrase', () => {
+  const value = mission(discoveryFor('sample'));
+  const coverage = { goal: 'Hoàn thành hành vi module đã nêu', impact: 'src/modules', destination: 'session evidence', stage: 'triển khai tính năng', verification: value.verification };
+  const authority = { kind: 'opening-scope', sourceRef: value.sourceRef, statement: Object.values(coverage).join('. '), coverage, scopeHash: scopeHash(value), normalizations: { goal: { excerpt: coverage.goal, value: value.goal, reason: 'The English ledger goal is a direct paraphrase of the supplied Vietnamese instruction.' } } };
+  assert.deepEqual(authorityErrors(value, authority), []);
+});
+test('owner declarations reached through an escaping junction cannot redirect workflow storage', async () => fixture(async base => {
+  const source = path.join(base, 'Source'); const outside = path.join(base, 'outside'); mkdirSync(source); mkdirSync(outside); mkdirSync(path.join(source, '.workspaces/projects'), { recursive: true });
+  writeFileSync(path.join(outside, 'workflow.json'), JSON.stringify({ version: 1, project: 'sample', ownerRole: 'be' }));
+  symlinkSync(outside, path.join(source, '.workspaces/projects/sample'), process.platform === 'win32' ? 'junction' : 'dir');
+  assert.throws(() => resolveWorkflowOwner(source, 'sample'), /escapes/);
+}));
+test('impact-derived handoff covers applicable lanes without invented backend or execution authority', () => {
+  const ui = mission(discoveryFor('sample', { tags: ['feature', 'interface'], stage: 'handoff' }));
+  assert.deepEqual(scopeErrors(ui, { complete: true }), []);
+  assert.ok(deliveryTargets(ui).includes('interface.plan')); assert.ok(!deliveryTargets(ui).includes('backend.plan')); assert.ok(!deliveryTargets(ui).includes('backend.generate'));
+  const state = { runtimeRevision: 3, lifecycle: { phase: 'active' }, mission: { ...ui, confirmation: { scopeHash: scopeHash(ui), authority: answerFor(ui), sourceRef: 'user:scope-answer' } } };
+  assert.ok(deliveryRequestErrors(state, { operatorId: 'git.publish' }).some(error => error.includes('DELIVERY_STAGE')));
+  ui.discovery.lanes.audit.status = 'not-applicable'; assert.ok(scopeErrors(ui).some(error => error.includes('applicable impact')));
+  delete ui.discovery.lanes.interface.dependsOn; assert.ok(scopeErrors(ui).some(error => error.includes('dependsOn')));
+  const full = mission(discoveryFor('sample', { tags: ['feature', 'backend', 'data', 'api', 'interface'], stage: 'implement' }));
+  for (const operator of ['business.decide', 'architecture.decide', 'backend.generate', 'api.verify', 'interface.generate', 'interface.audit', 'uat.verify', 'business.reconcile']) assert.ok(deliveryTargets(full).includes(operator));
+});
+test('a terse feature goal expands to a handoff-ready chain and an implementation proof chain', async () => {
+  const packages = await loadOperatorPackages(ROOT); const graph = await loadOperatorGraph(ROOT, packages);
+  for (const stage of ['handoff', 'implement']) {
+    const value = mission(discoveryFor('sample', { tags: ['feature', 'backend', 'api', 'interface'], stage }));
+    const plan = planChain({ packages, mission: value, options: { graph } });
+    const planned = Object.fromEntries(Object.entries(plan.presets).map(([cell, requirements]) => [cell, { requirements }]));
+    assert.deepEqual(validateChain(ROOT, packages, plan.chain, plan.steps, {}, { graph, mission: value, planned }), []);
+    for (const operator of deliveryTargets(value)) assert.ok(Object.values(plan.steps).includes(operator));
+    if (stage === 'handoff') assert.ok(!Object.values(plan.steps).includes('backend.generate'));
+  }
+});
+test('project owner declaration separates runtime Source and workflow storage; vague draft remains non-executable', async () => fixture(async base => {
+  const source = path.join(base, 'shared runtime'); const owner = path.join(base, 'product backend'); const frontend = path.join(base, 'product frontend');
+  for (const directory of [source, owner, frontend]) mkdirSync(directory);
+  mkdirSync(path.join(source, '.claude'));
+  declareOwner(source, 'sample', owner);
+  const input = { project: 'sample', hostBinding: { kind: 'codex-task', hostId: 'task-1', worktree: frontend, sourcePromptRef: 'user:opening' }, mission: mission(discoveryFor('sample')) };
+  const sessions = path.join(owner, '.worktrees', 'sessions');
+  await assert.rejects(() => openSession(path.join(source, '.worktrees', 'sessions'), input, { sourceRoot: source }), /sessionsRoot/);
+  const opened = await openSession(sessions, input, { sourceRoot: source });
+  assert.equal(opened.phase, 'draft');
+  await assert.rejects(() => confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: 'user:opening' }), /GOAL_AUTHORITY/);
+  const state = JSON.parse(readFileSync(path.join(opened.session, 'state.json')));
+  assert.equal(state.workflowOwner.ownerRoot, owner);
+  assert.ok(scopeBindingErrors(state, { requirements: { project: 'different', role: 'be' } }).some(error => error.includes('outside')));
+  assert.ok(scopeBindingErrors(state, {}).some(error => error.includes('GOAL_SOURCE_UNBOUND')));
+  const otherProject = structuredClone(state); otherProject.mission.discovery.repositories[0].project = 'other';
+  assert.ok(scopeBindingErrors(otherProject, {}).some(error => error.includes('owning workflow project')));
+  const badAuthority = answerFor(state.mission);
+  await assert.rejects(() => confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: badAuthority.sourceRef, authority: badAuthority }), /GOAL_SOURCE_UNBOUND/);
+  const git = (...args) => execFileSync('git', ['-C', owner, ...args], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  git('init'); git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-m', 'Initial');
+  state.mission.discovery.repositories[0].head = git('rev-parse', 'HEAD');
+  await discoverSession(opened.session, state.mission);
+  const authority = answerFor(state.mission);
+  await confirmSession(opened.session, { selected: 'as-stated', selectedBy: 'user', sourceRef: authority.sourceRef, authority });
+  const active = JSON.parse(readFileSync(path.join(opened.session, 'state.json')));
+  assert.deepEqual(workflowOwnerErrors(path.join(source, '.claude'), opened.session, active, { dispatch: true }), []);
+  const routeFile = path.join(source, active.workflowOwner.routeRef);
+  const route = JSON.parse(readFileSync(routeFile));
+  route.repository.head = 'b'.repeat(40); route.hydratedAt = new Date().toISOString();
+  writeFileSync(routeFile, JSON.stringify(route));
+  assert.deepEqual(workflowOwnerErrors(path.join(source, '.claude'), opened.session, active, { dispatch: true }), []);
+  route.repository.diskPath = frontend; writeFileSync(routeFile, JSON.stringify(route));
+  assert.ok(workflowOwnerErrors(path.join(source, '.claude'), opened.session, active, { dispatch: true }).some(error => error.includes('WORKFLOW_OWNER_DRIFT')));
+  route.repository.diskPath = owner; writeFileSync(routeFile, JSON.stringify(route));
+  await assert.rejects(() => discoverSession(opened.session, input.mission), /GOAL_FROZEN/);
+}));

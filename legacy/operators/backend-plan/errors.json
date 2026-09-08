@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only backend.plan emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, NO_PROGRESS, EVIDENCE_MISSING) come from operators/errors.json. MODULE_UNDEFINED is the operator's own defect and routes to itself: a decision may name a writer in its owner's words, and it is this operator that turns writers into modules.",
+  "codes": {
+    "MODULE_UNDEFINED": {
+      "domain": "self",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "An operation the frozen contract carries can be placed in no module: its writer resolves into no folder the source draws a boundary around, or it shares a writer with one module and a store boundary with another. A plan that left it out would send the generators out with an operation nobody fills; the reason names every such operation in one paragraph.",
+        "vi": "Một thao tác mà contract đã đóng băng mang không đặt vào module nào được: writer của nó không rơi vào thư mục nào mà source vạch ranh giới, hay nó dùng chung writer với một module và ranh giới kho với module khác. Một kế hoạch bỏ nó ra sẽ đưa các generator đi với một thao tác không ai điền; phần reason nêu mọi thao tác như vậy trong một đoạn."
+      },
+      "resume": {
+        "en": "Name the boundary in the decision's handoff, or have the contract owner correct the writer, and run the same plan again; a re-entry that names the same modules is NO_PROGRESS.",
+        "vi": "Nêu ranh giới trong phần handoff của quyết định, hoặc để chủ contract sửa lại writer, rồi chạy lại cùng bản kế hoạch; một lần vào lại gọi tên cùng những module là NO_PROGRESS."
+      }
+    }
+  }
+}

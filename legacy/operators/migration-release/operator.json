@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 9,
+  "id": "migration.release",
+  "domain": "migration",
+  "job": "Apply one frozen source migration plan once to one declared non-production target through the source-owned runner, and prove by a second invocation that nothing remains pending and the journal did not move.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-fresh",
+    "grammarBound": false,
+    "mode": "inline",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read",
+      "@tools/shell": "declared-commands",
+      "@tools/secrets": "resolve-by-name"
+    }
+  },
+  "primaryOutput": "migration-release"
+}

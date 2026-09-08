@@ -1,0 +1,764 @@
+{
+  "aliases": {
+    "@cli/age": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "age"
+      },
+      "kind": "cli",
+      "note": "SOPS and age are distinct executables. Their presence does not authorize generic credential decryption.",
+      "params": [],
+      "purpose": "Use age in the fixed credential-consuming operation.",
+      "resolvesTo": "executable:age",
+      "scheme": "cli://age",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/browser-walk": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [
+          "scripts/browser-walk.mjs"
+        ],
+        "executable": "node"
+      },
+      "kind": "cli",
+      "note": "Requires the declared Playwright installation and Chromium. This CLI runner is distinct from session browser control.",
+      "params": [],
+      "purpose": "Run the shipped declarative Playwright browser walk.",
+      "resolvesTo": "scripts/browser-walk.mjs",
+      "scheme": "cli://browser-walk",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/curl": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "curl"
+      },
+      "kind": "cli",
+      "note": "On Windows resolve the curl executable (curl.exe), not a PowerShell alias with different argument semantics. A native web-fetch capability is not this CLI alias.",
+      "params": [],
+      "purpose": "Probe an HTTP endpoint using the curl executable.",
+      "resolvesTo": "executable:curl",
+      "scheme": "cli://curl",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/docker": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "docker"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Inspect or operate containers and images through Docker CLI.",
+      "resolvesTo": "executable:docker",
+      "scheme": "cli://docker",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/gh": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "gh"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Observe or dispatch GitHub Actions through GitHub CLI.",
+      "resolvesTo": "executable:gh",
+      "scheme": "cli://gh",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/git": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "git"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Inspect or change Git repository state.",
+      "resolvesTo": "executable:git",
+      "scheme": "cli://git",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/host-artifacts": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [
+          "scripts/host-artifacts.mjs"
+        ],
+        "executable": "node"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Serve the declared artifact folder through the shipped loopback server.",
+      "resolvesTo": "scripts/host-artifacts.mjs",
+      "scheme": "cli://host-artifacts",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/mc": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "mc"
+      },
+      "kind": "cli",
+      "note": "Resolve the MinIO Client executable; another program also named mc is not a valid binding. HTTP or SDK access requires its own explicit invocation.",
+      "params": [],
+      "purpose": "Read or write declared MinIO objects through the MinIO client.",
+      "resolvesTo": "executable:mc",
+      "scheme": "cli://mc",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/node": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "node"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Run declared JavaScript entry points.",
+      "resolvesTo": "executable:node",
+      "scheme": "cli://node",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/npm": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "npm"
+      },
+      "kind": "cli",
+      "params": [],
+      "purpose": "Inspect packages or publish a declared package through npm.",
+      "resolvesTo": "executable:npm",
+      "scheme": "cli://npm",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/psql": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "psql"
+      },
+      "kind": "cli",
+      "note": "This alias requires PostgreSQL and psql; it is not a universal database client or service API.",
+      "params": [],
+      "purpose": "Run declared PostgreSQL verification commands.",
+      "resolvesTo": "executable:psql",
+      "scheme": "cli://psql",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/python": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "python"
+      },
+      "kind": "cli",
+      "note": "Resolve Python 3 from the active environment: python, python3, or py -3 as appropriate; record the selected executable and any launcher arguments.",
+      "params": [],
+      "purpose": "Run declared Python scripts.",
+      "resolvesTo": "executable:python",
+      "scheme": "cli://python",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/shell": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "<session-shell>"
+      },
+      "kind": "cli",
+      "note": "Resolve to the session shell (PowerShell, bash or another declared shell); do not assume bash on Windows. Arguments remain separate data until encoded for that shell.",
+      "params": [],
+      "purpose": "Run a declared command in the active session shell.",
+      "resolvesTo": "executable:<session-shell>",
+      "scheme": "cli://shell",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@cli/sops": {
+      "bind": "Resolved executable path and reported version in the active environment; working directory and arguments declared by the invocation.",
+      "invocation": {
+        "arguments": [],
+        "executable": "sops"
+      },
+      "kind": "cli",
+      "note": "Never emit decrypted credentials into the conversation or tool logs. Resolve and consume within the authorized operation.",
+      "params": [],
+      "purpose": "Use SOPS in the fixed credential-consuming operation.",
+      "resolvesTo": "executable:sops",
+      "scheme": "cli://sops",
+      "writers": [],
+      "zone": "cli"
+    },
+    "@remote/ghcr": {
+      "bind": "Image repository and immutable digest.",
+      "kind": "service",
+      "params": [
+        "image",
+        "digest"
+      ],
+      "purpose": "A container image pinned by digest.",
+      "resolvesTo": "ghcr.io/<image>@<digest>",
+      "scheme": "remote://ghcr",
+      "writers": [],
+      "zone": "remote"
+    },
+    "@remote/git": {
+      "bind": "Explicit remote URL and observed remote commit.",
+      "kind": "service",
+      "params": [
+        "repository"
+      ],
+      "purpose": "A named Git remote of the bound repository.",
+      "resolvesTo": "<GitRemote>",
+      "scheme": "remote://git",
+      "writers": [],
+      "zone": "remote"
+    },
+    "@remote/github-actions": {
+      "bind": "Repository identity, run id, head commit and observed conclusion.",
+      "kind": "service",
+      "params": [
+        "runId"
+      ],
+      "purpose": "One GitHub Actions run.",
+      "resolvesTo": "<GitHubRepository>/actions/runs/<runId>",
+      "scheme": "remote://github-actions",
+      "writers": [],
+      "zone": "remote"
+    },
+    "@remote/minio": {
+      "bind": "Endpoint, bucket, key, and observed object version or content digest.",
+      "kind": "service",
+      "params": [
+        "bucket",
+        "key"
+      ],
+      "purpose": "An object in the explicitly bound MinIO store.",
+      "resolvesTo": "<ObjectStore>/<bucket>/<key>",
+      "scheme": "remote://minio",
+      "writers": [],
+      "zone": "remote"
+    },
+    "@remote/npm": {
+      "bind": "Registry URL, exact package version and package integrity.",
+      "kind": "service",
+      "params": [
+        "package",
+        "version"
+      ],
+      "purpose": "A published npm package version.",
+      "resolvesTo": "<Registry>/<package>@<version>",
+      "scheme": "remote://npm",
+      "writers": [],
+      "zone": "remote"
+    },
+    "@tools/agent": {
+      "bind": "Resolve the active host delegation capability at invocation time. Require availability, user authorization where applicable, bounded context and declared ownership. Wait for the returned evidence before consuming it.",
+      "invocation": {
+        "capability": "agent"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Dispatch bounded work or independent review to a separate agent and receive its result through the active session.",
+      "resolvesTo": "session:agent",
+      "scheme": "tool://agent",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Host-advertised subagent delegation when available."
+        },
+        "openai": {
+          "supported": true,
+          "via": "Host-advertised subagent delegation when available."
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/browsercontrol": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "browsercontrol"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Drive a real browser against a served route: navigate, act, capture screenshots and DOM measurements.",
+      "resolvesTo": "session:browsercontrol",
+      "scheme": "tool://browsercontrol",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "mode required: the in-app Browser pane, or Claude in Chrome when the task needs the person's sessions"
+        },
+        "openai": {
+          "supported": true,
+          "via": "mode required: Codex computer use, which opens the person's own Chrome, on a dedicated browser profile (the shared UAT identity), never the person's logged-in profile"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/fileread": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "fileread"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Read declared workspace files and directories through the active session.",
+      "resolvesTo": "session:fileread",
+      "scheme": "tool://fileread",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Read, Glob and Grep"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex file reads"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/imagegen": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "imagegen"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Produce artwork: a digital image from an image model, made to one stated claim. Rendering HTML is the visualize tool, not this one.",
+      "resolvesTo": "session:imagegen",
+      "scheme": "tool://imagegen",
+      "support": {
+        "claude": {
+          "supported": false,
+          "via": "none; a judged step records that no artwork could be made and the branch continues; a required step blocks with the operator's own code"
+        },
+        "openai": {
+          "supported": true,
+          "via": "the OpenAI image model available to the Codex session"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/imageview": {
+      "bind": "Image inspection capability advertised by the active session; inspect actual pixels, not filenames or metadata.",
+      "invocation": {
+        "capability": "imageview"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Inspect image pixels through session image input or an image viewing tool.",
+      "resolvesTo": "session:imageview",
+      "scheme": "tool://imageview",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Attached images or an image-capable file reader."
+        },
+        "openai": {
+          "supported": true,
+          "via": "Attached images or an available image viewing tool."
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/print": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "print"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Present text and artifacts in the conversation using the host rendering capabilities.",
+      "resolvesTo": "session:print",
+      "scheme": "tool://print",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "the session's file and render hand-off, which displays an image or an HTML page in the conversation and falls back to the path or the URL"
+        },
+        "openai": {
+          "supported": true,
+          "via": "the absolute path or the URL printed into the conversation, with the image inline where the client renders one"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/sourcewrite": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "sourcewrite"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Edit files within the declared write scope through the active session.",
+      "resolvesTo": "session:sourcewrite",
+      "scheme": "tool://sourcewrite",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code Write and Edit"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex file edits"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/visualize": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "visualize"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Create a visual explanation or preview through the active session; record any produced files as outputs.",
+      "resolvesTo": "session:visualize",
+      "scheme": "tool://visualize",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "files written by the Claude Code session"
+        },
+        "openai": {
+          "supported": true,
+          "via": "files written by the Codex session"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@tools/websearch": {
+      "bind": "Capability advertised by the active session; availability and invocation permissions checked at use time.",
+      "invocation": {
+        "capability": "websearch"
+      },
+      "kind": "tool",
+      "params": [],
+      "purpose": "Read public web pages to close one named gap in the evidence; results are references with URLs, never authority.",
+      "resolvesTo": "session:websearch",
+      "scheme": "tool://websearch",
+      "support": {
+        "claude": {
+          "supported": true,
+          "via": "Claude Code WebSearch and WebFetch"
+        },
+        "openai": {
+          "supported": true,
+          "via": "Codex web search"
+        }
+      },
+      "writers": [],
+      "zone": "tools"
+    },
+    "@workspaces": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [],
+      "purpose": "The explicitly selected project workspace.",
+      "resolvesTo": "<Workspace>/",
+      "scheme": "workspace://root",
+      "writers": [
+        "git.publish",
+        "runtime.serve"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/alias": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "file",
+      "params": [],
+      "purpose": "The compiled alias registry.",
+      "resolvesTo": "<Runtime>/.dist/alias.json",
+      "scheme": "workspace://alias",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/artifacts": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Produced files, including images, documents and other deliverables.",
+      "resolvesTo": "<Workspace>/.works/<workId>/artifacts/",
+      "scheme": "workspace://artifacts",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/be": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "checkout",
+      "params": [],
+      "purpose": "The explicitly bound backend checkout; unavailable when the project has no backend role.",
+      "resolvesTo": "<Backend>/",
+      "scheme": "workspace://be",
+      "writers": [
+        "backend.generate"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/context": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Supporting reference files for a request.",
+      "resolvesTo": "<Workspace>/.works/<workId>/context/",
+      "scheme": "workspace://context",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/decisions": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Decisions bound to exact subjects.",
+      "resolvesTo": "<Workspace>/.works/<workId>/decisions/",
+      "scheme": "workspace://decisions",
+      "writers": [
+        "architecture.decide",
+        "business.decide",
+        "business.reconcile"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/evidence": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Evidence records naming artifact paths and digests.",
+      "resolvesTo": "<Workspace>/.works/<workId>/evidence/",
+      "scheme": "workspace://evidence",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/fe": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "checkout",
+      "params": [],
+      "purpose": "The explicitly bound frontend checkout; unavailable when the project has no frontend role.",
+      "resolvesTo": "<Frontend>/",
+      "scheme": "workspace://fe",
+      "writers": [
+        "interface.fix",
+        "interface.generate",
+        "library.update"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/grammar": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [],
+      "purpose": "The explicitly resolved grammar package directory; unavailable when no grammar package is bound.",
+      "resolvesTo": "<Grammar>/",
+      "scheme": "workspace://grammar",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/inputs": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Files supplied as the subject of a request.",
+      "resolvesTo": "<Workspace>/.works/<workId>/inputs/",
+      "scheme": "workspace://inputs",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/knowledge": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [],
+      "purpose": "Knowledge published by the selected skill runtime.",
+      "resolvesTo": "<Runtime>/knowledge/",
+      "scheme": "workspace://knowledge",
+      "writers": [
+        "knowledge.repair"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/requests": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Requests with separate inputs and context.",
+      "resolvesTo": "<Workspace>/.works/<workId>/requests/",
+      "scheme": "workspace://requests",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/responses": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "Responses declaring produced outputs and execution status.",
+      "resolvesTo": "<Workspace>/.works/<workId>/responses/",
+      "scheme": "workspace://responses",
+      "writers": [
+        "api.verify",
+        "architecture.decide",
+        "backend.generate",
+        "backend.plan",
+        "business.decide",
+        "business.reconcile",
+        "content.generate",
+        "data.plan",
+        "data.seed",
+        "environment.preflight",
+        "git.publish",
+        "identity.provision",
+        "interface.audit",
+        "interface.draw",
+        "interface.fix",
+        "interface.generate",
+        "interface.plan",
+        "knowledge.repair",
+        "landing.compose",
+        "library.update",
+        "migration.release",
+        "quality.verify",
+        "release.deploy",
+        "runtime.serve",
+        "service.operate",
+        "uat.plan",
+        "uat.verify",
+        "workflow.verify",
+        "workspace.bind"
+      ],
+      "zone": "workspaces"
+    },
+    "@workspaces/schema": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "file",
+      "params": [],
+      "purpose": "The compiled work-record schema.",
+      "resolvesTo": "<Runtime>/.dist/schema.json",
+      "scheme": "workspace://schema",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/skills": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [],
+      "purpose": "The explicitly bound skill runtime directory.",
+      "resolvesTo": "<Runtime>/",
+      "scheme": "workspace://skills",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/work": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [
+        "workId"
+      ],
+      "purpose": "One work record and its associated files.",
+      "resolvesTo": "<Workspace>/.works/<workId>/",
+      "scheme": "workspace://work",
+      "writers": [],
+      "zone": "workspaces"
+    },
+    "@workspaces/works": {
+      "bind": "Explicit absolute root binding from the active invocation; resolve within that root, verify existence when reading, and verify declared write scope before writing.",
+      "kind": "dir",
+      "params": [],
+      "purpose": "Work-record storage under the selected workspace.",
+      "resolvesTo": "<Workspace>/.works/",
+      "scheme": "workspace://works",
+      "writers": [],
+      "zone": "workspaces"
+    }
+  },
+  "note": "Closed registry of workspace locations, session capabilities, CLI commands and remote resources. Resolve the longest registered prefix with a slash boundary. Alias declarations do not grant permissions. Root bindings come from the active invocation; missing bindings fail explicitly.",
+  "schemaVersion": 1,
+  "segments": {
+    "gates": "package.json#scripts",
+    "husky": ".husky/",
+    "package": "package.json"
+  },
+  "zones": {
+    "cli": {
+      "en": "Named executables or shipped script entry points invoked as commands in the selected shell."
+    },
+    "remote": {
+      "en": "Internet. Registries, git remotes, image registries, CI runs, object storage. Read through a network; bound by version, digest, or observed head."
+    },
+    "tools": {
+      "en": "Capabilities invoked through the active agent session, including file access, web search, image generation, visualization, browser control and artifact presentation."
+    },
+    "workspaces": {
+      "en": "Bound local workspace, work-record directories and skill runtime files. All local resource aliases share this namespace."
+    }
+  }
+}

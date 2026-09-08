@@ -1,0 +1,67 @@
+{
+  "$id": "kind:bank-approvals",
+  "description": "The person's approvals of a product's bank, at @worktrees/banked/<product>/approvals.json, newest last. One approval covers one queue: it records who approved, when, the queue hash it approved (scripts/bank.mjs#queueHash) and the missions that queue listed. That one answer counts as the goal-confirm of every mission the queue names, so a session opened from a banked entry prints its goal block and does not wait. The hash is what keeps the approval honest: adding, reordering or dropping an entry changes it, the approval stops being current, and the next mission asks the person again. A mission whose goal the person corrects at open time is re-confirmed on its own, the bank entry is rewritten, and the hash the approval carries is stale by construction.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "product",
+    "approvals"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 9
+    },
+    "product": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "approvals": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "choice",
+          "who",
+          "at",
+          "queueHash",
+          "missionIds"
+        ],
+        "properties": {
+          "choice": {
+            "type": "string",
+            "pattern": "^bank:[a-z0-9][a-z0-9-]*:v[1-9][0-9]*$",
+            "description": "bank:<product>:v<n>, the decision id the session records the way it records a goal-confirm"
+          },
+          "who": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "the person who approved, by the name the session knows them by; never a credential and never an address"
+          },
+          "at": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+          },
+          "queueHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "missionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            }
+          }
+        }
+      }
+    }
+  }
+}

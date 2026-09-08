@@ -1,0 +1,20 @@
+{
+  "steps": [
+    { "id": "bind-journeys", "instruction": "Read the request and declared inputs. Extract each user journey with its actor, plus feature, environment, access, fixture and source-role policies. Bind surface routes when supplied. Ask when a journey has no known entry.",
+      "reads": [{ "alias": "@workspaces/requests", "path": "<requestId>.json", "when": "always" }, { "alias": "@workspaces/inputs", "path": "<declared-input-path>", "when": "when a surface map is declared" }, { "alias": "@workspaces/context", "path": "<declared-context-path>", "when": "when templates, prior flows or unchecked coverage are declared" }],
+      "writes": [], "calls": [{ "alias": "@tools/fileread", "purpose": "Read the goal, surface map and declared flow evidence.", "when": "always" }], "checks": ["request-shape", "request-files"], "produces": ["Frozen journey and policy inventory"] },
+    { "id": "inspect-existing-flows", "instruction": "Inspect existing flow names, case sheets, account aliases and seed namespaces. Reuse stable identities and history, but do not provision accounts or inspect secret values.",
+      "reads": [{ "alias": "@workspaces/context", "path": "<declared-flow-path>", "when": "for each supplied existing flow" }], "writes": [],
+      "calls": [{ "alias": "@tools/fileread", "purpose": "Inspect declared existing flow artifacts.", "when": "when existing flows are supplied" }], "checks": [], "produces": ["Reusable flow inventory"] },
+    { "id": "compose-flows", "instruction": "Create, update or reuse exactly one flow per journey. Write actor, precondition, input, bounded ordered UI actions, assertions, expected result, verification, fixture references and cleanup. Freeze access, fixtures and source roles; allocate distinct aliases and namespaces where required; tier every flow.",
+      "reads": [{ "alias": "@workspaces/inputs", "path": "<surface-map-path>", "when": "when a surface map is bound" }, { "alias": "@workspaces/context", "path": "<declared-template-path>", "when": "when a UAT template is supplied" }],
+      "writes": [{ "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/uat-plan.md", "when": "after all flows are defined" }, { "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/cases.json", "when": "after all cases are executable" }, { "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/units.json", "when": "after flow rows are final" }],
+      "calls": [{ "alias": "@tools/sourcewrite", "purpose": "Persist the plan, machine case sheet and matching unit list.", "when": "after all flow criteria are satisfied" }],
+      "checks": ["journey-coverage", "case-executability", "prerequisite-isolation", "units-and-tiers"], "produces": ["uat-plan", "uat-case-sheet", "units"] },
+    { "id": "emit-uat-plan", "instruction": "Write and validate the typed response after every planned flow passes. Report that no browser, sign-in or fixture operation has run.",
+      "reads": [{ "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/uat-plan.md", "when": "when the plan passes" }, { "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/cases.json", "when": "when the plan passes" }, { "alias": "@workspaces/artifacts", "path": "<requestId>/<attemptId>/units.json", "when": "when the plan passes" }],
+      "writes": [{ "alias": "@workspaces/responses", "path": "<responseId>.json", "when": "always" }],
+      "calls": [{ "alias": "@tools/sourcewrite", "purpose": "Write the response record.", "when": "always" }, { "alias": "@cli/python", "purpose": "Run scripts/validate_operator.py for this bundle and records.", "when": "always" }, { "alias": "@tools/print", "purpose": "Present the accepted UAT plan and cases.", "when": "after validation passes" }],
+      "checks": ["response-shape", "request-binding", "unique-outputs", "output-files", "observation-binding"], "produces": ["Response record"] }
+  ]
+}

@@ -1,0 +1,268 @@
+{
+  "steps": [
+    {
+      "id": "read-brief",
+      "instruction": "Read the exact request and declared files. Separate task inputs from context. Establish surface, audience, content, primary actions and visual constraints. Ask only for essential missing information; record reasonable assumptions. Select context.visual mode explicitly. For an existing surface or feature extension, bind its current or selected image as baseline in context.files. Do not choose new just to bypass missing context.",
+      "reads": [
+        {
+          "alias": "@workspaces/requests",
+          "path": "<requestId>.json",
+          "when": "always"
+        },
+        {
+          "alias": "@workspaces/inputs",
+          "path": "<declared-input-path>",
+          "when": "when a declared input file is under inputs/"
+        },
+        {
+          "alias": "@workspaces/context",
+          "path": "<declared-context-path>",
+          "when": "when a declared context file is under context/"
+        },
+        {
+          "alias": "@workspaces/work",
+          "path": "<declared-file-path>",
+          "when": "when a declared file uses another work-relative path"
+        }
+      ],
+      "writes": [],
+      "calls": [
+        {
+          "alias": "@tools/fileread",
+          "purpose": "Read the request and only its declared file references.",
+          "when": "always"
+        }
+      ],
+      "checks": [
+        "request-shape",
+        "request-files",
+        "visual-inheritance"
+      ],
+      "produces": [
+        "An understood brief with known facts, constraints and explicit assumptions."
+      ]
+    },
+    {
+      "id": "compose-prompt",
+      "instruction": "Read relevant bound references. Write the complete generation prompt: surface and viewport intent, hierarchy, exact supplied content, actions, visual language and reference usage. Preserve native-control and live-data intent; a drawing is not an implemented screen. State visual.preserve and visual.change explicitly; identify which regions remain intact. For extend/revise, append every preserve/change item verbatim as a checklist in the retained prompt; additional design explanation may follow.",
+      "reads": [
+        {
+          "alias": "@workspaces/context",
+          "path": "<declared-context-path>",
+          "when": "when context references are supplied"
+        },
+        {
+          "alias": "@workspaces/fe",
+          "path": "<declared-source-path>",
+          "when": "when frontend role and source path are bound"
+        },
+        {
+          "alias": "@workspaces/grammar",
+          "path": "<declared-reference-path>",
+          "when": "when grammar and reference are bound"
+        },
+        {
+          "alias": "@workspaces/knowledge",
+          "path": "<declared-reference-path>",
+          "when": "when an applicable reference is bound"
+        },
+        {
+          "alias": "@workspaces/work",
+          "path": "<baseline-path>",
+          "when": "visual.mode is extend or revise"
+        }
+      ],
+      "writes": [
+        {
+          "alias": "@workspaces/artifacts",
+          "path": "<requestId>/<attemptId>/generation-prompt.txt",
+          "when": "always"
+        }
+      ],
+      "calls": [
+        {
+          "alias": "@tools/fileread",
+          "purpose": "Read explicitly bound design references.",
+          "when": "when references are present"
+        },
+        {
+          "alias": "@tools/sourcewrite",
+          "purpose": "Save the exact complete prompt.",
+          "when": "always"
+        },
+        {
+          "alias": "@tools/imageview",
+          "purpose": "Inspect the baseline before composing a targeted edit prompt.",
+          "when": "visual.mode is extend or revise"
+        }
+      ],
+      "checks": [],
+      "produces": [
+        "generation-prompt"
+      ]
+    },
+    {
+      "id": "generate-direction",
+      "instruction": "Submit the retained prompt and declared reference images to image generation. Produce one interface PNG and persist the actual returned result. If the host returns inaccessible media, explain the persistence limit rather than inventing a local path. Pass the actual baseline image to the image-edit/generation call for extend/revise; mentioning a path in text is insufficient. The model does not supply durable image memory. Retain generation-context with requestId, attemptId, mode and the exact baseline, prompt and result file bindings.",
+      "reads": [
+        {
+          "alias": "@workspaces/artifacts",
+          "path": "<requestId>/<attemptId>/generation-prompt.txt",
+          "when": "always"
+        },
+        {
+          "alias": "@workspaces/inputs",
+          "path": "<declared-reference-image>",
+          "when": "when reference images are supplied"
+        },
+        {
+          "alias": "@workspaces/work",
+          "path": "<baseline-path>",
+          "when": "visual.mode is extend or revise"
+        }
+      ],
+      "writes": [
+        {
+          "alias": "@workspaces/artifacts",
+          "path": "<requestId>/<attemptId>/direction.png",
+          "when": "always"
+        },
+        {
+          "alias": "@workspaces/artifacts",
+          "path": "<requestId>/<attemptId>/generation-context.json",
+          "when": "always"
+        }
+      ],
+      "calls": [
+        {
+          "alias": "@tools/imagegen",
+          "purpose": "Generate the direction from the retained prompt and supplied references.",
+          "when": "always"
+        },
+        {
+          "alias": "@tools/sourcewrite",
+          "purpose": "Persist returned PNG bytes in the declared scope when needed.",
+          "when": "always"
+        }
+      ],
+      "checks": [],
+      "produces": [
+        "direction",
+        "generation-context"
+      ]
+    },
+    {
+      "id": "inspect-direction",
+      "instruction": "Open the actual image and perform validate.review. If it fails, follow recovery.json and retain every attempt. If unresolved findings remain, return mismatch. Never describe intended appearance as observed evidence.",
+      "reads": [
+        {
+          "alias": "@workspaces/artifacts",
+          "path": "<requestId>/<attemptId>/direction.png",
+          "when": "always"
+        },
+        {
+          "alias": "@workspaces/artifacts",
+          "path": "<requestId>/<attemptId>/generation-prompt.txt",
+          "when": "always"
+        },
+        {
+          "alias": "@workspaces/work",
+          "path": "<baseline-path>",
+          "when": "visual.mode is extend or revise"
+        }
+      ],
+      "writes": [
+        {
+          "alias": "@workspaces/artifacts",
+          "path": "<requestId>/<attemptId>/direction.png",
+          "when": "only when revising"
+        },
+        {
+          "alias": "@workspaces/artifacts",
+          "path": "<requestId>/<attemptId>/generation-prompt.txt",
+          "when": "only when revising"
+        }
+      ],
+      "calls": [
+        {
+          "alias": "@tools/imageview",
+          "purpose": "Inspect the actual PNG pixels.",
+          "when": "always"
+        },
+        {
+          "alias": "@tools/imagegen",
+          "purpose": "Revise against specific inspected findings.",
+          "when": "only when necessary"
+        },
+        {
+          "alias": "@tools/sourcewrite",
+          "purpose": "Retain exact final prompt and returned PNG.",
+          "when": "only when revising"
+        }
+      ],
+      "checks": [
+        "brief-fidelity",
+        "visual-quality",
+        "implementation-feasibility",
+        "generation-provenance",
+        "visual-continuity"
+      ],
+      "produces": [
+        "rationale"
+      ]
+    },
+    {
+      "id": "validate-and-present",
+      "instruction": "Write the response with actual paths, media types and SHA-256 digests. Run request and response machine checks. Present the PNG inline followed by rationale and prompt reference. Report incomplete checks truthfully; claim neither user approval nor working frontend behavior. Evaluate every review criterion against actual pixels and record its criterionId, result, referenced outputIds and concrete note in criteriaResults. Cover every request expected id with a passed observation before done. Follow criteria.json on failure, increment feedbackRound after each repair, and reassess all affected checks. Delete rejected generated images and preview copies after recording defects; retain only accepted images as response outputs and adjacent previews. Do not present an unaccepted direction.",
+      "reads": [
+        {
+          "alias": "@workspaces/artifacts",
+          "path": "<requestId>/<attemptId>/direction.png",
+          "when": "always"
+        },
+        {
+          "alias": "@workspaces/artifacts",
+          "path": "<requestId>/<attemptId>/generation-prompt.txt",
+          "when": "always"
+        }
+      ],
+      "writes": [
+        {
+          "alias": "@workspaces/responses",
+          "path": "<responseId>.json",
+          "when": "always"
+        }
+      ],
+      "calls": [
+        {
+          "alias": "@tools/sourcewrite",
+          "purpose": "Write the response with typed outputs and exact metadata.",
+          "when": "always"
+        },
+        {
+          "alias": "@cli/python",
+          "purpose": "Run scripts/validate_operator.py with the operator bundle, request, response and work root.",
+          "when": "always"
+        },
+        {
+          "alias": "@tools/print",
+          "purpose": "Present the actual image and response outputs.",
+          "when": "always"
+        }
+      ],
+      "checks": [
+        "response-shape",
+        "request-binding",
+        "unique-outputs",
+        "output-files",
+        "direction-png",
+        "generation-binding",
+        "prompt-content",
+        "observation-binding"
+      ],
+      "produces": [
+        "Response record and presented direction."
+      ]
+    }
+  ]
+}

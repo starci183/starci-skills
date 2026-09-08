@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "requestId": "document-filter-001",
+  "attemptId": "attempt-1",
+  "mode": "extend",
+  "baseline": {
+    "path": "context/baseline.png",
+    "sha256": "sha256:979c9221521f73caef2b6e340545e31d0d2f566f44e84e737391e2e8057a3934",
+    "mediaType": "image/png"
+  },
+  "prompt": {
+    "path": "artifacts/document-filter-001/attempt-1/generation-prompt.txt",
+    "sha256": "sha256:9712126e44c935b897b1e0e78635f3875f38501a856bae74fedade64ff1836f4",
+    "mediaType": "text/plain"
+  },
+  "image": {
+    "path": "artifacts/document-filter-001/attempt-1/direction.png",
+    "sha256": "sha256:6302c1d2c2c1a2172584884ecb4c8ccd98450253cc69a2274c4e931237040b83",
+    "mediaType": "image/png"
+  }
+}

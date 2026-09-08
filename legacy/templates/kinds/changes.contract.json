@@ -1,0 +1,10 @@
+{
+  "kind": "changes",
+  "example": "templates/changes.example.md",
+  "title": "^# changes — [a-z]+(?:\\.[a-z]+)+ step-\\d+/parallel-\\d+$",
+  "sections": [
+    { "heading": "^## Binding$", "table": "| Field | Value |", "rows": ["Operator", "Step", "Checkout", "Predecessor"], "cell": { "Value": "\\S" } },
+    { "heading": "^## Files$", "table": "| Path | Change | Why | Claims |", "minRows": 1, "cell": { "Change": "^(created|modified|deleted|unchanged)$" } },
+    { "heading": "^## What the next step must know$" }
+  ]
+}

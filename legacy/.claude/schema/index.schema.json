@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Works document contract",
+  "description": "Version 1 of the proposed .works document format. A document must match exactly one kind. This contract does not migrate or reinterpret legacy session records.",
+  "oneOf": [
+    { "$ref": "work.schema.json" },
+    { "$ref": "request.schema.json" },
+    { "$ref": "response.schema.json" },
+    { "$ref": "evidence.schema.json" },
+    { "$ref": "decision.schema.json" }
+  ]
+}

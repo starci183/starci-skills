@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Decision",
+  "description": ".works/<workId>/decisions/<id>.json: an attributed decision on an exact work revision and subject digest. Identity and authority are not authenticated by this schema.",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "id", "workId", "workRevision", "subject", "outcome", "decidedBy", "sourceRef", "rationale", "createdAt"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/version" },
+    "kind": { "const": "decision" },
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "workId": { "$ref": "common.schema.json#/$defs/id" },
+    "workRevision": { "$ref": "common.schema.json#/$defs/revision" },
+    "subject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "id", "sha256"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["work", "request", "response", "evidence"] },
+        "id": { "$ref": "common.schema.json#/$defs/id" },
+        "sha256": { "$ref": "common.schema.json#/$defs/digest" }
+      }
+    },
+    "outcome": { "type": "string", "enum": ["approved", "rejected", "changes-requested"] },
+    "decidedBy": { "$ref": "common.schema.json#/$defs/actor" },
+    "sourceRef": { "$ref": "common.schema.json#/$defs/text" },
+    "rationale": { "$ref": "common.schema.json#/$defs/text" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/timestamp" }
+  }
+}

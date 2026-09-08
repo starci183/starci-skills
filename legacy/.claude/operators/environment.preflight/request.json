@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "environment.preflight request",
+  "$ref": "works:request",
+  "properties": { "operation": { "const": "environment.preflight" }, "inputs": { "properties": { "prompts": { "minItems": 1 }, "files": { "minItems": 1 } } } },
+  "description": "State project, roles, environment, optional flow and runtime roles in inputs.prompts. Bind the exact environment and route declarations in inputs.files; bind hydrated projections, runtime registry, port projection and optional account metadata in context.files. Secret values must not be supplied."
+}

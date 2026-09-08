@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "kind": "response",
+  "id": "response-mobile-workbench-v1",
+  "workId": "mobile-workbench",
+  "workRevision": 1,
+  "requestId": "request-mobile-workbench-v1",
+  "status": "mismatch",
+  "reason": "The second and final allowed image attempt produced a strong mobile direction, but one evidence-form row still places Amount and Accounting month side by side instead of making every input full width, and the rendered UI does not literally state the requested no-self-approval rule. The image-call budget is exhausted, so the remaining review findings are retained rather than hidden.",
+  "outputs": [
+    {
+      "id": "generation-prompt",
+      "type": "file",
+      "description": "Exact prompt submitted for the retained second image-generation attempt.",
+      "file": {
+        "path": "artifacts/request-mobile-workbench-v1/attempt-2/generation-prompt.txt",
+        "sha256": "sha256:e2c2e5ed0e4f9a1dfa4e722432f6f4ca9ceb3f2feaaa796276a314f8a04861d7",
+        "mediaType": "text/plain"
+      }
+    },
+    {
+      "id": "rationale",
+      "type": "text",
+      "text": "Attempt 1 preserved the baseline content and converted the desktop table into mobile document cards, but left the four lower action areas in two side-by-side columns. Attempt 2 kept the original baseline attached, used attempt 1 only as an additional rejected-candidate reference, and stacked every major panel vertically. The retained image is materially closer to a 390 CSS-pixel layout and preserves the immutable-ledger, pending-correction, document-state, reconciliation, close-period, audit, context, and setup concepts. It remains a design artifact; native controls, authorization, and live data require implementation. No response record was written for attempt 1.",
+      "format": "plain"
+    }
+  ],
+  "observations": [
+    {
+      "criterionId": "mobile-layout",
+      "result": "failed",
+      "evidenceIds": [],
+      "note": "Major panels are vertically stacked and the desktop table is gone, but Amount and Accounting month still share one row rather than using the requested full-width-input treatment."
+    },
+    {
+      "criterionId": "ledger-semantics",
+      "result": "passed",
+      "evidenceIds": [],
+      "note": "The pixels show Immutable snapshot (view-only), a lock, Ledger v7, as-of date, ledger-version input, current immutable balance, and current/as-of controls without an edit-history affordance."
+    },
+    {
+      "criterionId": "document-lifecycle",
+      "result": "passed",
+      "evidenceIds": [],
+      "note": "The pixels show the Draft, Submitted, Approved, and Posted filters and preserve the three supplied records as readable stacked cards with statuses and source facts."
+    },
+    {
+      "criterionId": "accounting-actions",
+      "result": "failed",
+      "evidenceIds": [],
+      "note": "All requested actions and the pending-zero-effect message are visible, but the requested explicit no-self-approval wording is absent; distinct approval is stated only for the pending proposal."
+    },
+    {
+      "criterionId": "visual-continuity",
+      "result": "passed",
+      "evidenceIds": [],
+      "note": "The result retains the baseline's white cards, thin gray borders, compact sans-serif type, dark navy actions, green success badges, blue submitted badge, amber pending accent, and restrained density."
+    }
+  ],
+  "createdAt": "2026-09-07T23:50:29Z",
+  "feedbackRound": 1
+}

@@ -1,0 +1,67 @@
+{
+  "aliases": {
+    "@remote/npm": {
+      "params": [
+        "package",
+        "version"
+      ],
+      "kind": "service",
+      "resolvesTo": "<Registry>/<package>@<version>",
+      "scheme": "remote://npm",
+      "bind": "Registry URL, exact package version and package integrity.",
+      "writers": [],
+      "purpose": "A published npm package version.",
+      "zone": "remote"
+    },
+    "@remote/git": {
+      "params": [
+        "repository"
+      ],
+      "kind": "service",
+      "resolvesTo": "<GitRemote>",
+      "scheme": "remote://git",
+      "bind": "Explicit remote URL and observed remote commit.",
+      "writers": [],
+      "purpose": "A named Git remote of the bound repository.",
+      "zone": "remote"
+    },
+    "@remote/ghcr": {
+      "params": [
+        "image",
+        "digest"
+      ],
+      "kind": "service",
+      "resolvesTo": "ghcr.io/<image>@<digest>",
+      "scheme": "remote://ghcr",
+      "bind": "Image repository and immutable digest.",
+      "writers": [],
+      "purpose": "A container image pinned by digest.",
+      "zone": "remote"
+    },
+    "@remote/github-actions": {
+      "params": [
+        "runId"
+      ],
+      "kind": "service",
+      "resolvesTo": "<GitHubRepository>/actions/runs/<runId>",
+      "scheme": "remote://github-actions",
+      "bind": "Repository identity, run id, head commit and observed conclusion.",
+      "writers": [],
+      "purpose": "One GitHub Actions run.",
+      "zone": "remote"
+    },
+    "@remote/minio": {
+      "params": [
+        "bucket",
+        "key"
+      ],
+      "kind": "service",
+      "resolvesTo": "<ObjectStore>/<bucket>/<key>",
+      "scheme": "remote://minio",
+      "bind": "Endpoint, bucket, key, and observed object version or content digest.",
+      "writers": [],
+      "purpose": "An object in the explicitly bound MinIO store.",
+      "zone": "remote"
+    }
+  }
+}

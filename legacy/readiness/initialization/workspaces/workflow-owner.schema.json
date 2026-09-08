@@ -1,0 +1,30 @@
+{
+  "$id": "workspace:workflow-owner",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "project",
+    "ownerRole"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "version": {
+      "const": 1
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "ownerRole": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    }
+  }
+}

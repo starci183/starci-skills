@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 9,
+  "note": "Stop codes only environment.preflight emits. Same entry shape as operators/errors.json, scope implicit. Shared codes (INVALID_INPUT, NO_PROGRESS) come from operators/errors.json. ENVIRONMENT_NOT_READY is the one terminating code of the report itself: it is emitted after every check has run, never after the first wall, so its reason carries every wall at once. ROUTE_NAME_NEAR_MATCH is a fallback that records a suggestion and changes nothing: the declaration wall it accompanies still stands, because a name corrected silently is a route nobody declared.",
+  "codes": {
+    "ENVIRONMENT_NOT_READY": {
+      "domain": "caller",
+      "disposition": "terminate",
+      "meaning": {
+        "en": "At least one readiness wall stands: a declaration, a checkout, an identity custody, a runtime entry or port, a host capability or an environment approval is not in the state the chain that follows would need. The reason lists every wall in one paragraph, each by its check id, so a person clears them together instead of meeting them one per operator.",
+        "vi": "Ít nhất một bức tường sẵn sàng đang đứng: một khai báo, một checkout, một custody danh tính, một entry hay cổng runtime, một năng lực của máy hay một phê duyệt của môi trường không ở trạng thái mà chuỗi theo sau sẽ cần. Phần reason liệt kê mọi bức tường trong một đoạn, mỗi bức theo id của phép kiểm, để một người dọn chúng cùng lúc thay vì gặp từng bức ở từng operator."
+      },
+      "resume": {
+        "en": "Clear every wall the report names — the report's Walls table says who owns each and what repairs it — then re-enter with the same requirements; the re-entry runs every check again and a wall that did not move is the same wall, not progress.",
+        "vi": "Dọn mọi bức tường mà báo cáo nêu — bảng Walls của báo cáo nói ai sở hữu từng bức và cách sửa — rồi vào lại với cùng yêu cầu; lần vào lại chạy lại mọi phép kiểm, và một bức tường không nhúc nhích vẫn là bức tường ấy, không phải tiến triển."
+      }
+    },
+    "ROUTE_NAME_NEAR_MATCH": {
+      "domain": "self",
+      "disposition": "fallback",
+      "meaning": {
+        "en": "The requested project or role is declared by nothing, and exactly one declaration differs from the requested name by a hyphen, a suffix or letter case.",
+        "vi": "Project hoặc role được yêu cầu không có khai báo nào, và đúng một khai báo khác với tên được yêu cầu chỉ bởi một dấu gạch nối, một hậu tố hay chữ hoa chữ thường."
+      },
+      "fallback": {
+        "en": "Record the near match under ## Fallbacks taken and write the suggestion into the declaration wall's repair as suggested `<id>`; the wall stands and the requested name is never switched to the suggestion.",
+        "vi": "Ghi tên gần khớp dưới ## Fallbacks taken và viết gợi ý vào phần sửa của bức tường khai báo dưới dạng suggested `<id>`; bức tường vẫn đứng và tên được yêu cầu không bao giờ bị đổi sang gợi ý."
+      },
+      "resume": {
+        "en": "Request the declared name, or declare the requested one; this operator does neither.",
+        "vi": "Yêu cầu đúng tên đã khai, hoặc khai báo tên được yêu cầu; operator này không làm cả hai."
+      }
+    }
+  }
+}

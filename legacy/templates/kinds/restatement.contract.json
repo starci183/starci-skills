@@ -1,0 +1,8 @@
+{
+  "kind": "restatement",
+  "title": "^# restatement — [a-z0-9][a-z0-9-]*$",
+  "sections": [
+    { "heading": "^## Restatement$", "table": "| Line | Statement |", "minRows": 1, "maxRows": 5, "cell": { "Line": "^[1-5]$", "Statement": "\\S" } },
+    { "heading": "^## Source$", "table": "| Field | Value |", "rows": ["Field", "Quoted"], "cell": { "Value": "\\S" } }
+  ]
+}

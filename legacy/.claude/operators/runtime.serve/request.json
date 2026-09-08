@@ -1,0 +1,7 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"runtime.serve request",
+  "$ref":"works:request",
+  "properties":{"operation":{"const":"runtime.serve"},"expected":{"minItems":1},"inputs":{"properties":{"files":{"minItems":1}}}},
+  "description":"Bind one route key, one runtime-ladder rung, fixed port claims, the desired-state digest and allowed effects, current inventory, registry capability custody and existing environment authority. A serve request also binds the session commit and changed-file ownership."
+}

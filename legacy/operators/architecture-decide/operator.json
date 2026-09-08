@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 9,
+  "id": "architecture.decide",
+  "domain": "architecture",
+  "job": "Decide one architecture with its tech stack, system boundaries, and data ownership, and prove it against the observed current state, the rejected alternatives, verified compatibility, and an independent critique.",
+  "package": "operator.md",
+  "errors": "errors.json",
+  "validator": "validate.mjs",
+  "selfTest": "self-test.mjs",
+  "resources": {
+    "profile": "sol-reviewer",
+    "grammarBound": false,
+    "mode": "isolated",
+    "tools": {
+      "@tools/fileread": "context-aliases",
+      "@tools/git": "read",
+      "@tools/websearch": "bounded",
+      "@tools/visualize": "html"
+    }
+  },
+  "primaryOutput": "architecture-decision"
+}

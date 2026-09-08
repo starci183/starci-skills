@@ -1,0 +1,13 @@
+Use case: ui-mockup
+Asset type: desktop accounting workbench interface recovery revision
+Primary request: Recover the authoritative Accounting workbench contract by editing Image 1, the original correct baseline. Image 2 is the rejected candidate and may be used only to identify and remove the injected defect; it must never replace Image 1 as the visual baseline.
+Input images: Image 1 is the authoritative edit target and selected baseline. Image 2 is a rejected secondary reference showing the defect to remove.
+Style/medium: realistic, shippable desktop product UI; preserve the original baseline's white surfaces, restrained navy actions, fine gray borders, compact sans-serif typography, density, and visual hierarchy.
+Composition/framing: preserve the complete 1536x1024 viewport and existing left-main/right-rail arrangement.
+Text (verbatim): "Ledger balance (VND)", "VND 128,450,000", "Current immutable balance", "Immutable snapshot (view-only)".
+Preserve checklist: Preserve the complete 1536x1024 Accounting workbench composition, typography, white and navy visual language, spacing, documents table, evidence-document form, reconciliation card, close-period card, applied-context rail, pending-corrections rail, correction-proposal rail, and accounting-setup rail.
+Preserve checklist: Preserve all unrelated labels, values, badges, fields, buttons, and panel positions from the supplied baseline.
+Change checklist: Keep the ledger balance read-only and visibly immutable or locked, with no editable balance field and no direct balance-save control.
+Recovery edit: restore the Current ledger balance region to the authoritative baseline behavior. Render "VND 128,450,000" as large static heading text, not inside any input. Restore the small read-only cue "Current immutable balance" under the amount and include a subtle lock/read-only icon or cue consistent with the existing "Immutable snapshot (view-only)" treatment. Completely remove the "Save balance" button and all number-input spinner controls. Do not replace them with another direct ledger mutation action.
+Contract: the balance is derived from immutable, versioned ledger rows. Changes happen only through existing document posting and distinct-approver correction workflows already shown elsewhere; there is no direct balance-save mutation.
+Constraints: change only what is necessary to restore the read-only balance region. Keep the ledger version selector, documents, corrections, reconciliation, close-period, applied-context, and setup content unchanged from Image 1. Preserve all unrelated panels. No extra text, no new controls, no watermark.

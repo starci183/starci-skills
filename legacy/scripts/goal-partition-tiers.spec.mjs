@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import {openSession,confirmSession,cleanupFixtureOwners} from './v23-test-fixture.mjs';
+import {openAttempt,acceptAttempt} from './attempt-gate.mjs';
+import {unitObligation,obligationId,forecastObligations,goalPartitionCoverage} from './goal-partitions.mjs';
+const root=path.resolve(import.meta.dirname,'..');
+const put=async(file,value)=>{await mkdir(path.dirname(file),{recursive:true});await writeFile(file,typeof value==='string'?value:JSON.stringify(value));};
+
+test('an accepted UAT plan retains every journey obligation while a deferred secondary flow cannot replace it',async t=>{
+ const owner=await mkdtemp(path.join(os.tmpdir(),'starci-partition-tiers-'));t.after(async()=>{cleanupFixtureOwners(owner);await rm(owner,{recursive:true,force:true});});
+ const opened=await openSession(path.join(owner,'.worktrees/sessions'),{project:'partition-tiers',hostBinding:{kind:'codex-task',hostId:path.basename(owner),worktree:owner,sourcePromptRef:'user:fixture'},mission:{language:'en',goal:'Plan the primary browser journey and retain the deferred secondary journey.',target:'Fixture flow plan',includes:['The primary journey'],excludes:['Proof of the secondary flow'],outputs:['UAT plan'],doneWhen:[{producedBy:'uat.plan',evidence:'Both flow dispositions are recorded.'},{producedBy:'uat.verify',evidence:'Every required journey is verified.'}],verification:'Validate the exact unit and case sheet bindings.',sourceRef:'user:fixture'}});
+ await confirmSession(opened.session,{selected:'as-stated',selectedBy:'user',sourceRef:'user:fixture-approved'});
+ const session=opened.session,branch=path.join(session,'step-1/parallel-1'),file=path.join(session,'state.json');let state=JSON.parse(await readFile(file));state.chain=[['1/1']];state.steps={'1/1':'uat.plan'};state.current='1/1';await put(file,state);
+ const units=[{id:'primary-flow',kind:'flow',goal:'Read the primary page.',inputs:[],dependsOn:[],tier:'journey'},{id:'deferred-flow',kind:'flow',goal:'Read the secondary page.',inputs:[],dependsOn:[],tier:'secondary',deferral:{reason:'Outside the confirmed primary journey.'}}];
+ const request={contractVersion:'starci/v2.2',schemaVersion:9,operatorId:'uat.plan',sessionId:state.id,step:1,parallel:1,contexts:[{alias:'@worktrees/_templates',head:null}],requirements:{goal:state.mission.goal,feature:'partition-tiers',env:'dev',access:'anonymous',fixtures:'none',sourceRoles:'frontend'},inputs:{},resume:null,goal:{doneWhen:0},attempt:{id:'1/1:a1',number:1,kind:'initial',previous:null},expected:{version:1,goalVersion:1,sourceRef:'state.json#mission:v1/doneWhen:0',criteria:[{id:'planned',required:true,expected:'Both flow dispositions bind their case sheet.',verification:'Validate unit ids, tiers and executable cases.'}]},environment:{isolationId:'1/1:a1',mode:'isolated',workspace:null,reads:['@worktrees/_templates'],writes:[],exclusive:[],outputRoot:'response'},frozenInputs:[]};
+ await put(path.join(branch,'request/request.json'),request);await openAttempt(branch);
+ const text='# uat-plan — partition-tiers\n\n## Flows\n\n| Flow | Entry | Steps | Account | Seed namespace | Tier |\n| --- | --- | --- | --- | --- | --- |\n'+units.map(unit=>`| \`${unit.id}\` | \`/${unit.id}\` | 2 | — | — | ${unit.tier==='journey'?'journey':'secondary — '+unit.deferral.reason} |`).join('\n')+'\n\n## Fallbacks taken\n\n| Code | Action |\n| --- | --- |\n';
+ const sheet={contractVersion:'starci/v2.2',feature:'partition-tiers',env:'dev',planVersion:'uat-plan/1',flows:units.map(unit=>({access:'anonymous',fixtures:'none',sourceRoles:'frontend',flowId:unit.id,state:'missing',action:'create',entry:`/${unit.id}`,actorAliases:[],namespace:null})),cases:units.map(unit=>({caseId:unit.id+'-case',flowId:unit.id,order:1,actor:'anonymous',preconditions:['No prior session.'],inputs:['The public route.'],actions:['Open the route through a fresh browser.'],assertions:[unit.id+'-visible'],expected:[unit.goal],verification:['Read the rendered page.'],fixture:null,cleanup:'none'}))};
+ await put(path.join(branch,'response/response.md'),text);await put(path.join(branch,'response/data/units.json'),{schemaVersion:9,producedBy:'uat.plan',units});await put(path.join(branch,'response/data/cases.json'),sheet);
+ const fields={'uat-plan':'response/response.md',units:'response/data/units.json','uat-case-sheet':'response/data/cases.json'},evidence=Object.values(fields);
+ await put(path.join(branch,'response/response.json'),{contractVersion:'starci/v2.2',schemaVersion:9,operatorId:'uat.plan',step:1,parallel:1,status:'done',fields,fallbacks:[],commits:[],next:['uat.verify'],boundProfile:'sol-reviewer',ranProfile:'sol-reviewer',attempt:{id:'1/1:a1',number:1,expectedVersion:1},actual:{expectedVersion:1,observedAt:new Date().toISOString(),observations:[{criterionId:'planned',observed:'The primary journey and explicit deferral are recorded.',evidence}]},comparison:{expectedVersion:1,verdict:'matched',criteria:[{criterionId:'planned',verdict:'matched',evidence,note:'Both records validate.'}],next:'advance'},goalCheck:{achieved:true,evidence},outcome:{summary:'Primary and deferred flows planned.',primary:{kind:'document',label:'UAT plan',ref:'response/response.md'}}});
+ assert.equal((await acceptAttempt(branch)).state,'matched');state=JSON.parse(await readFile(file));
+ const input='step-1/parallel-1/response/data/units.json',set=await unitObligation(root,session,state,'uat.verify',input),id=obligationId(set);
+ assert.deepEqual(set.members,[{id:'primary-flow',goal:1}]);
+ const forecast={steps:{'2/1':'uat.verify'},goals:{'2/1':{doneWhen:1}},units:{'2/1':{id:'primary-flow',input}},obligations:{[id]:set},partitions:{'2/1':{set:id,member:'primary-flow'}}};
+ assert.deepEqual((await forecastObligations(root,session,state,forecast)).errors,[]);
+ const secondary=structuredClone(forecast);secondary.partitions['2/1'].member='deferred-flow';secondary.units['2/1'].id='deferred-flow';assert.match((await forecastObligations(root,session,state,secondary)).errors.join(),/exact member/);
+ const narrowed=structuredClone(forecast);narrowed.obligations[id].members=[];assert.ok((await forecastObligations(root,session,state,narrowed)).errors.length);
+ const coverage=await goalPartitionCoverage(root,session,state,forecast);assert.equal(coverage.goals.get(1).required.size,1);assert.equal(coverage.goals.get(1).complete,false,'a plan or a deferred flow is never browser verification');
+});
