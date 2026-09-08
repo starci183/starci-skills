@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "id": "uat.verify",
-  "purpose": "Verify one frozen product flow end to end on the attested running product and publish append-only case captures, three independent lane verdicts and namespace cleanup evidence.",
-  "scope": "Browser verification only. It creates no account, seed, source or runtime; it uses the supplied identity and namespace, masks credentials before capture, and removes only data created inside that namespace.",
-  "modules": {"request":"request.json","response":"response.json","validate":"validate.json","step":"step.json","criteria":"criteria.json"}
-}

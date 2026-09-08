@@ -1,0 +1,73 @@
+{
+  "schema": "starci/op-secondary@1",
+  "owner": "interface.implement",
+  "maxJobs": 3,
+  "calls": [
+    {
+      "op": "backend.implement",
+      "role": "interface.backend",
+      "scope": "Compatible API or rendering-data repair required by this FE outcome.",
+      "parentState": "waiting",
+      "matrixCell": "same",
+      "allowedChangeKinds": [
+        "api-integration",
+        "render-data"
+      ],
+      "owns": [
+        "the bounded backend repair and its support response"
+      ],
+      "allowedEffects": [
+        "Inspect the actual API contract and selected backend source.",
+        "Edit only exact request repository/path ownership.",
+        "Run scoped regression checks and commit when authorized."
+      ],
+      "requiredCriteria": [
+        "scope-preserved",
+        "business-unchanged",
+        "api-compatible",
+        "checks-pass",
+        "implementation-quality",
+        "commit-verified"
+      ],
+      "canCallOthers": false,
+      "maxSecondary": 0,
+      "canAdvanceWorkflow": false,
+      "canCompleteParent": false,
+      "businessChanged": false,
+      "apiCompatible": true,
+      "rules": [
+        "Return to the FE parent in the same matrix cell.",
+        "Do not add business rules, features, schema migrations or change authorization semantics.",
+        "Missing decisions or broader changes return blocked; never silently promote yourself to primary.",
+        "Return actual changed paths, code commits and evidence. The parent must independently recheck integration."
+      ],
+      "callSite": {
+        "step": 4,
+        "trigger": "Observed API integration or render-data defect blocks an accepted frontend journey and can be repaired without changing business.",
+        "skipWhen": "No qualifying backend defect.",
+        "inputs": [
+          "repository",
+          "paths",
+          "problem",
+          "changeKind",
+          "businessRefs"
+        ],
+        "wait": "Pause this primary cell until all required support responses pass.",
+        "resume": "Require every listed criterion including implementation-quality and commit-verified; inspect backend diff and integrate returned commits, resume step 4, then step 5 quality checks and step 6 render verification.",
+        "reentryFrom": [
+          5,
+          6
+        ],
+        "blockedWhen": "Needs business, schema or authorization changes, missing authority, or an unlisted secondary operator."
+      },
+      "inputKind": "code",
+      "outputFields": [
+        "codeRefs",
+        "changedPaths",
+        "businessChanged",
+        "apiCompatible"
+      ]
+    }
+  ],
+  "maxDefinitions": 3
+}

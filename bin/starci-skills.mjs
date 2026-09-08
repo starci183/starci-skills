@@ -45,22 +45,29 @@ from the user's scope: at most three sequential waves, each with at most three c
 Track current product completion in .work; hand off remaining work when the prompt budget ends.
 Questions do not require a work ledger.
 <!-- /starci:prompt-entry -->`;
-const PROMPT_ENTRY = `${ENTRY_MARKER}
+const PRESET_PROMPT_ENTRY = `${ENTRY_MARKER}
 For product development, enter [StarCi](.claude/INDEX.md), match the prompt to a named preset skill,
 and use its fixed bounded op chain. Across the prompt: at most three sequential waves and three
 concurrent ops per wave. Track selected scope and evidence in .work; do not invent workflows.
 Questions need no work ledger. Hand off work outside the selected scope or remaining budget.
 <!-- /starci:prompt-entry -->`;
 
+const PROMPT_ENTRY = `${ENTRY_MARKER}
+Use the single [StarCi skill](.claude/SKILL.md) to select one workflow from .claude/workflows/catalog.json.
+Use direct-task for ad hoc work that does not fit a specialized workflow. Keep the selected matrix
+within three sequential rows and three parallel primary cells; verify requested outcomes before advancing.
+Questions may stay read-only. Check/build .dist first. Preserve existing scope, evidence and user changes.
+<!-- /starci:prompt-entry -->`;
+
 const BOOTSTRAP = `# StarCi agent bootstrap
 
 ${PROMPT_ENTRY}
 
-Read [\`<Source>/.claude/INDEX.md\`](.claude/INDEX.md) completely and follow its load order.
+Read [\`<Source>/.claude/SKILL.md\`](.claude/SKILL.md) completely and follow its load order.
 
 \`<Source>\` is the single host repository that owns this bootstrap and the \`.claude\` runtime. A routed
 repository checkout or Git worktree follows that Source; do not rebind \`<Source>\` to it or expect it to
-contain another \`.claude/INDEX.md\`.
+contain another \`.claude/SKILL.md\`.
 
 This file is only a bootstrap. Do not copy context, brainstorm, compiler, gate or skill rules into it:
 the entry routes, and a rule copied here becomes a second home that nobody remembers to update.
@@ -72,16 +79,16 @@ Existing full workflows keep their current session and gates; formal UAT and pub
 <!-- /starci:prompt-entry -->`;
 const PREVIOUS_V3_LITE_ENTRY = `${ENTRY_MARKER}
 For bounded maintenance, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md).
-For tracked business work, use [StarCi](.claude/INDEX.md) and its selected-operation contract.
+For tracked business work, use [StarCi](.claude/SKILL.md) and its selected-operation contract.
 Do not create an automatic chain or migrate existing workflow evidence implicitly.
 <!-- /starci:prompt-entry -->`;
 const LITE_ENTRY = `${ENTRY_MARKER}
 For bounded maintenance, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md).
-For tracked business work, use [StarCi](.claude/INDEX.md) and its scope-bounded chain limits.
+For tracked business work, use [StarCi](.claude/SKILL.md) and its scope-bounded chain limits.
 Do not run an unbounded chain or migrate existing workflow evidence implicitly.
 <!-- /starci:prompt-entry -->`;
 const LITE_BOOTSTRAP = BOOTSTRAP.replace(PROMPT_ENTRY, LITE_ENTRY)
-  .replace('Read [\`<Source>/.claude/INDEX.md\`](.claude/INDEX.md) completely and follow its load order.',
+  .replace('Read [\`<Source>/.claude/SKILL.md\`](.claude/SKILL.md) completely and follow its load order.',
     'Read [StarCi Lite](.claude/skills/starci-lite/SKILL.md) first; it routes complex work to the full entry.');
 function selectedProfile(opts, manifest) {
   if (opts.profile !== undefined && opts.profile !== 'full') throw new Error('starci-lite is retired; use the full prompt-to-skill entry');
@@ -172,13 +179,13 @@ function bootstrapPlan(repo, profile) {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
     const current = readFileSync(file, 'utf8');
-    const customProtocol = [PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
+    const customProtocol = [PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
     if (/session-open\.mjs|plan-chain\.mjs|validated request\.json|Nothing is designed, written or committed outside a session/.test(customProtocol)) {
       throw new Error(name + ': custom v2 session/chain protocol conflicts with v3; reconcile it or use --no-bootstrap before changing payload');
     }
     const legacyBootstrap = BOOTSTRAP.replace(PROMPT_ENTRY, LEGACY_PROMPT_ENTRY);
     const legacyLiteBootstrap = LITE_BOOTSTRAP.replace(LITE_ENTRY, LEGACY_LITE_ENTRY);
-    for (const known of [BOOTSTRAP, LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
+    for (const known of [BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, PRESET_PROMPT_ENTRY), LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
       const normalized = current.replace(/\r\n/g, '\n'), authored = known.replace(/\r\n/g, '\n');
       if (normalized.startsWith(authored)) {
         let end = 0, count = 0;
@@ -187,7 +194,7 @@ function bootstrapPlan(repo, profile) {
         return { name, file, text: bootstrap + suffix, action: 'updated' };
       }
     }
-    const managed = [PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
+    const managed = [PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
     if (managed) {
       return { name, file, text: current.replace(managed, entry), action: 'updated' };
     }
@@ -217,7 +224,9 @@ function checkRetiredHostReferences(repo, plan) {
     const stat = lstatSync(file, { throwIfNoEntry: false });
     if (stat && (!stat.isFile() || stat.isSymbolicLink())) throw new Error(name + ': host instructions must be a regular file before runtime retirement');
     const text = plan?.find(item => item.name === name)?.text ?? (stat ? readFileSync(file, 'utf8') : '');
-    if (/\.claude\/(?:skills\/starci-lite\/|alias\/|routing\.json|operators\/|workflows\/|scripts\/)|session-open\.mjs|plan-chain\.mjs|validated request\.json/.test(text)) {
+    const currentPaths = new Set(payloadFiles(packageRoot));
+    const inspected = text.replace(/\.claude\/workflows\/[A-Za-z0-9_/-]+\.json\b/g, ref => currentPaths.has(ref.slice('.claude/'.length)) ? '' : ref);
+    if (text.replace(/\r\n/g,'\n').includes(PRESET_PROMPT_ENTRY) || /\.claude\/(?:skills\/starci-(?:lite|goal|migrate|business|architecture|build|redesign-fe|visual|content|uat|fix|data|runtime|release|maintain)\/|alias\/|routing\.json|operators\/|workflows\/|scripts\/)|session-open\.mjs|plan-chain\.mjs|validated request\.json/.test(inspected)) {
       throw new Error(name + ': host instructions still require retired runtime paths; reconcile routing before payload cleanup');
     }
   }
@@ -225,19 +234,21 @@ function checkRetiredHostReferences(repo, plan) {
 
 function checkMajorUpgrade(manifest, opts) {
   if (manifest && Number(manifest.version.split('.')[0]) < Number(pkg.version.split('.')[0]) && !opts.upgradeMajor) {
-    throw new Error('major workflow upgrade requires --upgrade-major after reviewing v3/README.md; existing .worktrees data is not migrated or deleted');
+    throw new Error('major workflow upgrade requires --upgrade-major after reviewing README.json; existing .worktrees data is not migrated or deleted');
   }
 }
 
 // Upgrade ownership only: these names are not executable legacy routing.
-const RETIRED_ROOTS = new Set(['alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'tests', 'workflows', 'docs', 'sites', 'v3', 'skills', 'bin']);
+const RETIRED_ROOTS = new Set(['v3', 'legacy', 'ops', 'profiles', 'contracts', 'core', 'schemas', 'specifications', 'cli', '.dist', 'alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'tests', 'workflows', 'skills', 'bin']);
+const PRESERVED_DOCUMENTATION_ROOTS = new Set(['docs','sites']);
 function retirementPlan(target, manifest) {
   const current = new Set(payloadFiles(packageRoot));
   const remove = [], preserved = [];
   for (const [relative, originalHash] of Object.entries(manifest?.files ?? {})) {
     if (typeof relative !== 'string' || relative.includes('\\') || relative.includes(':') || path.isAbsolute(relative) || relative.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('invalid installed manifest path; refusing cleanup before writes');
+    if (PRESERVED_DOCUMENTATION_ROOTS.has(relative.split('/')[0])) { preserved.push(relative); continue; }
     if (current.has(relative)) continue;
-    const allowed = relative === 'routing.json' || relative.startsWith('skills/starci-lite/') || RETIRED_ROOTS.has(relative.split('/')[0]);
+    const allowed = ['INDEX.md','INDEX.vi.md','README.md','README.vi.md','UPDATE.md','UPDATE.vi.md','SKILL.vi.md'].includes(relative) || relative === 'routing.json' || relative.startsWith('skills/starci-lite/') || RETIRED_ROOTS.has(relative.split('/')[0]);
     if (!allowed || relative === 'resources/settings.json' || relative.split('/').some(part => ['.git', '.work', '.worktrees', 'worktrees', '_local'].includes(part))) { preserved.push(relative); continue; }
     let cursor = target, missing = false;
     for (const part of relative.split('/')) {
@@ -265,6 +276,8 @@ function retirementPlan(target, manifest) {
     } else if (!current.has(relative) && !removedNames.has(relative)) preserved.push(relative);
   };
   for (const relative of RETIRED_ROOTS) inspect(relative);
+  // Keep V2 documentation/sites without walking build caches, dependencies or linked content.
+  for (const relative of PRESERVED_DOCUMENTATION_ROOTS) if(lstatSync(path.join(target,relative),{throwIfNoEntry:false})) preserved.push(relative);
   return { remove, preserved: [...new Set(preserved)] };
 }
 function retireOwnedFiles(target, plan) {
@@ -357,11 +370,11 @@ export function update(opts, log = console.log) {
 export function doctor(opts, log = console.log) {
   const target = path.join(opts.dir, '.claude');
   const installedPackage = path.join(target, 'package.json');
-  if (existsSync(installedPackage) && Number(JSON.parse(readFileSync(installedPackage, 'utf8')).version?.split('.')[0]) >= 3 && !existsSync(path.join(target, 'v3', 'cli', 'main.mjs'))) {
-    throw new Error('installed v3 runtime is incomplete: missing v3/cli/main.mjs; refusing fallback to legacy validation');
+  if (existsSync(installedPackage) && Number(JSON.parse(readFileSync(installedPackage, 'utf8')).version?.split('.')[0]) >= 3 && !existsSync(path.join(target, 'cli', 'main.mjs'))) {
+    throw new Error('installed v3 runtime is incomplete: missing cli/main.mjs; refusing fallback to legacy validation');
   }
-  if (existsSync(path.join(target, 'v3', 'cli', 'main.mjs'))) {
-    const tests = opts.quick ? ['ops.spec.mjs', 'core.spec.mjs', 'preset-skills.spec.mjs'] : ['ops.spec.mjs', 'core.spec.mjs', 'preset-skills.spec.mjs', 'cli.spec.mjs', 'acceptance.spec.mjs'];
+  if (existsSync(path.join(target, 'cli', 'main.mjs'))) {
+    const tests = opts.quick ? ['ops.spec.mjs', 'core.spec.mjs', 'workflow-routing.spec.mjs'] : ['ops.spec.mjs', 'core.spec.mjs', 'workflow-routing.spec.mjs', 'cli.spec.mjs', 'acceptance.spec.mjs'];
     const manifest = readManifest(target);
     if (manifest) {
       const drift = Object.entries(manifest.files).filter(([rel, hash]) => !existsSync(path.join(target, rel)) || sha(path.join(target, rel)) !== hash);
@@ -372,14 +385,14 @@ export function doctor(opts, log = console.log) {
       const environment = { ...process.env };
       // Doctor starts independent test runners even when invoked by an installer test.
       delete environment.NODE_TEST_CONTEXT;
-      const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', path.join(target, 'v3', testFile)], { cwd: target, encoding: 'utf8', windowsHide: true, env: environment });
+      const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', path.join(target, 'tests', testFile)], { cwd: target, encoding: 'utf8', windowsHide: true, env: environment });
       const output = (result.stdout ?? '') + (result.stderr ?? '');
       const count = Number(output.match(/^# tests (\d+)$/m)?.[1] ?? 0);
       const passed = Number(output.match(/^# pass (\d+)$/m)?.[1] ?? 0);
       const failures = Number(output.match(/^# fail (\d+)$/m)?.[1] ?? -1);
       const success = result.status === 0 && count > 0 && passed === count && failures === 0;
       if (!success) failed++;
-      log(`${success ? 'ok  ' : 'FAIL'} v3/${testFile}: ${passed}/${count} tests passed${success ? '' : '\n' + output.trim().split('\n').slice(-25).join('\n')}`);
+      log(`${success ? 'ok  ' : 'FAIL'} tests/${testFile}: ${passed}/${count} tests passed${success ? '' : '\n' + output.trim().split('\n').slice(-25).join('\n')}`);
     }
     log(failed ? `doctor: ${failed} v3 check(s) failed` : 'doctor: v3 local contracts/tests passed; no product or deployment acceptance implied');
     return failed;
@@ -412,7 +425,7 @@ work    runs the bounded .work CLI; use "work help". Never dispatches product op
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     if (process.argv[2] === 'work') {
-      const result = spawnSync(process.execPath, [path.join(packageRoot, 'v3', 'cli', 'main.mjs'), ...process.argv.slice(3)], { stdio: 'inherit', windowsHide: true });
+      const result = spawnSync(process.execPath, [path.join(packageRoot, 'cli', 'main.mjs'), ...process.argv.slice(3)], { stdio: 'inherit', windowsHide: true });
       process.exit(result.status ?? 1);
     }
     const opts = parseArgs(process.argv.slice(2));

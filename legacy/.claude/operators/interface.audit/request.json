@@ -1,7 +1,0 @@
-{
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "title":"interface.audit request",
-  "$ref":"works:request",
-  "properties":{"operation":{"const":"interface.audit"},"expected":{"minItems":1},"inputs":{"properties":{"files":{"minItems":1}}}},
-  "description":"Bind the source application, presentation ownership, direction decision, route, served-head evidence, surface class and frozen audit matrix. Include an account record by name for guarded routes and seeded-volume evidence when a criterion depends on data density."
-}

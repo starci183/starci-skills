@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "business.decide request",
-  "$ref": "works:request",
-  "properties": { "operation": { "const": "business.decide" }, "inputs": { "properties": { "prompts": { "minItems": 1 } } } },
-  "description": "State feature id, promise, target state and coverage dimensions in inputs.prompts. Target state is pending, in-progress or rejected; implemented belongs to business.reconcile. Bind prior authority or architecture evidence as files. Confirmation of the operator's plain-language restatement is essential before publication."
-}

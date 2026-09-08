@@ -1,6 +1,0 @@
-interface:
-  display_name: "StarCi Lite"
-  short_description: "Focused local changes with proportionate checks"
-  default_prompt: "Use $starci-lite to make this local change and verify the affected behavior."
-policy:
-  allow_implicit_invocation: true

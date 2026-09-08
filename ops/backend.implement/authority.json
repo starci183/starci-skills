@@ -1,0 +1,54 @@
+{
+  "schema": "starci/op-authority@1",
+  "op": "backend.implement",
+  "primary": {
+    "owns": [
+      "the selected matrix cell result",
+      "its final response and required criteria"
+    ],
+    "reads": [
+      "target",
+      "business",
+      "architecture",
+      "repo",
+      "matrix",
+      "profile"
+    ],
+    "writes": [
+      {
+        "id": "node",
+        "path": "N/node.yaml"
+      },
+      {
+        "id": "source",
+        "path": "repository:<repo-id>/<write-ceiling>"
+      },
+      {
+        "id": "evidence",
+        "path": "E/manifest.yaml + E/tests.json + E/test-output.txt + E/lineage.json + E/result.md"
+      },
+      {
+        "id": "matrixHandoff",
+        "path": "E/job-result.json"
+      },
+      {
+        "id": "apiDelivery",
+        "path": "E/api-contract.json + E/runtime.json"
+      }
+    ],
+    "allowedEffects": [
+      "owned source edits",
+      "scoped local commits when authorized",
+      "tests in declared sandbox",
+      "only selected owned development runtime setup and probes needed to verify this implementation; no production deployment"
+    ],
+    "canAdvanceWorkflow": false,
+    "maxSecondary": 3,
+    "calls": [],
+    "rules": [
+      "Use existing request authority only.",
+      "Preserve business expectations and criteria.",
+      "The coordinator gate, not this op, accepts the response and advances the workflow."
+    ]
+  }
+}

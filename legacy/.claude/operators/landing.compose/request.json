@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "landing.compose request",
-  "$ref": "works:request",
-  "properties": { "operation": { "const": "landing.compose" }, "inputs": { "properties": { "prompts": { "minItems": 1 } } } },
-  "description": "State the surface, concrete promise, canonical visual identity, allowed references and motion level in inputs.prompts. A bound business authority overrides paraphrased promise prose. Bind assets and prior plans as input files and exact Grammar/knowledge references as context files."
-}

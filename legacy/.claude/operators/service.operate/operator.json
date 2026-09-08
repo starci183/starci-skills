@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "id": "service.operate",
-  "purpose": "Bring one environment-declared auxiliary service to its requested state and prove that state from the service's own probe while recording its holder.",
-  "scope": "One declared service and state. It does not operate the product runtime, invent services, move ports, stop foreign processes, infer approval, or record credential values. Attestation is read-only.",
-  "modules": {"request":"request.json","response":"response.json","validate":"validate.json","step":"step.json","criteria":"criteria.json"}
-}

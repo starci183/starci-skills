@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "id": "api.verify",
-  "purpose": "Run the repository-owned end-to-end API suite as an external client against one attested runtime and publish the runner cases, three independent lane verdicts, namespace cleanup proof and raw output.",
-  "scope": "Verification only. The operator starts no runtime, authors no cases, changes no delivery source and touches only the request-authorized test namespace. Run records are append-only and credentials remain referenced by name.",
-  "modules": {"request":"request.json","response":"response.json","validate":"validate.json","step":"step.json","criteria":"criteria.json"}
-}

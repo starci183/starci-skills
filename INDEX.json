@@ -1,0 +1,44 @@
+{
+  "schema": "starci/layout@3",
+  "entry": "SKILL.md",
+  "build": {
+    "command": "node scripts/ensure-build.mjs",
+    "output": ".dist",
+    "format": "json",
+    "onMissingOrStale": "build-immediately",
+    "onFailure": "stop"
+  },
+  "folders": {
+    "ops": "Operator JSON and authority",
+    "workflows": "Matrices, contracts and runtime gates",
+    "profiles": "Host profiles",
+    "knowledge": "Lazy-loaded JSON guidance",
+    "contracts": "Validation code",
+    "core": "Work validation runtime",
+    "schemas": "JSON schemas",
+    "specifications": "Business and architecture contracts",
+    "cli": "Inspection commands",
+    "scripts": "Build tooling",
+    "tests": "Regression checks",
+    "docs": "Generated V3 JSON documentation",
+    "sites": "V3 sites generated from catalogs"
+  },
+  "limits": {
+    "rows": 3,
+    "parallel": 3,
+    "secondaryPerCaller": 3
+  },
+  "counts": {
+    "skills": 1,
+    "workflows": 8,
+    "ops": 14
+  },
+  "gates": "workflows/gates.json",
+  "work": {
+    "format": "yaml-1.2",
+    "schema": ".work/_schema/work.schema.yaml",
+    "node": "node.yaml",
+    "workflow": "<piece>/workflow/<run-id>/{goal,run}.yaml",
+    "approval": "goal-before-effects-and-result-before-done"
+  }
+}

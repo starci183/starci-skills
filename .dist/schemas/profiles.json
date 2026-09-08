@@ -1,0 +1,1 @@
+{"business":{"assertions":true},"architecture":{"assertions":true},"implementation":{"assertions":true,"code":true},"uat.ui":{"assertions":true,"uat":true,"image":true},"uat.ux":{"assertions":true,"uat":true,"behavior":true},"release":{"assertions":true,"code":true},"operations":{"assertions":true}}

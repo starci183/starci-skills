@@ -1,0 +1,66 @@
+{
+  "schema": "starci/transitions@1",
+  "workflow": "frontend",
+  "gate": {
+    "request": "strict",
+    "response": "strict",
+    "correlation": "requestId and SHA-256 of the exact request",
+    "criteria": "Every required request criterion must pass with evidence.",
+    "handoff": "Copy accepted outputs into the declared next input fields without rewriting them."
+  },
+  "support": {
+    "parent": "interface.implement",
+    "role": "interface.backend",
+    "operator": "backend.implement",
+    "countsAs": "The same matrix cell; never an extra sequential step or parallel column.",
+    "parentState": "waiting",
+    "maxSecondaryPerPrimary": 3,
+    "authoritySource": "interface.implement/secondary.json: the calling FE op owns the backend support scope, permissions, criteria and return behavior. Backend declares no caller-specific secondary role.",
+    "scope": [
+      "compatible API integration repair",
+      "data needed for frontend rendering"
+    ],
+    "forbidden": [
+      "business changes",
+      "new product features",
+      "unrelated schema or permissions changes"
+    ],
+    "gate": [
+      "scope-preserved",
+      "business-unchanged",
+      "api-compatible",
+      "checks-pass"
+    ],
+    "resume": "A passing support response resumes FE; FE must rerun affected checks/render before its own response can pass.",
+    "capacity": "A waiting parent does not execute concurrently; total active execution workers across all matrix cells and support calls remains at most three."
+  },
+  "repair": {
+    "owner": "AI coordinator and the selected operator",
+    "maxAutomaticAttemptsPerStep": 3,
+    "identicalFailure": "Stop unless diagnosis, evidence or repair method changes.",
+    "preserve": [
+      "original request",
+      "criteria",
+      "failed responses",
+      "evidence",
+      "cleanup obligations"
+    ],
+    "routes": {
+      "invalid-response": "same",
+      "criterion-failure": "same",
+      "product-defect": "implement",
+      "design-conflict": "draw",
+      "runtime-failure": "same",
+      "cleanup-incomplete": "uat",
+      "missing-authority": "user"
+    },
+    "constraints": [
+      "Repair only within existing source/resource authority; ask only for a genuinely missing decision or authority.",
+      "UAT does not secretly edit product code; a product defect reopens interface.implement, then fresh UAT.",
+      "Reopening a step archives that response and all downstream requests/responses before new mutation.",
+      "Old evidence remains immutable and cannot certify changed code or a changed draw.",
+      "Do not restart resource-creating actions while cleanup of the previous attempt remains unresolved.",
+      "Automatic attempt limits can be configured in this policy; do not silently retry forever."
+    ]
+  }
+}

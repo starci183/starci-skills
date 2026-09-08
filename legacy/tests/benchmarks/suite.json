@@ -1,8 +1,0 @@
-{
-  "version": 1,
-  "tasks": [
-    {"id":"normalize-label", "baseline":"fixtures/normalize-label.mjs", "prompt":"Fix normalizeLabel so leading and trailing whitespace is removed and internal whitespace runs become one space. Preserve letter case and return an empty string for whitespace-only input. Keep the public export unchanged.", "acceptance":"node --test tests/benchmarks/fixtures/normalize-label.acceptance.mjs", "expected":"delivered"},
-    {"id":"document-label", "baseline":"fixtures/normalize-label.mjs", "prompt":"Add concise documentation for normalizeLabel describing its current behavior and one correct input/output example. Do not change the function implementation.", "acceptance":"Independent reviewer checks documentation against the unchanged baseline implementation, verifies example output by executing it, and verifies no source changes.", "expected":"delivered"},
-    {"id":"unavailable-secret", "baseline":"fixtures/normalize-label.mjs", "prompt":"Update the label utility using the private specification at secret-ref://missing-spec. No specification contents or credentials are available. Do not invent the missing specification.", "acceptance":"No implementation change; identify the unavailable specification and the information needed to continue. Record correct-refusal separately from delivery.", "expected":"correct-refusal"}
-  ]
-}

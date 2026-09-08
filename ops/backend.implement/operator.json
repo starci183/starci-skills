@@ -1,0 +1,306 @@
+{
+  "id": "backend.implement",
+  "goal": {
+    "en": "Implement one selected backend outcome and prove its declared contract on actual code."
+  },
+  "nodeKinds": [
+    "implementation"
+  ],
+  "completionProfile": "implementation",
+  "sideEffects": [
+    "owned source edits",
+    "scoped local commits when authorized",
+    "tests in declared sandbox",
+    "only selected owned development runtime setup and probes needed to verify this implementation; no production deployment"
+  ],
+  "graphPolicy": {
+    "mode": "read-only",
+    "location": ".work node dependsOn/refs and resource files",
+    "prerequisiteState": "done",
+    "dispatch": "never"
+  },
+  "reads": [
+    {
+      "id": "target",
+      "path": "N/node.yaml",
+      "purpose": {
+        "en": "Read the existing selected N/node.yaml, ancestor scope, declared refs/dependencies/assertions and validator freshness. This consumer op requires its target node to exist. An absent target is a scope/graph gap: report it and propose a separately selected scope op; do not create a target or invent its acceptance/graph here."
+      }
+    },
+    {
+      "id": "business",
+      "path": ".work/<business>/business/**/node.yaml",
+      "purpose": {
+        "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
+      }
+    },
+    {
+      "id": "architecture",
+      "path": ".work/<business>/architecture/**/node.yaml",
+      "purpose": {
+        "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
+      }
+    },
+    {
+      "id": "repo",
+      "path": "repository:<repo-id>/<bound-paths>",
+      "purpose": {
+        "en": "When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty state; read applicable instructions, manifests, owning code, callers and relevant tests. Greenfield/spec-only work records source not-yet-created and grounds intent in the user request; no invented repository or fact citation. Source implementation still needs an actual selected writable repository."
+      }
+    },
+    {
+      "id": "matrix",
+      "path": "selected complete-job matrix request + workflows/jobs.json",
+      "purpose": {
+        "en": "Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable input bindings, requested output JSON shapes and required criteria. Standalone execution needs no fabricated matrix request. A template is not authority for extra effects."
+      }
+    },
+    {
+      "id": "profile",
+      "path": "profiles/registry.json + selected runtime execution profile + actual host tools/model",
+      "purpose": {
+        "en": "Select the actual host runtime codex or claude and this operator role from the V2-derived active profiles. Use current host model configuration; historical model names are not availability proof. Capabilities are the intersection of actual tools, selected profile policy, op permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles or extra-agent permissions."
+      }
+    }
+  ],
+  "writes": [
+    {
+      "id": "node",
+      "path": "N/node.yaml",
+      "fields": [
+        "state",
+        "blocker",
+        "completion.inputDigest",
+        "completion.evidence",
+        "completion.codeRefs"
+      ],
+      "content": {
+        "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+      }
+    },
+    {
+      "id": "source",
+      "path": "repository:<repo-id>/<write-ceiling>",
+      "fields": [
+        "source files",
+        "tests",
+        "migration/assets/config only when selected"
+      ],
+      "content": {
+        "en": "Only exact owned paths in the approved code-scope, with smallest required caller/integration changes; record actual diff and commit mapping, not proposed changes as delivered."
+      }
+    },
+    {
+      "id": "evidence",
+      "path": "E/manifest.yaml + E/tests.json + E/test-output.txt + E/lineage.json + E/result.md",
+      "fields": [
+        "id",
+        "nodeId",
+        "inputDigest",
+        "outcome",
+        "assertions",
+        "assets",
+        "provenance",
+        "codeRefs",
+        "extensions"
+      ],
+      "content": {
+        "en": "Store actual command, cwd/repo, source commit/tree, environment, exit code, counts and expected/actual per required proof, with sanitized original output. Operator-specific observed result in E/result.md: Map each AC/operation to delivered repo/path/symbol and actual commit. Preserve business and architecture authority; unknown rules are blockers, not implementation defaults. This implement op owns lint, typecheck, relevant tests/coverage, affected builds and Sonar. Resolve real repository scripts and CI thresholds; record command, source tree/commit, result and sanitized logs. For Sonar record the analysis/revision and actual server quality-gate result after processing; scanner submission alone is not pass. Fix scoped failures and rerun affected checks. A missing runner, token reference, coverage target or unavailable required Sonar gate is blocked/not-run, never pass; do not move this responsibility to architecture, business or UAT. Reuse existing authorization and keep secrets outside evidence."
+      }
+    },
+    {
+      "id": "matrixHandoff",
+      "path": "E/job-result.json",
+      "fields": [
+        "requestId",
+        "requestDigest",
+        "op",
+        "operation when selected",
+        "status",
+        "criteria",
+        "outputs",
+        "artifacts"
+      ],
+      "content": {
+        "en": "Only for a selected job matrix, return the exact request-bound result. Populate every declared cell output with actual canonical Work/source/runtime references or produced JSON artifacts from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream expectations. Missing required output/evidence remains blocked or failed and cannot advance. The selected request freezes output field schemas before execution."
+      }
+    },
+    {
+      "id": "apiDelivery",
+      "path": "E/api-contract.json + E/runtime.json",
+      "fields": [
+        "operations",
+        "request",
+        "response",
+        "errors",
+        "authorization",
+        "codeRefs",
+        "servedVersions",
+        "endpoint",
+        "probeEvidence"
+      ],
+      "content": {
+        "en": "When the selected consumer needs a runnable backend, deliver the implemented API request/response/error/authorization contract and actual served build references. Reuse or start only the authorized owned development target and record its identity and probes. No production deploy, API success or runtime readiness is inferred merely from a source commit. Standalone source-only work records runtime not requested instead of claiming readiness."
+      }
+    }
+  ],
+  "steps": [
+    {
+      "reads": [
+        "target",
+        "business",
+        "architecture",
+        "repo",
+        "profile"
+      ],
+      "writes": [],
+      "action": {
+        "en": "Bind the exact operation/AC set and inspect existing code plus sibling conventions, including DI/module registration and every relevant caller. Reuse already conforming behavior. Own preparation through delivery: inspect readiness and reproduce the requested defect when applicable, partition the selected work into cohesive changes and check callers before editing. Resolve repository-local dependencies and bounded development runtime needs under the existing scope. Shared library changes belong to the actual FE or BE package owner: include owner tests, packaging/export compatibility and selected consumer integration proof in this same implementation; never publish a package implicitly. Keep shared paths exclusive and report a missing required external authority rather than inventing a helper. Resolve the execution profile and actual tool availability before selecting instruments; this does not switch the model/runtime or spawn workers."
+      }
+    },
+    {
+      "reads": [
+        "business",
+        "architecture",
+        "repo"
+      ],
+      "writes": [
+        "source"
+      ],
+      "action": {
+        "en": "Implement transport, validation, permission checks, use-case logic and persistence inside the declared ownership. Enforce denials before unauthorized side effects; do not invent fallback behavior."
+      }
+    },
+    {
+      "reads": [
+        "business",
+        "architecture",
+        "repo"
+      ],
+      "writes": [
+        "source"
+      ],
+      "action": {
+        "en": "Implement declared transaction, retry/idempotency, concurrency, error identity and read-time revalidation. Migrations are source only; applying them remotely is not included."
+      }
+    },
+    {
+      "reads": [
+        "repo",
+        "target"
+      ],
+      "writes": [
+        "source",
+        "evidence"
+      ],
+      "action": {
+        "en": "Add/repair scoped tests; execute positive, denial, invalid-input and applicable race/reload regressions plus repository-required checks. Preserve raw failure and no-test/not-run status; repair only within this approved implementation goal. This implement op owns lint, typecheck, relevant tests/coverage, affected builds and Sonar. Resolve real repository scripts and CI thresholds; record command, source tree/commit, result and sanitized logs. For Sonar record the analysis/revision and actual server quality-gate result after processing; scanner submission alone is not pass. Fix scoped failures and rerun affected checks. A missing runner, token reference, coverage target or unavailable required Sonar gate is blocked/not-run, never pass; do not move this responsibility to architecture, business or UAT. Reuse existing authorization and keep secrets outside evidence."
+      }
+    },
+    {
+      "reads": [
+        "repo",
+        "target",
+        "matrix"
+      ],
+      "writes": [
+        "node",
+        "evidence",
+        "matrixHandoff",
+        "apiDelivery"
+      ],
+      "action": {
+        "en": "Review diff, verify no unrelated changes, commit the piece when authorized and read back the real SHA/diff. Bind proof to actual tested bytes; fresh code needs fresh required evidence. Stop after delivery. Create the scoped local commit under the existing implementation authority after required checks pass, read back full SHA and committed diff, and return per-repository commit references. Preserve unrelated local changes; never stage everything, bypass hooks, push or invent an empty commit. If no code changed, return the verified existing commit and explain no change. Missing commit proof prevents a passing delivery. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts. For an explicitly requested running API handoff, verify the actual owned development runtime and produce api-contract.json and runtime.json for FE/API acceptance; missing required served proof blocks that handoff."
+      }
+    }
+  ],
+  "proofs": [
+    {
+      "id": "binding",
+      "requirement": {
+        "en": "Run workspace validation; every cited ID/path exists or is explicitly proposed, required assertions are covered, input bindings are current, and an honest not-run/fail cannot earn done."
+      }
+    },
+    {
+      "id": "commit",
+      "requirement": {
+        "en": "Inspect exact staged diff and actual tests; bind full real source commit(s), per repository, and separately retain integration/tested mappings. Report uncommitted or no-change honestly."
+      }
+    },
+    {
+      "id": "behavior",
+      "requirement": {
+        "en": "Tests prove each declared operation facet including negative authorization and persistent state when promised; compile-only output cannot certify behavior."
+      }
+    },
+    {
+      "id": "implementation-quality",
+      "requirement": {
+        "en": "This implement op owns lint, typecheck, relevant tests/coverage, affected builds and Sonar. Resolve real repository scripts and CI thresholds; record command, source tree/commit, result and sanitized logs. For Sonar record the analysis/revision and actual server quality-gate result after processing; scanner submission alone is not pass. Fix scoped failures and rerun affected checks. A missing runner, token reference, coverage target or unavailable required Sonar gate is blocked/not-run, never pass; do not move this responsibility to architecture, business or UAT. Reuse existing authorization and keep secrets outside evidence."
+      }
+    }
+  ],
+  "blockers": [
+    {
+      "code": "BUSINESS_UNKNOWN",
+      "condition": {
+        "en": "Implementation reaches a rule not decided by the accepted business node."
+      }
+    },
+    {
+      "code": "SCOPE_WIDENING",
+      "condition": {
+        "en": "Required operation, owner or protected path lies outside selected code-scope."
+      }
+    },
+    {
+      "code": "PROOF_UNAVAILABLE",
+      "condition": {
+        "en": "A required check cannot execute or does not prove the declared behavior."
+      }
+    },
+    {
+      "code": "DECLARED_DEPENDENCY_UNMET",
+      "condition": {
+        "en": "A declared prerequisite is not effectively done, or a required declared input/scope is missing. Report node/resource IDs and propose a separately selected graph update when needed; never run predecessors or weaken dependsOn/refs/required to proceed."
+      }
+    }
+  ],
+  "placeholders": {
+    "business": "Selected business slug / slug nghiệp vụ đã chọn",
+    "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
+    "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
+    "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
+    "environment": "Resolved environment resource slug / slug environment đã resolve",
+    "identity": "Selected actor resource slug / slug actor đã chọn",
+    "fixture": "Selected fixture resource slug / slug fixture đã chọn",
+    "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
+    "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
+    "piece": "Stable selected piece slug / slug piece đã chọn",
+    "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
+    "screen": "Selected surface/state slug / slug screen-state đã chọn"
+  },
+  "commitPolicy": {
+    "mode": "scoped-local-commit",
+    "ownership": "exact-selected-paths",
+    "verify": "git-readback-full-sha-and-diff",
+    "push": false,
+    "reuseAuthorization": true,
+    "noChange": "return-existing-verified-commit-no-empty-commit"
+  },
+  "qualityPolicy": {
+    "owner": "backend.implement",
+    "checks": [
+      "lint",
+      "typecheck",
+      "tests",
+      "coverage",
+      "build",
+      "sonar"
+    ],
+    "requiredResult": "pass",
+    "sonarGate": "server-quality-gate-pass-for-tested-revision",
+    "missingRunner": "blocked",
+    "canDelegateResponsibility": false
+  }
+}

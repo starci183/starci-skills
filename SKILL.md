@@ -1,49 +1,28 @@
 ---
 name: starci
-description: Route product-development requests to named StarCi preset skills and scoped business pieces, with evidence-bound results. Use for business, architecture, implementation, UAT, migration and delivery; answer read-only questions without launching a mutating recipe.
+description: Select one bounded workflow, execute its complete operators, and prove the requested outcome.
 ---
 
-# StarCi Work 3.0
+Before every invocation, run `node scripts/ensure-build.mjs` from this skill's directory. It checks source and compiled JSON, immediately builds missing/stale `.dist`, and verifies the result. If it fails, stop; never use stale output. Do not assume a previous invocation's build is current.
 
-Use the user's current goal and authorization. Match each prompt to the named preset skills in [skills/catalog.json](skills/catalog.json), then use the selected mode's fixed recipe. Do not brainstorm a new workflow or choose arbitrary op chains. Across all selected skills: at most three sequential execution waves, each with at most three concurrent op invocations (nine invocations maximum). Complete that selected set or report its blockers, then stop. Never reset this budget by opening another batch, agent, task or subchain within the prompt.
+Read [.dist/workflows/catalog.json](.dist/workflows/catalog.json), select one workflow matching the requested outcome, then read only its definition and selected operator JSON from [.dist/ops/catalog.json](.dist/ops/catalog.json). Read [.dist/policy/common.json](.dist/policy/common.json) and the selected host profile. Load referenced knowledge JSON only when applicable; do not read the whole library.
 
-Each prompt may address one or more pieces. Map intended results to current `.work` scope, preset, mode and named branches yourself; users need not name operators or approve each authorized step again. State that mapping and waves briefly. Execute only the requested portion of a recipe: its maximum sequence is not permission for extra code, accounts, publication or deployment. Multiple selected recipes share one budget, preserving each recipe's ordering; defer what does not fit. Missing prerequisites stop their consumers. If no preset fits, report the coverage gap without inventing ops or changing this library implicitly. Unknown business decisions and new external effects still need user direction.
+Read [.dist/workflows/gates.json](.dist/workflows/gates.json) for every workflow. Questions can remain read-only. Unmatched work uses `direct-task` with the single `task.execute` op; it discovers actual context and requires `.work` before effects. Unknown explicit workflow IDs are errors. Bind actual targets and authority before effects, reusing existing user authorization.
 
-## Load only what this operation needs
+A workflow has at most 3 sequential rows and 3 parallel primary cells per row. Each caller defines at most 3 secondary types in its own JSON. Follow its exact trigger and authority, wait for support, and verify its result inside the same cell. No recursive support, automatic new agents, or unrelated successor work.
 
-1. Read [v3/README.md](v3/README.md) for supported storage, CLI and evidence limits.
-2. Read the skill catalogue and selected skill's `document` and `recipe`. Read each selected operation from [v3/ops/catalog.json](v3/ops/catalog.json), including `commonDocument` and exact `document`. Paths resolve relative to their catalogue. Do not load all skills/ops. A preset's link back to this already-read entry is context, not recursive dispatch.
-3. Read the canonical business goal, selected node, applicable ancestors, dependencies and resource references in the product-owned `.work`. Inspect source at the bound repository/revision before making source claims.
-4. Use the current core schemas and [core documentation](v3/core/README.md) for machine fields. Operator prose cannot override a schema or tool permission.
+The accepted output of one cell is the next cell's input unchanged. Advance only when request/response binding, all required criteria, and evidence pass. Repair within the existing cell and scope; never weaken criteria. Frontend has an executable local gate; the other matrices are declarations followed by the current coordinator, not a background dispatcher.
 
-English contracts are runtime authority; same-stem Vietnamese files are human mirrors. Existing source/knowledge can be read as evidence without importing its old routing instructions.
+FE/BE implement owns appropriate lint, typecheck, tests, build, Sonar, and scoped local commits. FE consumes all draws, reuses or creates assets, and outputs UAT flows and asset status. Unavailable image generation permits explicitly deferred decorative slots only. UAT owns account/seed/resource scripts, sequential flows, UX yes/no, screenshots/video, and exact owned cleanup.
 
-## Choose and stop
+Preserve unrelated user content, evidence, credentials and worktrees. Report actual outcomes, checks, effects and remaining issues. Maintenance policy: [UPDATE.json](UPDATE.json).
 
-For a new product purpose, select `starci-goal`; its setup establishes business purpose and initial scope without authorizing implementation of the whole tree. For code-to-Work adoption, select `starci-migrate`: source facts are observations, not approved intent. Imported unverified leaves can be authored `suspended` with a concrete `suspensionReason`, never fake old completion. A question, review or diagnosis does not authorize fixes, deployment or account changes.
+Every workflow must first inspect the actual Work root. If missing, route to workspace-bootstrap, preserving the original request/scope and suspended target workflow. Bootstrap requires its own approved goal; after proof and acceptance, resume the original workflow. Invalid existing Work is never overwritten.
 
-State the selected specific goal, expected result, write boundary and done-when compactly. Reuse explicit user authorization already covering them. Ask only for a missing decision or materially new authority. Keep this exchange in the task; no strict request/response files.
+Before any operator effects, present a goal with final business behavior, service/caller ownership, exact repository paths, real current line ranges/anchors/source hashes for existing code, explicitly proposed new paths, non-code resource effects, each cell’s purpose, output schema, criteria and exclusions. Wait for an actual user message approving that goal. Inspection and proposal preparation may continue read-only. Never fabricate approval receipts. A changed goal invalidates its approval.
 
-Identify eligible unfinished pieces from the tree, but execute only the selection covered by the request. Missing prerequisites are concrete blockers, not permission to invoke additional operators. Stop with actual result, evidence, code commits when applicable, and what remains unproved.
+Each workflow may map request/response field names from exact approved inputs and accepted outputs, keeping scope and business meaning unchanged. Use workflows/lifecycle.mjs to validate goals, enforce Work/approval gates, issue typed cell requests and verify responses. The frontend runtime is an evidence subgate, not authority to bypass the lifecycle.
 
-Scope and dependency edges belong to `.work`, not to a hardcoded operator chain. Read the selected node's declared graph; do not add, remove or bypass prerequisites to make an operation pass. A scope change must be explicitly selected and authorized. Changed semantic inputs suspend affected completed work transitively; retain its original commits/evidence and rerun only a subsequently selected piece, never the whole graph automatically.
+After technical pass, present the actual result and wait for user acceptance bound to that result. Only then mark the selected Work leaves done with current valid evidence; parent state derives from required children. Persist goal, requests/responses and actual user decisions as YAML via saveRun. Local receipts establish binding, not human authentication; the coordinator must source them from genuine user messages.
 
-## Evidence and truth
-
-Separate desired behavior, observed behavior and inference. Cite repository/revision/path for source facts; use actual tool outputs for execution claims. Never manufacture account IDs, routes, screenshots, commits, approvals, test results or deployment provenance.
-
-A passing validator proves the checks it implements, not semantic truth of arbitrary authored observations. Inspect evidence and its assertions. UI appearance is not behavioral UAT; login is not the downstream journey; source HEAD is not a served build. A requirement change invalidates affected proof until reviewed or retested.
-
-Keep credentials in the existing sealed/vault owner. Store only refs in `.work`; inspect and redact artifacts before durable capture. Account records do not independently authorize authentication, mutation, reset or provisioning. Follow applicable browser/tool instructions.
-
-## Parallel work
-
-This protocol permits the coordinator to assign independent selected ops to agents within the three-by-three cap when delegation is available and allowed by higher-priority/tool instructions. Use at most three active execution workers across the whole prompt, not three per parent. A coordinator executing an op occupies a slot too. Distinct node/source ownership, browser contexts and mutable-data namespaces are required; otherwise serialize within the cap or defer work to the next prompt. Three is a maximum, not a mandatory agent count.
-
-Each worker reads its own operation contract and evidence; ordinary messages are not accepted proof by themselves. Workers return results to the coordinator and do not recursively spawn or dispatch successors. The coordinator alone advances the selected waves. Retries consume an invocation/wave slot too; do not hide an unlimited chain inside one piece. Tool steps inside one bounded op are not separate ops. Do not silently move work to another user task.
-
-## Persistent result
-
-Update only owned leaf files/resources/evidence. Parents derive completion. Record full code commit SHAs per piece and the actual integrated/served identity where relevant. Preserve user changes and keep commits scoped; do not push, publish or deploy unless requested.
-
-Product `.work` is not a Git checkout container. Existing `.worktrees` data and actual Git worktrees are never automatically deleted or migrated. The V2 alias, routing, session and request/response runtime is removed from this package. Historical recovery is through Git, not an executable fallback. Migration/installer safety recognition of old names is not current storage authority.
+Work uses YAML 1.2: workspace.yaml, node.yaml, resource.yaml, evidence/manifest.yaml, workflow/goal.yaml and workflow/run.yaml. New Work includes YAML schemas in _schema/. Legacy node.md is read compatibility only; never create both formats in one directory.

@@ -1,0 +1,65 @@
+{
+  "schema": "starci/op-authority@1",
+  "op": "uat.verify",
+  "primary": {
+    "owns": [
+      "the selected matrix cell result",
+      "its final response and required criteria"
+    ],
+    "reads": [
+      "target",
+      "business",
+      "repo",
+      "environment",
+      "flows",
+      "accounts",
+      "fixtures",
+      "scripts",
+      "effects",
+      "workflow",
+      "matrix",
+      "profile"
+    ],
+    "writes": [
+      {
+        "id": "node",
+        "path": "N/node.yaml"
+      },
+      {
+        "id": "source",
+        "path": "repository:<repo-id>/<write-ceiling>"
+      },
+      {
+        "id": "resources",
+        "path": ".work/_resources/identities/<identity>/resource.yaml + .work/_resources/fixtures/<fixture>/resource.yaml"
+      },
+      {
+        "id": "evidence",
+        "path": "E/manifest.yaml + E/run-ledger.json + E/script-review.md + E/seed.json + E/flows.json + E/ux-checks.json + E/walk.json + E/screens/*.png + E/videos/* + E/readback.json + E/runtime.json + E/cleanup.json + E/costs.json + E/result.md"
+      },
+      {
+        "id": "handoff",
+        "path": "E/response.json"
+      },
+      {
+        "id": "matrixHandoff",
+        "path": "E/job-result.json"
+      }
+    ],
+    "allowedEffects": [
+      "scoped test account reuse/creation",
+      "owned prerequisite SQL seed and cleanup",
+      "selected test automation script authoring",
+      "declared product UI actions and explicitly authorized paid AI calls",
+      "direct provider/resource cleanup for exact run-owned IDs"
+    ],
+    "canAdvanceWorkflow": false,
+    "maxSecondary": 3,
+    "calls": [],
+    "rules": [
+      "Use existing request authority only.",
+      "Preserve business expectations and criteria.",
+      "The coordinator gate, not this op, accepts the response and advances the workflow."
+    ]
+  }
+}

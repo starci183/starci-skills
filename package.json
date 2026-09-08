@@ -1,7 +1,7 @@
 {
   "name": "@starci/skills",
   "version": "3.0.0-alpha.2",
-  "description": "StarCi Work: prompt-to-skill presets, bounded 3x3 operations, business completion trees and evidence-bound dependencies.",
+  "description": "StarCi: one skill, bounded workflow matrices, complete operators and verified direct tasks.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -12,17 +12,36 @@
   },
   "files": [
     "bin/",
-    "v3/",
-    "UPDATE.md",
-    "UPDATE.vi.md",
-    "INDEX.md",
-    "INDEX.vi.md",
     "SKILL.md",
-    "SKILL.vi.md",
     "knowledge/",
-    "README.md",
-    "README.vi.md",
-    "skills/"
+    "workflows/",
+    "ops/",
+    "profiles/",
+    "contracts/",
+    "core/",
+    "schemas/",
+    "specifications/",
+    "examples/",
+    "fixtures/",
+    "cli/",
+    "tests/",
+    "scripts/",
+    "docs/",
+    "README.json",
+    "UPDATE.json",
+    "INDEX.json",
+    ".dist/",
+    "sites/skills/src/",
+    "sites/skills/scripts/",
+    "sites/skills/public/",
+    "sites/skills/package.json",
+    "sites/skills/index.html",
+    "sites/skills/vite.config.ts",
+    "sites/skills/tsconfig.json",
+    "sites/skills/tsconfig.app.json",
+    "sites/skills/tsconfig.node.json",
+    "sites/docs/package.json",
+    "sites/docs/build.mjs"
   ],
   "repository": {
     "type": "git",
@@ -40,8 +59,16 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --test v3/*.spec.mjs",
-    "test:v3": "node --test v3/*.spec.mjs",
-    "work": "node v3/cli/main.mjs"
+    "test": "node --test tests/*.spec.mjs",
+    "work": "node cli/main.mjs",
+    "build": "node ops/generate.mjs && node scripts/build-workflows.mjs",
+    "build:check": "node scripts/build-workflows.mjs --check",
+    "build:ensure": "node scripts/ensure-build.mjs",
+    "build:sites": "node scripts/build-docs.mjs && npm --prefix sites/skills run build && npm --prefix sites/docs run build && node scripts/assemble-site.mjs",
+    "build:yaml": "node scripts/build-yaml.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "yaml": "^2.9.0"
   }
 }

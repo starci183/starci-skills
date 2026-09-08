@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "id": "interface.plan",
-  "purpose": "Map every page and modal of one feature once, choose one shared shell, and give each surface a goal, tier and data contract.",
-  "scope": "Read-only interface planning from references, frontend source and bound product context. Produces a surface map and units; it writes no source, copy or Grammar, renders nothing, and starts no service.",
-  "modules": { "request": "request.json", "response": "response.json", "validate": "validate.json", "step": "step.json", "criteria": "criteria.json" }
-}

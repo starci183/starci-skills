@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "id": "migration.release",
-  "purpose": "Apply one digest-frozen migration plan to one authorized non-production target through its source-owned runner and prove replay safety from the migration journal.",
-  "scope": "One release, target and immutable plan. It never invents or edits migrations, never substitutes a runner, never applies a partial or uncertain set again, and treats an already-applied set as a proved no-op.",
-  "modules": {"request":"request.json","response":"response.json","validate":"validate.json","step":"step.json","criteria":"criteria.json"}
-}

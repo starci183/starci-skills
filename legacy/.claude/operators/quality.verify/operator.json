@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "id": "quality.verify",
-  "purpose": "Verify one bounded delivery at one frozen source head by running its declared gates and reporting exact measured results without repairing the delivery.",
-  "scope": "Read-only verification of source and predecessor evidence. Gate commands may create their ordinary disposable build or test outputs, but this operator does not edit product source, re-score predecessor audits or conceal red gates with undeclared debt.",
-  "modules": {"request":"request.json","response":"response.json","validate":"validate.json","step":"step.json","criteria":"criteria.json"}
-}

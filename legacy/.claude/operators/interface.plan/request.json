@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "interface.plan request",
-  "$ref": "works:request",
-  "properties": { "operation": { "const": "interface.plan" }, "inputs": { "properties": { "prompts": { "minItems": 1 } } } },
-  "description": "State the feature and reference surface in inputs.prompts. Bind screenshots, a business promise or prior surface evidence in inputs.files and the exact Grammar/knowledge references in context.files. Missing source or reference authority requires clarification."
-}

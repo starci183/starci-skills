@@ -1,0 +1,45 @@
+{
+  "schema": "starci/document@1",
+  "sections": [
+    {
+      "title": "Maintaining StarCi Work 3.0",
+      "blocks": [
+        "Read the current entry, selected code/contract and its consumers before editing. The user's explicit requested major refactor defines the scope; do not open a v2 session or reconstruct request/response chains to maintain v3."
+      ]
+    },
+    {
+      "title": "One authority per concept",
+      "blocks": [
+        "Core schemas define machine shapes; core computes validation/digests/rollups. Operator common policy defines shared execution rules; op documents define domain-specific reads, writes and proof. SKILL.md is the only active skill; workflows/catalog.json owns workflow discovery, and workflow matrices own bounded sequence and handoffs. Entrypoints reference these authorities, never invent another routing graph. Scope/dependencies remain product-owned.",
+        "Change a contract and all affected consumers together. Preserve stable IDs; incompatible meanings require a version transition. Operator JSON contracts and runtime documentation are English only. Keep domain-specific implementation details in the actual operation, not universal policy."
+      ]
+    },
+    {
+      "title": "Grounding",
+      "blocks": [
+        "Inspect existing behavior before prescribing a fix. Separate observations from requirements and inference. Keep concrete product identities, machine paths and credentials out of reusable contracts. Synthetic examples must be labeled and must not masquerade as product acceptance.",
+        "Implement rejection checks where deterministic validation is possible. Test missing/changed evidence, stale inputs, path escape, ambiguous ownership and incomplete coverage. A hash cannot verify honesty of an authored statement; do not advertise it as such."
+      ]
+    },
+    {
+      "title": "Verification and commits",
+      "blocks": [
+        "Run affected v3 tests and the complete npm test before final delivery. Test relocated installation and CLI consumers when entrypoints or payload change. Commit exact piece ownership sets; do not sweep unrelated user edits into a commit. Preserve failed evidence and describe any unrun verification.",
+        "Do not hand-edit generated op documents; edit ops/<op>/operator.json and its applicable specification/secondary JSON, then regenerate through ops/generate.mjs and check reproducible generation. Removed V2 source/docs/tests are recoverable through Git, not an executable fallback. Verify installed references and package contents without old directories. Preserve domain knowledge while removing obsolete session/routing instructions."
+      ]
+    },
+    {
+      "title": "Release and migration",
+      "blocks": [
+        "A version change is not publication. Keep alpha/release status accurate. No npm publish, remote push, runtime deployment, real account operation or .worktrees migration is authorized merely by a request to edit this package.",
+        "A major installer upgrade requires deliberate opt-in and must not mutate product .work/.worktrees contents. Preserve custom bootstrap instructions; if they conflict with the new protocol, stop before payload writes and explain the conflict. Audit and preserve canonical Git/evidence/secret ownership before any separate data migration."
+      ]
+    },
+    {
+      "title": "Current documentation and sites",
+      "blocks": [
+        "Docs and sites use the current operator/workflow catalogs. Regenerate and build both sites when contracts change. There is no legacy directory or version wrapper. Installer updates replace unchanged owned documentation while preserving custom user content and builds."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,859 @@
+{
+  "schema": "starci/job-matrices@1",
+  "limits": {
+    "rows": 3,
+    "columns": 3,
+    "secondaryDefinitions": 3
+  },
+  "purpose": "Declarative complete-job workflows. Bind actual scope before execution; definitions alone do not run agents or certify results.",
+  "bindingRules": [
+    "Outputs are semantic handoffs produced in the op evidence bundle; the selected job request pins their exact JSON shape and artifact references before execution.",
+    "A reference consumes the exact accepted producer output, never a regenerated approximation.",
+    "Declared writeScopes are ownership keys that must resolve to actual exclusive paths, sessions and resource IDs. Shared physical targets or dependencies require sequential rows.",
+    "A primary may call only its own declared secondary policy; support retains the same matrix cell and never bypasses its parent gate.",
+    "Frontend workflow keeps its separately implemented strict request/response runtime; these matrices are validated templates, not an automatic executor."
+  ],
+  "workflows": [
+    {
+      "id": "source-to-work",
+      "parameters": [
+        "legacyScope",
+        "intent"
+      ],
+      "matrix": [
+        [
+          {
+            "id": "import",
+            "op": "workspace.manage",
+            "inputs": {
+              "scope": {
+                "parameter": "legacyScope"
+              }
+            },
+            "outputs": [
+              "workRef",
+              "inventory",
+              "sourceRefs",
+              "unresolved"
+            ],
+            "criteria": [
+              "source-preserved",
+              "work-valid",
+              "provenance-bound",
+              "unapproved-import-visible"
+            ],
+            "writeScopes": [
+              "canonical-work"
+            ],
+            "operation": "import"
+          }
+        ],
+        [
+          {
+            "id": "business",
+            "op": "business.decide",
+            "inputs": {
+              "work": {
+                "cell": "import",
+                "output": "workRef"
+              },
+              "observations": {
+                "cell": "import",
+                "output": "sourceRefs"
+              },
+              "intent": {
+                "parameter": "intent"
+              }
+            },
+            "outputs": [
+              "businessSpec",
+              "journeys"
+            ],
+            "criteria": [
+              "intent-resolved",
+              "coverage-pass",
+              "work-valid"
+            ],
+            "writeScopes": [
+              "canonical-work/business"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "architecture",
+            "op": "architecture.decide",
+            "inputs": {
+              "business": {
+                "cell": "business",
+                "output": "businessSpec"
+              },
+              "journeys": {
+                "cell": "business",
+                "output": "journeys"
+              },
+              "source": {
+                "cell": "import",
+                "output": "sourceRefs"
+              }
+            },
+            "outputs": [
+              "architectureSpec",
+              "codeImpacts",
+              "serviceCalls"
+            ],
+            "criteria": [
+              "service-routing-resolved",
+              "security-covered",
+              "implementable",
+              "work-valid"
+            ],
+            "writeScopes": [
+              "canonical-work/architecture"
+            ]
+          }
+        ]
+      ],
+      "transition": {
+        "request": "exact-cell-op-mode-inputs-criteria",
+        "response": "matching-request-digest-and-op-mode",
+        "advance": "all-required-criteria-pass-and-output-evidence-verified",
+        "missingOrFailed": "remain-in-cell",
+        "repair": "same-cell-same-acceptance-bounded-retry",
+        "evidence": "actual-artifacts-and-selected-work-completion-profile",
+        "dispatch": "explicit-coordinator-only"
+      }
+    },
+    {
+      "id": "new-work-design",
+      "parameters": [
+        "purpose",
+        "repositories"
+      ],
+      "matrix": [
+        [
+          {
+            "id": "prepare",
+            "op": "workspace.manage",
+            "inputs": {
+              "purpose": {
+                "parameter": "purpose"
+              },
+              "repositories": {
+                "parameter": "repositories"
+              }
+            },
+            "outputs": [
+              "workRef",
+              "repositoryRefs"
+            ],
+            "criteria": [
+              "purpose-scoped",
+              "repository-binding-verified",
+              "work-valid"
+            ],
+            "writeScopes": [
+              "canonical-work"
+            ],
+            "operation": "prepare"
+          }
+        ],
+        [
+          {
+            "id": "business",
+            "op": "business.decide",
+            "inputs": {
+              "work": {
+                "cell": "prepare",
+                "output": "workRef"
+              },
+              "repositories": {
+                "cell": "prepare",
+                "output": "repositoryRefs"
+              },
+              "purpose": {
+                "parameter": "purpose"
+              }
+            },
+            "outputs": [
+              "businessSpec",
+              "journeys"
+            ],
+            "criteria": [
+              "intent-resolved",
+              "coverage-pass",
+              "work-valid"
+            ],
+            "writeScopes": [
+              "canonical-work/business"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "architecture",
+            "op": "architecture.decide",
+            "inputs": {
+              "business": {
+                "cell": "business",
+                "output": "businessSpec"
+              },
+              "journeys": {
+                "cell": "business",
+                "output": "journeys"
+              }
+            },
+            "outputs": [
+              "architectureSpec",
+              "codeImpacts",
+              "serviceCalls"
+            ],
+            "criteria": [
+              "service-routing-resolved",
+              "security-covered",
+              "implementable",
+              "work-valid"
+            ],
+            "writeScopes": [
+              "canonical-work/architecture"
+            ]
+          }
+        ]
+      ],
+      "transition": {
+        "request": "exact-cell-op-mode-inputs-criteria",
+        "response": "matching-request-digest-and-op-mode",
+        "advance": "all-required-criteria-pass-and-output-evidence-verified",
+        "missingOrFailed": "remain-in-cell",
+        "repair": "same-cell-same-acceptance-bounded-retry",
+        "evidence": "actual-artifacts-and-selected-work-completion-profile",
+        "dispatch": "explicit-coordinator-only"
+      }
+    },
+    {
+      "id": "backend-delivery",
+      "parameters": [
+        "acceptedBusiness",
+        "sourceScope",
+        "apiCases"
+      ],
+      "matrix": [
+        [
+          {
+            "id": "architecture",
+            "op": "architecture.decide",
+            "inputs": {
+              "business": {
+                "parameter": "acceptedBusiness"
+              },
+              "scope": {
+                "parameter": "sourceScope"
+              }
+            },
+            "outputs": [
+              "architectureSpec",
+              "codeImpacts"
+            ],
+            "criteria": [
+              "service-routing-resolved",
+              "security-covered",
+              "implementable"
+            ],
+            "writeScopes": [
+              "work/architecture"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "backend",
+            "op": "backend.implement",
+            "inputs": {
+              "architecture": {
+                "cell": "architecture",
+                "output": "architectureSpec"
+              },
+              "scope": {
+                "cell": "architecture",
+                "output": "codeImpacts"
+              }
+            },
+            "outputs": [
+              "codeRefs",
+              "runtime",
+              "qualityEvidence"
+            ],
+            "criteria": [
+              "lint-pass",
+              "typecheck-pass",
+              "tests-coverage-pass",
+              "build-pass",
+              "sonar-gate-pass",
+              "commit-verified"
+            ],
+            "writeScopes": [
+              "backend-source",
+              "work/backend"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "acceptance",
+            "op": "review.verify",
+            "operation": "api",
+            "inputs": {
+              "code": {
+                "cell": "backend",
+                "output": "codeRefs"
+              },
+              "runtime": {
+                "cell": "backend",
+                "output": "runtime"
+              },
+              "cases": {
+                "parameter": "apiCases"
+              }
+            },
+            "outputs": [
+              "apiEvidence",
+              "findings"
+            ],
+            "criteria": [
+              "response-contract-pass",
+              "authorization-pass",
+              "readback-pass",
+              "owned-cleanup-pass"
+            ],
+            "writeScopes": [
+              "work/api-evidence"
+            ]
+          }
+        ]
+      ],
+      "transition": {
+        "request": "exact-cell-op-mode-inputs-criteria",
+        "response": "matching-request-digest-and-op-mode",
+        "advance": "all-required-criteria-pass-and-output-evidence-verified",
+        "missingOrFailed": "remain-in-cell",
+        "repair": "same-cell-same-acceptance-bounded-retry",
+        "evidence": "actual-artifacts-and-selected-work-completion-profile",
+        "dispatch": "explicit-coordinator-only"
+      }
+    },
+    {
+      "id": "publish-deploy",
+      "parameters": [
+        "implementationEvidence",
+        "publication",
+        "deployment"
+      ],
+      "matrix": [
+        [
+          {
+            "id": "review",
+            "op": "review.verify",
+            "operation": "delivery",
+            "inputs": {
+              "evidence": {
+                "parameter": "implementationEvidence"
+              }
+            },
+            "outputs": [
+              "verifiedDelivery"
+            ],
+            "criteria": [
+              "quality-evidence-current",
+              "required-gates-pass"
+            ],
+            "writeScopes": [
+              "work/review"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "publish",
+            "op": "release.deliver",
+            "operation": "publish",
+            "inputs": {
+              "delivery": {
+                "cell": "review",
+                "output": "verifiedDelivery"
+              },
+              "target": {
+                "parameter": "publication"
+              }
+            },
+            "outputs": [
+              "publishedRef",
+              "codeRefs"
+            ],
+            "criteria": [
+              "selected-ref-readback-pass",
+              "verified-commit-match"
+            ],
+            "writeScopes": [
+              "selected-remote-ref"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "deploy",
+            "op": "release.deliver",
+            "operation": "deploy",
+            "inputs": {
+              "published": {
+                "cell": "publish",
+                "output": "publishedRef"
+              },
+              "code": {
+                "cell": "publish",
+                "output": "codeRefs"
+              },
+              "target": {
+                "parameter": "deployment"
+              }
+            },
+            "outputs": [
+              "deploymentEvidence",
+              "runtime"
+            ],
+            "criteria": [
+              "immutable-artifact-match",
+              "steady-state-pass"
+            ],
+            "writeScopes": [
+              "selected-deployment"
+            ]
+          }
+        ]
+      ],
+      "transition": {
+        "request": "exact-cell-op-mode-inputs-criteria",
+        "response": "matching-request-digest-and-op-mode",
+        "advance": "all-required-criteria-pass-and-output-evidence-verified",
+        "missingOrFailed": "remain-in-cell",
+        "repair": "same-cell-same-acceptance-bounded-retry",
+        "evidence": "actual-artifacts-and-selected-work-completion-profile",
+        "dispatch": "explicit-coordinator-only"
+      }
+    },
+    {
+      "id": "three-independent-deliveries",
+      "parameters": [
+        "aAcceptedScope",
+        "bAcceptedScope",
+        "cAcceptedScope"
+      ],
+      "matrix": [
+        [
+          {
+            "id": "aBackend",
+            "op": "backend.implement",
+            "inputs": {
+              "scope": {
+                "parameter": "aAcceptedScope"
+              }
+            },
+            "outputs": [
+              "codeRefs",
+              "apiContract",
+              "runtime",
+              "qualityEvidence"
+            ],
+            "criteria": [
+              "lint-pass",
+              "typecheck-pass",
+              "tests-coverage-pass",
+              "build-pass",
+              "sonar-gate-pass",
+              "commit-verified"
+            ],
+            "writeScopes": [
+              "a/backend"
+            ]
+          },
+          {
+            "id": "bBackend",
+            "op": "backend.implement",
+            "inputs": {
+              "scope": {
+                "parameter": "bAcceptedScope"
+              }
+            },
+            "outputs": [
+              "codeRefs",
+              "apiContract",
+              "runtime",
+              "qualityEvidence"
+            ],
+            "criteria": [
+              "lint-pass",
+              "typecheck-pass",
+              "tests-coverage-pass",
+              "build-pass",
+              "sonar-gate-pass",
+              "commit-verified"
+            ],
+            "writeScopes": [
+              "b/backend"
+            ]
+          },
+          {
+            "id": "cBackend",
+            "op": "backend.implement",
+            "inputs": {
+              "scope": {
+                "parameter": "cAcceptedScope"
+              }
+            },
+            "outputs": [
+              "codeRefs",
+              "apiContract",
+              "runtime",
+              "qualityEvidence"
+            ],
+            "criteria": [
+              "lint-pass",
+              "typecheck-pass",
+              "tests-coverage-pass",
+              "build-pass",
+              "sonar-gate-pass",
+              "commit-verified"
+            ],
+            "writeScopes": [
+              "c/backend"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "aFrontend",
+            "op": "interface.implement",
+            "inputs": {
+              "scope": {
+                "parameter": "aAcceptedScope"
+              },
+              "backend": {
+                "cell": "aBackend",
+                "output": "apiContract"
+              },
+              "code": {
+                "cell": "aBackend",
+                "output": "codeRefs"
+              },
+              "runtime": {
+                "cell": "aBackend",
+                "output": "runtime"
+              }
+            },
+            "outputs": [
+              "flows",
+              "codeRefs",
+              "runtime",
+              "assets"
+            ],
+            "criteria": [
+              "lint-pass",
+              "typecheck-pass",
+              "tests-coverage-pass",
+              "build-pass",
+              "sonar-gate-pass",
+              "commit-verified",
+              "flows-ready",
+              "assets-accounted-for"
+            ],
+            "writeScopes": [
+              "a/frontend"
+            ]
+          },
+          {
+            "id": "bFrontend",
+            "op": "interface.implement",
+            "inputs": {
+              "scope": {
+                "parameter": "bAcceptedScope"
+              },
+              "backend": {
+                "cell": "bBackend",
+                "output": "apiContract"
+              },
+              "code": {
+                "cell": "bBackend",
+                "output": "codeRefs"
+              },
+              "runtime": {
+                "cell": "bBackend",
+                "output": "runtime"
+              }
+            },
+            "outputs": [
+              "flows",
+              "codeRefs",
+              "runtime",
+              "assets"
+            ],
+            "criteria": [
+              "lint-pass",
+              "typecheck-pass",
+              "tests-coverage-pass",
+              "build-pass",
+              "sonar-gate-pass",
+              "commit-verified",
+              "flows-ready",
+              "assets-accounted-for"
+            ],
+            "writeScopes": [
+              "b/frontend"
+            ]
+          },
+          {
+            "id": "cFrontend",
+            "op": "interface.implement",
+            "inputs": {
+              "scope": {
+                "parameter": "cAcceptedScope"
+              },
+              "backend": {
+                "cell": "cBackend",
+                "output": "apiContract"
+              },
+              "code": {
+                "cell": "cBackend",
+                "output": "codeRefs"
+              },
+              "runtime": {
+                "cell": "cBackend",
+                "output": "runtime"
+              }
+            },
+            "outputs": [
+              "flows",
+              "codeRefs",
+              "runtime",
+              "assets"
+            ],
+            "criteria": [
+              "lint-pass",
+              "typecheck-pass",
+              "tests-coverage-pass",
+              "build-pass",
+              "sonar-gate-pass",
+              "commit-verified",
+              "flows-ready",
+              "assets-accounted-for"
+            ],
+            "writeScopes": [
+              "c/frontend"
+            ]
+          }
+        ],
+        [
+          {
+            "id": "aUat",
+            "op": "uat.verify",
+            "inputs": {
+              "flows": {
+                "cell": "aFrontend",
+                "output": "flows"
+              },
+              "code": {
+                "cell": "aFrontend",
+                "output": "codeRefs"
+              },
+              "runtime": {
+                "cell": "aFrontend",
+                "output": "runtime"
+              },
+              "assets": {
+                "cell": "aFrontend",
+                "output": "assets"
+              }
+            },
+            "outputs": [
+              "results",
+              "cleanup"
+            ],
+            "criteria": [
+              "all-flow-steps-pass",
+              "ux-yes-no-match",
+              "real-screenshots-video",
+              "owned-cleanup-pass"
+            ],
+            "writeScopes": [
+              "a/uat-session",
+              "a/fixture-namespace"
+            ]
+          },
+          {
+            "id": "bUat",
+            "op": "uat.verify",
+            "inputs": {
+              "flows": {
+                "cell": "bFrontend",
+                "output": "flows"
+              },
+              "code": {
+                "cell": "bFrontend",
+                "output": "codeRefs"
+              },
+              "runtime": {
+                "cell": "bFrontend",
+                "output": "runtime"
+              },
+              "assets": {
+                "cell": "bFrontend",
+                "output": "assets"
+              }
+            },
+            "outputs": [
+              "results",
+              "cleanup"
+            ],
+            "criteria": [
+              "all-flow-steps-pass",
+              "ux-yes-no-match",
+              "real-screenshots-video",
+              "owned-cleanup-pass"
+            ],
+            "writeScopes": [
+              "b/uat-session",
+              "b/fixture-namespace"
+            ]
+          },
+          {
+            "id": "cUat",
+            "op": "uat.verify",
+            "inputs": {
+              "flows": {
+                "cell": "cFrontend",
+                "output": "flows"
+              },
+              "code": {
+                "cell": "cFrontend",
+                "output": "codeRefs"
+              },
+              "runtime": {
+                "cell": "cFrontend",
+                "output": "runtime"
+              },
+              "assets": {
+                "cell": "cFrontend",
+                "output": "assets"
+              }
+            },
+            "outputs": [
+              "results",
+              "cleanup"
+            ],
+            "criteria": [
+              "all-flow-steps-pass",
+              "ux-yes-no-match",
+              "real-screenshots-video",
+              "owned-cleanup-pass"
+            ],
+            "writeScopes": [
+              "c/uat-session",
+              "c/fixture-namespace"
+            ]
+          }
+        ]
+      ],
+      "transition": {
+        "request": "exact-cell-op-mode-inputs-criteria",
+        "response": "matching-request-digest-and-op-mode",
+        "advance": "all-required-criteria-pass-and-output-evidence-verified",
+        "missingOrFailed": "remain-in-cell",
+        "repair": "same-cell-same-acceptance-bounded-retry",
+        "evidence": "actual-artifacts-and-selected-work-completion-profile",
+        "dispatch": "explicit-coordinator-only"
+      }
+    },
+    {
+      "id": "direct-task",
+      "parameters": [
+        "request"
+      ],
+      "matrix": [
+        [
+          {
+            "id": "execute",
+            "op": "task.execute",
+            "inputs": {
+              "request": {
+                "parameter": "request"
+              }
+            },
+            "outputs": [
+              "result",
+              "evidence",
+              "effects",
+              "remaining"
+            ],
+            "criteria": [
+              "request-scope-resolved",
+              "requested-outcome-verified",
+              "effect-readback-complete"
+            ],
+            "writeScopes": [
+              "request-bound-scope"
+            ]
+          }
+        ]
+      ],
+      "transition": {
+        "request": "exact-cell-op-mode-inputs-criteria",
+        "response": "matching-request-digest-and-op-mode",
+        "advance": "all-required-criteria-pass-and-output-evidence-verified",
+        "missingOrFailed": "remain-in-cell",
+        "repair": "same-cell-same-acceptance-bounded-retry",
+        "evidence": "actual-artifacts-and-selected-work-completion-profile",
+        "dispatch": "explicit-coordinator-only"
+      }
+    },
+    {
+      "id": "workspace-bootstrap",
+      "parameters": [
+        "request"
+      ],
+      "matrix": [
+        [
+          {
+            "id": "prepare",
+            "op": "workspace.manage",
+            "operation": "prepare",
+            "inputs": {
+              "request": {
+                "parameter": "request"
+              }
+            },
+            "outputs": [
+              "workRef",
+              "repositoryBindings",
+              "scopeRef"
+            ],
+            "criteria": [
+              "work-valid",
+              "original-scope-preserved",
+              "bindings-verified"
+            ],
+            "writeScopes": [
+              "selected-workspace-metadata"
+            ]
+          }
+        ]
+      ],
+      "transition": {
+        "request": "exact-cell-op-mode-inputs-criteria",
+        "response": "matching-request-digest-and-op-mode",
+        "advance": "all-required-criteria-pass-and-output-evidence-verified",
+        "missingOrFailed": "remain-in-cell",
+        "repair": "same-cell-same-acceptance-bounded-retry",
+        "evidence": "actual-artifacts-and-selected-work-completion-profile",
+        "dispatch": "explicit-coordinator-only"
+      }
+    }
+  ]
+}

@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "id": "interface.audit",
-  "purpose": "Observe frozen primary interface surfaces on the attested route, capture and measure every selected matrix entry, and judge each claimed rule against its bound authority.",
-  "scope": "Read-only interface audit. It changes no source, runtime, account, data, design direction or knowledge rule. It may create browser walks and durable audit artifacts only inside the work record.",
-  "modules": {"request":"request.json","response":"response.json","validate":"validate.json","step":"step.json","criteria":"criteria.json"}
-}

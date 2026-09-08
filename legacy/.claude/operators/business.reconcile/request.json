@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "business.reconcile request",
-  "$ref": "works:request",
-  "properties": { "operation": { "const": "business.reconcile" }, "inputs": { "properties": { "prompts": { "minItems": 1 }, "files": { "minItems": 2 } } } },
-  "description": "State feature id, source role (be or fe) and target state (implemented or in-progress) in inputs.prompts. Bind exactly one role-appropriate delivered source receipt and the published business authority/matrix in inputs.files. Quality, UAT or API receipts may be additional evidence only."
-}

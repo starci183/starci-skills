@@ -1,7 +1,0 @@
-{
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "title":"api.verify request",
-  "$ref":"works:request",
-  "properties":{"operation":{"const":"api.verify"},"expected":{"minItems":1},"inputs":{"properties":{"files":{"minItems":1}}}},
-  "description":"Bind the attested runtime entry, frozen backend head, repository-owned suite command, authorized environment, flow namespace, optional account and seed receipts, and append-only run identity as declared inputs. The request must never contain a credential value or authorize source edits."
-}

@@ -1,7 +1,0 @@
-{
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "title":"migration.release request",
-  "$ref":"works:request",
-  "properties":{"operation":{"const":"migration.release"},"expected":{"minItems":1},"inputs":{"properties":{"files":{"minItems":3}}}},
-  "description":"Bind the route, backend migration application, passing quality verification, non-production target, release authority, immutable migration plan digest, source-owned runner and journal observation."
-}

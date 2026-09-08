@@ -1,0 +1,1 @@
+{"name":"@starci/docs-site","version":"3.0.0-alpha.2","private":true,"type":"module","scripts":{"build":"node ../../scripts/build-docs.mjs && node build.mjs"}}

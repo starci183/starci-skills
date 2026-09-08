@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "data.plan request",
-  "$ref": "works:request",
-  "properties": { "operation": { "const": "data.plan" }, "inputs": { "properties": { "prompts": { "minItems": 1 } } } },
-  "description": "State the mission goal, feature and environment in inputs.prompts. Bind an optional UAT plan and surface map in inputs.files, plus fixture templates or prior flow folders in context.files. Never include credentials."
-}

@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "workspace.bind request",
-  "$ref": "works:request",
-  "properties": { "operation": { "const": "workspace.bind" }, "inputs": { "properties": { "prompts": { "minItems": 1 }, "files": { "minItems": 2 } } } },
-  "description": "State project, role, routed or session checkout selection, declared write roots and shared-install policy in inputs.prompts. Bind the exact portable route declaration and hydrated projection as input files. A request hint is never route authority."
-}

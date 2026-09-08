@@ -1,0 +1,774 @@
+{
+  "id": "workspace.manage",
+  "goal": {
+    "en": "Create or reconstruct one canonical .work workspace from a new purpose or selected existing source and old worktrees, with verified bindings, preserved provenance and validated scope."
+  },
+  "nodeKinds": [
+    "operations"
+  ],
+  "completionProfile": "operations",
+  "sideEffects": [
+    "Only the selected operation contract permits effects; no union of mode permissions."
+  ],
+  "graphPolicy": {
+    "mode": "read-only",
+    "location": ".work node dependsOn/refs and resource files",
+    "prerequisiteState": "done",
+    "dispatch": "never"
+  },
+  "reads": [
+    {
+      "id": "target",
+      "path": "N/node.yaml",
+      "purpose": {
+        "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
+      }
+    },
+    {
+      "id": "selection",
+      "path": "selected request operation + exact mode contract in this operator JSON",
+      "purpose": {
+        "en": "Select exactly one named operation, its target, scope and criteria before any effect. No mode default or automatic chain."
+      }
+    },
+    {
+      "id": "matrix",
+      "path": "selected complete-job matrix request + workflows/jobs.json",
+      "purpose": {
+        "en": "Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable input bindings, requested output JSON shapes and required criteria. Standalone execution needs no fabricated matrix request. A template is not authority for extra effects."
+      }
+    },
+    {
+      "id": "profile",
+      "path": "profiles/registry.json + selected runtime execution profile + actual host tools/model",
+      "purpose": {
+        "en": "Select the actual host runtime codex or claude and this operator role from the V2-derived active profiles. Use current host model configuration; historical model names are not availability proof. Capabilities are the intersection of actual tools, selected profile policy, op permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles or extra-agent permissions."
+      }
+    }
+  ],
+  "writes": [
+    {
+      "id": "node",
+      "path": "N/node.yaml",
+      "fields": [
+        "completion.inputDigest",
+        "completion.evidence"
+      ],
+      "content": {
+        "en": "Bind only the selected mode completion profile and its actual evidence."
+      }
+    },
+    {
+      "id": "evidence",
+      "path": "E/manifest.yaml + E/result.json",
+      "fields": [
+        "id",
+        "nodeId",
+        "inputDigest",
+        "outcome",
+        "assertions",
+        "assets",
+        "provenance",
+        "codeRefs",
+        "extensions"
+      ],
+      "content": {
+        "en": "Record operation, exact scope, criteria, output artifact references, observed effects and unresolved findings."
+      }
+    },
+    {
+      "id": "matrixHandoff",
+      "path": "E/job-result.json",
+      "fields": [
+        "requestId",
+        "requestDigest",
+        "op",
+        "operation when selected",
+        "status",
+        "criteria",
+        "outputs",
+        "artifacts"
+      ],
+      "content": {
+        "en": "Only for a selected job matrix, return the exact request-bound result. Populate every declared cell output with actual canonical Work/source/runtime references or produced JSON artifacts from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream expectations. Missing required output/evidence remains blocked or failed and cannot advance. The selected request freezes output field schemas before execution."
+      }
+    }
+  ],
+  "steps": [
+    {
+      "reads": [
+        "target",
+        "selection",
+        "profile"
+      ],
+      "writes": [],
+      "action": {
+        "en": "Select prepare for a new or explicitly revised Work purpose, or import for an existing source/worktree pilot. Resolve one canonical destination, then load exactly that operation contract. Repository binding, inventory, preservation and validation are internal steps, not separate operators. Mode permissions never combine. Resolve the execution profile and actual tool availability before selecting instruments; this does not switch the model/runtime or spawn workers."
+      }
+    },
+    {
+      "reads": [
+        "target",
+        "selection",
+        "matrix"
+      ],
+      "writes": [
+        "node",
+        "evidence",
+        "matrixHandoff"
+      ],
+      "action": {
+        "en": "Complete the selected Work creation/reconstruction job and return canonical Work references, actual repository/source bindings, evidence and unresolved intent. Import never approves inferred business or executes product work. No deletion, retirement or unrelated docs/site removal is implied."
+      }
+    }
+  ],
+  "proofs": [
+    {
+      "id": "mode-result",
+      "requirement": {
+        "en": "Exactly the selected mode contract and all requested criteria pass with real evidence before delivery."
+      }
+    }
+  ],
+  "blockers": [
+    {
+      "code": "OPERATION_REQUIRED",
+      "condition": {
+        "en": "Missing, unknown or multiple operations; select a single mode under existing task authority."
+      }
+    }
+  ],
+  "placeholders": {
+    "business": "Selected business slug / slug nghiệp vụ đã chọn",
+    "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
+    "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
+    "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
+    "environment": "Resolved environment resource slug / slug environment đã resolve",
+    "identity": "Selected actor resource slug / slug actor đã chọn",
+    "fixture": "Selected fixture resource slug / slug fixture đã chọn",
+    "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
+    "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
+    "piece": "Stable selected piece slug / slug piece đã chọn",
+    "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
+    "screen": "Selected surface/state slug / slug screen-state đã chọn"
+  },
+  "modePolicy": {
+    "selection": "required-exactly-one",
+    "implicitChain": false,
+    "permissionUnion": false,
+    "completion": "selected-mode-profile"
+  },
+  "executionModes": {
+    "prepare": {
+      "id": "workspace.manage",
+      "goal": {
+        "en": "Create or revise one canonical .work purpose and verified repository bindings, ready for business specification."
+      },
+      "nodeKinds": [
+        "business"
+      ],
+      "completionProfile": "business",
+      "sideEffects": [
+        "native current-task goal creation/reuse only when explicitly requested and supported"
+      ],
+      "graphPolicy": {
+        "mode": "selected-scope-only",
+        "location": ".work node dependsOn/refs and resource files",
+        "prerequisiteState": "done",
+        "dispatch": "never"
+      },
+      "reads": [
+        {
+          "id": "intent",
+          "path": "current user request + existing .work/workspace.yaml",
+          "purpose": {
+            "en": "Read the actual requested outcome, agreed scope and existing workspace identity; do not turn examples or future ideas into obligations."
+          }
+        },
+        {
+          "id": "target",
+          "path": "N/node.yaml",
+          "purpose": {
+            "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
+          }
+        },
+        {
+          "id": "declaration",
+          "path": "current explicit repository scope + .work/_resources/repositories/<resource>/resource.yaml",
+          "purpose": {
+            "en": "Read explicit task location/repository selection and existing portable identity. A directory name, cwd or similar remote is only a hint when identity is unresolved."
+          }
+        },
+        {
+          "id": "matrix",
+          "path": "selected complete-job matrix request + workflows/jobs.json",
+          "purpose": {
+            "en": "Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable input bindings, requested output JSON shapes and required criteria. Standalone execution needs no fabricated matrix request. A template is not authority for extra effects."
+          }
+        },
+        {
+          "id": "profile",
+          "path": "profiles/registry.json + selected runtime execution profile + actual host tools/model",
+          "purpose": {
+            "en": "Select the actual host runtime codex or claude and this operator role from the V2-derived active profiles. Use current host model configuration; historical model names are not availability proof. Capabilities are the intersection of actual tools, selected profile policy, op permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles or extra-agent permissions."
+          }
+        }
+      ],
+      "writes": [
+        {
+          "id": "workspace",
+          "path": ".work/workspace.yaml",
+          "fields": [
+            "schema",
+            "id",
+            "extensions"
+          ],
+          "content": {
+            "en": "Initialize only an explicitly new canonical workspace; reuse an existing workspace unchanged. Never invent repository/environment resources merely to satisfy setup."
+          }
+        },
+        {
+          "id": "node",
+          "path": ".work/<business>/node.yaml + .work/<business>/setup/node.yaml + selected child directories/node.yaml",
+          "fields": [
+            "id",
+            "kind",
+            "required",
+            "dependsOn",
+            "refs",
+            "assertions",
+            "body: Purpose / Scope / Done when / Decisions / Unknowns",
+            "extensions.work3.nativeGoal: actual returned current-task goal reference only"
+          ],
+          "content": {
+            "en": "Write the parent purpose with no state. The one setup leaf .work/<business>/setup/node.yaml is N for this op, kind business, with only scope-review assertions. All planned business/architecture/code/UAT leaves remain todo, or explicit blocked/na with real reasons. Scope decisions distinguish implement, defer and not applicable. Store requirement IDs once. Repository binding is an internal part of this complete preparation job, not a separate prerequisite node. Declare only genuinely selected downstream business targets with expected assertions, todo; do not invent accepted business intent. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
+          }
+        },
+        {
+          "id": "evidence",
+          "path": "E/manifest.yaml + E/scope-review.md + E/repository-observation.json",
+          "fields": [
+            "id",
+            "nodeId",
+            "inputDigest",
+            "outcome",
+            "assertions",
+            "assets",
+            "provenance",
+            "codeRefs",
+            "extensions"
+          ],
+          "content": {
+            "en": "Retain source-intent citations and actual scope/coverage review under the setup leaf only. Set setup done only after real review evidence and validation; initial scaffolding has no completion. No code/UAT pass."
+          }
+        },
+        {
+          "id": "resource",
+          "path": ".work/_resources/repositories/<resource>/resource.yaml",
+          "fields": [
+            "id",
+            "kind",
+            "owner",
+            "revision",
+            "details.identity",
+            "details.remote",
+            "details.defaultRef",
+            "details.sourceRoots",
+            "details.workRootRef"
+          ],
+          "content": {
+            "en": "Create/repair only the explicitly selected repository declaration from verified Git metadata; machine-specific checkout paths stay local or observations, not portable identity."
+          }
+        },
+        {
+          "id": "matrixHandoff",
+          "path": "E/job-result.json",
+          "fields": [
+            "requestId",
+            "requestDigest",
+            "op",
+            "operation when selected",
+            "status",
+            "criteria",
+            "outputs",
+            "artifacts"
+          ],
+          "content": {
+            "en": "Only for a selected job matrix, return the exact request-bound result. Populate every declared cell output with actual canonical Work/source/runtime references or produced JSON artifacts from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream expectations. Missing required output/evidence remains blocked or failed and cannot advance. The selected request freezes output field schemas before execution."
+          }
+        }
+      ],
+      "steps": [
+        {
+          "reads": [
+            "intent",
+            "target",
+            "profile"
+          ],
+          "writes": [
+            "workspace",
+            "node"
+          ],
+          "action": {
+            "en": "Resolve the existing canonical workspace, or initialize only the explicitly new workspace identity; establish one purpose, actors/outcomes stated so far, inclusions and exclusions. Mark unspecified behavior unknown. Resolve the execution profile and actual tool availability before selecting instruments; this does not switch the model/runtime or spawn workers."
+          }
+        },
+        {
+          "reads": [
+            "target",
+            "declaration"
+          ],
+          "writes": [
+            "resource",
+            "evidence"
+          ],
+          "action": {
+            "en": "Inspect exact Git root/common-dir, remote identity, full HEAD, worktree registration, links and dirty paths with read-only commands. Bind only selected verified repository resources to the existing canonical .work root. Do not reset, clean, stash, switch or create another canonical tree. Retain sanitized repository-observation.json; source-free setup explicitly records no repository yet."
+          }
+        },
+        {
+          "reads": [
+            "intent",
+            "target"
+          ],
+          "writes": [
+            "node"
+          ],
+          "action": {
+            "en": "Map the purpose into the smallest useful completion tree. A task may cover three UAT flows, but each flow has separate UI and UX assertion leaves; do not pre-expand irrelevant lifecycle branches."
+          }
+        },
+        {
+          "reads": [
+            "intent",
+            "target"
+          ],
+          "writes": [
+            "node"
+          ],
+          "action": {
+            "en": "Record applicability and dependencies by stable IDs. A defer decision needs rationale/owner/revisit trigger and stays visible; it is not done or na. Reuse explicit approval, asking only unresolved material scope choices."
+          }
+        },
+        {
+          "reads": [
+            "intent",
+            "target"
+          ],
+          "writes": [
+            "node"
+          ],
+          "action": {
+            "en": "When the user explicitly requests a native goal for this current chat/task and an actual supported goal tool exists, inspect/create/reuse that goal according to the tool contract; retain only its returned reference in extensions.work3.nativeGoal. Otherwise keep purpose in .work and the current chat. Never invent a platform goal ID or create a separate task/agent goal automatically."
+          }
+        },
+        {
+          "reads": [
+            "target",
+            "matrix"
+          ],
+          "writes": [
+            "evidence",
+            "matrixHandoff"
+          ],
+          "action": {
+            "en": "Review tree coverage against the original purpose, validate references and report selected eligible ops as suggestions only. Stop without dispatch or cooking child pieces. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+          }
+        }
+      ],
+      "proofs": [
+        {
+          "id": "binding",
+          "requirement": {
+            "en": "Run workspace validation; every cited ID/path exists or is explicitly proposed, required assertions are covered, input bindings are current, and an honest not-run/fail cannot earn done."
+          }
+        },
+        {
+          "id": "scope",
+          "requirement": {
+            "en": "Every declared outcome is mapped to a required leaf, explicit deferred decision or justified non-applicability; setup completion never rolls implementation forward."
+          }
+        },
+        {
+          "id": "identity",
+          "requirement": {
+            "en": "Selected repositories have verified identities and one canonical Work root; an explicitly source-free purpose may have no repository resource."
+          }
+        }
+      ],
+      "blockers": [
+        {
+          "code": "PURPOSE_AMBIGUOUS",
+          "condition": {
+            "en": "Multiple materially different purposes or repository identities remain unresolved."
+          }
+        },
+        {
+          "code": "DECLARED_DEPENDENCY_UNMET",
+          "condition": {
+            "en": "A declared prerequisite is not effectively done, or a required declared input/scope is missing. Report node/resource IDs and propose a separately selected graph update when needed; never run predecessors or weaken dependsOn/refs/required to proceed."
+          }
+        }
+      ],
+      "placeholders": {
+        "business": "Selected business slug / slug nghiệp vụ đã chọn",
+        "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
+        "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
+        "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
+        "environment": "Resolved environment resource slug / slug environment đã resolve",
+        "identity": "Selected actor resource slug / slug actor đã chọn",
+        "fixture": "Selected fixture resource slug / slug fixture đã chọn",
+        "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
+        "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
+        "piece": "Stable selected piece slug / slug piece đã chọn",
+        "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
+        "screen": "Selected surface/state slug / slug screen-state đã chọn"
+      }
+    },
+    "import": {
+      "id": "workspace.manage",
+      "goal": {
+        "en": "Preserve and import one selected business/pilot from inspected source and existing artifacts into canonical .work, without claiming imported implementation or UAT is complete."
+      },
+      "nodeKinds": [
+        "operations"
+      ],
+      "completionProfile": "operations",
+      "sideEffects": [
+        "selected canonical workspace/resource/scope writes",
+        "scoped documentation commits only when authorized",
+        "optional explicitly authorized exact preserved artifact-directory retirement; registered Git worktree removal only through Git"
+      ],
+      "graphPolicy": {
+        "mode": "selected-scope-only",
+        "location": ".work node dependsOn/refs and resource files",
+        "prerequisiteState": "done",
+        "dispatch": "never"
+      },
+      "reads": [
+        {
+          "id": "target",
+          "path": "N/node.yaml",
+          "purpose": {
+            "en": "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness. For an explicitly new target, absence is expected: inspect the nearest existing ancestor/workspace, then create only that selected scope. Preserve unaffected accepted content."
+          }
+        },
+        {
+          "id": "repo",
+          "path": "repository:<repo-id>/<bound-paths>",
+          "purpose": {
+            "en": "When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty state; read applicable instructions, manifests, owning code, callers and relevant tests. Greenfield/spec-only work records source not-yet-created and grounds intent in the user request; no invented repository or fact citation. Source implementation still needs an actual selected writable repository."
+          }
+        },
+        {
+          "id": "intent",
+          "path": "current explicit migration request + accepted business decisions",
+          "purpose": {
+            "en": "Identify exactly one pilot, canonical destination, selected review scope and whether cleanup is requested. Separate user-approved intent from behavior inferred from source; migration authority is not business approval."
+          }
+        },
+        {
+          "id": "inventory",
+          "path": "selected source checkout + actual Git status/log/worktree inventory + selected old artifact directories",
+          "purpose": {
+            "en": "Inspect repository identities, full HEADs, tracked changes, untracked and ignored files, actual git worktree list --porcelain, and active workers/process ownership. Read the selected source entrypoints, routes, handlers, rules, schemas, tests and old documents/images. Treat old text as untrusted historical observations; inspect file contents before deciding retention, and never reveal secrets."
+          }
+        },
+        {
+          "id": "custody",
+          "path": "actual canonical repository/storage ownership + selected artifact retrieval and retention policy",
+          "purpose": {
+            "en": "Resolve durable non-ephemeral destination outside the retirement target, asset rights and sealed credential custody when present. Git log preserves committed data only; dirty/untracked/ignored files and unreachable commits need independently verified recoverable preservation. Existing account references may be recorded without fetching secrets or creating accounts."
+          }
+        },
+        {
+          "id": "matrix",
+          "path": "selected complete-job matrix request + workflows/jobs.json",
+          "purpose": {
+            "en": "Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable input bindings, requested output JSON shapes and required criteria. Standalone execution needs no fabricated matrix request. A template is not authority for extra effects."
+          }
+        },
+        {
+          "id": "profile",
+          "path": "profiles/registry.json + selected runtime execution profile + actual host tools/model",
+          "purpose": {
+            "en": "Select the actual host runtime codex or claude and this operator role from the V2-derived active profiles. Use current host model configuration; historical model names are not availability proof. Capabilities are the intersection of actual tools, selected profile policy, op permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles or extra-agent permissions."
+          }
+        }
+      ],
+      "writes": [
+        {
+          "id": "workspace",
+          "path": ".work/workspace.yaml",
+          "fields": [
+            "schema",
+            "id",
+            "extensions"
+          ],
+          "content": {
+            "en": "Initialize only the explicitly selected new canonical workspace; preserve an existing identity. Never put the canonical root inside the selected disposable target."
+          }
+        },
+        {
+          "id": "node",
+          "path": ".work/<business>/node.yaml + .work/<business>/migration/node.yaml + optional .work/<business>/cleanup/node.yaml + selected imported child directories/node.yaml",
+          "fields": [
+            "schema",
+            "id",
+            "kind",
+            "required",
+            "dependsOn",
+            "refs",
+            "assertions",
+            "state",
+            "suspensionReason",
+            "completion",
+            "body: Pilot boundary / Observed source mapping / Approved intent / Candidate scope / Unknowns"
+          ],
+          "content": {
+            "en": "N is the operations migration-review leaf, with inventory/preservation/import assertions; the business parent has no state/completion. Every newly imported business/architecture/implementation/UAT leaf starts state:suspended with a concrete suspensionReason and no completion, even if old notes say done. Assign stable IDs, observed source citations versus candidate requirements, and only approved graph scope. Do not overwrite existing accepted nodes. For an explicitly selected preset, declare its business-review and workflow-review targets before consumers run; their expected assertions remain bounded to intent review and imported graph integrity, never product completion. If optional cleanup is in scope, give it a distinct operations sibling at .work/<business>/cleanup/node.yaml, never a child of N, with exact deletion assertions; N must remain a leaf; unresolved cleanup remains blocked and does not turn an incomplete parent done. Graph edits apply only to the explicitly selected approved scope: declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new unrelated scope; finish all graph/spec changes before review proof."
+          }
+        },
+        {
+          "id": "resources",
+          "path": ".work/_resources/repositories/<resource>/resource.yaml + .work/_resources/imports/<resource>/resource.yaml + .work/_resources/imports/<resource>/assets/<asset>",
+          "fields": [
+            "schema",
+            "id",
+            "kind",
+            "owner",
+            "revision",
+            "details",
+            "files:[{path}]"
+          ],
+          "content": {
+            "en": "Record inspected repository root/identity/full commits and source mappings in details; keep observed versus inferred facts explicit. Preserve selected nonsecret source/design documents and images in imports assets with files relative paths. A source image is not product screenshot evidence. Preserve original artifact names, actual hashes and origin in the inventory report; register only retrievable existing account custody refs without secrets. Bind stable resource IDs in selected imported node refs before computing review digest. Do not copy whole source repositories or credentials into .work."
+          }
+        },
+        {
+          "id": "evidence",
+          "path": "E/manifest.yaml + E/inventory.json + E/source-map.md + E/preservation.json + E/import-review.md + E/cleanup.json",
+          "fields": [
+            "id",
+            "nodeId",
+            "inputDigest",
+            "outcome",
+            "assertions",
+            "assets",
+            "provenance",
+            "codeRefs",
+            "extensions"
+          ],
+          "content": {
+            "en": "Inventory each selected path: origin repository/commit, tracked/dirty/untracked/ignored status, actual byte hash, classification, retention decision, durable destination and verified retrieval hash or explicit unresolved status. Source rows cite actual path/symbol/commit, observed behavior, candidate business interpretation, confidence/unknown and separate intent authority. Preserve historical UAT as historical files, never a fresh pass manifest. Record migration assertions only, final .work validation output, cleanup target/authority/worker checks and actual action or blocked/not-requested. Imported child product assertions must have no fabricated evidence."
+          }
+        },
+        {
+          "id": "source",
+          "path": "repository:<repo-id>/<retirement-target>",
+          "fields": [
+            "optional exact old artifact-directory removal only; no product implementation edits"
+          ],
+          "content": {
+            "en": "Only if cleanup was explicitly selected and authorized: retire the one resolved old directory after all preservation/retrieval hashes, committed history reachability, recoverable dirty/untracked/ignored data, ownership and inactive-worker checks pass. The target cannot be a repository root, canonical .work root, broad parent or symlink; use actual registered worktree inventory, not its folder name. Registered Git worktrees require git worktree remove for the exact target without force; custom artifact directories use a recoverable same-shell move/removal at the exact verified target. If the target is outside the bound selected repository ceiling or any check is uncertain, do not delete; leave blocked cleanup. No accounts, deployments, broad cleanup, force or raw recursive deletion of Git worktrees."
+          }
+        },
+        {
+          "id": "matrixHandoff",
+          "path": "E/job-result.json",
+          "fields": [
+            "requestId",
+            "requestDigest",
+            "op",
+            "operation when selected",
+            "status",
+            "criteria",
+            "outputs",
+            "artifacts"
+          ],
+          "content": {
+            "en": "Only for a selected job matrix, return the exact request-bound result. Populate every declared cell output with actual canonical Work/source/runtime references or produced JSON artifacts from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream expectations. Missing required output/evidence remains blocked or failed and cannot advance. The selected request freezes output field schemas before execution."
+          }
+        }
+      ],
+      "steps": [
+        {
+          "reads": [
+            "intent",
+            "target",
+            "repo",
+            "inventory",
+            "custody",
+            "profile"
+          ],
+          "writes": [
+            "workspace",
+            "evidence"
+          ],
+          "action": {
+            "en": "Confirm one pilot and exact canonical destination. Inspect existing target and ancestors; absence is expected only for selected new scope. Inventory actual Git roots/HEAD/status/worktrees and selected historical artifacts before any writes or cleanup. Stop if ownership or pilot boundary is ambiguous. Resolve the execution profile and actual tool availability before selecting instruments; this does not switch the model/runtime or spawn workers."
+          }
+        },
+        {
+          "reads": [
+            "repo",
+            "inventory",
+            "intent"
+          ],
+          "writes": [
+            "evidence"
+          ],
+          "action": {
+            "en": "Read the bounded source and tests; map routes/actions/data/rules to source facts at actual commits. Report contradictions and missing behavior. Label inferred business as candidate, never approved intent; old checkmarks and test file existence prove no current execution."
+          }
+        },
+        {
+          "reads": [
+            "inventory",
+            "custody",
+            "repo"
+          ],
+          "writes": [
+            "resources",
+            "evidence"
+          ],
+          "action": {
+            "en": "Classify and preserve only selected durable nonsecret artifacts; hash original bytes and retrieve/re-hash destination bytes outside the cleanup target. Verify committed history remains reachable and separately preserve dirty/untracked/ignored material with owned safe custody. A missing or secret-containing artifact blocks its cleanup, not permission to copy secrets or drop data."
+          }
+        },
+        {
+          "reads": [
+            "intent",
+            "target",
+            "inventory",
+            "repo",
+            "custody"
+          ],
+          "writes": [
+            "node",
+            "resources"
+          ],
+          "action": {
+            "en": "Author the selected candidate tree and canonical source resources. Imported leaves are suspended with a specific suspensionReason until their own selected review/implementation/UAT proof; do not add completion. Preserve approved existing nodes. Declare only actual selected graph edges and preset review targets when explicitly requested; unresolved edges are recorded as unknown rather than invented IDs."
+          }
+        },
+        {
+          "reads": [
+            "target",
+            "intent",
+            "inventory",
+            "custody",
+            "repo"
+          ],
+          "writes": [
+            "source",
+            "evidence"
+          ],
+          "action": {
+            "en": "If and only if exact cleanup is selected, re-inspect worktree registration, source/dirty inventory and active-worker ownership immediately before removal. Require explicit deletion authority, verified durable bytes and recoverable commits/uncommitted data. Remove a registered worktree with Git without force, or retire a verified custom artifact directory recoverably. If any check fails, leave original untouched and record the separate cleanup leaf blocked. Do not run a successor op."
+          }
+        },
+        {
+          "reads": [
+            "target",
+            "intent",
+            "inventory",
+            "repo",
+            "custody",
+            "matrix"
+          ],
+          "writes": [
+            "node",
+            "evidence",
+            "matrixHandoff"
+          ],
+          "action": {
+            "en": "Finalize semantic scope/resources first, obtain the real inputDigest, then verify imported IDs/refs/assertions, preservation hashes and all suspended states. Write only observed migration evidence and migration-review completion after verification. Keep product children suspended and cleanup truth explicit; commit only selected documentation when authorized, record actual commit separately in evidence, then stop. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+          }
+        }
+      ],
+      "proofs": [
+        {
+          "id": "binding",
+          "requirement": {
+            "en": "Run workspace validation; every cited ID/path exists or is explicitly proposed, required assertions are covered, input bindings are current, and an honest not-run/fail cannot earn done."
+          }
+        },
+        {
+          "id": "source",
+          "requirement": {
+            "en": "Every claimed source behavior has inspected path/symbol/full commit and is distinguished from approved business intent; unknowns remain visible."
+          }
+        },
+        {
+          "id": "preservation",
+          "requirement": {
+            "en": "Every selected retained artifact has independently re-read identical hashes at a durable destination; dirty/untracked/ignored data and history remain recoverable before any deletion."
+          }
+        },
+        {
+          "id": "suspension",
+          "requirement": {
+            "en": "Imported product leaves are stored suspended with suspensionReason and without completion; they cannot satisfy done-only dependencies or receive migration evidence as product acceptance."
+          }
+        },
+        {
+          "id": "cleanup",
+          "requirement": {
+            "en": "Cleanup is not-requested, proven exact safe retirement, or separately blocked with original data retained. Migration success never hides required unresolved cleanup."
+          }
+        }
+      ],
+      "blockers": [
+        {
+          "code": "PILOT_SCOPE_UNKNOWN",
+          "condition": {
+            "en": "One business boundary, actual source ownership or canonical destination cannot be resolved."
+          }
+        },
+        {
+          "code": "PRESERVATION_UNPROVEN",
+          "condition": {
+            "en": "Selected bytes/history/uncommitted data cannot be retrieved identically and recoverably outside the retirement target; retain originals."
+          }
+        },
+        {
+          "code": "RETIREMENT_UNSAFE",
+          "condition": {
+            "en": "Deletion authority, exact target ownership, inactive worker status or worktree registration is missing/uncertain; do not delete or force."
+          }
+        },
+        {
+          "code": "DECLARED_DEPENDENCY_UNMET",
+          "condition": {
+            "en": "A declared prerequisite is not effectively done, or a required declared input/scope is missing. Report node/resource IDs and propose a separately selected graph update when needed; never run predecessors or weaken dependsOn/refs/required to proceed."
+          }
+        }
+      ],
+      "placeholders": {
+        "business": "Selected business slug / slug nghiệp vụ đã chọn",
+        "repo-id": "Resolved repository resource ID / resource ID repo đã resolve",
+        "bound-paths": "Inspected source read set / tập file nguồn cần đọc",
+        "write-ceiling": "Explicit owned source paths / tập file nguồn được ghi",
+        "environment": "Resolved environment resource slug / slug environment đã resolve",
+        "identity": "Selected actor resource slug / slug actor đã chọn",
+        "fixture": "Selected fixture resource slug / slug fixture đã chọn",
+        "resource": "Selected owned resource slug / slug resource thuộc quyền sửa",
+        "asset": "Actual selected source asset filename/format / tên file-định dạng asset nguồn thật đã chọn",
+        "piece": "Stable selected piece slug / slug piece đã chọn",
+        "flow": "Selected UAT journey slug / slug journey UAT đã chọn",
+        "screen": "Selected surface/state slug / slug screen-state đã chọn",
+        "retirement-target": "Exact inventoried old directory relative to the bound repository, verified within the selected ceiling / thư mục cũ inventory chính xác tương đối repo trong ceiling"
+      },
+      "migrationPolicy": {
+        "scope": "one-selected-business",
+        "importState": "suspended",
+        "reasonField": "suspensionReason",
+        "importCompletion": "forbidden",
+        "intentAuthority": "approved-intent-not-inferred-source",
+        "cleanup": "explicit-exact-preserved-inactive-only",
+        "registeredWorktreeRemoval": "git-without-force"
+      }
+    }
+  }
+}
