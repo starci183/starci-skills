@@ -9,6 +9,7 @@
     "onFailure": "stop"
   },
   "folders": {
+    "init": "Host AGENTS.md and CLAUDE.md bootstrap templates; never routed-source scaffolding",
     "ops": "Operator JSON and authority",
     "workflows": "Matrices, contracts and runtime gates",
     "profiles": "Host profiles",

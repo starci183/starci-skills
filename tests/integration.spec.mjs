@@ -61,6 +61,50 @@ test('relocated package uses v3 CLI and leaves product evidence/legacy data unto
   assert.ok(doctorOutput.some(line => /tests\/core.spec.mjs: [1-9]\d*\/[1-9]\d* tests passed/.test(line)), doctorOutput.join('\n'));
 });
 
+test('host bootstraps use packaged templates and leave bound BE/FE projects untouched on init and update', t => {
+  const root = host(t);
+  const backend = host(t), frontend = host(t);
+  put(backend, '.work/workspace.yaml', 'synthetic business evidence stays here\n');
+  put(backend, '.starci/plans/example/run/index.yaml', 'synthetic execution stays here\n');
+  put(frontend, 'src/page.tsx', 'export default function Page() {}\n');
+  const binding = JSON.stringify({schema:'starci/workspace-binding@1', project:'synthetic',
+    repositories:{be:{pathFromSource:path.relative(root,backend),gitRepository:'synthetic/be'},
+      fe:{pathFromSource:path.relative(root,frontend),gitRepository:'synthetic/fe'}},
+    work:{ownerRole:'be',pathFromRepository:'.work'}});
+  put(root, '.workspaces/projects/synthetic/work.json', binding);
+  const snapshot = dir => fs.readdirSync(dir, {recursive:true}).filter(p => fs.statSync(path.join(dir,p)).isFile())
+    .sort().map(p => [p,fs.readFileSync(path.join(dir,p),'utf8')]);
+  const before = [snapshot(backend),snapshot(frontend)];
+  init({dir:root,bootstrap:true},quiet);
+  for (const file of ['AGENTS.md','CLAUDE.md']) {
+    assert.equal(read(root,file),read(packageRoot,'init/'+file));
+    assert.equal(read(root,'.claude/init/'+file),read(root,file));
+    // Every relative Markdown target from the generated bootstrap must actually resolve.
+    for (const match of read(root,file).matchAll(/\]\(([^)]+)\)/g)) {
+      assert.equal(fs.statSync(path.resolve(root,match[1])).isFile(),true,match[1]);
+    }
+    assert.doesNotMatch(read(root,file),/INDEX\.md|direct-task|request\.json/);
+  }
+  const initial = read(root,'AGENTS.md');
+  update({dir:root},quiet);
+  update({dir:root},quiet);
+  assert.equal(read(root,'AGENTS.md'),initial);
+  assert.equal(read(root,'.workspaces/projects/synthetic/work.json'),binding);
+  assert.deepEqual([snapshot(backend),snapshot(frontend)],before);
+  for (const name of ['.work','.starci']) assert.equal(fs.existsSync(path.join(root,name)),false);
+});
+
+test('obsolete direct-task bootstrap migrates without altering custom host instructions', t => {
+  const root = host(t);
+  init({dir:root,bootstrap:true},quiet);
+  const obsolete = '<!-- starci:prompt-entry -->\nUse the single [StarCi skill](.claude/SKILL.md) to select one workflow from .claude/workflows/catalog.json.\nUse direct-task for ad hoc work that does not fit a specialized workflow. Keep the selected matrix\nwithin three sequential rows and three parallel primary cells; verify requested outcomes before advancing.\nQuestions may stay read-only. Check/build .dist first. Preserve existing scope, evidence and user changes.\n<!-- /starci:prompt-entry -->';
+  put(root,'AGENTS.md','# Custom host rule\n'+obsolete+'\n');
+  update({dir:root},quiet);
+  assert.ok(read(root,'AGENTS.md').startsWith('# Custom host rule\n'));
+  assert.doesNotMatch(read(root,'AGENTS.md'),/direct-task/);
+  assert.match(read(root,'AGENTS.md'),/\.workspaces\/projects/);
+});
+
 test('major upgrade requires opt-in before writing and never converts existing work evidence', t => {
   const root = host(t);
   init({ dir: root, bootstrap: true }, quiet);

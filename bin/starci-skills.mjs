@@ -53,16 +53,16 @@ concurrent ops per wave. Track selected scope and evidence in .work; do not inve
 Questions need no work ledger. Hand off work outside the selected scope or remaining budget.
 <!-- /starci:prompt-entry -->`;
 
-const PROMPT_ENTRY = `${ENTRY_MARKER}
+const DIRECT_TASK_PROMPT_ENTRY = `${ENTRY_MARKER}
 Use the single [StarCi skill](.claude/SKILL.md) to select one workflow from .claude/workflows/catalog.json.
 Use direct-task for ad hoc work that does not fit a specialized workflow. Keep the selected matrix
 within three sequential rows and three parallel primary cells; verify requested outcomes before advancing.
 Questions may stay read-only. Check/build .dist first. Preserve existing scope, evidence and user changes.
 <!-- /starci:prompt-entry -->`;
 
-const BOOTSTRAP = `# StarCi agent bootstrap
+const PREVIOUS_BOOTSTRAP = `# StarCi agent bootstrap
 
-${PROMPT_ENTRY}
+${DIRECT_TASK_PROMPT_ENTRY}
 
 Read [\`<Source>/.claude/SKILL.md\`](.claude/SKILL.md) completely and follow its load order.
 
@@ -73,6 +73,12 @@ contain another \`.claude/SKILL.md\`.
 This file is only a bootstrap. Do not copy context, brainstorm, compiler, gate or skill rules into it:
 the entry routes, and a rule copied here becomes a second home that nobody remembers to update.
 `;
+
+// Templates are installed only at the host root, never into routed BE/FE repositories.
+const BOOTSTRAP = readFileSync(path.join(packageRoot, 'init/AGENTS.md'), 'utf8');
+const CLAUDE_BOOTSTRAP = readFileSync(path.join(packageRoot, 'init/CLAUDE.md'), 'utf8');
+const PROMPT_ENTRY = BOOTSTRAP.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
+if (!PROMPT_ENTRY || CLAUDE_BOOTSTRAP !== BOOTSTRAP) throw new Error('Host bootstrap templates must share the same runtime entry');
 
 const LEGACY_LITE_ENTRY = `${ENTRY_MARKER}
 For every user prompt, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md) and use its scope classification.
@@ -88,7 +94,7 @@ For bounded maintenance, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md
 For tracked business work, use [StarCi](.claude/SKILL.md) and its scope-bounded chain limits.
 Do not run an unbounded chain or migrate existing workflow evidence implicitly.
 <!-- /starci:prompt-entry -->`;
-const LITE_BOOTSTRAP = BOOTSTRAP.replace(PROMPT_ENTRY, LITE_ENTRY)
+const LITE_BOOTSTRAP = PREVIOUS_BOOTSTRAP.replace(DIRECT_TASK_PROMPT_ENTRY, LITE_ENTRY)
   .replace('Read [\`<Source>/.claude/SKILL.md\`](.claude/SKILL.md) completely and follow its load order.',
     'Read [StarCi Lite](.claude/skills/starci-lite/SKILL.md) first; it routes complex work to the full entry.');
 function selectedProfile(opts, manifest) {
@@ -180,13 +186,13 @@ function bootstrapPlan(repo, profile) {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
     const current = readFileSync(file, 'utf8');
-    const customProtocol = [PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
+    const customProtocol = [PROMPT_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
     if (/session-open\.mjs|plan-chain\.mjs|validated request\.json|Nothing is designed, written or committed outside a session/.test(customProtocol)) {
       throw new Error(name + ': custom v2 session/chain protocol conflicts with v3; reconcile it or use --no-bootstrap before changing payload');
     }
     const legacyBootstrap = BOOTSTRAP.replace(PROMPT_ENTRY, LEGACY_PROMPT_ENTRY);
     const legacyLiteBootstrap = LITE_BOOTSTRAP.replace(LITE_ENTRY, LEGACY_LITE_ENTRY);
-    for (const known of [BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, PRESET_PROMPT_ENTRY), LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
+    for (const known of [BOOTSTRAP, PREVIOUS_BOOTSTRAP, ...[PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, LEGACY_PROMPT_ENTRY].map(entry => PREVIOUS_BOOTSTRAP.replace(DIRECT_TASK_PROMPT_ENTRY, entry)), BOOTSTRAP.replace(PROMPT_ENTRY, PRESET_PROMPT_ENTRY), LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
       const normalized = current.replace(/\r\n/g, '\n'), authored = known.replace(/\r\n/g, '\n');
       if (normalized.startsWith(authored)) {
         let end = 0, count = 0;
@@ -195,7 +201,7 @@ function bootstrapPlan(repo, profile) {
         return { name, file, text: bootstrap + suffix, action: 'updated' };
       }
     }
-    const managed = [PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
+    const managed = [PROMPT_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
     if (managed) {
       return { name, file, text: current.replace(managed, entry), action: 'updated' };
     }

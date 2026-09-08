@@ -12,6 +12,7 @@
   },
   "files": [
     "bin/",
+    "init/",
     "SKILL.md",
     "config.example.json",
     "knowledge/",
