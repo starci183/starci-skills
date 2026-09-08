@@ -5,7 +5,7 @@ description: Select one bounded workflow, execute its complete operators, and pr
 
 Before every invocation, run `node scripts/ensure-build.mjs` in this skill directory and stop if the current source and `.dist` cannot be verified.
 
-Initialization creates ignored `config.json` from `config.example.json` only when absent. Read local config for user-facing language and requested model/effort; defaults are `vi`, inherited host model (`null`), and `high`. Explicit task choices override these defaults. Pass supported model/effort preferences when dispatch is authorized; never claim to change the current session or silently substitute unsupported settings. Persisted Work and contracts remain English. Local config is never bundled into `.dist`.
+Initialization creates ignored `config.json` from `config.example.json` only when absent. Read local config for user-facing language and requested model/effort; defaults are `vi`, inherited host model (`null`), and `medium`. Explicit task choices override these defaults. Pass supported model/effort preferences when dispatch is authorized; never claim to change the current session or silently substitute unsupported settings. Persisted Work and contracts remain English. Local config is never bundled into `.dist`.
 
 Resolve project bindings through `.dist/schemas/workspace-routing.json`. Use the backend-owned canonical `.work`; workflow session YAML stays beside it under `.starci/plans`. Read-only questions may be answered without a job. For every action prompt, inspect enough context to freeze a semantic classification, then select only from `.dist/workflows/catalog.json`.
 

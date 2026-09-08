@@ -9,7 +9,7 @@ test('local config initializes once, preserves preferences and rejects invalid d
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-'));
  try {
  fs.copyFileSync(new URL('../config.example.json',import.meta.url),path.join(root,'config.example.json'));
- assert.deepEqual(loadConfig(root,{initialize:true}),{language:'vi',model:null,effort:'high'});
+ assert.deepEqual(loadConfig(root,{initialize:true}),{language:'vi',model:null,effort:'medium'});
  const custom={language:'en',model:'test-host-model',effort:'medium'};
  fs.writeFileSync(path.join(root,'config.json'),JSON.stringify(custom));
  assert.deepEqual(loadConfig(root,{initialize:true}),custom);
