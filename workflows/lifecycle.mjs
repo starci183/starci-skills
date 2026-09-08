@@ -1,4 +1,4 @@
-import {validatePlan} from './plan.mjs';
+import {validatePlan,planProgress} from './plan.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
@@ -48,14 +48,21 @@ function typed(value,schema){if(schema.enum&&!schema.enum.some(v=>same(v,value))
 export function propose(goal,{workRoot,repositories={}}){const checked=validateGoal(goal,{repositories}),work=workStatus(workRoot);return {schema:'starci/workflow-run@1',goal:structuredClone(goal),...checked,goalDigest:digest({goal,workRoot,repositories}),workRoot,repositories:structuredClone(repositories),route:work.status==='missing'&&goal.workflow!=='prepare-work'?'prepare-work':goal.workflow,status:'awaiting-goal-approval',approvals:[],requests:{},responses:{}};}
 function bound(run){requireThat(run.goalDigest===digest({goal:run.goal,workRoot:run.workRoot,repositories:run.repositories})&&run.scopeDigest===digest({requestId:run.goal.requestId,originalRequest:run.goal.originalRequest,scope:run.goal.scope}),'Frozen goal or original scope was changed');}
 function decision(receipt,phase,target){requireThat(receipt?.actor==='user'&&receipt.phase===phase&&receipt.digest===target&&receipt.approved===true&&text(receipt.messageId)&&text(receipt.quote),'An actual explicit user decision bound to this digest is required');}
+function resolvedJobQuestions(run) {
+ const questions=run.presentation.scope.workflows.find(x=>x.id===run.presentation.jobId)?.openQuestions??[];
+ if(!questions.length)return true;
+ const answers=run.goal.inputs?.planQuestionAnswers;
+ return Array.isArray(answers)&&answers.length===questions.length&&new Set(answers.map(x=>x?.question)).size===questions.length&&answers.every(x=>questions.includes(x?.question)&&text(x.answer));
+}
 export function presentGoal(run,{messageId,scope,jobId}) {
  bound(run);requireThat(run.status==='awaiting-goal-approval'&&text(messageId),'Present an unapproved goal with an actual assistant message ID');
+ requireThat(scope?.schema==='starci/plan@2','New workflow goal presentations require the complete Plan v2; revise legacy plans explicitly without migrating receipts');
  const checked=validatePlan(scope,catalog),job=scope.workflows.find(x=>x.id===jobId);
  requireThat(scope.requestId===run.goal.requestId&&scope.originalRequest===run.goal.originalRequest&&job?.workflow===run.goal.workflow,'Scope must preserve the original request and selected job');
  requireThat(run.goal.workTargets.every(x=>job.workTargets.includes(x))&&run.goal.scope.paths.every(x=>job.paths.includes(x))&&run.goal.scope.resources.every(x=>job.resources.includes(x)),'Goal exceeds presented scope job targets or effects');
  return {...run,presentation:{messageId,goalDigest:run.goalDigest,scopeDigest:checked.digest,jobId,scope:structuredClone(scope)}};
 }
-export function approveGoal(run,receipt){bound(run);requireThat(!(run.presentation?.scope.openQuestions?.length),'Resolve Plan questions with the user before goal approval');requireThat(run.presentation?.goalDigest===run.goalDigest&&validatePlan(run.presentation.scope,catalog).digest===run.presentation.scopeDigest,'Present the concrete scope and goal before approval');requireThat(receipt?.messageId!==run.goal.requestId&&receipt?.messageId!==run.presentation.messageId&&receipt?.quote!==run.goal.originalRequest&&receipt?.replyTo===run.presentation.messageId,'Approval must be an actual later user reply to the presented goal, not the original task request');decision(receipt,'goal',run.goalDigest);validateGoal(run.goal,{repositories:run.repositories});return {...run,approvals:[...run.approvals,structuredClone(receipt)],status:run.route==='prepare-work'&&run.goal.workflow!=='prepare-work'?'awaiting-bootstrap':'approved'};}
+export function approveGoal(run,receipt){bound(run);requireThat(!(run.presentation?.scope.openQuestions?.length),'Resolve Plan questions with the user before goal approval');requireThat(run.presentation?.goalDigest===run.goalDigest&&validatePlan(run.presentation.scope,catalog).digest===run.presentation.scopeDigest,'Present the concrete scope and goal before approval');requireThat(resolvedJobQuestions(run),'Resolve this workflow goal questions before approval; future workflow questions do not block it');requireThat(receipt?.messageId!==run.goal.requestId&&receipt?.messageId!==run.presentation.messageId&&receipt?.quote!==run.goal.originalRequest&&receipt?.replyTo===run.presentation.messageId,'Approval must be an actual later user reply to the presented goal, not the original task request');decision(receipt,'goal',run.goalDigest);validateGoal(run.goal,{repositories:run.repositories});return {...run,approvals:[...run.approvals,structuredClone(receipt)],status:run.route==='prepare-work'&&run.goal.workflow!=='prepare-work'?'awaiting-bootstrap':'approved'};}
 export function resumeFromBootstrap(run,bootstrap){bound(run);bound(bootstrap);requireThat(run.status==='awaiting-bootstrap'&&bootstrap.goal.workflow==='prepare-work'&&bootstrap.status==='done','An accepted completed bootstrap is required');requireThat(run.scopeDigest===bootstrap.scopeDigest&&run.workRoot===bootstrap.workRoot,'Bootstrap must preserve original request, scope and Work root');requireThat(workStatus(run.workRoot).status==='ready','Work bootstrap did not create valid Work');return {...run,route:run.goal.workflow,status:'approved',bootstrapDigest:digest(bootstrap)};}
 const investigationOps=new Set(['workspace.manage','business.decide','architecture.decide','interface.draw']);
 function workBindings(run,cell){
@@ -76,6 +83,7 @@ export function markWorkDone(run,completions){bound(run);requireThat(run.status=
 export {digest as workflowDigest};
 export function saveRun(run,planId=run.presentation?.scope.id??run.goal.id){
  bound(run);workStatus(run.workRoot);
+ requireThat(!run.presentation||planId===run.presentation.scope.id,'All workflow runs must remain in their one presented Plan bundle');
  requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(planId),'Unsafe Plan ID');
  const base=path.dirname(run.workRoot),dir=path.join(base,'.starci','plans',planId);
  const paths=['index.yaml','goal/index.yaml','approval/index.yaml','run/index.yaml'];
@@ -87,6 +95,10 @@ export function saveRun(run,planId=run.presentation?.scope.id??run.goal.id){
  const plan=run.presentation?.scope??null,planDigest=plan?validatePlan(plan,catalog).digest:run.goalDigest;
  requireThat(!oldGoal||oldGoal.planDigest===planDigest||(!oldGoal.plan&&oldGoal.jobs?.[jobId]?.goalDigest===run.goalDigest),'Plan changed; present a revised Plan instead of overwriting an existing bundle');
  const goals=oldGoal?.jobs??{},approvals=read('approval/index.yaml')?.jobs??{},runs=read('run/index.yaml')?.jobs??{};
+ for(const job of plan?.workflows??[]) {
+  approvals[job.id]??={status:'pending',presentation:null,receipts:[]};
+  runs[job.id]??={workflow:job.workflow,status:'planned',dependsOn:job.dependsOn,requests:{},responses:{},evidence:[]};
+ }
  requireThat(!goals[jobId]||goals[jobId].goalDigest===run.goalDigest,'Job goal changed; revise and reapprove before replacing execution');
  goals[jobId]={goal:run.goal,goalDigest:run.goalDigest,scopeDigest:run.scopeDigest,workRoot:run.workRoot,repositories:run.repositories};
  approvals[jobId]={status:run.approvals.length?'recorded':'pending',presentation:run.presentation?{messageId:run.presentation.messageId,goalDigest:run.goalDigest,planDigest}:null,receipts:run.approvals};
@@ -95,7 +107,7 @@ export function saveRun(run,planId=run.presentation?.scope.id??run.goal.id){
   'index.yaml':{schema:'starci/plan-index@1',id:planId,goal:'goal/index.yaml',approval:'approval/index.yaml',run:'run/index.yaml'},
   'goal/index.yaml':{schema:'starci/plan-goal@1',planDigest,plan,jobs:goals},
   'approval/index.yaml':{schema:'starci/plan-approval@1',planDigest,jobs:approvals},
-  'run/index.yaml':{schema:'starci/plan-run@1',planDigest,jobs:runs}
+  'run/index.yaml':{schema:'starci/plan-run@1',planDigest,...(plan?{status:planProgress(plan,runs)}:{}),jobs:runs}
  };
  for(const [relative,doc]of Object.entries(documents)){const file=path.join(dir,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(doc));}
  return dir;

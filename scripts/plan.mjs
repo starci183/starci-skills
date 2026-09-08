@@ -2,20 +2,31 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
-import {validatePlan} from '../workflows/plan.mjs';
+import {validatePlan,planAreas} from '../workflows/plan.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const catalog=JSON.parse(fs.readFileSync(path.join(root,'workflows/catalog.json')));
 const clean=x=>String(x).replaceAll('|','\\|').replace(/\r?\n/g,' ');
 export function renderPlan(plan){
  validatePlan(plan,catalog);
  const lines=['## Goal',plan.finalOutcome,'','| Area | Action | Outcome | Targets |','| --- | --- | --- | --- |'];
- for(const area of ['business','architecture','implementation','uat']){const v=plan[area];lines.push(`| ${area} | ${v.action} | ${clean(v.outcome)} | ${clean(v.targets.join(', '))} |`);}
+ for(const area of planAreas(plan)){const v=plan[area];lines.push(`| ${area} | ${v.action} | ${clean(v.outcome)} | ${clean(v.targets.join(', '))} |`);}
+ if(plan.schema==='starci/plan@2') {
+  lines.push('','## Coverage','| Area | Producing workflows | Reuse evidence / scope reason |','| --- | --- | --- |');
+  for(const area of planAreas(plan)){const v=plan[area];lines.push(`| ${area} | ${clean(v.workflowIds.join(', '))} | ${clean([...v.evidence,v.reason].filter(Boolean).join('; '))} |`);}
+  lines.push('','## Plan completion','| Criterion | Terminal outcome | Producing workflows |','| --- | --- | --- |');
+  for(const c of plan.completionCriteria)lines.push(`| ${clean(c.id)} | ${clean(c.outcome)} | ${clean(c.workflowIds.join(', '))} |`);
+ } else lines.push('','Legacy Plan v1: end-to-end coverage is not verified. Revise explicitly to v2 before presenting a new workflow goal; existing receipts are not migrated.');
  lines.push('','## Workflows','| Order | Workflow | Purpose | Input | Output | Criteria | Estimate |','| --- | --- | --- | --- | --- | --- | --- |');
  plan.workflows.forEach((j,i)=>lines.push(`| ${i+1} | ${j.workflow} | ${clean(j.purpose)} | ${clean(j.input)} | ${clean(j.output)} | ${clean(j.criteria.join('; '))} | ${j.estimate.minMinutes}–${j.estimate.maxMinutes} min; ${clean(j.estimate.assumptions)} |`));
+ if(plan.schema==='starci/plan@2') {
+  lines.push('','## Workflow checkpoints','| Job | Questions to resolve before this goal |','| --- | --- |');
+  for(const j of plan.workflows)lines.push(`| ${clean(j.id)} | ${clean(j.openQuestions.join('; ')||'None; present and confirm this workflow goal before effects.')} |`);
+ }
  lines.push('','## Open questions',(plan.openQuestions??[]).join('; ')||'None.');
  lines.push('','## Exclusions',plan.exclusions.join('; ')||'None.','','## Approval','Pending. Present this Plan and wait for an actual user decision.');return lines.join('\n')+'\n';
 }
 export function createBundle(plan,destination){
+ if(plan?.schema!=='starci/plan@2')throw Error('New Plan bundles require starci/plan@2; do not silently migrate legacy approvals');
  const {digest}=validatePlan(plan,catalog);if(!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(plan.id))throw Error('Unsafe Plan ID');
  const dir=path.resolve(destination);if(fs.existsSync(dir))throw Error('Destination exists; never overwrite a Plan or its approvals');
  let parent=path.dirname(dir);while(!fs.existsSync(parent))parent=path.dirname(parent);if(fs.lstatSync(parent).isSymbolicLink()||fs.realpathSync(parent).toLowerCase()!==parent.toLowerCase())throw Error('Plan destination cannot follow links');

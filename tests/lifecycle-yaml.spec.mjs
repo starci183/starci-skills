@@ -27,6 +27,10 @@ test('frontend stages bind only their owned Work and accept completed in-run pre
 function syntheticPresentation(run) {
  const section={action:'reuse',outcome:'Synthetic reviewed outcome',targets:[]};
  const scope={schema:'starci/plan@1',id:'synthetic-scope',requestId:run.goal.requestId,originalRequest:run.goal.originalRequest,finalOutcome:run.goal.finalOutcome,business:section,architecture:section,implementation:section,uat:section,exclusions:[],workflows:[{id:'job',workflow:run.goal.workflow,selection:{requestQuote:run.goal.originalRequest,codeChange:run.goal.workflow.startsWith('implement-'),verification:run.goal.workflow==='implement-frontend'?'browser-uat':'none',separateDeliverable:false},purpose:run.goal.finalOutcome,input:'Original request',output:'Verified outcome',criteria:run.goal.criteria,workTargets:run.goal.workTargets,paths:run.goal.scope.paths,resources:run.goal.scope.resources,dependsOn:[],estimate:{minMinutes:1,maxMinutes:2,assumptions:'Synthetic fixture only'}}]};
+ scope.schema='starci/plan@2';
+ for(const key of ['business','architecture','implementation','backend','frontend','uat'])scope[key]={action:'not-applicable',outcome:'Synthetic runtime-only fixture',targets:[],workflowIds:[],evidence:[],reason:'This fixture tests runtime operations, not product development.'};
+ scope.implementation={action:'change',outcome:run.goal.finalOutcome,targets:['piece'],workflowIds:['job'],evidence:[],reason:''};
+ scope.completionCriteria=[{id:'terminal',outcome:run.goal.finalOutcome,workflowIds:['job']}];scope.openQuestions=[];scope.workflows[0].openQuestions=[];
  return presentGoal(run,{messageId:'synthetic-presentation',scope,jobId:'job'});
 }
 function approveGoal(run,receipt) {return approvePresentedGoal(syntheticPresentation(run),{...receipt,replyTo:'synthetic-presentation'});}
@@ -50,4 +54,49 @@ test('Plan bundle separates goal approval and current execution without duplicat
  assert.equal(read('goal/index.yaml').jobs['goal-1'].goal.finalOutcome,f.goal.finalOutcome);
  assert.equal(fs.existsSync(path.join(path.dirname(f.root),'.starci','runs')),false);
  assert.throws(()=>saveRun(run,'../escape'),/Unsafe/);
+});
+
+test('future workflow questions stay in the complete Plan without blocking the current goal',t=>{
+ const f=fixture(t),run=propose(f.goal,{workRoot:f.root});
+ const scope=structuredClone(syntheticPresentation(run).presentation.scope);
+ scope.finalOutcome='Synthetic complete two-stage operational result, not just the first check.';
+ const future={...structuredClone(scope.workflows[0]),id:'future',dependsOn:['job'],openQuestions:['Which local diagnostic output is required?']};
+ scope.workflows.push(future);scope.implementation.workflowIds.push('future');scope.completionCriteria[0].workflowIds.push('future');
+ const shown=presentGoal(run,{messageId:'current-checkpoint',scope,jobId:'job'});
+ const approved=approvePresentedGoal(shown,{...f.receipt('goal',shown.goalDigest),replyTo:'current-checkpoint'});
+ assert.equal(approved.status,'approved');
+ const dir=saveRun(approved),read=rel=>parseYaml(fs.readFileSync(path.join(dir,rel),'utf8'));
+ assert.equal(read('goal/index.yaml').plan.finalOutcome,scope.finalOutcome);
+ assert.equal(read('run/index.yaml').status,'in-progress');
+ assert.equal(read('run/index.yaml').jobs.future.status,'planned');
+ assert.equal(read('approval/index.yaml').jobs.future.status,'pending');
+ assert.deepEqual(read('approval/index.yaml').jobs.future.receipts,[]);
+ assert.throws(()=>saveRun(approved,'new-plan-for-first-workflow'),/one presented Plan/);
+
+ const nextGoal={...structuredClone(f.goal),id:'goal-2'};
+ let next=propose(nextGoal,{workRoot:f.root});
+ next=presentGoal(next,{messageId:'future-checkpoint',scope,jobId:'future'});
+ assert.throws(()=>approvePresentedGoal(next,{...f.receipt('goal',next.goalDigest),replyTo:'future-checkpoint'}),/this workflow goal questions/);
+ for(const answers of [[{question:'different question',answer:'invalid'}],[{question:future.openQuestions[0],answer:''}]]) {
+  const badGoal={...structuredClone(nextGoal),inputs:{...nextGoal.inputs,planQuestionAnswers:answers}};
+  const bad=presentGoal(propose(badGoal,{workRoot:f.root}),{messageId:'bad-checkpoint',scope,jobId:'future'});
+  assert.throws(()=>approvePresentedGoal(bad,{...f.receipt('goal',bad.goalDigest),replyTo:'bad-checkpoint'}),/this workflow goal questions/);
+ }
+ nextGoal.inputs.planQuestionAnswers=[{question:future.openQuestions[0],answer:'Return the readiness observation, without production effects.'}];
+ next=presentGoal(propose(nextGoal,{workRoot:f.root}),{messageId:'answered-checkpoint',scope,jobId:'future'});
+ next=approvePresentedGoal(next,{...f.receipt('goal',next.goalDigest),replyTo:'answered-checkpoint'});
+ const firstReceipts=read('approval/index.yaml').jobs.job.receipts;
+ assert.equal(saveRun(next),dir);
+ assert.deepEqual(read('approval/index.yaml').jobs.job.receipts,firstReceipts);
+ assert.deepEqual(read('goal/index.yaml').plan,scope);
+ assert.equal(read('run/index.yaml').status,'in-progress');
+});
+
+test('terminal Plan questions still block every new goal and legacy presentations cannot bypass v2',t=>{
+ const f=fixture(t),run=propose(f.goal,{workRoot:f.root});
+ const scope=structuredClone(syntheticPresentation(run).presentation.scope);
+ scope.openQuestions=['Which final user outcome is actually requested?'];
+ const shown=presentGoal(run,{messageId:'global-checkpoint',scope,jobId:'job'});
+ assert.throws(()=>approvePresentedGoal(shown,{...f.receipt('goal',shown.goalDigest),replyTo:'global-checkpoint'}),/Plan questions/);
+ scope.schema='starci/plan@1';assert.throws(()=>presentGoal(run,{messageId:'legacy-checkpoint',scope,jobId:'job'}),/complete Plan v2/);
 });

@@ -1,29 +1,58 @@
 {
-  "schema": "starci/plan@1",
+  "schema": "starci/plan@2",
   "id": "",
   "requestId": "",
   "originalRequest": "",
   "finalOutcome": "",
   "business": {
-    "action": "reuse",
+    "action": "",
     "outcome": "",
-    "targets": []
+    "targets": [],
+    "workflowIds": [],
+    "evidence": [],
+    "reason": ""
   },
   "architecture": {
-    "action": "reuse",
+    "action": "",
     "outcome": "",
-    "targets": []
+    "targets": [],
+    "workflowIds": [],
+    "evidence": [],
+    "reason": ""
   },
   "implementation": {
-    "action": "reuse",
+    "action": "",
     "outcome": "",
-    "targets": []
+    "targets": [],
+    "workflowIds": [],
+    "evidence": [],
+    "reason": ""
+  },
+  "backend": {
+    "action": "",
+    "outcome": "",
+    "targets": [],
+    "workflowIds": [],
+    "evidence": [],
+    "reason": ""
+  },
+  "frontend": {
+    "action": "",
+    "outcome": "",
+    "targets": [],
+    "workflowIds": [],
+    "evidence": [],
+    "reason": ""
   },
   "uat": {
-    "action": "reuse",
+    "action": "",
     "outcome": "",
-    "targets": []
+    "targets": [],
+    "workflowIds": [],
+    "evidence": [],
+    "reason": ""
   },
+  "completionCriteria": [{"id": "", "outcome": "", "workflowIds": []}],
   "exclusions": [],
   "workflows": [
     {
@@ -37,6 +66,7 @@
       "paths": [],
       "resources": [],
       "dependsOn": [],
+      "openQuestions": [],
       "estimate": {
         "minMinutes": 0,
         "maxMinutes": 0,

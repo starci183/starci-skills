@@ -5922,7 +5922,7 @@
               "evidence"
             ],
             "action": {
-              "en": "Turn the request into one bounded job: desired outcome, known inputs, exact effect ceiling, acceptance criteria and current unknowns. Use available working tools. For unclear details, inspect first and ask only decisions that materially change the intended result or mutation target."
+              "en": "Distinguish the whole requested outcome from the bounded workflow currently being classified. Preserve the complete Plan under workflows/plan.json; never shrink a multi-stage mission into this one job. Identify this segment's desired outcome, known inputs, effect ceiling, criteria and unknowns. For unclear details, inspect first and ask only decisions that materially change the intended result or mutation target."
             }
           },
           {
@@ -5948,7 +5948,7 @@
               "evidence"
             ],
             "action": {
-              "en": "Choose the smallest plan that completes the requested job, including appropriate checks and recoverability. Resolve exact source paths, target rows/resources and predicates before mutation. Data corrections need attributable IDs, read-back and a transaction or explicit recoverable method when available. Deployment needs the selected target/artifact and bounded health/rollback checks. Missing material authority blocks only the affected action."
+              "en": "Choose the smallest bounded workflow that completes this segment, including appropriate checks and recoverability, while retaining all other required stages in the same end-to-end Plan. Resolve exact source paths, target rows/resources and predicates before mutation. Data corrections need attributable IDs, read-back and a transaction or explicit recoverable method when available. Deployment needs the selected target/artifact and bounded health/rollback checks. Missing material authority blocks only the affected action, not planning downstream delivery."
             }
           },
           {
@@ -5975,7 +5975,7 @@
               "evidence"
             ],
             "action": {
-              "en": "Verify the selected workflow supports every requested effect and proof without hidden successor work. If no workflow safely matches, return blocked with the exact missing decision or contract gap; never use analysis as a broad fallback executor."
+              "en": "Verify the selected workflow supports every effect and proof assigned to this segment; other requested outcomes must remain covered by explicit later workflows in the same Plan. Do not force an entire multi-stage mission into one workflow or hide successors. If no workflow safely matches this segment, return blocked with the exact missing decision or contract gap; never use analysis as a broad fallback executor."
             }
           },
           {
@@ -6002,7 +6002,7 @@
           {
             "id": "outcome",
             "requirement": {
-              "en": "The selected workflow contract can produce every requested criterion, or the analysis returns blocked with the exact gap."
+              "en": "The selected workflow contract can produce every criterion assigned to this segment, while the complete Plan still covers the remaining requested outcome; otherwise the analysis returns blocked with the exact gap."
             }
           },
           {
