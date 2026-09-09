@@ -32,6 +32,13 @@ importing consumers before implementation continues under a rebound goal. A new
 business decision returns to SRS and the actual authorized decision maker. Do not
 rewrite expectations or design simply to justify broken code.
 
+Follow [source of trust and specification repair](source-of-trust.md) through
+closure: code remains implementation to evaluate, not authority over accepted
+Work. A relevant SRS/SDS gap within the assigned repair scope must be corrected,
+reviewed and made currently done before its dependent implementation proceeds.
+Do not treat a gap report as the finished deliverable or mechanically stamp done
+because a test was made green.
+
 ## Visual output
 
 - Draw: map significant journey screens, states and needed viewports to reviewed

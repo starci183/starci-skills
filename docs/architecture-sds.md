@@ -4,6 +4,13 @@ Business says what must happen. Architecture explains how the system is designed
 to satisfy it. Implementation maps that design to actual source and verifies the
 running behavior. None of these documents substitutes for the others.
 
+Use the current accepted SRS/SDS in `.starciwork` as design authority, never an
+existing implementation or its passing tests. Follow [specification repair](source-of-trust.md)
+when a relevant case is uncovered: revise the owning SRS/SDS as appropriate,
+review affected consumers and re-establish current `done` before dependent
+implementation. A missing mechanism such as the actual form of restore requires
+an explicit design, not a call graph or a generic promise to support recovery.
+
 SDS here means Software Design Specification, including architecture and enough
 logical detail to implement without guessing the important mechanisms. It does
 not mean a source inventory. Source paths, symbols, revisions, commits and test

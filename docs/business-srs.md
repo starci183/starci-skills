@@ -2,6 +2,12 @@
 
 Business describes observable product behavior. Architecture decides how to realize it. A source observation or a supplied technical constraint is not permission to invent business policy.
 
+Current accepted Work, not legacy code, defines the intended product. Follow
+[source of trust and specification repair](source-of-trust.md) when a case is
+missing: complete the owning SRS flows and acceptance, review affected SDS and
+re-establish current `done` within authority. Reporting the gap alone is not
+completion of an authorized repair.
+
 New authoring uses this actual folder tree inside the backend-owned `.starciwork`:
 
 ```text

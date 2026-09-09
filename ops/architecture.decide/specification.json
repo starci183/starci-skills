@@ -34,7 +34,7 @@
         "node"
       ],
       "action": {
-        "en": "Resolve accepted SRS scope, drivers, actors and platform constraints from canonical Work. Read specifications/sds.schema.json and docs/architecture-sds.md. Architecture is source-independent: no source paths, symbols, revisions, codeImpacts, repository audit or test-command inventory. A design constraint does not prove deployed behavior."
+        "en": "Resolve current accepted SRS scope, drivers, actors and platform constraints from canonical .starciwork. Read specifications/sds.schema.json, docs/architecture-sds.md and docs/source-of-trust.md. Begin every new or revised SDS with complete journey and responsibility analysis, not a legacy call graph. Architecture is source-independent: no source paths, symbols, revisions, codeImpacts, repository audit or test-command inventory. Code and green tests do not authorize the target design; a design constraint does not prove deployed behavior."
       }
     },
     {
@@ -73,7 +73,7 @@
         "node"
       ],
       "action": {
-        "en": "Specify authoritative versus rebuildable data, storage, isolation, consistency, lifecycle, placement, connections and credential custody. For durable customer state, examine database consistency, volumes, config, Secrets/keys, independent backup ownership and recovery order. Select failure domains and HA/recovery depth from actual scope, not a mandatory cluster-loss checklist for every project."
+        "en": "Specify authoritative versus rebuildable data, storage, isolation, consistency, lifecycle, placement, connections and credential custody. For durable customer state, specify the selected backup/restore form, capture consistency, complete retained stores/objects/runtime state/config/Secrets/keys, independent custody, destination, compatibility, restore order, verification and safe resumption. A generic supports-restore promise, recreated configuration or module reinstall does not explain data recovery. Select failure domains and HA/recovery depth from actual scope, not a mandatory cluster-loss checklist for every project."
       }
     },
     {
@@ -112,7 +112,7 @@
         "node"
       ],
       "action": {
-        "en": "Validate recursive layout and exact canonical SRS/shared-design references. Review full requirement/flow/acceptance coverage across the owning architecture scope. Resolve material design blockers before pass; schema validity alone is not review. Implementation owns source mapping and test execution. Done means current reviewed design, never an edit lock."
+        "en": "Validate recursive layout and exact canonical SRS/shared-design references, then walk complete significant journeys as an implementer: each component, connection, state owner, success/partial/uncertain outcome and next permitted action must be unambiguous. Review full requirement/flow/acceptance coverage, shared consumer consistency and simpler alternatives across the owning scope. Resolve known material design blockers before pass and record concrete findings and resolutions; this does not require perfect foresight of all future cases. Gaps found during review, coding, testing, operation or later customer feedback require scoped SRS/SDS repair within authority and current reviewed done before dependent effects. Do not reopen unrelated design or rewrite requirements to justify legacy code. Schema validity alone is not review. Implementation owns source mapping and test execution; done is never an edit lock."
       }
     }
   ],

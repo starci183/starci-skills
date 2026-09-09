@@ -302,7 +302,7 @@
                 "node"
               ],
               "action": {
-                "en": "Resolve accepted SRS scope, drivers, actors and platform constraints from canonical Work. Read specifications/sds.schema.json and docs/architecture-sds.md. Architecture is source-independent: no source paths, symbols, revisions, codeImpacts, repository audit or test-command inventory. A design constraint does not prove deployed behavior."
+                "en": "Resolve current accepted SRS scope, drivers, actors and platform constraints from canonical .starciwork. Read specifications/sds.schema.json, docs/architecture-sds.md and docs/source-of-trust.md. Begin every new or revised SDS with complete journey and responsibility analysis, not a legacy call graph. Architecture is source-independent: no source paths, symbols, revisions, codeImpacts, repository audit or test-command inventory. Code and green tests do not authorize the target design; a design constraint does not prove deployed behavior."
               }
             },
             {
@@ -341,7 +341,7 @@
                 "node"
               ],
               "action": {
-                "en": "Specify authoritative versus rebuildable data, storage, isolation, consistency, lifecycle, placement, connections and credential custody. For durable customer state, examine database consistency, volumes, config, Secrets/keys, independent backup ownership and recovery order. Select failure domains and HA/recovery depth from actual scope, not a mandatory cluster-loss checklist for every project."
+                "en": "Specify authoritative versus rebuildable data, storage, isolation, consistency, lifecycle, placement, connections and credential custody. For durable customer state, specify the selected backup/restore form, capture consistency, complete retained stores/objects/runtime state/config/Secrets/keys, independent custody, destination, compatibility, restore order, verification and safe resumption. A generic supports-restore promise, recreated configuration or module reinstall does not explain data recovery. Select failure domains and HA/recovery depth from actual scope, not a mandatory cluster-loss checklist for every project."
               }
             },
             {
@@ -380,7 +380,7 @@
                 "node"
               ],
               "action": {
-                "en": "Validate recursive layout and exact canonical SRS/shared-design references. Review full requirement/flow/acceptance coverage across the owning architecture scope. Resolve material design blockers before pass; schema validity alone is not review. Implementation owns source mapping and test execution. Done means current reviewed design, never an edit lock."
+                "en": "Validate recursive layout and exact canonical SRS/shared-design references, then walk complete significant journeys as an implementer: each component, connection, state owner, success/partial/uncertain outcome and next permitted action must be unambiguous. Review full requirement/flow/acceptance coverage, shared consumer consistency and simpler alternatives across the owning scope. Resolve known material design blockers before pass and record concrete findings and resolutions; this does not require perfect foresight of all future cases. Gaps found during review, coding, testing, operation or later customer feedback require scoped SRS/SDS repair within authority and current reviewed done before dependent effects. Do not reopen unrelated design or rewrite requirements to justify legacy code. Schema validity alone is not review. Implementation owns source mapping and test execution; done is never an edit lock."
               }
             }
           ],
@@ -1021,7 +1021,7 @@
           "schema": "starci/specification-policy@1",
           "storage": ".starciwork",
           "payload": "business/overview/index.yaml plus recursive business/srs/**/index.yaml leaves carrying extensions.work3.specification; branches aggregate.",
-          "sourceTruth": "observed-not-approved-intent",
+          "sourceTruth": "Current accepted Business/SRS in .starciwork and actual authorized intent define the target; all code is legacy observation, never requirement authority.",
           "requiredSections": [
             "context",
             "actors",
@@ -1057,7 +1057,7 @@
                 "node"
               ],
               "action": {
-                "en": "Resolve the canonical .starciwork workspace and selected business leaf. Research accepted intent, domain documents and current FE/BE callers at exact revisions. Classify every citation as accepted intent, observed source, proposal or unknown; source behavior never approves policy."
+                "en": "Resolve the canonical .starciwork workspace and current accepted business scope before authoring. Read docs/source-of-trust.md and research authorized intent and domain documents first. Existing code, including newly tested code, is legacy observation rather than requirement authority; consult it only when relevant to an explicitly requested implementation-gap observation. Classify citations as accepted intent, observed source, proposal or unknown. Never infer the intended product or constrain its flows from existing FE/BE behavior."
               }
             },
             {
@@ -1082,7 +1082,7 @@
                 "node"
               ],
               "action": {
-                "en": "Every FR resolves to a detailed flow, not a title alone: trigger, primary/supporting actors, inputs, preconditions, numbered actor/request/system-response steps, guards, effects, failures, repeat behavior and success/failure postconditions. Alternative and exception branches identify their starting step, condition, ordered steps, resume/end and acceptance. Review denied/invalid input, cancellation, duplicate/retry, concurrency and recovery where relevant; explain absent branch classes without fabricating cases."
+                "en": "Trace each FR through a complete user journey, not a title alone: trigger, primary/supporting actors, inputs, preconditions, numbered actor/request/system-response steps, guards, effects, failures, repeat behavior and success/failure postconditions. Distinguish product users from external parties served on their behalf, initiators from recipients, and receipt of a request from completed work. Alternative and exception branches identify their starting step, condition, ordered steps, resume/end and acceptance. Proactively challenge denied/invalid input, cancellation, duplicate/retry, concurrency, partial failure, lost outcomes and recovery where relevant; explain absent branch classes without fabricating cases. Analysis is not perfect foresight: a gap found during review, coding, testing or later customer feedback enters the same authorized canonical SRS/SDS repair loop even after done."
               }
             },
             {
@@ -1132,7 +1132,7 @@
                 "evidence"
               ],
               "action": {
-                "en": "Validate detailed requirement/flow/branch/acceptance coverage and the recursive Work graph. Review contradictions, scope and unresolved decisions with the user. A complete branch rolls up only from valid required leaves; draft placeholders and schema validity cannot earn done. Output reviewed business outcomes and observable security/quality acceptance for Architecture; no implementation or deployed-proof claim."
+                "en": "Validate detailed requirement/flow/branch/acceptance coverage and the recursive Work graph. Walk the complete scope as a user and downstream designer before first done; check shared boundaries, contradictory rules, observable results and significant missing cases. Resolve authorized elaboration yourself and ask the actual decision maker only for genuinely undecided business policy or scope. Repair an identified gap in its canonical owner and review affected consumers, not merely report it. A complete branch rolls up only from current reviewed required leaves; draft placeholders, green code tests and schema validity cannot earn done. Output reviewed business outcomes and observable security/quality acceptance for Architecture; no implementation or deployed-proof claim."
               }
             }
           ],
