@@ -137,7 +137,9 @@ test('workspace plaintext credential fields are rejected without printing values
 test('artifact directories cannot smuggle completion nodes into the tree',t=>{
   for(const p of ['biz/evidence/run/hidden','biz/assets/hidden','_resources/custom/hidden','biz/EVIDENCE/run/hidden']) {
     const f=fixture(t);f.node('biz');f.node(p,{id:'smuggled',state:'na',naReason:'fake artifact completion'});
-    const r=f.run();assert.ok(codes(r).includes('LAYOUT'));assert.ok(!r.nodes.some(n=>n.id==='smuggled'));assert.equal(r.nodes[0].effectiveState,'invalid');
+    const r=f.run();assert.ok(!r.nodes.some(n=>n.id==='smuggled'));
+    if(p.startsWith('biz/assets/')){assert.ok(r.ok);assert.equal(r.nodes[0].effectiveState,'todo');}
+    else {assert.ok(codes(r).includes('LAYOUT'));assert.equal(r.nodes[0].effectiveState,'invalid');}
   }
 });
 test('changing reasoned NA scope invalidates dependent proof while bare state does not change digest',t=>{

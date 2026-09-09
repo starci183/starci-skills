@@ -121,6 +121,10 @@ Finishing one workflow does not finish the Plan. Passing metadata validation doe
 
 See [Business overview and nested SRS](docs/business-srs.md) for the `business/overview/index.yaml` and `business/srs/**/index.yaml` layout, a complete worked example and version-1 migration boundaries.
 
+See [Expandable Work tree](docs/work-tree.md) for recursive Business, Architecture,
+UI, BE/FE and UAT scopes, collocated images/videos, `interface.draw` ownership and
+editing completed work. Screens and assets are not limited to a fixed template.
+
 ## Execution modes
 
 | Mode | Use it for | Boundary |

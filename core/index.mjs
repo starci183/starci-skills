@@ -101,21 +101,24 @@ function validate(root,completions=null,candidate=null) {
   const workspace=read(path.join(absolute,'workspace.yaml'));
   if (workspace) register(workspace,'workspace');
   function hasCanonicalNode(dir){
-    try{return fs.readdirSync(dir,{withFileTypes:true}).some(ent=>{if(ent.name==='.git'||ent.name.startsWith('_'))return false;const p=path.join(dir,ent.name);if(ent.isDirectory())return hasCanonicalNode(p);if(ent.name!=='index.yaml')return false;try{return /(?:^|\n)\s*schema:\s*work\/node@2(?:\s|$)/.test(fs.readFileSync(p,'utf8'));}catch{return false;}});}catch{return false;}
+    try{return fs.readdirSync(dir,{withFileTypes:true}).some(ent=>{if(ent.name==='.git'||ent.name==='assets'||ent.name.startsWith('_'))return false;const p=path.join(dir,ent.name);if(ent.isDirectory())return hasCanonicalNode(p);if(ent.name!=='index.yaml')return false;try{return /(?:^|\n)\s*schema:\s*work\/node@2(?:\s|$)/.test(fs.readFileSync(p,'utf8'));}catch{return false;}});}catch{return false;}
   }
   const canonicalV2=hasCanonicalNode(absolute);
-  function walk(dir) {
+  function walk(dir, inAssets=false) {
     let entries;
     try { entries=fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)); } catch { issue('READ_DIRECTORY',rel(dir),'Cannot enumerate directory.'); return; }
     for (const ent of entries) {
       if (ent.name === '.git') continue;
       const p=path.join(dir,ent.name);
       if (ent.isSymbolicLink()) { issue('SYMLINK',rel(p),'Symlinks are not accepted in canonical workspace artifacts.'); continue; }
+      // Asset folders contain payloads, not Work metadata. Still traverse them
+      // to reject symlinks; a fixture named index.yaml is not a child node.
+      if(inAssets){if(ent.isDirectory())walk(p,true);continue;}
       if (ent.isDirectory()) {
         // Only the workspace-root local state is excluded; nested underscore folders remain invalid.
         if(dir===absolute&&ent.name==='_local')continue;
         if(ent.name.startsWith('_')){if(canonicalV2)reservedDirectories.push(rel(p));else if(!['_local','_workflows','_schema','_archive'].includes(ent.name))walk(p);}
-        else walk(p);
+        else walk(p,ent.name==='assets');
         continue;
       }
       let item;
@@ -224,10 +227,10 @@ function validate(root,completions=null,candidate=null) {
       if(n.meta.investigation!==undefined&&(!object(n.meta.investigation)||!/^[a-f0-9]{64}$/.test(n.meta.investigation.contextDigest??'')))issue('INVESTIGATION',n.path,'Investigation needs the exact reviewed contextDigest.');
       if(n.meta.history!==undefined)issue('CURRENT_ONLY',n.path,'Canonical Work v2 stores current specification and status only; Git retains history.');
       if(n.meta.ui!==undefined){
-        if(path.basename(n.dir)!=='ui')issue('UI_LAYOUT',n.path,'A module UI specification belongs in module/ui/index.yaml.');
+        if(!/(?:^|\/)ui(?:\/[^/]+)*\/index\.yaml$/.test(n.path))issue('UI_LAYOUT',n.path,'A UI specification belongs at ui/index.yaml or a recursively nested scope under ui/.');
         const states=new Set((n.meta.ui.states??[]).map(s=>String(s?.name??'').toLowerCase()));for(const required of ['loading','empty','error','interaction'])if(!states.has(required))issue('UI_STATE_COVERAGE',n.path,`UI specification must describe the ${required} state.`);
       }
-      if(n.meta.implementation!==undefined&&!['frontend','backend'].includes(path.basename(n.dir)))issue('IMPLEMENTATION_LAYOUT',n.path,'Structured implementation belongs in separate implementation/frontend or implementation/backend leaf nodes.');
+      if(n.meta.implementation!==undefined&&!/(?:^|\/)implementation\/(?:frontend|backend)(?:\/[^/]+)*\/index\.yaml$/.test(n.path))issue('IMPLEMENTATION_LAYOUT',n.path,'Structured implementation belongs under implementation/frontend/ or implementation/backend/, with optional nested scopes.');
     }
     const ownedAssets=[];
     if(n.meta.assets!==undefined){
@@ -238,7 +241,7 @@ function validate(root,completions=null,candidate=null) {
         try{let file=n.dir;for(const part of parts){file=path.join(file,part);if(fs.lstatSync(file).isSymbolicLink())throw Error('symlink');}if(!within(n.dir,fs.realpathSync(file))||!fs.statSync(file).isFile())throw Error('escape');ownedAssets.push({path:value,sha256:digest(fs.readFileSync(file))});}catch{issue('NODE_ASSET_UNREADABLE',n.path,'Node asset missing, non-file or unsafe.');}
       }}
     }
-    if(n.meta.ui!==undefined){const declared=new Set((n.meta.assets??[]).map(a=>a?.path));for(const asset of n.meta.ui.assets??[]){if(!declared.has(asset?.path))issue('UI_ASSET_BINDING',n.path,'Every ui.assets path must also appear in top-level assets so its current bytes bind the UI specification.');if(!/\.png$/i.test(asset?.path??''))issue('UI_ASSET_FORMAT',n.path,'Generated UI design assets use PNG files under ui/assets.');}}
+    if(n.meta.ui!==undefined){const declared=new Set((n.meta.assets??[]).map(a=>a?.path));for(const asset of n.meta.ui.assets??[]){if(!declared.has(asset?.path))issue('UI_ASSET_BINDING',n.path,'Every ui.assets path must also appear in top-level assets so its current bytes bind the UI specification.');}}
     const localFiles=[];
     for(const value of Object.values(n.meta.uat?.localFiles??{})){
       if(!text(value)||path.isAbsolute(value)||value.includes('\\')||value.includes(':')||value.split('/').some(part=>!part||part==='.'||part==='..')){issue('LOCAL_FILE_PATH',n.path,'UAT local files must be normalized relative paths beside the owning index.yaml.');continue;}
@@ -262,7 +265,7 @@ function validate(root,completions=null,candidate=null) {
     n.refs=n.refIds.map(id=>resolve(id,n,['node','resource'])).filter(Boolean);
     if (n.children.length) {
       if ('state' in n.meta || 'completion' in n.meta) issue('BRANCH_STATE',n.path,'Branches must not store state or completion.');
-      if(n.meta.schema==='work/node@2'&&n.meta.kind==='implementation'&&n.meta.implementation!==undefined)issue('IMPLEMENTATION_PARENT',n.path,'The implementation parent is thin and derives status from frontend/backend children; it carries no implementation payload.');
+      if(n.meta.schema==='work/node@2'&&n.meta.kind==='implementation'&&path.basename(n.dir)==='implementation'&&n.meta.implementation!==undefined)issue('IMPLEMENTATION_PARENT',n.path,'The implementation parent is thin and derives status from frontend/backend children; it carries no implementation payload.');
     } else {
       if (!metadataSchema.$defs.node.properties.state.enum.includes(n.meta.state)) issue('STATE',n.path,'Leaf state must be one of the states published by work/node@1.');
       if(n.meta.schema==='work/node@2'&&!['uninvestigate','todo','done'].includes(n.meta.state))issue('STATE',n.path,'Version 2 has exactly uninvestigate, todo and done.');

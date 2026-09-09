@@ -33,7 +33,7 @@
       },
       {
         "id": "designSource",
-        "path": "N/assets/direction.png"
+        "path": "N/assets/**/<asset>"
       },
       {
         "id": "draws",

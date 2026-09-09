@@ -588,7 +588,7 @@
             "assertions"
           ],
           "content": {
-            "en": "Write the selected UI direction to module/ui/index.yaml as readable block YAML. Record a compact region-to-component map in existing ui.observations or namespaced extensions: screen/state/region, exported component and props, label/body/band anatomy, geometry/paint owner, effective tokens/fallbacks, applicable knowledge rules, source references and unresolved gaps. App-owned regions remain explicit; do not wrap every region in a card. Generated design PNGs belong under ui/assets and every ui.assets path is also declared in top-level assets for byte binding."
+            "en": "Write the selected UI direction to one or more approved UI scope nodes at module/ui/index.yaml or recursively below ui/, following schemas/work-layout.json. Each node may cover multiple screens, states, steps and viewports; split only when useful. Record a compact region-to-component map in existing ui.observations or namespaced extensions: screen/state/region, exported component and props, label/body/band anatomy, geometry/paint owner, effective tokens/fallbacks, applicable knowledge rules, source references and unresolved gaps. App-owned regions remain explicit; do not wrap every region in a card. All design files belong under their owning node assets/** and every ui.assets path is also declared in top-level assets for byte binding."
           }
         },
         {
@@ -632,13 +632,13 @@
         },
         {
           "id": "designSource",
-          "path": "N/assets/direction.png",
+          "path": "N/assets/**/<asset>",
           "fields": [
             "ui.assets:[{path,role,provenance}]",
             "assets:[{path}]"
           ],
           "content": {
-            "en": "Store generated or accepted design PNGs under module/ui/assets. Do not place them under frontend implementation or UAT."
+            "en": "Store any number of generated or accepted design files under each selected UI node assets/** in their actual formats. Names and grouping follow the represented experience, not fixed desktop.png/mobile.png slots. Describe each file role/provenance and its screen/state/viewport coverage in index.yaml. Asset folders need no index.yaml. Keep one shared owner instead of duplicate copies; consumer nodes use refs to that owner. Do not place design files under frontend implementation or UAT; those own running-page captures."
           }
         },
         {

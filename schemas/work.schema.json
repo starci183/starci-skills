@@ -1190,7 +1190,7 @@
         },
         "architecture": {
           "$ref": "#/$defs/architectureSpec",
-          "description": "Module SDS: defines the target technical design, including Saga and CQRS, while separating observations and implementation gaps."
+          "description": "Technical design for the selected scope: responsibilities, connections, storage and context-specific risks. Patterns are justified choices, not mandatory business requirements."
         },
         "implementation": {
           "$ref": "#/$defs/implementationSpec",
@@ -1202,7 +1202,7 @@
         },
         "assets": {
           "type": "array",
-          "description": "Semantic input files owned by this node under assets/. Current bytes bind dependent work; output proof files belong in evidence asset references instead.",
+          "description": "Any number of semantic input files owned by this node under assets/**. Paths are relative to this index.yaml. Images, videos, diagrams and sample documents retain their original formats; current bytes bind dependent work. Execution captures are outputs, not semantic inputs.",
           "items": {
             "$ref": "#/$defs/nodeAsset"
           }
@@ -1537,8 +1537,12 @@
       "properties": {
         "path": {
           "type": "string",
-          "pattern": "^assets/",
-          "description": "Repository-relative source or evidence path."
+          "pattern": "^assets/(?=[^\\\\:\\x00-\\x1f]*$)(?!(?:.*/)?\\.{1,2}(?:/|$))[^/]+(?:/[^/]+)*$",
+          "description": "Node-relative file under assets/, with arbitrary nested folders. No absolute paths, traversal, empty segments, backslashes or control characters."
+        },
+        "description": {
+          "$ref": "#/$defs/string",
+          "description": "What this resource illustrates or supplies. A file is not a completion or verification claim."
         }
       }
     },
@@ -1591,7 +1595,7 @@
       }
     },
     "uiSpec": {
-      "description": "UI design specification owned by module/ui/index.yaml. It defines visual intent and binds generated design PNG inputs under ui/assets; it is separate from running-page screenshots and UAT evidence.",
+      "description": "UI design specification at module/ui/index.yaml or any scoped descendant under ui/. Each node may describe multiple screens, states and viewports, and own any number of design files under its own assets/**. Assets retain their actual formats; neither two filenames nor one image per screen is prescribed. Execution screenshots and UAT captures are separate outputs.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -1687,7 +1691,7 @@
         },
         "assets": {
           "type": "array",
-          "description": "Generated or accepted design assets owned under ui/assets/.",
+          "description": "Any number of design/reference assets under this UI node's assets/**. Explain covered screens, states and viewports in role; record origin in provenance. Each path also appears in node.assets. Multiple images do not imply alternative design directions.",
           "items": {
             "type": "object",
             "additionalProperties": false,
