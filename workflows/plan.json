@@ -1,8 +1,9 @@
 {
   "schema": "starci/plan-policy@1",
+  "mode": "Omitted/manual preserves the manual sequence below. Explicit mode: auto follows auto.json for one later user-approved Plan delegation, per-goal assistant risk assessment and delegated technical acceptance. Full coverage, bounded effects, evidence and reserved human decisions remain mandatory; no global default or implicit migration.",
   "purpose": "One long-running Plan preserves the complete requested outcome; short bounded workflows execute it incrementally without shrinking the Plan to the current job.",
   "contract": "New Plans use starci/plan@2. Existing v1 Plans are readable but do not prove full coverage; never silently migrate their hashes or approvals. A new workflow goal presentation requires an explicitly reviewed v2 Plan.",
-  "location": "<backend-repository>/.starci/plans/<task-name>/index.yaml",
+  "location": "<backend-repository>/.starciwork/_local/plans/<task-name>/index.yaml",
   "format": "English YAML; present the goal to the user in config.language",
   "stage": "Plan preflight: a long-running sequence of bounded workflows, not another workflow or product Work node",
   "beforeApproval": [
@@ -16,11 +17,12 @@
     "architecture": "Service and data owners, call direction, contracts, authorization, Saga/CQRS and recovery impacts at module level.",
     "implementation": "Overall implementation outcome; backend and frontend also have separate coverage rows, even when one is genuinely not applicable. Identify repositories, directories, proposed future targets and quality gates. Freeze current source hashes and exact write ceilings only when presenting the affected workflow goal.",
     "backend": "Backend deliverables, API/data contracts and unit/E2E proof, linked to producing workflow IDs; not a vague promise to decide later.",
-    "frontend": "UI/draw, frontend code and integration deliverables linked to producing workflow IDs; preserve any explicitly requested design alternatives and user selection before implementation.",
+    "frontend": "UI/draw, frontend code and integration deliverables linked to producing workflow IDs. Plan one visual direction by default following interface.draw; never invent an A/B/C deliverable or choice checkpoint. Multiple alternatives require an explicit user request for comparison or choice and a resolved count; preserve that request and selection before implementation. Required screens/states/viewports of one direction are coverage, not alternative directions.",
     "uat": "Named sequential user flows, expected outcomes, evidence and cleanup; distinguish unit/backend E2E from browser UAT.",
     "workflows": "The complete ordered route to the terminal outcome: named jobs with purpose, Work targets, proposed path/resource ceilings, prior inputs, outputs, criteria and estimated minutes range with assumptions. Each job is a bounded segment, not a replacement Plan. Unknown future technical details belong to that job's openQuestions and are resolved at its goal checkpoint. Estimates are not promises."
   },
   "coverage": {
+    "autoASAP": "For explicitly requested auto, present the complete Plan plus the candidate initial chain, its estimate, proposed bounded budget and the later checkpoint in one delegation presentation. After actual approval, execute eligible jobs sequentially now; future job questions block only their job and successors. Keep all later stages and terminal criteria. Candidates are not authority, proven readiness or a fixed two-job limit. See workflows/auto.json.",
     "shape": "Each area has action, outcome, targets, workflowIds, evidence and reason. completionCriteria contains unique IDs, observable terminal outcomes and producing workflowIds. All references must resolve to jobs in this Plan.",
     "change": "Required work maps to producing workflows even when execution is later or currently blocked. Lack of current approval never removes an end-to-end stage.",
     "reuse": "Reuse identifies existing target and evidence references, not a future decision or a no-write permission. Validators check declared references structurally, not their truth; inspect actual evidence before relying on reuse.",
@@ -35,14 +37,14 @@
   "changes": "Business, service, authorization, schema, targets or effect-ceiling changes invalidate the affected approval and require a revised user-facing goal.",
   "cleanup": "Keep unfinished or failed scope/session drafts for resumption. After all jobs are accepted and canonical Work proof validates, remove only this scope's temporary files and owned sessions. Preserve current product evidence in Work; Git tracks product history. Never recursively delete a shared session root.",
   "legacy": "Already running jobs without a presented goal must pause and present their current changes and revised scope; never manufacture retroactive approval.",
-  "ownership": "Backend owns .starci and canonical .work; frontend resolves them through workspace bindings. Keep .starci local and ignored by Git.",
+  "ownership": "Backend owns .starciwork/_local and canonical .starciwork; frontend resolves them through workspace bindings. Keep .starciwork/_local local and ignored by Git.",
   "files": {
     "index.yaml": "Stable Plan ID and relative pointers only; no duplicate execution state.",
     "goal/index.yaml": "The whole ordered Plan plus exact current workflow goals, their bindings and digests. No history.",
     "approval/index.yaml": "Pending or actual user decision receipts for each presented goal/result; bind message provenance and hashes. Never infer approval from a task request.",
     "run/index.yaml": "Current job states, requests, accepted responses, typed handoffs and evidence references. Preserve every completed producer needed by later jobs. No attempt history."
   },
-  "storage": "One backend-owned .starci/plans/<plan-id>/ bundle. All workflows in the same Plan share this directory; never create a separate runs tree or a new Plan per workflow.",
+  "storage": "One backend-owned .starciwork/_local/plans/<plan-id>/ bundle. All workflows in the same Plan share this directory; never create a separate runs tree or a new Plan per workflow.",
   "recovery": "Incomplete writes or mismatched Plan digests block resumption; never treat file presence as approval. Keep unfinished bundles. Goal revisions require renewed approval, not overwriting a running goal.",
   "template": "plan.template.json",
   "commands": {

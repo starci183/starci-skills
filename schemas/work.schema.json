@@ -1257,7 +1257,7 @@
         },
         "businessOverview": {
           "$ref": "#/$defs/businessOverviewSpec",
-          "description": "Overall product intent in customer language, owned by .work/business/index.yaml before detailed module SRS records."
+          "description": "Overall product intent in customer language, owned by .starciwork/business/index.yaml before detailed module SRS records."
         }
       },
       "allOf": [

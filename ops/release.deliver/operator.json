@@ -12,7 +12,7 @@
   ],
   "graphPolicy": {
     "mode": "read-only",
-    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
+    "location": ".starciwork node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -173,7 +173,7 @@
       ],
       "graphPolicy": {
         "mode": "read-only",
-        "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
+        "location": ".starciwork node dependsOn/refs with direct sourceRefs and collocated assets",
         "prerequisiteState": "done",
         "dispatch": "never"
       },
@@ -226,7 +226,7 @@
             "completion.codeRefs"
           ],
           "content": {
-            "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+            "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
           }
         },
         {
@@ -384,7 +384,7 @@
       ],
       "graphPolicy": {
         "mode": "read-only",
-        "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
+        "location": ".starciwork node dependsOn/refs with direct sourceRefs and collocated assets",
         "prerequisiteState": "done",
         "dispatch": "never"
       },
@@ -405,14 +405,14 @@
         },
         {
           "id": "environment",
-          "path": ".work/_resources/environments/<environment>/resource.yaml",
+          "path": ".starciwork/_resources/environments/<environment>/resource.yaml",
           "purpose": {
             "en": "Read exact target/origins, owner, configuration revision, declared probes and allowed effects; validate live observations without inferring identity from hostname alone."
           }
         },
         {
           "id": "release",
-          "path": ".work/_resources/releases/<resource>/resource.yaml + selected quality/UAT/migration evidence",
+          "path": ".starciwork/_resources/releases/<resource>/resource.yaml + selected quality/UAT/migration evidence",
           "purpose": {
             "en": "Read immutable artifact digest, source mapping, configuration/schema compatibility, intended target/revision, required gates, deployment authority, previous safe digest and recovery limits. Quality pass is not deploy permission."
           }
@@ -444,12 +444,12 @@
             "completion.codeRefs"
           ],
           "content": {
-            "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+            "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
           }
         },
         {
           "id": "resource",
-          "path": ".work/_resources/releases/<resource>/resource.yaml",
+          "path": ".starciwork/_resources/releases/<resource>/resource.yaml",
           "fields": [
             "id",
             "kind",
@@ -640,7 +640,7 @@
       ],
       "graphPolicy": {
         "mode": "read-only",
-        "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
+        "location": ".starciwork node dependsOn/refs with direct sourceRefs and collocated assets",
         "prerequisiteState": "done",
         "dispatch": "never"
       },
@@ -654,9 +654,9 @@
         },
         {
           "id": "architecture",
-          "path": ".work/<business>/architecture/**/index.yaml",
+          "path": ".starciwork/<business>/architecture/**/index.yaml",
           "purpose": {
-            "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
+            "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .starciwork graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
           }
         },
         {
@@ -668,7 +668,7 @@
         },
         {
           "id": "environment",
-          "path": ".work/_resources/environments/<environment>/resource.yaml",
+          "path": ".starciwork/_resources/environments/<environment>/resource.yaml",
           "purpose": {
             "en": "Read exact target/origins, owner, configuration revision, declared probes and allowed effects; validate live observations without inferring identity from hostname alone."
           }
@@ -707,7 +707,7 @@
             "completion.codeRefs"
           ],
           "content": {
-            "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+            "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
           }
         },
         {

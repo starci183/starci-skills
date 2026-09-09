@@ -1,6 +1,6 @@
 {
   "schema": "starci/specification-policy@1",
-  "storage": ".work",
+  "storage": ".starciwork",
   "payload": "business + sourceRefs on one module-level work/node@2 index.yaml",
   "sourceTruth": "observed-not-approved-intent",
   "requiredSections": [
@@ -22,7 +22,7 @@
   ],
   "maxSecondaryDefinitions": 3,
   "secondaryCalls": [],
-  "completion": "Review proof and current .work validation only; never implementation, Sonar or UAT pass.",
+  "completion": "Review proof and current .starciwork validation only; never implementation, Sonar or UAT pass.",
   "handoff": "Downstream consumes accepted requirement/AC/flow IDs unchanged and architecture code/service/security scope by reference. Missing decisions block the affected handoff.",
   "op": "business.decide",
   "impactMaturity": "preliminary-observed",
@@ -37,7 +37,7 @@
         "node"
       ],
       "action": {
-        "en": "Resolve the canonical .work workspace and selected business leaf. Research accepted intent, domain documents and current FE/BE callers at exact revisions. Classify every citation as accepted intent, observed source, proposal or unknown; source behavior never approves policy."
+        "en": "Resolve the canonical .starciwork workspace and selected business leaf. Research accepted intent, domain documents and current FE/BE callers at exact revisions. Classify every citation as accepted intent, observed source, proposal or unknown; source behavior never approves policy."
       }
     },
     {
@@ -112,7 +112,7 @@
         "evidence"
       ],
       "action": {
-        "en": "Validate coverage and .work bindings; review all unresolved decisions together. Output requirements, ordered flows, acceptance, preliminary impact and security inputs for architecture/draw/planning. No automatic secondary call is defined for this op; report a missing decision and do not invent a helper. Complete only this reviewed business scope."
+        "en": "Validate coverage and .starciwork bindings; review all unresolved decisions together. Output requirements, ordered flows, acceptance, preliminary impact and security inputs for architecture/draw/planning. No automatic secondary call is defined for this op; report a missing decision and do not invent a helper. Complete only this reviewed business scope."
       }
     }
   ]

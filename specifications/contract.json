@@ -1,7 +1,7 @@
 {
   "schema": "starci/specification-contract@1",
   "payloadSchema": "starci/specification@1",
-  "storage": ".work/<business>/{business,architecture}/<piece>/index.yaml#extensions.work3.specification (legacy work/node@1 may use node.md)",
+  "storage": ".starciwork/<business>/{business,architecture}/<piece>/index.yaml#extensions.work3.specification (legacy work/node@1 may use node.md)",
   "statuses": [
     "draft",
     "blocked",

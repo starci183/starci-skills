@@ -1,6 +1,6 @@
 {
-  "name": "@starci/skills",
-  "version": "3.0.0-alpha.2",
+  "name": "starci",
+  "version": "3.0.0-alpha.3",
   "description": "StarCi: one skill, bounded workflow matrices, complete operators and verified direct tasks.",
   "license": "MIT",
   "type": "module",
@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "bin": {
-    "starci-skills": "bin/starci-skills.mjs"
+    "starci": "bin/starci.mjs"
   },
   "files": [
     "bin/",
@@ -30,6 +30,9 @@
     "scripts/",
     "docs/",
     "README.json",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
     "UPDATE.json",
     "INDEX.json",
     ".dist/",
@@ -62,7 +65,8 @@
   },
   "scripts": {
     "test": "node --test tests/*.spec.mjs",
-    "work": "node cli/main.mjs",
+    "starci": "node bin/starci.mjs",
+    "prepack": "npm run build && npm run build:check",
     "build": "node ops/generate.mjs && node scripts/build-workflows.mjs",
     "build:check": "node scripts/build-workflows.mjs --check",
     "build:ensure": "node scripts/ensure-build.mjs",

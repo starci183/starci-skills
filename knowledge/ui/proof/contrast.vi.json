@@ -54,7 +54,7 @@
     {
       "title": "CONTRAST-1 — Phán quyết của tương phản",
       "blocks": [
-        "Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.work` hiện tại.",
+        "Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.starciwork` hiện tại.",
         "| Case | Dùng khi | Quan sát |",
         "| --- | --- | --- |",
         "| Case 1 | Lens chạy | `COLOR-3` và `COLOR-5` được xét dựa trên màu đã đo trong mọi theme và mọi state mà coverage khai, không bao giờ dựa vào tên token |",

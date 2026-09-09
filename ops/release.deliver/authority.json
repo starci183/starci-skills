@@ -60,7 +60,7 @@
               "completion.codeRefs"
             ],
             "content": {
-              "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+              "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
             }
           },
           {
@@ -125,12 +125,12 @@
               "completion.codeRefs"
             ],
             "content": {
-              "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+              "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
             }
           },
           {
             "id": "resource",
-            "path": ".work/_resources/releases/<resource>/resource.yaml",
+            "path": ".starciwork/_resources/releases/<resource>/resource.yaml",
             "fields": [
               "id",
               "kind",
@@ -209,7 +209,7 @@
               "completion.codeRefs"
             ],
             "content": {
-              "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+              "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
             }
           },
           {

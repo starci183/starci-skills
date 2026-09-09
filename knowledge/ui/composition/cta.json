@@ -11,7 +11,7 @@
         "The variant, the semantics, the blocked states, and the order of an action group are all decided",
         "before the region is built, because each of them is a promise the rendered page then has to keep.",
         "Applicability: API examples belong to the documented Grammar family; verify installed source and",
-        "the selected `.work` specification before use. Gap labels here are findings, not dispatch commands."
+        "the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands."
       ]
     },
     {
@@ -59,7 +59,7 @@
         "Governs the final action that cannot be undone.",
         "| Case | When | Assert |",
         "| --- | --- | --- |",
-        "| Case 1 | An action irreversibly deletes, revokes, or discards valuable state | The `.work` specification carries explicit destructive copy, a confirmation proportionate to the consequence, and a typed danger action treatment |",
+        "| Case 1 | An action irreversibly deletes, revokes, or discards valuable state | The `.starciwork` specification carries explicit destructive copy, a confirmation proportionate to the consequence, and a typed danger action treatment |",
         "| Case 2 | The published `ButtonVariant` offers no danger value | A `GRAMMAR_REQUIRED` gap records it, and the CTA does not ship on the primary variant instead |",
         "| Case 3 | The direction is tempted to import the vendor danger variant, or to add local red | No vendor danger variant and no local red appears against that control |",
         "| Case 4 | The action is a reversible cancel or an ordinary negative outcome | It carries no destructive treatment and no confirmation earned by destructiveness |"
@@ -73,8 +73,8 @@
         "| --- | --- | --- |",
         "| Case 1 | A decision offers a dominant action, an alternative, and a way out | DOM order runs dominant decision, supporting alternative, then escape or recovery, as the product requires |",
         "| Case 2 | The group wraps or stacks at a narrower width | Reading order and sequential focus order are identical at every width, and no CSS `order` reverses the group |",
-        "| Case 3 | A translated label grows well past its original length | The `.work` specification names the longest label the group must hold, and the group wraps or stacks rather than overlapping at that length |",
-        "| Case 4 | Two actions live in separate regions | They belong to separate decision owners in the `.work` specification, and neither ranks against the other |"
+        "| Case 3 | A translated label grows well past its original length | The `.starciwork` specification names the longest label the group must hold, and the group wraps or stacks rather than overlapping at that length |",
+        "| Case 4 | Two actions live in separate regions | They belong to separate decision owners in the `.starciwork` specification, and neither ranks against the other |"
       ]
     },
     {
@@ -83,7 +83,7 @@
         "Which region holds the decision is [Layout](layout.json), and which anchor names it is",
         "[Hierarchy](hierarchy.json). How many effects an activation may produce and who owns pending is",
         "[Action](action.json). How scarce the dominant treatment is across the page is [Accent](accent.json),",
-        "and what happens after the action settles is [Feedback](feedback.json). What the `.work` specification must",
+        "and what happens after the action settles is [Feedback](feedback.json). What the `.starciwork` specification must",
         "enumerate about these actions is [Coverage](coverage.json). Whether the rendered control is reachable,",
         "named, and visibly focused is [Accessibility](../proof/accessibility.json) and",
         "[Focus](../proof/focus.json)."

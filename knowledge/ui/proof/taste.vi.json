@@ -21,7 +21,7 @@
         "về mật độ đo trên dữ liệu đại diện và lựa chọn được trình rõ cho người dùng, ghi trong",
         "[bản ghi bằng chứng phương án trội](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-dominant-candidate.json).",
         "Các source phía trên là ghi chú lịch sử tại commit đã ghim, không phải quyền vận hành hiện tại.",
-        "Chỉ dùng ngưỡng/rubric đã được chọn trong scope `.work`; nhãn `ship` không cấp quyền release,",
+        "Chỉ dùng ngưỡng/rubric đã được chọn trong scope `.starciwork`; nhãn `ship` không cấp quyền release,",
         "và một quyết định cũ không thay thế phê duyệt nghiệp vụ của sản phẩm hiện tại."
       ]
     },
@@ -139,7 +139,7 @@
         "| Case 2 | Dải của lớp là trần chứ không phải sàn, như với `landing` và với nửa trên của `form` và `reader` | Phần thở giữ mật độ ở dưới trần ấy là liên tục chứ không phải những túi trống rải rác. Vùng trống bị cắt thành những khoảng rời rạc sẽ bác bỏ nó |",
         "| Case 3 | Phép ước lượng được thực hiện | Các hình chữ nhật được đếm đều được gọi tên trong bản ghi bằng chứng, để người đọc thứ hai lặp lại được và ra kết quả lệch chừng mười phần trăm |",
         "| Case 4 | Một lớp bề mặt dày được chụp ở viewport hẹp | Mật độ đạt được bằng sắp thứ tự và gom nhóm, không phải bằng cách thu nhỏ mục tiêu xuống dưới ngưỡng của chúng |",
-        "| Case 5 | Mật độ phụ thuộc số bản ghi | Đo theo khối lượng fixture đại diện đã khai cho flow `.work` được chọn và định danh dataset đã quan sát. Bằng chứng dưới khối lượng ghi số thực tế/kỳ vọng và còn thiếu. Tạo dữ liệu hay seed lại cần op được cấp quyền riêng; rubric không sửa dữ liệu hoặc bỏ qua quyết định cần từ người dùng. |",
+        "| Case 5 | Mật độ phụ thuộc số bản ghi | Đo theo khối lượng fixture đại diện đã khai cho flow `.starciwork` được chọn và định danh dataset đã quan sát. Bằng chứng dưới khối lượng ghi số thực tế/kỳ vọng và còn thiếu. Tạo dữ liệu hay seed lại cần op được cấp quyền riêng; rubric không sửa dữ liệu hoặc bỏ qua quyết định cần từ người dùng. |",
         "| Case 6 | Mật độ vẫn hỏng ở khối lượng đại diện | Ô Measured ghi `data-bound` kèm khối lượng đã đo; hàng ấy giữ điểm và kết luận hỏng của nó, và `TASTE-13` Case 6 để nó ngoài verdict, nên nó không chặn quality cũng không chặn UAT |",
         "Không phải rule này: ở mật độ đó mục tiêu còn thao tác được không thuộc",
         "[A11Y-4](accessibility.vi.json)."
@@ -197,7 +197,7 @@
         "| Case 5 | Một điểm được ghi mà không có phép đo | Mục đó vô hiệu, và ống kính chưa hoàn tất cho tới khi phép đo được chụp |",
         "| Case 6 | Một hàng dưới khối lượng hoặc bị giới hạn bởi dữ liệu | Quan sát dưới khối lượng không hoàn thành đánh giá. Chỉ loại tiêu chí data-bound khi phạm vi hiện tại đã duyệt nêu rõ không áp dụng, có lý do ghi lại. Assertion bắt buộc fail vẫn fail; không ngầm cho phép seed hoặc sửa dữ liệu. |",
         "| Case 7 | Người dùng chấp nhận rõ một ngoại lệ thiết kế đã đo | Ghi tham chiếu quyết định đúng phạm vi hiện tại và phép đo đã trình cho người dùng. Giữ quan sát fail gốc; agent không được bịa duyệt hoặc âm thầm đổi assertion bắt buộc fail thành pass. Đổi phạm vi áp dụng/nghiệm thu thuộc lần sửa spec được duyệt rõ. |",
-        "| Case 8 | Phạm vi audit chọn bề mặt chính hoặc toàn bộ ma trận state | Đọc phạm vi đã duyệt của node `.work` được chọn. Thiếu mục được chọn không được hoàn thành. Gọi tên state phụ ngoài phạm vi là chưa kiểm, không phải đạt; không cần schema audit cũ hay ngân sách vòng. Audit exhaustive thiếu state đã khai còn dở; kết quả giới hạn chỉ chứng minh bề mặt đã chọn. |",
+        "| Case 8 | Phạm vi audit chọn bề mặt chính hoặc toàn bộ ma trận state | Đọc phạm vi đã duyệt của node `.starciwork` được chọn. Thiếu mục được chọn không được hoàn thành. Gọi tên state phụ ngoài phạm vi là chưa kiểm, không phải đạt; không cần schema audit cũ hay ngân sách vòng. Audit exhaustive thiếu state đã khai còn dở; kết quả giới hạn chỉ chứng minh bề mặt đã chọn. |",
         "| Case 9 | Ống kính được chấm | Cùng một người chấm đã chấm ba tấm mốc của [bộ hiệu chuẩn](calibration/calibration.json) trong cùng một vòng, và mỗi tấm mốc rơi vào đúng dải `taste` của nó trong khoảng dung sai mà file ấy công bố; bản ghi bằng chứng mang ba điểm mốc cạnh điểm của bề mặt. Một tấm mốc lệch xa hơn, hay một ống kính chấm mà không có mốc nào, thì vô hiệu, vì một điểm lấy trên một thang chưa ai chứng minh không so được với tấm khác hay với vòng trước |",
         "Tập được chấm là `TASTE-1` tới `TASTE-12`; rule này là phần số học và bản thân nó không được chấm.",
         "Năm tiêu chí chặn cửa `ship` đúng là năm thứ người đọc nhận ra trước khi đọc chữ nào: điểm nhìn,",

@@ -66,7 +66,7 @@
     {
       "title": "TRUTH-5 — The render-truth verdict",
       "blocks": [
-        "Governs how selected observations are summarized in the current `.work` node's evidence.",
+        "Governs how selected observations are summarized in the current `.starciwork` node's evidence.",
         "| Case | When | Observe |",
         "| --- | --- | --- |",
         "| Case 1 | The lens runs | `TRUTH-1` to `TRUTH-4` are judged on every capture that renders a fact, an availability, a progress signal or an outcome, each traced to the authority behind it |",

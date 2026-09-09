@@ -41,10 +41,11 @@ test('relocated package uses v3 CLI and leaves product evidence/legacy data unto
   init({ dir: root, bootstrap: true }, quiet);
   assert.equal(read(root, '.worktrees/sessions/old/state.json'), historical);
   assert.ok(read(root, 'AGENTS.md').startsWith('# Team\r\nKeep this exact custom instruction.\r\n'));
-  assert.match(read(root, '.gitignore'), /^\.work\/_local\/$/m);
-  assert.doesNotMatch(read(root, '.gitignore'), /^\/?\.work\/$/m);
+  assert.match(read(root, '.gitignore'), /^\.starciwork\/_local\/$/m);
+  assert.doesNotMatch(read(root, '.gitignore'), /^\.starcitemp\/$/m);
+  assert.doesNotMatch(read(root, '.gitignore'), /^\/?\.starciwork\/$/m);
   assert.equal(fs.existsSync(path.join(root, '.work')), false);
-  const workRoot = path.join(root, '.work');
+  const workRoot = path.join(root, '.starciwork');
   let result = work(root, ['init', workRoot, '--id', 'relocated-fixture']);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(JSON.parse(result.stdout).productWorkExecuted, false);

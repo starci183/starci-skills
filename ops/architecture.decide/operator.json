@@ -10,7 +10,7 @@
   "sideEffects": [],
   "graphPolicy": {
     "mode": "selected-scope-only",
-    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
+    "location": ".starciwork node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -24,9 +24,9 @@
     },
     {
       "id": "business",
-      "path": ".work/<business>/business/**/index.yaml",
+      "path": ".starciwork/<business>/business/**/index.yaml",
       "purpose": {
-        "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
+        "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
       }
     },
     {
@@ -47,7 +47,7 @@
       "id": "specification",
       "path": "architecture.decide/specification.json + specifications/contract.json",
       "purpose": {
-        "en": "Read the JSON field contract and this operator procedure before authoring the .work payload."
+        "en": "Read the JSON field contract and this operator procedure before authoring the .starciwork payload."
       }
     },
     {
@@ -68,7 +68,7 @@
   "writes": [
     {
       "id": "node",
-      "path": ".work/<business>/architecture/<piece>/index.yaml",
+      "path": ".starciwork/<business>/architecture/<piece>/index.yaml",
       "fields": [
         "architecture",
         "sourceRefs",
@@ -212,7 +212,7 @@
         "matrixHandoff"
       ],
       "action": {
-        "en": "Validate .work and requirement→flow→code/service→security→AC coverage. Write the JSON specification into extensions.work3.specification before review digest, with actual source-map/review evidence. Output code/service impact, contracts, security controls and verification plan to backend/FE implement; unresolved required ownership/compatibility decisions block handoff. No secondary is defined; do not invent calls. Design completion does not complete implementation or UAT. Require serviceCalls, patternDecisions and securityReview JSON and reject unresolved routing/pattern/security blockers before handoff. Record documentation citations separately from source evidence; a passing structural validator cannot prove a deployed endpoint or security control. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+        "en": "Validate .starciwork and requirement→flow→code/service→security→AC coverage. Write the JSON specification into extensions.work3.specification before review digest, with actual source-map/review evidence. Output code/service impact, contracts, security controls and verification plan to backend/FE implement; unresolved required ownership/compatibility decisions block handoff. No secondary is defined; do not invent calls. Design completion does not complete implementation or UAT. Require serviceCalls, patternDecisions and securityReview JSON and reject unresolved routing/pattern/security blockers before handoff. Record documentation citations separately from source evidence; a passing structural validator cannot prove a deployed endpoint or security control. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
       }
     }
   ],
@@ -232,7 +232,7 @@
     {
       "id": "impact-security-coverage",
       "requirement": {
-        "en": "Every selected flow resolves cited code/service impact, security controls and acceptance; proposed/unknown facts remain explicit. Validate the JSON specification and .work before review completion."
+        "en": "Every selected flow resolves cited code/service impact, security controls and acceptance; proposed/unknown facts remain explicit. Validate the JSON specification and .starciwork before review completion."
       }
     }
   ],

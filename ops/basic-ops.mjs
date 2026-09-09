@@ -7,7 +7,7 @@ export function basicOps(operators) {
   return {
     schema: 'starci/basic-ops@1',
     limits: { sequentialSteps: 3, parallelPrimaries: 3, primarySlots: 9, secondaryDefinitionsPerPrimary: 3 },
-    storage: '.work',
+    storage: '.starciwork',
     scope: 'Operator-library contracts only; executing a product flow requires its actual accepted scope and bound resources.',
     ops: basicIds.map(id => {
       const op = operators.find(x => x.id === id);
@@ -21,7 +21,7 @@ export function basicOps(operators) {
       };
     }),
     handoffs: [
-      { from: 'business.decide', to: 'architecture.decide', output: '.work business node and specification', input: 'declared business refs/dependencies', invariant: 'Preserve selected accepted requirements, acceptance IDs and canonical journeys.' },
+      { from: 'business.decide', to: 'architecture.decide', output: '.starciwork business node and specification', input: 'declared business refs/dependencies', invariant: 'Preserve selected accepted requirements, acceptance IDs and canonical journeys.' },
       { from: 'business.decide', to: 'interface.draw', output: 'specification.journeys + journeyCoverage', input: 'selected business scope and workflow journeys', invariant: 'Copy canonical journeys; do not infer browser actions from internal service calls.' },
       { from: 'architecture.decide', to: 'interface.implement, backend.implement', output: 'codeImpacts, serviceImpacts, serviceCalls, contracts, security, pattern decisions', input: 'selected architecture scope and exact write ceilings', invariant: 'Resolve target service and writer; preserve/review rows are not write grants.' },
       { from: 'interface.draw', to: 'interface.implement', output: 'E/draws.json and actual image assets', input: 'draws[]', invariant: 'All required images are opened, mapped and checked against applicable knowledge.' },

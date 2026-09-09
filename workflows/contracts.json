@@ -13,7 +13,7 @@
       "criteria"
     ],
     "context": "References to business, architecture, knowledge, repository, environment, accounts, fixtures and current authorization; never credentials. Optional execution selects the actual runtime codex/claude, active working profile, observed host model and imageGenerationAvailable. Profile policy never grants a missing tool or switches the current host.",
-    "journeys": "Ordered business journeys with id, title, entry, actor, preconditions, steps and cleanup. Steps have id, action, expected and uxChecks; each check has id, question, expected yes/no. Copy accepted business specification.journeys without reconstructing actions from internal service-call steps; journeyCoverage provides AC links in the .work specification.",
+    "journeys": "Ordered business journeys with id, title, entry, actor, preconditions, steps and cleanup. Steps have id, action, expected and uxChecks; each check has id, question, expected yes/no. Copy accepted business specification.journeys without reconstructing actions from internal service-call steps; journeyCoverage provides AC links in the .starciwork specification.",
     "criteria": "Optional extra criterion IDs per draw/implement/uat; required workflow criteria cannot be removed."
   },
   "request": {
@@ -82,7 +82,7 @@
     "failedOutput": "For fail/blocked outputs must be null; preserve failure observations and artifacts.",
     "outputsByOp": {
       "interface.draw": {
-        "draws": "Nonempty array: id, artifact image ID, screen, state, viewport {width,height}. Every image was opened and reviewed."
+        "draws": "Nonempty array: id, artifact image ID, screen, state, viewport {width,height}. Every image was opened and reviewed. Follow interface.draw's single-direction default; array length counts required screen/state/viewport images, not permission to generate competing design alternatives."
       },
       "interface.implement": {
         "flows": "Ordered ready-to-run journeys. Preserve every original journey field/step/expected/UX check; add nonempty sourcePaths per flow.",

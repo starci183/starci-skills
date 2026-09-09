@@ -6,7 +6,7 @@
     "primarySlots": 9,
     "secondaryDefinitionsPerPrimary": 3
   },
-  "storage": ".work",
+  "storage": ".starciwork",
   "scope": "Operator-library contracts only; executing a product flow requires its actual accepted scope and bound resources.",
   "ops": [
     {
@@ -40,7 +40,7 @@
           "id": "specification",
           "path": "business.decide/specification.json + specifications/contract.json",
           "purpose": {
-            "en": "Read the JSON field contract and this operator procedure before authoring the .work payload."
+            "en": "Read the JSON field contract and this operator procedure before authoring the .starciwork payload."
           }
         },
         {
@@ -61,7 +61,7 @@
       "writes": [
         {
           "id": "node",
-          "path": ".work/<business>/business/<piece>/index.yaml",
+          "path": ".starciwork/<business>/business/<piece>/index.yaml",
           "fields": [
             "business",
             "sourceRefs",
@@ -71,7 +71,7 @@
             "required"
           ],
           "content": {
-            "en": "Before module SRS work, capture the overall product in .work/business/index.yaml as businessOverview block prose using purpose, customerUnderstanding, desiredOutcome, scope and openQuestions in the customer’s natural language. Then write one compact module-level business object with purpose, inputs/outputs, scope/exclusions, actors, AI authority boundaries, functional requirements, data/states, flows, exceptions, rules, non-functional requirements, acceptance criteria and unresolved questions. Unknown numeric targets remain unresolved rather than invented. Keep citations in sourceRefs and graph bindings in refs/dependsOn; do not create per-clause nodes or IDs."
+            "en": "Before module SRS work, capture the overall product in .starciwork/business/index.yaml as businessOverview block prose using purpose, customerUnderstanding, desiredOutcome, scope and openQuestions in the customer’s natural language. Then write one compact module-level business object with purpose, inputs/outputs, scope/exclusions, actors, AI authority boundaries, functional requirements, data/states, flows, exceptions, rules, non-functional requirements, acceptance criteria and unresolved questions. Unknown numeric targets remain unresolved rather than invented. Keep citations in sourceRefs and graph bindings in refs/dependsOn; do not create per-clause nodes or IDs."
           }
         },
         {
@@ -123,7 +123,7 @@
             "node"
           ],
           "action": {
-            "en": "Resolve the canonical .work workspace and selected business leaf. Research accepted intent, domain documents and current FE/BE callers at exact revisions. Classify every citation as accepted intent, observed source, proposal or unknown; source behavior never approves policy. Resolve the execution profile and actual tool availability before selecting instruments; this does not switch the model/runtime or spawn workers."
+            "en": "Resolve the canonical .starciwork workspace and selected business leaf. Research accepted intent, domain documents and current FE/BE callers at exact revisions. Classify every citation as accepted intent, observed source, proposal or unknown; source behavior never approves policy. Resolve the execution profile and actual tool availability before selecting instruments; this does not switch the model/runtime or spawn workers."
           }
         },
         {
@@ -200,7 +200,7 @@
             "matrixHandoff"
           ],
           "action": {
-            "en": "Validate coverage and .work bindings; review all unresolved decisions together. Output requirements, ordered flows, acceptance, preliminary impact and security inputs for architecture/draw/planning. No automatic secondary call is defined for this op; report a missing decision and do not invent a helper. Complete only this reviewed business scope. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+            "en": "Validate coverage and .starciwork bindings; review all unresolved decisions together. Output requirements, ordered flows, acceptance, preliminary impact and security inputs for architecture/draw/planning. No automatic secondary call is defined for this op; report a missing decision and do not invent a helper. Complete only this reviewed business scope. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
           }
         }
       ],
@@ -220,7 +220,7 @@
         {
           "id": "impact-security-coverage",
           "requirement": {
-            "en": "Every selected flow resolves cited code/service impact, security controls and acceptance; proposed/unknown facts remain explicit. Validate the JSON specification and .work before review completion."
+            "en": "Every selected flow resolves cited code/service impact, security controls and acceptance; proposed/unknown facts remain explicit. Validate the JSON specification and .starciwork before review completion."
           }
         }
       ],
@@ -263,9 +263,9 @@
         },
         {
           "id": "business",
-          "path": ".work/<business>/business/**/index.yaml",
+          "path": ".starciwork/<business>/business/**/index.yaml",
           "purpose": {
-            "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
+            "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
           }
         },
         {
@@ -286,7 +286,7 @@
           "id": "specification",
           "path": "architecture.decide/specification.json + specifications/contract.json",
           "purpose": {
-            "en": "Read the JSON field contract and this operator procedure before authoring the .work payload."
+            "en": "Read the JSON field contract and this operator procedure before authoring the .starciwork payload."
           }
         },
         {
@@ -307,7 +307,7 @@
       "writes": [
         {
           "id": "node",
-          "path": ".work/<business>/architecture/<piece>/index.yaml",
+          "path": ".starciwork/<business>/architecture/<piece>/index.yaml",
           "fields": [
             "architecture",
             "sourceRefs",
@@ -451,7 +451,7 @@
             "matrixHandoff"
           ],
           "action": {
-            "en": "Validate .work and requirement→flow→code/service→security→AC coverage. Write the JSON specification into extensions.work3.specification before review digest, with actual source-map/review evidence. Output code/service impact, contracts, security controls and verification plan to backend/FE implement; unresolved required ownership/compatibility decisions block handoff. No secondary is defined; do not invent calls. Design completion does not complete implementation or UAT. Require serviceCalls, patternDecisions and securityReview JSON and reject unresolved routing/pattern/security blockers before handoff. Record documentation citations separately from source evidence; a passing structural validator cannot prove a deployed endpoint or security control. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+            "en": "Validate .starciwork and requirement→flow→code/service→security→AC coverage. Write the JSON specification into extensions.work3.specification before review digest, with actual source-map/review evidence. Output code/service impact, contracts, security controls and verification plan to backend/FE implement; unresolved required ownership/compatibility decisions block handoff. No secondary is defined; do not invent calls. Design completion does not complete implementation or UAT. Require serviceCalls, patternDecisions and securityReview JSON and reject unresolved routing/pattern/security blockers before handoff. Record documentation citations separately from source evidence; a passing structural validator cannot prove a deployed endpoint or security control. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
           }
         }
       ],
@@ -471,7 +471,7 @@
         {
           "id": "impact-security-coverage",
           "requirement": {
-            "en": "Every selected flow resolves cited code/service impact, security controls and acceptance; proposed/unknown facts remain explicit. Validate the JSON specification and .work before review completion."
+            "en": "Every selected flow resolves cited code/service impact, security controls and acceptance; proposed/unknown facts remain explicit. Validate the JSON specification and .starciwork before review completion."
           }
         }
       ],
@@ -502,7 +502,7 @@
     {
       "id": "interface.draw",
       "goal": {
-        "en": "Produce and inspect the requested visual direction for one business-grounded surface."
+        "en": "Produce and inspect one business-grounded visual direction by default; create multiple alternatives only when the user explicitly requests a comparison or choice."
       },
       "reads": [
         {
@@ -514,9 +514,9 @@
         },
         {
           "id": "business",
-          "path": ".work/<business>/business/**/index.yaml",
+          "path": ".starciwork/<business>/business/**/index.yaml",
           "purpose": {
-            "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
+            "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
           }
         },
         {
@@ -542,16 +542,23 @@
         },
         {
           "id": "architecture",
-          "path": ".work/<business>/architecture/**/index.yaml",
+          "path": ".starciwork/<business>/architecture/**/index.yaml",
           "purpose": {
-            "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
+            "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .starciwork graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
           }
         },
         {
           "id": "knowledge",
           "path": "knowledge/INDEX.json + applicable UI composition/presentation and actual installed family topics",
           "purpose": {
-            "en": "Read applicable knowledge and inspect the installed source family before drawing. Accepted appearance cannot invent API behavior, bypass security or contradict business."
+            "en": "Before drawing, read applicable composition, presentation and family knowledge together with the resolved package described by the grammar input. Neither knowledge snapshots nor npm source alone is sufficient for a Grammar-bound design: knowledge explains composition/ownership; the actual package and active family determine available anatomy and styling. Accepted appearance cannot invent API behavior, bypass security or contradict business."
+          }
+        },
+        {
+          "id": "grammar",
+          "path": "consuming app manifest/lockfile + resolved component package exports/types/renderers/CSS + app family root/style imports",
+          "purpose": {
+            "en": "Resolve the UI package from the actual consuming app/importer, honoring workspace aliases and bundler resolution; do not assume a monorepo-root node_modules copy is the same version. Record package identity, version, resolved path and inspected file hashes/anchors. Inspect public exports, prop types, renderer anatomy and shipped CSS, then the app's active family root, imported styles and overrides. Trace each used semantic token to the selector/variable/fallback the renderer actually consumes; a similarly named family variable is not proof it is wired. Common component imports do not imply the Core palette or family. No install, upgrade or package edit is authorized by inspection. For a genuinely unbound greenfield design, record not applicable/proposed; unavailable required package or family remains an explicit gap, never a fabricated npm match."
           }
         },
         {
@@ -579,7 +586,7 @@
             "assertions"
           ],
           "content": {
-            "en": "Write the selected UI direction to module/ui/index.yaml as readable block YAML. Generated design PNGs belong under ui/assets and every ui.assets path is also declared in top-level assets for byte binding."
+            "en": "Write the selected UI direction to module/ui/index.yaml as readable block YAML. Record a compact region-to-component map in existing ui.observations or namespaced extensions: screen/state/region, exported component and props, label/body/band anatomy, geometry/paint owner, effective tokens/fallbacks, applicable knowledge rules, source references and unresolved gaps. App-owned regions remain explicit; do not wrap every region in a card. Generated design PNGs belong under ui/assets and every ui.assets path is also declared in top-level assets for byte binding."
           }
         },
         {
@@ -597,7 +604,7 @@
             "extensions"
           ],
           "content": {
-            "en": "Retain actual generated/drawn image and tool provenance, full prompt when relevant, inspected fidelity findings and separate asset identities. A generated drawing proves no product behavior."
+            "en": "Retain actual generated/drawn image and tool provenance, the full prompt including mapped component anatomy and effective family constraints, inspected fidelity findings and separate asset identities. Review against the region-to-component map, not generic attractiveness alone. Distinguish a generated preview from a screenshot of actual components; a generated drawing proves neither exact CSS/token fidelity nor product behavior."
           }
         },
         {
@@ -669,6 +676,7 @@
             "repo",
             "architecture",
             "knowledge",
+            "grammar",
             "profile"
           ],
           "writes": [
@@ -681,14 +689,16 @@
         {
           "reads": [
             "business",
-            "design"
+            "design",
+            "target",
+            "grammar"
           ],
           "writes": [
             "evidence",
             "designSource"
           ],
           "action": {
-            "en": "Use the available appropriate tool/skill to create the requested direction; retain the actual output and provenance. Missing tool means blocked output, never a claimed generated image."
+            "en": "Create one recommended visual direction by default, not an unsolicited A/B/C set. Only an explicit user request for alternatives, comparison or choice permits multiple directions; honor the requested count (for example two or three), and clarify the count before generation if unspecified. A generic design/improvement request or approval of an assistant-invented alternatives plan does not by itself request extra directions. Required screens, states and desktop/mobile views of the same direction are coverage, not competing alternatives; produce only the images needed for that coverage. Freeze the region-to-component map before image production and carry its actual anatomy, geometry, typography, state and family constraints into the drawing prompt or code-native preview. Do not draw a generic concept first and leave FE to retrofit Grammar afterward. Use the available appropriate tool/skill and retain actual output and provenance. When exact component fidelity is requested, render the actual installed components in an authorized isolated preview; if unavailable, report the limitation instead of certifying a generated approximation. Missing tool means blocked output, never a claimed generated image."
           }
         },
         {
@@ -696,7 +706,8 @@
             "target",
             "design",
             "business",
-            "knowledge"
+            "knowledge",
+            "grammar"
           ],
           "writes": [
             "node",
@@ -704,7 +715,7 @@
             "designSource"
           ],
           "action": {
-            "en": "Open and inspect actual output for business contradictions, hierarchy, component ownership, legibility, responsive feasibility and each independent asset. Distinguish subjective judgement from measured geometry. Review every image against applicable knowledge and mapped journey states; record actual coverage and unresolved conflicts. Never pass a mandatory state using an unrelated representative image."
+            "en": "Open and inspect actual output for business contradictions, hierarchy, component ownership, legibility, responsive feasibility and each independent asset. Compare each mapped region against the resolved renderer: label inside/outside the body as actually styled, joined bands versus inset content, separators versus outlines/shadows, typography, status treatment and active family tokens. Distinguish subjective judgement from measured geometry. Review every image against applicable knowledge and mapped journey states; record actual coverage and unresolved conflicts. A material Grammar mismatch must be revised or reported as a gap, not passed as an implementation detail for FE to fix. A user's visual acceptance does not prove npm/CSS conformance or permit package overrides to match the image. Never pass a mandatory state using an unrelated representative image."
           }
         },
         {
@@ -722,7 +733,7 @@
             "matrixHandoff"
           ],
           "action": {
-            "en": "Present the actual direction. Reuse accepted choice; ask only if materially different alternatives were requested and selection remains open. Stop without frontend code. For workflow execution, Return outputs.draws as the full reviewed image array with artifact IDs and screen/state/viewport mapping. Submit the exact response to the coordinator gate; never self-advance. Write E/draws.json for FE delivery in standalone and workflow modes; include every required reviewed image and retain its real artifact bytes. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+            "en": "Present the single recommended direction and its rationale by default; do not add an alternatives vote or generate extra options for the user to eliminate. Reuse an accepted choice. Ask for selection only when the user explicitly requested multiple alternatives and selection remains open; ordinary goal/result acceptance still applies. Stop without frontend code. For workflow execution, Return outputs.draws as the full reviewed image array with artifact IDs and screen/state/viewport mapping. Submit the exact response to the coordinator gate; never self-advance. Write E/draws.json for FE delivery in standalone and workflow modes; include every required reviewed image and retain its real artifact bytes. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
           }
         }
       ],
@@ -742,7 +753,7 @@
         {
           "id": "draws-knowledge-coverage",
           "requirement": {
-            "en": "Every required journey screen/state has a reviewed image and applicable knowledge review; unresolved mandatory conflicts block handoff."
+            "en": "Every required journey screen/state has a reviewed image and applicable knowledge review. For a Grammar-bound design, retain the app-resolved package/family evidence, region-to-component map and explicit image comparison against it; package name/version alone or a generic visual pass is insufficient. Unresolved mandatory conflicts block handoff. Generated previews remain previews, not measured component conformance."
           }
         }
       ],
@@ -785,16 +796,16 @@
         },
         {
           "id": "business",
-          "path": ".work/<business>/business/**/index.yaml",
+          "path": ".starciwork/<business>/business/**/index.yaml",
           "purpose": {
-            "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
+            "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
           }
         },
         {
           "id": "architecture",
-          "path": ".work/<business>/architecture/**/index.yaml",
+          "path": ".starciwork/<business>/architecture/**/index.yaml",
           "purpose": {
-            "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
+            "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .starciwork graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
           }
         },
         {
@@ -829,12 +840,12 @@
           "id": "design",
           "path": "selected UI node index.yaml + its owned assets/*",
           "purpose": {
-            "en": "Read the actual installed component API/tokens and accepted surface/direction/state map; only require a separate visual direction if this task selected one."
+            "en": "Read the accepted surface/direction/state and region-to-component map from interface.draw when present. Re-resolve component packages from the actual consuming app, not an assumed monorepo-root copy, and check exports/props/renderers/CSS plus the active family root and effective token bindings against applicable knowledge. Report missing mapping, drift or a material image/package conflict before copying it; do not override or rebuild Grammar to make an accepted generated approximation appear exact. Only require a separate visual direction if this task selected one; an existing no-draw scope can establish its mapping directly from source."
           }
         },
         {
           "id": "environment",
-          "path": ".work/_resources/environments/<environment>/resource.yaml",
+          "path": ".starciwork/_resources/environments/<environment>/resource.yaml",
           "purpose": {
             "en": "Read exact target/origins, owner, configuration revision, declared probes and allowed effects; validate live observations without inferring identity from hostname alone."
           }
@@ -880,7 +891,7 @@
             "completion.codeRefs"
           ],
           "content": {
-            "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+            "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
           }
         },
         {
@@ -1254,16 +1265,16 @@
         },
         {
           "id": "business",
-          "path": ".work/<business>/business/**/index.yaml",
+          "path": ".starciwork/<business>/business/**/index.yaml",
           "purpose": {
-            "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
+            "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
           }
         },
         {
           "id": "architecture",
-          "path": ".work/<business>/architecture/**/index.yaml",
+          "path": ".starciwork/<business>/architecture/**/index.yaml",
           "purpose": {
-            "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
+            "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .starciwork graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
           }
         },
         {
@@ -1300,7 +1311,7 @@
             "completion.codeRefs"
           ],
           "content": {
-            "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+            "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
           }
         },
         {
@@ -1535,9 +1546,9 @@
         },
         {
           "id": "business",
-          "path": ".work/<business>/business/**/index.yaml",
+          "path": ".starciwork/<business>/business/**/index.yaml",
           "purpose": {
-            "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
+            "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
           }
         },
         {
@@ -1549,28 +1560,28 @@
         },
         {
           "id": "environment",
-          "path": ".work/_resources/environments/<environment>/resource.yaml",
+          "path": ".starciwork/_resources/environments/<environment>/resource.yaml",
           "purpose": {
             "en": "Read exact target/origins, owner, configuration revision, declared probes and allowed effects; validate live observations without inferring identity from hostname alone."
           }
         },
         {
           "id": "flows",
-          "path": "request flows[] + selected .work/<business>/uat/<flow>/**/index.yaml",
+          "path": "request flows[] + selected .starciwork/<business>/uat/<flow>/**/index.yaml",
           "purpose": {
             "en": "Read the finite ordered flows array from the accepted FE E/flows.json or its exact selected workflow request. Preserve the FE commit/runtime binding; a different served build requires reconciliation before execution. Do not regenerate or weaken business expectations. Each selected flow maps to an existing target and specifies entry, actor role, ordered actions, expected business outcomes, observed-feedback checks, fixture needs, effects and cleanup. Preserve array order and step order; no flow fan-out or successor dispatch. Material missing expectations are resolved before mutation, not guessed from current behavior."
           }
         },
         {
           "id": "accounts",
-          "path": ".work/_resources/identities/<identity>/resource.yaml + selected account requirements and sealed custody",
+          "path": ".starciwork/_resources/identities/<identity>/resource.yaml + selected account requirements and sealed custody",
           "purpose": {
             "en": "Resolve an existing suitable test account, role, membership and credential custody; otherwise create a scoped test account through the actual supported identity owner when the UAT request authorizes account setup. Reuse is the first choice, never reset a shared password. Planned identity slots must already be in selected scope; write actual provider IDs only after observing creation. Preserve reused accounts and record whether a new account is disposable or explicitly retained."
           }
         },
         {
           "id": "fixtures",
-          "path": ".work/_resources/fixtures/<fixture>/resource.yaml + actual selected database schema and seed preconditions",
+          "path": ".starciwork/_resources/fixtures/<fixture>/resource.yaml + actual selected database schema and seed preconditions",
           "purpose": {
             "en": "Inspect actual schema, constraints, existing fixture state and required preconditions. Seed prerequisites only, never pre-create the action outcome under test. Resolve database/environment identity and the run-owned namespace; do not guess SQL tables or use broad table deletion."
           }
@@ -1622,7 +1633,7 @@
             "completion.evidence"
           ],
           "content": {
-            "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+            "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
           }
         },
         {
@@ -1640,7 +1651,7 @@
         },
         {
           "id": "resources",
-          "path": ".work/_resources/identities/<identity>/resource.yaml + .work/_resources/fixtures/<fixture>/resource.yaml",
+          "path": ".starciwork/_resources/identities/<identity>/resource.yaml + .starciwork/_resources/fixtures/<fixture>/resource.yaml",
           "fields": [
             "selected identity metadata",
             "selected fixture metadata",
@@ -1935,7 +1946,7 @@
     {
       "from": "business.decide",
       "to": "architecture.decide",
-      "output": ".work business node and specification",
+      "output": ".starciwork business node and specification",
       "input": "declared business refs/dependencies",
       "invariant": "Preserve selected accepted requirements, acceptance IDs and canonical journeys."
     },

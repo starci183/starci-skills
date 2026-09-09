@@ -10,7 +10,7 @@
         "[DNA](DNA.vi.json). Một hình dạng không có trong đây không phải là idiom của nhà. Nó vẫn có thể được",
         "ghép cho định hướng sản phẩm đã duyệt khi ngữ nghĩa Common, giải phẫu family và dữ kiện sản phẩm hiện",
         "có biểu đạt được nó; chỉ việc nâng nó thành idiom dùng lại của family mới thuộc chủ family.",
-        "Chỉ dùng playbook khi family này được chọn trong spec `.work` hiện tại. Ví dụ bên dưới là",
+        "Chỉ dùng playbook khi family này được chọn trong spec `.starciwork` hiện tại. Ví dụ bên dưới là",
         "tham khảo lịch sử; đối chiếu export, renderer và CSS cài thực tế trước khi hứa một năng lực.",
         "Các mục đọc dưới đây là thao tác suy xét trong một op, không phải chain tự chạy nhiều op."
       ]
@@ -53,7 +53,7 @@
         "Thầy làm rõ ngày 2026-09-05 về hình: hình có thể làm nổi bật ý chính, giải thích nội dung, tăng nhận",
         "diện hoặc tạo điểm nhấn gợi cảm xúc phù hợp. Nhấn mạnh thị giác có chủ đích là một vai trò cụ thể;",
         "hình không bắt buộc phải là sơ đồ chức năng mới đáng dùng. Ghi chủ thể, ý hoặc claim được highlight",
-        "và thứ tự chú ý mong muốn trong node thiết kế `.work` đã chọn. Chấm kích thước, tương phản và crop",
+        "và thứ tự chú ý mong muốn trong node thiết kế `.starciwork` đã chọn. Chấm kích thước, tương phản và crop",
         "trên bề mặt đã render: hình phải hỗ trợ thứ bậc ấy, không che nội dung hoặc tranh trọng tâm với hành",
         "động chính. Khoảng trống tự nó không bao giờ là lý do thêm hình; lấp chỗ hoặc cân mật độ mà không có",
         "vai trò nội dung hay điểm nhấn thì không đạt. Ghi không dùng hình khi hình không cải thiện bố cục.",

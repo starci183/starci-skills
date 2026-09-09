@@ -31,7 +31,7 @@
       },
       {
         "id": "resources",
-        "path": ".work/_resources/identities/<identity>/resource.yaml + .work/_resources/fixtures/<fixture>/resource.yaml"
+        "path": ".starciwork/_resources/identities/<identity>/resource.yaml + .starciwork/_resources/fixtures/<fixture>/resource.yaml"
       },
       {
         "id": "evidence",

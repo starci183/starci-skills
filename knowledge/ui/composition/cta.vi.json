@@ -11,7 +11,7 @@
         "Variant, ngữ nghĩa, các trạng thái bị chặn và thứ tự của một nhóm action đều được quyết trước khi",
         "dựng vùng, bởi mỗi thứ trong số đó là một lời hứa mà trang sau khi render phải giữ.",
         "Phạm vi áp dụng: ví dụ API thuộc family Grammar đã ghi nhận; đối chiếu source cài thực tế và",
-        "đặc tả `.work` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch."
+        "đặc tả `.starciwork` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch."
       ]
     },
     {
@@ -59,7 +59,7 @@
         "Chi phối action cuối cùng mà không thể hoàn tác.",
         "| Case | Dùng khi | Khẳng định |",
         "| --- | --- | --- |",
-        "| Case 1 | Một action xoá, thu hồi hoặc vứt bỏ vĩnh viễn thứ có giá trị | Đặc tả `.work` mang copy nêu rõ tính huỷ hoại, một bước xác nhận tương xứng với hệ quả, và một treatment action danger có kiểu |",
+        "| Case 1 | Một action xoá, thu hồi hoặc vứt bỏ vĩnh viễn thứ có giá trị | Đặc tả `.starciwork` mang copy nêu rõ tính huỷ hoại, một bước xác nhận tương xứng với hệ quả, và một treatment action danger có kiểu |",
         "| Case 2 | `ButtonVariant` công khai chưa có giá trị danger | Một gap `GRAMMAR_REQUIRED` ghi nhận điều đó, và CTA không được đưa lên variant primary để thay thế |",
         "| Case 3 | Direction bị cám dỗ import variant danger của vendor, hoặc thêm màu đỏ cục bộ | Không variant danger của vendor và không màu đỏ cục bộ nào đứng cạnh control đó |",
         "| Case 4 | Action là một thao tác huỷ có thể hoàn tác hoặc một kết cục tiêu cực thường | Nó không mang treatment huỷ hoại và không mang bước xác nhận sinh ra từ tính huỷ hoại |"
@@ -73,8 +73,8 @@
         "| --- | --- | --- |",
         "| Case 1 | Một quyết định có action chủ đạo, một lựa chọn thay thế và một lối ra | Thứ tự DOM chạy từ quyết định chủ đạo, tới lựa chọn thay thế, rồi tới lối ra hoặc lối phục hồi, tuỳ sản phẩm yêu cầu |",
         "| Case 2 | Nhóm wrap hoặc xếp chồng ở bề rộng hẹp hơn | Thứ tự đọc và thứ tự focus tuần tự trùng khít nhau ở mọi bề rộng, và không CSS `order` nào đảo nhóm |",
-        "| Case 3 | Một nhãn đã dịch dài hơn hẳn bản gốc | Đặc tả `.work` gọi tên nhãn dài nhất mà nhóm phải chứa, và ở độ dài đó nhóm wrap hoặc xếp chồng chứ không chồng lấn |",
-        "| Case 4 | Hai action nằm ở hai vùng khác nhau | Chúng thuộc hai decision owner riêng trong đặc tả `.work`, và không cái nào so cấp với cái kia |"
+        "| Case 3 | Một nhãn đã dịch dài hơn hẳn bản gốc | Đặc tả `.starciwork` gọi tên nhãn dài nhất mà nhóm phải chứa, và ở độ dài đó nhóm wrap hoặc xếp chồng chứ không chồng lấn |",
+        "| Case 4 | Hai action nằm ở hai vùng khác nhau | Chúng thuộc hai decision owner riêng trong đặc tả `.starciwork`, và không cái nào so cấp với cái kia |"
       ]
     },
     {
@@ -83,7 +83,7 @@
         "Vùng nào chứa quyết định thuộc [Layout](layout.vi.json), và anchor nào gọi tên vùng thuộc",
         "[Hierarchy](hierarchy.vi.json). Một lần kích hoạt được sinh bao nhiêu hiệu ứng và ai giữ pending thuộc",
         "[Action](action.vi.json). Treatment chủ đạo khan hiếm tới đâu trên cả trang thuộc",
-        "[Accent](accent.vi.json), và sau khi action xong thì nói gì thuộc [Feedback](feedback.vi.json). Đặc tả `.work`",
+        "[Accent](accent.vi.json), và sau khi action xong thì nói gì thuộc [Feedback](feedback.vi.json). Đặc tả `.starciwork`",
         "phải liệt kê những gì về các action này thuộc [Coverage](coverage.vi.json). Control sau khi render có",
         "chạm tới được, có tên và có focus nhìn thấy được không thuộc",
         "[Accessibility](../proof/accessibility.vi.json) và [Focus](../proof/focus.vi.json)."

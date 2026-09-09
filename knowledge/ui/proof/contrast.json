@@ -56,7 +56,7 @@
     {
       "title": "CONTRAST-1 — The contrast verdict",
       "blocks": [
-        "Governs how selected observations are summarized in the current `.work` node's evidence.",
+        "Governs how selected observations are summarized in the current `.starciwork` node's evidence.",
         "| Case | When | Observe |",
         "| --- | --- | --- |",
         "| Case 1 | The lens runs | `COLOR-3` and `COLOR-5` are judged from measured colour in every theme and every state the coverage declares, never from a token name |",

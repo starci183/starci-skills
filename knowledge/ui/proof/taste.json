@@ -22,7 +22,7 @@
         "of density measured against representative data and an explicitly shown user choice, recorded in",
         "[the dominant-candidate evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-dominant-candidate.json).",
         "The sources above are historical notes at a pinned commit, not current operating authority.",
-        "Use thresholds/rubrics selected in the `.work` scope; a `ship` label grants no release authority,",
+        "Use thresholds/rubrics selected in the `.starciwork` scope; a `ship` label grants no release authority,",
         "and a historical decision cannot replace approval of the current product's business requirements."
       ]
     },
@@ -139,7 +139,7 @@
         "| Case 2 | The class's band is a ceiling rather than a floor, as it is for `landing` and for the upper half of `form` and `reader` | The breathing room that keeps density under it is continuous rather than scattered pockets. Empty area broken into unrelated gaps falsifies it |",
         "| Case 3 | The estimate is taken | The rectangles counted are named in the evidence record, so a second reader can repeat the estimate and land within about ten percent |",
         "| Case 4 | A dense class is captured at a narrow viewport | Density is achieved by ordering and grouping, not by shrinking targets below their minimum |",
-        "| Case 5 | Density depends on record count | Measure against the representative fixture volume declared for the selected `.work` flow and identify the observed dataset. Below-volume evidence records actual and expected counts and remains insufficient. Data creation or reseeding requires its own authorized op; this rubric never mutates data or bypasses a needed user decision. |",
+        "| Case 5 | Density depends on record count | Measure against the representative fixture volume declared for the selected `.starciwork` flow and identify the observed dataset. Below-volume evidence records actual and expected counts and remains insufficient. Data creation or reseeding requires its own authorized op; this rubric never mutates data or bypasses a needed user decision. |",
         "| Case 6 | The density still fails at representative volume | The Measured cell reads `data-bound` with the volume it was measured at; the row keeps its score and its fail, and `TASTE-13` Case 6 leaves it out of the verdict, so it blocks neither quality nor UAT |",
         "Not this rule: whether a target is still operable at that density is",
         "[A11Y-4](accessibility.json)."
@@ -197,7 +197,7 @@
         "| Case 5 | A score is recorded with no measurement | The entry is void, and the lens is incomplete until the measurement is captured |",
         "| Case 6 | A row is below-volume or data-bound | Below-volume observations cannot complete the assessment. Exclude a data-bound criterion only when the approved current scope explicitly makes it inapplicable, with the reason recorded. A mandatory failed assertion remains failed; no seed or mutation is implicit. |",
         "| Case 7 | A user explicitly accepts a measured design exception | Record the exact current-scope decision reference and the measurement shown to the user. Keep the original failing observation; an agent cannot invent approval or silently turn a required failed assertion into pass. Applicability/acceptance changes belong to an explicitly approved spec edit. |",
-        "| Case 8 | Audit scope selects primary surfaces or an exhaustive state matrix | Read the selected `.work` node's approved scope. Missing selected entries prevent completion. Name secondary states outside scope as untested, never passed; no obsolete audit schema or round budget is required. An exhaustive audit missing a declared state is incomplete; scope-limited results prove only the selected surfaces. |",
+        "| Case 8 | Audit scope selects primary surfaces or an exhaustive state matrix | Read the selected `.starciwork` node's approved scope. Missing selected entries prevent completion. Name secondary states outside scope as untested, never passed; no obsolete audit schema or round budget is required. An exhaustive audit missing a declared state is incomplete; scope-limited results prove only the selected surfaces. |",
         "| Case 9 | The lens is scored | The same auditor scored the three anchor sheets of [the calibration set](calibration/calibration.json) in the same round, and each anchor landed inside its `taste` band within the tolerance that file publishes; the evidence record carries the three anchor scores beside the surface's. An anchor that drifts further, or a lens scored with no anchors, is void, because a score taken on a scale nobody proved cannot be compared with another sheet's or with an earlier round's |",
         "The scored set is `TASTE-1` to `TASTE-12`; this rule is the arithmetic and is not itself scored. The",
         "five criteria that gate `ship` are the ones a reader notices before reading a word: the focal point,",

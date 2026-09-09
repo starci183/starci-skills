@@ -66,7 +66,7 @@
     {
       "title": "MOTION-5 — The motion verdict",
       "blocks": [
-        "Governs how selected observations are summarized in the current `.work` node's evidence.",
+        "Governs how selected observations are summarized in the current `.starciwork` node's evidence.",
         "| Case | When | Observe |",
         "| --- | --- | --- |",
         "| Case 1 | The lens runs | `MOTION-1` to `MOTION-4` are judged on the capture pair the coverage requires: one with the reduced-motion preference unset and one with it set to reduce |",

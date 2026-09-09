@@ -13,7 +13,10 @@ function supportingReferences(op) {
   if(['backend.implement','architecture.decide'].includes(op.id)) refs.push({path:'knowledge/patterns/be/INDEX.json',when:'Use only topics matching the actual selected backend family and source conventions.'});
   if(['interface.implement'].includes(op.id)) refs.push({path:'knowledge/patterns/fe/INDEX.json',when:'Use applicable topics for the actual installed frontend family and owner packages.'});
   if(['interface.draw','interface.implement'].includes(op.id)) refs.push({path:'knowledge/ui/composition/INDEX.json',when:'Use applicable composition topics for the accepted surface and installed family.'});
-  if(op.id==='interface.implement') refs.push({path:'knowledge/ui/presentation/INDEX.json',when:'Resolve actual installed components and tokens; do not invent rule IDs or APIs.'});
+  if(['interface.draw','interface.implement'].includes(op.id)) {
+    refs.push({path:'knowledge/ui/presentation/INDEX.json',when:'Before drawing or implementation, resolve actual installed component anatomy and token ownership alongside applicable composition rules.'});
+    refs.push({path:'knowledge/grammars/INDEX.json',when:'When Grammar is selected, read applicable family knowledge and verify it against the consuming app’s resolved package and active family CSS; snapshots do not select a family or prove current APIs.'});
+  }
   if(['interface.draw','interface.implement','review.verify'].includes(op.id)) refs.push({path:'knowledge/ui/proof/INDEX.json',when:'Only for selected visual assertions; use real measurements and captures. This does not add appearance scoring to UAT.'});
   return refs;
 }

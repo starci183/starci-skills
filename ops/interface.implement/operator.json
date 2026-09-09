@@ -15,7 +15,7 @@
   ],
   "graphPolicy": {
     "mode": "read-only",
-    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
+    "location": ".starciwork node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -29,16 +29,16 @@
     },
     {
       "id": "business",
-      "path": ".work/<business>/business/**/index.yaml",
+      "path": ".starciwork/<business>/business/**/index.yaml",
       "purpose": {
-        "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
+        "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
       }
     },
     {
       "id": "architecture",
-      "path": ".work/<business>/architecture/**/index.yaml",
+      "path": ".starciwork/<business>/architecture/**/index.yaml",
       "purpose": {
-        "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .work graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
+        "en": "Read data ownership, operations/API/events, boundaries, code-scope and rationale declared by the selected .starciwork graph; distinguish proposed paths from observed files. No universal architecture-first op chain is implied; report genuinely missing required scope before proceeding."
       }
     },
     {
@@ -73,12 +73,12 @@
       "id": "design",
       "path": "selected UI node index.yaml + its owned assets/*",
       "purpose": {
-        "en": "Read the actual installed component API/tokens and accepted surface/direction/state map; only require a separate visual direction if this task selected one."
+        "en": "Read the accepted surface/direction/state and region-to-component map from interface.draw when present. Re-resolve component packages from the actual consuming app, not an assumed monorepo-root copy, and check exports/props/renderers/CSS plus the active family root and effective token bindings against applicable knowledge. Report missing mapping, drift or a material image/package conflict before copying it; do not override or rebuild Grammar to make an accepted generated approximation appear exact. Only require a separate visual direction if this task selected one; an existing no-draw scope can establish its mapping directly from source."
       }
     },
     {
       "id": "environment",
-      "path": ".work/_resources/environments/<environment>/resource.yaml",
+      "path": ".starciwork/_resources/environments/<environment>/resource.yaml",
       "purpose": {
         "en": "Read exact target/origins, owner, configuration revision, declared probes and allowed effects; validate live observations without inferring identity from hostname alone."
       }
@@ -124,7 +124,7 @@
         "completion.codeRefs"
       ],
       "content": {
-        "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+        "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
       }
     },
     {

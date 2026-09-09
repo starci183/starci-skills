@@ -171,6 +171,21 @@ test('conditional reused domain references must resolve; a fabricated reference 
   op.supportingReferences[0].path='knowledge/patterns/not-real/INDEX.json';
   assert.ok(errors(c).includes('DOMAIN_REFERENCE'));
 });
+test('draw and FE discovery both expose applicable presentation and Grammar package knowledge',()=>{
+  const generated=JSON.parse(outputs().get('catalog.json'));
+  for(const id of ['interface.draw','interface.implement']) {
+    const refs=generated.ops.find(op=>op.id===id).supportingReferences;
+    for(const target of ['knowledge/ui/composition/INDEX.json','knowledge/ui/presentation/INDEX.json','knowledge/grammars/INDEX.json']) {
+      assert.equal(refs.filter(ref=>ref.path===target).length,1,`${id}: ${target}`);
+      assert.ok(fs.existsSync(path.join(repository,target)));
+    }
+  }
+  assert.ok(!generated.ops.find(op=>op.id==='backend.implement').supportingReferences.some(ref=>ref.path==='knowledge/grammars/INDEX.json'));
+  const draw=generated.ops.find(op=>op.id==='interface.draw').contract;
+  assert.ok(draw.reads.some(read=>read.id==='grammar'));
+  for(const step of draw.steps.slice(0,3)) assert.ok(step.reads.includes('grammar'));
+  assert.deepEqual(validateCatalog(generated,{root,repositoryRoot:repository}).errors,[]);
+});
 test('consumer graph policy cannot add prerequisites, accept NA or dispatch a successor',()=>{
   const c=fresh();const op=c.ops.find(o=>o.id==='uat.verify');
   assert.equal(op.contract.graphPolicy.mode,'read-only');

@@ -62,7 +62,7 @@
         "Tên component và prop minh hoạ family Grammar đã ghi nhận, không phải yêu cầu chung cho mọi sản phẩm.",
         "Kiểm tra export và ownership trong source package thực sự được cài ở dự án trước khi dùng.",
         "Năng lực thiếu được ghi thành gap; không bịa API hoặc tự dispatch op tiếp theo.",
-        "Lưu quyết định thiết kế trong Markdown hoặc extension có namespace của node `.work` hiện tại,",
+        "Lưu quyết định thiết kế trong Markdown hoặc extension có namespace của node `.starciwork` hiện tại,",
         "kèm assertion nghiệm thu rõ ràng; folder này không định nghĩa receipt riêng."
       ]
     }

@@ -9,7 +9,7 @@
         "Historical snapshot: `@starci/grammar@0.4.13`, source checkout",
         "`41be722701c439e76910f80a8cbb65261da72e01`, captured 2026-09-05. This is not a claim that the",
         "currently installed package has these APIs or gaps. Before use, inspect the selected repository's",
-        "manifest/lockfile, exported types, renderers and CSS; record actual source/version in `.work`.",
+        "manifest/lockfile, exported types, renderers and CSS; record actual source/version in `.starciwork`.",
         "If source is unavailable, report unverified; do not infer current APIs or defects from old tables.",
         "The tables below preserve snapshot data and need no old generator to read. [Family](family.json)",
         "explains ownership boundaries; [Idioms](idioms.json) and [Playbook](playbook.json) are composition",

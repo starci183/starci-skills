@@ -16,7 +16,7 @@
   ],
   "graphPolicy": {
     "mode": "read-only",
-    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
+    "location": ".starciwork node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -30,9 +30,9 @@
     },
     {
       "id": "business",
-      "path": ".work/<business>/business/**/index.yaml",
+      "path": ".starciwork/<business>/business/**/index.yaml",
       "purpose": {
-        "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .work graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
+        "en": "Read accepted requirements, decisions, constraints and acceptance IDs declared as relevant inputs in the selected .starciwork graph. Intent governs expected behavior; source is not a replacement. Do not invent a mandatory BA predecessor for a scope that does not require one; a needed missing input is a reported graph/scope gap, not a new dependency silently added here."
       }
     },
     {
@@ -44,28 +44,28 @@
     },
     {
       "id": "environment",
-      "path": ".work/_resources/environments/<environment>/resource.yaml",
+      "path": ".starciwork/_resources/environments/<environment>/resource.yaml",
       "purpose": {
         "en": "Read exact target/origins, owner, configuration revision, declared probes and allowed effects; validate live observations without inferring identity from hostname alone."
       }
     },
     {
       "id": "flows",
-      "path": "request flows[] + selected .work/<business>/uat/<flow>/**/index.yaml",
+      "path": "request flows[] + selected .starciwork/<business>/uat/<flow>/**/index.yaml",
       "purpose": {
         "en": "Read the finite ordered flows array from the accepted FE E/flows.json or its exact selected workflow request. Preserve the FE commit/runtime binding; a different served build requires reconciliation before execution. Do not regenerate or weaken business expectations. Each selected flow maps to an existing target and specifies entry, actor role, ordered actions, expected business outcomes, observed-feedback checks, fixture needs, effects and cleanup. Preserve array order and step order; no flow fan-out or successor dispatch. Material missing expectations are resolved before mutation, not guessed from current behavior."
       }
     },
     {
       "id": "accounts",
-      "path": ".work/_resources/identities/<identity>/resource.yaml + selected account requirements and sealed custody",
+      "path": ".starciwork/_resources/identities/<identity>/resource.yaml + selected account requirements and sealed custody",
       "purpose": {
         "en": "Resolve an existing suitable test account, role, membership and credential custody; otherwise create a scoped test account through the actual supported identity owner when the UAT request authorizes account setup. Reuse is the first choice, never reset a shared password. Planned identity slots must already be in selected scope; write actual provider IDs only after observing creation. Preserve reused accounts and record whether a new account is disposable or explicitly retained."
       }
     },
     {
       "id": "fixtures",
-      "path": ".work/_resources/fixtures/<fixture>/resource.yaml + actual selected database schema and seed preconditions",
+      "path": ".starciwork/_resources/fixtures/<fixture>/resource.yaml + actual selected database schema and seed preconditions",
       "purpose": {
         "en": "Inspect actual schema, constraints, existing fixture state and required preconditions. Seed prerequisites only, never pre-create the action outcome under test. Resolve database/environment identity and the run-owned namespace; do not guess SQL tables or use broad table deletion."
       }
@@ -117,7 +117,7 @@
         "completion.evidence"
       ],
       "content": {
-        "en": "Read the existing selected scope, expected assertions and .work graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
+        "en": "Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only state/blocker/completion here; actual observations, findings, commit mappings and remaining cleanup belong to the evidence result, not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or separately selected scope update; never add/remove them to obtain pass."
       }
     },
     {
@@ -135,7 +135,7 @@
     },
     {
       "id": "resources",
-      "path": ".work/_resources/identities/<identity>/resource.yaml + .work/_resources/fixtures/<fixture>/resource.yaml",
+      "path": ".starciwork/_resources/identities/<identity>/resource.yaml + .starciwork/_resources/fixtures/<fixture>/resource.yaml",
       "fields": [
         "selected identity metadata",
         "selected fixture metadata",

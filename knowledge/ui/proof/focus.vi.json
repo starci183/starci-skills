@@ -80,7 +80,7 @@
     {
       "title": "FOCUS-6 — Phán quyết của focus",
       "blocks": [
-        "Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.work` hiện tại.",
+        "Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.starciwork` hiện tại.",
         "| Case | Dùng khi | Quan sát |",
         "| --- | --- | --- |",
         "| Case 1 | Lens chạy | `FOCUS-1` đến `FOCUS-5` đều được xét dựa trên phần tử thật sự đang giữ focus, ở mọi state mà coverage khai |",

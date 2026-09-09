@@ -10,7 +10,7 @@
   "sideEffects": [],
   "graphPolicy": {
     "mode": "read-only",
-    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
+    "location": ".starciwork node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },

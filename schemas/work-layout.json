@@ -9,7 +9,7 @@
     "nodeAssets": "<node>/assets/<file>",
     "uatFlow": "<module>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/}",
     "evidence": "<node>/evidence/<id>/manifest.yaml",
-    "workflowSession": "sibling .starci/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}",
+    "workflowSession": "internal .starciwork/_local/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}",
     "moduleUI": "<module>/ui/{index.yaml,assets/<generated-design.png>}",
     "implementation": "<module>/implementation/{index.yaml,frontend/index.yaml,backend/index.yaml}",
     "frontendCaptures": "<module>/implementation/frontend/assets/<running-page-screenshot>"
@@ -27,10 +27,10 @@
     "Declare semantic design/source files using node.assets with paths under own assets/. Their exact bytes contribute to semantic context; conservative hashing does not ignore presumed typo-only edits.",
     "Record output screenshots/videos in evidence assets with scope: node and paths under the primary owner assets/. Output evidence is not also declared as a semantic input, avoiding self-invalidating proof.",
     "Source code remains in bound repositories; code/index.yaml tracks requirements, exact source references and completion.",
-    "All structured Work records and results use YAML. JSON and underscore-prefixed directories are rejected in canonical Work v2; central schemas stay in .claude.",
+    "All structured Work records and results use YAML. JSON and underscore-prefixed directories are rejected in canonical records, except the workspace-root _local directory reserved for excluded execution state; central schemas stay in .claude.",
     "Repository and environment provenance is written directly in sourceRefs or the owning module record. refs and dependsOn remain stable technical node IDs for digest propagation.",
     "UAT accounts.yaml uses work/disposable-accounts@1 and may contain only synthetic disposable local role, username and password values. Images and video remain original binary assets.",
-    "Workflow session traces live beside .work in .starci/plans and never enter canonical Work hashes.",
+    "Workflow session traces live inside .starciwork/_local/plans and never enter canonical Work hashes.",
     "Each module UI direction belongs to ui/index.yaml. Generated drawings and design PNGs belong under ui/assets and are declared in both ui.assets and top-level assets for byte binding.",
     "Implementation/index.yaml is a derived parent with no authored state, completion or implementation payload. Frontend and backend children separately describe actual source.",
     "Frontend assets contain screenshots of the running page, never source design PNGs. UAT screenshots and videos stay under the owning uat/<flow>/assets directory."

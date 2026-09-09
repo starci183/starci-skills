@@ -17,7 +17,7 @@
     {
       "title": "COVERAGE-1 — What the specification must enumerate",
       "blocks": [
-        "Governs the coverage declared in the selected `.work` design node's Markdown or namespaced extensions.",
+        "Governs the coverage declared in the selected `.starciwork` design node's Markdown or namespaced extensions.",
         "The categories below describe information, not additional core metadata keys or a separate receipt schema.",
         "Declare the applicable categories as explicit node assertions before verification.",
         "| Case | When | Assert |",

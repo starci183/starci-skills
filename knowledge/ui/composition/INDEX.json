@@ -60,7 +60,7 @@
         "Component and prop examples describe the documented Grammar family, not universal product requirements.",
         "Verify exports and ownership against the selected project's installed source before using them.",
         "Record an unavailable capability as a gap; do not invent an API or automatically dispatch another op.",
-        "Store selected design decisions in the current `.work` node's Markdown or namespaced extensions,",
+        "Store selected design decisions in the current `.starciwork` node's Markdown or namespaced extensions,",
         "with explicit acceptance assertions; this folder defines no separate receipt format."
       ]
     }

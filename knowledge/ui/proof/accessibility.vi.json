@@ -69,7 +69,7 @@
     {
       "title": "A11Y-5 — Phán quyết của accessibility",
       "blocks": [
-        "Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.work` hiện tại.",
+        "Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.starciwork` hiện tại.",
         "| Case | Dùng khi | Quan sát |",
         "| --- | --- | --- |",
         "| Case 1 | Lens chạy | `A11Y-1` đến `A11Y-4` đều được xét ở mọi state mà coverage khai, trong mọi bảng màu, dựa trên cây accessibility đã tính và bản render đã đo chứ không dựa vào source |",

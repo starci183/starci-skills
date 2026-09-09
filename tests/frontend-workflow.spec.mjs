@@ -65,6 +65,20 @@ test('draw outputs become FE inputs; FE flows, code and runtime become UAT input
   assert.throws(() => advance(x.root, d), /already complete/);
 });
 const same = (a, b) => assert.deepEqual(a, b);
+test('one design direction can hand off required desktop and mobile views without truncation', t => {
+  const x = fixture(t), d = draw(x);
+  d.outputs.draws.push({ id: 'draw-mobile', artifact: 'mobile-image', screen: 'example', state: 'default', viewport: { width: 390, height: 844 } });
+  const bytes = Buffer.from('Synthetic mobile view of the same direction, NOT product proof');
+  fs.writeFileSync(path.join(x.root, 'synthetic-mobile.txt'), bytes);
+  d.artifacts.push({ id: 'mobile-image', kind: 'image', path: 'synthetic-mobile.txt', sha256: crypto.createHash('sha256').update(bytes).digest('hex') });
+  assert.equal(advance(x.root, d).advanced, true);
+  same(request(x.root).inputs.draws, d.outputs.draws);
+  same(request(x.root).inputs.drawArtifacts, d.artifacts);
+  const impl = implementation(x);
+  assert.throws(() => advance(x.root, impl));
+  impl.outputs.assets.reviewedDrawIds.push('draw-mobile');
+  assert.equal(advance(x.root, impl).advanced, true);
+});
 test('bad request correlation, unknown fields, missing criteria and unpassed criteria cannot advance', t => {
   const x = fixture(t);
   for (const mutate of [r => { r.op = 'uat.verify'; }, r => { r.requestDigest = '0'.repeat(64); }, r => { r.extra = true; }, r => { r.criteria.pop(); }, r => { r.criteria[0].status = 'fail'; }]) {

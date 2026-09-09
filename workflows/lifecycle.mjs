@@ -1,7 +1,9 @@
 import {validatePlan,planProgress} from './plan.mjs';
+import {stateRoot,assertNewStoragePath,isLocalOnlyWorkspace} from './storage.mjs';
+import {assertAutoGoal,hasAutoAcceptance,verifyAutoEvidence,verifyAutoPredecessors,completeAutoPlan} from './auto.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
+import {canonicalJSON,sha256,validateWorkspace,previewCompletion} from '../core/index.mjs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {fileURLToPath} from 'node:url';
 import {validBackendRun} from './select.mjs';
@@ -18,7 +20,7 @@ const projectSkillPath=resolveProjectSkillPath();
 const matrix=(id,operation)=>{if(id==='implement-frontend')return JSON.parse(fs.readFileSync(new URL('./matrix.json',import.meta.url))).rows;const workflow=jobs.workflows.find(w=>w.id===id);if(!workflow)return undefined;const rows=structuredClone(workflow.matrix);if(workflow.operations){requireThat(workflow.operations.includes(operation),'Select exactly one supported workflow operation');rows[0][0].operation=operation;}return rows;};
 export function workStatus(root){
  requireThat(text(root)&&path.isAbsolute(root),'An absolute Work root is required');
- if(!fs.existsSync(root))return {status:'missing',route:'prepare-work'};
+ if(!fs.existsSync(root)||isLocalOnlyWorkspace(root))return {status:'missing',route:'prepare-work'};
  const recoverable=new Set(['STALE_COMPLETION','STALE_EVIDENCE','DEPENDENCY_NOT_DONE']);const checked=validateWorkspace(root),fatal=checked.errors.filter(e=>!recoverable.has(e.code));requireThat(fatal.length===0,'Existing Work is invalid; inspect it without overwriting');return {status:checked.ok?'ready':'stale'};
 }
 export function validateGoal(goal,{repositories={}}={}){
@@ -48,6 +50,38 @@ function typed(value,schema){if(schema.enum&&!schema.enum.some(v=>same(v,value))
 export function propose(goal,{workRoot,repositories={}}){const checked=validateGoal(goal,{repositories}),work=workStatus(workRoot);return {schema:'starci/workflow-run@1',goal:structuredClone(goal),...checked,goalDigest:digest({goal,workRoot,repositories}),workRoot,repositories:structuredClone(repositories),route:work.status==='missing'&&goal.workflow!=='prepare-work'?'prepare-work':goal.workflow,status:'awaiting-goal-approval',approvals:[],requests:{},responses:{}};}
 function bound(run){requireThat(run.goalDigest===digest({goal:run.goal,workRoot:run.workRoot,repositories:run.repositories})&&run.scopeDigest===digest({requestId:run.goal.requestId,originalRequest:run.goal.originalRequest,scope:run.goal.scope}),'Frozen goal or original scope was changed');}
 function decision(receipt,phase,target){requireThat(receipt?.actor==='user'&&receipt.phase===phase&&receipt.digest===target&&receipt.approved===true&&text(receipt.messageId)&&text(receipt.quote),'An actual explicit user decision bound to this digest is required');}
+function goalAuthorized(run) {
+ if(run.automatic)return assertAutoGoal(run);
+ return run.approvals.some(a=>a.actor==='user'&&a.phase==='goal'&&a.digest===run.goalDigest&&a.approved&&text(a.messageId)&&a.messageId!==run.goal.requestId&&a.replyTo===run.presentation.messageId);
+}
+function deliveryAuthorized(run) {
+ if(run.automatic){assertAutoGoal(run);verifyAutoEvidence(run);return hasAutoAcceptance(run);}
+ return run.approvals.some(a=>a.phase==='acceptance'&&a.digest===run.resultDigest&&a.actor==='user'&&a.approved);
+}
+export function preflightCompletion(run,completions) {
+ bound(run);
+ requireThat(['awaiting-acceptance','accepted'].includes(run.status)&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'A complete unchanged result is required before completion preflight');
+ requireThat(same(Object.keys(completions).sort(),[...run.goal.workTargets].sort()),'Completion preflight must cover exactly the selected leaves');
+ const current=validateWorkspace(run.workRoot);
+ requireThat(current.ok,'Current Work is invalid before completion preflight');
+ const predicted=previewCompletion(run.workRoot,completions);
+ return {ok:predicted.ok&&run.goal.workTargets.every(id=>predicted.nodes.some(n=>n.id===id&&n.children.length===0&&n.effectiveState==='done')),preview:true,goalDigest:run.goalDigest,resultDigest:run.resultDigest,completionsDigest:digest(completions),errors:predicted.errors,warnings:predicted.warnings};
+}
+export function authorizeAutoGoal(run,{authorization,assessment,priorRuns={}}) {
+ bound(run);requireThat(run.status==='awaiting-goal-approval'&&run.presentation,'Present this concrete goal before auto risk assessment');
+ const automatic={authorization:structuredClone(authorization),assessment:structuredClone(assessment)};
+ const receipt={actor:'assistant',phase:'delegated-goal',digest:run.goalDigest,authorizationDigest:digest(authorization),assessmentDigest:digest(assessment)};
+ const next={...run,automatic,approvals:[...run.approvals,receipt]};
+ assertAutoGoal(next);verifyAutoPredecessors(next,priorRuns);validateGoal(run.goal,{repositories:run.repositories});
+ requireThat(run.route===run.goal.workflow,'Missing Work requires the explicitly listed prepare-work job first');
+ return {...next,status:'approved'};
+}
+export function acceptAutoDelivery(run) {
+ bound(run);assertAutoGoal(run);
+ requireThat(run.status==='awaiting-acceptance'&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'A complete unchanged auto result is required');
+ verifyAutoEvidence(run);
+ return {...run,status:'accepted',approvals:[...run.approvals,{actor:'assistant',phase:'delegated-acceptance',approved:true,digest:run.resultDigest,authorizationDigest:digest(run.automatic.authorization)}]};
+}
 function resolvedJobQuestions(run) {
  const questions=run.presentation.scope.workflows.find(x=>x.id===run.presentation.jobId)?.openQuestions??[];
  if(!questions.length)return true;
@@ -75,26 +109,30 @@ function workBindings(run,cell){
  if(!recovering){const completed=new Set(Object.keys(run.responses).flatMap(id=>run.goal.cells.find(c=>c.id===id)?.workTargets??[]));requireThat(targets.every(n=>n.state!=='uninvestigate'&&(n.eligible||(n.blockedBy.length>0&&n.blockedBy.every(id=>completed.has(id))))),'Work targets must be investigated, unblocked and eligible; completed in-run prerequisites are allowed');}
  return targets.map(n=>({id:n.id,contextDigest:n.contextDigest,inputDigest:n.inputDigest}));
 }
-export function requestCell(run,cellId){bound(run);requireThat(run.presentation?.goalDigest===run.goalDigest&&validatePlan(run.presentation.scope,catalog).digest===run.presentation.scopeDigest,'A current presented Plan is required before dispatch');requireThat(run.approvals.some(a=>a.actor==='user'&&a.phase==='goal'&&a.digest===run.goalDigest&&a.approved&&text(a.messageId)&&a.messageId!==run.goal.requestId&&a.replyTo===run.presentation.messageId),'Missing actual bound goal approval');requireThat(['approved','running'].includes(run.status),'Goal approval and Work gate must pass before work');if(!Object.keys(run.requests).length)validateGoal(run.goal,{repositories:run.repositories});const rows=matrix(run.goal.workflow,run.goal.cells?.[0]?.operation),rowIndex=rows.findIndex(row=>row.some(c=>c.id===cellId));requireThat(rowIndex>=0&&!run.requests[cellId]&&!run.responses[cellId],'Unknown, already requested or already accepted cell');requireThat(rows.slice(0,rowIndex).flat().every(c=>run.responses[c.id]),'Previous sequential row has not passed');const cell=run.goal.cells.find(c=>c.id===cellId),inputs={};const bindings=workBindings(run,cell);for(const [key,binding]of Object.entries(cell.inputs)){const source=binding.from==='request'?run.goal.inputs:run.responses[binding.cell]?.outputs;requireThat(source&&Object.hasOwn(source,binding.key),'Missing accepted upstream output');inputs[key]=structuredClone(source[binding.key]);}const request={schema:'starci/cell-request@1',projectSkillPath,cell:cell.id,op:cell.op,operation:cell.operation??null,goalDigest:run.goalDigest,scopeDigest:run.scopeDigest,workBindings:bindings,inputs,criteria:cell.criteria,outputSchema:cell.outputSchema};request.delegationPrompt=`Open and invoke the project StarCi skill at ${projectSkillPath}. Execute workflow ${run.goal.workflow}, approved goal ${run.goalDigest}, cell ${cell.id} with operator ${cell.op}. Use Work root ${run.workRoot} and only the request-bound targets, inputs, output schema, criteria and effect ceiling in this cell request. Return the exact typed response; do not perform free-form successor work.`;return {run:{...run,status:'running',requests:{...run.requests,[cellId]:request}},request:structuredClone(request)};}
-export function acceptCell(run,response,{evidenceRoot}){bound(run);const request=run.requests[response?.cell];requireThat(run.status==='running'&&request&&!run.responses[response.cell]&&response.requestDigest===digest(request)&&response.goalDigest===run.goalDigest&&response.scopeDigest===run.scopeDigest&&response.op===request.op&&response.operation===request.operation,'Response must match the current approved request');requireThat(same(request.workBindings??[],workBindings(run,run.goal.cells.find(c=>c.id===request.cell))),'Work inputs changed after dispatch; discard this response and investigate current scope');requireThat(response.status==='pass'&&typed(response.outputs,request.outputSchema),'Response status or typed outputs failed');requireThat(Array.isArray(response.criteria)&&response.criteria.length===request.criteria.length&&new Set(response.criteria.map(c=>c.id)).size===request.criteria.length&&request.criteria.every(id=>response.criteria.some(c=>c.id===id&&c.status==='pass'&&text(c.observation)&&list(c.evidence))),'All pinned criteria need passing observations and actual evidence');requireThat(Array.isArray(response.artifacts)&&response.artifacts.length>0&&new Set(response.artifacts.map(a=>a.id)).size===response.artifacts.length,'Actual artifacts required');const base=fs.realpathSync(evidenceRoot);for(const a of response.artifacts){const file=path.resolve(base,a.path);requireThat(inside(base,file)&&fs.existsSync(file)&&inside(base,fs.realpathSync(file))&&sha256(fs.readFileSync(file))===a.sha256,'Evidence escapes, is missing or has changed');}requireThat(response.criteria.every(c=>c.evidence.every(id=>response.artifacts.some(a=>a.id===id))),'Criterion references missing artifact');const next={...run,responses:{...run.responses,[response.cell]:structuredClone(response)}};if(Object.keys(next.responses).length===run.goal.cells.length){next.status='awaiting-acceptance';next.resultDigest=digest({goalDigest:run.goalDigest,responses:next.responses});}return next;}
+export function requestCell(run,cellId){bound(run);requireThat(run.presentation?.goalDigest===run.goalDigest&&validatePlan(run.presentation.scope,catalog).digest===run.presentation.scopeDigest,'A current presented Plan is required before dispatch');requireThat(goalAuthorized(run),'Missing actual bound goal approval');requireThat(['approved','running'].includes(run.status),'Goal approval and Work gate must pass before work');if(!Object.keys(run.requests).length)validateGoal(run.goal,{repositories:run.repositories});const rows=matrix(run.goal.workflow,run.goal.cells?.[0]?.operation),rowIndex=rows.findIndex(row=>row.some(c=>c.id===cellId));requireThat(rowIndex>=0&&!run.requests[cellId]&&!run.responses[cellId],'Unknown, already requested or already accepted cell');requireThat(rows.slice(0,rowIndex).flat().every(c=>run.responses[c.id]),'Previous sequential row has not passed');const cell=run.goal.cells.find(c=>c.id===cellId),inputs={};const bindings=workBindings(run,cell);for(const [key,binding]of Object.entries(cell.inputs)){const source=binding.from==='request'?run.goal.inputs:run.responses[binding.cell]?.outputs;requireThat(source&&Object.hasOwn(source,binding.key),'Missing accepted upstream output');inputs[key]=structuredClone(source[binding.key]);}const request={schema:'starci/cell-request@1',projectSkillPath,cell:cell.id,op:cell.op,operation:cell.operation??null,goalDigest:run.goalDigest,scopeDigest:run.scopeDigest,workBindings:bindings,inputs,criteria:cell.criteria,outputSchema:cell.outputSchema};request.delegationPrompt=`Open and invoke the project StarCi skill at ${projectSkillPath}. Execute workflow ${run.goal.workflow}, approved goal ${run.goalDigest}, cell ${cell.id} with operator ${cell.op}. Use Work root ${run.workRoot} and only the request-bound targets, inputs, output schema, criteria and effect ceiling in this cell request. Return the exact typed response; do not perform free-form successor work.`;return {run:{...run,status:'running',requests:{...run.requests,[cellId]:request}},request:structuredClone(request)};}
+export function acceptCell(run,response,{evidenceRoot}){bound(run);const request=run.requests[response?.cell];requireThat(run.status==='running'&&request&&!run.responses[response.cell]&&response.requestDigest===digest(request)&&response.goalDigest===run.goalDigest&&response.scopeDigest===run.scopeDigest&&response.op===request.op&&response.operation===request.operation,'Response must match the current approved request');requireThat(same(request.workBindings??[],workBindings(run,run.goal.cells.find(c=>c.id===request.cell))),'Work inputs changed after dispatch; discard this response and investigate current scope');requireThat(response.status==='pass'&&typed(response.outputs,request.outputSchema),'Response status or typed outputs failed');requireThat(Array.isArray(response.criteria)&&response.criteria.length===request.criteria.length&&new Set(response.criteria.map(c=>c.id)).size===request.criteria.length&&request.criteria.every(id=>response.criteria.some(c=>c.id===id&&c.status==='pass'&&text(c.observation)&&list(c.evidence))),'All pinned criteria need passing observations and actual evidence');requireThat(Array.isArray(response.artifacts)&&response.artifacts.length>0&&new Set(response.artifacts.map(a=>a.id)).size===response.artifacts.length,'Actual artifacts required');const base=fs.realpathSync(evidenceRoot);for(const a of response.artifacts){const file=path.resolve(base,a.path);requireThat(inside(base,file)&&fs.existsSync(file)&&inside(base,fs.realpathSync(file))&&sha256(fs.readFileSync(file))===a.sha256,'Evidence escapes, is missing or has changed');}requireThat(response.criteria.every(c=>c.evidence.every(id=>response.artifacts.some(a=>a.id===id))),'Criterion references missing artifact');const next={...run,evidenceRoots:{...run.evidenceRoots,[response.cell]:base},responses:{...run.responses,[response.cell]:structuredClone(response)}};if(Object.keys(next.responses).length===run.goal.cells.length){next.status='awaiting-acceptance';next.resultDigest=digest({goalDigest:run.goalDigest,responses:next.responses});}return next;}
 export function acceptDelivery(run,receipt){bound(run);requireThat(run.status==='awaiting-acceptance'&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'A complete unchanged result is required');decision(receipt,'acceptance',run.resultDigest);return {...run,status:'accepted',approvals:[...run.approvals,structuredClone(receipt)]};}
-export function markWorkDone(run,completions){bound(run);requireThat(run.status==='accepted'&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'User acceptance is required before Work done');requireThat(run.approvals.some(a=>a.phase==='acceptance'&&a.digest===run.resultDigest&&a.actor==='user'&&a.approved),'Missing bound user acceptance');const before=validateWorkspace(run.workRoot);requireThat(before.ok,'Work must be valid before completion');requireThat(same(Object.keys(completions).sort(),[...run.goal.workTargets].sort()),'Completion cannot target other Work nodes');const writes=[];for(const [id,completion]of Object.entries(completions)){const node=before.nodes.find(n=>n.id===id);requireThat(node&&node.children.length===0,'Only selected leaf nodes can be marked; parents derive done');const file=path.resolve(run.workRoot,node.path);requireThat(inside(fs.realpathSync(run.workRoot),fs.realpathSync(file)),'Node escapes Work');const original=fs.readFileSync(file,'utf8');let meta,body='';if(file.endsWith('.md')){const m=original.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/);requireThat(m,'Malformed legacy node');meta=parseYaml(m[1]);body=m[2];}else meta=parseYaml(original);meta.state='done';meta.completion=completion;const bytes=file.endsWith('.md')?'---\n'+stringifyYaml(meta)+'---\n'+body:stringifyYaml(meta);writes.push({file,original,bytes});}
+export function markWorkDone(run,completions){bound(run);requireThat(run.status==='accepted'&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'User acceptance is required before Work done');requireThat(deliveryAuthorized(run),'Missing bound user acceptance');const before=validateWorkspace(run.workRoot);requireThat(before.ok,'Work must be valid before completion');requireThat(same(Object.keys(completions).sort(),[...run.goal.workTargets].sort()),'Completion cannot target other Work nodes');const preview=preflightCompletion(run,completions);requireThat(preview.ok,'Completion preflight failed; no Work files changed: '+JSON.stringify(preview.errors));const writes=[];for(const [id,completion]of Object.entries(completions)){const node=before.nodes.find(n=>n.id===id);requireThat(node&&node.children.length===0,'Only selected leaf nodes can be marked; parents derive done');const file=path.resolve(run.workRoot,node.path);requireThat(inside(fs.realpathSync(run.workRoot),fs.realpathSync(file)),'Node escapes Work');const original=fs.readFileSync(file,'utf8');let meta,body='';if(file.endsWith('.md')){const m=original.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/);requireThat(m,'Malformed legacy node');meta=parseYaml(m[1]);body=m[2];}else meta=parseYaml(original);meta.state='done';meta.completion=completion;const bytes=file.endsWith('.md')?'---\n'+stringifyYaml(meta)+'---\n'+body:stringifyYaml(meta);writes.push({file,original,bytes});}
  try{for(const w of writes){requireThat(fs.readFileSync(w.file,'utf8')===w.original,'Concurrent node change');fs.writeFileSync(w.file,w.bytes);}const verified=validateWorkspace(run.workRoot);requireThat(verified.ok&&run.goal.workTargets.every(id=>verified.nodes.find(n=>n.id===id)?.effectiveState==='done'),'Completion proof failed; Work done rolled back');return {...run,status:'done'};}catch(error){for(const w of writes)if(fs.readFileSync(w.file,'utf8')===w.bytes)fs.writeFileSync(w.file,w.original);throw error;}}
 export {digest as workflowDigest};
 export function saveRun(run,planId=run.presentation?.scope.id??run.goal.id){
  bound(run);workStatus(run.workRoot);
  requireThat(!run.presentation||planId===run.presentation.scope.id,'All workflow runs must remain in their one presented Plan bundle');
  requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(planId),'Unsafe Plan ID');
- const base=path.dirname(run.workRoot),dir=path.join(base,'.starci','plans',planId);
+ // Normalize only I/O paths: never rewrite the request-bound Work root or its digest.
+ const base=path.dirname(path.resolve(run.workRoot)),state=path.relative(base,stateRoot(run.workRoot)),dir=path.join(base,state,'plans',planId);
+ if(!fs.existsSync(path.join(dir,'goal/index.yaml')))assertNewStoragePath(dir);
  const paths=['index.yaml','goal/index.yaml','approval/index.yaml','run/index.yaml'];
- for(const relative of ['.starci','.starci/plans','.starci/plans/'+planId,...paths.map(p=>'.starci/plans/'+planId+'/'+p)]){
-  let file=path.join(base,relative);while(file!==base){requireThat(!fs.existsSync(file)||!fs.lstatSync(file).isSymbolicLink(),'Local Plan cannot follow symlinks');file=path.dirname(file);}
+ for(const relative of [state,state+'/plans',state+'/plans/'+planId,...paths.map(p=>state+'/plans/'+planId+'/'+p)]){
+  let file=path.join(base,relative);while(file!==base){requireThat(inside(base,file),'Plan ancestor escaped its owner');requireThat(!fs.existsSync(file)||!fs.lstatSync(file).isSymbolicLink(),'Local Plan cannot follow symlinks');const parent=path.dirname(file);requireThat(parent!==file,'Plan ancestor walk reached the filesystem root');file=parent;}
  }
  const read=relative=>fs.existsSync(path.join(dir,relative))?parseYaml(fs.readFileSync(path.join(dir,relative),'utf8')):null;
  const oldGoal=read('goal/index.yaml'),jobId=run.presentation?.jobId??run.goal.id;
  const plan=run.presentation?.scope??null,planDigest=plan?validatePlan(plan,catalog).digest:run.goalDigest;
  requireThat(!oldGoal||oldGoal.planDigest===planDigest||(!oldGoal.plan&&oldGoal.jobs?.[jobId]?.goalDigest===run.goalDigest),'Plan changed; present a revised Plan instead of overwriting an existing bundle');
- const goals=oldGoal?.jobs??{},approvals=read('approval/index.yaml')?.jobs??{},runs=read('run/index.yaml')?.jobs??{};
+ const oldApproval=read('approval/index.yaml'),oldExecution=read('run/index.yaml');
+ if(oldGoal)requireThat(oldApproval?.planDigest===oldGoal.planDigest&&oldExecution?.planDigest===oldGoal.planDigest,'Incomplete or mismatched Plan bundle; reconcile before saving');
+ const goals=oldGoal?.jobs??{},approvals=oldApproval?.jobs??{},runs=oldExecution?.jobs??{};
  for(const job of plan?.workflows??[]) {
   approvals[job.id]??={status:'pending',presentation:null,receipts:[]};
   runs[job.id]??={workflow:job.workflow,status:'planned',dependsOn:job.dependsOn,requests:{},responses:{},evidence:[]};
@@ -103,12 +141,30 @@ export function saveRun(run,planId=run.presentation?.scope.id??run.goal.id){
  goals[jobId]={goal:run.goal,goalDigest:run.goalDigest,scopeDigest:run.scopeDigest,workRoot:run.workRoot,repositories:run.repositories};
  approvals[jobId]={status:run.approvals.length?'recorded':'pending',presentation:run.presentation?{messageId:run.presentation.messageId,goalDigest:run.goalDigest,planDigest}:null,receipts:run.approvals};
  const {goal,presentation,approvals:receipts,repositories,workRoot,...execution}=run;runs[jobId]=execution;
+ if(oldExecution?.completion)requireThat(oldExecution.completion.planDigest===planDigest&&Object.entries(oldExecution.completion.resultDigests).every(([id,d])=>runs[id]?.status==='done'&&runs[id]?.resultDigest===d),'Completed Plan results changed; explicit revision is required');
  const documents={
   'index.yaml':{schema:'starci/plan-index@1',id:planId,goal:'goal/index.yaml',approval:'approval/index.yaml',run:'run/index.yaml'},
   'goal/index.yaml':{schema:'starci/plan-goal@1',planDigest,plan,jobs:goals},
   'approval/index.yaml':{schema:'starci/plan-approval@1',planDigest,jobs:approvals},
-  'run/index.yaml':{schema:'starci/plan-run@1',planDigest,...(plan?{status:planProgress(plan,runs)}:{}),jobs:runs}
+  'run/index.yaml':{schema:'starci/plan-run@1',planDigest,...(plan?{status:oldExecution?.completion?'done':planProgress(plan,runs)}:{}),jobs:runs,...(oldExecution?.completion?{completion:oldExecution.completion}:{})}
  };
  for(const [relative,doc]of Object.entries(documents)){const file=path.join(dir,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(doc));}
  return dir;
+}
+export function saveAutoCompletion(plan,{authorization,criteria}) {
+ const dir=path.join(stateRoot(authorization.presentation.workRoot),'plans',plan.id);
+ requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(plan.id),'Unsafe Plan ID');
+ const read=relative=>{const file=path.join(dir,relative);requireThat(fs.realpathSync(file).toLowerCase()===file.toLowerCase(),'Plan completion cannot follow links');return fs.readFileSync(file,'utf8');};
+ const goal=parseYaml(read('goal/index.yaml')),approval=parseYaml(read('approval/index.yaml')),original=read('run/index.yaml'),execution=parseYaml(original);
+ const planDigest=validatePlan(plan,catalog).digest;
+ requireThat(goal.planDigest===planDigest&&same(goal.plan,plan)&&approval.planDigest===planDigest&&execution.planDigest===planDigest,'Mismatched Plan bundle; reconcile before completion');
+ const runs={};
+ for(const job of plan.workflows) {
+  const g=goal.jobs[job.id],a=approval.jobs[job.id],r=execution.jobs[job.id];
+  requireThat(g&&a?.presentation&&r,'Missing workflow records');
+  runs[job.id]={...r,...g,approvals:a.receipts,presentation:{...a.presentation,scope:plan,scopeDigest:planDigest,jobId:job.id}};
+ }
+ const completion=completeAutoPlan(plan,{authorization,runs,criteria});
+ const file=path.join(dir,'run/index.yaml');requireThat(fs.readFileSync(file,'utf8')===original,'Concurrent Plan change');
+ fs.writeFileSync(file,stringifyYaml({...execution,status:'done',completion}));return completion;
 }

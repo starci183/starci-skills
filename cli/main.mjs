@@ -4,24 +4,26 @@ import fs from 'node:fs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {inspectStorage,assertNewStoragePath,isLocalOnlyWorkspace} from '../workflows/storage.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const opsRoot = path.resolve(moduleDir, '../ops');
-const help = `Work 3.0 — bounded, local operations
+const help = `StarCi 3.0 — bounded, local operations
 Usage:
-  work init <work-root> --id <workspace-id>
-  work validate <work-root>
-  work tree <work-root>
-  work impact <work-root> <node-or-resource-id>
-  work stale <work-root>
-  work ops
-  work op <op-id>
-  work workflows
-  work workflow <workflow-id>
-  work route <intent>
-  work plan <plan.yaml>
-  work audit-legacy <legacy-root>
+  starci workspace init <work-root> --id <workspace-id>
+  starci storage <backend-root>
+  starci validate <work-root>
+  starci tree <work-root>
+  starci impact <work-root> <node-or-resource-id>
+  starci stale <work-root>
+  starci ops
+  starci op <op-id>
+  starci workflows
+  starci workflow <workflow-id>
+  starci route <intent>
+  starci plan <plan.yaml>
+  starci audit-legacy <legacy-root>
 Work metadata uses YAML 1.2. No command runs an op,
 creates requests/responses, approves work, marks completion, or migrates legacy data.`;
 
@@ -31,7 +33,7 @@ function inside(root, target) {
 }
 
 function exactArgs(args, count) {
-  if (args.length !== count || args.some(value => !value || value.startsWith('--'))) throw new Error('Invalid arguments. Use work --help.');
+  if (args.length !== count || args.some(value => !value || value.startsWith('--'))) throw new Error('Invalid arguments. Use starci --help.');
 }
 
 function directory(root) {
@@ -95,14 +97,17 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
   try {
     const [command, ...args] = argv;
     if (!command || ['--help', '-h', 'help'].includes(command)) { emit(help); return 0; }
+    if(command==='storage'){exactArgs(args,1);const result=inspectStorage(directory(args[0]));emit(result);return result.newWorkAllowed?0:1;}
     if(command==='plan'){exactArgs(args,1);const plan=parseYaml(fs.readFileSync(args[0],'utf8'));const {propose}=await import('../workflows/lifecycle.mjs');emit(propose(plan.goal,{workRoot:plan.workRoot,repositories:plan.repositories}));return 0;}
     if (command === 'init') {
-      if (args.length !== 3 || args[1] !== '--id' || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/.test(args[2])) throw new Error('Use work init <new-work-root> --id <stable-id>.');
+      if (args.length !== 3 || args[1] !== '--id' || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/.test(args[2])) throw new Error('Use starci workspace init <new-work-root> --id <stable-id>.');
       const root = path.resolve(args[0]);
-      if (fs.existsSync(root)) throw new Error('Init requires a new root; existing data will not be modified.');
+      assertNewStoragePath(root);
+      const localOnly=isLocalOnlyWorkspace(root);
+      if (fs.existsSync(root)&&!localOnly) throw new Error('Init requires a new root or only reserved _local state; existing Work will not be modified.');
       directory(path.dirname(root));
       loadConfig(undefined, {initialize:true});
-      fs.mkdirSync(root);
+      if(!localOnly)fs.mkdirSync(root);
       fs.writeFileSync(path.join(root, 'workspace.yaml'), stringifyYaml({ schema: 'work/workspace@1', id: args[2] }), { flag: 'wx' });
       fs.mkdirSync(path.join(root,'_schema'));
       for(const name of ['work.schema'])fs.writeFileSync(path.join(root,'_schema',name+'.yaml'),stringifyYaml(JSON.parse(fs.readFileSync(path.resolve(moduleDir,'../schemas',name+'.json')))));
@@ -133,12 +138,15 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const root=path.resolve(moduleDir,'../workflows');
       const read=name=>JSON.parse(fs.readFileSync(path.join(root,name),'utf8'));
       const catalog=read('catalog.json'),jobs=read('jobs.json'),frontend=read('frontend.json');
-      const {validateWorkflowCatalog,selectWorkflow}=await import('../workflows/select.mjs');
+      const {validateWorkflowCatalog}=await import('../workflows/select.mjs');
       const checked=validateWorkflowCatalog(catalog,jobs,frontend);
       if(!checked.ok)throw Error(checked.errors.join('; '));
       if(command==='workflows')emit(catalog);
       else {
-        const selected=selectWorkflow(catalog,command==='workflow'?{workflowId:args[0],classification:{action:args[0],effectful:args[0]!=='analyze-request'},readOnly:args[0]==='analyze-request'}:{classification:{action:args[0],effectful:args[0]!=='analyze-request'},readOnly:args[0]==='analyze-request'});
+        // Catalog inspection is not effectful request classification or execution approval.
+        const entry=catalog.workflows.find(w=>w.id===args[0]||(command==='route'&&w.intent===args[0]));
+        if(!entry)throw Error('Unknown workflow or unresolved intent; inspect workflows before execution');
+        const selected={kind:'workflow',...entry,reason:'catalog-inspection'};
         const definition=selected.id===frontend.id?frontend:jobs.workflows.find(w=>w.id===selected.id);
         emit({selection:selected,definition,executed:false});
       }
@@ -185,11 +193,11 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       }
       return result.ok ? 0 : 1;
     }
-    throw new Error('Unknown command. Use work --help.');
+    throw new Error('Unknown command. Use starci --help.');
   } catch (error) {
     // Never print file content, stack traces, or JSON parser excerpts containing secret values.
     const message = error instanceof SyntaxError ? 'Malformed metadata JSON; no content echoed.' : String(error.message ?? error);
-    io.err(`work: ${message}\n`);
+    io.err(`starci: ${message}\n`);
     return 1;
   }
 }

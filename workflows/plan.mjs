@@ -5,12 +5,20 @@ const strings=x=>Array.isArray(x)&&x.every(text)&&new Set(x).size===x.length;
 export const planAreas=scope=>scope.schema==='starci/plan@2'?['business','architecture','implementation','backend','frontend','uat']:['business','architecture','implementation','uat'];
 export function planProgress(scope,jobs) {
  const states=scope.workflows.map(job=>jobs[job.id]?.status??'planned');
- if(states.every(state=>state==='done'))return 'done';
+ if(states.every(state=>state==='done'))return scope.mode==='auto'?'awaiting-terminal-review':'done';
  if(states.some(state=>['blocked','failed','awaiting-bootstrap'].includes(state)))return 'blocked';
  return states.every(state=>state==='planned')?'planned':'in-progress';
 }
 export function validatePlan(scope, catalog) {
  if(!['starci/plan@1','starci/plan@2'].includes(scope?.schema)||!text(scope.id)||!text(scope.requestId)||!text(scope.originalRequest)||!text(scope.finalOutcome)||!Array.isArray(scope.exclusions)||!Array.isArray(scope.workflows)||!scope.workflows.length) throw Error('A concrete pre-workflow scope is required');
+ if(scope.mode!==undefined&&!['manual','auto'].includes(scope.mode))throw Error('Plan mode must be manual or auto; omission preserves manual behavior');
+ if(scope.mode==='auto') {
+  if(scope.schema!=='starci/plan@2'||!scope.auto||!Number.isInteger(scope.auto.maxMinutes)||scope.auto.maxMinutes<1||scope.auto.maxMinutes>480||scope.auto.acceptance!=='verified-criteria')throw Error('Auto requires Plan v2, an explicit 1–480 minute budget and verified-criteria delegation');
+  for(const job of scope.workflows) {
+   const policy=job.auto;
+   if(!policy||!['local','isolated-test','manual'].includes(policy.environment)||!strings(policy.business)||!policy.business.length||!Array.isArray(policy.resourceEffects)||policy.resourceEffects.some(e=>!e||!job.resources.includes(e.target)||!text(e.operation)||!text(e.postcondition)))throw Error('Each auto Plan job needs an environment, business ceiling and exact resource-effect ceilings; use manual for reserved checkpoints');
+  }
+ } else if(scope.auto!==undefined||scope.workflows.some(job=>job.auto!==undefined))throw Error('Auto policy cannot be silently attached to a manual Plan');
  for(const section of planAreas(scope)) {
   const value=scope[section];
   if(!value||!['change','reuse','not-applicable'].includes(value.action)||!text(value.outcome)||!Array.isArray(value.targets))throw Error('Scope must explain business, architecture, implementation and UAT, including explicit reuse or non-applicability');

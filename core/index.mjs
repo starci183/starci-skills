@@ -22,7 +22,19 @@ export function validateWorkspace(root) {
   try { return validate(root); }
   catch { return {ok:false,errors:[{code:'MALFORMED_WORKSPACE',path:'.',message:'Malformed or unreadable workspace; no completion can be certified.'}],warnings:[],nodes:[],resources:[]}; }
 }
-function validate(root) {
+/** Predict exact leaf completion without changing any file or granting acceptance. */
+export function previewCompletion(root,completions) {
+  try {
+    if(!object(completions))throw Error('Expected completion map');
+    return {...validate(root,structuredClone(completions)),preview:true};
+  } catch {return {ok:false,preview:true,errors:[{code:'COMPLETION_PREVIEW',path:'.',message:'Invalid completion preview; no files were changed.'}],warnings:[],nodes:[],resources:[]};}
+}
+/** Validate a sealed, new evidence directory against live Work without publishing it. */
+export function previewEvidence(root,{directory,nodeId,name}) {
+  try {return {...validate(root,null,{directory,nodeId,name}),preview:true};}
+  catch {return {ok:false,preview:true,errors:[{code:'EVIDENCE_PREVIEW',path:'.',message:'Invalid staged evidence; nothing was published.'}],warnings:[],nodes:[],resources:[]};}
+}
+function validate(root,completions=null,candidate=null) {
   const errors = [], warnings = [], nodes = [], resources = [], evidence = [], jsonFiles = [], accountFiles = [], reservedDirectories = [], ids = new Map();
   const issue = (code, p, message) => errors.push({code, path:p, message});
   const warn = (code, p, message) => warnings.push({code, path:p, message});
@@ -53,6 +65,7 @@ function validate(root) {
   }
   function register(item,type) {
     item.type=type;
+    if(type==='node'&&completions&&Object.hasOwn(completions,item.meta.id))item.meta={...item.meta,state:'done',completion:completions[item.meta.id]};
     checkKeys(item.meta,metadataSchema.$defs[type],item.path);
     checkSecrets(item.meta,item.path);
     if (!text(item.meta.id) || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(item.meta.id)) issue('ID',item.path,'Stable id is required and must contain only letters, digits, dot, underscore, colon or hyphen.');
@@ -99,6 +112,8 @@ function validate(root) {
       const p=path.join(dir,ent.name);
       if (ent.isSymbolicLink()) { issue('SYMLINK',rel(p),'Symlinks are not accepted in canonical workspace artifacts.'); continue; }
       if (ent.isDirectory()) {
+        // Only the workspace-root local state is excluded; nested underscore folders remain invalid.
+        if(dir===absolute&&ent.name==='_local')continue;
         if(ent.name.startsWith('_')){if(canonicalV2)reservedDirectories.push(rel(p));else if(!['_local','_workflows','_schema','_archive'].includes(ent.name))walk(p);}
         else walk(p);
         continue;
@@ -118,6 +133,26 @@ function validate(root) {
     }
   }
   walk(absolute);
+  if(candidate) {
+    if(!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(candidate.name))throw Error('Unsafe evidence name');
+    const owner=nodes.find(n=>n.meta.id===candidate.nodeId),stage=fs.realpathSync(candidate.directory);
+    const localStaging=path.join(absolute,'_local','evidence-staging');
+    const directLocalStage=path.dirname(stage)===localStaging;
+    if(!owner||fs.lstatSync(candidate.directory).isSymbolicLink()||(within(absolute,stage)&&!directLocalStage)||!fs.statSync(stage).isDirectory())throw Error('Invalid evidence staging ownership');
+    const meta=parseYaml(fs.readFileSync(path.join(stage,'manifest.yaml'),'utf8'));
+    if(meta.nodeId!==candidate.nodeId||!Array.isArray(meta.assets))throw Error('Staged evidence owner mismatch');
+    const allowed=new Set(['manifest.yaml',...meta.assets.filter(a=>a.scope!=='node').map(a=>a.path)]);
+    const scan=dir=>{for(const ent of fs.readdirSync(dir,{withFileTypes:true})){
+      const file=path.join(dir,ent.name),relative=path.relative(stage,file).split(path.sep).join('/');
+      if(ent.isSymbolicLink()||ent.name.startsWith('_')||ent.name==='.git'||ent.name.toLowerCase().endsWith('.json')||ent.name==='manifest.yaml'&&relative!=='manifest.yaml'||['index.yaml','node.yaml','node.md','resource.yaml','accounts.yaml'].includes(ent.name))throw Error('Unsafe staged artifact');
+      if(ent.isDirectory())scan(file);else if(!ent.isFile()||!allowed.has(relative))throw Error('Unsealed staged file');
+    }};scan(stage);
+    const destination=path.join(owner.dir,'evidence',candidate.name);
+    if(fs.existsSync(destination))throw Error('Never overwrite published evidence');
+    const item={meta,body:'',markdown:false,path:rel(path.join(destination,'manifest.yaml')),file:path.join(stage,'manifest.yaml'),dir:stage};
+    register(item,'evidence');evidence.push(item);
+  }
+  if(completions)for(const id of Object.keys(completions))if(!nodes.some(n=>n.meta.id===id))issue('COMPLETION_TARGET',id,'Completion preview target does not exist.');
   const nodesByDirectory=new Map();for(const n of nodes){const items=nodesByDirectory.get(n.dir)??[];items.push(n);nodesByDirectory.set(n.dir,items);}for(const [dir,items] of nodesByDirectory)if(items.length>1)issue('NODE_FORMAT_CONFLICT',rel(dir),'A Work folder must contain exactly one node metadata file.');
   if(canonicalV2){
     for(const p of reservedDirectories)issue('RESERVED_DIRECTORY',p,'Canonical Work v2 keeps no underscore-prefixed directories; collocate owned YAML records and assets with their node.');

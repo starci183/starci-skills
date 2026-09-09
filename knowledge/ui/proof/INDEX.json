@@ -37,7 +37,7 @@
         "| [Taste](taste.json) | Whether a surface that passes every canon rule is still good enough to ship | TASTE-1 to TASTE-13 |",
         "| [UX](ux.json) | Whether a person with a task actually finished it on the running product | UX-1 to UX-12 (read by `uat.verify`) |",
         "| [Calibration](calibration/calibration.json) | The scale a scored lens is proved on: three anchor sheets (`calibration/anchor-low.html`, `anchor-mid.html`, `anchor-high.html`), each with the `taste` and `ux` band it is expected to land in and the one-line reason, plus the tolerance; read by TASTE-13 Case 9 | data, no rule of its own |",
-        "Each topic keeps its criteria and aggregation rule. Select applicable criteria in the `.work`",
+        "Each topic keeps its criteria and aggregation rule. Select applicable criteria in the `.starciwork`",
         "node before verification and bind assertions to actual runtime evidence. Rubric labels",
         "`ship`, `fix-first`, `blocked` are assessment conclusions, not node states or release authority.",
         "No receipt, response table, dispatcher or copied verdict is required between ops.",

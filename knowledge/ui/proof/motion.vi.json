@@ -66,7 +66,7 @@
     {
       "title": "MOTION-5 — Phán quyết của chuyển động",
       "blocks": [
-        "Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.work` hiện tại.",
+        "Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.starciwork` hiện tại.",
         "| Case | Dùng khi | Quan sát |",
         "| --- | --- | --- |",
         "| Case 1 | Lens chạy | `MOTION-1` đến `MOTION-4` được xét trên cặp ảnh chụp mà coverage đòi: một ảnh khi tuỳ chọn giảm chuyển động chưa bật và một ảnh khi đã bật |",

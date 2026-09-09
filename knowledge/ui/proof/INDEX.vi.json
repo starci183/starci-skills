@@ -37,7 +37,7 @@
         "| [Taste](taste.vi.json) | Một bề mặt đã qua sạch canon có đủ đẹp để ship không | TASTE-1 đến TASTE-13 |",
         "| [UX](ux.vi.json) | Một người mang theo nhiệm vụ có thật sự làm xong nó trên sản phẩm đang chạy không | UX-1 đến UX-12 (do `uat.verify` đọc) |",
         "| [Hiệu chuẩn](calibration/calibration.json) | Cái thang mà một ống kính có chấm điểm được chứng minh trên đó: ba tấm mốc (`calibration/anchor-low.html`, `anchor-mid.html`, `anchor-high.html`), mỗi tấm kèm dải `taste` và `ux` nó được kỳ vọng rơi vào cùng lý do một dòng, và khoảng dung sai; TASTE-13 Case 9 đọc nó | dữ liệu, không có rule riêng |",
-        "Mỗi topic giữ tiêu chí và phép tổng hợp riêng. Chọn tiêu chí áp dụng trong node `.work`",
+        "Mỗi topic giữ tiêu chí và phép tổng hợp riêng. Chọn tiêu chí áp dụng trong node `.starciwork`",
         "trước khi kiểm chứng; liên kết assertion với bằng chứng runtime thực tế. Các nhãn rubric",
         "`ship`, `fix-first`, `blocked` là kết luận đánh giá, không phải trạng thái node hoặc quyền release.",
         "Không bắt buộc receipt, bảng response, bộ điều phối hay sao chép verdict giữa các op.",

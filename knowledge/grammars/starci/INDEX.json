@@ -8,7 +8,7 @@
         "Historical snapshot: `@starci/grammar@0.4.13`, source checkout",
         "`41be722701c439e76910f80a8cbb65261da72e01`, captured 2026-09-05. This is not a claim that the",
         "currently installed package has these APIs or gaps. Before use, inspect the selected repository's",
-        "manifest/lockfile, exported types, renderers and CSS; record actual source/version in `.work`.",
+        "manifest/lockfile, exported types, renderers and CSS; record actual source/version in `.starciwork`.",
         "If source is unavailable, report unverified; do not infer current APIs or defects from old tables.",
         "This branch preserves observations about one visual family; it does not choose a default family",
         "or override business requirements. [UI knowledge](../../ui/INDEX.json) supplies scope-selected",

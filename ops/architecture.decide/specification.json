@@ -1,6 +1,6 @@
 {
   "schema": "starci/specification-policy@1",
-  "storage": ".work",
+  "storage": ".starciwork",
   "payload": "architecture + sourceRefs on one module-level work/node@2 index.yaml",
   "sourceTruth": "observed-not-approved-intent",
   "requiredSections": [
@@ -17,7 +17,7 @@
   ],
   "maxSecondaryDefinitions": 3,
   "secondaryCalls": [],
-  "completion": "Review proof and current .work validation only; never implementation, Sonar or UAT pass.",
+  "completion": "Review proof and current .starciwork validation only; never implementation, Sonar or UAT pass.",
   "handoff": "Downstream consumes accepted requirement/AC/flow IDs unchanged and architecture code/service/security scope by reference. Missing decisions block the affected handoff.",
   "op": "architecture.decide",
   "impactMaturity": "implementation-scoped",
@@ -112,7 +112,7 @@
         "evidence"
       ],
       "action": {
-        "en": "Validate the compact module architecture and current .work graph. Canonical index.yaml must contain target ownership, call chain, contracts, data/transaction/concurrency/security design, plus concrete Saga and CQRS designs. Put observed facts in observations and sourceRefs; record missing runtime mechanisms in gaps rather than claiming they exist. Architecture completion does not complete implementation or UAT."
+        "en": "Validate the compact module architecture and current .starciwork graph. Canonical index.yaml must contain target ownership, call chain, contracts, data/transaction/concurrency/security design, plus concrete Saga and CQRS designs. Put observed facts in observations and sourceRefs; record missing runtime mechanisms in gaps rather than claiming they exist. Architecture completion does not complete implementation or UAT."
       }
     }
   ],

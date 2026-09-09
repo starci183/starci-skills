@@ -8,7 +8,7 @@
         "Historical snapshot: `@starci/grammar@0.4.13`, source checkout",
         "`41be722701c439e76910f80a8cbb65261da72e01`, captured 2026-09-05. This is not a claim that the",
         "currently installed package has these APIs or gaps. Before use, inspect the selected repository's",
-        "manifest/lockfile, exported types, renderers and CSS; record actual source/version in `.work`.",
+        "manifest/lockfile, exported types, renderers and CSS; record actual source/version in `.starciwork`.",
         "If source is unavailable, report unverified; do not infer current APIs or defects from old tables."
       ]
     },
@@ -50,7 +50,7 @@
       "title": "Gaps",
       "blocks": [
         "Capabilities recorded as absent at the snapshot, with historical source locations in each row.",
-        "Recheck actual installed source before recording a current gap in the `.work` node; this table",
+        "Recheck actual installed source before recording a current gap in the `.starciwork` node; this table",
         "is not the sole live gap inventory and does not trigger library edits.",
         "| Component | Missing capability | Evidence |",
         "| --- | --- | --- |",

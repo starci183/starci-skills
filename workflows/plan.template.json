@@ -1,5 +1,6 @@
 {
   "schema": "starci/plan@2",
+  "mode": "manual",
   "id": "",
   "requestId": "",
   "originalRequest": "",

@@ -8,7 +8,7 @@
         "Snapshot lịch sử: `@starci/grammar@0.4.13`, source checkout",
         "`41be722701c439e76910f80a8cbb65261da72e01`, ghi nhận 2026-09-05. Đây không phải API/gap đã",
         "kiểm chứng trên package đang cài hôm nay. Trước khi dùng, đọc manifest/lockfile, export/type,",
-        "renderer và CSS thực tế của repository được chọn; ghi source/phiên bản vào node `.work`.",
+        "renderer và CSS thực tế của repository được chọn; ghi source/phiên bản vào node `.starciwork`.",
         "Nếu không có source thì ghi chưa kiểm chứng, không suy ra API hoặc lỗi hiện tại từ bảng cũ.",
         "Nhánh này giữ quan sát về một visual family, không chọn family mặc định hoặc ghi đè nghiệp vụ.",
         "[Kiến thức UI](../../ui/INDEX.vi.json) cung cấp tiêu chí tham khảo được chọn theo scope; sản phẩm sở hữu",

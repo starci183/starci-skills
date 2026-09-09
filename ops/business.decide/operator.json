@@ -10,7 +10,7 @@
   "sideEffects": [],
   "graphPolicy": {
     "mode": "selected-scope-only",
-    "location": ".work node dependsOn/refs with direct sourceRefs and collocated assets",
+    "location": ".starciwork node dependsOn/refs with direct sourceRefs and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -40,7 +40,7 @@
       "id": "specification",
       "path": "business.decide/specification.json + specifications/contract.json",
       "purpose": {
-        "en": "Read the JSON field contract and this operator procedure before authoring the .work payload."
+        "en": "Read the JSON field contract and this operator procedure before authoring the .starciwork payload."
       }
     },
     {
@@ -61,7 +61,7 @@
   "writes": [
     {
       "id": "node",
-      "path": ".work/<business>/business/<piece>/index.yaml",
+      "path": ".starciwork/<business>/business/<piece>/index.yaml",
       "fields": [
         "business",
         "sourceRefs",
@@ -71,7 +71,7 @@
         "required"
       ],
       "content": {
-        "en": "Before module SRS work, capture the overall product in .work/business/index.yaml as businessOverview block prose using purpose, customerUnderstanding, desiredOutcome, scope and openQuestions in the customer’s natural language. Then write one compact module-level business object with purpose, inputs/outputs, scope/exclusions, actors, AI authority boundaries, functional requirements, data/states, flows, exceptions, rules, non-functional requirements, acceptance criteria and unresolved questions. Unknown numeric targets remain unresolved rather than invented. Keep citations in sourceRefs and graph bindings in refs/dependsOn; do not create per-clause nodes or IDs."
+        "en": "Before module SRS work, capture the overall product in .starciwork/business/index.yaml as businessOverview block prose using purpose, customerUnderstanding, desiredOutcome, scope and openQuestions in the customer’s natural language. Then write one compact module-level business object with purpose, inputs/outputs, scope/exclusions, actors, AI authority boundaries, functional requirements, data/states, flows, exceptions, rules, non-functional requirements, acceptance criteria and unresolved questions. Unknown numeric targets remain unresolved rather than invented. Keep citations in sourceRefs and graph bindings in refs/dependsOn; do not create per-clause nodes or IDs."
       }
     },
     {
@@ -123,7 +123,7 @@
         "node"
       ],
       "action": {
-        "en": "Resolve the canonical .work workspace and selected business leaf. Research accepted intent, domain documents and current FE/BE callers at exact revisions. Classify every citation as accepted intent, observed source, proposal or unknown; source behavior never approves policy. Resolve the execution profile and actual tool availability before selecting instruments; this does not switch the model/runtime or spawn workers."
+        "en": "Resolve the canonical .starciwork workspace and selected business leaf. Research accepted intent, domain documents and current FE/BE callers at exact revisions. Classify every citation as accepted intent, observed source, proposal or unknown; source behavior never approves policy. Resolve the execution profile and actual tool availability before selecting instruments; this does not switch the model/runtime or spawn workers."
       }
     },
     {
@@ -200,7 +200,7 @@
         "matrixHandoff"
       ],
       "action": {
-        "en": "Validate coverage and .work bindings; review all unresolved decisions together. Output requirements, ordered flows, acceptance, preliminary impact and security inputs for architecture/draw/planning. No automatic secondary call is defined for this op; report a missing decision and do not invent a helper. Complete only this reviewed business scope. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+        "en": "Validate coverage and .starciwork bindings; review all unresolved decisions together. Output requirements, ordered flows, acceptance, preliminary impact and security inputs for architecture/draw/planning. No automatic secondary call is defined for this op; report a missing decision and do not invent a helper. Complete only this reviewed business scope. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
       }
     }
   ],
@@ -220,7 +220,7 @@
     {
       "id": "impact-security-coverage",
       "requirement": {
-        "en": "Every selected flow resolves cited code/service impact, security controls and acceptance; proposed/unknown facts remain explicit. Validate the JSON specification and .work before review completion."
+        "en": "Every selected flow resolves cited code/service impact, security controls and acceptance; proposed/unknown facts remain explicit. Validate the JSON specification and .starciwork before review completion."
       }
     }
   ],

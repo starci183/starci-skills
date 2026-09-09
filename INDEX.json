@@ -42,7 +42,7 @@
     "approval": "goal-before-effects-and-result-before-done",
     "checklist": "<business>/<item>/**/index.yaml",
     "evidence": "<business>/<item>/evidence/<id>/manifest.yaml",
-    "workflowState": "<backend>/.starci/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}",
+    "workflowState": "<backend>/.starciwork/_local/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}",
     "layout": "schemas/work-layout.json"
   },
   "executionModes": {

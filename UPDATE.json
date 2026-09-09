@@ -2,7 +2,7 @@
   "schema": "starci/document@1",
   "sections": [
     {
-      "title": "Maintaining StarCi Work 3.0",
+      "title": "Maintaining StarCi 3.0",
       "blocks": [
         "Read the current entry, selected code/contract and its consumers before editing. The user's explicit requested major refactor defines the scope; do not open a v2 session or reconstruct request/response chains to maintain v3."
       ]
@@ -32,7 +32,7 @@
       "title": "Release and migration",
       "blocks": [
         "A version change is not publication. Keep alpha/release status accurate. No npm publish, remote push, runtime deployment, real account operation or .worktrees migration is authorized merely by a request to edit this package.",
-        "A major installer upgrade requires deliberate opt-in and must not mutate product .work/.worktrees contents. Preserve custom bootstrap instructions; if they conflict with the new protocol, stop before payload writes and explain the conflict. Audit and preserve canonical Git/evidence/secret ownership before any separate data migration."
+        "A major installer upgrade requires deliberate opt-in and must not mutate product .starciwork/.worktrees contents. Preserve custom bootstrap instructions; if they conflict with the new protocol, stop before payload writes and explain the conflict. Audit and preserve canonical Git/evidence/secret ownership before any separate data migration."
       ]
     },
     {

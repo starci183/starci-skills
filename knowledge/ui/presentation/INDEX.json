@@ -13,7 +13,7 @@
         "-> rendered UI",
         "```",
         "This is domain knowledge for the selected Grammar design family, not a universal operator chain.",
-        "Apply its rules only when that family and these criteria belong to the approved `.work` scope.",
+        "Apply its rules only when that family and these criteria belong to the approved `.starciwork` scope.",
         "When an applicable rule's `When` matches, use it or preserve an equivalent value supplied by the",
         "actual public API. The selected repository and accepted design source govern when they differ;",
         "report a conflict instead of silently replacing the design system or expanding implementation scope."
@@ -32,7 +32,7 @@
         "For a selected knowledge maintenance change, update the relevant rule or reference table from real",
         "source and observed evidence; keep its stable rule address and Vietnamese mirror. Shared component",
         "changes require their own selected owner scope. Preserve repeated-observation rationale for reusable",
-        "cases, but no generator, session or receipt machinery is required. `.work` owns selected scope and",
+        "cases, but no generator, session or receipt machinery is required. `.starciwork` owns selected scope and",
         "evidence; Git owns edit history."
       ]
     },

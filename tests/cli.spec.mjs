@@ -35,7 +35,7 @@ function snapshot(root) {
 
 test('init creates only a fresh minimal root and refuses all existing roots without mutation', t => {
   const parent = temporary(t);
-  const root = path.join(parent, '.work');
+  const root = path.join(parent, '.starciwork');
   const created = run('init', root, '--id', 'workspace:test');
   assert.equal(created.status, 0, created.stderr);
   assert.deepEqual(fs.readdirSync(root).sort(), ['.gitignore', '_schema', 'workspace.yaml']);
@@ -51,7 +51,7 @@ test('init creates only a fresh minimal root and refuses all existing roots with
 
 test('read-only validate and tree do not create requests, responses, runs, or metadata updates', t => {
   const parent = temporary(t);
-  const root = path.join(parent, '.work');
+  const root = path.join(parent, '.starciwork');
   assert.equal(run('init', root, '--id', 'workspace:test').status, 0);
   const before = snapshot(parent);
   for (const command of ['validate', 'tree']) {
@@ -97,7 +97,7 @@ test('legacy audit never follows junctions or symlinks to external content', t =
 test('argument errors cannot silently execute other commands', t => {
   const root = temporary(t);
   const before = snapshot(root);
-  for (const args of [['cook'], ['init', path.join(root, '.work')], ['init', path.join(root, '.work'), '--id', '../escape'], ['validate', root, '--write'], ['audit-legacy', root, '--import'], ['op', '../CONTRACT.md'], ['impact', root], ['impact', root, 'node', '--cook']]) {
+  for (const args of [['cook'], ['init', path.join(root, '.starciwork')], ['init', path.join(root, '.starciwork'), '--id', '../escape'], ['validate', root, '--write'], ['audit-legacy', root, '--import'], ['op', '../CONTRACT.md'], ['impact', root], ['impact', root, 'node', '--cook']]) {
     const result = run(...args);
     assert.equal(result.status, 1, args.join(' '));
   }
@@ -106,7 +106,7 @@ test('argument errors cannot silently execute other commands', t => {
 
 test('impact follows canonical typed graph without including an unrelated sibling or modifying data', t => {
   const parent = temporary(t);
-  const root = path.join(parent, '.work');
+  const root = path.join(parent, '.starciwork');
   assert.equal(run('init', root, '--id', 'impact-fixture').status, 0);
   resource(root, 'art', 'design', { purpose: 'Synthetic shared desired direction' });
   const family = writeNode(root, 'family', { id: 'family' });
@@ -139,7 +139,7 @@ test('impact follows canonical typed graph without including an unrelated siblin
 
 test('impact refuses malformed graph and never echoes secret-bearing resource values', t => {
   const parent = temporary(t);
-  const root = path.join(parent, '.work');
+  const root = path.join(parent, '.starciwork');
   assert.equal(run('init', root, '--id', 'impact-invalid').status, 0);
   resource(root, 'actor', 'identity', { password: 'SYNTHETIC_IMPACT_SECRET_NEVER_ECHO' });
   writeNode(root, 'piece', { refs: ['actor'], dependsOn: ['missing'] });
@@ -152,7 +152,7 @@ test('impact refuses malformed graph and never echoes secret-bearing resource va
 
 test('impact terminates with a structured cycle error instead of treating a dependency loop as executable', t => {
   const parent = temporary(t);
-  const root = path.join(parent, '.work');
+  const root = path.join(parent, '.starciwork');
   assert.equal(run('init', root, '--id', 'impact-cycle').status, 0);
   writeNode(root, 'first', { id: 'first', dependsOn: ['second'] });
   writeNode(root, 'second', { id: 'second', dependsOn: ['first'] });
@@ -185,7 +185,7 @@ test('catalogue and op commands show contracts but do not execute or mutate work
 
 test('invalid-workspace CLI reports failure without rewriting evidence or exposing credential values', t => {
   const parent = temporary(t);
-  const root = path.join(parent, '.work');
+  const root = path.join(parent, '.starciwork');
   assert.equal(run('init', root, '--id', 'workspace:test').status, 0);
   fs.mkdirSync(path.join(root, '_resources', 'identities', 'actor'), { recursive: true });
   fs.writeFileSync(path.join(root, '_resources', 'identities', 'actor', 'resource.yaml'), JSON.stringify({ schema: 'work/resource@1', id: 'actor', kind: 'identity', owner: 'test', revision: '1', details: { password: 'SYNTHETIC_SECRET_NEVER_ECHO' } }));
@@ -211,7 +211,7 @@ test('installed workspace.manage forward-test authors only scoped todo planning 
   for (const relative of ['SKILL.md', 'README.json', `ops/${catalog.commonDocument}`, `ops/${selected.document}`, 'schemas/work.schema.json']) {
     assert.ok(fs.readFileSync(path.join(root, '.claude', relative), 'utf8').length > 100, `missing installed authority: ${relative}`);
   }
-  const workRoot = path.join(root, '.work');
+  const workRoot = path.join(root, '.starciwork');
   assert.equal(invoke('init', workRoot, '--id', 'synthetic-draft-workspace').status, 0);
   const beforeContract = snapshot(root);
   const contract = invoke('op', 'workspace.manage');
@@ -246,7 +246,7 @@ test('installed review.verify can inspect synthetic producer gate proof without 
   assert.equal(spawnSync('git', ['init', '--quiet', root], { encoding: 'utf8', windowsHide: true }).status, 0);
   install({ dir: root, bootstrap: true }, () => {});
   const invoke = (...args) => spawnSync(process.execPath, [path.join(root, '.claude/bin/starci-skills.mjs'), 'work', ...args], { cwd: root, encoding: 'utf8', windowsHide: true });
-  const workRoot = path.join(root, '.work');
+  const workRoot = path.join(root, '.starciwork');
   assert.equal(invoke('init', workRoot, '--id', 'synthetic-quality-workspace').status, 0);
   const source = path.join(root, 'quality-source.spec.mjs');
   fs.copyFileSync(fileURLToPath(new URL('./fixtures/quality-source.spec.mjs', import.meta.url)), source);

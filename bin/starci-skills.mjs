@@ -3,10 +3,10 @@
 // bootstrap files at the repo root (CLAUDE.md for Claude Code, AGENTS.md for Codex); nothing here is
 // a framework the tree depends on at run time. The CLI has no dependencies and needs Node 20+.
 //
-//   npx @starci/skills init            install the tree into ./.claude and write the bootstraps
-//   npx @starci/skills update          bring an installed tree to this package's version
-//   npx @starci/skills doctor          run the tree's own validators on the installed copy
-//   npx @starci/skills version
+//   npx starci init            install the tree into ./.claude and write the bootstraps
+//   npx starci update          bring an installed tree to this package's version
+//   npx starci doctor          run the tree's own validators on the installed copy
+//   npx starci version
 //
 // Every command takes --dir <repo> (default: the current directory). init refuses a non-empty
 // .claude it did not install unless --force; update keeps a file a person changed locally unless
@@ -29,7 +29,7 @@ const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf
 // CLI must survive relocation: installed doctor fixtures copy this same declared payload.
 export const PAYLOAD = [...new Set(['package.json', ...pkg.files.map(ref => ref.replace(/\/$/, ''))])];
 const MANIFEST = '.starci-skills.json';
-const LOCAL_IGNORES = ['.work/_local/','.work/_workflows/','.starci/'];
+const LOCAL_IGNORES = ['.starciwork/_local/'];
 const ENTRY_MARKER = '<!-- starci:prompt-entry -->';
 const LEGACY_PROMPT_ENTRY = `${ENTRY_MARKER}
 For every user prompt, enter [StarCi](.claude/INDEX.md) before planning or target work and follow
@@ -78,6 +78,10 @@ the entry routes, and a rule copied here becomes a second home that nobody remem
 const BOOTSTRAP = readFileSync(path.join(packageRoot, 'init/AGENTS.md'), 'utf8');
 const CLAUDE_BOOTSTRAP = readFileSync(path.join(packageRoot, 'init/CLAUDE.md'), 'utf8');
 const PROMPT_ENTRY = BOOTSTRAP.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
+const SPLIT_STORAGE_BOOTSTRAP = BOOTSTRAP.replace("The project's backend owns shared `.starciwork`; Plan/run state lives inside `.starciwork/_local/plans` for both backend and frontend.", "The project's backend owns the shared `.starciwork` and sibling `.starcitemp` for both backend and frontend.");
+const SPLIT_STORAGE_ENTRY = SPLIT_STORAGE_BOOTSTRAP.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
+const PRE_RENAME_BOOTSTRAP = SPLIT_STORAGE_BOOTSTRAP.replaceAll('.starciwork', '.work').replaceAll('.starcitemp', '.starci');
+const PRE_RENAME_ENTRY = PRE_RENAME_BOOTSTRAP.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
 if (!PROMPT_ENTRY || CLAUDE_BOOTSTRAP !== BOOTSTRAP) throw new Error('Host bootstrap templates must share the same runtime entry');
 
 const LEGACY_LITE_ENTRY = `${ENTRY_MARKER}
@@ -186,13 +190,13 @@ function bootstrapPlan(repo, profile) {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
     const current = readFileSync(file, 'utf8');
-    const customProtocol = [PROMPT_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
+    const customProtocol = [PROMPT_ENTRY, SPLIT_STORAGE_ENTRY, PRE_RENAME_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
     if (/session-open\.mjs|plan-chain\.mjs|validated request\.json|Nothing is designed, written or committed outside a session/.test(customProtocol)) {
       throw new Error(name + ': custom v2 session/chain protocol conflicts with v3; reconcile it or use --no-bootstrap before changing payload');
     }
     const legacyBootstrap = BOOTSTRAP.replace(PROMPT_ENTRY, LEGACY_PROMPT_ENTRY);
     const legacyLiteBootstrap = LITE_BOOTSTRAP.replace(LITE_ENTRY, LEGACY_LITE_ENTRY);
-    for (const known of [BOOTSTRAP, PREVIOUS_BOOTSTRAP, ...[PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, LEGACY_PROMPT_ENTRY].map(entry => PREVIOUS_BOOTSTRAP.replace(DIRECT_TASK_PROMPT_ENTRY, entry)), BOOTSTRAP.replace(PROMPT_ENTRY, PRESET_PROMPT_ENTRY), LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
+    for (const known of [BOOTSTRAP, SPLIT_STORAGE_BOOTSTRAP, PRE_RENAME_BOOTSTRAP, PREVIOUS_BOOTSTRAP, ...[PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, LEGACY_PROMPT_ENTRY].map(entry => PREVIOUS_BOOTSTRAP.replace(DIRECT_TASK_PROMPT_ENTRY, entry)), BOOTSTRAP.replace(PROMPT_ENTRY, PRESET_PROMPT_ENTRY), LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
       const normalized = current.replace(/\r\n/g, '\n'), authored = known.replace(/\r\n/g, '\n');
       if (normalized.startsWith(authored)) {
         let end = 0, count = 0;
@@ -201,7 +205,7 @@ function bootstrapPlan(repo, profile) {
         return { name, file, text: bootstrap + suffix, action: 'updated' };
       }
     }
-    const managed = [PROMPT_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
+    const managed = [PROMPT_ENTRY, SPLIT_STORAGE_ENTRY, PRE_RENAME_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
     if (managed) {
       return { name, file, text: current.replace(managed, entry), action: 'updated' };
     }
@@ -219,7 +223,7 @@ function writeBootstraps(repo, log, plan) {
   const ignore = path.join(repo, '.gitignore');
   const lines = existsSync(ignore) ? readFileSync(ignore, 'utf8').split(/\r?\n/) : [];
   for(const LOCAL_IGNORE of LOCAL_IGNORES) if (!lines.some((l) => l.trim() === LOCAL_IGNORE || l.trim() === '/' + LOCAL_IGNORE)) {
-    appendFileSync(ignore, `${lines.length && lines.at(-1) !== '' ? '\n' : ''}# StarCi Work: local scratch and workflow tracking are ignored; product evidence remains durable\n${LOCAL_IGNORE}\n`);
+    appendFileSync(ignore, `${lines.length && lines.at(-1) !== '' ? '\n' : ''}# StarCi: local scratch and workflow tracking are ignored; product evidence remains durable\n${LOCAL_IGNORE}\n`);
     log(`added ${LOCAL_IGNORE} to .gitignore`);
   }
 }
@@ -256,7 +260,7 @@ function retirementPlan(target, manifest) {
     if (PRESERVED_DOCUMENTATION_ROOTS.has(relative.split('/')[0])) { preserved.push(relative); continue; }
     if (current.has(relative)) continue;
     const allowed = ['INDEX.md','INDEX.vi.md','README.md','README.vi.md','UPDATE.md','UPDATE.vi.md','SKILL.vi.md'].includes(relative) || relative === 'routing.json' || relative.startsWith('skills/starci-lite/') || RETIRED_ROOTS.has(relative.split('/')[0]);
-    if (!allowed || relative === 'resources/settings.json' || relative.split('/').some(part => ['.git', '.work', '.worktrees', 'worktrees', '_local'].includes(part))) { preserved.push(relative); continue; }
+    if (!allowed || relative === 'resources/settings.json' || relative.split('/').some(part => ['.git', '.work', '.starciwork', '.starcitemp', '.worktrees', 'worktrees', '_local'].includes(part))) { preserved.push(relative); continue; }
     let cursor = target, missing = false;
     for (const part of relative.split('/')) {
       cursor = path.join(cursor, part);
@@ -274,7 +278,7 @@ function retirementPlan(target, manifest) {
   const inspect = relative => {
     const stat = lstatSync(path.join(target, relative), { throwIfNoEntry: false });
     if (!stat) return;
-    if (stat.isSymbolicLink() || relative === 'resources/settings.json' || relative.split('/').some(part => ['.git', '.work', '.worktrees', 'worktrees', '_local'].includes(part))) {
+    if (stat.isSymbolicLink() || relative === 'resources/settings.json' || relative.split('/').some(part => ['.git', '.work', '.starciwork', '.starcitemp', '.worktrees', 'worktrees', '_local'].includes(part))) {
       preserved.push(relative);
       return;
     }
@@ -419,20 +423,30 @@ const HELP = `${pkg.name} ${pkg.version}
   npx ${pkg.name} update [--dir <repo>] [--force] [--upgrade-major]
   npx ${pkg.name} doctor [--dir <repo>] [--quick]
   npx ${pkg.name} version
-  npx ${pkg.name} work <command> [arguments]
+  npx ${pkg.name} workspace init <backend>/.starciwork --id <project>
+  npx ${pkg.name} storage <backend>
+  npx ${pkg.name} validate <backend>/.starciwork
+  npx ${pkg.name} tree <backend>/.starciwork
+  npx ${pkg.name} workflows
+  npx ${pkg.name} workflow <workflow-id>
+  npx ${pkg.name} ops | op <op-id> | route <intent>
+  npx ${pkg.name} impact <work-root> <id> | stale <work-root> | plan <plan.yaml>
+  npx ${pkg.name} audit-legacy <legacy-root>
 
 init    copies the runtime into <repo>/.claude, adds the StarCi entry once to CLAUDE.md and AGENTS.md
-        while preserving custom instructions, and ignores .work/_local/ and .work/_workflows/.
+        while preserving custom instructions. Project data lives in backend .starciwork;
+        local Plan/run/evidence staging lives in .starciwork/_local. FE is source only.
         Refuses a .claude it did not install unless --force; --no-bootstrap keeps host files unchanged.
 update  replaces current runtime paths; locally changed current files are kept unless --force.
         Retired manifest-owned unchanged files are removed; changed or unowned files are preserved.
-        Personal settings, product .work/.worktrees and Git metadata are never cleanup targets.
+        Personal settings, product .starciwork and legacy data are never cleanup targets.
         A major upgrade requires --upgrade-major; no existing .worktrees data is migrated/deleted.
 entry   one full prompt-to-skill router; Lite is removed. Known old bootstraps can be migrated safely.
         Custom host rules are preserved; unresolved conflicts stop the update before writes.
         Existing product ledgers are retained; installing skills does not migrate them.
 doctor  runs v3 local contract tests on the installed copy and reports local drift.
-work    runs the bounded .work CLI; use "work help". Never dispatches product operations.
+workspace init creates only a new metadata root. Other data commands are read-only.
+        No CLI command runs an agent, approves a goal, deploys, or migrates existing data.
 `;
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -17,7 +17,7 @@
     {
       "title": "Gắn tiêu chí vào work",
       "blocks": [
-        "Chọn rule ID phù hợp làm acceptance assertion của node `.work` đã chọn. Ghi expected owner/state/viewport/điều kiện quan sát trong Markdown hoặc extension theo namespace của node; ghi observation thật và ảnh trong evidence bundle. Dùng [metadata contract hiện tại](../../core/README.json) cho field và completion. Claim trên markup, điểm số hoặc ví dụ chép lại không phải proof.",
+        "Chọn rule ID phù hợp làm acceptance assertion của node `.starciwork` đã chọn. Ghi expected owner/state/viewport/điều kiện quan sát trong Markdown hoặc extension theo namespace của node; ghi observation thật và ảnh trong evidence bundle. Dùng [metadata contract hiện tại](../../core/README.json) cho field và completion. Claim trên markup, điểm số hoặc ví dụ chép lại không phải proof.",
         "Direction, bản ghi quan sát và verdict trong topic là quyết định/finding chuyên môn của node đó. Chúng không yêu cầu response file riêng, session ledger, dispatch tự động hay validator toàn cục khác. Thiếu công cụ đo hoặc API cài thật thì ghi rõ giới hạn, không bịa thành công.",
         "Khi stack cài thật dùng mẫu Common/family được mô tả, inspect component ownership trước khi thêm style app. Đánh giá output reusable, family delta và app delta riêng. Giữ semantic state, focus, accessibility và public prop; capability thiếu là gap có source cho owner, không phải quyền bịa API thay thế.",
         "Rule ID giữ ổn định. Rubric chỉ áp dụng khi scope được chấp nhận đã chọn nó; điểm/ngưỡng không vượt acceptance nghiệp vụ hoặc cho phép ship/deploy/sửa data/op tiếp. Observation lịch sử có thể gợi ý phép kiểm, không chứng minh completion hiện tại."

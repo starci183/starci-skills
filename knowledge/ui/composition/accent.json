@@ -11,7 +11,7 @@
         "the decision is about allocation, not about paint. Nothing in this file may change what the product",
         "is claiming; accent only makes an existing claim easier to find.",
         "Applicability: API examples belong to the documented Grammar family; verify installed source and",
-        "the selected `.work` specification before use. Gap labels here are findings, not dispatch commands."
+        "the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands."
       ]
     },
     {
@@ -33,7 +33,7 @@
         "Governs the small visual anchor that helps a reader scan peers.",
         "| Case | When | Assert |",
         "| --- | --- | --- |",
-        "| Case 1 | Peer features, rows, or sections need a compact anchor for scanning | `IconTile tone=\"accent\"`, or `Icon` in its declared role, carries it, with a reviewed semantic glyph named in the `.work` specification |",
+        "| Case 1 | Peer features, rows, or sections need a compact anchor for scanning | `IconTile tone=\"accent\"`, or `Icon` in its declared role, carries it, with a reviewed semantic glyph named in the `.starciwork` specification |",
         "| Case 2 | The anchor sits beside a name | The visible text identity remains, and the mark never replaces it |",
         "| Case 3 | The direction wants a different plate size or shape | The published geometry carries it, at `sm` 32 or `md` 40 nominal CSS pixels, and no coloured rounded square is rebuilt around an icon |",
         "| Case 4 | The glyph would be the only identity for an unfamiliar feature | Every unfamiliar feature carries a name; no glyph is its sole identity |"
@@ -71,7 +71,7 @@
         "| Case | When | Assert |",
         "| --- | --- | --- |",
         "| Case 1 | Content reports success, warning, danger, pending, or selection | `Badge`, a presentation-state owner, or the current-state owner carries it; the primary accent carries none of them |",
-        "| Case 2 | A final destructive CTA is required | A typed danger action treatment is required first, and while `ButtonVariant` publishes no danger value the `.work` specification records that gap |",
+        "| Case 2 | A final destructive CTA is required | A typed danger action treatment is required first, and while `ButtonVariant` publishes no danger value the `.starciwork` specification records that gap |",
         "| Case 3 | Local red would bridge that gap today | No local red and no family repaint of `primary` appears against that action |",
         "| Case 4 | An ordinary primary action looks consequential | Consequence and confirmation are named in the product decision, not inferred from the emphasis |"
       ]

@@ -68,7 +68,7 @@
     {
       "title": "A11Y-5 — The accessibility verdict",
       "blocks": [
-        "Governs how selected observations are summarized in the current `.work` node's evidence.",
+        "Governs how selected observations are summarized in the current `.starciwork` node's evidence.",
         "| Case | When | Observe |",
         "| --- | --- | --- |",
         "| Case 1 | The lens runs | `A11Y-1` to `A11Y-4` are each judged at every state the coverage declares, in every colour scheme, from the computed accessibility tree and the measured render rather than from source |",

@@ -66,7 +66,7 @@
     {
       "title": "TRUTH-5 — Phán quyết của tính thật của bản render",
       "blocks": [
-        "Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.work` hiện tại.",
+        "Chi phối cách tổng hợp các quan sát đã chọn trong bằng chứng của node `.starciwork` hiện tại.",
         "| Case | Dùng khi | Quan sát |",
         "| --- | --- | --- |",
         "| Case 1 | Lens chạy | `TRUTH-1` đến `TRUTH-4` được xét trên mọi ảnh chụp có render một dữ kiện, một mức khả dụng, một tín hiệu tiến trình hay một outcome, mỗi thứ đều truy về thẩm quyền đứng sau nó |",

@@ -1,0 +1,40 @@
+# Build and release StarCi
+
+This is the maintainer workflow, not a requirement for users installing a reviewed archive. Package preparation does not publish to npm or push Git.
+
+## Verify source
+
+```sh
+npm ci
+npm run build
+npm test
+npm --prefix sites/skills ci
+npm run build:sites
+npm run build:check
+```
+
+Review source changes, generated contracts and test failures. Do not weaken validators to produce a green release. The runtime bundles its YAML dependency in `core/yaml.mjs`; rebuild it with `npm run build:yaml` when deliberately changing that dependency and retain its license notice.
+
+## Make an archive
+
+```sh
+npm pack --json --pack-destination /absolute/release-output
+```
+
+Create that output directory first, outside the runtime and product trees. `prepack` regenerates and checks compiled contracts. It does not replace the full tests above. Inspect the resulting file inventory for local configuration, secrets, product records, Git state, `node_modules`, caches and unrelated site output. `package.json.files` explicitly bounds the installed payload; keep all runtime references, tests used by doctor and human docs available after relocation.
+
+Test the **archive**, not only the source checkout:
+
+```sh
+npx --yes --package=/absolute/release-output/starci-3.0.0-alpha.3.tgz starci --help
+npx --yes --package=/absolute/release-output/starci-3.0.0-alpha.3.tgz starci init --dir /absolute/isolated-host
+node /absolute/isolated-host/.claude/bin/starci.mjs doctor --dir /absolute/isolated-host --quick
+```
+
+Also verify new workspace initialization/validation, an update preserving custom host instructions, and explicitly bound legacy storage. Record the archive hash and test results with the handoff. Do not test installation against an active user's runtime.
+
+## Publication is a separate approval
+
+The intended package is `starci`, prerelease `3.0.0-alpha.3`. A registry lookup returning not-found is not proof of namespace ownership. Before any publish, the maintainer must confirm authenticated npm account rights, name/version availability, archive contents, license ownership and intended prerelease dist-tag. Require explicit publication authority, then publish the exact reviewed archive. Do not expose tokens in logs or source. Update README release status only after registry verification succeeds.
+
+Never publish unrelated dirty changes, silently retag a stable release as an alpha, or assume the previous `@starci/skills` package redirects users. Announce the naming transition and migration limits in the release notes.

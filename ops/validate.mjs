@@ -68,7 +68,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
         for(const error of checked.errors) issue(errors,'MODE_'+error.code,at+':'+mode,error.message);
       }
     }
-    if(!c.graphPolicy||!['read-only','selected-scope-only'].includes(c.graphPolicy.mode)||c.graphPolicy.prerequisiteState!=='done'||c.graphPolicy.dispatch!=='never'||c.graphPolicy.location!=='.work node dependsOn/refs with direct sourceRefs and collocated assets') issue(errors,'GRAPH_POLICY',at,'Graph authority must live in .work, require done prerequisites and never dispatch automatically');
+    if(!c.graphPolicy||!['read-only','selected-scope-only'].includes(c.graphPolicy.mode)||c.graphPolicy.prerequisiteState!=='done'||c.graphPolicy.dispatch!=='never'||c.graphPolicy.location!=='.starciwork node dependsOn/refs with direct sourceRefs and collocated assets') issue(errors,'GRAPH_POLICY',at,'Graph authority must live in .starciwork, require done prerequisites and never dispatch automatically');
     if(c.graphPolicy?.mode==='read-only'&&c.writes.some(w=>w.id==='node'&&w.fields?.some(f=>['dependsOn','refs','required'].includes(f)))) issue(errors,'CONSUMER_GRAPH_WRITE',at,'A consumer op cannot silently rewrite scope/input graph fields');
     if(c.migrationPolicy) {
       const expected={scope:'one-selected-business',importState:'uninvestigate',initialActivity:'idle',importCompletion:'forbidden',intentAuthority:'approved-intent-not-inferred-source',cleanup:'explicit-exact-preserved-inactive-only',registeredWorktreeRemoval:'git-without-force'};
@@ -77,7 +77,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
     }
     if(['business.decide','architecture.decide'].includes(at)) {
       const field=at==='business.decide'?'business':'architecture';
-      if(c.specificationPolicy?.storage!=='.work'||!c.specificationPolicy?.payload?.includes(field)||!c.writes.some(w=>w.fields.includes(field)&&w.fields.includes('sourceRefs'))||!c.proofs.some(p=>p.id==='impact-security-coverage')) issue(errors,'SPECIFICATION_POLICY',at,'Planning must own a compact schema-bound module specification with source and impact coverage');
+      if(c.specificationPolicy?.storage!=='.starciwork'||!c.specificationPolicy?.payload?.includes(field)||!c.writes.some(w=>w.fields.includes(field)&&w.fields.includes('sourceRefs'))||!c.proofs.some(p=>p.id==='impact-security-coverage')) issue(errors,'SPECIFICATION_POLICY',at,'Planning must own a compact schema-bound module specification with source and impact coverage');
     }
     if(at==='interface.draw'&&(!['repo','architecture','knowledge'].every(id=>c.reads.some(r=>r.id===id))||!c.writes.some(w=>w.id==='draws'))) issue(errors,'DRAW_HANDOFF',at,'Draw must read source/architecture/knowledge and always return draws');
     if(at==='architecture.decide'&&!['target','target.saga','target.cqrs','gaps'].every(k=>c.specificationPolicy?.requiredSections?.includes(k))) issue(errors,'ARCHITECTURE_DEPTH',at,'Architecture must define module routing, Saga, CQRS and explicit implementation gaps');
@@ -105,7 +105,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
     }
     for(const w of c.writes) {
       if(!Array.isArray(w.fields)||!w.fields.length||!w.fields.every(nonempty)) issue(errors,'WRITE_FIELDS',at,w.id+' has no field/content matrix');
-      if(!/^(?:N\/(?:index\.yaml|assets\/)|E\/|\.work\/|repository:<repo-id>\/)/.test(w.path??'')) issue(errors,'WRITE_DESTINATION',at,'Write must target explicit Work node/assets/evidence or bound source repository');
+      if(!/^(?:N\/(?:index\.yaml|assets\/)|E\/|\.starciwork\/|repository:<repo-id>\/)/.test(w.path??'')) issue(errors,'WRITE_DESTINATION',at,'Write must target explicit Work node/assets/evidence or bound source repository');
       if(w.path?.startsWith('repository:')&&w.id!=='source') issue(errors,'SOURCE_SCOPE',at,'Product source writes need explicit source binding');
     }
     const usedReads=new Set(),usedWrites=new Set();

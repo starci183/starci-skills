@@ -11,7 +11,7 @@
         "thể sửa nó sẽ bắt người đọc đi tìm nguyên nhân, còn một lối phục hồi ở tầm cả trang cho một panel",
         "hỏng sẽ ném đi cả phần công việc chưa từng hỏng.",
         "Phạm vi áp dụng: ví dụ API thuộc family Grammar đã ghi nhận; đối chiếu source cài thực tế và",
-        "đặc tả `.work` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch."
+        "đặc tả `.starciwork` được chọn trước khi dùng. Tên gap ở đây là finding, không phải lệnh dispatch."
       ]
     },
     {
@@ -60,7 +60,7 @@
       "blocks": [
         "Khi nhiều control cùng tham gia thì ai giữ pending thuộc [Action](action.vi.json), và có những điều",
         "kiện nào thuộc [State](state.vi.json). Người đọc đang được đẩy về phía action nào thuộc",
-        "[CTA](cta.vi.json). Đặc tả `.work` phải liệt kê những gì về các đường kết cục này thuộc",
+        "[CTA](cta.vi.json). Đặc tả `.starciwork` phải liệt kê những gì về các đường kết cục này thuộc",
         "[Coverage](coverage.vi.json). Một thông điệp có được gắn về đúng field của nó không, và có được đọc",
         "lên đúng một lần không, thuộc [Accessibility](../proof/accessibility.vi.json) và",
         "[Render truth](../proof/render-truth.vi.json)."

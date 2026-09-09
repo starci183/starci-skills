@@ -17,7 +17,7 @@
     {
       "title": "COVERAGE-1 — Đặc tả phải liệt kê những gì",
       "blocks": [
-        "Chi phối phạm vi được khai trong Markdown hoặc extension có namespace của node thiết kế `.work` đã chọn.",
+        "Chi phối phạm vi được khai trong Markdown hoặc extension có namespace của node thiết kế `.starciwork` đã chọn.",
         "Các nhóm dưới đây mô tả thông tin, không phải key metadata core bổ sung hay schema biên nhận riêng.",
         "Khai các nhóm áp dụng thành assertion rõ ràng của node trước khi kiểm chứng.",
         "| Case | Dùng khi | Khẳng định |",
