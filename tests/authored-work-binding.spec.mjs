@@ -10,6 +10,7 @@ import {propose,presentGoal,approveGoal,presentDelegatedGoal,authorizeDelegatedG
 import {registerScopedMandate,delegatedContext,hasDelegatedAcceptance} from '../workflows/delegation.mjs';
 import {presentAutoPlan,approveAutoPlan,verifyAutoEvidence,verifyAutoPredecessors} from '../workflows/auto.mjs';
 import {verifyRunWork} from '../workflows/work-binding.mjs';
+import {verifyProducerResult} from '../workflows/producer-verification.mjs';
 
 // All authority/proof below is an isolated synthetic fixture, never product acceptance.
 function fixture(t,{mode='manual',legacy=false,ui=false}={}){
@@ -111,6 +112,50 @@ test('interface.draw creates exact predeclared new assets and seals actual image
 
 test('undeclared asset creation and changed non-writable asset bytes reject authoring',t=>{
  for(const existed of [false,true]){const f=fixture(t),asset='assets/reference.txt',absolute=path.join(f.root,path.dirname(f.files[0]),asset);fs.mkdirSync(path.dirname(absolute),{recursive:true});if(existed){fs.writeFileSync(absolute,'synthetic original');f.put(f.files[0],{...f.read(f.files[0]),assets:[{path:asset}]});}const issued=f.issue(f.approve());fs.writeFileSync(absolute,'synthetic changed');f.put(f.files[0],{...f.read(f.files[0]),assets:[{path:asset}]});assert.throws(()=>f.result(issued),/immutable/);}
+});
+
+for(const mode of ['manual','auto','delegated'])test(`${mode}: reject lifecycle-mutable canonical YAML before accepting a raw artifact`,t=>{
+ const f=fixture(t,{mode}),issued=f.issue(f.approve()),before=structuredClone(issued.run),response=f.response(issued),file=path.join(f.root,f.files[0]);
+ response.artifacts.push({id:'canonical-spec',path:path.relative(f.dir,file),sha256:sha256(fs.readFileSync(file))});response.criteria[0].evidence.push('canonical-spec');
+ assert.throws(()=>acceptCell(issued.run,response,{evidenceRoot:f.dir}),/lifecycle-mutable.*semantic workResult/);
+ assert.deepEqual(issued.run,before);assert.equal(issued.run.responses[f.workflow],undefined);assert.equal(f.read(f.files[0]).state,'todo');
+});
+
+for(const alias of ['normalized-relative','absolute','hardlink','symlink'])test(`canonical raw artifact cannot evade rejection via ${alias}`,t=>{
+ const f=fixture(t),issued=f.issue(f.approve()),response=f.response(issued),file=path.join(f.root,f.files[0]);let artifactPath;
+ if(alias==='normalized-relative')artifactPath=path.dirname(path.relative(f.dir,file))+'/../'+path.basename(path.dirname(file))+'/index.yaml';
+ if(alias==='absolute')artifactPath=file;
+ if(alias==='hardlink'){artifactPath='aliased-review.yaml';fs.linkSync(file,path.join(f.dir,artifactPath));}
+ if(alias==='symlink'){const link=path.join(f.dir,'linked-design');fs.symlinkSync(path.dirname(file),link,process.platform==='win32'?'junction':'dir');artifactPath='linked-design/index.yaml';}
+ response.artifacts.push({id:'alias',path:artifactPath,sha256:sha256(fs.readFileSync(file))});response.criteria[0].evidence.push('alias');
+ assert.throws(()=>acceptCell(issued.run,response,{evidenceRoot:f.dir}),/lifecycle-mutable/);assert.deepEqual(issued.run.responses,{});
+});
+
+test('foreign artifact outside evidence root remains rejected even under an authored request',t=>{
+ const f=fixture(t),issued=f.issue(f.approve()),response=f.response(issued),base=path.join(f.dir,'proof-root');fs.mkdirSync(base);
+ response.artifacts=[{id:'review',path:'../review.log',sha256:sha256(fs.readFileSync(path.join(f.dir,'review.log')))}];
+ assert.throws(()=>acceptCell(issued.run,response,{evidenceRoot:base}),/escapes/);
+});
+
+for(const mode of ['manual','auto','delegated'])for(const drift of ['design','image','review','completion'])test(`${mode}: semantic output and immutable evidence survive done/reload; ${drift} drift does not`,t=>{
+ const f=fixture(t,{mode}),asset='assets/design.png',file=path.join(f.root,path.dirname(f.files[0]),asset);
+ fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6X8AAAAASUVORK5CYII=','base64'));
+ f.put(f.files[0],{...f.read(f.files[0]),assets:[{path:asset}]});
+ const issued=f.issue(f.approve());f.edit();f.edit(f.files[1]);const response=f.response(issued);response.artifacts.push({id:'drawing',path:path.relative(f.dir,file),sha256:sha256(fs.readFileSync(file))});response.criteria[0].evidence.push('drawing');
+ const result=acceptCell(issued.run,response,{evidenceRoot:f.dir}),done=markWorkDone(f.accept(result),f.completions());saveRun(done);
+ const loaded=loadPlanRuns(f.plan,f.root).design;assert.equal(loaded.status,'done');assert.deepEqual(loaded.responses,done.responses);assert.equal(verifyProducerResult(loaded),true);
+ if(mode==='delegated')assert.equal(hasDelegatedAcceptance(loaded),true);
+ if(drift==='design')f.edit();if(drift==='image')fs.appendFileSync(file,'changed');if(drift==='review')fs.appendFileSync(path.join(f.dir,'review.log'),'changed');if(drift==='completion'){const n=f.read(f.files[0]);delete n.completion;f.put(f.files[0],n);}
+ assert.throws(()=>verifyProducerResult(loaded));if(mode==='delegated')assert.equal(hasDelegatedAcceptance(loaded),false);
+});
+
+test('historical raw-canonical receipt remains inspectable but cannot gain a retroactive hash exemption',t=>{
+ const f=fixture(t,{mode:'delegated'}),issued=f.issue(f.approve()),historical=f.result(issued),file=path.join(f.root,f.files[0]);
+ // Construct the old transport shape in this synthetic fixture only. The new
+ // acceptCell rejects this shape; producer verification must not silently relax it.
+ const response=historical.responses[f.workflow];response.artifacts.push({id:'historical-canonical',path:path.relative(f.dir,file),sha256:sha256(fs.readFileSync(file))});response.criteria[0].evidence.push('historical-canonical');historical.resultDigest=workflowDigest({goalDigest:historical.goalDigest,responses:historical.responses});
+ const accepted=f.accept(historical),done=markWorkDone(accepted,f.completions());saveRun(done);
+ const loaded=loadPlanRuns(f.plan,f.root).design;assert.equal(loaded.status,'done');assert.deepEqual(loaded.responses,done.responses);assert.equal(verifyRunWork(loaded),true);assert.throws(()=>verifyProducerResult(loaded),/evidence/);assert.equal(hasDelegatedAcceptance(loaded),false);
 });
 
 for(const mode of ['manual','auto'])test(`${mode}: frontend successor rechecks both sealed draw content and artifacts before new effects`,t=>{

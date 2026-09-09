@@ -120,6 +120,21 @@ producer consumption verify the sealed current outputs; changed output bytes
 or invalidated required inputs require review again. Operational activity and
 legitimate completion metadata do not change semantic output identity.
 
+Keep the selected canonical node path in the typed design output, not in the
+response's raw-byte `artifacts` list. The runtime already binds that authored
+Work through `workResult`; `markWorkDone` legitimately rewrites its completion
+metadata. Use immutable review/check artifacts for criterion evidence instead of
+hashing the mutable node file or copying the specification into another snapshot.
+Raw artifacts such as images, videos, logs and review documents remain byte-bound.
+The lifecycle rejects a selected authored node used as a raw artifact before
+acceptance, including an alias resolving to that same file.
+
+If a historical accepted response used that invalid pattern and its byte proof is
+now stale, preserve its receipts and valid current Work. Do not rewrite the old
+artifact hash, exempt it from integrity checks or repeat product effects. Obtain
+a fresh bounded current-result review under the actual approval protocol, with
+semantic Work outputs and immutable review artifacts, before downstream reuse.
+
 Legacy `cell-request@1` retains its strict original input comparison. Never add
 the policy to an existing request or replace its hashes retrospectively. Preserve
 that historical attempt and present a fresh bounded review checkpoint against
