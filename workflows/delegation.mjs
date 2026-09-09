@@ -6,6 +6,7 @@ import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {validatePlan} from './plan.mjs';
 import {verifyAutoEvidence,verifyAutoPredecessors} from './auto.mjs';
 import {typed} from './typed.mjs';
+import {verifyWorkResult} from './work-binding.mjs';
 
 const hash=x=>sha256(canonicalJSON(x));
 const same=(a,b)=>hash(a)===hash(b);
@@ -124,7 +125,7 @@ function verifyPartialResults(run) {
   const cell=run.goal.cells.find(c=>c.id===id),request=run.requests[id];
   requireThat(cell&&request&&request.cell===id&&request.goalDigest===run.goalDigest&&request.scopeDigest===run.scopeDigest&&request.op===cell.op&&request.operation===(cell.operation??null)&&same(request.criteria,cell.criteria)&&same(request.outputSchema,cell.outputSchema),'Accepted producer no longer matches the goal cell');
   const current=run.goal.workflow==='prepare-work'?[]:(cell.workTargets??run.goal.workTargets).map(id=>{const n=work.nodes.find(n=>n.id===id);requireThat(n,'Producer Work target is missing');requireThat(n.blockedBy.every(id=>run.status!=='done'&&completedInRun.has(id)),'Producer prerequisite is no longer effectively done');if(run.status==='done')requireThat(n.effectiveState==='done','Completed producer Work proof is no longer valid');return {id:n.id,inputDigest:n.inputDigest,contextDigest:n.contextDigest};});
-  requireThat(same(current,request.workBindings??[]),'Producer Work inputs changed; investigate before consuming this result');
+  verifyWorkResult(run,cell,response);
   const inputs={};for(const [key,binding]of Object.entries(cell.inputs)){const producer=binding.from==='request'?run.goal.inputs:run.responses[binding.cell]?.outputs;requireThat(producer&&Object.hasOwn(producer,binding.key),'Accepted producer input is missing');inputs[key]=producer[binding.key];}
   requireThat(same(inputs,request.inputs)&&typed(response.outputs,cell.outputSchema)&&Array.isArray(response.criteria)&&response.criteria.length===cell.criteria.length&&new Set(response.criteria.map(c=>c.id)).size===cell.criteria.length,'Typed result, exact criteria or producer inputs changed');
   verifyAutoEvidence({...run,goal:{...run.goal,cells:[cell]},responses:{[id]:response}});

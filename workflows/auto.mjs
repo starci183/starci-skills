@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
 import {validatePlan} from './plan.mjs';
 import {hasDelegatedAcceptance} from './delegation.mjs';
+import {verifyRunWork,scopedWorkStatus} from './work-binding.mjs';
 const digest=x=>sha256(canonicalJSON(x));
 const text=x=>typeof x==='string'&&x.trim().length>0;
 const requireThat=(ok,message)=>{if(!ok)throw Error(message);};
@@ -115,6 +116,7 @@ export function hasAutoAcceptance(run) {
 }
 export function verifyAutoEvidence(run) {
  requireThat(Object.keys(run.responses).length===run.goal.cells.length,'Incomplete auto result');
+ verifyRunWork(run);
  for(const cell of run.goal.cells) {
   const request=run.requests[cell.id],response=run.responses[cell.id];
   requireThat(request&&response?.status==='pass'&&response.requestDigest===digest(request)&&response.goalDigest===run.goalDigest&&response.scopeDigest===run.scopeDigest&&response.op===request.op&&response.operation===request.operation,'Auto response no longer matches its request');
@@ -138,7 +140,7 @@ export function verifyAutoPredecessors(run,priorRuns,{throughEnd=false}={}) {
   requireThat(hasAutoAcceptance(prior)||hasDelegatedAcceptance(prior)||prior.approvals.some(a=>a.actor==='user'&&a.phase==='acceptance'&&a.approved===true&&a.digest===prior.resultDigest&&text(a.messageId)),'Previous workflow lacks acceptance');
   verifyAutoEvidence(prior);
   const work=validateWorkspace(prior.workRoot);
-  requireThat(work.ok&&prior.goal.workTargets.every(id=>work.nodes.some(n=>n.id===id&&n.effectiveState==='done')),'Previous Work proof is no longer current');
+  requireThat(scopedWorkStatus(work,prior.goal.workTargets,{done:true,authored:prior.goal.cells.some(c=>c.workPolicy)}).ok,'Previous Work proof is no longer current');
  }
 }
 export function nextAutoJob(plan,{authorization,runs={}}) {

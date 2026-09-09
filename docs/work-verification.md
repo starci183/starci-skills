@@ -79,3 +79,53 @@ Hashes detect changes to declared inputs, not missing edges or wrong semantics.
 Review the dependency graph as well as its digests. Schema validation establishes
 structure and consistency; substantive review and actual execution establish
 whether the claimed result is true. Neither substitutes for the other.
+
+## Authoring a design without freezing its own output
+
+An authorized Business, Architecture or interface-draw cell can opt into this
+policy on its concrete goal **before presentation and dispatch**:
+
+```yaml
+workPolicy:
+  schema: starci/authored-work@1
+  targets: [example.design.leaf]
+  assetWrites: # optional; exact paths, not an asset-directory permission
+    - nodeId: example.design.leaf
+      path: assets/desktop.png
+```
+
+The targets must exactly match that cell's existing selected Work leaves. Each
+leaf and each declared writable asset also needs its exact canonical file path
+in a goal resource effect or source impact. A new asset need not exist before
+dispatch; its existing ancestors must be safe. Other existing assets remain
+immutable inputs. Declaring or changing an unapproved asset fails. Images remain
+bound by their actual bytes, including after result acceptance.
+
+This emits `starci/cell-request@2`. Core hashes the immutable input graph while
+masking only the selected authored leaf content. Workspace/ancestor content,
+external inputs, leaf identity, paths, kind, assertions and dependency/reference
+edges remain frozen. This narrow authoring mode does not create leaves, change
+their graph or invent acceptance assertions. Select and review necessary scope
+changes separately before authoring; do not remove a dependency to clear a gate.
+
+`acceptCell` derives `response.workResult` from the actual resulting Work and
+includes it in the result digest. Workers cannot supply that seal themselves.
+Original request bindings remain unchanged for audit. Approval, completion and
+producer consumption verify the sealed current outputs; changed output bytes
+or invalidated required inputs require review again. Operational activity and
+legitimate completion metadata do not change semantic output identity.
+
+Legacy `cell-request@1` retains its strict original input comparison. Never add
+the policy to an existing request or replace its hashes retrospectively. Preserve
+that historical attempt and present a fresh bounded review checkpoint against
+current content under actual authority. Loading old or stale runs is inspection,
+not a statement that their results may advance.
+
+Completion preflight reports `ok` for the exact selected completion scope and
+`globalOk` for the entire Work. `remainingErrors` preserves unrelated recoverable
+stale-review diagnostics. Structural errors still fail. Necessary external
+design inputs and intermediary imports must have current review: masking an
+authored upstream change does not renew a stale unselected consumer's acceptance.
+Completing upstream repair never completes those downstream nodes automatically.
+These hashes protect declared scope and change detection, not human truth or
+OS-level prevention of writes outside the declared scope.

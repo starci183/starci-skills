@@ -23,6 +23,12 @@ export function validateWorkspace(root) {
   try { return validate(root); }
   catch { return {ok:false,errors:[{code:'MALFORMED_WORKSPACE',path:'.',message:'Malformed or unreadable workspace; no completion can be certified.'}],warnings:[],nodes:[],resources:[]}; }
 }
+/** Hash immutable design inputs, masking only explicitly selected authored leaves.
+ * Ordinary validation and semantic hashes are unchanged; this grants no writes. */
+export function authoredWorkspace(root,targets) {
+  if(!Array.isArray(targets)||!targets.length||new Set(targets).size!==targets.length||!targets.every(text))throw Error('Exact authored target IDs required');
+  return validate(root,null,null,targets);
+}
 /** Predict exact leaf completion without changing any file or granting acceptance. */
 export function previewCompletion(root,completions) {
   try {
@@ -35,14 +41,15 @@ export function previewEvidence(root,{directory,nodeId,name}) {
   try {return {...validate(root,null,{directory,nodeId,name}),preview:true};}
   catch {return {ok:false,preview:true,errors:[{code:'EVIDENCE_PREVIEW',path:'.',message:'Invalid staged evidence; nothing was published.'}],warnings:[],nodes:[],resources:[]};}
 }
-function validate(root,completions=null,candidate=null) {
+function validate(root,completions=null,candidate=null,authoredTargets=null) {
+  let authoredBinding,authoredAssets;
   const errors = [], warnings = [], nodes = [], resources = [], evidence = [], jsonFiles = [], accountFiles = [], reservedDirectories = [], ids = new Map();
   const issue = (code, p, message) => errors.push({code, path:p, message});
   const warn = (code, p, message) => warnings.push({code, path:p, message});
   let absolute;
   const rel = p => path.relative(absolute, p).split(path.sep).join('/') || '.';
   const within = (base, p) => { const r = path.relative(base,p); return r === '' || (!r.startsWith(`..${path.sep}`) && r !== '..' && !path.isAbsolute(r)); };
-  const result = () => ({ok:errors.length === 0, errors, warnings, nodes:nodes.map(n => ({id:n.meta.id, path:n.path, schema:n.meta.schema, kind:n.meta.kind, required:n.meta.required, state:n.meta.state ?? null, effectiveState:n.effectiveState ?? 'invalid', specDigest:n.specDigest, contextDigest:n.contextDigest??null, inputDigest:n.inputDigest ?? null, investigationDigest:n.meta.investigation?.contextDigest??null, completion:n.meta.completion?{inputDigest:n.meta.completion.inputDigest??null,...(Object.hasOwn(n.meta.completion,'review')?{review:structuredClone(n.meta.completion.review)}:{evidence:Array.isArray(n.meta.completion.evidence)?[...n.meta.completion.evidence]:[]})}:null, eligible:n.eligible ?? false, children:n.children.map(c => c.meta.id),dependsOn:(n.effectiveDeps??[]).map(d=>d.meta.id),refs:(n.effectiveRefs??[]).map(d=>d.meta.id),blockedBy:n.blockedBy??[],suspensionReasons:n.suspensionReasons??[]})), resources:resources.map(r => ({id:r.meta.id,kind:r.meta.kind,revision:r.meta.revision,path:r.path,specDigest:r.specDigest}))});
+  const result = () => ({ok:errors.length === 0, errors, warnings,...(authoredTargets?{authoredBinding,authoredAssets}:{}), nodes:nodes.map(n => ({id:n.meta.id, path:n.path, schema:n.meta.schema, kind:n.meta.kind, required:n.meta.required, state:n.meta.state ?? null, effectiveState:n.effectiveState ?? 'invalid', specDigest:n.specDigest, contextDigest:n.contextDigest??null, inputDigest:n.inputDigest ?? null, investigationDigest:n.meta.investigation?.contextDigest??null, completion:n.meta.completion?{inputDigest:n.meta.completion.inputDigest??null,...(Object.hasOwn(n.meta.completion,'review')?{review:structuredClone(n.meta.completion.review)}:{evidence:Array.isArray(n.meta.completion.evidence)?[...n.meta.completion.evidence]:[]})}:null, eligible:n.eligible ?? false, children:n.children.map(c => c.meta.id),dependsOn:(n.effectiveDeps??[]).map(d=>d.meta.id),refs:(n.effectiveRefs??[]).map(d=>d.meta.id),blockedBy:n.blockedBy??[],blockers:n.meta.blockers??[],suspensionReasons:n.suspensionReasons??[]})), resources:resources.map(r => ({id:r.meta.id,kind:r.meta.kind,revision:r.meta.revision,path:r.path,specDigest:r.specDigest}))});
   try {
     absolute = path.resolve(root);
     if (fs.lstatSync(absolute).isSymbolicLink() || !fs.statSync(absolute).isDirectory()) throw new Error('Root must be a real directory, not a symlink.');
@@ -258,6 +265,7 @@ function validate(root,completions=null,candidate=null) {
         if(!object(accounts)||Object.keys(accounts).sort().join(',')!=='accounts,disposable,schema'||accounts.schema!=='work/disposable-accounts@1'||accounts.disposable!==true||!Array.isArray(accounts.accounts)||accounts.accounts.length===0||!accounts.accounts.every(validAccount))throw Error('schema');
       }catch{issue('ACCOUNTS_SCHEMA',rel(accountsPath),'Disposable accounts must match work/disposable-accounts@1 exactly: disposable true and nonempty role, username and password strings only.');}
     }
+    n.ownedAssets=ownedAssets;
     n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),...(localFiles.length?{localFiles:localFiles.sort((a,b)=>a.path.localeCompare(b.path))}:{}),metadata:Object.fromEntries(Object.entries(n.meta).filter(([k])=>!operational.has(k)&&!(n.meta.schema==='work/node@2'&&k==='description'))),body:n.body}));
   }
   if(canonicalV2)for(const p of accountFiles)if(!ownedAccounts.has(path.resolve(p)))issue('ACCOUNTS_OWNER',rel(p),'accounts.yaml is allowed only beside its owning Work v2 UAT index.yaml and must be declared as uat.localFiles.accounts.');
@@ -356,6 +364,21 @@ function validate(root,completions=null,candidate=null) {
     visiting.delete(n);return n.inputDigest;
   }
   nodes.forEach(input);
+  if(authoredTargets){
+    const selected=new Set(authoredTargets),cache=new Map(),active=new Set();
+    const shape=n=>({id:n.meta.id,path:n.path,schema:n.meta.schema,kind:n.meta.kind,required:n.meta.required,blockers:n.meta.blockers??[],assertions:n.meta.assertions??[],dependsOn:n.depIds,refs:n.refIds,children:n.children.map(c=>c.meta.id)});
+    const spec=n=>selected.has(n.meta.id)?digest(canonicalJSON({authored:shape(n)})):n.specDigest;
+    function masked(n){
+      if(cache.has(n))return cache.get(n);
+      if(active.has(n))throw Error('Authored input graph has a cycle');active.add(n);
+      const ancestors=[];for(let a=n.parent;a;a=a.parent)ancestors.unshift(a);
+      const bindings=item=>[...item.deps,...item.refs.filter(r=>item===n||r.type!=='node'||!within(r.dir,n.dir))].map(r=>({id:r.meta.id,digest:r.type==='resource'?r.specDigest:masked(r)})).sort((a,b)=>a.id.localeCompare(b.id));
+      const value=digest(canonicalJSON({workspace:workspaceDigest,spec:spec(n),ancestors:ancestors.map(a=>({id:a.meta.id,spec:spec(a),bindings:bindings(a)})),bindings:bindings(n),children:n.children.map(c=>({id:c.meta.id,digest:masked(c)})).sort((a,b)=>a.id.localeCompare(b.id))}));
+      active.delete(n);cache.set(n,value);return value;
+    }
+    authoredAssets=authoredTargets.map(id=>{const n=nodes.find(n=>n.meta.id===id);return {id,assets:n?.ownedAssets??[]};});
+    authoredBinding=authoredTargets.map(id=>{const n=nodes.find(n=>n.meta.id===id);if(!n||n.children.length)throw Error('Authored output must be an existing exact leaf');return {...shape(n),invariantDigest:masked(n)};});
+  }
   function codeRefs(refs,item,required=false) {
     if(refs===undefined && !required)return [];
     if(!Array.isArray(refs) || (required && !refs.length)) {issue('CODE_REFS',item.path,'codeRefs requires a nonempty array of repository/full commit SHA bindings.');return [];}

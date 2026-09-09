@@ -45,6 +45,16 @@ The APIs are in `workflows/delegation.mjs` and `workflows/lifecycle.mjs`. All ex
 
 Adoption can start between workflows: preserve earlier valid direct-user goal/result receipts unchanged. Terminal review accepts those exact currently verified predecessors or decisions under this same mandate, never a different coordinator mandate or invented replacement receipts. Current producer checks compare semantic Work bindings and prerequisite state; a `done` producer additionally needs current effective Work completion. Corrupt completion proof cannot qualify merely because its semantic hash stayed the same. Unrelated stale Work is not itself a reason to invalidate a correctly isolated producer.
 
+For an authorized design revision, freeze the explicit authored-output policy
+described in [Work verification](work-verification.md) on the presented goal.
+Coordinator approval does not implicitly enable it. The runtime seals new target
+content separately from immutable inputs; coordinator review accepts that actual
+result, never a rewritten request binding. Manual, auto and scoped coordinator
+paths share these currentness checks. A stale intermediate import still needs
+its own bounded review; completing the selected output cannot accept another
+owner's node. Preserve historical runs for inspection and use a fresh checkpoint
+when an old strict request cannot represent the intended revision.
+
 `revokeScopedMandate(plan, reference, {source})` records an actual user revocation. State is reread before new effects, acceptance and Work completion. Historical accepted proof remains inspectable after closure/revocation; this never grants new execution authority. An interrupted terminal save is not permission to reactivate the mandate: inspect the same bundle and reconcile its actual completion before retrying.
 
 ## Boundaries preserved
