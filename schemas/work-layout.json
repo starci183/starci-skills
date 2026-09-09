@@ -12,13 +12,15 @@
     "workflowSession": "internal .starciwork/_local/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}",
     "moduleUI": "<module>/ui/{index.yaml,assets/<generated-design.png>}",
     "implementation": "<module>/implementation/{index.yaml,frontend/index.yaml,backend/index.yaml}",
-    "frontendCaptures": "<module>/implementation/frontend/assets/<running-page-screenshot>"
+    "frontendCaptures": "<module>/implementation/frontend/assets/<running-page-screenshot>",
+    "businessOverview": "<module>/business/overview/index.yaml",
+    "businessSRS": "<module>/business/srs/**/index.yaml"
   },
   "rules": [
     "Each work folder has one index.yaml node; index is the node, not an extra directory listing.",
     "Split by independently owned questions and acceptance boundaries, not workflow stages. Names and depth stay flexible.",
-    "Canonical index.yaml uses work/node@2 metadata. Module SRS/SDS use compact business or architecture objects; description remains for small unstructured nodes only.",
-    "Keep global parents thin. Business commonly separates independently checkable rules, actors, states, flows and acceptance. Architecture separates services, contracts, data, patterns, security, recovery, code and verification only where the selected scope needs independently investigable or acceptable children.",
+    "Canonical index.yaml uses work/node@2 metadata. New Business has a readable businessOverview and nested SRS leaves with extensions.work3.specification payload (schema: starci/specification@2). Legacy compact business remains readable; it is not a second detailed copy of a new SRS.",
+    "Business/index.yaml aggregates overview/index.yaml and srs/index.yaml. SRS folders are recursive cohesive capabilities, each leaf containing its own requirements, actors, states, rules, full flows and acceptance; do not split those linked concerns into disconnected tables. Architecture separates independently owned design concerns only when useful for the actual scope.",
     "Do not atomize by template. Create or retain a child when it owns a distinct question, decision, implementation boundary or acceptance result; otherwise keep the material together.",
     "Only leaves author state: uninvestigate, todo or done. todo is confirmed incomplete work and requires no investigation receipt. activity is auxiliary: idle, investigating, implementing or verifying. blockers[] explains impediments without becoming lifecycle state. Parents author no state or completion and derive progress from required descendants.",
     "When investigation occurs, investigation.contextDigest binds semantic context, excluding child rollup and auxiliary activity, blockers and history. A semantic parent change makes every affected descendant effectively uninvestigate while preserving stored done, completion, history and evidence.",
@@ -36,23 +38,15 @@
     "Frontend assets contain screenshots of the running page, never source design PNGs. UAT screenshots and videos stay under the owning uat/<flow>/assets directory."
   ],
   "example": {
-    "vps/create/": [
-      "index.yaml",
+    "knowledge/": [
       "business/index.yaml",
-      "business/rules/index.yaml",
-      "business/actors/index.yaml",
-      "business/states/index.yaml",
-      "business/flows/index.yaml",
-      "business/acceptance/index.yaml",
-      "architecture/index.yaml",
-      "architecture/services/index.yaml",
-      "architecture/contracts/index.yaml",
-      "architecture/data/index.yaml",
-      "architecture/patterns/index.yaml",
-      "architecture/security/index.yaml",
-      "architecture/recovery/index.yaml",
-      "architecture/code/index.yaml",
-      "architecture/verification/index.yaml"
+      "business/overview/index.yaml",
+      "business/srs/index.yaml",
+      "business/srs/documents/index.yaml",
+      "business/srs/documents/update/index.yaml",
+      "business/srs/A/index.yaml",
+      "business/srs/A/B/index.yaml",
+      "architecture/index.yaml"
     ]
   }
 }

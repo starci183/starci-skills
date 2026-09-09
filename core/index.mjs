@@ -209,7 +209,7 @@ function validate(root,completions=null,candidate=null) {
     const structured=['businessOverview','business','architecture','ui','implementation','uat'].filter(key=>n.meta[key]!==undefined);
     if(structured.length>1)issue('MODULE_SPEC',n.path,'A module node owns at most one business, architecture, UI, implementation or UAT specification.');
     if(n.meta.business!==undefined&&n.meta.kind!=='business')issue('MODULE_SPEC_OWNER',n.path,'business belongs to a business node.');
-    if(n.meta.businessOverview!==undefined&&(n.meta.kind!=='business-overview'||n.path!=='business/index.yaml'))issue('MODULE_SPEC_OWNER',n.path,'businessOverview belongs only to the product-level business/index.yaml node with kind business-overview.');
+    if(n.meta.businessOverview!==undefined&&(n.meta.kind!=='business-overview'||!(n.path==='business/index.yaml'||/(?:^|\/)business\/overview\/index\.yaml$/.test(n.path))))issue('MODULE_SPEC_OWNER',n.path,'businessOverview belongs to business/overview/index.yaml or the legacy product business/index.yaml, with kind business-overview.');
     if(n.meta.architecture!==undefined&&n.meta.kind!=='architecture')issue('MODULE_SPEC_OWNER',n.path,'architecture belongs to an architecture node.');
     if(n.meta.ui!==undefined&&n.meta.kind!=='ui')issue('MODULE_SPEC_OWNER',n.path,'ui belongs to a UI node.');
     if(n.meta.implementation!==undefined&&n.meta.kind!=='implementation')issue('MODULE_SPEC_OWNER',n.path,'implementation belongs to an implementation node.');
@@ -277,12 +277,28 @@ function validate(root,completions=null,candidate=null) {
     const unique=items=>[...new Map(items.map(item=>[item.meta.id,item])).values()].sort((a,b)=>a.meta.id.localeCompare(b.meta.id));
     n.effectiveDeps=unique(deps);n.effectiveRefs=unique(refs);
     const spec = n.meta.extensions?.work3?.specification;
+    const srsMatch = n.path.match(/^(.*(?:^|\/)business\/)srs\/(?:[^/]+\/)*index\.yaml$/);
+    if(srsMatch){
+      const businessRoot=srsMatch[1], srsRoot=businessRoot+'srs/index.yaml';
+      if(n.meta.kind!=='business')issue('SRS_LAYOUT',n.path,'SRS branches and leaves have kind business.');
+      if(!nodes.some(x=>x.path===businessRoot+'index.yaml')||!nodes.some(x=>x.path===srsRoot)||!nodes.some(x=>x.path===businessRoot+'overview/index.yaml'&&x.meta.kind==='business-overview'))issue('SRS_LAYOUT',n.path,'Nested SRS requires business/index.yaml, business/overview/index.yaml and business/srs/index.yaml.');
+      if(n.meta.business!==undefined)issue('SRS_DUPLICATE',n.path,'Version 2 SRS is the sole detailed payload; do not duplicate it in business.');
+      if(n.children.length&&spec!==undefined)issue('SRS_BRANCH_PAYLOAD',n.path,'SRS branches aggregate descendant requirements; only leaves carry specifications.');
+      if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!=='starci/specification@2')issue('SRS_VERSION',n.path,'Authored SRS leaves require starci/specification@2; uninvestigated placeholders cannot complete.');
+    }
     if (spec !== undefined) {
       const review = validateSpecification(spec);
       for (const message of review.errors) issue('SPECIFICATION', n.path, message);
       if (!['business','architecture'].includes(n.meta.kind) || spec?.op !== n.meta.kind + '.decide') issue('SPECIFICATION_OWNER', n.path, 'Specification must belong to its business/architecture node kind.');
       if (spec?.op === 'architecture.decide') {
-        const businesses = [...n.effectiveRefs,...n.effectiveDeps].filter(r => r.type === 'node' && r.meta.kind === 'business' && r.meta.extensions?.work3?.specification).map(r => r.meta.extensions.work3.specification);
+        const businessInputs = r => r.type === 'node' ? [r,...r.children.flatMap(businessInputs)] : [];
+        const businesses = [...n.effectiveRefs,...n.effectiveDeps].flatMap(businessInputs).filter(r=>r.meta.kind==='business'&&r.meta.extensions?.work3?.specification).map(r=>r.meta.extensions.work3.specification);
+        if(spec.schema==='starci/specification@2') for(const business of businesses.filter(b=>b.schema==='starci/specification@2')) {
+          for(const field of ['requirements','flows','actors','data','externalInterfaces','acceptance']) for(const input of business[field]??[]) {
+            const output=(spec[field]??[]).find(row=>row.id===input.id);
+            if(!output||canonicalJSON(output)!==canonicalJSON(input))issue('SPECIFICATION_BUSINESS_DRIFT',n.path,'Architecture must preserve referenced SRS '+field+' item '+input.id+' unchanged; service calls are separate.');
+          }
+        }
         for (const journey of Array.isArray(spec.journeys) ? spec.journeys : []) {
           const matches = businesses.flatMap(b => Array.isArray(b.journeys) ? b.journeys : []).filter(j => j.id === journey.id);
           if (matches.length && matches.some(j => canonicalJSON(j) !== canonicalJSON(journey))) issue('SPECIFICATION_JOURNEY_DRIFT', n.path, 'Architecture must preserve referenced business journey actions and expectations.');

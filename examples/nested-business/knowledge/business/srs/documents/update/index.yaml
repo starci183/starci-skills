@@ -1,0 +1,381 @@
+schema: work/node@2
+required: true
+id: example.business.srs.documents.update
+kind: business
+state: todo
+description: Synthetic FR-KNOW-03 with complete detailed flows; not approved product work.
+extensions:
+  work3:
+    specification:
+      schema: starci/specification@2
+      op: business.decide
+      status: draft
+      context:
+        purpose: "Synthetic teaching example: safely update an owned knowledge document."
+        scope: Edit existing text documents only. Excludes importing files, search ranking, storage
+          technology and infrastructure design.
+        glossary:
+          - term: Current revision
+            meaning: The saved document version readers currently see.
+        assumptions:
+          - This example proposes revision retention; it is not an approved Nivo requirement.
+        externalConstraints: []
+        dataScope: One document and its saved revisions; this example does not define physical storage.
+        interfaceScope: The owner interacts with the product; no third-party interface is in scope.
+      sources:
+        - id: example-intent
+          kind: proposal
+          repository: synthetic-example
+          revision: draft
+          path: brief.txt
+          symbol: Example only
+          observation: Authored teaching scenario, not a real user acceptance or source observation.
+      actors:
+        - id: owner
+          name: Document owner
+          goal: Correct their knowledge without losing saved content.
+          responsibilities:
+            - Review proposed changes
+          rights:
+            - Read and update their own document
+          restrictions:
+            - Cannot read or edit another owner's document
+      requirements:
+        - id: FR-KNOW-03
+          kind: FR
+          statement: The owner can review, change, submit or cancel an existing document; outcomes distinguish
+            saved, rejected and uncertain changes.
+          authority: proposed
+          sourceRefs:
+            - example-intent
+          acceptanceIds:
+            - AC-SAVED
+            - AC-CANCEL
+            - AC-DENIED
+            - AC-INVALID
+            - AC-CONFLICT
+            - AC-FAILED
+        - id: BR-OWNER
+          kind: BR
+          statement: Only the document owner can read or update the document in this example.
+          authority: proposed
+          sourceRefs:
+            - example-intent
+          acceptanceIds:
+            - AC-SAVED
+            - AC-DENIED
+        - id: NFR-PRIVACY
+          kind: NFR
+          statement: Denied document requests disclose no document content and produce no document changes.
+          authority: proposed
+          sourceRefs:
+            - example-intent
+          acceptanceIds:
+            - AC-DENIED
+      data:
+        - id: document
+          name: Knowledge document
+          owner: Document owner
+          attributes:
+            - name: content
+              meaning: The owner's knowledge text
+              validation: Must contain non-whitespace text
+              sensitivity: Private to its owner
+            - name: revision
+              meaning: Identity of the saved version being edited
+              validation: Must identify the current version before replacing content
+              sensitivity: Private document metadata
+          states:
+            - current
+            - superseded
+          transitions:
+            - from: current
+              to: superseded
+              trigger: A replacement revision is successfully saved
+              ruleIds:
+                - BR-OWNER
+      externalInterfaces: []
+      flows:
+        - id: FLOW-UPDATE
+          actor: owner
+          entry: Open an existing knowledge document
+          trigger: The owner chooses to correct saved knowledge
+          supportingActors: []
+          inputs:
+            - Document identity
+            - Current revision
+            - Replacement content
+          requirementIds:
+            - FR-KNOW-03
+            - BR-OWNER
+            - NFR-PRIVACY
+          ruleIds:
+            - BR-OWNER
+          preconditions:
+            - The document exists; the requester is identified, but permission is still checked.
+          steps:
+            - id: open
+              actor: owner
+              request: Request the document for editing
+              response: Return the current content only after confirming ownership
+              guard: BR-OWNER
+              effects: No saved data changes
+              failure: Denied access follows E-DENIED
+              repeat: Repeated opens read the current saved content
+              acceptanceIds:
+                - AC-DENIED
+            - id: edit
+              actor: owner
+              request: Change content locally
+              response: Show unsaved edits and allow cancellation
+              guard: The document has been opened with permission
+              effects: Only the pending edit changes
+              failure: Cancelled edits follow A-CANCEL
+              repeat: Further edits replace only the pending content
+              acceptanceIds:
+                - AC-CANCEL
+            - id: submit
+              actor: owner
+              request: Submit content and the revision that was edited
+              response: Validate non-empty content and detect intervening changes
+              guard: Recheck ownership; input valid; revision current
+              effects: No saved data changes before checks pass
+              failure: Invalid input follows E-INVALID; stale revision follows E-CONFLICT
+              repeat: Repeated submission must not silently overwrite a newer revision
+              acceptanceIds:
+                - AC-INVALID
+            - id: save
+              actor: system
+              request: Apply the validated replacement
+              response: Report the saved current revision after saving succeeds
+              guard: All submission checks still hold
+              effects: New content becomes current; previous content retained per this example policy
+              failure: Uncertain or failed save follows E-FAILED
+              repeat: Check current result before retrying an uncertain save
+              acceptanceIds:
+                - AC-FAILED
+            - id: read-back
+              actor: owner
+              request: Read the saved document
+              response: Display the new current content and saved status
+              guard: Current ownership permits access
+              effects: No further changes
+              failure: Do not display unsaved edits as persisted data
+              repeat: Read-only repetition does not create revisions
+              acceptanceIds:
+                - AC-SAVED
+          alternatives:
+            - id: A-CANCEL
+              fromStep: edit
+              condition: Owner chooses Cancel
+              steps:
+                - id: cancel
+                  actor: owner
+                  request: Cancel editing
+                  response: Close the editor
+                  guard: No save has begun
+                  effects: Discard pending edits only
+                  failure: If saving began, first resolve its outcome
+                  repeat: Repeated cancellation does not change saved content
+                  acceptanceIds:
+                    - AC-CANCEL
+              resumeAt: end
+              postconditions:
+                - The saved document is unchanged
+              acceptanceIds:
+                - AC-CANCEL
+          exceptions:
+            - id: E-DENIED
+              fromStep: open
+              condition: Requester is not the document owner
+              steps:
+                - id: deny
+                  actor: system
+                  request: Evaluate access
+                  response: Return access denied without document content
+                  guard: BR-OWNER
+                  effects: No document change
+                  failure: Do not reveal private data in the error
+                  repeat: Repeated denied requests stay denied
+                  acceptanceIds:
+                    - AC-DENIED
+              resumeAt: end
+              postconditions:
+                - No private content disclosed or modified
+              acceptanceIds:
+                - AC-DENIED
+            - id: E-INVALID
+              fromStep: submit
+              condition: Replacement text is empty
+              steps:
+                - id: invalid
+                  actor: system
+                  request: Validate replacement text
+                  response: Identify the invalid content field and retain edits
+                  guard: Content fails the stated validation
+                  effects: No saved change
+                  failure: Keep unsaved content distinct from saved content
+                  repeat: Corrected content can be submitted again
+                  acceptanceIds:
+                    - AC-INVALID
+              resumeAt: edit
+              postconditions:
+                - Owner can correct the pending edit
+              acceptanceIds:
+                - AC-INVALID
+            - id: E-CONFLICT
+              fromStep: submit
+              condition: Submitted revision is no longer current
+              steps:
+                - id: conflict
+                  actor: system
+                  request: Compare edited and current revision
+                  response: Refuse overwrite and offer the current version for review
+                  guard: An intervening change exists
+                  effects: Keep saved content and unsaved edit intact
+                  failure: Never silently choose a winner
+                  repeat: Owner must review and resubmit against the current revision
+                  acceptanceIds:
+                    - AC-CONFLICT
+              resumeAt: edit
+              postconditions:
+                - No intervening update is overwritten
+              acceptanceIds:
+                - AC-CONFLICT
+            - id: E-FAILED
+              fromStep: save
+              condition: Saving fails or its outcome is uncertain
+              steps:
+                - id: failed
+                  actor: system
+                  request: Resolve the save result
+                  response: Identify whether a saved revision is visible; otherwise report an unresolved save
+                  guard: A success result is not yet established
+                  effects: Never expose partial content as saved
+                  failure: Preserve the pending edit and explain uncertainty
+                  repeat: Check current content before the owner retries
+                  acceptanceIds:
+                    - AC-FAILED
+              resumeAt: end
+              postconditions:
+                - Current saved content is distinguishable from the pending edit
+              acceptanceIds:
+                - AC-FAILED
+          postconditions:
+            - The requested update is visibly saved, or cancellation/rejection/failure is clearly
+              distinguished.
+          failurePostconditions:
+            - No unauthorized overwrite; no partial document is reported as saved.
+          branchReview:
+            alternatives: Cancellation changes the owner's chosen outcome without being an error.
+            exceptions: Access denial, invalid input, stale edit and uncertain saving are relevant to this
+              update scope; no distributed-service scenario is invented.
+          acceptanceIds:
+            - AC-SAVED
+            - AC-CANCEL
+            - AC-DENIED
+            - AC-INVALID
+            - AC-CONFLICT
+            - AC-FAILED
+      security:
+        - id: SEC-OWNER
+          threat: A requester accesses another owner's knowledge
+          trustBoundary: Requester versus document owner
+          control: Deny reading and mutation without ownership
+          enforcementOwner: The product must enforce the ownership rule; technical placement belongs to Architecture
+          sourceRefs:
+            - example-intent
+          acceptanceIds:
+            - AC-DENIED
+          residualRisk: Identity compromise is outside this example and needs a separately scoped assessment.
+      acceptance:
+        - id: AC-SAVED
+          requirementIds:
+            - FR-KNOW-03
+            - BR-OWNER
+          flowIds:
+            - FLOW-UPDATE
+          given: An owner edits their current document
+          when: They submit valid changed content
+          then: One new current revision is visible and the prior content is retained for this synthetic
+            policy.
+          proofOwner: business.decide
+          instrument: Review this synthetic flow against the stated scenario; not an executed product test
+          scenario: positive
+        - id: AC-CANCEL
+          requirementIds:
+            - FR-KNOW-03
+          flowIds:
+            - FLOW-UPDATE
+          given: Unsaved edits are present
+          when: The owner cancels
+          then: The editor closes and the saved document is unchanged.
+          proofOwner: business.decide
+          instrument: Review this synthetic flow against the stated scenario; not an executed product test
+          scenario: alternative
+        - id: AC-DENIED
+          requirementIds:
+            - FR-KNOW-03
+            - BR-OWNER
+            - NFR-PRIVACY
+          flowIds:
+            - FLOW-UPDATE
+          given: The requester does not own the document
+          when: They try to read or update it
+          then: No document content is disclosed and no data changes.
+          proofOwner: business.decide
+          instrument: Review this synthetic flow against the stated scenario; not an executed product test
+          scenario: negative
+        - id: AC-INVALID
+          requirementIds:
+            - FR-KNOW-03
+          flowIds:
+            - FLOW-UPDATE
+          given: The submitted content is empty after trimming
+          when: The owner submits it
+          then: A validation error identifies the content field; edits remain available and no revision is
+            created.
+          proofOwner: business.decide
+          instrument: Review this synthetic flow against the stated scenario; not an executed product test
+          scenario: boundary
+        - id: AC-CONFLICT
+          requirementIds:
+            - FR-KNOW-03
+          flowIds:
+            - FLOW-UPDATE
+          given: Another edit has changed the current revision
+          when: An older edit is submitted
+          then: The overwrite is refused and the owner can inspect the current version without losing unsaved
+            edits.
+          proofOwner: business.decide
+          instrument: Review this synthetic flow against the stated scenario; not an executed product test
+          scenario: negative
+        - id: AC-FAILED
+          requirementIds:
+            - FR-KNOW-03
+          flowIds:
+            - FLOW-UPDATE
+          given: Saving cannot finish reliably
+          when: The system reports failure and the owner checks the current version
+          then: No partial document is presented as saved; the current saved content and pending edit are
+            distinguishable before any retry.
+          proofOwner: business.decide
+          instrument: Review this synthetic flow against the stated scenario; not an executed product test
+          scenario: recovery
+      decisions:
+        - id: example-policy
+          status: proposed
+          statement: Revision retention and owner-only rights are illustrative, not accepted product policy.
+          owner: Example reviewer
+          sourceRefs:
+            - example-intent
+          blocking: true
+      handoff:
+        inputsFrom:
+          - Synthetic brief
+        outputsTo:
+          - Architecture design consuming the accepted SRS, if this example were approved
+        preserve:
+          - FR-KNOW-03 and the explicit flow/acceptance outcomes
+      journeys: []
+      journeyCoverage: []

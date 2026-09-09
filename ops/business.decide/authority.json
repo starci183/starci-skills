@@ -17,7 +17,7 @@
     "writes": [
       {
         "id": "node",
-        "path": ".starciwork/<business>/business/<piece>/index.yaml"
+        "path": ".starciwork/<business>/business/**/index.yaml"
       },
       {
         "id": "evidence",

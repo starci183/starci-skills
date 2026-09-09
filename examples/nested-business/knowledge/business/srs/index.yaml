@@ -1,0 +1,7 @@
+schema: work/node@2
+required: true
+id: example.business.srs
+kind: business
+description: Recursive SRS aggregate; add cohesive folders without a registry.
+dependsOn:
+  - example.business.overview

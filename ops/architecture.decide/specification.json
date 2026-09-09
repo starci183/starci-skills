@@ -1,15 +1,14 @@
 {
   "schema": "starci/specification-policy@1",
   "storage": ".starciwork",
-  "payload": "architecture + sourceRefs on one module-level work/node@2 index.yaml",
+  "payload": "architecture target summary plus extensions.work3.specification on the owned architecture leaf",
   "sourceTruth": "observed-not-approved-intent",
   "requiredSections": [
     "status",
     "target",
     "observations",
     "gaps",
-    "target.saga",
-    "target.cqrs"
+    "architectureReview"
   ],
   "qualityExecutionOwner": [
     "interface.implement",
@@ -58,7 +57,7 @@
         "node"
       ],
       "action": {
-        "en": "Choose and justify the smallest design meeting hard constraints, comparing alternatives where material. Specify API request/response/errors, compatibility, transaction, lock scope, idempotency, event ordering, retry limits, timeout, compensation and read-back. Unknowns stay explicit. Evaluate Saga, CQRS, transactional outbox/inbox, idempotency, concurrency control and resilience patterns against actual invariants. Each pattern decision says adopt/preserve/reject/defer, why, simpler alternative, trade-off, scope and proof. Saga requires participant-local transactions, durable orchestration/choreography state, compensation/pivot/retry and failure recovery; an outbox alone is not Saga. CQRS requires explicit read/write models and consistency/read-your-writes policy; separate handler filenames do not prove CQRS and CQRS does not require event sourcing or separate databases."
+        "en": "Choose the smallest design satisfying accepted invariants and actual constraints. Challenge one coherent proposal with a materially simpler alternative, trade-offs and a reasoned decision. Select concerns from real business risks, data value, scale, trust boundaries and operating model, not a universal technology checklist. Evaluate named patterns only when relevant; patternDecisions may be empty. An adopted Saga/CQRS/outbox must describe actual mechanisms, not labels or handler filenames. Specify applicable transaction, idempotency, ordering, timeout, concurrency and recovery behavior; never invent numeric targets or unresolved product policy."
       }
     },
     {
@@ -98,7 +97,7 @@
         "node"
       ],
       "action": {
-        "en": "Produce implementation ceilings, protected paths, dependencies and required checks from actual repository scripts/CI. Lint, typecheck, tests/coverage, build and Sonar execute inside FE/BE implement; this op specifies them only. Bind rollout/migration/cleanup plans without executing them. Preserve business expected results unchanged. Design failure-injection tests for wrong service target, unauthorized forwarding, stale reads, duplicate/out-of-order messages, crash after commit before publish, compensation failure and retry exhaustion as applicable; implementations run them. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned."
+        "en": "Produce implementation ceilings, protected paths, dependencies and required checks from actual repository scripts/CI. Lint, typecheck, tests/coverage, build and Sonar execute inside FE/BE implement; this op specifies them only. Bind rollout/migration/cleanup plans without executing them. Preserve business expected results unchanged. Design failure-injection tests for wrong service target, unauthorized forwarding, stale reads, duplicate/out-of-order messages, crash after commit before publish, compensation failure and retry exhaustion as applicable; implementations run them. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned. Record architectureReview with context-selected concerns linked to requirements, sources, concrete trigger/impact/control/owner/acceptance scenarios, decisions, residual risks and evidence limitations. Examine persistence, connections, failure domains, capacity, security, HA, backup/restore, provider or total-infrastructure loss only to the depth their consequences require in this scope. Where durable customer state is in scope, identify authoritative versus rebuildable data, all stores/volumes/config/Secrets/keys, consistency point, independent backup custody, recovery prerequisites/order and verification. Never claim every possible edge case is covered or a recovery drill ran from design prose. Current external production practices need primary sources and an explicit applicability argument."
       }
     },
     {
@@ -112,7 +111,7 @@
         "evidence"
       ],
       "action": {
-        "en": "Validate the compact module architecture and current .starciwork graph. Canonical index.yaml must contain target ownership, call chain, contracts, data/transaction/concurrency/security design, plus concrete Saga and CQRS designs. Put observed facts in observations and sourceRefs; record missing runtime mechanisms in gaps rather than claiming they exist. Architecture completion does not complete implementation or UAT."
+        "en": "Validate target ownership, request/data/credential paths, contracts and applicable failure controls against accepted Business and actual sources. Separate proposed design from observations and implementation gaps. Require accepted decisions for material concerns and residual risks before passing design review. Omit unnecessary Saga/CQRS designs; validate concrete mechanisms when selected. Preserve accepted SRS requirements/flows/AC and user journeys, with explicit business leaf dependencies. Architecture done means reviewed design only, never implementation, security audit, HA or executed restore proof."
       }
     }
   ],
@@ -129,5 +128,7 @@
       "topic": "API threat review",
       "url": "https://owasp.org/www-project-api-security/"
     }
-  ]
+  ],
+  "payloadSchema": "starci/specification@2",
+  "analysisPolicy": "context-driven"
 }

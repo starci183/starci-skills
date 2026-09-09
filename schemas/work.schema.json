@@ -546,8 +546,6 @@
             "transactionBoundary",
             "concurrencyControls",
             "securityControls",
-            "saga",
-            "cqrs",
             "schema",
             "migrationRequirements",
             "configuration",
@@ -690,7 +688,7 @@
                   "description": "Explicit differences between current implementation and the required target; never present a gap as already implemented."
                 }
               },
-              "description": "Mandatory target Saga policy, including coordination, success events, compensation and known gaps."
+              "description": "Optional selected saga design; concrete mechanisms are required when present."
             },
             "cqrs": {
               "type": "object",
@@ -764,7 +762,7 @@
                   "description": "Explicit differences between current implementation and the required target; never present a gap as already implemented."
                 }
               },
-              "description": "Mandatory target CQRS policy, including commands, queries, events and known gaps."
+              "description": "Optional selected cqrs design; concrete mechanisms are required when present."
             },
             "schema": {
               "$ref": "#/$defs/stringList",
@@ -822,7 +820,7 @@
           "description": "Explicit differences between current implementation and the required target; never present a gap as already implemented."
         }
       },
-      "description": "Module SDS: target technical design and observed current facts. Mandatory Saga/CQRS design and explicit gaps distinguish target from implementation."
+      "description": "Module SDS: target technical design, observed facts and explicit gaps. Named pattern designs are optional and must be concrete when selected."
     },
     "implementationSpec": {
       "type": "object",
@@ -1754,7 +1752,7 @@
         },
         "openQuestions": {
           "$ref": "#/$defs/string",
-          "description": "Unresolved customer questions or \u201cNone stated\u201d; do not silently convert guesses into requirements."
+          "description": "Unresolved customer questions or “None stated”; do not silently convert guesses into requirements."
         }
       }
     }

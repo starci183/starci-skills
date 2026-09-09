@@ -110,14 +110,16 @@ A typical new feature covers business → architecture → backend → frontend,
 
 | Stage | What it establishes |
 | --- | --- |
-| Business | User journeys, rules, ownership, exceptions and acceptance expectations. |
-| Architecture | Source-grounded responsibilities, contracts, interactions and design decisions. |
+| Business | Readable overview plus nested SRS: actors, rules, FR/NFR, detailed happy/alternative/exception flows and acceptance. |
+| Architecture | Source-grounded responsibilities, connection/data contracts and context-driven design/risk decisions; named patterns are optional. |
 | Backend | Approved code changes with unit, backend E2E and API evidence before frontend handoff. |
 | Frontend | Bound design creation/reuse, implementation and browser UAT; not just a screenshot or a build. |
 | Review / standalone UAT | Explicit verification scope and actual results; unit tests are not browser UAT. |
 | Publish / deploy | Separately authorized delivery effects, not an automatic consequence of finishing code. |
 
 Finishing one workflow does not finish the Plan. Passing metadata validation does not prove the product works. A `done` claim must have current evidence for its selected scope, and downstream status can become stale when upstream inputs change.
+
+See [Business overview and nested SRS](docs/business-srs.md) for the `business/overview/index.yaml` and `business/srs/**/index.yaml` layout, a complete worked example and version-1 migration boundaries.
 
 ## Execution modes
 

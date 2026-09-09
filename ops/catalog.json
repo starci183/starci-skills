@@ -100,10 +100,11 @@
               "refs",
               "dependsOn",
               "assertions",
-              "required"
+              "required",
+              "extensions.work3.specification"
             ],
             "content": {
-              "en": "Write one compact module-level architecture object with observed/proposed status, target service ownership, call chain, contracts, data ownership, transaction/concurrency/security controls, mandatory Saga and CQRS designs, observations and explicit gaps. A target design does not claim its mechanisms already exist; cite current code only in sourceRefs and observations."
+              "en": "Write target ownership, call chain, contracts, data ownership and context-relevant controls, observations and gaps. Full starci/specification@2 records the source-grounded design and architectureReview. Patterns are optional and justified; do not require Saga/CQRS for every module. Preserve accepted Business outcomes and distinguish design proof from running behavior."
             }
           },
           {
@@ -181,7 +182,7 @@
               "node"
             ],
             "action": {
-              "en": "Choose and justify the smallest design meeting hard constraints, comparing alternatives where material. Specify API request/response/errors, compatibility, transaction, lock scope, idempotency, event ordering, retry limits, timeout, compensation and read-back. Unknowns stay explicit. Evaluate Saga, CQRS, transactional outbox/inbox, idempotency, concurrency control and resilience patterns against actual invariants. Each pattern decision says adopt/preserve/reject/defer, why, simpler alternative, trade-off, scope and proof. Saga requires participant-local transactions, durable orchestration/choreography state, compensation/pivot/retry and failure recovery; an outbox alone is not Saga. CQRS requires explicit read/write models and consistency/read-your-writes policy; separate handler filenames do not prove CQRS and CQRS does not require event sourcing or separate databases."
+              "en": "Choose the smallest design satisfying accepted invariants and actual constraints. Challenge one coherent proposal with a materially simpler alternative, trade-offs and a reasoned decision. Select concerns from real business risks, data value, scale, trust boundaries and operating model, not a universal technology checklist. Evaluate named patterns only when relevant; patternDecisions may be empty. An adopted Saga/CQRS/outbox must describe actual mechanisms, not labels or handler filenames. Specify applicable transaction, idempotency, ordering, timeout, concurrency and recovery behavior; never invent numeric targets or unresolved product policy."
             }
           },
           {
@@ -221,7 +222,7 @@
               "node"
             ],
             "action": {
-              "en": "Produce implementation ceilings, protected paths, dependencies and required checks from actual repository scripts/CI. Lint, typecheck, tests/coverage, build and Sonar execute inside FE/BE implement; this op specifies them only. Bind rollout/migration/cleanup plans without executing them. Preserve business expected results unchanged. Design failure-injection tests for wrong service target, unauthorized forwarding, stale reads, duplicate/out-of-order messages, crash after commit before publish, compensation failure and retry exhaustion as applicable; implementations run them. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned. Partition the selected FE/BE code impacts into cohesive implementation pieces with exact paths, protected boundaries, prerequisites, acceptance IDs, safe commit boundaries and test ownership. Check that each operation is assigned once; pieces may run in parallel only with disjoint mutable ownership and no dependency on another piece output."
+              "en": "Produce implementation ceilings, protected paths, dependencies and required checks from actual repository scripts/CI. Lint, typecheck, tests/coverage, build and Sonar execute inside FE/BE implement; this op specifies them only. Bind rollout/migration/cleanup plans without executing them. Preserve business expected results unchanged. Design failure-injection tests for wrong service target, unauthorized forwarding, stale reads, duplicate/out-of-order messages, crash after commit before publish, compensation failure and retry exhaustion as applicable; implementations run them. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned. Record architectureReview with context-selected concerns linked to requirements, sources, concrete trigger/impact/control/owner/acceptance scenarios, decisions, residual risks and evidence limitations. Examine persistence, connections, failure domains, capacity, security, HA, backup/restore, provider or total-infrastructure loss only to the depth their consequences require in this scope. Where durable customer state is in scope, identify authoritative versus rebuildable data, all stores/volumes/config/Secrets/keys, consistency point, independent backup custody, recovery prerequisites/order and verification. Never claim every possible edge case is covered or a recovery drill ran from design prose. Current external production practices need primary sources and an explicit applicability argument."
             }
           },
           {
@@ -237,7 +238,7 @@
               "matrixHandoff"
             ],
             "action": {
-              "en": "Validate .starciwork and requirement→flow→code/service→security→AC coverage. Write the JSON specification into extensions.work3.specification before review digest, with actual source-map/review evidence. Output code/service impact, contracts, security controls and verification plan to backend/FE implement; unresolved required ownership/compatibility decisions block handoff. No secondary is defined; do not invent calls. Design completion does not complete implementation or UAT. Require serviceCalls, patternDecisions and securityReview JSON and reject unresolved routing/pattern/security blockers before handoff. Record documentation citations separately from source evidence; a passing structural validator cannot prove a deployed endpoint or security control. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+              "en": "Validate target ownership, request/data/credential paths, contracts and applicable failure controls against accepted Business and actual sources. Separate proposed design from observations and implementation gaps. Require accepted decisions for material concerns and residual risks before passing design review. Omit unnecessary Saga/CQRS designs; validate concrete mechanisms when selected. Preserve accepted SRS requirements/flows/AC and user journeys, with explicit business leaf dependencies. Architecture done means reviewed design only, never implementation, security audit, HA or executed restore proof."
             }
           }
         ],
@@ -298,15 +299,14 @@
         "specificationPolicy": {
           "schema": "starci/specification-policy@1",
           "storage": ".starciwork",
-          "payload": "architecture + sourceRefs on one module-level work/node@2 index.yaml",
+          "payload": "architecture target summary plus extensions.work3.specification on the owned architecture leaf",
           "sourceTruth": "observed-not-approved-intent",
           "requiredSections": [
             "status",
             "target",
             "observations",
             "gaps",
-            "target.saga",
-            "target.cqrs"
+            "architectureReview"
           ],
           "qualityExecutionOwner": [
             "interface.implement",
@@ -355,7 +355,7 @@
                 "node"
               ],
               "action": {
-                "en": "Choose and justify the smallest design meeting hard constraints, comparing alternatives where material. Specify API request/response/errors, compatibility, transaction, lock scope, idempotency, event ordering, retry limits, timeout, compensation and read-back. Unknowns stay explicit. Evaluate Saga, CQRS, transactional outbox/inbox, idempotency, concurrency control and resilience patterns against actual invariants. Each pattern decision says adopt/preserve/reject/defer, why, simpler alternative, trade-off, scope and proof. Saga requires participant-local transactions, durable orchestration/choreography state, compensation/pivot/retry and failure recovery; an outbox alone is not Saga. CQRS requires explicit read/write models and consistency/read-your-writes policy; separate handler filenames do not prove CQRS and CQRS does not require event sourcing or separate databases."
+                "en": "Choose the smallest design satisfying accepted invariants and actual constraints. Challenge one coherent proposal with a materially simpler alternative, trade-offs and a reasoned decision. Select concerns from real business risks, data value, scale, trust boundaries and operating model, not a universal technology checklist. Evaluate named patterns only when relevant; patternDecisions may be empty. An adopted Saga/CQRS/outbox must describe actual mechanisms, not labels or handler filenames. Specify applicable transaction, idempotency, ordering, timeout, concurrency and recovery behavior; never invent numeric targets or unresolved product policy."
               }
             },
             {
@@ -395,7 +395,7 @@
                 "node"
               ],
               "action": {
-                "en": "Produce implementation ceilings, protected paths, dependencies and required checks from actual repository scripts/CI. Lint, typecheck, tests/coverage, build and Sonar execute inside FE/BE implement; this op specifies them only. Bind rollout/migration/cleanup plans without executing them. Preserve business expected results unchanged. Design failure-injection tests for wrong service target, unauthorized forwarding, stale reads, duplicate/out-of-order messages, crash after commit before publish, compensation failure and retry exhaustion as applicable; implementations run them. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned."
+                "en": "Produce implementation ceilings, protected paths, dependencies and required checks from actual repository scripts/CI. Lint, typecheck, tests/coverage, build and Sonar execute inside FE/BE implement; this op specifies them only. Bind rollout/migration/cleanup plans without executing them. Preserve business expected results unchanged. Design failure-injection tests for wrong service target, unauthorized forwarding, stale reads, duplicate/out-of-order messages, crash after commit before publish, compensation failure and retry exhaustion as applicable; implementations run them. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned. Record architectureReview with context-selected concerns linked to requirements, sources, concrete trigger/impact/control/owner/acceptance scenarios, decisions, residual risks and evidence limitations. Examine persistence, connections, failure domains, capacity, security, HA, backup/restore, provider or total-infrastructure loss only to the depth their consequences require in this scope. Where durable customer state is in scope, identify authoritative versus rebuildable data, all stores/volumes/config/Secrets/keys, consistency point, independent backup custody, recovery prerequisites/order and verification. Never claim every possible edge case is covered or a recovery drill ran from design prose. Current external production practices need primary sources and an explicit applicability argument."
               }
             },
             {
@@ -409,7 +409,7 @@
                 "evidence"
               ],
               "action": {
-                "en": "Validate the compact module architecture and current .starciwork graph. Canonical index.yaml must contain target ownership, call chain, contracts, data/transaction/concurrency/security design, plus concrete Saga and CQRS designs. Put observed facts in observations and sourceRefs; record missing runtime mechanisms in gaps rather than claiming they exist. Architecture completion does not complete implementation or UAT."
+                "en": "Validate target ownership, request/data/credential paths, contracts and applicable failure controls against accepted Business and actual sources. Separate proposed design from observations and implementation gaps. Require accepted decisions for material concerns and residual risks before passing design review. Omit unnecessary Saga/CQRS designs; validate concrete mechanisms when selected. Preserve accepted SRS requirements/flows/AC and user journeys, with explicit business leaf dependencies. Architecture done means reviewed design only, never implementation, security audit, HA or executed restore proof."
               }
             }
           ],
@@ -426,7 +426,9 @@
               "topic": "API threat review",
               "url": "https://owasp.org/www-project-api-security/"
             }
-          ]
+          ],
+          "payloadSchema": "starci/specification@2",
+          "analysisPolicy": "context-driven"
         }
       }
     },
@@ -775,10 +777,11 @@
       "authority": "business.decide/authority.json",
       "goal": "Specify the selected business behavior precisely enough to implement and independently accept it.",
       "nodeKinds": [
-        "business"
+        "business",
+        "business-overview"
       ],
       "writeScope": [
-        ".starciwork/<business>/business/<piece>/index.yaml",
+        ".starciwork/<business>/business/**/index.yaml",
         "E/manifest.yaml + E/coverage-review.md",
         "E/job-result.yaml"
       ],
@@ -791,7 +794,8 @@
           "en": "Specify the selected business behavior precisely enough to implement and independently accept it."
         },
         "nodeKinds": [
-          "business"
+          "business",
+          "business-overview"
         ],
         "completionProfile": "business",
         "sideEffects": [],
@@ -848,9 +852,10 @@
         "writes": [
           {
             "id": "node",
-            "path": ".starciwork/<business>/business/<piece>/index.yaml",
+            "path": ".starciwork/<business>/business/**/index.yaml",
             "fields": [
-              "business",
+              "businessOverview",
+              "extensions.work3.specification",
               "sourceRefs",
               "refs",
               "assertions",
@@ -858,7 +863,7 @@
               "required"
             ],
             "content": {
-              "en": "Before module SRS work, capture the overall product in .starciwork/business/index.yaml as businessOverview block prose using purpose, customerUnderstanding, desiredOutcome, scope and openQuestions in the customer’s natural language. Then write one compact module-level business object with purpose, inputs/outputs, scope/exclusions, actors, AI authority boundaries, functional requirements, data/states, flows, exceptions, rules, non-functional requirements, acceptance criteria and unresolved questions. Unknown numeric targets remain unresolved rather than invented. Keep citations in sourceRefs and graph bindings in refs/dependsOn; do not create per-clause nodes or IDs."
+              "en": "Author business/overview/index.yaml with businessOverview for readable purpose, customer understanding, outcome, scope and open questions. Author the sole detailed SRS in extensions.work3.specification using starci/specification@2 on cohesive business/srs/**/index.yaml leaves. Intermediate folders are metadata-only aggregates; scale by adding folders, not editing a registry or duplicating a monolithic SRS. Stable FR/BR/NFR/flow/AC IDs and explicit core refs/dependsOn provide traceability. Do not repeat the detailed SRS in a compact business object. Preserve canonical user journeys and never turn internal service hops into UI actions."
             }
           },
           {
@@ -923,7 +928,7 @@
               "node"
             ],
             "action": {
-              "en": "Write objective, glossary, actors, ownership, FR/BR and measurable NFRs. Separate output from persisted effects and technical constraints from business policy. Preserve unknown numeric targets with the decision owner; never invent targets."
+              "en": "Write purpose, scope/exclusions, glossary, assumptions, actors with responsibilities/rights/restrictions, FR/BR and observable NFRs. Specify business data attributes, validation, sensitivity, states/transitions and external inputs/outputs/errors. State why a data or external-interface inventory is empty. Source observations and supplied technical constraints are not approved business policy; unknown numeric targets retain a decision owner."
             }
           },
           {
@@ -935,7 +940,7 @@
               "node"
             ],
             "action": {
-              "en": "Write ordered flows with entry, actor, prerequisites, request, response/error, transitions, guards, side effects and postconditions. Cover success, invalid/denied input, retry, duplicate, concurrency, cancellation and recovery where relevant; mark non-applicability with reasons."
+              "en": "Every FR resolves to a detailed flow, not a title alone: trigger, primary/supporting actors, inputs, preconditions, numbered actor/request/system-response steps, guards, effects, failures, repeat behavior and success/failure postconditions. Alternative and exception branches identify their starting step, condition, ordered steps, resume/end and acceptance. Review denied/invalid input, cancellation, duplicate/retry, concurrency and recovery where relevant; explain absent branch classes without fabricating cases."
             }
           },
           {
@@ -948,7 +953,7 @@
               "node"
             ],
             "action": {
-              "en": "Trace each flow to observed UI/API/module/store callers and affected services. Record a preliminary codeImpacts/serviceImpacts inventory, source citations, direct versus transitive impact, preserve/change/review disposition and unknowns. This is architecture input, not authorization to edit every discovered file."
+              "en": "Review observable outcomes against accepted intent and observed behavior. Business states what users and the system must do, not class inheritance, repositories, service placement, Saga/CQRS, Kubernetes or backup tooling. Preserve genuinely supplied technical constraints as sourced external constraints; hand implementation questions to Architecture instead of encoding an invented design in requirements."
             }
           },
           {
@@ -972,7 +977,7 @@
               "node"
             ],
             "action": {
-              "en": "Assign stable requirement/flow/AC IDs and Given/When/Then expectations, proof owner and instrument. Record decisions to implement/preserve/defer/not-applicable with authority and revisit condition. Store the full JSON payload in extensions.work3.specification and real dependencies/refs in core fields, not hidden prose. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned."
+              "en": "Author business/overview/index.yaml with businessOverview for readable purpose, customer understanding, outcome, scope and open questions. Author the sole detailed SRS in extensions.work3.specification using starci/specification@2 on cohesive business/srs/**/index.yaml leaves. Intermediate folders are metadata-only aggregates; scale by adding folders, not editing a registry or duplicating a monolithic SRS. Stable FR/BR/NFR/flow/AC IDs and explicit core refs/dependsOn provide traceability. Do not repeat the detailed SRS in a compact business object. Preserve canonical user journeys and never turn internal service hops into UI actions."
             }
           },
           {
@@ -987,7 +992,7 @@
               "matrixHandoff"
             ],
             "action": {
-              "en": "Validate coverage and .starciwork bindings; review all unresolved decisions together. Output requirements, ordered flows, acceptance, preliminary impact and security inputs for architecture/draw/planning. No automatic secondary call is defined for this op; report a missing decision and do not invent a helper. Complete only this reviewed business scope. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+              "en": "Validate detailed requirement/flow/branch/acceptance coverage and the recursive Work graph. Review contradictions, scope and unresolved decisions with the user. A complete branch rolls up only from valid required leaves; draft placeholders and schema validity cannot earn done. Output reviewed business outcomes and observable security/quality acceptance for Architecture; no implementation or deployed-proof claim. Return the selected matrix's request-bound typed outputs when applicable."
             }
           }
         ],
@@ -1007,7 +1012,7 @@
           {
             "id": "impact-security-coverage",
             "requirement": {
-              "en": "Every selected flow resolves cited code/service impact, security controls and acceptance; proposed/unknown facts remain explicit. Validate the JSON specification and .starciwork before review completion."
+              "en": "Every FR has a detailed actor flow and acceptance, every alternative/exception has ordered steps and postconditions, and security has observable negative acceptance. Validate nested ownership and version-2 SRS; no code/service inventory is required in Business."
             }
           }
         ],
@@ -1048,20 +1053,21 @@
         "specificationPolicy": {
           "schema": "starci/specification-policy@1",
           "storage": ".starciwork",
-          "payload": "business + sourceRefs on one module-level work/node@2 index.yaml",
+          "payload": "business/overview/index.yaml plus recursive business/srs/**/index.yaml leaves carrying extensions.work3.specification; branches aggregate.",
           "sourceTruth": "observed-not-approved-intent",
           "requiredSections": [
-            "module",
-            "purpose",
-            "scope",
+            "context",
             "actors",
-            "functionalRequirements",
-            "dataAndStates",
+            "requirements",
+            "data",
+            "externalInterfaces",
             "flows",
-            "businessRules",
-            "nonFunctionalRequirements",
-            "acceptanceCriteria",
-            "unresolvedQuestions"
+            "security",
+            "acceptance",
+            "decisions",
+            "handoff",
+            "journeys",
+            "journeyCoverage"
           ],
           "qualityExecutionOwner": [
             "interface.implement",
@@ -1070,9 +1076,9 @@
           "maxSecondaryDefinitions": 3,
           "secondaryCalls": [],
           "completion": "Review proof and current .starciwork validation only; never implementation, Sonar or UAT pass.",
-          "handoff": "Downstream consumes accepted requirement/AC/flow IDs unchanged and architecture code/service/security scope by reference. Missing decisions block the affected handoff.",
+          "handoff": "Architecture consumes accepted SRS leaf IDs, requirements, flows and acceptance unchanged, including inherited scope. No code/service design or implementation checks belong in Business.",
           "op": "business.decide",
-          "impactMaturity": "preliminary-observed",
+          "impactMaturity": "business-outcomes-only",
           "steps": [
             {
               "reads": [
@@ -1097,7 +1103,7 @@
                 "node"
               ],
               "action": {
-                "en": "Write objective, glossary, actors, ownership, FR/BR and measurable NFRs. Separate output from persisted effects and technical constraints from business policy. Preserve unknown numeric targets with the decision owner; never invent targets."
+                "en": "Write purpose, scope/exclusions, glossary, assumptions, actors with responsibilities/rights/restrictions, FR/BR and observable NFRs. Specify business data attributes, validation, sensitivity, states/transitions and external inputs/outputs/errors. State why a data or external-interface inventory is empty. Source observations and supplied technical constraints are not approved business policy; unknown numeric targets retain a decision owner."
               }
             },
             {
@@ -1109,7 +1115,7 @@
                 "node"
               ],
               "action": {
-                "en": "Write ordered flows with entry, actor, prerequisites, request, response/error, transitions, guards, side effects and postconditions. Cover success, invalid/denied input, retry, duplicate, concurrency, cancellation and recovery where relevant; mark non-applicability with reasons."
+                "en": "Every FR resolves to a detailed flow, not a title alone: trigger, primary/supporting actors, inputs, preconditions, numbered actor/request/system-response steps, guards, effects, failures, repeat behavior and success/failure postconditions. Alternative and exception branches identify their starting step, condition, ordered steps, resume/end and acceptance. Review denied/invalid input, cancellation, duplicate/retry, concurrency and recovery where relevant; explain absent branch classes without fabricating cases."
               }
             },
             {
@@ -1122,7 +1128,7 @@
                 "node"
               ],
               "action": {
-                "en": "Trace each flow to observed UI/API/module/store callers and affected services. Record a preliminary codeImpacts/serviceImpacts inventory, source citations, direct versus transitive impact, preserve/change/review disposition and unknowns. This is architecture input, not authorization to edit every discovered file."
+                "en": "Review observable outcomes against accepted intent and observed behavior. Business states what users and the system must do, not class inheritance, repositories, service placement, Saga/CQRS, Kubernetes or backup tooling. Preserve genuinely supplied technical constraints as sourced external constraints; hand implementation questions to Architecture instead of encoding an invented design in requirements."
               }
             },
             {
@@ -1146,7 +1152,7 @@
                 "node"
               ],
               "action": {
-                "en": "Write one compact module-level business object in canonical index.yaml. Use plain requirement titles and behavior, ordered actor/action/systemResponse flow steps, measurable nonFunctionalRequirements and Given/When/Then acceptanceCriteria. Keep unknown targets in unresolvedQuestions instead of inventing an SLA. Put observed repository citations in sourceRefs and graph bindings in refs/dependsOn; do not create per-clause IDs or hide the SRS in Markdown description."
+                "en": "Author business/overview/index.yaml with businessOverview for readable purpose, customer understanding, outcome, scope and open questions. Author the sole detailed SRS in extensions.work3.specification using starci/specification@2 on cohesive business/srs/**/index.yaml leaves. Intermediate folders are metadata-only aggregates; scale by adding folders, not editing a registry or duplicating a monolithic SRS. Stable FR/BR/NFR/flow/AC IDs and explicit core refs/dependsOn provide traceability. Do not repeat the detailed SRS in a compact business object. Preserve canonical user journeys and never turn internal service hops into UI actions."
               }
             },
             {
@@ -1159,10 +1165,12 @@
                 "evidence"
               ],
               "action": {
-                "en": "Validate coverage and .starciwork bindings; review all unresolved decisions together. Output requirements, ordered flows, acceptance, preliminary impact and security inputs for architecture/draw/planning. No automatic secondary call is defined for this op; report a missing decision and do not invent a helper. Complete only this reviewed business scope."
+                "en": "Validate detailed requirement/flow/branch/acceptance coverage and the recursive Work graph. Review contradictions, scope and unresolved decisions with the user. A complete branch rolls up only from valid required leaves; draft placeholders and schema validity cannot earn done. Output reviewed business outcomes and observable security/quality acceptance for Architecture; no implementation or deployed-proof claim."
               }
             }
-          ]
+          ],
+          "payloadSchema": "starci/specification@2",
+          "layout": "business/index.yaml aggregates overview/index.yaml and srs/index.yaml; add cohesive folders recursively under srs with no registry. Branches have no stored state or SRS; leaves own complete SRS. Legacy accepted records remain readable without automatic migration."
         }
       }
     },

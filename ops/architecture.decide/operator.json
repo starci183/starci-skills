@@ -75,10 +75,11 @@
         "refs",
         "dependsOn",
         "assertions",
-        "required"
+        "required",
+        "extensions.work3.specification"
       ],
       "content": {
-        "en": "Write one compact module-level architecture object with observed/proposed status, target service ownership, call chain, contracts, data ownership, transaction/concurrency/security controls, mandatory Saga and CQRS designs, observations and explicit gaps. A target design does not claim its mechanisms already exist; cite current code only in sourceRefs and observations."
+        "en": "Write target ownership, call chain, contracts, data ownership and context-relevant controls, observations and gaps. Full starci/specification@2 records the source-grounded design and architectureReview. Patterns are optional and justified; do not require Saga/CQRS for every module. Preserve accepted Business outcomes and distinguish design proof from running behavior."
       }
     },
     {
@@ -156,7 +157,7 @@
         "node"
       ],
       "action": {
-        "en": "Choose and justify the smallest design meeting hard constraints, comparing alternatives where material. Specify API request/response/errors, compatibility, transaction, lock scope, idempotency, event ordering, retry limits, timeout, compensation and read-back. Unknowns stay explicit. Evaluate Saga, CQRS, transactional outbox/inbox, idempotency, concurrency control and resilience patterns against actual invariants. Each pattern decision says adopt/preserve/reject/defer, why, simpler alternative, trade-off, scope and proof. Saga requires participant-local transactions, durable orchestration/choreography state, compensation/pivot/retry and failure recovery; an outbox alone is not Saga. CQRS requires explicit read/write models and consistency/read-your-writes policy; separate handler filenames do not prove CQRS and CQRS does not require event sourcing or separate databases."
+        "en": "Choose the smallest design satisfying accepted invariants and actual constraints. Challenge one coherent proposal with a materially simpler alternative, trade-offs and a reasoned decision. Select concerns from real business risks, data value, scale, trust boundaries and operating model, not a universal technology checklist. Evaluate named patterns only when relevant; patternDecisions may be empty. An adopted Saga/CQRS/outbox must describe actual mechanisms, not labels or handler filenames. Specify applicable transaction, idempotency, ordering, timeout, concurrency and recovery behavior; never invent numeric targets or unresolved product policy."
       }
     },
     {
@@ -196,7 +197,7 @@
         "node"
       ],
       "action": {
-        "en": "Produce implementation ceilings, protected paths, dependencies and required checks from actual repository scripts/CI. Lint, typecheck, tests/coverage, build and Sonar execute inside FE/BE implement; this op specifies them only. Bind rollout/migration/cleanup plans without executing them. Preserve business expected results unchanged. Design failure-injection tests for wrong service target, unauthorized forwarding, stale reads, duplicate/out-of-order messages, crash after commit before publish, compensation failure and retry exhaustion as applicable; implementations run them. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned. Partition the selected FE/BE code impacts into cohesive implementation pieces with exact paths, protected boundaries, prerequisites, acceptance IDs, safe commit boundaries and test ownership. Check that each operation is assigned once; pieces may run in parallel only with disjoint mutable ownership and no dependency on another piece output."
+        "en": "Produce implementation ceilings, protected paths, dependencies and required checks from actual repository scripts/CI. Lint, typecheck, tests/coverage, build and Sonar execute inside FE/BE implement; this op specifies them only. Bind rollout/migration/cleanup plans without executing them. Preserve business expected results unchanged. Design failure-injection tests for wrong service target, unauthorized forwarding, stale reads, duplicate/out-of-order messages, crash after commit before publish, compensation failure and retry exhaustion as applicable; implementations run them. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned. Record architectureReview with context-selected concerns linked to requirements, sources, concrete trigger/impact/control/owner/acceptance scenarios, decisions, residual risks and evidence limitations. Examine persistence, connections, failure domains, capacity, security, HA, backup/restore, provider or total-infrastructure loss only to the depth their consequences require in this scope. Where durable customer state is in scope, identify authoritative versus rebuildable data, all stores/volumes/config/Secrets/keys, consistency point, independent backup custody, recovery prerequisites/order and verification. Never claim every possible edge case is covered or a recovery drill ran from design prose. Current external production practices need primary sources and an explicit applicability argument."
       }
     },
     {
@@ -212,7 +213,7 @@
         "matrixHandoff"
       ],
       "action": {
-        "en": "Validate .starciwork and requirement→flow→code/service→security→AC coverage. Write the JSON specification into extensions.work3.specification before review digest, with actual source-map/review evidence. Output code/service impact, contracts, security controls and verification plan to backend/FE implement; unresolved required ownership/compatibility decisions block handoff. No secondary is defined; do not invent calls. Design completion does not complete implementation or UAT. Require serviceCalls, patternDecisions and securityReview JSON and reject unresolved routing/pattern/security blockers before handoff. Record documentation citations separately from source evidence; a passing structural validator cannot prove a deployed endpoint or security control. When selected in a job matrix, produce E/job-result.json bound to the exact request, its output schema and every required criterion. This handoff is conditional and does not change standalone or named frontend response contracts."
+        "en": "Validate target ownership, request/data/credential paths, contracts and applicable failure controls against accepted Business and actual sources. Separate proposed design from observations and implementation gaps. Require accepted decisions for material concerns and residual risks before passing design review. Omit unnecessary Saga/CQRS designs; validate concrete mechanisms when selected. Preserve accepted SRS requirements/flows/AC and user journeys, with explicit business leaf dependencies. Architecture done means reviewed design only, never implementation, security audit, HA or executed restore proof."
       }
     }
   ],
