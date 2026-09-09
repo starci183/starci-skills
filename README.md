@@ -111,7 +111,7 @@ A typical new feature covers business → architecture → backend → frontend,
 | Stage | What it establishes |
 | --- | --- |
 | Business | Readable overview plus nested SRS: actors, rules, FR/NFR, detailed happy/alternative/exception flows and acceptance. |
-| Architecture | Source-grounded responsibilities, connection/data contracts and context-driven design/risk decisions; named patterns are optional. |
+| Architecture | Source-independent SDS derived from accepted SRS: responsibilities, connection/data contracts and context-driven design/risk decisions; named patterns are optional. |
 | Backend | Approved code changes with unit, backend E2E and API evidence before frontend handoff. |
 | Frontend | Bound design creation/reuse, implementation and browser UAT; not just a screenshot or a build. |
 | Review / standalone UAT | Explicit verification scope and actual results; unit tests are not browser UAT. |
@@ -124,6 +124,11 @@ See [Business overview and nested SRS](docs/business-srs.md) for the `business/o
 See [Expandable Work tree](docs/work-tree.md) for recursive Business, Architecture,
 UI, BE/FE and UAT scopes, collocated images/videos, `interface.draw` ownership and
 editing completed work. Screens and assets are not limited to a fixed template.
+
+Read the [complete knowledge-document update example](docs/examples/knowledge-update-delivery.md)
+for one feature across SRS, SDS, UI, backend including real backend E2E,
+frontend and browser UAT. It explicitly separates planned checks from actual
+results; it is not an accepted product change or a passing test report.
 
 ## Execution modes
 

@@ -67,6 +67,11 @@ do not create empty folders or split every screen, requirement or concern by rot
 Every scope folder owns one `index.yaml`. Parents aggregate required descendants;
 only leaves author state. Stable IDs survive reorganizing paths.
 
+For a complete readable example spanning SRS, SDS, UI, backend E2E, frontend and
+browser UAT, see [Replace a knowledge document](examples/knowledge-update-delivery.md).
+It illustrates responsibilities and verification, not accepted product scope or
+a completed implementation.
+
 ## Responsibilities
 
 - Business overview explains who needs what and why in plain language. Nested SRS
