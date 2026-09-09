@@ -23,7 +23,7 @@
   ],
   "maxSecondaryDefinitions": 3,
   "secondaryCalls": [],
-  "completion": "Review proof and current .starciwork validation only; never implementation, Sonar or UAT pass.",
+  "completion": "Current overview/SRS use completion.review in the owning index.yaml, following docs/source-of-trust.md and current Work validation. No evidence directory or duplicate specification; never implementation, Sonar or UAT pass. Workflow authorization and result acceptance remain required.",
   "handoff": "Architecture consumes accepted SRS leaf IDs, requirements, flows and acceptance unchanged, including inherited scope. No code/service design or implementation checks belong in Business.",
   "op": "business.decide",
   "impactMaturity": "business-outcomes-only",

@@ -8,7 +8,8 @@
     "businessTree": "<module>/**/index.yaml",
     "nodeAssets": "<node>/assets/**/<file-in-original-format>",
     "uatFlow": "<module>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/}",
-    "evidence": "<node>/evidence/<id>/manifest.yaml",
+    "designReview": "Current Business overview/SRS/SDS use completion.review inside their owning index.yaml, without an evidence folder.",
+    "evidence": "Profiles using execution proof may retain <node>/evidence/<id>/manifest.yaml; this is not a required folder for every layer.",
     "workflowSession": "internal .starciwork/_local/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}",
     "moduleUI": "<module>/ui/**/{index.yaml,assets/**}",
     "implementation": "<module>/implementation/{index.yaml,frontend/**/index.yaml,backend/**/index.yaml}",
@@ -19,6 +20,7 @@
     "architectureSDS": "<module>/architecture/sds/**/index.yaml"
   },
   "rules": [
+    "Retained AI interface.draw images and real running-product screenshots both live under the bound backend .starciwork in their owning node assets/**. Identify generated design versus real capture and the actual capture environment; external/temp/chat-only media are not stored Work deliverables. Keep one owner and reference it across UI/implementation/UAT rather than copying bytes.",
     "Each semantic scope folder has one index.yaml node and may contain further scope folders and optional assets/. The same recursive convention applies to Business, Architecture, UI, implementation/backend, implementation/frontend and UAT. Asset subfolders are payload organization, not Work nodes, and need no index.yaml. Keep small scopes flat; do not create empty template folders.",
     "Split by independently owned questions and acceptance boundaries, not workflow stages. Names and depth stay flexible.",
     "Canonical index.yaml uses work/node@2 metadata. New Business has a readable businessOverview and nested SRS leaves with extensions.work3.specification payload (schema: starci/specification@2). Legacy compact business remains readable; it is not a second detailed copy of a new SRS.",

@@ -85,6 +85,29 @@ only leaves author state. Stable IDs survive reorganizing paths.
 
 ## Assets and interface.draw
 
+Distinguish two visual origins explicitly in each asset's role/provenance:
+
+Both kinds of retained visual must live in the bound backend-owned `.starciwork`,
+inside the owning node's `assets/**` in their original format. A temporary image
+tool path, chat attachment or externally displayed screenshot is not the stored
+Work deliverable. Import authorized files into that owner and verify the saved
+bytes; then link/display that canonical asset. Do not leave the only copy in a
+host temp directory, the frontend repository or a separate screenshot library.
+
+- An AI-generated `interface.draw` image is a proposed design, not observed product behavior.
+- A real product screenshot records an actual running interface. Identify the
+  environment and observed build when known; local/staging is not production.
+  A production screenshot may document the existing baseline, not the newly
+  implemented target. Unknown build identity stays an explicit limitation.
+
+Both may be useful UI inputs, but never substitute one for the other. Keep a
+reference screenshot with its UI owner when it informs design; keep implementation
+verification captures with implementation and acceptance captures with UAT. Refer
+to the single owner instead of copying the same media across layers. This is
+provenance, not two mandatory folder trees. Production access still requires
+authorization; a request to distinguish screenshots does not grant deployment,
+live data changes or access to customer information.
+
 `interface.draw` writes to one or more selected nodes under `ui/`, never to a new
 operator-specific tree. One UI node may cover many screens; one screen may need
 many images or video sequences. There is no fixed image count or filename:
@@ -144,11 +167,17 @@ re-evaluate changed content and affected dependents. Do not force stale work gre
 fabricate acceptance, or reopen unrelated completed branches.
 
 An `assets/` folder needs no evidence manifest merely to exist or to be read.
-Legacy completion receipts still use the existing verification contract: this
-layout update does not silently migrate or disable those checks. Preserve useful
+Current Business overview, SRS and SDS use the collocated review described in
+[source of trust](source-of-trust.md). Other completion profiles still use their
+execution verification contract; this does not silently disable those checks. Preserve useful
 media when explicitly migrating/removing old evidence folders; deleting a folder
 does not make its former completion trustworthy. Test results and observed behavior
 must remain honest regardless of storage format.
+
+See [useful verification and dependency repair](work-verification.md) for the
+relationship between this folder tree, its dependency graph and layer-specific
+completion. Execution evidence may be useful; a separate evidence layer for every
+scope is not the model.
 
 The machine-readable layout is `schemas/work-layout.json`; node fields are defined
 in `schemas/work.schema.json` and enforced by the workspace validator.

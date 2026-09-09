@@ -52,6 +52,29 @@ branches before their result is accepted. Do not erase unrelated completed work,
 blindly rerun the whole project, or retain stale green results on affected inputs.
 Completion of a downstream node cannot repair a known-invalid upstream contract.
 
+## Recording a current design review
+
+For current `work/node@2` Business overview, SRS@2 and SDS@3 leaves, keep the
+review inside `completion.review` on the owning `index.yaml`; do not create an
+evidence directory or a second specification copy. `completion.inputDigest`
+binds the reviewed semantic inputs, including ancestors and declared imports.
+The review has schema `starci/design-review@1`, declared reviewer and actual
+authority provenance, ISO `reviewedAt`, one concrete passing observation for each
+required node assertion, and an explicit `limitations` list. It is a current
+review record, not another Work node, external manifest or workflow history.
+
+Resolve the specification's blocking decisions and set its own status to pass
+only after real review. Check `previewCompletion` before recording `state: done`;
+unaccepted prerequisites still block completion. Inspect the returned
+`effectiveState`, never only the stored flag. Changing semantic inputs invalidates
+this review exactly as it invalidates other completion bindings. The validator
+checks consistency and coverage; it does not authenticate a reviewer or prove the
+truth of prose. Do not invent an authority message or generic observations.
+
+This design-only record cannot complete implementation, UI or UAT. Their actual
+code checks, runtime observations and media remain distinct obligations; the
+legacy transport remains readable during its separately scoped migration.
+
 ## Author carefully; keep the contract current throughout delivery
 
 Apply careful analysis to every new or revised SRS/SDS, not only after a user reports a gap.

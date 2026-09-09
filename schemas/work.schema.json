@@ -143,8 +143,11 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "inputDigest",
-        "evidence"
+        "inputDigest"
+      ],
+      "oneOf": [
+        { "required": ["evidence"], "not": { "required": ["review"] } },
+        { "required": ["review"], "not": { "required": ["evidence"] } }
       ],
       "properties": {
         "inputDigest": {
@@ -160,6 +163,9 @@
           },
           "description": "Relative YAML, image or video evidence paths that support the result."
         },
+        "review": {
+          "$ref": "#/$defs/designReview"
+        },
         "codeRefs": {
           "type": "array",
           "minItems": 1,
@@ -170,6 +176,33 @@
         }
       },
       "description": "Historical proof binding for authored done. Digest mismatch makes effective state uninvestigate without rewriting this receipt."
+    },
+    "designReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "reviewer", "authority", "reviewedAt", "observations", "limitations"],
+      "properties": {
+        "schema": { "const": "starci/design-review@1" },
+        "reviewer": { "$ref": "#/$defs/string" },
+        "authority": { "$ref": "#/$defs/string", "description": "Actual user or delegated review provenance, not an authenticated receipt supplied by the validator." },
+        "reviewedAt": { "type": "string", "format": "date-time" },
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "outcome", "observation"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "outcome": { "enum": ["pass", "fail", "not-run", "inconclusive"] },
+              "observation": { "$ref": "#/$defs/string" }
+            }
+          }
+        },
+        "limitations": { "type": "array", "items": { "$ref": "#/$defs/string" } }
+      },
+      "description": "Collocated review of current SRS/SDS or business overview only; never substitutes for implementation tests, UI captures or UAT execution."
     },
     "stringList": {
       "type": "array",
@@ -828,7 +861,6 @@
       "required": [
         "status",
         "changes",
-        "currentCodeMap",
         "gaps"
       ],
       "properties": {
@@ -850,7 +882,6 @@
               "why",
               "repository",
               "directory",
-              "files",
               "revision",
               "verification"
             ],
@@ -873,7 +904,7 @@
               },
               "files": {
                 "$ref": "#/$defs/stringList",
-                "description": "Relevant source files."
+                "description": "Optional targeted source anchors when useful; do not duplicate the changed-file inventory already available from the bound Git diff."
               },
               "revision": {
                 "$ref": "#/$defs/string",
@@ -917,7 +948,7 @@
               }
             }
           },
-          "description": "Map from architectural layers to current source symbols."
+          "description": "Optional focused map for non-obvious design-to-code boundaries; not a required inventory of files or symbols."
         },
         "gaps": {
           "$ref": "#/$defs/stringList",

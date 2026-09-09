@@ -15,6 +15,18 @@ test('operational activity and blockers keep digests stable, but blockers preven
 
 test('ordinary defined todo is actionable without an investigation receipt',t=>{const f=fixture(t);f.write('defined',{state:'todo'});const node=f.run().nodes[0];assert.equal(node.effectiveState,'todo');assert.equal(node.investigationDigest,null);assert.equal(node.eligible,true);});
 
+test('implementation records meaningful changes without duplicating Git file inventories',t=>{
+ const f=fixture(t);
+ const id=f.write('implementation/backend',{kind:'implementation',state:'todo',implementation:{
+  status:'observed',changes:[{what:'Rejected duplicate delivery in a synthetic fixture.',why:'Preserve the original intent.',repository:'fixture-repo',directory:'src/delivery',revision:'1'.repeat(40),verification:['Focused synthetic test; no real integration claim.']}],gaps:['Real integration has not run.']
+ }});
+ let report=f.run();assert.ok(report.ok,JSON.stringify(report.errors));assert.notEqual(report.nodes.find(n=>n.id===id).effectiveState,'done');
+ f.mutate(id,m=>{m.implementation.changes[0].files=['src/delivery/handler.ts'];m.implementation.currentCodeMap=[{layer:'domain',symbol:'handle',path:'src/delivery/handler.ts',responsibility:'Optional useful anchor for original-intent dispatch.'}];});
+ report=f.run();assert.ok(report.ok,JSON.stringify(report.errors));
+ f.mutate(id,m=>{m.implementation.changes[0].files='not-a-list';});
+ assert.equal(f.run().ok,false);
+});
+
 test('canonical YAML v2 hashes description changes',t=>{const f=fixture(t);f.write('defined',{state:'todo'},'Initial semantic prose.');const before=f.run().nodes[0];f.mutate('defined',m=>{m.description='Changed semantic prose.';});assert.notEqual(f.run().nodes[0].specDigest,before.specDigest);});
 
 test('YAML v2 enforces published nested types, required completion fields and exact states',t=>{const cases=[m=>{m.history=['not-an-object'];},m=>{m.timestamps='not-an-object';},m=>{m.completion={inputDigest:'bad',evidence:[]};},m=>{m.state='uninvestigated';},m=>{m.investigation={contextDigest:'0'.repeat(64),extra:true};}];for(const change of cases){const f=fixture(t);f.write('defined',{state:'todo'});f.toYaml('defined');f.mutate('defined',change);const result=f.run();assert.equal(result.ok,false);assert.ok(result.errors.some(e=>['SCHEMA_VALUE','STATE','UNKNOWN_FIELD','INVESTIGATION'].includes(e.code)),JSON.stringify(result.errors));}});

@@ -19,7 +19,7 @@
   ],
   "maxSecondaryDefinitions": 3,
   "secondaryCalls": [],
-  "completion": "Current design review in Work, never source implementation or executed recovery. Existing legacy completion transport remains readable, not fabricated.",
+  "completion": "Current SDS uses completion.review in the owning index.yaml, following docs/source-of-trust.md; never source implementation or executed recovery. No evidence directory or duplicate design. Workflow authorization and result acceptance remain required; legacy records remain readable, not fabricated.",
   "handoff": "Reference canonical SRS and SDS IDs without copying. Implementation owns repository/file/symbol/commit mapping and actual tests.",
   "op": "architecture.decide",
   "impactMaturity": "logical-design",

@@ -42,7 +42,7 @@ function validate(root,completions=null,candidate=null) {
   let absolute;
   const rel = p => path.relative(absolute, p).split(path.sep).join('/') || '.';
   const within = (base, p) => { const r = path.relative(base,p); return r === '' || (!r.startsWith(`..${path.sep}`) && r !== '..' && !path.isAbsolute(r)); };
-  const result = () => ({ok:errors.length === 0, errors, warnings, nodes:nodes.map(n => ({id:n.meta.id, path:n.path, schema:n.meta.schema, kind:n.meta.kind, required:n.meta.required, state:n.meta.state ?? null, effectiveState:n.effectiveState ?? 'invalid', specDigest:n.specDigest, contextDigest:n.contextDigest??null, inputDigest:n.inputDigest ?? null, investigationDigest:n.meta.investigation?.contextDigest??null, completion:n.meta.completion?{inputDigest:n.meta.completion.inputDigest??null,evidence:Array.isArray(n.meta.completion.evidence)?[...n.meta.completion.evidence]:[]}:null, eligible:n.eligible ?? false, children:n.children.map(c => c.meta.id),dependsOn:(n.effectiveDeps??[]).map(d=>d.meta.id),refs:(n.effectiveRefs??[]).map(d=>d.meta.id),blockedBy:n.blockedBy??[],suspensionReasons:n.suspensionReasons??[]})), resources:resources.map(r => ({id:r.meta.id,kind:r.meta.kind,revision:r.meta.revision,path:r.path,specDigest:r.specDigest}))});
+  const result = () => ({ok:errors.length === 0, errors, warnings, nodes:nodes.map(n => ({id:n.meta.id, path:n.path, schema:n.meta.schema, kind:n.meta.kind, required:n.meta.required, state:n.meta.state ?? null, effectiveState:n.effectiveState ?? 'invalid', specDigest:n.specDigest, contextDigest:n.contextDigest??null, inputDigest:n.inputDigest ?? null, investigationDigest:n.meta.investigation?.contextDigest??null, completion:n.meta.completion?{inputDigest:n.meta.completion.inputDigest??null,...(Object.hasOwn(n.meta.completion,'review')?{review:structuredClone(n.meta.completion.review)}:{evidence:Array.isArray(n.meta.completion.evidence)?[...n.meta.completion.evidence]:[]})}:null, eligible:n.eligible ?? false, children:n.children.map(c => c.meta.id),dependsOn:(n.effectiveDeps??[]).map(d=>d.meta.id),refs:(n.effectiveRefs??[]).map(d=>d.meta.id),blockedBy:n.blockedBy??[],suspensionReasons:n.suspensionReasons??[]})), resources:resources.map(r => ({id:r.meta.id,kind:r.meta.kind,revision:r.meta.revision,path:r.path,specDigest:r.specDigest}))});
   try {
     absolute = path.resolve(root);
     if (fs.lstatSync(absolute).isSymbolicLink() || !fs.statSync(absolute).isDirectory()) throw new Error('Root must be a real directory, not a symlink.');
@@ -411,9 +411,28 @@ function validate(root,completions=null,candidate=null) {
     const profile=Object.hasOwn(profiles,n.meta.kind)?profiles[n.meta.kind]:null;
     if(!profile){issue('UNSUPPORTED_PROFILE',n.path,'Unknown leaf kind retained, but cannot earn done without a supported verification profile.');return false;}
     const c=n.meta.completion;
-    if(!object(c)){issue('COMPLETION',n.path,'Done requires completion binding and evidence.');return false;}
+    if(!object(c)){issue('COMPLETION',n.path,'Done requires a current completion binding and its supported verification record.');return false;}
     if(c.inputDigest!==n.inputDigest){issue('STALE_COMPLETION',n.path,'Completion no longer binds current semantic inputs.');n.stale=true;}
     const required=stringList(n.meta.assertions,n.path,'assertions',true);
+    if(Object.hasOwn(c,'review')){
+      const spec=n.meta.extensions?.work3?.specification;
+      const supported=n.meta.schema==='work/node@2'&&(
+        (n.meta.kind==='business-overview'&&object(n.meta.businessOverview))||
+        (n.meta.kind==='business'&&spec?.schema==='starci/specification@2'&&spec.op==='business.decide')||
+        (n.meta.kind==='architecture'&&spec?.schema===SDS_SCHEMA&&spec.op==='architecture.decide'));
+      if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to current structured Business overview, SRS and source-independent SDS; other profiles require their existing proof.');
+      if(Object.hasOwn(c,'evidence')||Object.hasOwn(c,'codeRefs'))issue('DESIGN_REVIEW_MIXED',n.path,'Design review cannot be mixed with legacy evidence or code completion bindings.');
+      const review=c.review,seen=new Set();
+      if(!object(review)||review.schema!=='starci/design-review@1'||!text(review.reviewer)||!text(review.authority)||!text(review.reviewedAt)||!/^\d{4}-\d{2}-\d{2}T/.test(review.reviewedAt)||!Number.isFinite(Date.parse(review.reviewedAt)))issue('DESIGN_REVIEW',n.path,'Review needs declared reviewer, actual authority provenance and an ISO review time; the validator does not authenticate them.');
+      if(!Array.isArray(review?.observations)||!review.observations.length)issue('DESIGN_REVIEW_OBSERVATIONS',n.path,'Review must contain concrete current assertion observations.');
+      else for(const a of review.observations){
+        if(!object(a)||!text(a.id)||!required.includes(a.id)||seen.has(a.id)||a.outcome!=='pass'||!text(a.observation))issue('DESIGN_REVIEW_OBSERVATION',n.path,'Each required design assertion needs one unique passing observation; unknown, failed or missing claims cannot complete design.');
+        if(object(a))seen.add(a.id);
+      }
+      for(const id of required)if(!seen.has(id))issue('ASSERTION_COVERAGE',n.path,'Required design assertion has no reviewed observation.');
+      if(!Array.isArray(review?.limitations)||review.limitations.some(v=>!text(v)))issue('DESIGN_REVIEW_LIMITATIONS',n.path,'Review limitations must be an explicit list; known material blockers cannot be hidden here.');
+      return true;
+    }
     const evidenceIds=stringList(c.evidence,n.path,'completion.evidence',true);
     const refs=codeRefs(c.codeRefs,n,!!profile.code);
     for(const r of refs)if(object(r)&&!n.effectiveRefs.some(ref=>ref.meta.id===r.repository))issue('UNBOUND_REPOSITORY',n.path,'Completion repository resources must be included in own or inherited node refs.');
