@@ -32,7 +32,7 @@ export function renderPlan(plan){
   for(const j of plan.workflows)lines.push(`| ${clean(j.id)} | ${clean(j.openQuestions.join('; ')||(plan.mode==='auto'?'None; announce concrete goal and assess risk under explicit Plan delegation.':'None; present and confirm this workflow goal before effects.'))} |`);
  }
  lines.push('','## Open questions',(plan.openQuestions??[]).join('; ')||'None.');
- lines.push('','## Exclusions',plan.exclusions.join('; ')||'None.','','## Approval','Pending. Present this Plan and wait for an actual user decision.');return lines.join('\n')+'\n';
+ lines.push('','## Exclusions',plan.exclusions.join('; ')||'None.','','## Approval','Proposal only: live approval state is not loaded by this renderer. Present the goal and use its actual direct-user, scoped-coordinator or explicit-auto approval record before effects.');return lines.join('\n')+'\n';
 }
 export function createBundle(plan,destination){
  if(plan?.schema!=='starci/plan@2')throw Error('New Plan bundles require starci/plan@2; do not silently migrate legacy approvals');

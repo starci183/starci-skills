@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
 import {validatePlan} from './plan.mjs';
+import {hasDelegatedAcceptance} from './delegation.mjs';
 const digest=x=>sha256(canonicalJSON(x));
 const text=x=>typeof x==='string'&&x.trim().length>0;
 const requireThat=(ok,message)=>{if(!ok)throw Error(message);};
@@ -95,6 +96,7 @@ export function assessAutoGoal(run,assessment) {
  return {allowed:reasons.length===0,reasons};
 }
 export function assertAutoGoal(run,{active=true}={}) {
+ requireThat(!run.delegated,'Cannot mix scoped manual and auto authority');
  const plan=run.presentation?.scope,p=assertAutoAuthority(plan,run.automatic?.authorization,{active});
  requireThat(run.presentation.scopeDigest===p.planDigest&&run.presentation.goalDigest===run.goalDigest&&run.goalDigest===digest({goal:run.goal,workRoot:run.workRoot,repositories:run.repositories})&&run.scopeDigest===digest({requestId:run.goal.requestId,originalRequest:run.goal.originalRequest,scope:run.goal.scope}),'Auto goal or presented scope changed');
  requireThat(run.workRoot===p.workRoot&&digest(run.repositories)===digest(p.repositories)&&run.goal.requestId===plan.requestId&&run.goal.originalRequest===plan.originalRequest,'Auto repository, Work or request binding changed');
@@ -132,7 +134,8 @@ export function verifyAutoPredecessors(run,priorRuns,{throughEnd=false}={}) {
   const prior=priorRuns[job.id];
   requireThat(prior?.status==='done'&&prior.presentation?.scopeDigest===run.presentation.scopeDigest&&digest(prior.presentation.scope)===run.presentation.scopeDigest&&prior.presentation?.jobId===job.id&&prior.goal.workflow===job.workflow&&prior.workRoot===run.workRoot&&digest(prior.repositories)===digest(run.repositories),'Previous Plan workflow is not completed in the same binding');
   requireThat(prior.goalDigest===digest({goal:prior.goal,workRoot:prior.workRoot,repositories:prior.repositories})&&prior.resultDigest===digest({goalDigest:prior.goalDigest,responses:prior.responses}),'Previous workflow proof changed');
-  requireThat(hasAutoAcceptance(prior)||prior.approvals.some(a=>a.actor==='user'&&a.phase==='acceptance'&&a.approved===true&&a.digest===prior.resultDigest&&text(a.messageId)),'Previous workflow lacks acceptance');
+  requireThat(!prior.delegated||hasDelegatedAcceptance(prior),'Invalid scoped predecessor acceptance cannot use a user-shaped fallback');
+  requireThat(hasAutoAcceptance(prior)||hasDelegatedAcceptance(prior)||prior.approvals.some(a=>a.actor==='user'&&a.phase==='acceptance'&&a.approved===true&&a.digest===prior.resultDigest&&text(a.messageId)),'Previous workflow lacks acceptance');
   verifyAutoEvidence(prior);
   const work=validateWorkspace(prior.workRoot);
   requireThat(work.ok&&prior.goal.workTargets.every(id=>work.nodes.some(n=>n.id===id&&n.effectiveState==='done')),'Previous Work proof is no longer current');

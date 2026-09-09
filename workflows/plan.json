@@ -1,5 +1,6 @@
 {
   "schema": "starci/plan-policy@1",
+  "approverDelegation": "An actual user may explicitly delegate bounded technical approval to a named coordinator while this Plan remains manual. Read delegation.json and docs/scoped-approval.md. That contract replaces only repetitive direct-user technical decisions below with actual scoped assistant decisions; it never makes an observer an approver, changes execution mode, fabricates native message IDs or bypasses presentation/current Work/typed proof. Without that explicit mandate, the direct-user rules below remain unchanged.",
   "mode": "Omitted/manual preserves the manual sequence below. Explicit mode: auto follows auto.json for one later user-approved Plan delegation, per-goal assistant risk assessment and delegated technical acceptance. Full coverage, bounded effects, evidence and reserved human decisions remain mandatory; no global default or implicit migration.",
   "purpose": "One long-running Plan preserves the complete requested outcome; short bounded workflows execute it incrementally without shrinking the Plan to the current job.",
   "contract": "New Plans use starci/plan@2. Existing v1 Plans are readable but do not prove full coverage; never silently migrate their hashes or approvals. A new workflow goal presentation requires an explicitly reviewed v2 Plan.",

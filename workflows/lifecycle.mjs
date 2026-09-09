@@ -1,12 +1,14 @@
 import {validatePlan,planProgress} from './plan.mjs';
 import {stateRoot,assertNewStoragePath,isLocalOnlyWorkspace} from './storage.mjs';
 import {assertAutoGoal,hasAutoAcceptance,verifyAutoEvidence,verifyAutoPredecessors,completeAutoPlan} from './auto.mjs';
+import {readScopedMandate,validateDelegationSource,assertDelegatedGoal,assertDelegatedAssessment,assertDelegatedDispatch,hasDelegatedAcceptance,verifyDelegatedResult,completeDelegatedPlan,closeScopedMandate} from './delegation.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {canonicalJSON,sha256,validateWorkspace,previewCompletion} from '../core/index.mjs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {fileURLToPath} from 'node:url';
 import {validBackendRun} from './select.mjs';
+import {typed} from './typed.mjs';
 const digest=x=>sha256(canonicalJSON(x));
 const text=x=>typeof x==='string'&&x.trim().length>0;
 const same=(a,b)=>digest(a)===digest(b);
@@ -46,15 +48,17 @@ export function validateGoal(goal,{repositories={}}={}){
  return {ok:true,goalDigest:digest(goal),scopeDigest:digest({requestId:goal.requestId,originalRequest:goal.originalRequest,scope:goal.scope})};
 }
 function validateShapeSchema(schema){requireThat(schema&&['object','array','string','number','boolean','null'].includes(schema.type),'Unsupported output schema');requireThat(Object.keys(schema).every(k=>['type','properties','required','additionalProperties','items','enum'].includes(k)),'Unsupported output schema keywords');if(schema.type==='object'){requireThat(schema.additionalProperties===false&&schema.properties&&Array.isArray(schema.required)&&schema.required.every(k=>Object.hasOwn(schema.properties,k)),'Objects need closed properties and required keys');Object.values(schema.properties).forEach(validateShapeSchema);}if(schema.type==='array')validateShapeSchema(schema.items);}
-function typed(value,schema){if(schema.enum&&!schema.enum.some(v=>same(v,value)))return false;if(schema.type==='null')return value===null;if(schema.type==='array')return Array.isArray(value)&&value.every(v=>typed(v,schema.items));if(schema.type==='object')return value!==null&&typeof value==='object'&&!Array.isArray(value)&&schema.required.every(k=>Object.hasOwn(value,k))&&Object.keys(value).every(k=>Object.hasOwn(schema.properties,k)&&typed(value[k],schema.properties[k]));return typeof value===schema.type&&(schema.type!=='number'||Number.isFinite(value));}
+export {typed};
 export function propose(goal,{workRoot,repositories={}}){const checked=validateGoal(goal,{repositories}),work=workStatus(workRoot);return {schema:'starci/workflow-run@1',goal:structuredClone(goal),...checked,goalDigest:digest({goal,workRoot,repositories}),workRoot,repositories:structuredClone(repositories),route:work.status==='missing'&&goal.workflow!=='prepare-work'?'prepare-work':goal.workflow,status:'awaiting-goal-approval',approvals:[],requests:{},responses:{}};}
 function bound(run){requireThat(run.goalDigest===digest({goal:run.goal,workRoot:run.workRoot,repositories:run.repositories})&&run.scopeDigest===digest({requestId:run.goal.requestId,originalRequest:run.goal.originalRequest,scope:run.goal.scope}),'Frozen goal or original scope was changed');}
 function decision(receipt,phase,target){requireThat(receipt?.actor==='user'&&receipt.phase===phase&&receipt.digest===target&&receipt.approved===true&&text(receipt.messageId)&&text(receipt.quote),'An actual explicit user decision bound to this digest is required');}
 function goalAuthorized(run) {
+ if(run.delegated)return assertDelegatedGoal(run);
  if(run.automatic)return assertAutoGoal(run);
  return run.approvals.some(a=>a.actor==='user'&&a.phase==='goal'&&a.digest===run.goalDigest&&a.approved&&text(a.messageId)&&a.messageId!==run.goal.requestId&&a.replyTo===run.presentation.messageId);
 }
 function deliveryAuthorized(run) {
+ if(run.delegated){assertDelegatedGoal(run);return hasDelegatedAcceptance(run);}
  if(run.automatic){assertAutoGoal(run);verifyAutoEvidence(run);return hasAutoAcceptance(run);}
  return run.approvals.some(a=>a.phase==='acceptance'&&a.digest===run.resultDigest&&a.actor==='user'&&a.approved);
 }
@@ -68,6 +72,7 @@ export function preflightCompletion(run,completions) {
  return {ok:predicted.ok&&run.goal.workTargets.every(id=>predicted.nodes.some(n=>n.id===id&&n.children.length===0&&n.effectiveState==='done')),preview:true,goalDigest:run.goalDigest,resultDigest:run.resultDigest,completionsDigest:digest(completions),errors:predicted.errors,warnings:predicted.warnings};
 }
 export function authorizeAutoGoal(run,{authorization,assessment,priorRuns={}}) {
+ requireThat(!run.delegated,'Cannot mix scoped manual and automatic authority');
  bound(run);requireThat(run.status==='awaiting-goal-approval'&&run.presentation,'Present this concrete goal before auto risk assessment');
  const automatic={authorization:structuredClone(authorization),assessment:structuredClone(assessment)};
  const receipt={actor:'assistant',phase:'delegated-goal',digest:run.goalDigest,authorizationDigest:digest(authorization),assessmentDigest:digest(assessment)};
@@ -90,13 +95,37 @@ function resolvedJobQuestions(run) {
 }
 export function presentGoal(run,{messageId,scope,jobId}) {
  bound(run);requireThat(run.status==='awaiting-goal-approval'&&text(messageId),'Present an unapproved goal with an actual assistant message ID');
+ return presentBoundGoal(run,{messageId,scope,jobId});
+}
+function presentBoundGoal(run,{messageId,scope,jobId,provenance}) {
  requireThat(scope?.schema==='starci/plan@2','New workflow goal presentations require the complete Plan v2; revise legacy plans explicitly without migrating receipts');
  const checked=validatePlan(scope,catalog),job=scope.workflows.find(x=>x.id===jobId);
  requireThat(scope.requestId===run.goal.requestId&&scope.originalRequest===run.goal.originalRequest&&job?.workflow===run.goal.workflow,'Scope must preserve the original request and selected job');
  requireThat(run.goal.workTargets.every(x=>job.workTargets.includes(x))&&run.goal.scope.paths.every(x=>job.paths.includes(x))&&run.goal.scope.resources.every(x=>job.resources.includes(x)),'Goal exceeds presented scope job targets or effects');
- return {...run,presentation:{messageId,goalDigest:run.goalDigest,scopeDigest:checked.digest,jobId,scope:structuredClone(scope)}};
+ return {...run,presentation:{messageId,...(provenance?{provenance:structuredClone(provenance)}:{}),goalDigest:run.goalDigest,scopeDigest:checked.digest,jobId,scope:structuredClone(scope)}};
 }
-export function approveGoal(run,receipt){bound(run);requireThat(!(run.presentation?.scope.openQuestions?.length),'Resolve Plan questions with the user before goal approval');requireThat(run.presentation?.goalDigest===run.goalDigest&&validatePlan(run.presentation.scope,catalog).digest===run.presentation.scopeDigest,'Present the concrete scope and goal before approval');requireThat(resolvedJobQuestions(run),'Resolve this workflow goal questions before approval; future workflow questions do not block it');requireThat(receipt?.messageId!==run.goal.requestId&&receipt?.messageId!==run.presentation.messageId&&receipt?.quote!==run.goal.originalRequest&&receipt?.replyTo===run.presentation.messageId,'Approval must be an actual later user reply to the presented goal, not the original task request');decision(receipt,'goal',run.goalDigest);validateGoal(run.goal,{repositories:run.repositories});return {...run,approvals:[...run.approvals,structuredClone(receipt)],status:run.route==='prepare-work'&&run.goal.workflow!=='prepare-work'?'awaiting-bootstrap':'approved'};}
+export function presentDelegatedGoal(run,{scope,jobId,reference,provenance}) {
+ bound(run);requireThat(run.status==='awaiting-goal-approval'&&!run.automatic,'Present an unapproved manual goal');
+ const {mandate}=readScopedMandate(scope,reference);validateDelegationSource(provenance,'assistant');
+ requireThat(provenance.threadId===mandate.taskThreadId,'Present the goal in its actual task');
+ return presentBoundGoal(run,{scope,jobId,messageId:provenance.messageId,provenance});
+}
+export function authorizeDelegatedGoal(run,{reference,assessment,source,priorRuns={}}) {
+ bound(run);requireThat(run.status==='awaiting-goal-approval'&&run.presentation&&!run.automatic,'Present this manual goal before coordinator review');
+ const receipt={actor:'assistant',phase:'scoped-goal',approved:true,digest:run.goalDigest,mandateDigest:reference.digest,presentationDigest:digest(run.presentation),assessmentDigest:digest(assessment),source:structuredClone(source)};
+ const next={...run,delegated:{reference:structuredClone(reference),assessment:structuredClone(assessment)},approvals:[...run.approvals,receipt]};
+ assertDelegatedGoal(next);assertDelegatedAssessment(next,assessment,'goal');verifyAutoPredecessors(next,priorRuns);validateGoal(next.goal,{repositories:next.repositories});
+ requireThat(next.route===next.goal.workflow,'Missing Work requires an explicitly listed prepare-work job');
+ return {...next,status:'approved'};
+}
+export function acceptDelegatedDelivery(run,{source,assessment,priorRuns={}}) {
+ bound(run);const {mandate}=assertDelegatedGoal(run);validateDelegationSource(source,'assistant');
+ requireThat(source.threadId===mandate.coordinatorThreadId&&run.status==='awaiting-acceptance','Actual designated coordinator result review required');
+ assertDelegatedAssessment(run,assessment,'acceptance');verifyAutoPredecessors(run,priorRuns);verifyDelegatedResult(run);
+ for(const cell of run.goal.cells)requireThat(same(run.requests[cell.id].workBindings??[],workBindings(run,cell)),'Work inputs changed before result acceptance');
+ return {...run,status:'accepted',approvals:[...run.approvals,{actor:'assistant',phase:'scoped-acceptance',approved:true,digest:run.resultDigest,mandateDigest:run.delegated.reference.digest,assessmentDigest:digest(assessment),assessment:structuredClone(assessment),source:structuredClone(source)}]};
+}
+export function approveGoal(run,receipt){bound(run);requireThat(!run.delegated&&!run.presentation?.provenance&&text(run.presentation?.messageId),'Present the actual goal message before direct user approval');requireThat(!(run.presentation?.scope.openQuestions?.length),'Resolve Plan questions with the user before goal approval');requireThat(run.presentation?.goalDigest===run.goalDigest&&validatePlan(run.presentation.scope,catalog).digest===run.presentation.scopeDigest,'Present the concrete scope and goal before approval');requireThat(resolvedJobQuestions(run),'Resolve this workflow goal questions before approval; future workflow questions do not block it');requireThat(receipt?.messageId!==run.goal.requestId&&receipt?.messageId!==run.presentation.messageId&&receipt?.quote!==run.goal.originalRequest&&receipt?.replyTo===run.presentation.messageId,'Approval must be an actual later user reply to the presented goal, not the original task request');decision(receipt,'goal',run.goalDigest);validateGoal(run.goal,{repositories:run.repositories});return {...run,approvals:[...run.approvals,structuredClone(receipt)],status:run.route==='prepare-work'&&run.goal.workflow!=='prepare-work'?'awaiting-bootstrap':'approved'};}
 export function resumeFromBootstrap(run,bootstrap){bound(run);bound(bootstrap);requireThat(run.status==='awaiting-bootstrap'&&bootstrap.goal.workflow==='prepare-work'&&bootstrap.status==='done','An accepted completed bootstrap is required');requireThat(run.scopeDigest===bootstrap.scopeDigest&&run.workRoot===bootstrap.workRoot,'Bootstrap must preserve original request, scope and Work root');requireThat(workStatus(run.workRoot).status==='ready','Work bootstrap did not create valid Work');return {...run,route:run.goal.workflow,status:'approved',bootstrapDigest:digest(bootstrap)};}
 const investigationOps=new Set(['workspace.manage','business.decide','architecture.decide','interface.draw']);
 function workBindings(run,cell){
@@ -109,14 +138,15 @@ function workBindings(run,cell){
  if(!recovering){const completed=new Set(Object.keys(run.responses).flatMap(id=>run.goal.cells.find(c=>c.id===id)?.workTargets??[]));requireThat(targets.every(n=>n.state!=='uninvestigate'&&(n.eligible||(n.blockedBy.length>0&&n.blockedBy.every(id=>completed.has(id))))),'Work targets must be investigated, unblocked and eligible; completed in-run prerequisites are allowed');}
  return targets.map(n=>({id:n.id,contextDigest:n.contextDigest,inputDigest:n.inputDigest}));
 }
-export function requestCell(run,cellId){bound(run);requireThat(run.presentation?.goalDigest===run.goalDigest&&validatePlan(run.presentation.scope,catalog).digest===run.presentation.scopeDigest,'A current presented Plan is required before dispatch');requireThat(goalAuthorized(run),'Missing actual bound goal approval');requireThat(['approved','running'].includes(run.status),'Goal approval and Work gate must pass before work');if(!Object.keys(run.requests).length)validateGoal(run.goal,{repositories:run.repositories});const rows=matrix(run.goal.workflow,run.goal.cells?.[0]?.operation),rowIndex=rows.findIndex(row=>row.some(c=>c.id===cellId));requireThat(rowIndex>=0&&!run.requests[cellId]&&!run.responses[cellId],'Unknown, already requested or already accepted cell');requireThat(rows.slice(0,rowIndex).flat().every(c=>run.responses[c.id]),'Previous sequential row has not passed');const cell=run.goal.cells.find(c=>c.id===cellId),inputs={};const bindings=workBindings(run,cell);for(const [key,binding]of Object.entries(cell.inputs)){const source=binding.from==='request'?run.goal.inputs:run.responses[binding.cell]?.outputs;requireThat(source&&Object.hasOwn(source,binding.key),'Missing accepted upstream output');inputs[key]=structuredClone(source[binding.key]);}const request={schema:'starci/cell-request@1',projectSkillPath,cell:cell.id,op:cell.op,operation:cell.operation??null,goalDigest:run.goalDigest,scopeDigest:run.scopeDigest,workBindings:bindings,inputs,criteria:cell.criteria,outputSchema:cell.outputSchema};request.delegationPrompt=`Open and invoke the project StarCi skill at ${projectSkillPath}. Execute workflow ${run.goal.workflow}, approved goal ${run.goalDigest}, cell ${cell.id} with operator ${cell.op}. Use Work root ${run.workRoot} and only the request-bound targets, inputs, output schema, criteria and effect ceiling in this cell request. Return the exact typed response; do not perform free-form successor work.`;return {run:{...run,status:'running',requests:{...run.requests,[cellId]:request}},request:structuredClone(request)};}
+export function requestCell(run,cellId,delegatedReview){bound(run);if(run.delegated)assertDelegatedDispatch(run,delegatedReview,cellId);requireThat(run.presentation?.goalDigest===run.goalDigest&&validatePlan(run.presentation.scope,catalog).digest===run.presentation.scopeDigest,'A current presented Plan is required before dispatch');requireThat(goalAuthorized(run),'Missing actual bound goal approval');requireThat(['approved','running'].includes(run.status),'Goal approval and Work gate must pass before work');if(!Object.keys(run.requests).length)validateGoal(run.goal,{repositories:run.repositories});const rows=matrix(run.goal.workflow,run.goal.cells?.[0]?.operation),rowIndex=rows.findIndex(row=>row.some(c=>c.id===cellId));requireThat(rowIndex>=0&&!run.requests[cellId]&&!run.responses[cellId],'Unknown, already requested or already accepted cell');requireThat(rows.slice(0,rowIndex).flat().every(c=>run.responses[c.id]),'Previous sequential row has not passed');const cell=run.goal.cells.find(c=>c.id===cellId),inputs={};const bindings=workBindings(run,cell);for(const [key,binding]of Object.entries(cell.inputs)){const source=binding.from==='request'?run.goal.inputs:run.responses[binding.cell]?.outputs;requireThat(source&&Object.hasOwn(source,binding.key),'Missing accepted upstream output');inputs[key]=structuredClone(source[binding.key]);}const request={schema:'starci/cell-request@1',...(run.delegated?{delegatedReview:{coordinatorThreadId:delegatedReview.coordinatorThreadId,taskThreadId:delegatedReview.taskThreadId,assessment:structuredClone(delegatedReview.assessment)}}:{}),projectSkillPath,cell:cell.id,op:cell.op,operation:cell.operation??null,goalDigest:run.goalDigest,scopeDigest:run.scopeDigest,workBindings:bindings,inputs,criteria:cell.criteria,outputSchema:cell.outputSchema};request.delegationPrompt=`Open and invoke the project StarCi skill at ${projectSkillPath}. Execute workflow ${run.goal.workflow}, approved goal ${run.goalDigest}, cell ${cell.id} with operator ${cell.op}. Use Work root ${run.workRoot} and only the request-bound targets, inputs, output schema, criteria and effect ceiling in this cell request. Return the exact typed response; do not perform free-form successor work.`;return {run:{...run,status:'running',requests:{...run.requests,[cellId]:request}},request:structuredClone(request)};}
 export function acceptCell(run,response,{evidenceRoot}){bound(run);const request=run.requests[response?.cell];requireThat(run.status==='running'&&request&&!run.responses[response.cell]&&response.requestDigest===digest(request)&&response.goalDigest===run.goalDigest&&response.scopeDigest===run.scopeDigest&&response.op===request.op&&response.operation===request.operation,'Response must match the current approved request');requireThat(same(request.workBindings??[],workBindings(run,run.goal.cells.find(c=>c.id===request.cell))),'Work inputs changed after dispatch; discard this response and investigate current scope');requireThat(response.status==='pass'&&typed(response.outputs,request.outputSchema),'Response status or typed outputs failed');requireThat(Array.isArray(response.criteria)&&response.criteria.length===request.criteria.length&&new Set(response.criteria.map(c=>c.id)).size===request.criteria.length&&request.criteria.every(id=>response.criteria.some(c=>c.id===id&&c.status==='pass'&&text(c.observation)&&list(c.evidence))),'All pinned criteria need passing observations and actual evidence');requireThat(Array.isArray(response.artifacts)&&response.artifacts.length>0&&new Set(response.artifacts.map(a=>a.id)).size===response.artifacts.length,'Actual artifacts required');const base=fs.realpathSync(evidenceRoot);for(const a of response.artifacts){const file=path.resolve(base,a.path);requireThat(inside(base,file)&&fs.existsSync(file)&&inside(base,fs.realpathSync(file))&&sha256(fs.readFileSync(file))===a.sha256,'Evidence escapes, is missing or has changed');}requireThat(response.criteria.every(c=>c.evidence.every(id=>response.artifacts.some(a=>a.id===id))),'Criterion references missing artifact');const next={...run,evidenceRoots:{...run.evidenceRoots,[response.cell]:base},responses:{...run.responses,[response.cell]:structuredClone(response)}};if(Object.keys(next.responses).length===run.goal.cells.length){next.status='awaiting-acceptance';next.resultDigest=digest({goalDigest:run.goalDigest,responses:next.responses});}return next;}
-export function acceptDelivery(run,receipt){bound(run);requireThat(run.status==='awaiting-acceptance'&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'A complete unchanged result is required');decision(receipt,'acceptance',run.resultDigest);return {...run,status:'accepted',approvals:[...run.approvals,structuredClone(receipt)]};}
+export function acceptDelivery(run,receipt){bound(run);requireThat(!run.delegated,'Scoped delegation requires an explicit coordinator result decision');requireThat(run.status==='awaiting-acceptance'&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'A complete unchanged result is required');decision(receipt,'acceptance',run.resultDigest);return {...run,status:'accepted',approvals:[...run.approvals,structuredClone(receipt)]};}
 export function markWorkDone(run,completions){bound(run);requireThat(run.status==='accepted'&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'User acceptance is required before Work done');requireThat(deliveryAuthorized(run),'Missing bound user acceptance');const before=validateWorkspace(run.workRoot);requireThat(before.ok,'Work must be valid before completion');requireThat(same(Object.keys(completions).sort(),[...run.goal.workTargets].sort()),'Completion cannot target other Work nodes');const preview=preflightCompletion(run,completions);requireThat(preview.ok,'Completion preflight failed; no Work files changed: '+JSON.stringify(preview.errors));const writes=[];for(const [id,completion]of Object.entries(completions)){const node=before.nodes.find(n=>n.id===id);requireThat(node&&node.children.length===0,'Only selected leaf nodes can be marked; parents derive done');const file=path.resolve(run.workRoot,node.path);requireThat(inside(fs.realpathSync(run.workRoot),fs.realpathSync(file)),'Node escapes Work');const original=fs.readFileSync(file,'utf8');let meta,body='';if(file.endsWith('.md')){const m=original.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/);requireThat(m,'Malformed legacy node');meta=parseYaml(m[1]);body=m[2];}else meta=parseYaml(original);meta.state='done';meta.completion=completion;const bytes=file.endsWith('.md')?'---\n'+stringifyYaml(meta)+'---\n'+body:stringifyYaml(meta);writes.push({file,original,bytes});}
  try{for(const w of writes){requireThat(fs.readFileSync(w.file,'utf8')===w.original,'Concurrent node change');fs.writeFileSync(w.file,w.bytes);}const verified=validateWorkspace(run.workRoot);requireThat(verified.ok&&run.goal.workTargets.every(id=>verified.nodes.find(n=>n.id===id)?.effectiveState==='done'),'Completion proof failed; Work done rolled back');return {...run,status:'done'};}catch(error){for(const w of writes)if(fs.readFileSync(w.file,'utf8')===w.bytes)fs.writeFileSync(w.file,w.original);throw error;}}
 export {digest as workflowDigest};
 export function saveRun(run,planId=run.presentation?.scope.id??run.goal.id){
  bound(run);workStatus(run.workRoot);
+ if(run.delegated)assertDelegatedGoal(run,{active:false});
  requireThat(!run.presentation||planId===run.presentation.scope.id,'All workflow runs must remain in their one presented Plan bundle');
  requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(planId),'Unsafe Plan ID');
  // Normalize only I/O paths: never rewrite the request-bound Work root or its digest.
@@ -139,14 +169,14 @@ export function saveRun(run,planId=run.presentation?.scope.id??run.goal.id){
  }
  requireThat(!goals[jobId]||goals[jobId].goalDigest===run.goalDigest,'Job goal changed; revise and reapprove before replacing execution');
  goals[jobId]={goal:run.goal,goalDigest:run.goalDigest,scopeDigest:run.scopeDigest,workRoot:run.workRoot,repositories:run.repositories};
- approvals[jobId]={status:run.approvals.length?'recorded':'pending',presentation:run.presentation?{messageId:run.presentation.messageId,goalDigest:run.goalDigest,planDigest}:null,receipts:run.approvals};
+ approvals[jobId]={status:run.approvals.length?'recorded':'pending',presentation:run.presentation?{messageId:run.presentation.messageId,...(run.presentation.provenance?{provenance:run.presentation.provenance}:{}),goalDigest:run.goalDigest,planDigest}:null,receipts:run.approvals};
  const {goal,presentation,approvals:receipts,repositories,workRoot,...execution}=run;runs[jobId]=execution;
  if(oldExecution?.completion)requireThat(oldExecution.completion.planDigest===planDigest&&Object.entries(oldExecution.completion.resultDigests).every(([id,d])=>runs[id]?.status==='done'&&runs[id]?.resultDigest===d),'Completed Plan results changed; explicit revision is required');
  const documents={
   'index.yaml':{schema:'starci/plan-index@1',id:planId,goal:'goal/index.yaml',approval:'approval/index.yaml',run:'run/index.yaml'},
   'goal/index.yaml':{schema:'starci/plan-goal@1',planDigest,plan,jobs:goals},
   'approval/index.yaml':{schema:'starci/plan-approval@1',planDigest,jobs:approvals},
-  'run/index.yaml':{schema:'starci/plan-run@1',planDigest,...(plan?{status:oldExecution?.completion?'done':planProgress(plan,runs)}:{}),jobs:runs,...(oldExecution?.completion?{completion:oldExecution.completion}:{})}
+  'run/index.yaml':{schema:'starci/plan-run@1',planDigest,...(plan?{status:oldExecution?.completion?'done':Object.values(runs).some(r=>r.delegated)&&plan.workflows.every(j=>runs[j.id]?.status==='done')?'awaiting-terminal-review':planProgress(plan,runs)}:{}),jobs:runs,...(oldExecution?.completion?{completion:oldExecution.completion}:{})}
  };
  for(const [relative,doc]of Object.entries(documents)){const file=path.join(dir,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(doc));}
  return dir;
@@ -167,4 +197,24 @@ export function saveAutoCompletion(plan,{authorization,criteria}) {
  const completion=completeAutoPlan(plan,{authorization,runs,criteria});
  const file=path.join(dir,'run/index.yaml');requireThat(fs.readFileSync(file,'utf8')===original,'Concurrent Plan change');
  fs.writeFileSync(file,stringifyYaml({...execution,status:'done',completion}));return completion;
+}
+
+/** Read the same four-file bundle without manufacturing presentation/approval IDs. */
+export function loadPlanRuns(plan,workRoot) {
+ const dir=path.join(stateRoot(workRoot),'plans',plan.id),planDigest=validatePlan(plan,catalog).digest;
+ requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(plan.id),'Unsafe Plan ID');
+ const read=relative=>{const file=path.join(dir,relative);requireThat(fs.realpathSync(file).toLowerCase()===file.toLowerCase(),'Plan bundle cannot follow links');return parseYaml(fs.readFileSync(file,'utf8'));};
+ const g=read('goal/index.yaml'),a=read('approval/index.yaml'),r=read('run/index.yaml');
+ requireThat(g.planDigest===planDigest&&same(g.plan,plan)&&a.planDigest===planDigest&&r.planDigest===planDigest,'Mismatched Plan bundle');
+ const runs={};
+ for(const job of plan.workflows){if(!g.jobs[job.id])continue;const approval=a.jobs[job.id],execution=r.jobs[job.id];requireThat(approval?.presentation&&execution,'Incomplete workflow records');const presentation={...approval.presentation,scope:plan,scopeDigest:planDigest,jobId:job.id};delete presentation.planDigest;const run={...execution,...g.jobs[job.id],approvals:approval.receipts,presentation};bound(run);if(run.delegated)assertDelegatedGoal(run,{active:false});runs[job.id]=run;}
+ return runs;
+}
+export function saveDelegatedCompletion(plan,{reference,criteria,source}) {
+ const {mandate}=readScopedMandate(plan,reference),file=path.join(stateRoot(mandate.binding.workRoot),'plans',plan.id,'run/index.yaml');
+ const runs=loadPlanRuns(plan,mandate.binding.workRoot),original=fs.readFileSync(file,'utf8');
+ const completion=completeDelegatedPlan(plan,{reference,runs,criteria,source});
+ requireThat(fs.readFileSync(file,'utf8')===original,'Concurrent Plan change');
+ fs.writeFileSync(file,stringifyYaml({...parseYaml(original),status:'done',completion}));
+ closeScopedMandate(plan,reference,completion);return completion;
 }
