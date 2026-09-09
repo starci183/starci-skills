@@ -68,7 +68,8 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
         for(const error of checked.errors) issue(errors,'MODE_'+error.code,at+':'+mode,error.message);
       }
     }
-    if(!c.graphPolicy||!['read-only','selected-scope-only'].includes(c.graphPolicy.mode)||c.graphPolicy.prerequisiteState!=='done'||c.graphPolicy.dispatch!=='never'||c.graphPolicy.location!=='.starciwork node dependsOn/refs with direct sourceRefs and collocated assets') issue(errors,'GRAPH_POLICY',at,'Graph authority must live in .starciwork, require done prerequisites and never dispatch automatically');
+    const graphLocation=at==='architecture.decide'?'Canonical .starciwork SRS/SDS owners and collocated assets':'.starciwork node dependsOn/refs with direct sourceRefs and collocated assets';
+    if(!c.graphPolicy||!['read-only','selected-scope-only'].includes(c.graphPolicy.mode)||c.graphPolicy.prerequisiteState!=='done'||c.graphPolicy.dispatch!=='never'||c.graphPolicy.location!==graphLocation) issue(errors,'GRAPH_POLICY',at,'Graph authority must live in .starciwork, require done prerequisites and never dispatch automatically');
     if(c.graphPolicy?.mode==='read-only'&&c.writes.some(w=>w.id==='node'&&w.fields?.some(f=>['dependsOn','refs','required'].includes(f)))) issue(errors,'CONSUMER_GRAPH_WRITE',at,'A consumer op cannot silently rewrite scope/input graph fields');
     if(c.migrationPolicy) {
       const expected={scope:'one-selected-business',importState:'uninvestigate',initialActivity:'idle',importCompletion:'forbidden',intentAuthority:'approved-intent-not-inferred-source',cleanup:'explicit-exact-preserved-inactive-only',registeredWorktreeRemoval:'git-without-force'};
@@ -77,10 +78,11 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
     }
     if(['business.decide','architecture.decide'].includes(at)) {
       const field=at==='business.decide'?'business':'architecture';
-      if(c.specificationPolicy?.storage!=='.starciwork'||!c.specificationPolicy?.payload?.includes(field)||!c.writes.some(w=>w.fields.includes('extensions.work3.specification')&&w.fields.includes('sourceRefs'))||c.specificationPolicy?.payloadSchema!=='starci/specification@2'||!c.proofs.some(p=>p.id==='impact-security-coverage')) issue(errors,'SPECIFICATION_POLICY',at,'Planning must own a versioned specification with source and requirement coverage');
+      const architecture=at==='architecture.decide';
+      if(c.specificationPolicy?.storage!=='.starciwork'||!c.specificationPolicy?.payload?.includes(field)||!c.writes.some(w=>w.fields.includes('extensions.work3.specification')&&(architecture?!w.fields.includes('sourceRefs'):w.fields.includes('sourceRefs')))||c.specificationPolicy?.payloadSchema!==(architecture?'starci/specification@3':'starci/specification@2')||!c.proofs.some(p=>p.id==='impact-security-coverage')) issue(errors,'SPECIFICATION_POLICY',at,'Business owns SRS@2; Architecture owns source-independent SDS@3 with canonical requirement references');
     }
     if(at==='interface.draw'&&(!['repo','architecture','knowledge'].every(id=>c.reads.some(r=>r.id===id))||!c.writes.some(w=>w.id==='draws'))) issue(errors,'DRAW_HANDOFF',at,'Draw must read source/architecture/knowledge and always return draws');
-    if(at==='architecture.decide'&&(!['target','architectureReview','gaps'].every(k=>c.specificationPolicy?.requiredSections?.includes(k))||c.specificationPolicy?.analysisPolicy!=='context-driven')) issue(errors,'ARCHITECTURE_DEPTH',at,'Architecture requires context-driven review, target ownership and explicit implementation gaps');
+    if(at==='architecture.decide'&&(!['businessRefs','designRefs','views','decisions','checks','limitations'].every(k=>c.specificationPolicy?.requiredSections?.includes(k))||c.specificationPolicy?.analysisPolicy!=='context-driven'||c.reads.some(r=>r.id==='repo'))) issue(errors,'ARCHITECTURE_DEPTH',at,'Architecture requires source-independent design views, context-driven challenge, owned references, checks and limitations');
     if(['interface.implement','backend.implement'].includes(at)) {
       const checks=at==='backend.implement'?['lint','typecheck','unit','backend-e2e','coverage','build','sonar']:['lint','typecheck','tests','coverage','build','sonar'];
       if(c.qualityPolicy?.owner!==at||JSON.stringify(c.qualityPolicy?.checks)!==JSON.stringify(checks)||c.qualityPolicy?.missingRunner!=='blocked'||c.qualityPolicy?.canDelegateResponsibility!==false||!c.proofs.some(p=>p.id==='implementation-quality')) issue(errors,'IMPLEMENT_QUALITY',at,'Implement owns all quality checks and blocks missing proof');

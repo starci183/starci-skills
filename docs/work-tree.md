@@ -28,10 +28,13 @@ on that tree, not a directory taxonomy. Plans remain under the backend-owned
         │               └── assets/...
         ├── architecture/
         │   ├── index.yaml
-        │   └── <design-scope>/
+        │   ├── overview/index.yaml
+        │   └── sds/
         │       ├── index.yaml
-        │       ├── assets/...
-        │       └── <subscope>/...
+        │       └── <design-scope>/
+        │           ├── index.yaml
+        │           ├── assets/...
+        │           └── <subscope>/...
         ├── ui/
         │   ├── index.yaml
         │   └── <experience>/
@@ -71,7 +74,9 @@ only leaves author state. Stable IDs survive reorganizing paths.
   postconditions and acceptance together. Existing code is observation, not intent.
 - Architecture maps those requirements to responsibilities, contracts, connections,
   storage, security and context-specific failure/recovery decisions. Patterns are
-  justified choices, not compulsory Business content.
+  justified choices, not compulsory Business content. Source-independent SDS uses
+  canonical Business IDs, not copied requirements, source files or symbols. See
+  [Architecture SDS](architecture-sds.md) for typed views and shared imports.
 - UI specifies experiences, interactions, states, component grammar and coverage.
 - Implementation links the design to actual BE/FE source; it does not copy source
   repositories into Work.

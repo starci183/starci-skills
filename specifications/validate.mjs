@@ -1,4 +1,5 @@
 import { validateJourneys } from '../contracts/journeys.mjs';
+import { validateSDS, SDS_SCHEMA } from './sds.mjs';
 import { validateSRSDetails, validateArchitectureReview } from './v2.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,7 +9,7 @@ const text = x => typeof x === 'string' && x.trim().length > 0;
 const safePath = x => text(x) && !path.posix.isAbsolute(x) && !path.win32.isAbsolute(x) && !/[\\:\x00-\x1f]/.test(x) && !x.split('/').some(p => !p || p === '.' || p === '..');
 
 export function validateSpecification(spec) {
-  try { return validate(spec); }
+  try { return spec?.schema === SDS_SCHEMA ? validateSDS(spec) : validate(spec); }
   catch { return { ok: false, errors: ['Malformed specification; no handoff can be certified.'] }; }
 }
 function validate(spec) {

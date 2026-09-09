@@ -429,5 +429,13 @@
       "coverage": "Every FR maps to a flow and acceptance. Main and branch steps, outcomes, entry/resume points, actors and BR references must resolve. Empty alternative/exception sets need an explicit applicability reason.",
       "assurance": "Structural checks validate joins and declared decisions, not source truth, exhaustive scenario discovery or actual production behavior. Proposed tests are not executed proof."
     }
+  },
+  "currentArchitecturePayloadSchema": "starci/specification@3",
+  "architectureV3": {
+    "schema": "specifications/sds.schema.json",
+    "layout": "architecture/{overview,sds/**}/index.yaml",
+    "business": "Reference canonical SRS IDs without duplicating requirements/flows/acceptance.",
+    "source": "No source paths, symbols, revisions or code impact mapping. Implementation owns those.",
+    "legacy": "Specification@1/@2 remain readable under their original checks. Migration never reuses stale completion."
   }
 }

@@ -1,5 +1,6 @@
 import {parseYaml} from './yaml.mjs';
 import { validateSpecification } from '../specifications/validate.mjs';
+import { validateSDSBindings, SDS_SCHEMA } from '../specifications/sds.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
@@ -280,6 +281,14 @@ function validate(root,completions=null,candidate=null) {
     const unique=items=>[...new Map(items.map(item=>[item.meta.id,item])).values()].sort((a,b)=>a.meta.id.localeCompare(b.meta.id));
     n.effectiveDeps=unique(deps);n.effectiveRefs=unique(refs);
     const spec = n.meta.extensions?.work3?.specification;
+    const sdsMatch = n.path.match(/^(.*(?:^|\/)architecture\/)sds\/(?:[^/]+\/)*index\.yaml$/);
+    if(sdsMatch){
+      const archRoot=sdsMatch[1];
+      if(n.meta.kind!=='architecture')issue('SDS_LAYOUT',n.path,'SDS branches and leaves have kind architecture.');
+      for(const suffix of ['index.yaml','overview/index.yaml','sds/index.yaml'])if(!nodes.some(x=>x.path===archRoot+suffix&&x.meta.kind==='architecture'))issue('SDS_LAYOUT',n.path,'Nested SDS requires architecture/index.yaml, overview/index.yaml and sds/index.yaml.');
+      if(n.children.length&&spec!==undefined)issue('SDS_BRANCH_PAYLOAD',n.path,'SDS branches aggregate; do not duplicate their descendant design.');
+      if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!==SDS_SCHEMA)issue('SDS_VERSION',n.path,'Authored SDS leaves require source-independent specification@3.');
+    }
     const srsMatch = n.path.match(/^(.*(?:^|\/)business\/)srs\/(?:[^/]+\/)*index\.yaml$/);
     if(srsMatch){
       const businessRoot=srsMatch[1], srsRoot=businessRoot+'srs/index.yaml';
@@ -295,6 +304,12 @@ function validate(root,completions=null,candidate=null) {
       if (!['business','architecture'].includes(n.meta.kind) || spec?.op !== n.meta.kind + '.decide') issue('SPECIFICATION_OWNER', n.path, 'Specification must belong to its business/architecture node kind.');
       if (spec?.op === 'architecture.decide') {
         const businessInputs = r => r.type === 'node' ? [r,...r.children.flatMap(businessInputs)] : [];
+        if(spec.schema===SDS_SCHEMA&&review.ok){
+          if(n.children.length)issue('SDS_BRANCH_PAYLOAD',n.path,'SDS payloads belong to leaves.');
+          if(n.meta.sourceRefs?.length||n.meta.architecture!==undefined)issue('SDS_SOURCE_MAPPING',n.path,'Source mapping and legacy duplicate architecture payload belong to Implementation, not SDS.');
+          const allowedNodeIds=new Set([...n.effectiveRefs,...n.effectiveDeps].flatMap(businessInputs).map(x=>x.meta.id));
+          for(const message of validateSDSBindings(spec,{nodes,allowedNodeIds}))issue('SDS_BINDING',n.path,message);
+        }
         const businesses = [...n.effectiveRefs,...n.effectiveDeps].flatMap(businessInputs).filter(r=>r.meta.kind==='business'&&r.meta.extensions?.work3?.specification).map(r=>r.meta.extensions.work3.specification);
         if(spec.schema==='starci/specification@2') for(const business of businesses.filter(b=>b.schema==='starci/specification@2')) {
           for(const field of ['requirements','flows','actors','data','externalInterfaces','acceptance']) for(const input of business[field]??[]) {

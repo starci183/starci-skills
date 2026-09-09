@@ -43,7 +43,7 @@ export function buildFiles() {
     }
     entries.push({ id: op.id, goal: op.goal, knowledge: op.supportingReferences, operator: op.id + '/operator.json', authority: op.id + '/authority.json' });
   }
-  for (const name of ['contract.json']) files.set('specifications/' + name, fs.readFileSync(path.join(root, 'specifications', name)));
+  for (const name of ['contract.json','sds.schema.json']) files.set('specifications/' + name, fs.readFileSync(path.join(root, 'specifications', name)));
   for (const name of fs.readdirSync(path.join(root, 'examples')).filter(x => x.endsWith('.json'))) files.set('examples/' + name, fs.readFileSync(path.join(root, 'examples', name)));
   files.set('ops/catalog.json', json({ schema: 'starci/built-ops@1', ops: entries }));
   files.set('policy/common.json', json({ schema: 'starci/policy@1', rules: JSON.parse(fs.readFileSync(path.join(root, 'ops/common.json'), 'utf8').replaceAll('../SKILL.md','../../SKILL.md')) }));

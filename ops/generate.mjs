@@ -10,7 +10,8 @@ const clean = value => String(value).replaceAll('|','\\|').replaceAll('\n',' ');
 const table = (headers, rows) => '| '+headers.map(clean).join(' | ')+' |\n| '+headers.map(()=> '---').join(' | ')+' |\n'+rows.map(row=>'| '+row.map(clean).join(' | ')+' |').join('\n')+'\n';
 function supportingReferences(op) {
   const refs=[];
-  if(['backend.implement','architecture.decide'].includes(op.id)) refs.push({path:'knowledge/patterns/be/INDEX.json',when:'Use only topics matching the actual selected backend family and source conventions.'});
+  if(op.id==='backend.implement') refs.push({path:'knowledge/patterns/be/INDEX.json',when:'Use only topics matching the actual selected backend family and source conventions.'});
+  if(op.id==='architecture.decide') refs.push({path:'knowledge/patterns/be/INDEX.json',when:'Consult only applicable logical design mechanisms; source convention examples do not require source mapping in SDS.'});
   if(['interface.implement'].includes(op.id)) refs.push({path:'knowledge/patterns/fe/INDEX.json',when:'Use applicable topics for the actual installed frontend family and owner packages.'});
   if(['interface.draw','interface.implement'].includes(op.id)) refs.push({path:'knowledge/ui/composition/INDEX.json',when:'Use applicable composition topics for the accepted surface and installed family.'});
   if(['interface.draw','interface.implement'].includes(op.id)) {

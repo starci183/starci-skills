@@ -9,7 +9,6 @@
     "reads": [
       "target",
       "business",
-      "repo",
       "constraints",
       "specification",
       "matrix",
@@ -18,11 +17,7 @@
     "writes": [
       {
         "id": "node",
-        "path": ".starciwork/<business>/architecture/<piece>/index.yaml"
-      },
-      {
-        "id": "evidence",
-        "path": "E/manifest.yaml + E/source-map.json + E/design-review.md"
+        "path": ".starciwork/<business>/architecture/{overview,sds/**}/index.yaml"
       },
       {
         "id": "matrixHandoff",

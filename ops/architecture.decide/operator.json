@@ -1,7 +1,7 @@
 {
   "id": "architecture.decide",
   "goal": {
-    "en": "Resolve a bounded design into real repository ownership, contracts and implementable code scope."
+    "en": "Design a source-independent SDS with responsibilities, contracts, storage, runtime flows and context-specific failure controls."
   },
   "nodeKinds": [
     "architecture"
@@ -10,7 +10,7 @@
   "sideEffects": [],
   "graphPolicy": {
     "mode": "selected-scope-only",
-    "location": ".starciwork node dependsOn/refs with direct sourceRefs and collocated assets",
+    "location": "Canonical .starciwork SRS/SDS owners and collocated assets",
     "prerequisiteState": "done",
     "dispatch": "never"
   },
@@ -30,22 +30,15 @@
       }
     },
     {
-      "id": "repo",
-      "path": "repository:<repo-id>/<bound-paths>",
-      "purpose": {
-        "en": "When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty state; read applicable instructions, manifests, owning code, callers and relevant tests. Greenfield/spec-only work records source not-yet-created and grounds intent in the user request; no invented repository or fact citation. Source implementation still needs an actual selected writable repository."
-      }
-    },
-    {
       "id": "constraints",
-      "path": "selected resource contracts + actual package/deployment manifests",
+      "path": "canonical Work quality/platform constraints and primary design documentation",
       "purpose": {
-        "en": "Read exact versions, deployment topology and data constraints; compatibility claims need source/documentation or experiments, not memory."
+        "en": "Read stated deployment, storage, trust and compatibility constraints. Verify technology claims using primary documentation where necessary; do not present a design as deployed-source observation."
       }
     },
     {
       "id": "specification",
-      "path": "architecture.decide/specification.json + specifications/contract.json",
+      "path": "architecture.decide/specification.json + specifications/sds.schema.json + docs/architecture-sds.md",
       "purpose": {
         "en": "Read the JSON field contract and this operator procedure before authoring the .starciwork payload."
       }
@@ -68,10 +61,8 @@
   "writes": [
     {
       "id": "node",
-      "path": ".starciwork/<business>/architecture/<piece>/index.yaml",
+      "path": ".starciwork/<business>/architecture/{overview,sds/**}/index.yaml",
       "fields": [
-        "architecture",
-        "sourceRefs",
         "refs",
         "dependsOn",
         "assertions",
@@ -79,25 +70,7 @@
         "extensions.work3.specification"
       ],
       "content": {
-        "en": "Write target ownership, call chain, contracts, data ownership and context-relevant controls, observations and gaps. Full starci/specification@2 records the source-grounded design and architectureReview. Patterns are optional and justified; do not require Saga/CQRS for every module. Preserve accepted Business outcomes and distinguish design proof from running behavior."
-      }
-    },
-    {
-      "id": "evidence",
-      "path": "E/manifest.yaml + E/source-map.json + E/design-review.md",
-      "fields": [
-        "id",
-        "nodeId",
-        "inputDigest",
-        "outcome",
-        "assertions",
-        "assets",
-        "provenance",
-        "codeRefs",
-        "extensions"
-      ],
-      "content": {
-        "en": "Record observed current source map and compatibility checks; selected alternative/risk review is design proof, not a passing runtime."
+        "en": "Author source-independent specification@3. Overview explains context; recursive SDS scopes own design details. Branches aggregate without duplicate payloads. Preserve Business by reference; source mapping belongs to Implementation."
       }
     },
     {
@@ -121,99 +94,97 @@
   "steps": [
     {
       "reads": [
-        "repo",
-        "constraints",
         "target",
+        "business",
+        "constraints",
         "specification",
         "profile"
       ],
       "writes": [
-        "evidence"
-      ],
-      "action": {
-        "en": "Research exact FE/BE revisions, manifests, entrypoints, DI, API handlers, data stores, jobs, deploy topology and tests. Follow inbound callers and outbound consumers; cite repository/path/symbol/revision and distinguish observed paths from proposed paths. Trace each network hop from caller symbol through URL/config resolution, proxy/ingress wiring, receiving handler and deployment owner; record synchronous, async and in-process edges separately. Names and comments are clues, not endpoint proof. Keep observed and desired routing separate and block contradictory boundary decisions. Resolve the execution profile and actual tool availability before selecting instruments; this does not switch the model/runtime or spawn workers."
-      }
-    },
-    {
-      "reads": [
-        "business",
-        "repo",
-        "constraints"
-      ],
-      "writes": [
         "node"
       ],
       "action": {
-        "en": "Map accepted business flow and AC IDs to responsible services and authoritative data writers. Draw the logical request/response and asynchronous event sequence in ordered flow rows, including trust boundaries; never assume a class is an independently deployed service. Write ordered serviceCalls with caller/callee service IDs, caller/receiver source refs, operation, endpoint binding, credentials/trust boundary, data classification, timeout/retry and evidence status. Verify response path and downstream side effects. Unobserved deployment/runtime facts remain unknown."
-      }
-    },
-    {
-      "reads": [
-        "business",
-        "constraints",
-        "repo"
-      ],
-      "writes": [
-        "node"
-      ],
-      "action": {
-        "en": "Choose the smallest design satisfying accepted invariants and actual constraints. Challenge one coherent proposal with a materially simpler alternative, trade-offs and a reasoned decision. Select concerns from real business risks, data value, scale, trust boundaries and operating model, not a universal technology checklist. Evaluate named patterns only when relevant; patternDecisions may be empty. An adopted Saga/CQRS/outbox must describe actual mechanisms, not labels or handler filenames. Specify applicable transaction, idempotency, ordering, timeout, concurrency and recovery behavior; never invent numeric targets or unresolved product policy."
-      }
-    },
-    {
-      "reads": [
-        "repo",
-        "business",
-        "constraints"
-      ],
-      "writes": [
-        "node"
-      ],
-      "action": {
-        "en": "Write codeImpacts with exact repository/path/symbol, observed/proposed identity, direct/transitive relation, change/preserve/review decision, reason, caller chain, tests and protected paths. Write serviceImpacts with deployable owner, inbound/outbound consumers, stores/events, compatibility, rollout/rollback and observability; explain unaffected boundaries. Map every selected pattern and service call back to exact source symbols, data/event schemas, deployment/config owners and protected paths. Do not route traffic to a different service merely because its repository contains a matching resolver."
-      }
-    },
-    {
-      "reads": [
-        "business",
-        "repo",
-        "constraints"
-      ],
-      "writes": [
-        "node"
-      ],
-      "action": {
-        "en": "Review each trust boundary: authentication, object/tenant authorization, validation, credential custody, sensitive logs, external provider/AI input, replay and resource abuse where relevant. Link threat, server-side control owner, code/service impact and positive/negative AC. Record residual risks and decision owner without claiming a security audit ran. Add a threat model per trust boundary: assets, entry points, attacker capability, exploit path, impact, prevention/detection, control owner and negative acceptance. Assess object/function/property authorization, tenant isolation, token issuer/audience/scope and forwarding, SSRF/redirect/DNS/egress, injection, webhook authenticity/replay, resource/AI cost abuse, sensitive transcripts/logs and dependency risks when applicable. Mark non-applicability with evidence; unresolved high-impact risks need a decision owner and block acceptance."
-      }
-    },
-    {
-      "reads": [
-        "business",
-        "repo",
-        "constraints",
-        "target"
-      ],
-      "writes": [
-        "node"
-      ],
-      "action": {
-        "en": "Produce implementation ceilings, protected paths, dependencies and required checks from actual repository scripts/CI. Lint, typecheck, tests/coverage, build and Sonar execute inside FE/BE implement; this op specifies them only. Bind rollout/migration/cleanup plans without executing them. Preserve business expected results unchanged. Design failure-injection tests for wrong service target, unauthorized forwarding, stale reads, duplicate/out-of-order messages, crash after commit before publish, compensation failure and retry exhaustion as applicable; implementations run them. Author canonical user journeys and journeyCoverage links to flow/AC IDs using the shared journey contract; preserve accepted journeys unchanged in architecture. Do not convert internal service hops into UI actions. Browser-free scope may use an empty array only when no UAT acceptance is assigned. Record architectureReview with context-selected concerns linked to requirements, sources, concrete trigger/impact/control/owner/acceptance scenarios, decisions, residual risks and evidence limitations. Examine persistence, connections, failure domains, capacity, security, HA, backup/restore, provider or total-infrastructure loss only to the depth their consequences require in this scope. Where durable customer state is in scope, identify authoritative versus rebuildable data, all stores/volumes/config/Secrets/keys, consistency point, independent backup custody, recovery prerequisites/order and verification. Never claim every possible edge case is covered or a recovery drill ran from design prose. Current external production practices need primary sources and an explicit applicability argument."
+        "en": "Resolve accepted SRS scope, drivers, actors and platform constraints from canonical Work. Read specifications/sds.schema.json and docs/architecture-sds.md. Architecture is source-independent: no source paths, symbols, revisions, codeImpacts, repository audit or test-command inventory. A design constraint does not prove deployed behavior."
       }
     },
     {
       "reads": [
         "target",
         "business",
-        "repo",
+        "constraints"
+      ],
+      "writes": [
+        "node"
+      ],
+      "action": {
+        "en": "Write logical components with responsibilities, exclusions and dependency directions. Contracts have one owner, caller/receiver, sync/async/in-process mode, inputs, outcomes/errors, authority, timeout, retry, idempotency and compatibility. Import shared views by stable Work/view IDs; never copy or redefine another owner contract."
+      }
+    },
+    {
+      "reads": [
+        "target",
+        "business",
+        "constraints"
+      ],
+      "writes": [
+        "node"
+      ],
+      "action": {
+        "en": "Design runtime scenarios referencing canonical SRS flow IDs. Every step names its component, contracts, data, commit point, failure outcome and recovery. Cover significant architectural differences, including response loss, concurrency, duplicates, ordering, partial success and cancellation where relevant."
+      }
+    },
+    {
+      "reads": [
+        "target",
+        "business",
+        "constraints"
+      ],
+      "writes": [
+        "node"
+      ],
+      "action": {
+        "en": "Specify authoritative versus rebuildable data, storage, isolation, consistency, lifecycle, placement, connections and credential custody. For durable customer state, examine database consistency, volumes, config, Secrets/keys, independent backup ownership and recovery order. Select failure domains and HA/recovery depth from actual scope, not a mandatory cluster-loss checklist for every project."
+      }
+    },
+    {
+      "reads": [
+        "target",
+        "business",
+        "constraints"
+      ],
+      "writes": [
+        "node"
+      ],
+      "action": {
+        "en": "Challenge one coherent proposal with a materially simpler alternative, rationale, cost, downsides and revisit conditions. Patterns are optional; specify actual mechanisms rather than names. Use applicable knowledge and primary technical references with an applicability argument. Do not invent business targets or product policy; make technical choices within approved requirements."
+      }
+    },
+    {
+      "reads": [
+        "target",
+        "business",
+        "constraints"
+      ],
+      "writes": [
+        "node"
+      ],
+      "action": {
+        "en": "Write relevant quality/threat/failure scenarios with trigger, impact, response, owner and planned design checks linked to SRS acceptance. Keep residual risk and limitations explicit. Never claim source implementation, security audit, HA verification or a recovery drill ran from a design document."
+      }
+    },
+    {
+      "reads": [
+        "target",
+        "business",
         "constraints",
         "matrix"
       ],
       "writes": [
-        "evidence",
+        "node",
         "matrixHandoff"
       ],
       "action": {
-        "en": "Validate target ownership, request/data/credential paths, contracts and applicable failure controls against accepted Business and actual sources. Separate proposed design from observations and implementation gaps. Require accepted decisions for material concerns and residual risks before passing design review. Omit unnecessary Saga/CQRS designs; validate concrete mechanisms when selected. Preserve accepted SRS requirements/flows/AC and user journeys, with explicit business leaf dependencies. Architecture done means reviewed design only, never implementation, security audit, HA or executed restore proof."
+        "en": "Validate recursive layout and exact canonical SRS/shared-design references. Review full requirement/flow/acceptance coverage across the owning architecture scope. Resolve material design blockers before pass; schema validity alone is not review. Implementation owns source mapping and test execution. Done means current reviewed design, never an edit lock."
       }
     }
   ],
@@ -227,13 +198,13 @@
     {
       "id": "implementability",
       "requirement": {
-        "en": "Every selected operation has an owner, actual/proposed repo-path scope and test instrument; every required business outcome maps to a contract. No source implementation claim."
+        "en": "Each significant operation resolves logical owner, contract, data/commit boundary and planned check. Core design choices must not be left for implementers to invent. Source mapping belongs to Implementation."
       }
     },
     {
       "id": "impact-security-coverage",
       "requirement": {
-        "en": "Every selected flow resolves cited code/service impact, security controls and acceptance; proposed/unknown facts remain explicit. Validate the JSON specification and .starciwork before review completion."
+        "en": "SRS outcomes map to owned contracts, runtime scenarios and design checks. Assess relevant threats/failures and limitations. Structural validation does not establish semantic approval or executed behavior."
       }
     }
   ],

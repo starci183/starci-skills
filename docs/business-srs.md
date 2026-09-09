@@ -46,9 +46,9 @@ node --test tests/srs-v2.spec.mjs
 
 ## Architecture consumes the SRS
 
-Reference the accepted SRS leaf IDs or a deliberate aggregate scope through `refs`/`dependsOn`. The core resolves descendant specifications of referenced aggregates. Version-2 Architecture must preserve referenced requirements, actors, data, external interfaces, business flows and acceptance unchanged; technical call sequences live separately in `serviceCalls`.
+Reference the accepted SRS leaf IDs or a deliberate aggregate scope through `refs`/`dependsOn`. The core resolves descendant specifications of referenced aggregates. New source-independent Architecture uses specification@3 `businessRefs` with canonical requirement/flow/acceptance IDs; it does not copy Business rows. Version-2 Architecture remains readable with its old copy-preservation checks, but is not the new authoring format.
 
-Architecture owns code/service impacts, actual connection paths and credential boundaries, data writers, compatibility and implementation checks. Its `architectureReview` records the concrete context, one coherent proposal challenged against a simpler alternative, relevant concerns/scenarios, decisions, residual risks and evidence limitations. Select concerns to match business consequences and actual operating conditions. Saga, CQRS, HA and disaster recovery are not universal required designs. If durable customer data is in scope, make storage, backup custody, consistency and recovery prerequisites explicit; design prose is still not an executed restore test.
+Architecture owns logical components, contracts, connections and credential boundaries, data writers/storage, runtime scenarios and compatibility. Its SDS records concrete context, one coherent proposal challenged against a simpler alternative, relevant failure/security scenarios, decisions and limitations. Source files, symbols, revisions, code-impact mapping and executed checks belong to Implementation. Select concerns to match business consequences and operating conditions, not a universal Saga/CQRS/HA checklist. Durable customer data requires explicit storage, backup custody, consistency and recovery prerequisites; design prose is not an executed restore test. See [Architecture SDS](architecture-sds.md).
 
 ## Versioning and completion
 
