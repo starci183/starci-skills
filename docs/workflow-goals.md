@@ -1,0 +1,35 @@
+# Workflow goals: brief in chat, full specification in the Plan
+
+Every bounded workflow presents two consistent views of the same goal:
+
+- The full English goal remains in the existing Plan bundle. Supply a readable
+  rendering in the configured user language with all sections and tables intact.
+- The task chat starts with a concise explanation of the current workflow. Link
+  both artifacts so the user can scan the brief or inspect the complete scope.
+
+Apply this at each workflow checkpoint, not only when first creating the Plan.
+Do not replace the brief with an opened YAML panel or a report to a coordinator.
+Do not duplicate the complete Plan in chat unless the user asks for it.
+
+## Example (illustrative, not an approved product goal)
+
+Goal `chatbot-control-recovery` — sửa backend để khi người vận hành tiếp quản,
+bot ngừng bắt đầu lượt gửi mới nhưng vẫn theo dõi lượt đang gửi.
+
+- Kết quả: takeover và phục hồi không làm gửi trùng; lượt chưa xác minh vẫn chờ.
+- Phạm vi: backend Chatbot và test; không sửa frontend, nghiệp vụ hay production.
+- Đạt khi: unit, PostgreSQL integration và API E2E qua cả takeover, mất kết quả,
+  gửi lại và cô lập hai installation.
+- Ước lượng: 2–4 giờ, phụ thuộc test DB; bước sau là tích hợp delivery/referral.
+- Trạng thái: đang trình duyệt goal này; chưa bắt đầu sửa source.
+- Goal đầy đủ: [link tới goal cụ thể]. Bản đọc: [link tới bản render đầy đủ].
+
+Replace illustrative links with real retrievable artifacts. Include important
+risks or remaining decisions in the brief, even if that makes it slightly longer.
+For auto, state the valid delegation and current risk assessment instead of
+inventing a new manual checkpoint. For an unchanged approved goal on resume,
+summarize progress and the next action without asking the same approval again.
+
+The summary cannot broaden effects, conceal a changed goal, replace acceptance
+checks, or create approval. Detailed write sets, hashes and matrices stay in the
+full document; the actual approval still binds the exact presented goal.
