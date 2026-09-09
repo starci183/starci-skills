@@ -48,6 +48,26 @@ export function scopedWorkStatus(work,ids,{done=false,authored=false,requiredChi
  const blocked=scopeNodes.filter(n=>n.blockers?.length||n.blockedBy.some(id=>!selected.has(id))||n.suspensionReasons.some(r=>['ANCESTOR_NOT_INVESTIGATED','COMPLETION_BLOCKED','DECLARED_SUSPENSION'].includes(r.code))||external.has(n.id)&&(authored?n.effectiveState!=='done':['invalid','uninvestigate','suspended','blocked'].includes(n.effectiveState))||done&&selected.has(n.id)&&(n.children.length||n.effectiveState!=='done'));
  return {ok:!errors.length&&!missing.length&&!blocked.length,errors,missing,blocked:blocked.map(n=>n.id),remainingErrors:work.errors.filter(e=>!errors.includes(e)),globalOk:work.ok};
 }
+
+/** Ephemeral readiness only. Callers must verify the earlier accepted cells'
+ * current proof before supplying their exact leaf IDs. Never mutates Work or
+ * treats an aggregate itself as an accepted leaf. References bind content;
+ * only dependsOn adds completion ordering, as in the persistent Work graph. */
+export function inRunWorkReady(work,ids,completed=[]){
+ const byId=new Map(work.nodes.map(n=>[n.id,n])),accepted=new Set(completed),visiting=new Set(),memo=new Map();
+ if(work.errors.some(e=>!recoverable.has(e.code)))return false;
+ const sound=n=>n&&!['invalid','uninvestigate','suspended','blocked'].includes(n.effectiveState)&&!['uninvestigate','suspended','blocked'].includes(n.state)&&!n.blockers?.length&&!n.suspensionReasons?.length&&!work.errors.some(e=>e.path===n.path||e.path.startsWith(path.posix.dirname(n.path)+'/evidence/'));
+ function prerequisites(n){return n.dependsOn.every(ready)&&n.refs.every(id=>{const ref=byId.get(id);return ref?sound(ref):work.resources.some(r=>r.id===id);});}
+ function ready(id){
+  if(memo.has(id))return memo.get(id);
+  const n=byId.get(id);if(!sound(n)||visiting.has(id))return false;
+  visiting.add(id);
+  const required=n.children.filter(id=>byId.get(id)?.required!==false);
+  const ok=prerequisites(n)&&(n.children.length?(required.length?required.every(ready):n.effectiveState==='done'):n.effectiveState==='done'||accepted.has(id));
+  visiting.delete(id);memo.set(id,ok);return ok;
+ }
+ return ids.every(id=>{const n=byId.get(id);return sound(n)&&prerequisites(n);});
+}
 export function requestWorkPolicy(run,cell){
  if(!validateWorkPolicy(run.goal,cell))return {};
  const work=authored(run,cell),verdict=scopedWorkStatus(work,targets(run,cell),{authored:true});

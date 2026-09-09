@@ -9,6 +9,8 @@ import {stringifyYaml,parseYaml} from '../core/yaml.mjs';
 import {registerScopedMandate,readScopedMandate,revokeScopedMandate,delegatedContext,hasDelegatedAcceptance} from '../workflows/delegation.mjs';
 import {propose,presentGoal,approveGoal,presentDelegatedGoal,authorizeDelegatedGoal,requestCell,acceptCell,acceptDelivery,acceptDelegatedDelivery,markWorkDone,saveRun,loadPlanRuns,saveDelegatedCompletion,workflowDigest} from '../workflows/lifecycle.mjs';
 import {validBackendRun} from '../workflows/select.mjs';
+import {presentAutoPlan,approveAutoPlan} from '../workflows/auto.mjs';
+import {authorizeAutoGoal} from '../workflows/lifecycle.mjs';
 
 const source=(actor,threadId,quote)=>({actor,threadId,messageId:null,messageIdAvailability:'not-exposed',quote,assurance:'conversation-context-not-authenticated'});
 function fixture(t,{count=2,workflow='implement-backend'}={}) {
@@ -104,7 +106,95 @@ test('existing source anchors are revalidated at first delegated dispatch',t=>{
 });
 
 test('Plan questions and current workflow questions cannot become coordinator answers',t=>{
- const f=fixture(t,{count:1});f.plan.workflows[0].openQuestions=['Synthetic owner product choice'];const reference=f.register(),run=f.shown(reference);run.goal.inputs.planQuestionAnswers=[{question:'Synthetic owner product choice',answer:'Agent guessed'}];assert.throws(()=>authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review}));
+ const f=fixture(t,{count:1});f.plan.workflows[0].openQuestions=['Synthetic owner product choice'];const reference=f.register(),goal=f.goal();goal.inputs.planQuestionAnswers=[{question:'Synthetic owner product choice',answer:'Agent guessed'}];const run=f.shown(reference,0,goal);assert.throws(()=>authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review}),/mandate technical classification/);
+});
+
+const technicalPair={question:'Synthetic exact isolated fixture choice?',answer:'Use the reviewed disposable local fixture.'};
+function technicalFixture(t,{count=1}={}) {
+ const f=fixture(t,{count});f.plan.workflows[0].openQuestions=[technicalPair.question];
+ f.options.jobs[0].technicalQuestions=[technicalPair.question];
+ f.options.review.quote='Synthetic coordinator classified this exact question as technical within existing local scope; no product policy choice.';
+ const goal=f.goal();goal.inputs.planQuestionAnswers=[{...technicalPair}];
+ return {...f,technicalGoal:goal};
+}
+
+test('exact reviewed technical answer frozen before presentation works through dispatch, acceptance, persistence and terminal closure',t=>{
+ const f=technicalFixture(t),reference=f.register();let run=f.shown(reference,0,f.technicalGoal);
+ run=authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review});run=f.finish(run);saveRun(run);
+ const restored=loadPlanRuns(f.plan,f.root)['job-0'];assert.equal(hasDelegatedAcceptance(restored),true);assert.deepEqual(restored.goal.inputs.planQuestionAnswers,[technicalPair]);
+ const criteria=[{id:'terminal',status:'pass',observation:'Synthetic accepted technical scope verified',evidence:[{jobId:'job-0',cellId:'implement-backend',criterionId:'backend-e2e-pass'}]}];
+ assert.equal(saveDelegatedCompletion(f.plan,{reference,criteria,source:f.review}).status,'done');assert.equal(hasDelegatedAcceptance(restored),true);assert.throws(()=>f.issue(restored),/terminal/);
+});
+
+test('future technical answers are discovered per goal under the same mandate without guessing them during Plan review',t=>{
+ const f=fixture(t);f.plan.workflows[1].openQuestions=[technicalPair.question];f.options.jobs[1].technicalQuestions=[technicalPair.question];
+ const reference=f.register(),runs={'job-0':f.finish(f.approve(reference))};saveRun(runs['job-0']);
+ const goal=f.goal(1);goal.inputs.planQuestionAnswers=[{question:technicalPair.question,answer:'Inspected prior synthetic result: '+runs['job-0'].resultDigest}];
+ let run=f.shown(reference,1,goal);run=authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review,priorRuns:runs});runs['job-1']=f.finish(run,1,runs);saveRun(runs['job-1']);
+ const criteria=[{id:'terminal',status:'pass',observation:'Both synthetic results share one unchanged mandate',evidence:[0,1].map(i=>({jobId:'job-'+i,cellId:'implement-backend',criterionId:'backend-e2e-pass'}))}];
+ assert.equal(saveDelegatedCompletion(f.plan,{reference,criteria,source:f.review}).status,'done');assert.equal(readScopedMandate(f.plan,reference,{active:false}).digest,reference.digest);
+});
+
+for(const [name,answers]of [
+ ['missing',undefined],['empty',[]],['duplicate',[technicalPair,technicalPair]],
+ ['wrong question',[{question:'Different question',answer:technicalPair.answer}]],
+ ['empty answer',[{question:technicalPair.question,answer:' '}]],
+ ['extra answer',[technicalPair,{question:'Unasked question',answer:'Guessed'}]],
+ ['extra field',[{...technicalPair,approved:true}]],
+])test(`delegated technical answer rejects ${name} even when frozen before presentation`,t=>{
+ const f=technicalFixture(t),reference=f.register();if(answers===undefined)delete f.technicalGoal.inputs.planQuestionAnswers;else f.technicalGoal.inputs.planQuestionAnswers=structuredClone(answers);
+ const run=f.shown(reference,0,f.technicalGoal);assert.throws(()=>authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review}),/mandate technical classification/);
+});
+
+test('mandate technical questions require exact unique strings belonging to that job',t=>{
+ const f=technicalFixture(t);
+ for(const questions of [null,[technicalPair.question,technicalPair.question],['Not in this job'],[technicalPair],[' ']]){
+  f.options.jobs[0].technicalQuestions=questions;assert.throws(()=>f.register(),/unique exact technical/);
+ }
+});
+
+test('historical mandates default deny technical answers and cannot inherit another job allowlist',t=>{
+ const f=technicalFixture(t,{count:2});delete f.options.jobs[0].technicalQuestions;
+ f.plan.workflows[1].openQuestions=[technicalPair.question];f.options.jobs[1].technicalQuestions=[technicalPair.question];
+ const reference=f.register(),run=f.shown(reference,0,f.technicalGoal);
+ assert.throws(()=>authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review}),/mandate technical classification/);
+});
+
+test('technical allowlist does not resolve Plan questions or an additional unreviewed business question',t=>{
+ for(const planQuestion of [false,true]){
+  const f=technicalFixture(t);if(planQuestion)f.plan.openQuestions=['Synthetic owner business choice'];else {f.plan.workflows[0].openQuestions.push('Synthetic owner business choice');f.technicalGoal.inputs.planQuestionAnswers.push({question:'Synthetic owner business choice',answer:'Coordinator guessed'});}
+  const reference=f.register(),run=f.shown(reference,0,f.technicalGoal);assert.throws(()=>authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review}),/Unresolved/);
+ }
+});
+
+test('changed technical answer after presentation or changed mandate cannot reuse approval',t=>{
+ const f=technicalFixture(t),reference=f.register(),shown=f.shown(reference,0,f.technicalGoal);
+ const changed=structuredClone(shown);changed.goal.inputs.planQuestionAnswers[0].answer='Changed after presentation';assert.throws(()=>authorizeDelegatedGoal(changed,{reference,assessment:f.assessment(changed,'goal'),source:f.review}),/changed|digest/i);
+ const run=authorizeDelegatedGoal(shown,{reference,assessment:f.assessment(shown,'goal'),source:f.review});
+ const approvedChanged=structuredClone(run);approvedChanged.goal.inputs.planQuestionAnswers[0].answer='Changed after approval';assert.throws(()=>f.issue(approvedChanged),/changed|digest/i);
+ const state=parseYaml(fs.readFileSync(reference.file,'utf8'));state.mandate.jobs[0].technicalQuestions[0]='Changed after review';f.put(reference.file,state);assert.throws(()=>f.issue(run),/changed/);
+});
+
+test('reviewed technical answer cannot expand business, paths, targets or resource operations',t=>{
+ for(const mutate of [g=>g.scope.business.push('foreign'),g=>g.scope.paths.push('repo:new-unapproved.txt'),g=>g.workTargets.push('foreign'),g=>g.resourceEffects[0].operation='different-operation']){
+  const f=technicalFixture(t),reference=f.register();mutate(f.technicalGoal);
+  assert.throws(()=>{const run=f.shown(reference,0,f.technicalGoal);authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review});},/scope|targets|effect|Work/i);
+ }
+});
+
+test('direct manual user can approve a frozen answer without inheriting coordinator question policy',t=>{
+ const f=technicalFixture(t);delete f.options.jobs[0].technicalQuestions;
+ const run=presentGoal(propose(f.technicalGoal,{workRoot:f.root,repositories:{repo:f.dir}}),{messageId:'synthetic-direct-question-presentation',scope:f.plan,jobId:'job-0'});
+ const approved=approveGoal(run,{actor:'user',phase:'goal',approved:true,digest:run.goalDigest,messageId:'synthetic-direct-question-reply',replyTo:run.presentation.messageId,quote:'Synthetic actual user approves the presented answer'});assert.equal(approved.status,'approved');assert.ok(requestCell(approved,'implement-backend').request);
+});
+
+test('auto does not inherit delegated technical-question classification',t=>{
+ const f=technicalFixture(t);f.plan.mode='auto';f.plan.auto={maxMinutes:10,acceptance:'verified-criteria'};
+ f.plan.workflows[0].auto={environment:'isolated-test',business:['synthetic'],resourceEffects:f.technicalGoal.resourceEffects,technicalQuestions:[technicalPair.question]};
+ const presentation=presentAutoPlan(f.plan,{messageId:'synthetic-auto-plan-presentation',workRoot:f.root,repositories:{repo:f.dir}});
+ const authorization=approveAutoPlan(f.plan,presentation,{actor:'user',phase:'plan-auto',approved:true,digest:presentation.digest,replyTo:presentation.messageId,messageId:'synthetic-auto-approval',quote:'Synthetic user approves bounded auto execution'});
+ const run=presentGoal(propose(f.technicalGoal,{workRoot:f.root,repositories:{repo:f.dir}}),{messageId:'synthetic-auto-goal',scope:f.plan,jobId:'job-0'});
+ assert.throws(()=>authorizeAutoGoal(run,{authorization,assessment:{risk:'low',environment:'isolated-test',reversible:true,reason:'Synthetic local fixture only',evidence:['Synthetic fixture inspected'],hazards:[]}}),/checkpoint|question/i);
 });
 
 test('multi-stage frontend chain cannot reuse stale risk or stale draw proof for the next stage',t=>{

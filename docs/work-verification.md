@@ -60,6 +60,11 @@ the owning implementation/UAT record and its supported verification artifacts;
 extend a typed contract only when a real result cannot be represented honestly.
 Never put credentials or real customer data into audit records or captures.
 
+For evidence bundles, use [scoped publication](scoped-evidence-publication.md)
+to preview and publish a new sealed result against its actual owner/input scope.
+Unrelated recoverable stale diagnostics remain visible as `globalOk: false`;
+publication neither accepts a workflow nor marks its nodes done.
+
 ## Repair the failing link, then affected consumers
 
 1. Trace a discrepancy to its owner: requirement, design, implementation, test
@@ -163,3 +168,21 @@ reuse. Revoking/closing a mandate or expiring an auto budget stops new effects;
 it does not retroactively falsify a previously accepted result whose proof is
 still current. The consumer needs its own current execution authority. Local
 receipt consistency is auditable provenance, not authenticated human identity.
+
+## Aggregate prerequisites inside one workflow
+
+Keep a truthful aggregate dependency such as UAT depending on implementation.
+Before a successor cell runs, the runtime verifies prior accepted cell results
+again and derives temporary readiness through the aggregate's required children.
+Each required leaf must either be currently effectively done or be the exact
+target of an earlier accepted, still-current cell in this same run. The aggregate
+is not itself a substitute receipt. Missing required siblings, invalid graph,
+reopened or suspended Work, stale artifacts and unavailable prerequisites block
+progress. An optional child is not required unless separately consumed by an
+explicit dependency. References retain their content-binding semantics; they
+do not become new execution-order edges.
+
+This calculation does not write done, change Work hashes, remove dependencies
+or accept future cells. The same currentness checks apply when accepting a cell
+and reviewing the complete result. Work remains todo until the complete accepted
+workflow passes normal completion preflight; parents then derive their state.

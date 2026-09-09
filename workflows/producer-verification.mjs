@@ -3,7 +3,7 @@ import path from 'node:path';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
 import {validatePlan} from './plan.mjs';
 import {typed} from './typed.mjs';
-import {verifyWorkResult,scopedWorkStatus} from './work-binding.mjs';
+import {verifyWorkResult,scopedWorkStatus,inRunWorkReady} from './work-binding.mjs';
 import {validBackendRun} from './select.mjs';
 
 const hash=x=>sha256(canonicalJSON(x));
@@ -42,10 +42,16 @@ export function verifyProducerEnvelope(run){
 export function verifyProducerCells(run,{complete=true}={}){
  verifyRequiredProducerInputs(run);
  need(run?.requests&&run.responses&&Array.isArray(run.goal?.cells),'Missing producer request/results');
- if(complete)need(Object.keys(run.responses).length===run.goal.cells.length,'Incomplete producer result');
- const work=validateWorkspace(run.workRoot),inRun=new Set(Object.keys(run.responses).flatMap(id=>run.goal.cells.find(c=>c.id===id)?.workTargets??[]));
+ const ids=run.goal.cells.map(c=>c.id),responseIds=Object.keys(run.responses);
+ need(new Set(ids).size===ids.length&&responseIds.every(id=>ids.includes(id)),'Unknown producer cell response');
+ if(complete)need(ids.every(id=>Object.hasOwn(run.responses,id)),'Incomplete producer result');
+ const rows=run.goal.workflow==='implement-frontend'?frontend.rows:jobs.workflows.find(j=>j.id===run.goal.workflow)?.matrix;
+ need(rows&&Object.keys(run.requests).every(id=>rows.flat().some(c=>c.id===id)),'Unknown producer cell request');
+ for(const [i,row]of rows.entries())for(const cell of row)if(run.responses[cell.id])need(rows.slice(0,i).flat().every(c=>run.responses[c.id]),'Producer handoff skipped a prior row');
+ const work=validateWorkspace(run.workRoot),inRun=[];
  need(work.errors.every(e=>['STALE_COMPLETION','STALE_EVIDENCE','DEPENDENCY_NOT_DONE'].includes(e.code)),'Current producer Work graph is invalid');
- for(const [id,response]of Object.entries(run.responses)){
+ for(const {id}of rows.flat().filter(c=>run.responses[c.id])){
+  const response=run.responses[id];
   const cell=run.goal.cells.find(c=>c.id===id),request=run.requests[id];
   need(cell&&request&&request.cell===id&&request.goalDigest===run.goalDigest&&request.scopeDigest===run.scopeDigest&&request.op===cell.op&&request.operation===(cell.operation??null)&&same(request.criteria,cell.criteria)&&same(request.outputSchema,cell.outputSchema),'Producer request differs from its frozen goal cell');
   need(response?.cell===id&&response.status==='pass'&&response.requestDigest===hash(request)&&response.goalDigest===run.goalDigest&&response.scopeDigest===run.scopeDigest&&response.op===request.op&&response.operation===request.operation,'Producer response no longer matches its request');
@@ -57,7 +63,14 @@ export function verifyProducerCells(run,{complete=true}={}){
   for(const artifact of response.artifacts){need(text(artifact.id)&&text(artifact.path)&&/^[a-f0-9]{64}$/.test(artifact.sha256??''),'Malformed producer artifact');const file=path.resolve(base,artifact.path);need(inside(base,file)&&fs.existsSync(file)&&inside(base,fs.realpathSync(file))&&fs.statSync(file).isFile()&&sha256(fs.readFileSync(file))===artifact.sha256,'Producer evidence is missing, stale or escapes its root');}
   need(response.criteria.every(c=>c.evidence.every(id=>response.artifacts.some(a=>a.id===id))),'Producer criterion references missing artifact');
   verifyWorkResult(run,cell,response);
-  if(run.goal.workflow!=='prepare-work')for(const target of cell.workTargets??run.goal.workTargets){const n=work.nodes.find(n=>n.id===target);need(n&&n.blockedBy.every(id=>run.status!=='done'&&inRun.has(id))&&!n.blockers?.length,'Producer prerequisite is no longer current');if(run.status==='done')need(n.effectiveState==='done','Completed producer Work proof is no longer current');}
+  if(run.goal.workflow!=='prepare-work'){
+   const owned=cell.workTargets??run.goal.workTargets;
+   // Design authoring has its own stricter input/output policy and may repair
+   // a selected stale leaf. Do not change that separate recovery contract.
+   if(!cell.workPolicy)need(inRunWorkReady(work,owned,run.status==='done'?[]:inRun),'Producer prerequisite is no longer current');
+   if(run.status==='done')for(const target of owned)need(work.nodes.find(n=>n.id===target)?.effectiveState==='done','Completed producer Work proof is no longer current');
+   inRun.push(...owned);
+  }
  }
  if(run.status==='done')need(scopedWorkStatus(work,run.goal.workTargets,{done:true,authored:run.goal.cells.some(c=>c.workPolicy),requiredChildrenOnly:run.goal.workflow==='implement-backend'}).ok,'Completed producer scope is no longer current');
  if(run.goal.workflow==='implement-backend')need(scopedWorkStatus(work,run.goal.workTargets,{done:run.status==='done',authored:true,requiredChildrenOnly:true}).ok&&run.goal.workTargets.every(id=>!['invalid','uninvestigate','suspended','blocked'].includes(work.nodes.find(n=>n.id===id)?.effectiveState)),'Backend producer inputs or completion are no longer current');
