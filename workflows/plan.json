@@ -50,7 +50,8 @@
   "commands": {
     "template": "node scripts/plan.mjs template",
     "create": "node scripts/plan.mjs create <filled-plan.yaml> <new-plan-directory>",
-    "render": "node scripts/plan.mjs render <goal/index.yaml>"
+    "render": "node scripts/plan.mjs render <goal/index.yaml>",
+    "present": "node scripts/present-goal.mjs <goal/index.yaml> <job-id> <new-local-presentation-directory>"
   },
   "presentation": "Two layers, for every workflow: retain the complete goal in the same Plan bundle and provide its full rendered document; lead directly in the task chat with a brief for the current bounded workflow. The full document preserves terminal Goal, areas including backend/frontend, coverage with reuse evidence/non-applicability reasons, Plan completion criteria, ordered workflows with input/output/criteria/estimate, per-workflow checkpoints, exclusions and approval state. Translate display prose to config.language. Draft-only trials use the same bundle in an allowed scratch location. Do not paste the whole Plan into chat by default or replace its complete artifact with a summary.",
   "workflowGoalBrief": {

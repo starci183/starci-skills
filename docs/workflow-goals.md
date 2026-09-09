@@ -11,6 +11,27 @@ Apply this at each workflow checkpoint, not only when first creating the Plan.
 Do not replace the brief with an opened YAML panel or a report to a coordinator.
 Do not duplicate the complete Plan in chat unless the user asks for it.
 
+Export the selected workflow and complete Plan for delivery with:
+
+```text
+node scripts/present-goal.mjs <goal/index.yaml> <job-id> <new-local-presentation-directory>
+```
+
+Keep presentations under the existing Plan's `_local` location, for example
+`<plan>/presentations/<job-id>-<revision>/`. The command creates `goal.yaml`
+(byte-identical full source goal), `goal.md` (selected workflow detail and full
+Plan), and `presentation.yaml` (source hash and selected job identity).
+It refuses a stale Plan digest, unknown job, links or existing destination;
+it never creates approvals, runs or a replacement Plan. A Plan-stage proposal
+is labelled as such, not as a frozen/approved executable goal. Before approval,
+verify the exported source hash still matches the canonical goal and use the
+existing approval protocol, not the presentation metadata. Translate the readable
+prose to the configured language without changing the goal's scope or criteria.
+
+Link `goal.yaml` and the readable document from the short in-chat brief. The
+canonical `goal/index.yaml` remains the sole execution authority source; the
+export's name is for convenient user delivery, not another editable goal state.
+
 ## Example (illustrative, not an approved product goal)
 
 Goal `chatbot-control-recovery` — sửa backend để khi người vận hành tiếp quản,
