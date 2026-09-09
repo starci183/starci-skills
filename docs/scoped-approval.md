@@ -19,6 +19,18 @@ assurance: conversation-context-not-authenticated
 
 When a native message ID is exposed, preserve it and use `messageIdAvailability: available`. A returned task ID, completed turn ID, local record ID or content hash is not a native message ID. Preserve such context in the actual explanation, not by mislabeling it. The source conversation supplies authority; these local records cannot authenticate a user, detect a dishonest quote or sandbox a malicious caller. Hashes detect changed bytes, not truth.
 
+## Target readiness before approval
+
+Before freezing or approving an effectful workflow goal, inspect its actual target state, eligibility, blockers and current declared inputs through `validateWorkspace`. A valid workspace and completed SRS/SDS do not imply that an imported implementation leaf is ready. Read its semantic scope too: an obsolete implementation map or invented architectural obligation must not become the expectation merely because it is already on disk.
+
+For an imported `uninvestigate` consumer whose scope needs confirmation or correction, select a bounded `prepare-work` / `prepare` scope revision under actual authority before implementation. Reuse the existing workspace and bindings; revise only the selected incomplete leaf's purpose, accepted design mapping and meaningful assertions. Keep correct dependency edges and explicitly review any necessary graph change. Set it to `todo` only after the scope is genuinely confirmed; do not mark implementation done or copy a new digest into old proof to clear the gate. Fresh confirmed `todo` needs no investigation receipt. Already-ready nodes do not acquire an extra preparation workflow.
+
+Separate preparation's completion target from its write scope. The setup/scope-review leaf is the sole preparation `workTargets` completion target, using the prepare operation's business profile. A future implementation leaf is an explicitly authorized path/resource write target that remains `todo` without completion. Name both roles in the goal and typed input. Never use the future implementation leaf as a setup completion target: `markWorkDone` correctly requires proof for every exact selected completion target. Create or reuse only the bounded setup leaf needed for this revision, not a new workspace or a product-wide setup tree. Preparation review proves scope readiness, not code, backend E2E or UAT.
+
+After the scope revision, read back eligibility and current inputs, then present/review the affected implementation checkpoint before first dispatch. Preserve prior approvals honestly; changed goals or effect ceilings require renewed review, not retroactive receipts. Preparation is not a way around missing business decisions or unfinished required designs. The default gate continues to reject undeclared `uninvestigate` consumer dispatch.
+
+Match Work target granularity to bounded acceptance: cohesive implementation child leaves can complete separately while their parent aggregates them. Do not mark the whole parent done from one partial workflow or enlarge a workflow solely to fit an oversized leaf; use only the decomposition the actual scope needs.
+
 ## API and bounded review
 
 The APIs are in `workflows/delegation.mjs` and `workflows/lifecycle.mjs`. All example field names below describe a contract, not real product approval.

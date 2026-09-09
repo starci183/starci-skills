@@ -180,3 +180,29 @@ test('forward-slash Windows bindings keep exact identity and cannot hang ancesto
  const result=spawnSync(process.execPath,['--input-type=module','-e',code],{encoding:'utf8',timeout:5000});assert.equal(result.error,undefined,result.error?.message);assert.equal(result.status,0,result.stderr);
  const reference=JSON.parse(result.stdout);assert.equal(readScopedMandate(f.plan,reference).mandate.binding.workRoot,f.options.workRoot);
 });
+
+test('unconfirmed imported backend scope cannot dispatch, while an already-ready backend needs no preparation job',t=>{
+ const f=fixture(t,{count:1}),file=path.join(f.root,'piece-0/index.yaml'),node=parseYaml(fs.readFileSync(file,'utf8'));
+ f.put(file,{...node,kind:'implementation',state:'uninvestigate',description:'Synthetic imported implementation observation; target is not confirmed'});
+ const reference=f.register(),run=f.approve(reference);assert.throws(()=>f.issue(run),/investigated/);assert.equal(Object.keys(run.requests).length,0);
+ const ready=fixture(t,{count:1}),readyFile=path.join(ready.root,'piece-0/index.yaml');ready.put(readyFile,{...parseYaml(fs.readFileSync(readyFile,'utf8')),kind:'implementation'});const ref=ready.register(),issued=ready.issue(ready.approve(ref));assert.equal(issued.run.status,'running');assert.equal(ready.plan.workflows.length,1);assert.equal(fs.existsSync(path.join(ready.root,'scope/setup/index.yaml')),false);
+});
+
+test('bounded prepare confirms child scope todo but completes only setup before backend dispatch',t=>{
+ const f=fixture(t),setupFile=path.join(f.root,'scope/setup/index.yaml'),backendFile=path.join(f.root,'piece-1/index.yaml');
+ f.put(setupFile,{schema:'work/node@2',id:'setup',kind:'business',required:true,state:'todo',description:'Synthetic bounded review of imported backend scope only',assertions:['scope-reviewed']});
+ const imported=parseYaml(fs.readFileSync(backendFile,'utf8'));f.put(backendFile,{...imported,kind:'implementation',state:'uninvestigate',description:'Synthetic unconfirmed legacy implementation mapping'});
+ const job=f.plan.workflows[0];job.workflow='prepare-work';job.selection.codeChange=false;job.workTargets=['setup'];job.criteria=['scope-reviewed'];job.paths=['repo:.starciwork/scope/setup/index.yaml','repo:.starciwork/piece-1/index.yaml'];job.purpose='Confirm only the selected imported backend scope';job.output='Reviewed setup and incomplete confirmed backend target';
+ f.options.jobs[0].resourceEffects=[{target:'test:0',operation:'revise-selected-incomplete-scope',postcondition:'Setup review is separate; backend is confirmed todo without completion',category:'work-record'}];
+ f.plan.backend.targets=['piece-1'];f.plan.backend.workflowIds=['job-1'];
+ const reference=f.register(),goal=f.goal();goal.cells[0].op='workspace.manage';goal.cells[0].operation='prepare';goal.cells[0].outputSchema={type:'object',properties:{workRef:{type:'string'}},required:['workRef'],additionalProperties:false};goal.inputs.scopeRevision={completionTarget:'setup',incompleteWriteTarget:'piece-1',acceptedPurpose:'Synthetic module-local backend outcome, not the imported legacy assumption'};goal.cells[0].inputs.scopeRevision={from:'request',key:'scopeRevision'};
+ goal.impacts=[setupFile,backendFile].map(file=>({repository:'repo',service:'Synthetic scope review',path:path.relative(f.dir,file).replaceAll('\\','/'),status:'existing',startLine:1,endLine:1,sourceHash:sha256(fs.readFileSync(file)),anchor:'schema: work/node@2',change:'Only declared scope-review or incomplete-target metadata',businessReason:'Confirm current requested scope without claiming implementation'}));
+ let preparation=f.shown(reference,0,goal);preparation=authorizeDelegatedGoal(preparation,{reference,assessment:f.assessment(preparation,'goal'),source:f.review});
+ const issued=requestCell(preparation,'prepare-work',{coordinatorThreadId:'coordinator',taskThreadId:'worker',assessment:f.assessment(preparation,'prepare-work')});assert.deepEqual(issued.request.workBindings,[]);
+ f.put(backendFile,{...imported,kind:'implementation',state:'todo',description:goal.inputs.scopeRevision.acceptedPurpose});
+ const r=issued.request;preparation=acceptCell(issued.run,{cell:r.cell,op:r.op,operation:r.operation,goalDigest:r.goalDigest,scopeDigest:r.scopeDigest,requestDigest:workflowDigest(r),status:'pass',criteria:[{id:'scope-reviewed',status:'pass',observation:'Synthetic expected scope and unchanged ownership reviewed; backend remains incomplete',evidence:['log']}],outputs:{workRef:'scope/setup/index.yaml'},artifacts:[{id:'log',path:'proof-0.log',sha256:sha256(fs.readFileSync(path.join(f.dir,'proof-0.log')))}]},{evidenceRoot:f.dir});preparation=f.accept(preparation);
+ const setup=validateWorkspace(f.root).nodes.find(n=>n.id==='setup');f.put(path.join(f.root,'scope/setup/evidence/review/manifest.yaml'),{schema:'work/evidence@1',id:'setup-proof',nodeId:'setup',inputDigest:setup.inputDigest,outcome:'pass',assertions:[{id:'scope-reviewed',outcome:'pass',observation:'Synthetic scope review only; no code or E2E acceptance'}],assets:[]});
+ const completion={inputDigest:setup.inputDigest,evidence:['setup-proof']};assert.throws(()=>markWorkDone(preparation,{setup:completion,'piece-1':completion}),/other Work nodes/);preparation=markWorkDone(preparation,{setup:completion});
+ const checked=validateWorkspace(f.root),backend=checked.nodes.find(n=>n.id==='piece-1');assert.equal(checked.ok,true);assert.equal(checked.nodes.find(n=>n.id==='setup').effectiveState,'done');assert.equal(backend.state,'todo');assert.equal(backend.effectiveState,'todo');assert.equal(backend.completion,null);assert.equal(backend.eligible,true);
+ const priorRuns={'job-0':preparation},backendRun=f.approve(reference,1,priorRuns);assert.equal(f.issue(backendRun,priorRuns).run.status,'running');assert.equal(validateWorkspace(f.root).nodes.find(n=>n.id==='piece-1').effectiveState,'todo');
+});
