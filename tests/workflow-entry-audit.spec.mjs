@@ -66,9 +66,9 @@ test('deploy does not imply publish and standalone verification does not imply i
   assert.deepEqual(selectJobPlan(catalog,{actions:[classify('publish-code'),classify('deploy-release')]}).jobs.map(x=>x.id),['publish-code','deploy-release']);
 });
 
-test('frontend-only reuses an actually accepted backend run and rejects forged or partial proof',()=>{
+test('frontend-only rejects receipt-shaped backend claims without the real frozen producer lifecycle',()=>{
   const accepted=acceptedBackendRun();
-  assert.deepEqual(selectJobPlan(catalog,{actions:[classify('implement-frontend',true,true)],acceptedBackendRun:accepted}).jobs.map(x=>x.id),['implement-frontend']);
+  assert.throws(()=>selectJobPlan(catalog,{actions:[classify('implement-frontend',true,true)],acceptedBackendRun:accepted}));
   assert.throws(()=>selectJobPlan(catalog,{actions:[classify('implement-frontend',true,true)],acceptedBackendEvidence:{workflow:'implement-backend',resultDigest:'a'.repeat(64),unit:true,backendE2E:true,apiContract:'forged'}}));
   for(const mutate of [r=>r.status='running',r=>r.resultDigest='a'.repeat(64),r=>r.approvals=[],r=>r.responses.backend.criteria[0].status='fail',r=>r.responses.backend.outputs.apiContract='']){const bad=structuredClone(accepted);mutate(bad);assert.throws(()=>selectJobPlan(catalog,{actions:[classify('implement-frontend',true,true)],acceptedBackendRun:bad}));}
 });

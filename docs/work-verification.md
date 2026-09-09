@@ -129,3 +129,37 @@ authored upstream change does not renew a stale unselected consumer's acceptance
 Completing upstream repair never completes those downstream nodes automatically.
 These hashes protect declared scope and change detection, not human truth or
 OS-level prevention of writes outside the declared scope.
+
+## Backend handoff: current producer proof, not an accepted label
+
+An API-dependent frontend consumer must receive the real backend lifecycle run.
+Manual user approval, explicit auto delegation and scoped coordinator approval
+use the same authority-independent producer verification: frozen goal/Plan and
+bindings; every dispatched cell and consumed input; closed typed outputs;
+distinct passing criteria including unit and backend E2E; actual unchanged
+artifact bytes; current Work inputs and required dependency/reference review.
+API conformance needs its own passing `api-contract-pass` criterion; a nonempty
+API description is not that check. API-dependent frontend jobs recheck the same
+backend producer before every cell effect, when accepting cells/results, at
+completion and during later reuse—not just when presenting the frontend goal.
+Each mode then checks its own approval records. A malformed auto or coordinator
+record cannot fall back to a user-shaped receipt. Do not repair old history by
+inventing approvals, hashes or missing requests.
+
+An accepted result may precede marking its selected leaf done. A run claiming
+`done` additionally needs current effective completion for those exact leaves:
+removed completion, stale manifests or reopened required design inputs block
+handoff even when their semantic content hash did not change. Unrelated
+recoverable stale review remains visible without invalidating a current scoped
+producer; structural Work errors still block. This does not compare an old
+pre-edit source anchor with its expected newly implemented bytes.
+An aggregate prerequisite needs its required children current, not every
+optional future branch. An optional leaf explicitly consumed by a dependency
+or reference still needs current review. Optional content stays hash-bound;
+this readiness distinction never removes it from semantic change detection.
+
+Historical runs remain loadable for inspection. Loading is not validation for
+reuse. Revoking/closing a mandate or expiring an auto budget stops new effects;
+it does not retroactively falsify a previously accepted result whose proof is
+still current. The consumer needs its own current execution authority. Local
+receipt consistency is auditable provenance, not authenticated human identity.

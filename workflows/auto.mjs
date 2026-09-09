@@ -4,7 +4,8 @@ import {fileURLToPath} from 'node:url';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
 import {validatePlan} from './plan.mjs';
 import {hasDelegatedAcceptance} from './delegation.mjs';
-import {verifyRunWork,scopedWorkStatus} from './work-binding.mjs';
+import {scopedWorkStatus} from './work-binding.mjs';
+import {verifyProducerCells,verifyProducerResult,hasDirectProducerAcceptance} from './producer-verification.mjs';
 const digest=x=>sha256(canonicalJSON(x));
 const text=x=>typeof x==='string'&&x.trim().length>0;
 const requireThat=(ok,message)=>{if(!ok)throw Error(message);};
@@ -110,24 +111,12 @@ export function assertAutoGoal(run,{active=true}={}) {
 }
 export function hasAutoAcceptance(run) {
  try {
-  assertAutoGoal(run,{active:false});
+  assertAutoGoal(run,{active:false});verifyProducerResult(run);
   return run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses})&&run.approvals.some(a=>a.actor==='assistant'&&a.phase==='delegated-acceptance'&&a.digest===run.resultDigest&&a.authorizationDigest===digest(run.automatic.authorization)&&a.approved===true);
  } catch {return false;}
 }
 export function verifyAutoEvidence(run) {
- requireThat(Object.keys(run.responses).length===run.goal.cells.length,'Incomplete auto result');
- verifyRunWork(run);
- for(const cell of run.goal.cells) {
-  const request=run.requests[cell.id],response=run.responses[cell.id];
-  requireThat(request&&response?.status==='pass'&&response.requestDigest===digest(request)&&response.goalDigest===run.goalDigest&&response.scopeDigest===run.scopeDigest&&response.op===request.op&&response.operation===request.operation,'Auto response no longer matches its request');
-  requireThat(cell.criteria.every(id=>response.criteria.some(c=>c.id===id&&c.status==='pass'&&text(c.observation)&&c.evidence?.length&&c.evidence.every(e=>response.artifacts.some(a=>a.id===e)))),'Missing auto criterion proof');
-  requireThat(response.artifacts?.length&&text(run.evidenceRoots?.[cell.id]),'Missing bound auto evidence root');
-  const base=fs.realpathSync(run.evidenceRoots[cell.id]);
-  for(const artifact of response.artifacts) {
-   const file=path.resolve(base,artifact.path);
-   requireThat(inside(base,file)&&fs.existsSync(file)&&inside(base,fs.realpathSync(file))&&sha256(fs.readFileSync(file))===artifact.sha256,'Auto evidence is missing, stale or escapes its root');
-  }
- }
+ return verifyProducerCells(run);
 }
 export function verifyAutoPredecessors(run,priorRuns,{throughEnd=false}={}) {
  const plan=run.presentation.scope,index=throughEnd?plan.workflows.length:plan.workflows.findIndex(j=>j.id===run.presentation.jobId);
@@ -137,10 +126,11 @@ export function verifyAutoPredecessors(run,priorRuns,{throughEnd=false}={}) {
   requireThat(prior?.status==='done'&&prior.presentation?.scopeDigest===run.presentation.scopeDigest&&digest(prior.presentation.scope)===run.presentation.scopeDigest&&prior.presentation?.jobId===job.id&&prior.goal.workflow===job.workflow&&prior.workRoot===run.workRoot&&digest(prior.repositories)===digest(run.repositories),'Previous Plan workflow is not completed in the same binding');
   requireThat(prior.goalDigest===digest({goal:prior.goal,workRoot:prior.workRoot,repositories:prior.repositories})&&prior.resultDigest===digest({goalDigest:prior.goalDigest,responses:prior.responses}),'Previous workflow proof changed');
   requireThat(!prior.delegated||hasDelegatedAcceptance(prior),'Invalid scoped predecessor acceptance cannot use a user-shaped fallback');
-  requireThat(hasAutoAcceptance(prior)||hasDelegatedAcceptance(prior)||prior.approvals.some(a=>a.actor==='user'&&a.phase==='acceptance'&&a.approved===true&&a.digest===prior.resultDigest&&text(a.messageId)),'Previous workflow lacks acceptance');
+  verifyProducerResult(prior);
+  requireThat(prior.delegated?hasDelegatedAcceptance(prior):prior.automatic?hasAutoAcceptance(prior):hasDirectProducerAcceptance(prior),'Previous workflow lacks acceptance');
   verifyAutoEvidence(prior);
   const work=validateWorkspace(prior.workRoot);
-  requireThat(scopedWorkStatus(work,prior.goal.workTargets,{done:true,authored:prior.goal.cells.some(c=>c.workPolicy)}).ok,'Previous Work proof is no longer current');
+  requireThat(scopedWorkStatus(work,prior.goal.workTargets,{done:true,authored:prior.goal.cells.some(c=>c.workPolicy),requiredChildrenOnly:prior.goal.workflow==='implement-backend'}).ok,'Previous Work proof is no longer current');
  }
 }
 export function nextAutoJob(plan,{authorization,runs={}}) {

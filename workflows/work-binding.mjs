@@ -37,9 +37,9 @@ function authored(run,cell){
 function invariant(work,cell){return {nodes:work.authoredBinding,assets:work.authoredAssets.map(item=>({id:item.id,assets:item.assets.filter(asset=>!(cell.workPolicy.assetWrites??[]).some(a=>a.nodeId===item.id&&a.path===asset.path))}))};}
 
 /** Scoped truth, not a replacement for the global validator verdict. */
-export function scopedWorkStatus(work,ids,{done=false,authored=false}={}){
+export function scopedWorkStatus(work,ids,{done=false,authored=false,requiredChildrenOnly=false}={}){
  const selected=new Set(ids),necessary=new Set(),byId=new Map(work.nodes.map(n=>[n.id,n])),external=new Set();
- function visit(id,upstream=false){const n=byId.get(id);if(!n)return; if(upstream&&!selected.has(id))external.add(id);if(necessary.has(id))return;necessary.add(id);for(const input of [...n.dependsOn,...n.refs])visit(input,true);if(upstream)for(const child of n.children)visit(child,true);}
+ function visit(id,upstream=false){const n=byId.get(id);if(!n)return; if(upstream&&!selected.has(id))external.add(id);if(necessary.has(id))return;necessary.add(id);for(const input of [...n.dependsOn,...n.refs])visit(input,true);if(upstream)for(const child of n.children)if(!requiredChildrenOnly||byId.get(child)?.required!==false)visit(child,true);}
  ids.forEach(id=>visit(id));
  const scopeNodes=[...necessary].map(id=>byId.get(id));
  const belongs=e=>scopeNodes.some(n=>e.path===n.path||e.path.startsWith(path.posix.dirname(n.path)+'/evidence/'));

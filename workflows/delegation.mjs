@@ -4,9 +4,8 @@ import {fileURLToPath} from 'node:url';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {validatePlan} from './plan.mjs';
-import {verifyAutoEvidence,verifyAutoPredecessors} from './auto.mjs';
-import {typed} from './typed.mjs';
-import {verifyWorkResult} from './work-binding.mjs';
+import {verifyAutoPredecessors} from './auto.mjs';
+import {verifyProducerResult,hasDirectProducerAcceptance} from './producer-verification.mjs';
 
 const hash=x=>sha256(canonicalJSON(x));
 const same=(a,b)=>hash(a)===hash(b);
@@ -117,39 +116,16 @@ export function assertDelegatedDispatch(run,{coordinatorThreadId,taskThreadId,as
  verifyAutoPredecessors(run,priorRuns);
  if(Object.keys(run.responses).length)verifyPartialResults(run);
 }
-function verifyPartialResults(run) {
- const work=validateWorkspace(run.workRoot);
- requireThat(work.errors.every(e=>['STALE_COMPLETION','STALE_EVIDENCE','DEPENDENCY_NOT_DONE'].includes(e.code)),'Current producer Work graph is invalid');
- const completedInRun=new Set(Object.keys(run.responses).flatMap(id=>run.goal.cells.find(c=>c.id===id)?.workTargets??[]));
- for(const [id,response]of Object.entries(run.responses)) {
-  const cell=run.goal.cells.find(c=>c.id===id),request=run.requests[id];
-  requireThat(cell&&request&&request.cell===id&&request.goalDigest===run.goalDigest&&request.scopeDigest===run.scopeDigest&&request.op===cell.op&&request.operation===(cell.operation??null)&&same(request.criteria,cell.criteria)&&same(request.outputSchema,cell.outputSchema),'Accepted producer no longer matches the goal cell');
-  const current=run.goal.workflow==='prepare-work'?[]:(cell.workTargets??run.goal.workTargets).map(id=>{const n=work.nodes.find(n=>n.id===id);requireThat(n,'Producer Work target is missing');requireThat(n.blockedBy.every(id=>run.status!=='done'&&completedInRun.has(id)),'Producer prerequisite is no longer effectively done');if(run.status==='done')requireThat(n.effectiveState==='done','Completed producer Work proof is no longer valid');return {id:n.id,inputDigest:n.inputDigest,contextDigest:n.contextDigest};});
-  verifyWorkResult(run,cell,response);
-  const inputs={};for(const [key,binding]of Object.entries(cell.inputs)){const producer=binding.from==='request'?run.goal.inputs:run.responses[binding.cell]?.outputs;requireThat(producer&&Object.hasOwn(producer,binding.key),'Accepted producer input is missing');inputs[key]=producer[binding.key];}
-  requireThat(same(inputs,request.inputs)&&typed(response.outputs,cell.outputSchema)&&Array.isArray(response.criteria)&&response.criteria.length===cell.criteria.length&&new Set(response.criteria.map(c=>c.id)).size===cell.criteria.length,'Typed result, exact criteria or producer inputs changed');
-  verifyAutoEvidence({...run,goal:{...run.goal,cells:[cell]},responses:{[id]:response}});
- }
-}
-export function verifyDelegatedResult(run) {
- requireThat(Object.keys(run.responses).length===run.goal.cells.length&&run.resultDigest===hash({goalDigest:run.goalDigest,responses:run.responses}),'Incomplete or changed delegated result');
- verifyPartialResults(run);
-}
+function verifyPartialResults(run) {return verifyProducerResult(run,{partial:true});}
+export function verifyDelegatedResult(run) {return verifyProducerResult(run);}
 export function hasDelegatedAcceptance(run) {
  try{const {mandate}=assertDelegatedGoal(run,{active:false});verifyDelegatedResult(run);return run.approvals.some(a=>{if(a?.actor!=='assistant'||a.phase!=='scoped-acceptance'||a.approved!==true||a.digest!==run.resultDigest||a.mandateDigest!==run.delegated.reference.digest)return false;validateDelegationSource(a.source,'assistant');return a.source.threadId===mandate.coordinatorThreadId&&riskShape(a.assessment,'acceptance',mandate.jobs.find(j=>j.id===run.presentation.jobId).environment)&&a.assessmentDigest===hash(a.assessment);});}catch{return false;}
-}
-function hasDirectAcceptance(run) {
- try {
-  if(run.automatic||run.delegated||run.presentation?.provenance||!text(run.presentation?.messageId))return false;
-  verifyDelegatedResult(run);
-  return run.approvals.some(a=>a?.actor==='user'&&a.phase==='goal'&&a.approved===true&&a.digest===run.goalDigest&&text(a.messageId)&&text(a.quote)&&a.messageId!==run.goal.requestId&&a.messageId!==run.presentation.messageId&&a.quote!==run.goal.originalRequest&&a.replyTo===run.presentation.messageId)&&run.approvals.some(a=>a?.actor==='user'&&a.phase==='acceptance'&&a.approved===true&&a.digest===run.resultDigest&&text(a.messageId)&&text(a.quote));
- }catch{return false;}
 }
 export function completeDelegatedPlan(plan,{reference,runs,criteria,source}) {
  const state=readScopedMandate(plan,reference);validateDelegationSource(source,'assistant');requireThat(source.threadId===state.mandate.coordinatorThreadId,'Only the designated coordinator reviews terminal completion');
  const binding=state.mandate.binding;
  verifyAutoPredecessors({presentation:{scope:plan,scopeDigest:state.mandate.planDigest},workRoot:binding.workRoot,repositories:binding.repositories},runs,{throughEnd:true});
- requireThat(plan.workflows.every(j=>{const r=runs[j.id];return r?.delegated?r.delegated.reference.digest===reference.digest&&hasDelegatedAcceptance(r):r&&hasDirectAcceptance(r); }),'Every workflow needs this mandate or unchanged direct-user acceptance; foreign delegation is not inherited');
+ requireThat(plan.workflows.every(j=>{const r=runs[j.id];return r?.delegated?r.delegated.reference.digest===reference.digest&&hasDelegatedAcceptance(r):r&&hasDirectProducerAcceptance(r); }),'Every workflow needs this mandate or unchanged direct-user acceptance; foreign delegation is not inherited');
  requireThat(Array.isArray(criteria)&&criteria.length===plan.completionCriteria.length&&new Set(criteria.map(c=>c?.id)).size===criteria.length,'Review every terminal criterion once');
  for(const expected of plan.completionCriteria){const actual=criteria.find(c=>c.id===expected.id);requireThat(actual?.status==='pass'&&text(actual.observation)&&Array.isArray(actual.evidence)&&expected.workflowIds.every(id=>actual.evidence.some(e=>e.jobId===id)),'Terminal criterion lacks producer proof');for(const ref of actual.evidence){const proof=runs[ref.jobId]?.responses[ref.cellId]?.criteria.find(c=>c.id===ref.criterionId);requireThat(expected.workflowIds.includes(ref.jobId)&&proof?.status==='pass'&&proof.evidence.length,'Invalid terminal producer');}}
  return {schema:'starci/scoped-completion@1',actor:'assistant',status:'done',planDigest:state.mandate.planDigest,mandateDigest:reference.digest,resultDigests:Object.fromEntries(plan.workflows.map(j=>[j.id,runs[j.id].resultDigest])),criteria:structuredClone(criteria),source};
