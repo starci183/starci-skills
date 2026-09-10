@@ -23,3 +23,32 @@ At exit, review actual outputs against every criterion, check completion can be
 recorded, then return usable results in the task. Distinguish unfinished scope from
 failed checks. Record meaningful workflow friction and its cause for later runtime
 improvement; do not count paperwork milestones as product delivery.
+
+## Coordinator owns decisions, executor owns delivery
+
+A delegated coordinator manages the complete Plans, their dependencies and exclusive
+shared ownership. At entry, approve or reject the concrete goal against current
+SRS/SDS, prerequisites, scope and risk. If rejected, return the specific unmet
+condition, not a replacement implementation. At exit, compare expected and actual
+outcomes, inspect the evidence needed to establish each claim, accept or return
+the complete result, then release eligible dependent workflows. Acceptance is not
+merely repeating the executor's pass count.
+
+Between these boundaries, the executor owns code, tests, diagnosis and in-scope
+repairs. Progress checks use task-level state or the agreed handoff, not recurring
+source diffs, per-file log inspection or duplicate test runs. Use the available
+completion wait with its cursor; unchanged state produces no user-facing report,
+new task, reminder message or restart. A wait timeout is not an execution failure.
+Intervene only for a reported blocker, a real cross-task conflict, changed authority
+or a concrete safety issue. Investigate that issue without taking over unrelated
+work. A separate implementation role requires explicit ownership and scope; it is
+not implied by being coordinator. In solo execution, keep the same entry/exit
+boundaries without inventing a second task or repeated self-approval checkpoints.
+
+If a workflow does not make sense in actual use, distinguish a product defect, an
+executor deviation and a runtime defect. Record the expected/actual mismatch and
+its impact once. Under explicit runtime-maintenance authority, repair the smallest
+relevant rule or mechanism and verify it with a representative regression scenario;
+otherwise return a proposed correction. Do not alter active requests, weaken
+acceptance or rewrite prior receipts to make a result pass. Adopt changed runtime
+guidance at a safe workflow boundary unless the defect prevents safe execution.

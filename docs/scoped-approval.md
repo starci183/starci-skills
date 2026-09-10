@@ -4,6 +4,13 @@ Use this only when the actual user explicitly delegates technical approval to a 
 
 The mandate and the decision are different facts: the user grants a role; the coordinator later reviews a concrete Plan, goal or result. Record the latter as `actor: assistant`. Do not fabricate `actor: user` approvals, infer an auto budget, change execution mode or install a scheduler.
 
+The coordinator owns Plan sequencing, goal approve/reject decisions, dependency and
+ownership conflicts, task-level progress and expected-versus-actual acceptance.
+The executor owns implementation and its internal repair loop. Follow
+[the coordinator boundary](workflow-delivery-boundary.md#coordinator-owns-decisions-executor-owns-delivery)
+for quiet waits, exception handling and authorized runtime improvement. The APIs
+below record boundary decisions; they do not require supervision of every command.
+
 ## Honest conversation provenance
 
 User grant, coordinator review and actual task presentation use this shape:
