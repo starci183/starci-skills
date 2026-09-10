@@ -38,11 +38,12 @@ sections:
   verification:
     type: verification
     schema: starci/sds-verification@1
-    required: [id, title, businessAcceptanceRefs, scopeRefs, level, setup, steps, expected, securityChecks, performanceChecks, failureChecks, evidence]
+    required: [id, title, businessAcceptanceRefs, scopeRefs, level, setup, steps, expected, securityChecks, performanceChecks, failureChecks]
 rules:
   - Architecture overview is one structured starci/sds-overview@1 payload at architecture/overview/index.yaml. It summarizes accepted SRS scope, context and independently selected target-design dispositions; prose alone cannot complete it.
   - Inspect only relevant current source, configuration and installed APIs to establish feasibility and migration impact. Record retain, extend, correct, replace or add decisions with rationale; observations never override SRS or become implementation proof.
   - SDS is a source-of-truth design contract derived from SRS and design decisions, never from current source code. Source observations, revisions and implementation proof are forbidden.
+  - SDS verification nodes specify scenarios and expected results only. Evidence fields and executed proof belong to excluded local run state, never SDS.
   - Flow is the primary route. Every main, alternative and exception sequence references exact code units and ends in an observable application or receiver result.
   - Code units prescribe repository role, target path and symbols as the design source of truth. Implementation owns actual code and revision proof.
   - Contracts state direction, sync or async mode, request, response, errors, authorization, timeout, retry, idempotency and compatibility.

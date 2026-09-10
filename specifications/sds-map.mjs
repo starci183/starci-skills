@@ -65,7 +65,10 @@ function local(payload,type){
  }
  if(type==='deployment')if(!text(payload.topology)||!Array.isArray(payload.placements)||!payload.placements.length||!Array.isArray(payload.connections)||!object(payload.configuration)||!object(payload.credentials)||!text(payload.scaling)||!texts(payload.failureDomains)||!text(payload.rollout)||!text(payload.rollback)||!object(payload.recovery))fail('Deployment needs topology, placement, connections, config/credential custody, scaling, failure domains, rollout, rollback and recovery.');
  if(type==='decision')if(!text(payload.problem)||!Array.isArray(payload.options)||payload.options.length<2||!text(payload.decision)||!['proposed','accepted','deferred','rejected'].includes(payload.status)||!text(payload.rationale)||!texts(payload.tradeoffs)||!texts(payload.affectedRefs)||!text(payload.revisitWhen))fail('Design decision needs alternatives, status, rationale, tradeoffs, affected refs and revisit condition.');
- if(type==='verification')if(!texts(payload.businessAcceptanceRefs)||!texts(payload.scopeRefs)||!text(payload.level)||!texts(payload.setup)||!texts(payload.steps)||!texts(payload.expected)||!texts(payload.securityChecks,{empty:true})||!texts(payload.performanceChecks,{empty:true})||!texts(payload.failureChecks,{empty:true})||!text(payload.evidence))fail('Verification design needs Business acceptance, scope, setup, steps, expected results, quality checks and evidence plan.');
+ if(type==='verification'){
+  if(Object.hasOwn(payload,'evidence')||Object.hasOwn(payload,'executionEvidence'))fail('SDS is source of truth; evidence fields belong to local verification state.');
+  if(!texts(payload.businessAcceptanceRefs)||!texts(payload.scopeRefs)||!text(payload.level)||!texts(payload.setup)||!texts(payload.steps)||!texts(payload.expected)||!texts(payload.securityChecks,{empty:true})||!texts(payload.performanceChecks,{empty:true})||!texts(payload.failureChecks,{empty:true}))fail('Verification design needs Business acceptance, scope, setup, steps, expected results and quality checks.');
+ }
  return errors;
 }
 

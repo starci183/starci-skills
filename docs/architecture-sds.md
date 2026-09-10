@@ -111,7 +111,7 @@ Do not invent business SLAs or retention. Keep unresolved targets linked to thei
 
 Deployment maps code units and stores to the selected monolith or microservice topology, connections, configuration and credential custody, scaling, failure domains, rollout, rollback and recovery. Decisions compare at least one viable alternative and record status, rationale, tradeoffs, affected refs and revisit conditions.
 
-Verification records the planned unit, integration, backend E2E, frontend or UAT scenario. It links Business acceptance to SDS scope and defines setup, actions, expected result, security/performance/failure checks and required evidence. A plan is not executed proof; Implementation and UAT attach current observations later.
+Verification records the planned unit, integration, backend E2E, frontend or UAT scenario. It links Business acceptance to SDS scope and defines setup, actions, expected result, and security/performance/failure checks. SDS never asks for or stores evidence; executed proof remains in excluded local run state.
 
 ## Chatbot code-path example
 

@@ -58,7 +58,8 @@ function localValidation(payload,type){
   if(!object(payload.postconditions)||!texts(payload.postconditions.success)||!texts(payload.postconditions.failure))fail('FR needs success and failure postconditions.');
  }
  if(type==='non-functional-requirement'){
-  if(!texts(payload.scope)||!text(payload.requirement)||!object(payload.measurement)||!text(payload.measurement.metric)||!text(payload.measurement.conditions)||!text(payload.measurement.evidenceRequired))fail('NFR needs scope, requirement and a measurable evidence contract.');
+  if(!texts(payload.scope)||!text(payload.requirement)||!object(payload.measurement)||!text(payload.measurement.metric)||!text(payload.measurement.conditions))fail('NFR needs scope, requirement and measurable conditions.');
+  if(object(payload.measurement)&&Object.hasOwn(payload.measurement,'evidenceRequired'))fail('NFR is source of truth; measurement.evidenceRequired belongs to local verification, not SRS.');
   if(!texts(payload.decisionRefs,{empty:true}))fail('NFR decisionRefs must be a unique text array.');gwt(payload.acceptanceCriteria,'NFR');
  }
  if(type==='business-rule'){
@@ -76,7 +77,10 @@ function localValidation(payload,type){
   for(let index=0;index<stages.length;index++){const stage=stages[index];if(!text(stage.actorAction)||!text(stage.requirementRef)||!text(stage.flowRef)||!texts(stage.acceptanceRefs)||!text(stage.outcome)||stage.nextStep!==(ids[index+1]??null))fail(`${stage?.id??'Journey stage'} is incomplete or breaks sequence.`);}
   for(const branch of payload.branches??[])if(!text(branch.id)||!texts(branch.atStageRefs)||!text(branch.requirementRef)||!text(branch.flowRef)||!text(branch.condition)||!text(branch.handling)||!texts(branch.acceptanceRefs)||!texts(branch.outcome))fail(`${branch?.id??'Journey branch'} is incomplete.`);gwt(payload.acceptanceCriteria,'Journey');
  }
- if(type==='policy-decision')if(!text(payload.accountableRole)||!text(payload.question)||!texts(payload.requiredDecisions)||!text(payload.safeDisposition)||!text(payload.closureEvidence)||!['open','accepted','deferred','rejected'].includes(payload.decisionStatus))fail('Policy decision needs status, accountable role, question, required decisions, safe disposition and closure evidence.');
+ if(type==='policy-decision'){
+  if(Object.hasOwn(payload,'closureEvidence'))fail('Policy decisions use closureCriteria; evidence fields do not belong in SRS.');
+  if(!text(payload.accountableRole)||!text(payload.question)||!texts(payload.requiredDecisions)||!text(payload.safeDisposition)||!text(payload.closureCriteria)||!['open','accepted','deferred','rejected'].includes(payload.decisionStatus))fail('Policy decision needs status, accountable role, question, required decisions, safe disposition and closure criteria.');
+ }
  return errors;
 }
 

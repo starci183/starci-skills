@@ -64,7 +64,7 @@ sections:
       - question
       - requiredDecisions
       - safeDisposition
-      - closureEvidence
+      - closureCriteria
   data:
     type: data-definition
     schema: starci/srs-data-definition@1
@@ -94,6 +94,7 @@ sections:
       - acceptanceCriteria
 rules:
   - SRS is a source-of-truth product contract derived from accepted intent and authority, never from source code. Code paths, symbols, revisions and implementation proof are forbidden.
+  - SRS defines acceptance and decision-closure criteria, never evidence requirements or executed-proof fields. Runtime proof belongs only to excluded local run state.
   - Product briefs, stakeholder decisions, policy and research may be cited as authorityRefs; this is distinct from implementation sourceRefs.
   - Functional main, alternative and exception flows stay inside their owning functional-requirement index.yaml.
   - NFRs, rules, data definitions and journeys are independent addressable leaves, never copied into every FR.
