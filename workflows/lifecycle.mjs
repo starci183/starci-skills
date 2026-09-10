@@ -10,6 +10,7 @@ import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import { readDistJson } from '../core/runtime-root.mjs';
 import {fileURLToPath} from 'node:url';
 import {validBackendRun} from './select.mjs';
+import {assertSourceLayout} from './source-layout.mjs';
 import {typed} from './typed.mjs';
 import {verifyProducerResult,verifyRequiredProducerInputs,hasDirectProducerAcceptance} from './producer-verification.mjs';
 import {validateWorkPolicy,requestWorkPolicy,sealWorkResult,verifyRunWork,scopedWorkStatus,inRunWorkReady} from './work-binding.mjs';
@@ -30,6 +31,7 @@ export function workStatus(root){
  const recoverable=new Set(['STALE_COMPLETION','STALE_EVIDENCE','DEPENDENCY_NOT_DONE']);const checked=validateWorkspace(root),fatal=checked.errors.filter(e=>!recoverable.has(e.code));requireThat(fatal.length===0,'Existing Work is invalid; inspect it without overwriting');return {status:checked.ok?'ready':'stale'};
 }
 export function validateGoal(goal,{repositories={}}={}){
+ if(Object.hasOwn(repositories,'be')||Object.hasOwn(repositories,'fe'))assertSourceLayout({be:repositories.be,fe:repositories.fe,workRoot:repositories.be?path.join(path.resolve(repositories.be),'.starciwork'):undefined});
  requireThat(goal?.schema==='starci/goal@1'&&text(goal.id)&&text(goal.originalRequest)&&text(goal.requestId)&&text(goal.finalOutcome),'Concrete original request and final goal are required');
  requireThat(catalog.workflows.some(w=>w.id===goal.workflow),'Unknown workflow');
  if(goal.workflow==='implement-frontend'){requireThat(typeof goal.inputs?.requiresBackend==='boolean','Freeze whether this frontend job depends on a backend API');if(goal.inputs.requiresBackend)requireThat(validBackendRun(goal.inputs.acceptedBackendRun),'API-dependent frontend work requires an accepted backend lifecycle run with unit, backend E2E and API evidence');}

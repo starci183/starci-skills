@@ -1,0 +1,94 @@
+schema: starci/source-layout@1
+purpose: Enforce one current StarCi host in backend, one backend-owned product workspace, and a clean frontend source without duplicate project state.
+roles:
+  be:
+    required:
+      - path: .git
+        type: git-marker
+      - path: AGENTS.md
+        type: file
+      - path: CLAUDE.md
+        type: file
+      - path: .claude/SKILL.md
+        type: file
+      - path: .stacks
+        type: directory
+      - path: .starciwork/workspace.yaml
+        type: file
+      - path: .starciwork/features/index.yaml
+        type: file
+      - path: .workspaces
+        type: directory
+      - path: package.json
+        type: json-file
+      - path: pnpm-workspace.yaml
+        type: file
+      - path: tsconfig.json
+        type: file
+      - path: src
+        type: directory
+    requiredAny:
+      - id: backend-source-roots
+        paths:
+          - apps
+          - features
+          - packages
+          - src
+        minimum: 1
+    forbidden:
+      - .claude-v3
+      - .claude_legacy
+      - .claude-vip
+      - .claude-starci-ultimate
+      - .work
+      - .starci
+      - .starcitemp
+    content:
+      - path: AGENTS.md
+        includes: .claude/SKILL.md
+      - path: CLAUDE.md
+        includes: .claude/SKILL.md
+  fe:
+    required:
+      - path: .git
+        type: git-marker
+      - path: AGENTS.md
+        type: file
+      - path: CLAUDE.md
+        type: file
+      - path: package.json
+        type: json-file
+      - path: pnpm-workspace.yaml
+        type: file
+      - path: tsconfig.json
+        type: file
+      - path: src
+        type: directory
+      - path: public
+        type: directory
+    requiredAny:
+      - id: frontend-source-roots
+        paths:
+          - apps
+          - packages
+          - src
+        minimum: 1
+    forbidden:
+      - .claude
+      - .claude-v3
+      - .claude_legacy
+      - .claude-vip
+      - .claude-starci-ultimate
+      - .stacks
+      - .starciwork
+      - .workspaces
+      - .work
+      - .starci
+      - .starcitemp
+    content: []
+pairRules:
+  - Backend and frontend roots are distinct real directories.
+  - Backend owns the only .claude runtime, .stacks and .starciwork for the project.
+  - Frontend keeps framework instructions in AGENTS.md and CLAUDE.md, but no StarCi runtime or product workspace copy.
+  - The bound Work root is exactly <backend>/.starciwork and contains features/index.yaml.
+  - Required path checks do not prove application behavior, build success, source completeness or production readiness.

@@ -1,6 +1,7 @@
 schema: starci/workspace-routing@1
 source: The host directory containing this .claude checkout and sibling .workspaces directory.
 registry: .workspaces/projects/<project>/work.json
+sourceLayoutContract: schemas/source-layout.yaml
 rules:
   - AGENTS.md and CLAUDE.md are host bootstrap files installed from .claude/init. Project setup does
     not create these files or another .claude in routed backend/frontend sources.
@@ -28,6 +29,8 @@ rules:
     mapping; never silently use an illustrative outputs workspace as project Work.
   - Use the resolved backend Work root for schema validation, workflow goals, external local
     workflow records, evidence and completion.
+  - Validate the resolved backend/frontend pair with source-layout before workflow effects. A failed
+    source contract never authorizes creating a second runtime, stack or workspace in frontend.
   - Before new workspace or Plan creation, inspect backend storage with starci storage. Canonical
     names are .starciwork and internal .starciwork/_local; legacy .work/.starci means
     migration-required, mixed names mean conflict. Coordinate migration before new planning, never

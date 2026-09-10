@@ -12,6 +12,7 @@ const help = `StarCi 3.0 — bounded, local operations
 Usage:
   starci workspace init <work-root> --id <workspace-id>
   starci storage <backend-root>
+  starci source-layout <backend-root> <frontend-root>
   starci validate <work-root>
   starci tree <work-root>
   starci impact <work-root> <node-or-resource-id>
@@ -110,6 +111,14 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
     const [command, ...args] = argv;
     if (!command || ['--help', '-h', 'help'].includes(command)) { emit(help); return 0; }
     if(command==='storage'){exactArgs(args,1);const result=inspectStorage(directory(args[0]));emit(result);return result.newWorkAllowed?0:1;}
+    if(command==='source-layout'){
+      exactArgs(args,2);
+      const {validateSourceLayout}=await import('../workflows/source-layout.mjs');
+      const be=path.resolve(args[0]),fe=path.resolve(args[1]);
+      const result=validateSourceLayout({be,fe,workRoot:path.join(be,'.starciwork')});
+      emit(result);
+      return result.ok?0:1;
+    }
     if(command==='plan'){exactArgs(args,1);const plan=parseYaml(fs.readFileSync(args[0],'utf8'));const {propose}=await import('../workflows/lifecycle.mjs');emit(propose(plan.goal,{workRoot:plan.workRoot,repositories:plan.repositories}));return 0;}
     if (command === 'init') {
       if (args.length !== 3 || args[1] !== '--id' || !/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/.test(args[2])) throw new Error('Use starci workspace init <new-work-root> --id <stable-id>.');

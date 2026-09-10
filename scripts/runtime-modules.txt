@@ -34,5 +34,6 @@ workflows/presentation.mjs
 workflows/producer-verification.mjs
 workflows/select.mjs
 workflows/storage.mjs
+workflows/source-layout.mjs
 workflows/typed.mjs
 workflows/work-binding.mjs
