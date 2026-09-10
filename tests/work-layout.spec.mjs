@@ -1,16 +1,15 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';import {sha256,validateWorkspace} from '../core/index.mjs';
-test('cosmetic business debt does not change semantic proof or hide substantive drift',t=>{
+test('a direct business correction invalidates prior semantic proof',t=>{
   const f=fixture(t);f.node('module/business',{schema:'work/node@2'});f.done('module/business');
   const before=validateWorkspace(f.root),id='module.business';
-  f.put('module/business/debt.md','# Debt\n- D1: display heading typo; open; fix after UAT.\n');
-  const after=validateWorkspace(f.root);
-  assert.ok(after.ok,JSON.stringify(after.errors));assert.equal(after.nodes.length,before.nodes.length);
-  assert.equal(after.nodes.find(n=>n.id===id).inputDigest,before.nodes.find(n=>n.id===id).inputDigest);
-  assert.equal(after.nodes.find(n=>n.id===id).effectiveState,'done');
   const file=path.join(f.root,'module/business/index.yaml'),meta=parseYaml(fs.readFileSync(file,'utf8'));
   f.put('module/business/index.yaml',{...meta,description:'Changed substantive requirement'});
-  assert.notEqual(validateWorkspace(f.root).nodes.find(n=>n.id===id).effectiveState,'done');
+  const after=validateWorkspace(f.root);
+  assert.ok(before.ok,JSON.stringify(before.errors));assert.equal(after.ok,false);
+  assert.ok(after.errors.some(error=>error.code==='STALE_COMPLETION'&&error.path==='module/business/index.yaml'));
+  assert.notEqual(after.nodes.find(n=>n.id===id).inputDigest,before.nodes.find(n=>n.id===id).inputDigest);
+  assert.notEqual(after.nodes.find(n=>n.id===id).effectiveState,'done');
 });
 function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-layout-'));t.after(()=>{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(root).startsWith('starci-layout-'));fs.rmSync(root,{recursive:true,force:true});});const put=(p,v)=>{const f=path.join(root,p);fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,typeof v==='string'?v:stringifyYaml(v));};put('workspace.yaml',{schema:'work/workspace@1',id:'synthetic-layout'});const node=(dir,extra={})=>put(dir+'/index.yaml',{schema:'work/node@1',id:dir.replaceAll('/','.'),kind:'business',required:true,state:'todo',description:'Synthetic structural fixture, not product proof.',assertions:['verified'],...extra});const done=dir=>{const result=validateWorkspace(root),n=result.nodes.find(n=>n.id===dir.replaceAll('/','.'));assert.ok(result.ok,JSON.stringify(result.errors));put(dir+'/evidence/unit/manifest.yaml',{schema:'work/evidence@1',id:'proof.'+n.id,nodeId:n.id,inputDigest:n.inputDigest,outcome:'pass',assertions:[{id:'verified',outcome:'pass',observation:'Synthetic assertion from unit fixture'}],assets:[]});const meta=parseYaml(fs.readFileSync(path.join(root,dir,'index.yaml'),'utf8'));put(dir+'/index.yaml',{...meta,state:'done',completion:{inputDigest:n.inputDigest,evidence:['proof.'+n.id]}});};return {root,put,node,done};}
 test('node-owned input image bytes invalidate referenced code but not unrelated done',t=>{const f=fixture(t);f.put('frontend/assets/design.svg','<svg xmlns="http://www.w3.org/2000/svg"/>');f.node('frontend',{assets:[{path:'assets/design.svg'}]});f.node('code',{refs:['frontend']});f.node('other');f.done('code');f.done('other');const before=validateWorkspace(f.root);assert.ok(before.ok);f.put('frontend/assets/design.svg','<svg xmlns="http://www.w3.org/2000/svg"><title>Changed fixture</title></svg>');const after=validateWorkspace(f.root);assert.equal(after.nodes.find(n=>n.id==='code').effectiveState,'suspended');assert.equal(after.nodes.find(n=>n.id==='other').effectiveState,'done');});

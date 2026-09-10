@@ -1,0 +1,5 @@
+schema: work/node@2
+id: module.business.srs
+kind: business
+required: true
+description: Synthetic folder-owned SRS aggregate.

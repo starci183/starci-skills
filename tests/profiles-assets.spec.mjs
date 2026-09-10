@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {selectProfile} from '../profiles/select.mjs';
+import {resolveExecutionChain,selectExecutionTarget,selectProfile} from '../profiles/select.mjs';
+import {readPublicJson} from './helpers/read-public.mjs';
 import {validateAssets} from '../contracts/assets.mjs';
 
-test('V2 active roles select Codex or Claude without reviving retired profiles or granting tools',()=>{
+test('active roles select Codex, Claude or Qwen without reviving retired profiles or granting tools',()=>{
   const codex=selectProfile({runtime:'codex',op:'interface.implement',imageGenerationAvailable:true});
   assert.equal(codex.profile,'sol-fresh');assert.equal(codex.model,null);assert.equal(codex.imageGeneration,true);
   assert.equal(selectProfile({runtime:'openai',op:'business.decide'}).profile,'sol-reviewer');
@@ -11,8 +12,35 @@ test('V2 active roles select Codex or Claude without reviving retired profiles o
   const claude=selectProfile({runtime:'claude',op:'interface.implement',imageGenerationAvailable:true});
   assert.equal(claude.profile,'opus');assert.equal(claude.imageGeneration,false);assert.equal(claude.allowDeferredArtwork,true);
   assert.equal(selectProfile({runtime:'claude',op:'architecture.decide'}).profile,'fable');
+  const qwen=selectProfile({runtime:'qwencloud',op:'interface.implement'});
+  assert.equal(qwen.profile,'qwen-flash');assert.equal(qwen.model,'qwen3.8-flash');assert.equal(qwen.provider,'qwencloud-token-plan');
   for(const options of [{runtime:'codex',profile:'astra'},{runtime:'claude',profile:'fable-legacy'},{runtime:'claude',profile:'sol-fresh'},{runtime:'codex',profile:'sol-reviewer'}])assert.throws(()=>selectProfile({...options,op:'interface.implement'}));
   assert.throws(()=>selectProfile({runtime:'unknown',op:'interface.implement'}));
+});
+test('every operator has an ordered external-agent chain and skill-level defaults remain usable',()=>{
+  const registry=readPublicJson('profiles/registry.json'),ops=readPublicJson('ops/catalog.json').ops.map(x=>x.id);
+  assert.equal(registry.schema,'starci/profile-registry@2');
+  assert.deepEqual(Object.keys(registry.operators).sort(),[...ops].sort());
+  for(const op of ops){
+    const route=resolveExecutionChain({skill:'starci',op});
+    assert.equal(route.candidates.length,3);
+    assert.equal(new Set(route.candidates.map(x=>x.target)).size,3);
+  }
+  assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates.map(x=>x.target),['qwen-flash','codex-sol','claude-opus']);
+  assert.equal(resolveExecutionChain({op:'interface.implement'}).candidates[0].orcaLaunch.kind,'command-terminal');
+  assert.equal(resolveExecutionChain({op:'backend.implement'}).candidates[0].orcaLaunch.agent,'codex');
+  assert.deepEqual(registry.skills.starci.chains.working,['codex-sol','claude-opus','qwen-flash']);
+});
+test('Orca selects the first ready candidate and only falls through after verified no-effect failures',()=>{
+  let selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen']});
+  assert.equal(selected.selected.target,'qwen-flash');
+  assert.equal(selected.selected.orcaLaunch.dispatch,'return-preamble-and-send');
+  selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude']});
+  assert.equal(selected.selected.target,'codex-sol');
+  selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen-flash',reason:'rate-limited',effectState:'none'}]});
+  assert.equal(selected.selected.target,'codex-sol');
+  assert.throws(()=>selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen-flash',reason:'rate-limited',effectState:'unknown'}]}),/Unsafe fallback/);
+  assert.throws(()=>selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen-flash',reason:'permission-denied',effectState:'none'}]}),/reconciliation/);
 });
 const pending=()=>({reviewedDrawIds:['draw-1'],items:[{id:'hero',drawIds:['draw-1'],usage:'Decorative hero artwork',requiredForFlow:false,status:'deferred',sourcePath:null,artifact:null,provenance:'Claude profile has no image generator; inspected existing repository assets first.',brief:{prompt:'Create the approved abstract hero illustration',width:1200,height:800,format:'webp',placement:'Hero right column',placeholder:'blank-reserved-slot'}}]});
 test('deferred artwork needs exact draw coverage, a real brief and no fabricated file or functional acceptance',()=>{

@@ -1,0 +1,5 @@
+schema: work/node@2
+id: sds-code
+kind: architecture
+required: true
+description: SDS code map aggregate.

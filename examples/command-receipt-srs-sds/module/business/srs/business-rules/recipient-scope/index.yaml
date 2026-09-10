@@ -1,0 +1,50 @@
+schema: work/node@2
+id: srs-br-scope
+kind: business
+required: true
+description: Synthetic authored specification leaf.
+state: done
+assertions:
+  - contract-reviewed
+extensions:
+  work3:
+    specification:
+      schema: starci/srs@3
+      op: business.decide
+      status: pass
+      id: BR-CMD-SCOPE
+      nodeType: business-rule
+      name: Recipient scope
+      summary: Synthetic Recipient scope; no product behavior or approval is asserted.
+      refs:
+        - type: functional-requirement
+          nodeId: srs-fr-command
+          itemId: FR-CMD-01
+      content:
+        statement: Only the selected recipient may own the requested effect.
+        rationale: Shared routing must not widen authority.
+        source:
+          authority: Synthetic scenario owner
+          origin: Explicit synthetic example
+          scope: Cross-module command delivery only
+          acceptance: accepted
+        appliesTo:
+          - FR-CMD-01
+        conditions:
+          - The request names one installed recipient.
+        outcomes:
+          - The selected recipient accepts or rejects the request.
+completion:
+  inputDigest: caad707c80a7d788301a5a4752e447d2b41a519184cbee6d6f6d36111b30a0d1
+  review:
+    schema: starci/design-review@1
+    reviewer: Synthetic fixture reviewer
+    authority: Synthetic runtime regression authority only.
+    reviewedAt: 2026-09-10T00:00:00Z
+    observations:
+      - id: contract-reviewed
+        outcome: pass
+        observation: The synthetic specification is complete enough to exercise runtime bindings; no product
+          or code acceptance is claimed.
+    limitations:
+      - All code units and verification tests are planned and were not executed.

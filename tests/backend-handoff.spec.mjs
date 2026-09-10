@@ -183,7 +183,7 @@ test('producer verification loads in different entry orders and a relocated runt
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handoff-import-'));
  t.after(()=>{assert.equal(path.dirname(dir),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(dir).startsWith('starci-handoff-import-'));fs.rmSync(dir,{recursive:true,force:true});});
  const sourceRoot=new URL('../',import.meta.url);
- for(const name of ['workflows','core','schemas','specifications','contracts','.dist','SKILL.md'])fs.cpSync(new URL(name,sourceRoot),path.join(dir,name),{recursive:true});
+ for(const name of ['workflows','profiles','scripts','core','schemas','specifications','contracts','.dist','SKILL.md'])fs.cpSync(new URL(name,sourceRoot),path.join(dir,name),{recursive:true});
  for(const order of [['producer-verification','select','lifecycle'],['lifecycle','auto','delegation','select'],['select','delegation','producer-verification']]){
   const script=order.map(name=>'await import('+JSON.stringify(new URL('./workflows/'+name+'.mjs','file:///'+dir.replaceAll('\\','/')+'/').href)+');').join('');
   const result=spawnSync(process.execPath,['--input-type=module','-e',script],{encoding:'utf8',timeout:15000});assert.equal(result.status,0,result.stderr||result.error?.message);

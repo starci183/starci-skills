@@ -1,0 +1,5 @@
+schema: work/node@2
+id: sds-decisions
+kind: architecture
+required: true
+description: Decision aggregate.

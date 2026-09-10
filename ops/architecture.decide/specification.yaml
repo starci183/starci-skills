@@ -1,17 +1,21 @@
 schema: starci/specification-policy@1
 storage: .starciwork
-payload: architecture/overview/index.yaml plus recursive architecture/sds/**/index.yaml leaves
-  carrying source-independent specification@3; branches aggregate.
-sourceTruth: Canonical Work intent and design constraints, not code.
+payload: architecture/overview/index.yaml carrying starci/sds-overview@1 plus recursive
+  architecture/sds/**/index.yaml leaves carrying extensions.work3.sds code-map sections; parent
+  indexes carry only sds-aggregate metadata.
+sourceTruth: Canonical Work intent and design decisions define the target. A concise relevant
+  source/configuration/installed-API survey informs feasibility and migration; the overview then
+  independently records retain, extend, correct, replace or add decisions with rationale and impact.
+  Actual source observations and revisions remain Implementation or UAT proof, never SDS authority.
 requiredSections:
-  - purpose
-  - businessRefs
-  - designRefs
-  - views
+  - flows
+  - code-map
+  - contracts
+  - data
+  - quality
+  - deployment
   - decisions
-  - checks
-  - references
-  - limitations
+  - verification
 qualityExecutionOwner:
   - interface.implement
   - backend.implement
@@ -21,10 +25,16 @@ completion: Current SDS uses completion.review in the owning index.yaml, followi
   docs/source-of-trust.md; never source implementation or executed recovery. No evidence directory
   or duplicate design. Workflow authorization and result acceptance remain required; legacy records
   remain readable, not fabricated.
-handoff: Reference canonical SRS and SDS IDs without copying. Implementation owns
-  repository/file/symbol/commit mapping and actual tests.
+handoff: Reference canonical SRS and SDS items with exact typed refs. SDS owns the target
+  repository/file/symbol/call/state/test-location map; Implementation realizes it and owns actual
+  revision/build test results.
 op: architecture.decide
 impactMaturity: logical-design
+scopeSufficiency: Proactively anticipate realistic main, alternative, failure and edge cases plus
+  relevant constraints for the selected slice. Foreseeable material behavior, boundaries, contracts,
+  data, authority, assumptions and decisions must not be omitted. Comprehensive reasoning does not
+  require theoretical perfection before coding; implementation and tests empirically refine the
+  owning SRS/SDS through affected-scope repair and fresh review.
 steps:
   - reads:
       - target
@@ -34,12 +44,10 @@ steps:
       - node
     action:
       en: "Resolve current accepted SRS scope, drivers, actors and platform constraints from canonical
-        .starciwork. Read specifications/sds.schema.json, docs/architecture-sds.md and
-        docs/source-of-trust.md. Begin every new or revised SDS with complete journey and
-        responsibility analysis, not a legacy call graph. Architecture is source-independent: no
-        source paths, symbols, revisions, codeImpacts, repository audit or test-command inventory.
-        Code and green tests do not authorize the target design; a design constraint does not prove
-        deployed behavior."
+        .starciwork. Read specifications/sds-map.json, docs/architecture-sds.md and
+        docs/source-of-trust.md. Prescribe target repository roles, paths and symbols without
+        existing/planned status, revisions or source evidence. Code and green tests do not authorize
+        the target design; actual conformance belongs to Implementation and UAT."
   - reads:
       - target
       - business
@@ -71,9 +79,10 @@ steps:
     action:
       en: Specify authoritative versus rebuildable data, storage, isolation, consistency, lifecycle,
         placement, connections and credential custody. For durable customer state, specify the
-        selected backup/restore form, capture consistency, complete retained stores/objects/runtime
-        state/config/Secrets/keys, independent custody, destination, compatibility, restore order,
-        verification and safe resumption. A generic supports-restore promise, recreated
+        selected backup/restore form, capture consistency, authoritative and derived state, complete
+        retained stores/objects/runtime state/config/Secrets/keys, custody outside the relevant
+        failure domain, destination, compatibility, restore order, reconciliation, old-writer
+        fencing, verification and safe resumption. Volume bytes, a generic supports-restore promise, recreated
         configuration or module reinstall does not explain data recovery. Select failure domains and
         HA/recovery depth from actual scope, not a mandatory cluster-loss checklist for every
         project.
@@ -86,7 +95,7 @@ steps:
     action:
       en: Challenge one coherent proposal with a materially simpler alternative, rationale, cost,
         downsides and revisit conditions. Patterns are optional; specify actual mechanisms rather
-        than names. Use applicable knowledge and primary technical references with an applicability
+        than names. Use applicable StarCi knowledge, verified installed APIs and primary technical references with an applicability
         argument. Do not invent business targets or product policy; make technical choices within
         approved requirements.
   - reads:
@@ -116,12 +125,29 @@ steps:
         cases. Gaps found during review, coding, testing, operation or later customer feedback
         require scoped SRS/SDS repair within authority and current reviewed done before dependent
         effects. Do not reopen unrelated design or rewrite requirements to justify legacy code.
-        Schema validity alone is not review. Implementation owns source mapping and test execution;
-        done is never an edit lock."
+        Apply the call/signature/owner joins and admission-to-worker crash review in
+        docs/architecture-sds.md; copied happy-path calls cannot implement cancellation or recovery.
+        Schema validity alone is not review. SDS owns the target code map and planned verification;
+        Implementation owns code effects and actual execution evidence. Done is never an edit lock."
 references:
   - topic: Architecture views and decisions
     url: https://arc42.org/overview/
   - topic: Context and component diagrams
     url: https://c4model.com/diagrams
-payloadSchema: starci/specification@3
+payloadSchema: starci/sds-map@1
+payloadField: extensions.work3.sds
+aggregateSchema: starci/sds-aggregate@1
+sectionSchemas:
+  - starci/sds-overview@1
+  - starci/sds-flow@1
+  - starci/sds-code-unit@1
+  - starci/sds-contract@1
+  - starci/sds-data-model@1
+  - starci/sds-quality@1
+  - starci/sds-deployment@1
+  - starci/sds-decision@1
+  - starci/sds-verification@1
+compatibilitySchemas:
+  - starci/specification@3
+  - starci/sds@4
 analysisPolicy: context-driven

@@ -1,0 +1,5 @@
+schema: work/node@2
+id: srs-nfrs
+kind: business
+required: true
+description: Non-functional requirement aggregate.

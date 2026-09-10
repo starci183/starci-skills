@@ -1,0 +1,5 @@
+schema: work/node@2
+id: sds-flows
+kind: architecture
+required: true
+description: SDS flow aggregate.

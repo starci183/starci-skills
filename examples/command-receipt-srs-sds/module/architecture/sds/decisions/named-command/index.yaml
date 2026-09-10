@@ -1,0 +1,60 @@
+schema: work/node@2
+id: sds-decision-command
+kind: architecture
+required: true
+description: Synthetic authored specification leaf.
+state: done
+assertions:
+  - contract-reviewed
+extensions:
+  work3:
+    specification:
+      schema: starci/sds@4
+      op: architecture.decide
+      status: pass
+      id: DEC-NAMED-COMMAND
+      nodeType: decision
+      name: Reject generic execution
+      summary: Synthetic Reject generic execution; all code units are planned and tests are not executed.
+      refs:
+        - type: contract
+          nodeId: sds-contract-command
+          itemId: CMD-V1
+        - type: code-unit
+          nodeId: sds-code-router
+          itemId: CU-ROUTER
+        - type: code-unit
+          nodeId: sds-code-recipient
+          itemId: CU-RECIPIENT
+      content:
+        problem: Shared routing could accidentally own domain effects.
+        drivers:
+          - Least authority
+          - Recipient validation
+        options:
+          - Named versioned command
+          - Generic arbitrary payload execution
+        choice: Named versioned command.
+        rationale: Receiver retains business validation and effect ownership.
+        tradeoffs: Each capability needs an explicit schema and handler.
+        status: accepted
+        decisionOwner: Synthetic owner
+        revisitWhen: Never for arbitrary execution; revisit transport only.
+        affectedRefs:
+          - CMD-V1
+          - CU-ROUTER
+          - CU-RECIPIENT
+completion:
+  inputDigest: a9169ee4a922b53f1039cf39cf0e701c6f00109c58a0e87d67303838474babae
+  review:
+    schema: starci/design-review@1
+    reviewer: Synthetic fixture reviewer
+    authority: Synthetic runtime regression authority only.
+    reviewedAt: 2026-09-10T00:00:00Z
+    observations:
+      - id: contract-reviewed
+        outcome: pass
+        observation: The synthetic specification is complete enough to exercise runtime bindings; no product
+          or code acceptance is claimed.
+    limitations:
+      - All code units and verification tests are planned and were not executed.

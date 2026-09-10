@@ -1,0 +1,52 @@
+schema: work/node@2
+id: sds-deployment-monolith
+kind: architecture
+required: true
+description: Synthetic authored specification leaf.
+state: done
+assertions:
+  - contract-reviewed
+extensions:
+  work3:
+    specification:
+      schema: starci/sds@4
+      op: architecture.decide
+      status: pass
+      id: DEP-MONOLITH
+      nodeType: deployment
+      name: Selected modular monolith
+      summary: Synthetic Selected modular monolith; all code units are planned and tests are not executed.
+      refs: []
+      content:
+        topology: monolith
+        selected: true
+        placements:
+          - UI in client bundle
+          - router and recipient modules in application process
+          - receipt in relational store
+        connections:
+          - CMD-V1 in-process interface
+        dataOwnership: Recipient module exclusively writes receipts.
+        backgroundWork: Reconciliation worker invokes recipient status lookup.
+        failureDomains:
+          - Application unavailable
+          - database unavailable
+          - response loss
+        correlation: Intent ID crosses modules and UI state.
+        configuration: Capability installation binding is versioned.
+        rollout: Add compatible schema before consumer activation.
+        rollback: Disable integration without deleting receipts.
+completion:
+  inputDigest: 8e51997ca9edcdb0a1aaed95c2085c8ef748a467d116401fc6ecd50f74cb971d
+  review:
+    schema: starci/design-review@1
+    reviewer: Synthetic fixture reviewer
+    authority: Synthetic runtime regression authority only.
+    reviewedAt: 2026-09-10T00:00:00Z
+    observations:
+      - id: contract-reviewed
+        outcome: pass
+        observation: The synthetic specification is complete enough to exercise runtime bindings; no product
+          or code acceptance is claimed.
+    limitations:
+      - All code units and verification tests are planned and were not executed.

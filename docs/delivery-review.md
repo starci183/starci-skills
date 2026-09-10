@@ -8,9 +8,9 @@ not the required output or the truth of the checks. Never impersonate a human.
 
 ## Result review
 
-Triage form-only findings using [delivery debt](delivery-debt.md). Record safe
-cleanup in the owning `business/debt.md` and continue authorized code/UAT;
-presentation polish alone is not a substantive acceptance gate.
+Fix form-only findings and missing flow details directly in the owning Work or
+product source, then re-run the affected checks. Presentation polish alone does
+not require a new Plan, but it must not be deferred into a separate ledger.
 
 Report the selected goal/revision, what actually changed, observed results against
 the acceptance criteria, remaining failures or limitations, and the next workflow
@@ -25,8 +25,10 @@ test distinguish product defect, stale fixture/double, environment misconfigurat
 and an invalid design assumption. Verify doubles still implement the real called
 signature, callbacks, ordering and error behavior; discarded preparation callbacks
 can turn a meaningful integration test into an empty successful operation. Keep
-the behavioral assertion unless the approved contract actually changed. Re-run
-both positive and negative cases after the correct scoped repair. Label real and
+the behavioral assertion unless the approved contract actually changed. Have the
+owning executor repair and re-run both positive and negative cases, then return
+the complete corrected result; the Plan coordinator reviews it rather than taking
+over the repair. Label real and
 doubled boundaries; local Core/provider doubles do not establish production or
 real external-provider behavior.
 

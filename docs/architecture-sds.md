@@ -45,6 +45,17 @@ SDS prescribes the target even when files or symbols do not yet exist. It does n
 
 Every folder owns `index.yaml`. Parents carry `starci/sds-aggregate@1` metadata and no authored state/completion. Detailed leaves use `extensions.work3.sds`:
 
+The overview leaf carries `starci/sds-overview@1`: accepted SRS IDs, goals, in/out scope, actors, system context, quality strategy, constraints, deployment topology references, implementation handoff, and at least one design decision. Each decision states a concern, `retain|extend|correct|replace|add`, rationale, impact and migration. Before choosing it, inspect the smallest relevant source/configuration/installed-API surface needed to test feasibility. The resulting disposition is independently governed by accepted SRS and quality needs; do not copy observations, revisions or implementation status into SDS.
+
+Design sufficiency is scoped to the selected implementation slice, but it is not shallow. Proactively
+walk realistic main, alternative, failure and edge paths and relevant constraints; make foreseeable
+material behavior, boundaries/contracts, data, authority, assumptions and decisions implementable
+without guessing. Keep consequential unknowns explicit. Comprehensive anticipation does not require
+theoretical perfection or exhaustive certainty before coding: unresolved consequential ambiguity
+blocks affected effects, while a sufficiently decided slice proceeds to implementation and tests.
+Concrete findings then repair and re-review the owning SRS/SDS and affected dependencies, preserve
+current unrelated work, and continue without copying stale completion.
+
 | Folder | Schema |
 | --- | --- |
 | Flow | `starci/sds-flow@1` |
@@ -142,3 +153,5 @@ Security quality leaves cover conversation authorization, prompt/input trust, to
 Validate with `node bin/starci.mjs validate <work-root>`. A valid SDS map proves internal structure and traceability only. Readiness review still checks that significant SRS branches reach prescribed code and customer-visible outcomes, every contract/data writer has one owner, and material edge cases have mechanisms. Implementation separately proves which actual files and revisions conform.
 
 Changing accepted SRS invalidates dependent SDS proof. Changing the code map requires affected implementation and UAT to be rechecked. Preserve unrelated completed scopes and historical evidence.
+
+The compatibility reader also accepts the pre-upstream `starci/sds@4` leaf format for recovery and explicitly authorized migration. It is not the new authoring contract: new SDS content uses the section schemas published in `specifications/sds-map.json`, and current source observations remain Implementation proof rather than SDS authority.

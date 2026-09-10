@@ -10,7 +10,7 @@ input:
   optionalFields:
     - criteria
   context: |-
-    References to business, architecture, knowledge, repository, environment, accounts, fixtures and current authorization; never credentials. Optional execution selects the actual runtime codex/claude, active working profile, observed host model and imageGenerationAvailable. Profile policy never grants a missing tool or switches the current host.
+    References to business, architecture, knowledge, repository, environment, accounts, fixtures and current authorization; never credentials. A fixed-runtime caller may select one observed runtime/profile. An Orca caller consumes the request-bound skill/operator execution chain and launches its first ready external agent. Profile policy never installs an agent, grants a missing tool or expands authority.
   journeys: |-
     Ordered business journeys with id, title, entry, actor, preconditions, steps and cleanup. Steps have id, action, expected and uxChecks; each check has id, question, expected yes/no. Copy accepted business specification.journeys without reconstructing actions from internal service-call steps; journeyCoverage provides AC links in the .starciwork specification.
   criteria: |-
@@ -143,6 +143,6 @@ commands:
     node dist/workflows/frontend.mjs resume RUN_DIR SUPPORT_RESPONSE_JSON
   status: node dist/workflows/frontend.mjs status RUN_DIR
 execution: |-
-  The AI coordinator invokes real operator tools from emitted JSON requests and supplies responses. This local engine enforces transitions, waiting and evidence binding; it does not invent a model adapter or launch an OpenAI service by itself.
+  One shared Orca workflow may coordinate the resolved AgentOS workspace and its modules. The workflow runner emits operator requests containing an ordered external-agent chain; Orca selects the first observed ready candidate and may fall through only after an allowed failure with verified no effects. Providers remain workers below the common workflow. The Plan coordinator owns goal approval and complete-result acceptance. This local engine still does not install agents, authenticate providers or grant tools by itself.
 standaloneFE: |-
   The identical {flows,codeRefs,runtime} object is always written to E/flows.json, validated against accepted journeys with validateFEHandoff; this does not certify UAT.

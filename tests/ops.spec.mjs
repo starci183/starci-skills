@@ -39,6 +39,40 @@ test('current V3 contracts have complete resolvable catalogue identities and Eng
   assert.ok(catalogue.ops.some(o=>o.id==='workspace.manage'));
   assert.ok(catalogue.ops.some(o=>o.id==='scope.retire'));
 });
+test('decide operator dispatch selects split SRS and SDS authoring while legacy schemas stay compatibility-only',()=>{
+  const generated=JSON.parse(outputs().get('catalog.json'));
+  const srsContract=parseYaml(fs.readFileSync(path.join(repository,'specifications','srs-sections.yaml'),'utf8'));
+  const sdsContract=parseYaml(fs.readFileSync(path.join(repository,'specifications','sds-map.yaml'),'utf8'));
+  const business=generated.ops.find(op=>op.id==='business.decide').contract;
+  assert.equal(business.specificationPolicy.payloadSchema,'starci/srs-sections@1');
+  assert.equal(business.specificationPolicy.payloadField,'extensions.work3.srs');
+  assert.equal(business.specificationPolicy.aggregateSchema,'starci/srs-aggregate@1');
+  assert.deepEqual(business.specificationPolicy.compatibilitySchemas,['starci/specification@2','starci/srs@3']);
+  assert.equal(business.specificationPolicy.payloadSchema,srsContract.schema);
+  assert.deepEqual(business.specificationPolicy.requiredSections,Object.keys(srsContract.sections));
+  assert.deepEqual(business.specificationPolicy.sectionSchemas,Object.values(srsContract.sections).map(section=>section.schema));
+  assert.ok(business.writes.find(write=>write.id==='node').fields.includes('extensions.work3.srs'));
+  assert.ok(!business.writes.find(write=>write.id==='node').fields.includes('extensions.work3.specification'));
+  const architecture=generated.ops.find(op=>op.id==='architecture.decide').contract;
+  assert.equal(architecture.specificationPolicy.payloadSchema,'starci/sds-map@1');
+  assert.equal(architecture.specificationPolicy.payloadField,'extensions.work3.sds');
+  assert.equal(architecture.specificationPolicy.aggregateSchema,'starci/sds-aggregate@1');
+  assert.deepEqual(architecture.specificationPolicy.compatibilitySchemas,['starci/specification@3','starci/sds@4']);
+  assert.equal(architecture.specificationPolicy.payloadSchema,sdsContract.schema);
+  assert.deepEqual(architecture.specificationPolicy.requiredSections,Object.keys(sdsContract.sections));
+  assert.deepEqual(architecture.specificationPolicy.sectionSchemas,[sdsContract.overview.schema,...Object.values(sdsContract.sections).map(section=>section.schema)]);
+  assert.ok(architecture.writes.find(write=>write.id==='node').fields.includes('extensions.work3.sds'));
+  assert.ok(!architecture.reads.some(read=>read.id==='source'));
+  assert.ok(!architecture.writes.some(write=>write.fields.includes('sourceRefs')));
+  for(const mutate of [
+    contract=>{contract.specificationPolicy.payloadSchema='starci/srs@3';},
+    contract=>{contract.writes.find(write=>write.id==='node').fields=['extensions.work3.specification','sourceRefs'];},
+  ]){const changed=fresh();mutate(changed.ops.find(op=>op.id==='business.decide').contract);assert.ok(errors(changed).includes('SPECIFICATION_POLICY'));}
+  for(const mutate of [
+    contract=>{contract.specificationPolicy.payloadSchema='starci/sds@4';},
+    contract=>{contract.reads.push({id:'source',path:'repository:<repo-id>/<bound-paths>',purpose:{en:'Inspect a current revision.'}});contract.steps[0].reads.push('source');},
+  ]){const changed=fresh();mutate(changed.ops.find(op=>op.id==='architecture.decide').contract);const observed=errors(changed);assert.ok(observed.includes('SPECIFICATION_POLICY')||observed.includes('ARCHITECTURE_DEPTH'));}
+});
 test('UAT contract rejects parallel/visual execution and incomplete cleanup or recording authority',()=>{
   for(const [key,value] of [['flowOrder','parallel'],['appearanceScoring',true],['uxAnswers','scores'],['cleanup','optional'],['recording','screenshots-only'],['paidAI','unlimited']]) {
     const c=fresh();c.ops.find(o=>o.id==='uat.verify').contract.uatPolicy[key]=value;

@@ -17,10 +17,9 @@ shape:
   implementation: features/<feature>/implementation/{index.yaml,frontend/**/index.yaml,backend/**/index.yaml}
   frontendCaptures: features/<feature>/implementation/frontend/assets/<running-page-screenshot>
   businessOverview: features/<feature>/business/overview/index.yaml
-  businessDebt: features/<feature>/business/debt.md (non-semantic maintenance ledger, not approval or
-    completion proof)
   businessSRS: features/<feature>/business/srs/**/index.yaml
-  architectureOverview: features/<feature>/architecture/overview/index.yaml
+  architectureOverview: features/<feature>/architecture/overview/index.yaml with one strict
+    extensions.work3.sds starci/sds-overview@1 payload
   architectureSDS: features/<feature>/architecture/sds/**/index.yaml
   featureCatalog: features/index.yaml
   feature: features/<feature>/index.yaml

@@ -1,0 +1,5 @@
+schema: work/node@2
+id: module.business
+kind: business
+required: true
+description: Synthetic Business aggregate.

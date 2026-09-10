@@ -1,0 +1,5 @@
+schema: work/node@2
+id: srs-data
+kind: business
+required: true
+description: Business data aggregate.

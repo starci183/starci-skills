@@ -9,7 +9,7 @@ export function authorityFor(op) {
       canAdvanceWorkflow: false,
       maxSecondary: 3,
       calls: [],
-      rules: ['Use existing request authority only.', 'Preserve business expectations and criteria.', 'The coordinator gate, not this op, accepts the response and advances the workflow.']
+      rules: ['Use existing request authority only.', 'Preserve business expectations and criteria.', 'The executing task\'s workflow runner, not this op, validates the cell response and advances within the approved workflow. The Plan coordinator owns goal approval and complete-result acceptance, not per-cell execution.']
     }
   };
   if (op.executionModes) {

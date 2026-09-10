@@ -1,0 +1,75 @@
+schema: work/node@2
+id: srs-journey-command
+kind: business
+required: true
+description: Synthetic authored specification leaf.
+state: done
+assertions:
+  - contract-reviewed
+extensions:
+  work3:
+    specification:
+      schema: starci/srs@3
+      op: business.decide
+      status: pass
+      id: JOURNEY-CMD
+      nodeType: customer-journey
+      name: Operator receives recipient result
+      summary: Synthetic Operator receives recipient result; no product behavior or approval is asserted.
+      refs:
+        - type: functional-requirement
+          nodeId: srs-fr-command
+          itemId: FR-CMD-01
+        - type: flow
+          nodeId: srs-fr-command
+          itemId: FLOW-CMD-BUSINESS
+        - type: non-functional-requirement
+          nodeId: srs-nfr-command
+          itemId: NFR-CMD-RELIABILITY
+        - type: branch
+          nodeId: srs-fr-command
+          itemId: ALT-TARGET-OFFLINE
+        - type: branch
+          nodeId: srs-fr-command
+          itemId: EX-UNKNOWN
+      content:
+        actor: authorized operator
+        goal: Receive or reconcile one visible recipient result.
+        context: The operator uses an installed synthetic capability.
+        start: The operator selects the recipient action.
+        preconditions:
+          - The selected capability is installed.
+        stages:
+          - id: J1
+            actorAction: Submit the requested outcome.
+            touchpoint: Command page.
+            observableResponse: The request becomes pending and then displays its result.
+            outcome: The recipient result is visible.
+            functionalRequirementRef: FR-CMD-01
+            flowRef: FLOW-CMD-BUSINESS
+            nfrRefs:
+              - NFR-CMD-RELIABILITY
+        significantPaths:
+          - condition: The selected recipient is unavailable.
+            branchRef: ALT-TARGET-OFFLINE
+            observableOutcome: Only that integration is shown unavailable.
+          - condition: The result is ambiguous.
+            branchRef: EX-UNKNOWN
+            observableOutcome: The operator sees reconciliation pending.
+        end: The operator sees a definitive or reconcilable result.
+        outcomeCriteria:
+          - No unrelated capability is affected.
+completion:
+  inputDigest: 71e33525d43c0e6aba90acb6e37e5bb1c6d72dfe5c66f167e1222253e71670a2
+  review:
+    schema: starci/design-review@1
+    reviewer: Synthetic fixture reviewer
+    authority: Synthetic runtime regression authority only.
+    reviewedAt: 2026-09-10T00:00:00Z
+    observations:
+      - id: contract-reviewed
+        outcome: pass
+        observation: The synthetic specification is complete enough to exercise runtime bindings; no product
+          or code acceptance is claimed.
+    limitations:
+      - All code units and verification tests are planned and were not executed.

@@ -9,6 +9,7 @@ const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
 function shape(value, schema, at, errors) {
   if (schema.$ref) return shape(value, schema.$ref.slice(2).split('/').reduce((v, k) => v[k], sdsSchema), at, errors);
   const fail = message => errors.push(`${at}: ${message}`);
+  if(schema.oneOf){const attempts=schema.oneOf.map(branch=>{const branchErrors=[];shape(value,branch,at,branchErrors);return branchErrors;});if(attempts.filter(x=>!x.length).length!==1)fail('must match exactly one supported shape');return;}
   for (const branch of schema.allOf ?? []) shape(value, branch, at, errors);
   if (schema.if) { const probe = []; shape(value, schema.if, at, probe); if (!probe.length && schema.then) shape(value, schema.then, at, errors); }
   if (schema.const !== undefined && value !== schema.const) fail('constant differs');
@@ -47,7 +48,7 @@ export function validateSDS(spec) {
   for (const name of ['views', 'decisions', 'checks', 'references']) unique(spec[name], 'id', name);
   for (const name of ['businessRefs', 'designRefs']) unique(spec[name], 'nodeId', name);
   const views = new Map(spec.views.map(v => [v.id, v]));
-  const imported = new Set(spec.designRefs.flatMap(r => r.viewIds.map(id => `${r.nodeId}#${id}`)));
+  const imported = new Set(spec.designRefs.flatMap(r => (r.viewIds??r.items.map(x=>x.id)).map(id => `${r.nodeId}#${id}`)));
   const businessIds = field => new Set(spec.businessRefs.flatMap(r => r[field].map(id => `${r.nodeId}#${id}`)));
   const checkRef = (id, kinds, at) => {
     if (imported.has(id)) return; // Owner and view kind are checked by workspace resolution below.
@@ -117,13 +118,16 @@ export function validateSDSBindings(spec, {nodes, allowedNodeIds}) {
   const imported = new Map();
   for (const ref of spec.designRefs) {
     const node = find(ref.nodeId), design = node?.meta.extensions?.work3?.specification;
-    if (!allowedNodeIds.has(ref.nodeId) || node?.meta.kind !== 'architecture' || design?.schema !== SDS_SCHEMA) { errors.push(`Unbound SDS owner ${ref.nodeId}`); continue; }
-    for (const id of ref.viewIds) {
-      const view = design.views.find(v => v.id === id);
-      if (!view) errors.push(`Missing SDS view ${ref.nodeId}#${id}`);
-      else imported.set(`${ref.nodeId}#${id}`, view);
+    if(ref.schema==='starci/sds@4'){
+      if(!allowedNodeIds.has(ref.nodeId)||node?.meta.kind!=='architecture'||design?.schema!=='starci/sds@4'){errors.push(`Unbound SDS@4 owner ${ref.nodeId}`);continue;}
+      const reverse={structure:'code-unit',contracts:'contract',data:'data'};
+      for(const item of ref.items){if(design.id!==item.id||design.nodeType!==reverse[item.kind])errors.push(`Missing/wrong-kind SDS@4 item ${ref.nodeId}#${item.id}`);else imported.set(`${ref.nodeId}#${item.id}`,{kind:item.kind});}
+      if(spec.status==='pass'&&design.status!=='pass')errors.push(`Shared design not accepted: ${ref.nodeId}`);
+    }else{
+      if (!allowedNodeIds.has(ref.nodeId) || node?.meta.kind !== 'architecture' || design?.schema !== SDS_SCHEMA) { errors.push(`Unbound SDS owner ${ref.nodeId}`); continue; }
+      for (const id of ref.viewIds) {const view = design.views.find(v => v.id === id);if (!view) errors.push(`Missing SDS view ${ref.nodeId}#${id}`);else imported.set(`${ref.nodeId}#${id}`, view);}
+      if (spec.status === 'pass' && design.status !== 'pass') errors.push(`Shared design not accepted: ${ref.nodeId}`);
     }
-    if (spec.status === 'pass' && design.status !== 'pass') errors.push(`Shared design not accepted: ${ref.nodeId}`);
   }
   for (const view of spec.views) for (const ref of designEdges(view)) {
     if (ref.id.includes('#') && (!imported.has(ref.id) || !ref.kinds.includes(imported.get(ref.id).kind))) errors.push(`Wrong-kind imported SDS view ${ref.id}`);

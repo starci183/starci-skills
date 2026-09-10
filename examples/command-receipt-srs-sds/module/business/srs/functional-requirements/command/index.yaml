@@ -1,0 +1,163 @@
+schema: work/node@2
+id: srs-fr-command
+kind: business
+required: true
+description: Synthetic authored specification leaf.
+state: done
+assertions:
+  - contract-reviewed
+extensions:
+  work3:
+    specification:
+      schema: starci/srs@3
+      op: business.decide
+      status: pass
+      id: FR-CMD-01
+      nodeType: functional-requirement
+      name: Deliver a versioned command
+      summary: Synthetic Deliver a versioned command; no product behavior or approval is asserted.
+      refs:
+        - type: business-rule
+          nodeId: srs-br-scope
+          itemId: BR-CMD-SCOPE
+        - type: non-functional-requirement
+          nodeId: srs-nfr-command
+          itemId: NFR-CMD-RELIABILITY
+      content:
+        goal: Deliver one consented command to its installed recipient and expose a reconcilable result.
+        source:
+          authority: Synthetic scenario owner
+          origin: Explicit synthetic example
+          scope: Cross-module command delivery only
+          acceptance: accepted
+        actors:
+          - authorized operator
+          - recipient installation
+        trigger: The operator submits a supported command.
+        preconditions:
+          - Source and target installations are active and the supported interaction is available.
+        inputs:
+          - An operator request and target installation.
+        mainFlow:
+          - id: M1
+            actor: authorized operator
+            action: Submit an authorized request for the selected recipient.
+            systemResponse: Accept or reject it according to consent, authority and recipient scope.
+            guard: The operator is allowed to request this outcome for this target.
+            stateEffect: The request becomes visibly pending.
+            acceptanceIds:
+              - AC-CMD-OK
+          - id: M2
+            actor: system
+            action: The recipient processes the accepted request.
+            systemResponse: Return the recipient-owned business result.
+            guard: Consent and authority remain valid.
+            stateEffect: The result becomes observable once.
+            acceptanceIds:
+              - AC-CMD-OK
+        alternativeFlows:
+          - id: ALT-TARGET-OFFLINE
+            fromStep: M2
+            condition: Target integration is unavailable.
+            steps:
+              - id: A1
+                actor: system
+                action: Record integration unavailable.
+                systemResponse: Return unavailable without changing unrelated local capability.
+                guard: Failure is scoped to the target integration.
+                stateEffect: Receipt is terminal unavailable; no domain effect.
+                acceptanceIds:
+                  - AC-CMD-OFFLINE
+            resumeAt: end
+            end: The caller can display integration unavailable.
+            postconditions:
+              - Only the target integration is unavailable.
+            acceptanceIds:
+              - AC-CMD-OFFLINE
+        exceptionFlows:
+          - id: EX-UNKNOWN
+            fromStep: M2
+            condition: The sender cannot tell whether the recipient completed the request.
+            steps:
+              - id: E1
+                actor: system
+                action: Ask for the outcome of the same request before trying again.
+                systemResponse: Reconcile the same intent before any retry.
+                guard: The request identity remains the same.
+                stateEffect: Receipt remains reconcilable.
+                acceptanceIds:
+                  - AC-CMD-UNKNOWN
+            resumeAt: end
+            end: UI shows pending reconciliation.
+            postconditions:
+              - No blind replay occurs.
+            acceptanceIds:
+              - AC-CMD-UNKNOWN
+          - id: EX-PAYLOAD-CONFLICT
+            fromStep: M1
+            condition: The same request identity is reused for a different requested outcome.
+            steps:
+              - id: E2
+                actor: system
+                action: Reject the inconsistent repeat.
+                systemResponse: Return intent payload conflict.
+                guard: The repeated request differs from the original.
+                stateEffect: Original receipt and domain state remain unchanged.
+                acceptanceIds:
+                  - AC-CMD-CONFLICT
+            resumeAt: end
+            end: UI shows a conflict.
+            postconditions:
+              - Changed payload is never executed.
+            acceptanceIds:
+              - AC-CMD-CONFLICT
+        branchReview:
+          alternativeFlows: Target availability is a relevant integration-only branch.
+          exceptionFlows: Unknown outcome and conflicting replay are material execution boundaries.
+        postconditions:
+          - Success has exactly one recipient-owned receipt and observable UI result.
+          - Failure never grants arbitrary payload execution.
+        businessRuleRefs:
+          - BR-CMD-SCOPE
+        nfrRefs:
+          - NFR-CMD-RELIABILITY
+        acceptanceCriteria:
+          - id: AC-CMD-OK
+            given: Valid authority, consent and compatible capability
+            when: The stable command is submitted
+            then: The recipient validates and applies its named domain command once
+            flowRef: FLOW-CMD-BUSINESS
+            branchRef: main
+          - id: AC-CMD-OFFLINE
+            given: The target integration is unavailable
+            when: The command is submitted
+            then: Only that integration is unavailable and no recipient effect occurs
+            flowRef: FLOW-CMD-BUSINESS
+            branchRef: ALT-TARGET-OFFLINE
+          - id: AC-CMD-UNKNOWN
+            given: Dispatch may have occurred and the response is lost
+            when: The caller observes timeout
+            then: The same intent is reconciled before retry
+            flowRef: FLOW-CMD-BUSINESS
+            branchRef: EX-UNKNOWN
+          - id: AC-CMD-CONFLICT
+            given: An intent already has a stored fingerprint
+            when: The same ID carries changed payload
+            then: The recipient rejects conflict without changing the original result
+            flowRef: FLOW-CMD-BUSINESS
+            branchRef: EX-PAYLOAD-CONFLICT
+        flowId: FLOW-CMD-BUSINESS
+completion:
+  inputDigest: 4b8dd124592523456dc8904b17774512892ee8e88f70c924f67ec05d5271a160
+  review:
+    schema: starci/design-review@1
+    reviewer: Synthetic fixture reviewer
+    authority: Synthetic runtime regression authority only.
+    reviewedAt: 2026-09-10T00:00:00Z
+    observations:
+      - id: contract-reviewed
+        outcome: pass
+        observation: The synthetic specification is complete enough to exercise runtime bindings; no product
+          or code acceptance is claimed.
+    limitations:
+      - All code units and verification tests are planned and were not executed.

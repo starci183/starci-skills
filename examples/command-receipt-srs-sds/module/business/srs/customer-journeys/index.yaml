@@ -1,0 +1,5 @@
+schema: work/node@2
+id: srs-journeys
+kind: business
+required: true
+description: Customer journey aggregate.

@@ -5,7 +5,7 @@ import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {inspectStorage,assertNewStoragePath,isLocalOnlyWorkspace} from '../workflows/storage.mjs';
-import { distPath, requireDist, readDistJson } from '../core/runtime-root.mjs';
+import { distPath, requireDist, readDistJson, skillRoot } from '../core/runtime-root.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const help = `StarCi 3.0 — bounded, local operations
@@ -22,6 +22,7 @@ Usage:
   starci workflows
   starci workflow <workflow-id>
   starci route <intent>
+  starci agent-route <skill-id> <op-id> <ready-runtimes>
   starci plan <plan.yaml>
   starci audit-legacy <legacy-root>
 Work metadata uses YAML 1.2. No command runs an op,
@@ -115,7 +116,8 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       exactArgs(args,2);
       const {validateSourceLayout}=await import('../workflows/source-layout.mjs');
       const be=path.resolve(args[0]),fe=path.resolve(args[1]);
-      const result=validateSourceLayout({be,fe,workRoot:path.join(be,'.starciwork')});
+      const host=path.dirname(skillRoot);
+      const result=validateSourceLayout({host,be,fe,workRoot:path.join(be,'.starciwork')});
       emit(result);
       return result.ok?0:1;
     }
@@ -138,6 +140,14 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       return 0;
     }
     if (command === 'audit-legacy') { exactArgs(args, 1); emit(auditLegacy(args[0])); return 0; }
+    if(command==='agent-route'){
+      exactArgs(args,3);
+      const inventory=args[2].split(',').map(runtime=>runtime.trim()).filter(Boolean);
+      if(!inventory.length)throw Error('At least one observed ready runtime is required');
+      const {selectExecutionTarget}=await import('../profiles/select.mjs');
+      emit(selectExecutionTarget({skill:args[0],op:args[1],inventory}));
+      return 0;
+    }
     if (command === 'impact') {
       exactArgs(args, 2);
       directory(args[0]);

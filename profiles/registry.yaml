@@ -1,9 +1,19 @@
-schema: starci/profile-registry@1
+schema: starci/profile-registry@2
 runtimes:
   - codex
   - claude
+  - qwen
 aliases:
   openai: codex
+  anthropic: claude
+  qwencloud: qwen
+  alibaba: qwen
+orchestration:
+  runtime: orca
+  owner: source-host
+  workspaceRouting: .workspaces/projects/<project>/work.json
+  dispatch: One shared Orca workflow resolves the workspace/project, emits StarCi operator cells and
+    launches the first ready external agent in each cell's execution chain.
 defaults:
   codex:
     working: sol-fresh
@@ -11,12 +21,126 @@ defaults:
   claude:
     working: opus
     reasoning: fable
+  qwen:
+    working: qwen-flash
+    reasoning: qwen-reviewer
 reasoningOps:
   - business.decide
   - architecture.decide
   - review.verify
-selection: Select the actual host runtime; use the operator role and current host model. Do not
-  start extra tasks, switch providers or spend outside existing authority.
+targets:
+  codex-sol:
+    runtime: codex
+    profile: sol-fresh
+    orcaLaunch:
+      kind: managed-agent
+      agent: codex
+  codex-sol-reviewer:
+    runtime: codex
+    profile: sol-reviewer
+    orcaLaunch:
+      kind: managed-agent
+      agent: codex
+  claude-opus:
+    runtime: claude
+    profile: opus
+    orcaLaunch:
+      kind: managed-agent
+      agent: claude
+  claude-fable:
+    runtime: claude
+    profile: fable
+    orcaLaunch:
+      kind: managed-agent
+      agent: claude
+  qwen-flash:
+    runtime: qwen
+    profile: qwen-flash
+    orcaLaunch:
+      kind: command-terminal
+      command: qwen
+      dispatch: return-preamble-and-send
+  qwen-reviewer:
+    runtime: qwen
+    profile: qwen-reviewer
+    orcaLaunch:
+      kind: command-terminal
+      command: qwen
+      dispatch: return-preamble-and-send
+skills:
+  starci:
+    chains:
+      working:
+        - codex-sol
+        - claude-opus
+        - qwen-flash
+      reasoning:
+        - codex-sol-reviewer
+        - claude-fable
+        - qwen-reviewer
+operators:
+  architecture.decide:
+    skill: starci
+    chain: [codex-sol-reviewer, claude-fable, qwen-reviewer]
+  backend.implement:
+    skill: starci
+    chain: [codex-sol, claude-opus, qwen-flash]
+  business.decide:
+    skill: starci
+    chain: [codex-sol-reviewer, claude-fable, qwen-reviewer]
+  content.generate:
+    skill: starci
+    chain: [qwen-flash, codex-sol, claude-opus]
+  interface.draw:
+    skill: starci
+    chain: [qwen-flash, codex-sol, claude-opus]
+  interface.implement:
+    skill: starci
+    chain: [qwen-flash, codex-sol, claude-opus]
+  knowledge.repair:
+    skill: starci
+    chain: [codex-sol, claude-opus, qwen-flash]
+  release.deliver:
+    skill: starci
+    chain: [codex-sol, claude-opus, qwen-flash]
+  review.verify:
+    skill: starci
+    chain: [codex-sol-reviewer, claude-fable, qwen-reviewer]
+  runtime.operate:
+    skill: starci
+    chain: [codex-sol, claude-opus, qwen-flash]
+  scope.retire:
+    skill: starci
+    chain: [codex-sol, claude-opus, qwen-flash]
+  task.execute:
+    skill: starci
+    chain: [codex-sol, claude-opus, qwen-flash]
+  uat.verify:
+    skill: starci
+    chain: [codex-sol, claude-opus, qwen-flash]
+  workspace.manage:
+    skill: starci
+    chain: [codex-sol, claude-opus, qwen-flash]
+fallback:
+  allowedReasons:
+    - unavailable
+    - quota-exhausted
+    - rate-limited
+    - startup-failure
+    - unsupported
+  requiredEffectState: none
+  blockedReasons:
+    - permission-denied
+    - user-checkpoint
+    - business-ambiguity
+    - safety-block
+    - partial-or-unknown-effects
+selection: Orca supplies the observed external-agent inventory. Resolve the selected skill and
+  operator chain from top to bottom, choosing the first ready runtime/profile. Fall through only
+  after an allowed failure with verified no-effect state. This policy never installs an agent,
+  authenticates a provider, grants tools or expands the workflow authority. Use managed-agent
+  launch when Orca recognizes the provider; use the declared command-terminal strategy for a
+  usable CLI such as Qwen that this Orca build does not recognize for supervised worker-start.
 assetFallback: When image generation is unavailable, reuse verified assets first; Claude may leave
   decorative image slots blank with a concrete deferred brief. Never mark missing artwork generated
   or satisfy a functional criterion with a blank slot.
@@ -31,6 +155,13 @@ examples:
     profile: opus
     model: null
     imageGenerationAvailable: false
+  orcaInterfaceImplementation:
+    skill: starci
+    op: interface.implement
+    availableRuntimes:
+      - codex
+      - claude
+      - qwen
 examplesNote: Examples of frontend context.execution only. Set availability from observed host
-  tools, never copy true as proof. Omit model to inherit the actual host configuration. For
-  reasoning operators resolve the reasoning default instead.
+  tools, never copy true as proof. Fixed-runtime contexts may omit model to inherit the actual host
+  configuration. Orca resolves ordered skill/operator candidates from observed readiness instead.

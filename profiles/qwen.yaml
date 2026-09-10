@@ -1,0 +1,18 @@
+schema: starci/execution-profiles@1
+runtime: qwen
+provider: qwencloud-token-plan
+source: user-configured-qwen-code-runtime
+modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch
+profiles:
+  qwen-flash:
+    role: working
+    model: qwen3.8-flash
+    imageGeneration: false
+    roleDescription: Execute bounded implementation, content, repair or operation work through Qwen Code.
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
+  qwen-reviewer:
+    role: reasoning
+    model: qwen3.8-flash
+    imageGeneration: false
+    roleDescription: Analyze and verify evidence without repairing the product being judged.
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization

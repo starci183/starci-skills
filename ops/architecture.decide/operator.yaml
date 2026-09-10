@@ -1,7 +1,7 @@
 id: architecture.decide
 goal:
-  en: Design a source-independent SDS with responsibilities, contracts, storage, runtime flows and
-    context-specific failure controls.
+  en: Design a flow-led target code map with exact source units, contracts, state paths, recovery and
+    planned verification.
 nodeKinds:
   - architecture
 completionProfile: architecture
@@ -34,11 +34,16 @@ reads:
         using primary documentation where necessary; do not present a design as deployed-source
         observation.
   - id: specification
-    path: architecture.decide/specification.json + specifications/sds.schema.json +
+    path: architecture.decide/specification.json + specifications/sds-map.json +
       docs/architecture-sds.md
     purpose:
       en: Read the JSON field contract and this operator procedure before authoring the .starciwork
         payload.
+  - id: feasibility
+    path: Selected repositories, relevant configuration and installed API declarations
+    purpose:
+      en: Inspect only surfaces material to the selected design so targets and migration are feasible.
+        The survey informs but never overrides accepted SRS or supplies completion proof.
   - id: matrix
     path: selected complete-job matrix request + workflows/jobs.json
     purpose:
@@ -48,7 +53,7 @@ reads:
   - id: profile
     path: profiles/registry.json + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Select the actual host runtime codex or claude and this operator role from the V2-derived active
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
         permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
@@ -61,11 +66,13 @@ writes:
       - dependsOn
       - assertions
       - required
-      - extensions.work3.specification
+      - extensions.work3.sds
     content:
-      en: Author source-independent specification@3. Overview explains context; recursive SDS scopes own
-        design details. Branches aggregate without duplicate payloads. Preserve Business by
-        reference; source mapping belongs to Implementation.
+      en: Author overview plus typed extensions.work3.sds leaves in flows, code-map, contracts, data,
+        quality, deployment, decisions and verification. Parent indexes carry only
+        starci/sds-aggregate@1 metadata. Code units prescribe target repository roles, paths and
+        symbols without source status or revision evidence. Preserve Business and shared design
+        through stable IDs and exact owning Work refs.
   - id: matrixHandoff
     path: E/job-result.json
     fields:
@@ -89,14 +96,17 @@ steps:
       - business
       - constraints
       - specification
+      - feasibility
       - profile
     writes:
       - node
     action:
       en: "Resolve accepted SRS scope, drivers, actors and platform constraints from canonical Work. Read
-        specifications/sds.schema.json and docs/architecture-sds.md. Architecture is
-        source-independent: no source paths, symbols, revisions, codeImpacts, repository audit or
-        test-command inventory. A design constraint does not prove deployed behavior."
+        specifications/sds-map.json and docs/architecture-sds.md. Survey relevant source,
+        configuration and installed APIs; then independently record retain, extend, correct, replace
+        or add decisions with rationale, impact and migration. Prescribe target repository roles,
+        paths, symbols and signatures without source status, revisions or proof. Never write product
+        code or present a design constraint as deployed behavior."
   - reads:
       - target
       - business
@@ -107,7 +117,11 @@ steps:
       en: Write logical components with responsibilities, exclusions and dependency directions. Contracts
         have one owner, caller/receiver, sync/async/in-process mode, inputs, outcomes/errors,
         authority, timeout, retry, idempotency and compatibility. Import shared views by stable
-        Work/view IDs; never copy or redefine another owner contract.
+        Work/item IDs; never copy or redefine another owner contract. A generic inter-module command
+        requires an advertised recipient capability, versioned payload, valid installations,
+        authority and consent, stable intent plus fingerprint, and recipient-owned effect/receipt.
+        Admission is not delivery or business completion; an unknown response reconciles the same
+        intent. Never create an arbitrary-payload effect endpoint.
   - reads:
       - target
       - business
@@ -116,7 +130,9 @@ steps:
       - node
     action:
       en: Design runtime scenarios referencing canonical SRS flow IDs. Every step names its component,
-        contracts, data, commit point, failure outcome and recovery. Cover significant architectural
+        target repo/path/symbol/signature, callers/callees, contracts, authorization, data,
+        transaction/state decision, return path, failure outcome, recovery and planned verification.
+        Do not attach source status or revision evidence. Cover significant architectural
         differences, including response loss, concurrency, duplicates, ordering, partial success and
         cancellation where relevant.
   - reads:
@@ -128,9 +144,11 @@ steps:
     action:
       en: Specify authoritative versus rebuildable data, storage, isolation, consistency, lifecycle,
         placement, connections and credential custody. For durable customer state, examine database
-        consistency, volumes, config, Secrets/keys, independent backup ownership and recovery order.
-        Select failure domains and HA/recovery depth from actual scope, not a mandatory cluster-loss
-        checklist for every project.
+        consistency, complete backup set, authoritative/derived state, volumes, config, Secrets/keys,
+        custody outside the relevant failure domain, restore destination/order, reconciliation,
+        old-writer fencing and safe effect resumption. Volume bytes alone do not prove recovery.
+        Select failure domains and recovery depth from actual scope, not a mandatory checklist for
+        every project.
   - reads:
       - target
       - business
@@ -140,8 +158,8 @@ steps:
     action:
       en: Challenge one coherent proposal with a materially simpler alternative, rationale, cost,
         downsides and revisit conditions. Patterns are optional; specify actual mechanisms rather
-        than names. Use applicable knowledge and primary technical references with an applicability
-        argument. Do not invent business targets or product policy; make technical choices within
+        than names. Use applicable StarCi knowledge, verified installed APIs and primary technical
+        references with an applicability argument. Do not invent business targets or product policy; make technical choices within
         approved requirements.
   - reads:
       - target
@@ -172,12 +190,16 @@ proofs:
     requirement:
       en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
-        done.
+        done. Legacy specification@3 and sds@4 remain readable compatibility inputs, never new
+        authoring output.
   - id: implementability
     requirement:
-      en: Each significant operation resolves logical owner, contract, data/commit boundary and planned
-        check. Core design choices must not be left for implementers to invent. Source mapping
-        belongs to Implementation.
+      en: Each significant operation resolves logical owner, contract, data/commit boundary, target
+        repo/path/symbol/signature, caller/callee, authorization, state/transaction, return/recovery
+        and planned test location for the selected implementation slice. Proactively walk realistic
+        main, alternative, failure and edge cases and relevant constraints; foreseeable material cases
+        and core choices must not be left for implementers to invent. Explicit unknowns and subsequent
+        empirical refinement do not require theoretical perfection before coding.
   - id: impact-security-coverage
     requirement:
       en: SRS outcomes map to owned contracts, runtime scenarios and design checks. Assess relevant

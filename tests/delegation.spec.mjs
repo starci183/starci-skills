@@ -198,16 +198,23 @@ test('auto does not inherit delegated technical-question classification',t=>{
  assert.throws(()=>authorizeAutoGoal(run,{authorization,assessment:{risk:'low',environment:'isolated-test',reversible:true,reason:'Synthetic local fixture only',evidence:['Synthetic fixture inspected'],hazards:[]}}),/checkpoint|question/i);
 });
 
-test('multi-stage frontend chain cannot reuse stale risk or stale draw proof for the next stage',t=>{
+test('one goal approval covers the cell chain, with current stage checks and separate final acceptance',t=>{
  const f=fixture(t,{count:1});f.plan.workflows[0].workflow='implement-frontend';f.plan.workflows[0].selection.verification='browser-uat';
  const reference=f.register(),goal=f.goal();goal.inputs.requiresBackend=false;
 const matrix=readWorkflow('matrix.json').rows.flat();
  goal.cells=matrix.map((cell,i)=>({...cell,purpose:'Synthetic '+cell.id,finalOutput:'Synthetic typed stage result',criteria:goal.criteria,workTargets:goal.workTargets,inputs:{request:i?{from:'cell',cell:matrix[i-1].id,key:'apiContract'}:{from:'request',key:'request'}},outputSchema:{type:'object',properties:{apiContract:{type:'string'}},required:['apiContract'],additionalProperties:false}}));
  let run=f.shown(reference,0,goal);run=authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review});
+ const entryApprovals=structuredClone(run.approvals);
  const next=cellId=>requestCell(run,cellId,{coordinatorThreadId:'coordinator',taskThreadId:'worker',assessment:f.assessment(run,cellId)});
  assert.throws(()=>next('implement'),/Previous sequential/);
  for(const cell of matrix){const stale=f.assessment(run,cell.id),issued=next(cell.id),r=issued.request;run=acceptCell(issued.run,{cell:r.cell,op:r.op,operation:r.operation,goalDigest:r.goalDigest,scopeDigest:r.scopeDigest,requestDigest:workflowDigest(r),status:'pass',criteria:r.criteria.map(id=>({id,status:'pass',observation:'Synthetic stage check',evidence:['log']})),outputs:{apiContract:'Synthetic '+cell.id},artifacts:[{id:'log',path:'proof-0.log',sha256:sha256(fs.readFileSync(path.join(f.dir,'proof-0.log')))}]},{evidenceRoot:f.dir});if(cell.id==='draw'){assert.throws(()=>requestCell(run,'implement',{coordinatorThreadId:'coordinator',taskThreadId:'worker',assessment:{...stale,stage:'implement'}}),/risk/);fs.writeFileSync(path.join(f.dir,'proof-0.log'),'stale draw');assert.throws(()=>next('implement'),/evidence/);fs.writeFileSync(path.join(f.dir,'proof-0.log'),'Synthetic proof 0');}}
- assert.equal(f.accept(run).status,'accepted');
+ assert.deepEqual(run.approvals,entryApprovals,'Internal cells must not require or manufacture additional coordinator decisions');
+ assert.deepEqual(Object.keys(run.responses),matrix.map(cell=>cell.id));
+ assert.equal(run.status,'awaiting-acceptance');
+ assert.equal(hasDelegatedAcceptance(run),false,'Passing cells are not final coordinator acceptance');
+ const accepted=f.accept(run);
+ assert.equal(accepted.status,'accepted');
+ assert.equal(accepted.approvals.length,entryApprovals.length+1);
 });
 
 test('user-shaped fallback cannot hide invalid scoped acceptance, and revocation blocks result/Work advancement',t=>{

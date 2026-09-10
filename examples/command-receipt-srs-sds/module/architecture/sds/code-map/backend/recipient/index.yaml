@@ -1,0 +1,92 @@
+schema: work/node@2
+id: sds-code-recipient
+kind: architecture
+required: true
+description: Synthetic authored specification leaf.
+state: done
+assertions:
+  - contract-reviewed
+extensions:
+  work3:
+    specification:
+      schema: starci/sds@4
+      op: architecture.decide
+      status: pass
+      id: CU-RECIPIENT
+      nodeType: code-unit
+      name: CU-RECIPIENT
+      summary: Synthetic CU-RECIPIENT; all code units are planned and tests are not executed.
+      refs:
+        - type: code-unit
+          nodeId: sds-code-page
+          itemId: CU-COMMAND-PAGE
+        - type: contract
+          nodeId: sds-contract-command
+          itemId: CMD-V1
+        - type: data
+          nodeId: sds-data-receipt
+          itemId: DATA-RECEIPT
+        - type: flow
+          nodeId: sds-flow-command
+          itemId: FLOW-CMD
+        - type: quality
+          nodeId: sds-quality-idempotency
+          itemId: QUAL-IDEMPOTENCY
+        - type: verification
+          nodeId: sds-verification-command
+          itemId: VER-CMD
+      content:
+        layer: backend
+        responsibility: Validate and execute the named recipient domain command.
+        boundaries: No arbitrary payload execution.
+        owner: Synthetic design owner
+        repository: synthetic-be
+        file: planned/cu-recipient.ts
+        symbol: CU-RECIPIENT
+        signature: "CU-RECIPIENT(command): CommandResult"
+        inputs:
+          - Typed command
+        outputs:
+          - Typed result
+        existence: planned
+        currentObservation: No production source was inspected or claimed.
+        sourceObservation: null
+        plannedChanges:
+          - Create this synthetic code unit.
+        callers:
+          - CU-COMMAND-PAGE
+        callees: []
+        dependencies: []
+        providedInterfaces:
+          - CMD-V1
+        consumedInterfaces: []
+        enforcement:
+          validation: At the named function entry.
+          authorization: Inside recipient handler before data access
+          stateVersion: Compare intent fingerprint and receipt state.
+          transaction: Named InjectEntityManager callback; no Repository facade
+          errorMapping: Map typed result without changing outcome meaning.
+        contractRefs:
+          - CMD-V1
+        dataRefs:
+          - DATA-RECEIPT
+        flowRefs:
+          - FLOW-CMD
+        qualityRefs:
+          - QUAL-IDEMPOTENCY
+        testRefs:
+          - VER-CMD
+completion:
+  inputDigest: bc6b4a8a4e2c811e1a12a929fc064b156173bdcb60aa6c6abe57a3ca8de50267
+  review:
+    schema: starci/design-review@1
+    reviewer: Synthetic fixture reviewer
+    authority: Synthetic runtime regression authority only.
+    reviewedAt: 2026-09-10T00:00:00Z
+    observations:
+      - id: contract-reviewed
+        outcome: pass
+        observation: The synthetic specification is complete enough to exercise runtime bindings; no product
+          or code acceptance is claimed.
+    limitations:
+      - All code units and verification tests are planned and were not executed.

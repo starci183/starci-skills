@@ -1,0 +1,299 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: starci/srs@3
+title: starci/srs@3
+type: object
+additionalProperties: false
+required:
+  - schema
+  - op
+  - status
+  - id
+  - nodeType
+  - name
+  - summary
+  - refs
+  - content
+properties:
+  schema:
+    const: starci/srs@3
+  op:
+    const: business.decide
+  status:
+    enum:
+      - draft
+      - blocked
+      - pass
+  id:
+    $ref: "#/$defs/id"
+  nodeType:
+    enum:
+      - functional-requirement
+      - non-functional-requirement
+      - business-rule
+      - data
+      - customer-journey
+  name:
+    $ref: "#/$defs/text"
+  summary:
+    $ref: "#/$defs/text"
+  refs:
+    type: array
+    items:
+      $ref: "#/$defs/ref"
+  content:
+    type: object
+allOf:
+  - if:
+      properties:
+        nodeType:
+          const: functional-requirement
+      required:
+        - nodeType
+    then:
+      properties:
+        content:
+          $ref: "#/$defs/content-functional-requirement"
+  - if:
+      properties:
+        nodeType:
+          const: non-functional-requirement
+      required:
+        - nodeType
+    then:
+      properties:
+        content:
+          $ref: "#/$defs/content-non-functional-requirement"
+  - if:
+      properties:
+        nodeType:
+          const: business-rule
+      required:
+        - nodeType
+    then:
+      properties:
+        content:
+          $ref: "#/$defs/content-business-rule"
+  - if:
+      properties:
+        nodeType:
+          const: data
+      required:
+        - nodeType
+    then:
+      properties:
+        content:
+          $ref: "#/$defs/content-data"
+  - if:
+      properties:
+        nodeType:
+          const: customer-journey
+      required:
+        - nodeType
+    then:
+      properties:
+        content:
+          $ref: "#/$defs/content-customer-journey"
+$defs:
+  text:
+    type: string
+    minLength: 1
+  id:
+    type: string
+    minLength: 1
+    pattern: ^[^#]+$
+  ref:
+    type: object
+    additionalProperties: false
+    required:
+      - type
+      - nodeId
+      - itemId
+    properties:
+      type:
+        enum:
+          - functional-requirement
+          - non-functional-requirement
+          - business-rule
+          - data
+          - customer-journey
+          - acceptance
+          - flow
+          - branch
+      nodeId:
+        $ref: "#/$defs/id"
+      itemId:
+        $ref: "#/$defs/id"
+  content-functional-requirement:
+    type: object
+    additionalProperties: false
+    required:
+      - goal
+      - source
+      - actors
+      - trigger
+      - preconditions
+      - inputs
+      - flowId
+      - mainFlow
+      - alternativeFlows
+      - exceptionFlows
+      - branchReview
+      - postconditions
+      - businessRuleRefs
+      - nfrRefs
+      - acceptanceCriteria
+    properties:
+      goal:
+        $ref: "#/$defs/text"
+      source:
+        type:
+          - object
+          - "null"
+      actors:
+        type: array
+      trigger:
+        $ref: "#/$defs/text"
+      preconditions:
+        type: array
+      inputs:
+        type: array
+      flowId:
+        $ref: "#/$defs/text"
+      mainFlow:
+        type: array
+      alternativeFlows:
+        type: array
+      exceptionFlows:
+        type: array
+      branchReview:
+        type:
+          - object
+          - "null"
+      postconditions:
+        type: array
+      businessRuleRefs:
+        type: array
+      nfrRefs:
+        type: array
+      acceptanceCriteria:
+        type: array
+  content-non-functional-requirement:
+    type: object
+    additionalProperties: false
+    required:
+      - statement
+      - rationale
+      - source
+      - scope
+      - measurement
+      - target
+      - acceptanceRefs
+    properties:
+      statement:
+        $ref: "#/$defs/text"
+      rationale:
+        $ref: "#/$defs/text"
+      source:
+        type:
+          - object
+          - "null"
+      scope:
+        type:
+          - object
+          - "null"
+      measurement:
+        type:
+          - object
+          - "null"
+      target:
+        type:
+          - object
+          - "null"
+      acceptanceRefs:
+        type: array
+  content-business-rule:
+    type: object
+    additionalProperties: false
+    required:
+      - statement
+      - rationale
+      - source
+      - appliesTo
+      - conditions
+      - outcomes
+    properties:
+      statement:
+        $ref: "#/$defs/text"
+      rationale:
+        $ref: "#/$defs/text"
+      source:
+        type:
+          - object
+          - "null"
+      appliesTo:
+        type: array
+      conditions:
+        type: array
+      outcomes:
+        type: array
+  content-data:
+    type: object
+    additionalProperties: false
+    required:
+      - meaning
+      - owner
+      - classification
+      - attributes
+      - validations
+      - states
+      - transitions
+      - lifecycle
+    properties:
+      meaning:
+        $ref: "#/$defs/text"
+      owner:
+        $ref: "#/$defs/text"
+      classification:
+        $ref: "#/$defs/text"
+      attributes:
+        type: array
+      validations:
+        type: array
+      states:
+        type: array
+      transitions:
+        type: array
+      lifecycle:
+        $ref: "#/$defs/text"
+  content-customer-journey:
+    type: object
+    additionalProperties: false
+    required:
+      - actor
+      - goal
+      - context
+      - start
+      - preconditions
+      - stages
+      - significantPaths
+      - end
+      - outcomeCriteria
+    properties:
+      actor:
+        $ref: "#/$defs/text"
+      goal:
+        $ref: "#/$defs/text"
+      context:
+        $ref: "#/$defs/text"
+      start:
+        $ref: "#/$defs/text"
+      preconditions:
+        type: array
+      stages:
+        type: array
+      significantPaths:
+        type: array
+      end:
+        $ref: "#/$defs/text"
+      outcomeCriteria:
+        type: array

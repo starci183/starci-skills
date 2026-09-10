@@ -36,7 +36,7 @@ support:
   capacity: |-
     A waiting parent does not execute concurrently; total active execution workers across all matrix cells and support calls remains at most three.
 repair:
-  owner: AI coordinator and the selected operator
+  owner: Executing workflow runner and selected operator; Plan coordinator owns boundary decisions and escalations, not in-scope repairs.
   maxAutomaticAttemptsPerStep: 3
   identicalFailure: |-
     Stop unless diagnosis, evidence or repair method changes.

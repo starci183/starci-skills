@@ -13,6 +13,21 @@ useful for implementation mapping, migration planning and observing a mismatch;
 its presence cannot approve a feature, establish a policy or limit the target to
 what already happens to exist.
 
+Architecture work nevertheless inspects the relevant implementation, configuration and installed
+API surface needed to avoid an infeasible target and to plan migration. Keep that survey scoped to
+the selected design concerns, then decide independently whether to retain, extend, correct, replace
+or add a mechanism from accepted SRS and quality constraints. The SDS records the decision,
+rationale, impact and migration—not source revisions, observed status or executed proof.
+
+Think broadly before coding: anticipate realistic main, alternative, failure and edge cases and the
+relevant constraints of the selected slice. Do not excuse foreseeable material omissions; state
+assumptions and consequential unknowns. This thoroughness is compatible with empirical refinement and
+does not demand theoretical perfection of the whole product before any code. Unresolved consequential
+behavior, contract, data, authority or security choices block affected effects; a sufficiently decided
+slice proceeds to implementation/testing. Concrete findings repair the owning contracts and affected
+consumers, re-establish scoped freshness, preserve valid unrelated work and continue. Never hide the
+mismatch, turn uncertainty into design-last, broaden it into a full-tree gate or reuse stale `done`.
+
 A correct implementation of the wrong Business or Architecture is not successful
 delivery. During coding, keep checking the intended outcome and significant
 behavior against the current SRS/SDS, especially at integration boundaries and
@@ -58,7 +73,8 @@ For current `work/node@2` Business overview, split SRS leaves and code-map SDS
 leaves, keep the review inside `completion.review` on the owning `index.yaml`;
 do not create an evidence directory or a second specification copy. The legacy
 cohesive SRS@2 and source-independent SDS@3 formats remain reviewable while they
-are migrated. `completion.inputDigest` binds the reviewed semantic inputs,
+are migrated. The pre-upstream `starci/srs@3` and `starci/sds@4` leaf formats are
+also compatibility inputs only, not new-authoring authority. `completion.inputDigest` binds the reviewed semantic inputs,
 including ancestors and declared imports.
 The review has schema `starci/design-review@1`, declared reviewer and actual
 authority provenance, ISO `reviewedAt`, one concrete passing observation for each

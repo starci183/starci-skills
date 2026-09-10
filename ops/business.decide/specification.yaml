@@ -1,22 +1,16 @@
 schema: starci/specification-policy@1
 storage: .starciwork
 payload: business/overview/index.yaml plus recursive business/srs/**/index.yaml leaves carrying
-  extensions.work3.specification; branches aggregate.
+  extensions.work3.srs section payloads; parent indexes carry only srs-aggregate metadata.
 sourceTruth: Current accepted Business/SRS in .starciwork and actual authorized intent define the
   target; all code is legacy observation, never requirement authority.
 requiredSections:
-  - context
-  - actors
-  - requirements
+  - functional-requirements
+  - non-functional-requirements
+  - business-rules
+  - policy-decisions
   - data
-  - externalInterfaces
-  - flows
-  - security
-  - acceptance
-  - decisions
-  - handoff
-  - journeys
-  - journeyCoverage
+  - customer-journeys
 qualityExecutionOwner:
   - interface.implement
   - backend.implement
@@ -104,20 +98,21 @@ steps:
     action:
       en: Author business/overview/index.yaml with businessOverview for readable purpose, customer
         understanding, outcome, scope and open questions. Author the sole detailed SRS in
-        extensions.work3.specification using starci/specification@2 on cohesive
-        business/srs/**/index.yaml leaves. Intermediate folders are metadata-only aggregates; scale
-        by adding folders, not editing a registry or duplicating a monolithic SRS. Stable
-        FR/BR/NFR/flow/AC IDs and explicit core refs/dependsOn provide traceability. Do not repeat
-        the detailed SRS in a compact business object. Preserve canonical user journeys and never
-        turn internal service hops into UI actions.
+        typed extensions.work3.srs leaves under functional-requirements,
+        non-functional-requirements, business-rules, policy-decisions, data and
+        customer-journeys. Every item owns a folder/index.yaml; every intermediate index carries
+        only starci/srs-aggregate@1 metadata. Keep each FR's flows, branch review,
+        postconditions and acceptance cohesive. Link stable semantic IDs to exact owning Work refs.
   - reads:
       - target
       - repo
       - intent
     writes:
-      - evidence
+      - review
     action:
-      en: Validate detailed requirement/flow/branch/acceptance coverage and the recursive Work graph. Walk
+      en: Validate detailed requirement/flow/branch/acceptance coverage and the recursive Work graph.
+        Apply the state-identity and NFR-target review in docs/business-srs.md; enum order cannot
+        define transitions and configuration prerequisites cannot replace mandatory guarantees. Walk
         the complete scope as a user and downstream designer before first done; check shared
         boundaries, contradictory rules, observable results and significant missing cases. Resolve
         authorized elaboration yourself and ask the actual decision maker only for genuinely
@@ -126,7 +121,21 @@ steps:
         current reviewed required leaves; draft placeholders, green code tests and schema validity
         cannot earn done. Output reviewed business outcomes and observable security/quality
         acceptance for Architecture; no implementation or deployed-proof claim.
-payloadSchema: starci/specification@2
-layout: business/index.yaml aggregates overview/index.yaml and srs/index.yaml; add cohesive folders
-  recursively under srs with no registry. Branches have no stored state or SRS; leaves own complete
-  SRS. Legacy accepted records remain readable without automatic migration.
+payloadSchema: starci/srs-sections@1
+payloadField: extensions.work3.srs
+aggregateSchema: starci/srs-aggregate@1
+sectionSchemas:
+  - starci/srs-functional-requirement@1
+  - starci/srs-non-functional-requirement@1
+  - starci/srs-business-rule@1
+  - starci/srs-policy-decision@1
+  - starci/srs-data-definition@1
+  - starci/srs-customer-journey@1
+compatibilitySchemas:
+  - starci/specification@2
+  - starci/srs@3
+layout: business/index.yaml aggregates overview/index.yaml and srs/index.yaml. SRS has real
+  functional-requirements, non-functional-requirements, business-rules, data and customer-journeys
+  categories; every item has its own folder/index.yaml. Branches have no payload or author state.
+  Legacy specification@2 and srs@3 remain readable under their original checks for recovery or an
+  explicitly authorized migration, but neither is a new-authoring format.

@@ -1,0 +1,5 @@
+schema: work/node@2
+id: sds-deployments
+kind: architecture
+required: true
+description: Deployment aggregate.

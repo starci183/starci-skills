@@ -1,0 +1,5 @@
+schema: work/node@2
+id: srs-frs
+kind: business
+required: true
+description: Functional requirement aggregate.

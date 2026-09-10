@@ -61,6 +61,17 @@ test('read-only validate and tree do not create requests, responses, runs, or me
   }
 });
 
+test('agent-route exposes the first ready external worker for Orca without executing it',()=>{
+  const selected=run('agent-route','starci','interface.implement','codex,claude,qwen');
+  assert.equal(selected.status,0,selected.stderr);
+  const result=JSON.parse(selected.stdout);
+  assert.equal(result.selected.target,'qwen-flash');
+  assert.equal(result.selected.model,'qwen3.8-flash');
+  const fallback=run('agent-route','starci','interface.implement','claude');
+  assert.equal(fallback.status,0,fallback.stderr);
+  assert.equal(JSON.parse(fallback.stdout).selected.target,'claude-opus');
+});
+
 test('legacy audit inventories credentials without echoing values and does not execute scripts', t => {
   const root = temporary(t);
   fs.mkdirSync(path.join(root, 'uat'));

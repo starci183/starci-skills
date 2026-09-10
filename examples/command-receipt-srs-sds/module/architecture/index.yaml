@@ -1,0 +1,7 @@
+schema: work/node@2
+id: module.architecture
+kind: architecture
+required: true
+description: Synthetic Architecture aggregate.
+refs:
+  - module.business

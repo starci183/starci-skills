@@ -2,6 +2,10 @@ schema: starci/sds-map@1
 purpose: A filesystem code map that traces accepted business flows through target source units, contracts, data, quality mechanisms, deployment and verification.
 payload: extensions.work3.sds
 aggregateSchema: starci/sds-aggregate@1
+overview:
+  type: overview
+  schema: starci/sds-overview@1
+  required: [id, title, status, businessRefs, designGoals, scope, actors, systemContext, qualityStrategy, decisions, constraints, topologyRefs, implementationHandoff]
 sections:
   flows:
     type: flow
@@ -36,6 +40,8 @@ sections:
     schema: starci/sds-verification@1
     required: [id, title, businessAcceptanceRefs, scopeRefs, level, setup, steps, expected, securityChecks, performanceChecks, failureChecks, evidence]
 rules:
+  - Architecture overview is one structured starci/sds-overview@1 payload at architecture/overview/index.yaml. It summarizes accepted SRS scope, context and independently selected target-design dispositions; prose alone cannot complete it.
+  - Inspect only relevant current source, configuration and installed APIs to establish feasibility and migration impact. Record retain, extend, correct, replace or add decisions with rationale; observations never override SRS or become implementation proof.
   - SDS is a source-of-truth design contract derived from SRS and design decisions, never from current source code. Source observations, revisions and implementation proof are forbidden.
   - Flow is the primary route. Every main, alternative and exception sequence references exact code units and ends in an observable application or receiver result.
   - Code units prescribe repository role, target path and symbols as the design source of truth. Implementation owns actual code and revision proof.

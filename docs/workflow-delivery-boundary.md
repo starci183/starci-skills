@@ -26,6 +26,15 @@ improvement; do not count paperwork milestones as product delivery.
 
 ## Coordinator owns decisions, executor owns delivery
 
+Distinguish the Plan coordinator from the executing task's workflow runner. The
+runner dispatches operators, validates cell responses and manages bounded repairs
+inside an already approved workflow. Legacy engine labels such as "coordinator
+gate" or `explicit-coordinator-only` refer to this internal transition gate, not
+an instruction for the Plan coordinator to operate tools or approve every cell.
+The runner cannot grant goal approval or final acceptance on the coordinator's
+behalf. Current cell checks retain the actual mandate and approval identities;
+they do not create another conversation decision.
+
 A delegated coordinator manages the complete Plans, their dependencies and exclusive
 shared ownership. At entry, approve or reject the concrete goal against current
 SRS/SDS, prerequisites, scope and risk. If rejected, return the specific unmet

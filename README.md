@@ -119,7 +119,9 @@ A typical new feature covers business → architecture → backend → frontend,
 
 Finishing one workflow does not finish the Plan. Passing metadata validation does not prove the product works. A `done` claim must have current evidence for its selected scope, and downstream status can become stale when upstream inputs change.
 
-See [Business overview and nested SRS](docs/business-srs.md) for the `business/overview/index.yaml` and `business/srs/**/index.yaml` layout, a complete worked example and version-1 migration boundaries.
+See [Business overview and nested SRS](docs/business-srs.md) for the split functional, non-functional, business-rule, policy-decision, data and customer-journey section contracts. See [Architecture SDS](docs/architecture-sds.md) for the sectioned target code map. Legacy and pre-upstream compatibility specifications remain readable; new authoring uses `specifications/srs-sections.json` and `specifications/sds-map.json`, and migration requires current review.
+
+`examples/command-receipt-srs-sds/` is retained only as a regression fixture for the pre-upstream `starci/srs@3` and `starci/sds@4` compatibility readers. Do not copy it as the current authoring template.
 
 See [Expandable Work tree](docs/work-tree.md) for recursive Business, Architecture,
 UI, BE/FE and UAT scopes, collocated images/videos, `interface.draw` ownership and

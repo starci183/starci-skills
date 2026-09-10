@@ -2,6 +2,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../core/yaml.mjs';
 
+// Operator validation must run while bootstrapping a source package before .dist exists.
+// Keep these authoring identities explicit here and regression-check them against the
+// published specification contracts; importing runtime readers would create a build cycle.
+const AUTHORING_POLICIES=Object.freeze({
+  'business.decide':Object.freeze({
+    contractSchema:'starci/srs-sections@1',payloadField:'extensions.work3.srs',aggregateSchema:'starci/srs-aggregate@1',
+    sections:Object.freeze(['functional-requirements','non-functional-requirements','business-rules','policy-decisions','data','customer-journeys']),
+    sectionSchemas:Object.freeze(['starci/srs-functional-requirement@1','starci/srs-non-functional-requirement@1','starci/srs-business-rule@1','starci/srs-policy-decision@1','starci/srs-data-definition@1','starci/srs-customer-journey@1']),
+    compatibilitySchemas:Object.freeze(['starci/specification@2','starci/srs@3'])
+  }),
+  'architecture.decide':Object.freeze({
+    contractSchema:'starci/sds-map@1',payloadField:'extensions.work3.sds',aggregateSchema:'starci/sds-aggregate@1',
+    sections:Object.freeze(['flows','code-map','contracts','data','quality','deployment','decisions','verification']),
+    sectionSchemas:Object.freeze(['starci/sds-overview@1','starci/sds-flow@1','starci/sds-code-unit@1','starci/sds-contract@1','starci/sds-data-model@1','starci/sds-quality@1','starci/sds-deployment@1','starci/sds-decision@1','starci/sds-verification@1']),
+    compatibilitySchemas:Object.freeze(['starci/specification@3','starci/sds@4'])
+  })
+});
+
 const nonempty = value=>typeof value==='string'&&value.trim().length>0;
 const safeRelative = value=>nonempty(value)&&!path.posix.isAbsolute(value)&&!path.win32.isAbsolute(value)&&!value.split(/[\\/]/).some(p=>p==='..'||p==='.')&&!value.includes('\\');
 const unique = values=>new Set(values).size===values.length;
@@ -92,7 +110,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles,documents=
         for(const error of checked.errors) issue(errors,'MODE_'+error.code,at+':'+mode,error.message);
       }
     }
-    const graphLocation=at==='architecture.decide'?'Canonical .starciwork SRS/SDS owners and collocated assets':'.starciwork node dependsOn/refs with direct sourceRefs and collocated assets';
+    const graphLocation=at==='architecture.decide'?'Canonical .starciwork SRS/SDS owners and collocated assets':at==='business.decide'?'.starciwork node dependsOn/refs and collocated assets':'.starciwork node dependsOn/refs with direct sourceRefs and collocated assets';
     if(!c.graphPolicy||!['read-only','selected-scope-only'].includes(c.graphPolicy.mode)||c.graphPolicy.prerequisiteState!=='done'||c.graphPolicy.dispatch!=='never'||c.graphPolicy.location!==graphLocation) issue(errors,'GRAPH_POLICY',at,'Graph authority must live in .starciwork, require done prerequisites and never dispatch automatically');
     if(c.graphPolicy?.mode==='read-only'&&c.writes.some(w=>w.id==='node'&&w.fields?.some(f=>['dependsOn','refs','required'].includes(f)))) issue(errors,'CONSUMER_GRAPH_WRITE',at,'A consumer op cannot silently rewrite scope/input graph fields');
     if(c.migrationPolicy) {
@@ -101,12 +119,13 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles,documents=
       if(!c.reads.some(r=>r.id==='inventory')||!c.reads.some(r=>r.id==='custody')||!c.writes.some(w=>w.id==='node'&&w.fields?.includes('activity')&&w.fields?.includes('blockers'))||!c.writes.some(w=>w.id==='resources'&&w.fields?.includes('files:[{path}]'))||!['source','preservation','investigation-state','cleanup'].every(id=>c.proofs.some(p=>p.id===id))) issue(errors,'MIGRATION_BINDING',at,'Migration requires actual inventory/custody, uninvestigate source scope and independent preservation/import/cleanup proofs');
     }
     if(['business.decide','architecture.decide'].includes(at)) {
-      const field=at==='business.decide'?'business':'architecture';
       const architecture=at==='architecture.decide';
-      if(c.specificationPolicy?.storage!=='.starciwork'||!c.specificationPolicy?.payload?.includes(field)||!c.writes.some(w=>w.fields.includes('extensions.work3.specification')&&(architecture?!w.fields.includes('sourceRefs'):w.fields.includes('sourceRefs')))||c.specificationPolicy?.payloadSchema!==(architecture?'starci/specification@3':'starci/specification@2')||!c.proofs.some(p=>p.id==='impact-security-coverage')) issue(errors,'SPECIFICATION_POLICY',at,'Business owns SRS@2; Architecture owns source-independent SDS@3 with canonical requirement references');
+      const expected=AUTHORING_POLICIES[at],payloadField=expected.payloadField;
+      const nodeWrite=c.writes.find(w=>w.id==='node'),policy=c.specificationPolicy;
+      if(policy?.storage!=='.starciwork'||!policy?.payload?.includes(architecture?'architecture':'business')||!policy?.payload?.includes(payloadField)||!nodeWrite?.fields.includes(payloadField)||nodeWrite?.fields.includes('extensions.work3.specification')||nodeWrite?.fields.includes('sourceRefs')||policy?.payloadSchema!==expected.contractSchema||policy?.payloadField!==payloadField||policy?.aggregateSchema!==expected.aggregateSchema||JSON.stringify(policy?.requiredSections)!==JSON.stringify(expected.sections)||JSON.stringify(policy?.sectionSchemas)!==JSON.stringify(expected.sectionSchemas)||JSON.stringify(policy?.compatibilitySchemas)!==JSON.stringify(expected.compatibilitySchemas)||!c.proofs.some(p=>p.id==='impact-security-coverage')) issue(errors,'SPECIFICATION_POLICY',at,'Business must author split SRS section@1 payloads and Architecture must author split SDS code-map section@1 payloads; specification@2/@3 and srs@3/sds@4 are compatibility readers only');
     }
     if(at==='interface.draw'&&(!['repo','architecture','knowledge'].every(id=>c.reads.some(r=>r.id===id))||!c.writes.some(w=>w.id==='draws'))) issue(errors,'DRAW_HANDOFF',at,'Draw must read source/architecture/knowledge and always return draws');
-    if(at==='architecture.decide'&&(!['businessRefs','designRefs','views','decisions','checks','limitations'].every(k=>c.specificationPolicy?.requiredSections?.includes(k))||c.specificationPolicy?.analysisPolicy!=='context-driven'||c.reads.some(r=>r.id==='repo'))) issue(errors,'ARCHITECTURE_DEPTH',at,'Architecture requires source-independent design views, context-driven challenge, owned references, checks and limitations');
+    if(at==='architecture.decide'&&(c.specificationPolicy?.analysisPolicy!=='context-driven'||c.reads.some(r=>r.id==='source')||c.writes.some(w=>w.id==='source'||w.fields?.includes('sourceRefs')||/repository:<repo-id>/.test(w.path??'')))) issue(errors,'ARCHITECTURE_DEPTH',at,'Architecture requires a context-driven target code map without source observations, revisions or product-code effects');
     if(['interface.implement','backend.implement'].includes(at)) {
       const checks=at==='backend.implement'?['lint','typecheck','unit','backend-e2e','coverage','build','sonar']:['lint','typecheck','tests','coverage','build','sonar'];
       if(c.qualityPolicy?.owner!==at||JSON.stringify(c.qualityPolicy?.checks)!==JSON.stringify(checks)||c.qualityPolicy?.missingRunner!=='blocked'||c.qualityPolicy?.canDelegateResponsibility!==false||!c.proofs.some(p=>p.id==='implementation-quality')) issue(errors,'IMPLEMENT_QUALITY',at,'Implement owns all quality checks and blocks missing proof');

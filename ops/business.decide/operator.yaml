@@ -8,7 +8,7 @@ completionProfile: business
 sideEffects: []
 graphPolicy:
   mode: selected-scope-only
-  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  location: .starciwork node dependsOn/refs and collocated assets
   prerequisiteState: done
   dispatch: never
 reads:
@@ -46,7 +46,7 @@ reads:
   - id: profile
     path: profiles/registry.json + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Select the actual host runtime codex or claude and this operator role from the V2-derived active
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
         permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
@@ -56,36 +56,33 @@ writes:
     path: .starciwork/<business>/business/**/index.yaml
     fields:
       - businessOverview
-      - extensions.work3.specification
-      - sourceRefs
+      - extensions.work3.srs
       - refs
       - assertions
       - dependsOn
       - required
     content:
       en: Author business/overview/index.yaml with businessOverview for readable purpose, customer
-        understanding, outcome, scope and open questions. Author the sole detailed SRS in
-        extensions.work3.specification using starci/specification@2 on cohesive
-        business/srs/**/index.yaml leaves. Intermediate folders are metadata-only aggregates; scale
-        by adding folders, not editing a registry or duplicating a monolithic SRS. Stable
-        FR/BR/NFR/flow/AC IDs and explicit core refs/dependsOn provide traceability. Do not repeat
-        the detailed SRS in a compact business object. Preserve canonical user journeys and never
-        turn internal service hops into UI actions.
-  - id: evidence
-    path: E/manifest.yaml + E/coverage-review.md
+        understanding, outcome, scope and open questions. Author typed extensions.work3.srs leaves
+        under functional-requirements, non-functional-requirements, business-rules,
+        policy-decisions, data and customer-journeys. Every item owns a folder/index.yaml; every
+        intermediate index carries only starci/srs-aggregate@1 metadata. Keep each FR's main,
+        alternative and exception flows, branch review, postconditions and acceptance together.
+        Stable semantic refs resolve through exact owning Work refs without copying.
+  - id: review
+    path: N/index.yaml
     fields:
-      - id
-      - nodeId
-      - inputDigest
-      - outcome
-      - assertions
-      - assets
-      - provenance
-      - codeRefs
-      - extensions
+      - completion.inputDigest
+      - completion.review.schema
+      - completion.review.reviewer
+      - completion.review.authority
+      - completion.review.reviewedAt
+      - completion.review.observations
+      - completion.review.limitations
     content:
-      en: Record requirement-to-acceptance coverage, concrete source observations and unresolved
-        contradictions; a specification review is not implementation evidence.
+      en: Record current requirement-to-acceptance review on the owning node after contradictions and
+        blockers are resolved. This is not implementation evidence and never carries a prior done or
+        rewritten digest across changed content.
   - id: matrixHandoff
     path: E/job-result.yaml
     fields:
@@ -114,8 +111,8 @@ steps:
       - node
     action:
       en: Resolve the canonical .starciwork workspace and selected business leaf. Research accepted
-        intent, domain documents and current FE/BE callers at exact revisions. Classify every
-        citation as accepted intent, observed source, proposal or unknown; source behavior never
+        intent and supplied domain documents. Classify every citation as accepted intent, observed
+        source, proposal or unknown; source behavior never
         approves policy. Resolve the execution profile and actual tool availability before selecting
         instruments; this does not switch the model/runtime or spawn workers.
   - reads:
@@ -170,21 +167,19 @@ steps:
     writes:
       - node
     action:
-      en: Author business/overview/index.yaml with businessOverview for readable purpose, customer
-        understanding, outcome, scope and open questions. Author the sole detailed SRS in
-        extensions.work3.specification using starci/specification@2 on cohesive
-        business/srs/**/index.yaml leaves. Intermediate folders are metadata-only aggregates; scale
-        by adding folders, not editing a registry or duplicating a monolithic SRS. Stable
-        FR/BR/NFR/flow/AC IDs and explicit core refs/dependsOn provide traceability. Do not repeat
-        the detailed SRS in a compact business object. Preserve canonical user journeys and never
-        turn internal service hops into UI actions.
+      en: Author business/overview/index.yaml for readable intent and typed extensions.work3.srs
+        leaves under functional-requirements, non-functional-requirements, business-rules,
+        policy-decisions, data and customer-journeys. Every item owns a folder/index.yaml;
+        intermediate indexes carry only starci/srs-aggregate@1 metadata. Keep each FR's flows,
+        branch review, postconditions and acceptance cohesive, and connect semantic IDs to exact
+        owning Work refs.
   - reads:
       - target
       - repo
       - intent
       - matrix
     writes:
-      - evidence
+      - review
       - matrixHandoff
     action:
       en: Validate detailed requirement/flow/branch/acceptance coverage and the recursive Work graph.
@@ -208,7 +203,8 @@ proofs:
     requirement:
       en: Every FR has a detailed actor flow and acceptance, every alternative/exception has ordered steps
         and postconditions, and security has observable negative acceptance. Validate nested
-        ownership and version-2 SRS; no code/service inventory is required in Business.
+        ownership and every split SRS section contract; no code/service inventory is required in
+        Business. Legacy specification@2 and srs@3 are compatibility inputs, never new output.
 blockers:
   - code: BUSINESS_UNKNOWN
     condition:

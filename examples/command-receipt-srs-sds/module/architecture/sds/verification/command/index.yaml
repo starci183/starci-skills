@@ -1,0 +1,104 @@
+schema: work/node@2
+id: sds-verification-command
+kind: architecture
+required: true
+description: Synthetic authored specification leaf.
+state: done
+assertions:
+  - contract-reviewed
+extensions:
+  work3:
+    specification:
+      schema: starci/sds@4
+      op: architecture.decide
+      status: pass
+      id: VER-CMD
+      nodeType: verification
+      name: Command safety scenarios
+      summary: Synthetic Command safety scenarios; all code units are planned and tests are not executed.
+      refs:
+        - type: acceptance
+          nodeId: srs-fr-command
+          itemId: AC-CMD-OK
+        - type: acceptance
+          nodeId: srs-fr-command
+          itemId: AC-CMD-OFFLINE
+        - type: acceptance
+          nodeId: srs-fr-command
+          itemId: AC-CMD-UNKNOWN
+        - type: acceptance
+          nodeId: srs-fr-command
+          itemId: AC-CMD-CONFLICT
+        - type: non-functional-requirement
+          nodeId: srs-nfr-command
+          itemId: NFR-CMD-RELIABILITY
+        - type: flow
+          nodeId: sds-flow-command
+          itemId: FLOW-CMD
+        - type: code-unit
+          nodeId: sds-code-page
+          itemId: CU-COMMAND-PAGE
+        - type: code-unit
+          nodeId: sds-code-router
+          itemId: CU-ROUTER
+        - type: code-unit
+          nodeId: sds-code-recipient
+          itemId: CU-RECIPIENT
+      content:
+        businessRefs:
+          - AC-CMD-OK
+          - AC-CMD-OFFLINE
+          - AC-CMD-UNKNOWN
+          - AC-CMD-CONFLICT
+        flowRefs:
+          - FLOW-CMD
+        branchRefs:
+          - ALT-OFFLINE
+          - EX-UNKNOWN
+        codeUnitRefs:
+          - CU-COMMAND-PAGE
+          - CU-ROUTER
+          - CU-RECIPIENT
+        nfrRefs:
+          - NFR-CMD-RELIABILITY
+        tests:
+          - repository: synthetic-be
+            file: test/command.e2e-spec.ts
+            case: same intent outcome reconciliation
+            existence: planned
+        fixtures:
+          - Two isolated installations and a consented named capability.
+        actorAuthority: Authorized source operator; wrong target and revoked consent negative actors.
+        preconditions:
+          - No existing receipt except duplicate cases.
+        actions:
+          - Submit valid, duplicate, conflicting and wrong-scope commands.
+        faults:
+          - Target unavailable
+          - Response loss after commit
+        expectedData:
+          - Exactly one authoritative receipt per intent.
+        expectedEffects:
+          - At most one recipient domain effect.
+        expectedResponse:
+          - Typed success/unavailable/forbidden/conflict/outcome-unknown.
+        expectedAppState:
+          - UI displays success, scoped unavailable, conflict or reconciliation.
+        forbiddenChanges:
+          - Shared router never performs recipient domain effects.
+        measurements: []
+        executionEvidence: null
+completion:
+  inputDigest: 9cde35aad17be57fca680fa3525b60dbbcc1a65ccdef85167f47744e45bff440
+  review:
+    schema: starci/design-review@1
+    reviewer: Synthetic fixture reviewer
+    authority: Synthetic runtime regression authority only.
+    reviewedAt: 2026-09-10T00:00:00Z
+    observations:
+      - id: contract-reviewed
+        outcome: pass
+        observation: The synthetic specification is complete enough to exercise runtime bindings; no product
+          or code acceptance is claimed.
+    limitations:
+      - All code units and verification tests are planned and were not executed.

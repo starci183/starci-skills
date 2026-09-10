@@ -104,3 +104,5 @@ business/srs/
 Run `node bin/starci.mjs validate <work-root>`. The validator checks folder/schema matching, parent/leaf ownership, semantic ID uniqueness, FR flow/step/acceptance joins, typed references, journey coverage and data transitions. It does not prove stakeholder acceptance, complete reasoning, implementation or production behavior.
 
 Draft and blocked payloads cannot earn completed Work. Reorganizing folders changes semantic ancestry; preserve old proof and establish new review for changed content. Current accepted SRS remains the input to SDS, UI, implementation and UAT.
+
+The compatibility reader also accepts the pre-upstream `starci/srs@3` leaf format for recovery and explicitly authorized migration. Do not use it for new authoring: new SRS content uses the section schemas published in `specifications/srs-sections.json`. Migration preserves stable IDs and useful evidence but requires a fresh scoped review; it never copies stale `done` state.

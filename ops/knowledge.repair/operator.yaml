@@ -44,7 +44,7 @@ reads:
   - id: profile
     path: profiles/registry.json + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Select the actual host runtime codex or claude and this operator role from the V2-derived active
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
         proof. Capabilities are the intersection of actual tools, selected profile policy, op
         permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles

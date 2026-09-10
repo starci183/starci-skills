@@ -1,7 +1,7 @@
 schema: starci/source-layout@1
-purpose: Enforce one current StarCi host in backend, one backend-owned product workspace, and a clean frontend source without duplicate project state.
+purpose: Enforce one explicit StarCi host, one backend-owned product workspace, and clean routed product sources without duplicate runtime or route-registry identities.
 roles:
-  be:
+  host:
     required:
       - path: .git
         type: git-marker
@@ -11,14 +11,28 @@ roles:
         type: file
       - path: .claude/SKILL.md
         type: file
-      - path: .stacks
+      - path: .workspaces/projects
         type: directory
+    requiredAny: []
+    forbidden:
+      - .claude-v3
+      - .claude_legacy
+      - .claude-vip
+      - .claude-starci-ultimate
+    forbiddenIdentities: []
+    content:
+      - path: AGENTS.md
+        includes: .claude/SKILL.md
+      - path: CLAUDE.md
+        includes: .claude/SKILL.md
+  be:
+    required:
+      - path: .git
+        type: git-marker
       - path: .starciwork/workspace.yaml
         type: file
       - path: .starciwork/features/index.yaml
         type: file
-      - path: .workspaces
-        type: directory
       - path: package.json
         type: json-file
       - path: pnpm-workspace.yaml
@@ -43,29 +57,25 @@ roles:
       - .work
       - .starci
       - .starcitemp
-    content:
-      - path: AGENTS.md
-        includes: .claude/SKILL.md
-      - path: CLAUDE.md
-        includes: .claude/SKILL.md
+    forbiddenIdentities:
+      - id: starci-runtime
+        paths:
+          - .claude/SKILL.md
+        minimum: 1
+      - id: workspace-route-registry
+        paths:
+          - .workspaces/projects
+          - .workspaces/local/routes
+        minimum: 1
+    content: []
   fe:
     required:
       - path: .git
         type: git-marker
-      - path: AGENTS.md
-        type: file
-      - path: CLAUDE.md
-        type: file
       - path: package.json
         type: json-file
       - path: pnpm-workspace.yaml
         type: file
-      - path: tsconfig.json
-        type: file
-      - path: src
-        type: directory
-      - path: public
-        type: directory
     requiredAny:
       - id: frontend-source-roots
         paths:
@@ -74,21 +84,29 @@ roles:
           - src
         minimum: 1
     forbidden:
-      - .claude
       - .claude-v3
       - .claude_legacy
       - .claude-vip
       - .claude-starci-ultimate
-      - .stacks
       - .starciwork
-      - .workspaces
       - .work
       - .starci
       - .starcitemp
+    forbiddenIdentities:
+      - id: starci-runtime
+        paths:
+          - .claude/SKILL.md
+        minimum: 1
+      - id: workspace-route-registry
+        paths:
+          - .workspaces/projects
+          - .workspaces/local/routes
+        minimum: 1
     content: []
 pairRules:
-  - Backend and frontend roots are distinct real directories.
-  - Backend owns the only .claude runtime, .stacks and .starciwork for the project.
-  - Frontend keeps framework instructions in AGENTS.md and CLAUDE.md, but no StarCi runtime or product workspace copy.
+  - Host, backend and frontend are explicit real directories; backend and frontend are distinct. Host may equal backend only when both roles explicitly resolve to the same real directory.
+  - Host owns the only .claude/SKILL.md runtime identity and .workspaces project/route registry. Backend owns the project's only .starciwork.
+  - Routed backend and frontend sources contain no duplicate StarCi runtime or route-registry identity and no product workspace outside the backend-owned .starciwork.
+  - A project-owned .claude or .workspaces directory without those identity markers is not rejected by name alone; .stacks may hold legitimate repository deployment knowledge.
   - The bound Work root is exactly <backend>/.starciwork and contains features/index.yaml.
   - Required path checks do not prove application behavior, build success, source completeness or production readiness.

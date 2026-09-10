@@ -63,6 +63,11 @@ sections:
         contract completely. No preset skill layer or automatic successor exists. A question may
         remain read-only. Unmatched/ad hoc jobs use direct-task → task.execute; unknown explicit
         workflow names are not silently substituted.
+      - In Orca, keep that workflow common to the resolved workspace and modules. Each emitted cell
+        binds one ordered external-agent chain from profiles/registry.json. The operator chain is
+        explicit and overrides the owning skill default; otherwise it inherits that default. Select
+        the first observed ready candidate. Fall through only for an allowed failure after verified
+        no effects; never duplicate partial or unknown effects across providers.
       - Each cell owns a complete request-bound job. Select exact scope, actual inputs, permitted
         effects and required criteria; no catalog text grants new authority. Reuse existing
         authorization. For missing material intent or uncertain remote effects inspect/reconcile

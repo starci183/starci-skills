@@ -12,6 +12,8 @@ specifications/validate.mjs
 specifications/sds.mjs
 specifications/sds-map.mjs
 specifications/srs-sections.mjs
+specifications/srs-v3.mjs
+specifications/sds-v4.mjs
 specifications/v2.mjs
 profiles/select.mjs
 scripts/config.mjs

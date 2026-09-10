@@ -2,7 +2,7 @@ import {readDistJson} from '../core/runtime-root.mjs';
 
 export const SDS_MAP_CONTRACT=readDistJson('specifications','sds-map.json');
 export const SDS_AGGREGATE_SCHEMA=SDS_MAP_CONTRACT.aggregateSchema;
-export const SDS_MAP_SCHEMAS=Object.freeze(Object.fromEntries(Object.values(SDS_MAP_CONTRACT.sections).map(section=>[section.type,section.schema])));
+export const SDS_MAP_SCHEMAS=Object.freeze(Object.fromEntries([SDS_MAP_CONTRACT.overview,...Object.values(SDS_MAP_CONTRACT.sections)].map(section=>[section.type,section.schema])));
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const text=value=>typeof value==='string'&&value.trim().length>0;
 const texts=(value,{empty=false}={})=>Array.isArray(value)&&(empty||value.length>0)&&value.every(text)&&new Set(value).size===value.length;
@@ -15,6 +15,7 @@ const hasImplementationProvenance=value=>{
 
 export function classifySDSPath(relative,hasChildren=false){
  const parts=relative.replaceAll('\\','/').split('/'),architecture=parts.lastIndexOf('architecture'),sds=architecture>=0?parts.indexOf('sds',architecture+1):-1;
+ if(architecture>=0&&parts.slice(architecture+1).join('/')==='overview/index.yaml')return {aggregate:false,type:SDS_MAP_CONTRACT.overview.type,category:'overview',expectedSchema:SDS_MAP_CONTRACT.overview.schema};
  if(sds<0||parts.at(-1)!=='index.yaml')return null;
  const tail=parts.slice(sds+1,-1);if(!tail.length)return {aggregate:true,section:'sds',expectedSchema:SDS_AGGREGATE_SCHEMA};
  const category=tail[0],contract=SDS_MAP_CONTRACT.sections[category];if(!contract)return {aggregate:false,type:null,category,expectedSchema:null};
@@ -23,13 +24,18 @@ export function classifySDSPath(relative,hasChildren=false){
 }
 
 function local(payload,type){
- const errors=[],fail=message=>errors.push(message),section=Object.values(SDS_MAP_CONTRACT.sections).find(item=>item.type===type);
+ const errors=[],fail=message=>errors.push(message),section=[SDS_MAP_CONTRACT.overview,...Object.values(SDS_MAP_CONTRACT.sections)].find(item=>item.type===type);
  if(!object(payload)){fail('Typed SDS payload is required.');return errors;}
  if(payload.schema!==section?.schema)fail(`Expected ${section?.schema}.`);
  if(hasImplementationProvenance(payload))fail('SDS is independent of source code; source observations, revisions and implementation proof belong to Implementation.');
  for(const key of section?.required??[])if(!Object.hasOwn(payload,key))fail(`Missing ${key}.`);
  if(!text(payload.id)||!text(payload.title))fail('Stable id and title are required.');
  if(payload.status!==undefined&&!['draft','ready','blocked','accepted','proposed'].includes(payload.status))fail('Unsupported SDS status.');
+ if(type==='overview'){
+  for(const key of ['businessRefs','designGoals','actors','systemContext','qualityStrategy','constraints','topologyRefs','implementationHandoff'])if(!texts(payload[key]))fail(`${key} must be a non-empty unique text array.`);
+  if(!object(payload.scope)||!texts(payload.scope.in)||!texts(payload.scope.out)||!Array.isArray(payload.decisions)||!payload.decisions.length)fail('Overview needs explicit in/out scope and design decisions.');
+  if(Array.isArray(payload.decisions))for(const decision of payload.decisions)if(!object(decision)||!text(decision.concern)||!['retain','extend','correct','replace','add'].includes(decision.disposition)||!text(decision.rationale)||!text(decision.impact)||!text(decision.migration))fail('Each overview decision needs concern, retain/extend/correct/replace/add disposition, rationale, impact and migration.');
+ }
  if(type==='flow'){
   if(!Array.isArray(payload.businessRefs)||!payload.businessRefs.length||!object(payload.entryPoint)||!text(payload.entryPoint.channel)||!text(payload.entryPoint.trigger)||!text(payload.entryPoint.codeUnitRef)||!texts(payload.preconditions,{empty:true})||!Array.isArray(payload.inputs)||!texts(payload.participants))fail('SDS flow needs Business refs, an exact entry point, preconditions, inputs and participants.');
   const alternatives=payload.alternativeSequences,exceptions=payload.exceptionSequences,sequences=[payload.mainSequence,...(Array.isArray(alternatives)?alternatives:[]),...(Array.isArray(exceptions)?exceptions:[])];
@@ -63,11 +69,11 @@ function local(payload,type){
  return errors;
 }
 
-export function validateSDSMap(entries,srsEntries=[]){
+export function validateSDSMap(entries,srsEntries=[],businessEntries=[]){
  const issues=[],add=(entry,code,message)=>issues.push({code,path:entry.path,message}),byId=new Map();
  for(const entry of entries){const {classification,payload}=entry;if(classification.aggregate){if(payload!==undefined&&payload?.schema!==SDS_AGGREGATE_SCHEMA)add(entry,'SDS_AGGREGATE','SDS parent indexes may contain only starci/sds-aggregate@1 metadata.');continue;}if(!classification.type){add(entry,'SDS_SECTION_PATH','Unsupported SDS section folder.');continue;}for(const message of local(payload,classification.type))add(entry,'SDS_MAP',message);if(object(payload)&&text(payload.id)){if(byId.has(payload.id))add(entry,'SDS_ID',`Duplicate SDS id ${payload.id}.`);else byId.set(payload.id,entry);}}
  const resolve=(entry,ids,type,label,{empty=false}={})=>{if(!Array.isArray(ids)||(!empty&&!ids.length)){add(entry,'SDS_REF',`${label} references are required.`);return;}for(const id of ids){const target=byId.get(id);if(!target||target.classification.type!==type)add(entry,'SDS_REF',`${label} ${id} does not resolve to ${type}.`);}};
- const business=new Map(),flows=new Map(),acceptance=new Map();for(const entry of srsEntries){const payload=entry.payload;if(!object(payload)||!text(payload.id))continue;business.set(payload.id,entry);if(entry.classification.type==='functional-requirement'){for(const flow of [payload.mainFlow,...(payload.alternativeFlows??[]),...(payload.exceptionFlows??[])])if(object(flow)&&text(flow.id))flows.set(flow.id,entry);for(const ac of payload.acceptanceCriteria??[])if(object(ac)&&text(ac.id))acceptance.set(ac.id,entry);}}
+ const business=new Map(),flows=new Map(),acceptance=new Map();for(const entry of businessEntries)if(text(entry.nodeId))business.set(entry.nodeId,entry);for(const entry of srsEntries){const payload=entry.payload;if(text(entry.nodeId))business.set(entry.nodeId,entry);if(!object(payload)||!text(payload.id))continue;business.set(payload.id,entry);if(entry.classification.type==='functional-requirement'){for(const flow of [payload.mainFlow,...(payload.alternativeFlows??[]),...(payload.exceptionFlows??[])])if(object(flow)&&text(flow.id))flows.set(flow.id,entry);for(const ac of payload.acceptanceCriteria??[])if(object(ac)&&text(ac.id))acceptance.set(ac.id,entry);}}
  const businessRef=(entry,ref)=>{if(!object(ref)||!texts(ref.requirementIds)||!texts(ref.flowIds)||!texts(ref.acceptanceIds))return add(entry,'SDS_BUSINESS','Business refs need requirement, flow and acceptance IDs.');for(const id of ref.requirementIds)if(!business.has(id))add(entry,'SDS_BUSINESS',`Unknown SRS requirement ${id}.`);for(const id of ref.flowIds)if(!flows.has(id))add(entry,'SDS_BUSINESS',`Unknown SRS flow ${id}.`);for(const id of ref.acceptanceIds)if(!acceptance.has(id))add(entry,'SDS_BUSINESS',`Unknown SRS acceptance ${id}.`);};
  for(const entry of entries.filter(item=>!item.classification.aggregate)){const payload=entry.payload,type=entry.classification.type;if(!object(payload))continue;
   if(type==='flow'){
@@ -80,7 +86,8 @@ export function validateSDSMap(entries,srsEntries=[]){
   if(type==='quality'){for(const id of payload.businessRefs??[])if(!business.has(id)&&!flows.has(id))add(entry,'SDS_BUSINESS',`Unknown quality Business ref ${id}.`);for(const id of payload.scopeRefs??[])if(!byId.has(id))add(entry,'SDS_REF',`Unknown quality scope ${id}.`);resolve(entry,payload.verificationRefs,'verification','Quality verification');}
   if(type==='deployment')for(const placement of payload.placements??[])resolve(entry,[placement.codeUnitRef],'code-unit','Deployment placement');
   if(type==='verification'){for(const id of payload.businessAcceptanceRefs??[])if(!acceptance.has(id))add(entry,'SDS_BUSINESS',`Unknown verification acceptance ${id}.`);for(const id of payload.scopeRefs??[])if(!byId.has(id))add(entry,'SDS_REF',`Unknown verification scope ${id}.`);}
-  if(type==='decision')for(const id of payload.affectedRefs??[])if(!byId.has(id))add(entry,'SDS_REF',`Unknown decision target ${id}.`);
+ if(type==='decision')for(const id of payload.affectedRefs??[])if(!byId.has(id))add(entry,'SDS_REF',`Unknown decision target ${id}.`);
+  if(type==='overview'){for(const id of payload.businessRefs??[])if(!business.has(id))add(entry,'SDS_BUSINESS',`Unknown overview Business ref ${id}.`);resolve(entry,payload.topologyRefs,'deployment','Overview topology');}
  }
  const flowEntries=entries.filter(entry=>entry.classification.type==='flow');if(flowEntries.length&&!entries.some(entry=>entry.classification.type==='code-unit'))add(flowEntries[0],'SDS_CODE_MAP','SDS flows require owned code units.');
  return issues;
