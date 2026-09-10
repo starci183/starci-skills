@@ -1,8 +1,10 @@
 schema: starci/workspace-routing@1
-source: The host directory containing this .claude checkout and sibling .workspaces directory.
+source: The StarCi host directory containing this .claude checkout and its paired sibling .workspaces route registry.
 registry: .workspaces/projects/<project>/work.json
 sourceLayoutContract: schemas/source-layout.yaml
 rules:
+  - .claude and .workspaces are a host pair. They are not default directories for every source;
+    routed frontend and ordinary source repositories must not receive copies.
   - AGENTS.md and CLAUDE.md are host bootstrap files installed from .claude/init. Project setup does
     not create these files or another .claude in routed backend/frontend sources.
   - Read the selected project's binding before resolving Work or target code. Preserve Source when

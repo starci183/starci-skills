@@ -1,65 +1,106 @@
-# Business overview and nested SRS
+# Business overview and filesystem-split SRS
 
-Business describes observable product behavior. Architecture decides how to realize it. A source observation or a supplied technical constraint is not permission to invent business policy.
+Business defines observable product behavior. SRS is a source-of-truth contract derived from product intent, stakeholder authority, policy and customer outcomes. It is independent of source code. Architecture maps SRS behavior to a target technical design; Implementation later proves whether actual code conforms.
 
-Current accepted Work, not legacy code, defines the intended product. Follow
-[source of trust and specification repair](source-of-trust.md) when a case is
-missing: complete the owning SRS flows and acceptance, review affected SDS and
-re-establish current `done` within authority. Reporting the gap alone is not
-completion of an authorized repair.
+One project has one backend-owned `.starciwork`. `features/index.yaml` is the product catalog and every actual capability owns `features/<feature>/`. Shared rules, data, NFRs, decisions and cross-feature journeys have one accountable feature owner; other features reference their stable IDs.
 
-A project has one bound `.starciwork`. `features/index.yaml` is its product catalog; each actual feature owns its business, architecture and other applicable layers below `features/<feature>/`. The project name is metadata, not another directory. Shared definitions and cross-feature journeys have one accountable feature owner and are referenced across features. Create only layers containing actual work.
-
-New authoring uses this actual folder tree inside the backend-owned `.starciwork`:
+## Required tree
 
 ```text
 .starciwork/features/<feature>/business/
-├── index.yaml                 aggregate; no stored state/completion
+├── index.yaml
 ├── overview/
-│   └── index.yaml             readable purpose, outcome, scope, open questions
+│   └── index.yaml
 └── srs/
-    ├── index.yaml             aggregate; shared scope/dependencies
-    ├── documents/
-    │   ├── index.yaml         aggregate
-    │   └── update/
-    │       └── index.yaml     complete cohesive SRS leaf
-    └── A/
-        ├── index.yaml         aggregate when it has children
-        └── B/
-            └── index.yaml     another cohesive SRS leaf
+    ├── index.yaml
+    ├── functional-requirements/
+    │   ├── index.yaml
+    │   └── <function>/
+    │       └── index.yaml
+    ├── non-functional-requirements/
+    │   ├── index.yaml
+    │   └── <quality-requirement>/
+    │       └── index.yaml
+    ├── business-rules/
+    │   ├── index.yaml
+    │   ├── <rule>/
+    │   │   └── index.yaml
+    │   └── policy-decisions/
+    │       ├── index.yaml
+    │       └── <decision>/
+    │           └── index.yaml
+    ├── data/
+    │   ├── index.yaml
+    │   └── <business-entity>/
+    │       └── index.yaml
+    └── customer-journeys/
+        ├── index.yaml
+        └── <journey>/
+            └── index.yaml
 ```
 
-Add a folder with its own `index.yaml` under SRS to extend the tree. No registry edit is needed. A leaf may become an aggregate through a deliberate migration; remove its stored state/completion only as part of that migration, preserving old proof and establishing new leaf evidence. Intermediate folders own scope, not another copy of all descendant requirements. Every folder in an authored nested tree should have its own node.
+Every folder owns one `index.yaml`. Parent indexes aggregate scope and immediate children; they do not copy descendant details or store authored state/completion. Detailed leaves use `extensions.work3.srs` and one schema selected by their folder:
 
-The overview has `kind: business-overview` and a `businessOverview` object. SRS branches and leaves have `kind: business`; leaves own `extensions.work3.specification` with `schema: starci/specification@2`. Do not duplicate it in a compact `business` object or hide it in a prose description. Stable node IDs define dependencies; folder paths are organization, not identity. Put the overview dependency on the SRS aggregate so its descendants inherit that input.
+| Folder | Schema |
+| --- | --- |
+| Functional requirement | `starci/srs-functional-requirement@1` |
+| Non-functional requirement | `starci/srs-non-functional-requirement@1` |
+| Business rule | `starci/srs-business-rule@1` |
+| Policy decision | `starci/srs-policy-decision@1` |
+| Business data | `starci/srs-data-definition@1` |
+| Customer journey | `starci/srs-customer-journey@1` |
 
-## What a complete leaf contains
+The machine-readable contract is `specifications/srs-sections.json`. A legacy cohesive `starci/specification@2` leaf remains readable, but new work uses the split tree. Do not use a product-specific schema such as `starci-next/srs@1`.
 
-- Purpose, scope/exclusions, glossary, assumptions and sourced external constraints.
-- Actors: goals, responsibilities, rights and restrictions.
-- Stable FR, BR and NFR IDs with intent authority, sources and acceptance links. NFRs state observable criteria; unresolved numeric targets stay decisions, not invented SLAs.
-- Business data attributes, validation, sensitivity, ownership, states and transitions; external inputs, outputs, errors and constraints. Explain an empty inventory.
-- Each FR links to a full flow: trigger, actors, input, preconditions, ordered actor/request/response/guard/effect steps and success/failure postconditions.
-- Alternatives and exceptions: starting step, condition, ordered steps, resume point or end, resulting state and acceptance. Explain an absent branch class.
-- Given/When/Then acceptance, observable security denials, unresolved decisions and downstream handoff. Executable UI journeys, when applicable, retain their original actions and expectations.
+## Functional requirements
 
-A title such as **FR-KNOW-03 — Update a knowledge document** is not a flow. The [complete synthetic example](../examples/nested-business/knowledge/business/srs/documents/update/index.yaml) describes opening an owned document, editing, submitting, validating, saving and reading back. It includes cancellation, denied access, invalid content, concurrent modification and uncertain saving, with explicit postconditions. Its policies are illustrative and remain draft; do not copy them into a real product as approved requirements.
+`functional-requirements/<function>/index.yaml` owns the complete use case:
 
-Run the example without changing any project:
+- stable ID, title, goal, authority/source and actors;
+- trigger, preconditions, validated inputs and observable outputs;
+- ordered main-flow steps with actor, request, system response, business effect and acceptance references;
+- alternative and exception flows with the exact main step where they fork, condition, ordered handling, resume point or end, remaining state and acceptance;
+- success and failure postconditions;
+- references to business rules, data, NFRs and unresolved policy decisions;
+- Given/When/Then acceptance linked back to its flow and steps;
+- an SDS handoff requiring every path to be mapped to code and verification.
 
-```sh
-node bin/starci.mjs validate examples/nested-business
-node --test tests/srs-v2.spec.mjs
+Authority references identify product briefs, stakeholder decisions, policies or approved research as `authorityRefs`. Do not put repository roles, code paths, symbols, commits, `sourceRefs` or implementation observations into SRS.
+
+Main, alternative and exception flows remain inside the same functional requirement file. When a branch class genuinely does not apply, record an explicit rationale; an empty list without rationale is invalid. Repeated requests, concurrent changes, cancellation, timeouts, uncertain outcomes and recovery are specified when they can change the observable result.
+
+## NFR, rules, data and decisions
+
+Each NFR states its business reason, exact FR/flow/journey scope, measurement boundary, metric, conditions and required evidence. A missing target stays tied to an open policy decision; never invent an SLA, latency percentile, retention period or capacity budget.
+
+Business rules state reusable invariants and link acceptance. Data definitions own meaning, fields, validation, sensitivity, state transitions, invariants, relations and privacy handling. Policy decisions name the accountable role, open question, required decisions, safe behavior while open, affected FR/data/NFR IDs and evidence that closes the decision.
+
+## Customer journeys
+
+`customer-journeys/<journey>/index.yaml` connects a real actor need to an observable result across one or more FRs. Each ordered stage references the owning FR, flow and acceptance IDs. Significant waiting, cancellation, denial and recovery paths reference the matching FR branch; the journey does not restate that flow.
+
+Every FR must participate in at least one journey. A journey is incomplete when its stage order breaks, it links an unrelated flow/acceptance, or its completion claim ignores a referenced failed/cancelled branch.
+
+## Chatbot example
+
+A chatbot feature can split its Business contract without scattering one use case:
+
+```text
+business/srs/
+├── functional-requirements/ask-a-question/index.yaml       # FR-CHAT-01
+├── non-functional-requirements/answer-latency/index.yaml   # NFR-CHAT-01
+├── business-rules/conversation-access/index.yaml           # BR-CHAT-01
+├── policy-decisions/retention-period/index.yaml             # PD-CHAT-01
+├── data/conversation/index.yaml                             # DATA-CHAT-01
+└── customer-journeys/get-an-answer/index.yaml               # J-CHAT-01
 ```
 
-## Architecture consumes the SRS
+`FR-CHAT-01` owns the whole observable interaction: the learner submits a valid question, sees an accepted/waiting state when work is not immediate, and finally receives a grounded answer or an explicit terminal outcome. Its alternatives cover clarification, cancellation and a repeated request. Its exceptions cover unauthorized conversation access, invalid input, knowledge unavailability, model timeout and an unknown late result. Each branch names its fork step, ordered responses, resume/end point, final state and Given/When/Then acceptance.
 
-Reference the accepted SRS leaf IDs or a deliberate aggregate scope through `refs`/`dependsOn`. The core resolves descendant specifications of referenced aggregates. New source-independent Architecture uses specification@3 `businessRefs` with canonical requirement/flow/acceptance IDs; it does not copy Business rows. Version-2 Architecture remains readable with its old copy-preservation checks, but is not the new authoring format.
+`NFR-CHAT-01` defines the measurement boundary from submit action to visible state and links an open decision when no percentile target has been accepted. `BR-CHAT-01` says only a current conversation member can read or append messages. `DATA-CHAT-01` owns request identity, conversation/message states, invariants and privacy. `J-CHAT-01` orders open conversation, ask, wait or clarify, receive result and recover/retry stages by referencing exact FR flow and acceptance IDs.
 
-Architecture owns logical components, contracts, connections and credential boundaries, data writers/storage, runtime scenarios and compatibility. Its SDS records concrete context, one coherent proposal challenged against a simpler alternative, relevant failure/security scenarios, decisions and limitations. Source files, symbols, revisions, code-impact mapping and executed checks belong to Implementation. Select concerns to match business consequences and operating conditions, not a universal Saga/CQRS/HA checklist. Durable customer data requires explicit storage, backup custody, consistency and recovery prerequisites; design prose is not an executed restore test. See [Architecture SDS](architecture-sds.md).
+## Validation and completion
 
-## Versioning and completion
+Run `node bin/starci.mjs validate <work-root>`. The validator checks folder/schema matching, parent/leaf ownership, semantic ID uniqueness, FR flow/step/acceptance joins, typed references, journey coverage and data transitions. It does not prove stakeholder acceptance, complete reasoning, implementation or production behavior.
 
-Version 1 remains readable under its original payload checks. It is not automatically reapproved as version 2. New nested SRS uses version 2, with no Business code/service tables or implementation-check plan. An `uninvestigate` leaf may be a clear placeholder; authored `todo` or `done` SRS requires the complete payload. A branch cannot store state, completion or its own SRS payload.
-
-Reorganization changes ancestry and may change input digests. Preserve published evidence bytes, obtain new scoped verification for changed specifications and never rewrite old digests to restore green status. Schema and reference validation check structure, not truth, user approval, completeness of human reasoning or deployed behavior.
+Draft and blocked payloads cannot earn completed Work. Reorganizing folders changes semantic ancestry; preserve old proof and establish new review for changed content. Current accepted SRS remains the input to SDS, UI, implementation and UAT.

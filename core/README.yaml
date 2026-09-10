@@ -3,22 +3,23 @@ sections:
   - title: Canonical expandable Work layout
     blocks:
       - Canonical Work v2 uses workspace.yaml and one index.yaml per active node. New Business
-        separates overview/index.yaml from recursive srs/**/index.yaml leaves with
-        starci/specification@2; legacy compact records remain readable. Architecture, implementation
-        and UAT retain their owning nodes.
+        separates overview/index.yaml from typed recursive srs/**/index.yaml section leaves.
+        Architecture uses a typed target code map below architecture/sds; implementation and UAT
+        later prove that map. Legacy cohesive specification@2 and source-independent
+        specification@3 records remain readable.
       - Only leaves author uninvestigate, todo or done. Parents derive progress. Stable dependsOn
         and refs edges propagate semantic changes without rewriting stored state or evidence.
       - All structured records and results use YAML. JSON and underscore-prefixed directories are
         rejected in canonical records. Root _local is the sole excluded execution-state directory;
         nested _local remains invalid. Central schemas remain in .claude; Plan/run records live in
         .starciwork/_local/plans.
-      - Source provenance is direct through sourceRefs, with full lowercase 40/64-hex revision and
-        normalized repository-relative path. Observed extensions.work3.specification.sources on
-        work/node@2 bind to the owning node's sourceRefs by repository/path/revision; missing paths
-        and conflicting revisions fail without requiring legacy resource manifests. work/node@1
-        retains its resource/revision checks. This metadata binding does not inspect Git objects or
-        source files. UAT flows collocate index.yaml, exact disposable accounts.yaml, assets and
-        optional seed/delete scripts.
+      - SRS and SDS are upstream source-of-truth contracts. SRS owns required behavior and SDS owns
+        the prescribed technical design; implementation and UAT provide actual conformance proof.
+        Source provenance is direct through sourceRefs on proof-owning nodes, with full lowercase
+        40/64-hex revision and normalized repository-relative path. Legacy specification source
+        observations retain their compatibility binding. work/node@1 retains its resource/revision
+        checks. UAT flows collocate index.yaml, exact disposable accounts.yaml, assets and optional
+        seed/delete scripts.
       - "UI ownership is explicit: module/ui/index.yaml owns design direction and generated PNGs
         under ui/assets. A thin implementation parent derives state from separate frontend and
         backend implementation leaves. Frontend assets are running-page screenshots; each UAT flow

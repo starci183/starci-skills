@@ -1,0 +1,103 @@
+schema: starci/srs-sections@1
+purpose: Typed contracts for a filesystem-split SRS. Each detailed item owns one index.yaml while parent indexes aggregate scope.
+payload: extensions.work3.srs
+aggregate:
+  schema: starci/srs-aggregate@1
+  allowedSections:
+    - feature-srs
+    - functional-requirements
+    - non-functional-requirements
+    - business-rules
+    - policy-decisions
+    - data
+    - customer-journeys
+sections:
+  functional-requirements:
+    type: functional-requirement
+    schema: starci/srs-functional-requirement@1
+    required:
+      - id
+      - title
+      - goal
+      - actors
+      - trigger
+      - preconditions
+      - inputs
+      - outputs
+      - mainFlow
+      - alternativeFlows
+      - exceptionFlows
+      - postconditions
+      - businessRuleRefs
+      - dataRefs
+      - nonFunctionalRefs
+      - decisionRefs
+      - acceptanceCriteria
+  non-functional-requirements:
+    type: non-functional-requirement
+    schema: starci/srs-non-functional-requirement@1
+    required:
+      - id
+      - title
+      - scope
+      - requirement
+      - measurement
+      - decisionRefs
+      - acceptanceCriteria
+  business-rules:
+    type: business-rule
+    schema: starci/srs-business-rule@1
+    required:
+      - id
+      - title
+      - statements
+      - decisionRefs
+      - acceptanceCriteria
+  policy-decisions:
+    type: policy-decision
+    schema: starci/srs-policy-decision@1
+    required:
+      - id
+      - title
+      - decisionStatus
+      - accountableRole
+      - question
+      - requiredDecisions
+      - safeDisposition
+      - closureEvidence
+  data:
+    type: data-definition
+    schema: starci/srs-data-definition@1
+    required:
+      - id
+      - title
+      - owner
+      - fields
+      - relations
+      - states
+      - transitions
+      - invariants
+      - privacy
+      - validationCases
+  customer-journeys:
+    type: customer-journey
+    schema: starci/srs-customer-journey@1
+    required:
+      - id
+      - title
+      - actor
+      - entry
+      - preconditions
+      - stages
+      - branches
+      - exit
+      - acceptanceCriteria
+rules:
+  - SRS is a source-of-truth product contract derived from accepted intent and authority, never from source code. Code paths, symbols, revisions and implementation proof are forbidden.
+  - Product briefs, stakeholder decisions, policy and research may be cited as authorityRefs; this is distinct from implementation sourceRefs.
+  - Functional main, alternative and exception flows stay inside their owning functional-requirement index.yaml.
+  - NFRs, rules, data definitions and journeys are independent addressable leaves, never copied into every FR.
+  - Customer journeys connect FR flow and acceptance IDs without becoming a duplicate flow specification.
+  - A missing numeric NFR target remains an explicit decision reference, never an invented threshold.
+  - Parent indexes aggregate immediate scope and children; they do not repeat descendant detail.
+  - Structural validity proves internal consistency only, not stakeholder acceptance, implementation or production behavior.

@@ -54,18 +54,20 @@ Completion of a downstream node cannot repair a known-invalid upstream contract.
 
 ## Recording a current design review
 
-For current `work/node@2` Business overview, SRS@2 and SDS@3 leaves, keep the
-review inside `completion.review` on the owning `index.yaml`; do not create an
-evidence directory or a second specification copy. `completion.inputDigest`
-binds the reviewed semantic inputs, including ancestors and declared imports.
+For current `work/node@2` Business overview, split SRS leaves and code-map SDS
+leaves, keep the review inside `completion.review` on the owning `index.yaml`;
+do not create an evidence directory or a second specification copy. The legacy
+cohesive SRS@2 and source-independent SDS@3 formats remain reviewable while they
+are migrated. `completion.inputDigest` binds the reviewed semantic inputs,
+including ancestors and declared imports.
 The review has schema `starci/design-review@1`, declared reviewer and actual
 authority provenance, ISO `reviewedAt`, one concrete passing observation for each
 required node assertion, and an explicit `limitations` list. It is a current
 review record, not another Work node, external manifest or workflow history.
 
-Resolve the specification's blocking decisions and set its own status to pass
-only after real review. Check `previewCompletion` before recording `state: done`;
-unaccepted prerequisites still block completion. Inspect the returned
+Resolve blocking decisions and set a split leaf's status to `accepted` only after
+real review; legacy specifications use `pass`. Check `previewCompletion` before
+recording `state: done`; unaccepted prerequisites still block completion. Inspect the returned
 `effectiveState`, never only the stored flag. Changing semantic inputs invalidates
 this review exactly as it invalidates other completion bindings. The validator
 checks consistency and coverage; it does not authenticate a reviewer or prove the

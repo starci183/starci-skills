@@ -1,7 +1,7 @@
 schema: starci/specification-contract@1
 payloadSchema: starci/specification@1
-storage: .starciwork/<business>/{business,architecture}/<piece>/index.yaml#extensions.work3.specification
-  (legacy work/node@1 may use node.md)
+storage: Legacy cohesive records use extensions.work3.specification; current split SRS and code-map
+  SDS use extensions.work3.srs and extensions.work3.sds in their typed section index.yaml files.
 statuses:
   - draft
   - blocked
@@ -381,10 +381,8 @@ v2:
     - owner
     - acceptanceIds
   semantics:
-    layout: New Business uses business/index.yaml as an aggregate, business/overview/index.yaml as the
-      readable overview and business/srs/**/index.yaml as a recursive SRS scope tree. Branches
-      aggregate; every authored leaf owns one cohesive SRS with full flows, not a title-only FR. A
-      new folder is discovered without a second registry.
+    layout: This section defines the legacy cohesive specification@2 layout. Current Business uses
+      business/overview/index.yaml plus the typed split SRS contract in srs-sections.yaml.
     migration: Version 1 remains readable under its original checks; never rewrite legacy evidence or
       mark it reviewed under version 2. Migrating a completed leaf into a branch requires an
       explicit scoped migration, new leaf evidence and preserved historical proof.
@@ -400,6 +398,7 @@ v2:
     assurance: Structural checks validate joins and declared decisions, not source truth, exhaustive
       scenario discovery or actual production behavior. Proposed tests are not executed proof.
 currentArchitecturePayloadSchema: starci/specification@3
+currentArchitectureMapContract: specifications/sds-map.json
 architectureV3:
   schema: specifications/sds.schema.json
   layout: architecture/{overview,sds/**}/index.yaml
@@ -407,3 +406,8 @@ architectureV3:
   source: No source paths, symbols, revisions or code impact mapping. Implementation owns those.
   legacy: Specification@1/@2 remain readable under their original checks. Migration never reuses stale
     completion.
+architectureMap:
+  layout: architecture/sds/{flows,code-map,contracts,data,quality,deployment,decisions,verification}/**/index.yaml
+  payload: extensions.work3.sds
+  source: SDS prescribes target repository paths and symbols without source status or revision evidence. Implementation and UAT prove conformance.
+  legacy: Source-independent specification@3 remains readable; new authoring uses the code map.

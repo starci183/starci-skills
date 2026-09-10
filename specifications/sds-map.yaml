@@ -1,0 +1,46 @@
+schema: starci/sds-map@1
+purpose: A filesystem code map that traces accepted business flows through target source units, contracts, data, quality mechanisms, deployment and verification.
+payload: extensions.work3.sds
+aggregateSchema: starci/sds-aggregate@1
+sections:
+  flows:
+    type: flow
+    schema: starci/sds-flow@1
+    required: [id, title, businessRefs, entryPoint, preconditions, inputs, participants, mainSequence, alternativeSequences, exceptionSequences, recovery, postconditions, resultMapping, topologyRefs, verificationRefs]
+  code-map:
+    type: code-unit
+    schema: starci/sds-code-unit@1
+    required: [id, title, side, repositoryRole, path, symbols, callers, callees, contractRefs, dataRefs, qualityRefs, verificationRefs]
+  contracts:
+    type: contract
+    schema: starci/sds-contract@1
+    required: [id, title, kind, callerCodeUnitRef, receiverCodeUnitRef, mode, transport, operation, request, response, errors, authorization, timeout, retry, idempotency, compatibility]
+  data:
+    type: data-model
+    schema: starci/sds-data-model@1
+    required: [id, title, ownerCodeUnitRef, store, authoritative, classification, fields, states, transactions, consistency, retention, recovery]
+  quality:
+    type: quality
+    schema: starci/sds-quality@1
+    required: [id, title, qualityKind, businessRefs, scopeRefs, mechanism, scenarios, measurement, optimization, tradeoffs, verificationRefs]
+  deployment:
+    type: deployment
+    schema: starci/sds-deployment@1
+    required: [id, title, topology, placements, connections, configuration, credentials, scaling, failureDomains, rollout, rollback, recovery]
+  decisions:
+    type: decision
+    schema: starci/sds-decision@1
+    required: [id, title, problem, options, decision, status, rationale, tradeoffs, affectedRefs, revisitWhen]
+  verification:
+    type: verification
+    schema: starci/sds-verification@1
+    required: [id, title, businessAcceptanceRefs, scopeRefs, level, setup, steps, expected, securityChecks, performanceChecks, failureChecks, evidence]
+rules:
+  - SDS is a source-of-truth design contract derived from SRS and design decisions, never from current source code. Source observations, revisions and implementation proof are forbidden.
+  - Flow is the primary route. Every main, alternative and exception sequence references exact code units and ends in an observable application or receiver result.
+  - Code units prescribe repository role, target path and symbols as the design source of truth. Implementation owns actual code and revision proof.
+  - Contracts state direction, sync or async mode, request, response, errors, authorization, timeout, retry, idempotency and compatibility.
+  - Data identifies its writer, store, transaction boundaries, consistency, lifecycle and recovery.
+  - Security, performance and reliability record applicable scenarios, mechanisms, measurement, optimizations, tradeoffs and verification.
+  - Monolith and microservice topology are explicit deployment choices; flow behavior remains traceable in either topology.
+  - SDS readiness means the target code path is implementable without guessing. SDS never claims source observation; Implementation and UAT prove code and running behavior.

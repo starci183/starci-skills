@@ -1,6 +1,8 @@
 import {parseYaml} from './yaml.mjs';
 import { validateSpecification } from '../specifications/validate.mjs';
 import { validateSDSBindings, SDS_SCHEMA } from '../specifications/sds.mjs';
+import {classifySDSPath,validateSDSMap,SDS_AGGREGATE_SCHEMA} from '../specifications/sds-map.mjs';
+import {classifySRSPath,validateSRSGraph,SRS_AGGREGATE_SCHEMA} from '../specifications/srs-sections.mjs';
 import { readDistJson } from './runtime-root.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,7 +46,7 @@ export function previewEvidence(root,{directory,nodeId,name}) {
 }
 function validate(root,completions=null,candidate=null,authoredTargets=null) {
   let authoredBinding,authoredAssets;
-  const errors = [], warnings = [], nodes = [], resources = [], evidence = [], jsonFiles = [], accountFiles = [], reservedDirectories = [], ids = new Map();
+  const errors = [], warnings = [], nodes = [], resources = [], evidence = [], jsonFiles = [], accountFiles = [], reservedDirectories = [], ids = new Map(), splitSrsEntries=[],splitSdsEntries=[];
   const issue = (code, p, message) => errors.push({code, path:p, message});
   const warn = (code, p, message) => warnings.push({code, path:p, message});
   let absolute;
@@ -290,22 +292,46 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     const unique=items=>[...new Map(items.map(item=>[item.meta.id,item])).values()].sort((a,b)=>a.meta.id.localeCompare(b.meta.id));
     n.effectiveDeps=unique(deps);n.effectiveRefs=unique(refs);
     const spec = n.meta.extensions?.work3?.specification;
+    const splitSrs=n.meta.extensions?.work3?.srs;
+    const splitSds=n.meta.extensions?.work3?.sds;
     const sdsMatch = n.path.match(/^(.*(?:^|\/)architecture\/)sds\/(?:[^/]+\/)*index\.yaml$/);
     if(sdsMatch){
       const archRoot=sdsMatch[1];
       if(n.meta.kind!=='architecture')issue('SDS_LAYOUT',n.path,'SDS branches and leaves have kind architecture.');
       for(const suffix of ['index.yaml','overview/index.yaml','sds/index.yaml'])if(!nodes.some(x=>x.path===archRoot+suffix&&x.meta.kind==='architecture'))issue('SDS_LAYOUT',n.path,'Nested SDS requires architecture/index.yaml, overview/index.yaml and sds/index.yaml.');
       if(n.children.length&&spec!==undefined)issue('SDS_BRANCH_PAYLOAD',n.path,'SDS branches aggregate; do not duplicate their descendant design.');
-      if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!==SDS_SCHEMA)issue('SDS_VERSION',n.path,'Authored SDS leaves require source-independent specification@3.');
+      if(splitSds!==undefined){
+        const classification=classifySDSPath(n.path,n.children.length>0);
+        if(spec!==undefined)issue('SDS_DUPLICATE',n.path,'Use either a code-map SDS section or one legacy specification, never both.');
+        if(!classification)issue('SDS_SECTION_PATH',n.path,'Typed SDS content must live under architecture/sds.');
+        else {
+          if(n.children.length&&!classification.aggregate)issue('SDS_BRANCH_PAYLOAD',n.path,'A detailed SDS item cannot also aggregate child scopes.');
+          if(classification.aggregate&&splitSds?.schema!==SDS_AGGREGATE_SCHEMA)issue('SDS_AGGREGATE',n.path,'SDS parent indexes use starci/sds-aggregate@1 metadata.');
+          if(n.meta.sourceRefs?.length)issue('SDS_SOURCE_MAPPING',n.path,'SDS prescribes the target code map; sourceRefs and revision proof belong to Implementation.');
+          splitSdsEntries.push({path:n.path,nodeId:n.meta.id,workRefs:n.refIds,payload:splitSds,classification});
+        }
+      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!==SDS_SCHEMA)issue('SDS_VERSION',n.path,'Authored SDS leaves require a typed code-map section or legacy starci/specification@3.');
+      if(!n.children.length&&n.meta.state==='done'&&splitSds!==undefined&&splitSds.status!=='accepted')issue('SDS_NOT_ACCEPTED',n.path,'A reviewed SDS code-map leaf must have status accepted before it can complete.');
     }
     const srsMatch = n.path.match(/^(.*(?:^|\/)business\/)srs\/(?:[^/]+\/)*index\.yaml$/);
     if(srsMatch){
       const businessRoot=srsMatch[1], srsRoot=businessRoot+'srs/index.yaml';
       if(n.meta.kind!=='business')issue('SRS_LAYOUT',n.path,'SRS branches and leaves have kind business.');
+      if(n.meta.sourceRefs?.length)issue('SRS_CODE_INPUT',n.path,'SRS is a source-of-truth contract independent of source code; sourceRefs belong to Implementation proof.');
       if(!nodes.some(x=>x.path===businessRoot+'index.yaml')||!nodes.some(x=>x.path===srsRoot)||!nodes.some(x=>x.path===businessRoot+'overview/index.yaml'&&x.meta.kind==='business-overview'))issue('SRS_LAYOUT',n.path,'Nested SRS requires business/index.yaml, business/overview/index.yaml and business/srs/index.yaml.');
       if(n.meta.business!==undefined)issue('SRS_DUPLICATE',n.path,'Version 2 SRS is the sole detailed payload; do not duplicate it in business.');
       if(n.children.length&&spec!==undefined)issue('SRS_BRANCH_PAYLOAD',n.path,'SRS branches aggregate descendant requirements; only leaves carry specifications.');
-      if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!=='starci/specification@2')issue('SRS_VERSION',n.path,'Authored SRS leaves require starci/specification@2; uninvestigated placeholders cannot complete.');
+      if(splitSrs!==undefined){
+        const classification=classifySRSPath(n.path,n.children.length>0);
+        if(spec!==undefined)issue('SRS_DUPLICATE',n.path,'Use either a split SRS section or one legacy cohesive specification, never both.');
+        if(!classification)issue('SRS_SECTION_PATH',n.path,'Typed SRS content must live under business/srs.');
+        else {
+          if(n.children.length&&!classification.aggregate)issue('SRS_BRANCH_PAYLOAD',n.path,'A detailed SRS item cannot also aggregate child scopes.');
+          if(classification.aggregate&&splitSrs?.schema!==SRS_AGGREGATE_SCHEMA)issue('SRS_AGGREGATE',n.path,'SRS parent indexes use starci/srs-aggregate@1 metadata.');
+          splitSrsEntries.push({path:n.path,nodeId:n.meta.id,workRefs:n.refIds,payload:splitSrs,classification});
+        }
+      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!=='starci/specification@2')issue('SRS_VERSION',n.path,'Authored SRS leaves require a typed split SRS section or legacy cohesive starci/specification@2; uninvestigated placeholders cannot complete.');
+      if(!n.children.length&&n.meta.state==='done'&&splitSrs!==undefined&&splitSrs.status!=='accepted')issue('SRS_NOT_ACCEPTED',n.path,'A reviewed SRS section must have status accepted before it can complete.');
     }
     if (spec !== undefined) {
       const review = validateSpecification(spec);
@@ -347,6 +373,8 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       }
     }
   }
+  for(const finding of validateSRSGraph(splitSrsEntries))issue(finding.code,finding.path,finding.message);
+  for(const finding of validateSDSMap(splitSdsEntries,splitSrsEntries))issue(finding.code,finding.path,finding.message);
   const visiting=new Set();
   const workspaceDigest=workspace?digest(canonicalJSON(workspace.meta)):'';
   function input(n) {
@@ -462,11 +490,15 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     const required=stringList(n.meta.assertions,n.path,'assertions',true);
     if(Object.hasOwn(c,'review')){
       const spec=n.meta.extensions?.work3?.specification;
+      const splitSrs=n.meta.extensions?.work3?.srs,srsSection=splitSrs===undefined?null:classifySRSPath(n.path,false);
+      const splitSds=n.meta.extensions?.work3?.sds,sdsSection=splitSds===undefined?null:classifySDSPath(n.path,false);
       const supported=n.meta.schema==='work/node@2'&&(
         (n.meta.kind==='business-overview'&&object(n.meta.businessOverview))||
         (n.meta.kind==='business'&&spec?.schema==='starci/specification@2'&&spec.op==='business.decide')||
-        (n.meta.kind==='architecture'&&spec?.schema===SDS_SCHEMA&&spec.op==='architecture.decide'));
-      if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to current structured Business overview, SRS and source-independent SDS; other profiles require their existing proof.');
+        (n.meta.kind==='architecture'&&spec?.schema===SDS_SCHEMA&&spec.op==='architecture.decide')||
+        (n.meta.kind==='business'&&srsSection?.type&&splitSrs?.schema===srsSection.expectedSchema)||
+        (n.meta.kind==='architecture'&&sdsSection?.type&&splitSds?.schema===sdsSection.expectedSchema));
+      if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to current structured Business overview, split SRS, code-map SDS and their readable legacy formats; other profiles require their existing proof.');
       if(Object.hasOwn(c,'evidence')||Object.hasOwn(c,'codeRefs')||Object.hasOwn(c,'sourceIdentity'))issue('DESIGN_REVIEW_MIXED',n.path,'Design review cannot be mixed with evidence or source completion bindings.');
       const review=c.review,seen=new Set();
       if(!object(review)||review.schema!=='starci/design-review@1'||!text(review.reviewer)||!text(review.authority)||!text(review.reviewedAt)||!/^\d{4}-\d{2}-\d{2}T/.test(review.reviewedAt)||!Number.isFinite(Date.parse(review.reviewedAt)))issue('DESIGN_REVIEW',n.path,'Review needs declared reviewer, actual authority provenance and an ISO review time; the validator does not authenticate them.');

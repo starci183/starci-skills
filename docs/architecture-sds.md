@@ -1,150 +1,144 @@
-# Source-independent Architecture and SDS
+# SDS as the target code map
 
-Business says what must happen. Architecture explains how the system is designed
-to satisfy it. Implementation maps that design to actual source and verifies the
-running behavior. None of these documents substitutes for the others.
+SRS defines observable behavior, rules, journeys and acceptance. SDS maps those outcomes to the target code path: where a request or event enters, which files and symbols must run, which contracts and data boundaries are crossed, how failures and late results return to the app, and which checks will prove the path. Together SRS and SDS are the project's upstream source of truth. Implementation supplies the code and executed proof.
 
-Use the current accepted SRS/SDS in `.starciwork` as design authority, never an
-existing implementation or its passing tests. Follow [specification repair](source-of-trust.md)
-when a relevant case is uncovered: revise the owning SRS/SDS as appropriate,
-review affected consumers and re-establish current `done` before dependent
-implementation. A missing mechanism such as the actual form of restore requires
-an explicit design, not a call graph or a generic promise to support recovery.
+SDS prescribes the target even when files or symbols do not yet exist. It does not record observed/proposed source status, revisions or current-code evidence. Those facts belong to Implementation, which must map actual code back to SDS and report any gap instead of rewriting the design from code.
 
-SDS here means Software Design Specification, including architecture and enough
-logical detail to implement without guessing the important mechanisms. It does
-not mean a source inventory. Source paths, symbols, revisions, commits and test
-commands belong to Implementation. Technologies, topology, API/event contracts,
-data models and recovery procedures are legitimate design content.
-
-## Structure and ownership
-
-A project has one bound `.starciwork`. `features/index.yaml` is its product catalog; each actual feature owns its business, architecture and other applicable layers below `features/<feature>/`. The project name is metadata, not another directory. Shared definitions and cross-feature journeys have one accountable feature owner and are referenced across features. Create only layers containing actual work.
+## Required tree
 
 ```text
-.starciwork/features/<feature>/
-├── business/
-│   ├── index.yaml
-│   ├── overview/index.yaml
-│   └── srs/
-│       ├── index.yaml
-│       └── <capability>/<subscope>/index.yaml
-└── architecture/
+.starciwork/features/<feature>/architecture/
+├── index.yaml
+├── overview/
+│   └── index.yaml
+└── sds/
     ├── index.yaml
-    ├── overview/index.yaml
-    └── sds/
+    ├── flows/
+    │   ├── index.yaml
+    │   └── <flow>/index.yaml
+    ├── code-map/
+    │   ├── index.yaml
+    │   ├── frontend/<code-unit>/index.yaml
+    │   ├── backend/<code-unit>/index.yaml
+    │   └── shared/<code-unit>/index.yaml
+    ├── contracts/
+    │   ├── index.yaml
+    │   └── <api-event-job-or-call>/index.yaml
+    ├── data/
+    │   ├── index.yaml
+    │   └── <model-or-store>/index.yaml
+    ├── quality/
+    │   ├── index.yaml
+    │   ├── security/<concern>/index.yaml
+    │   ├── performance/<concern>/index.yaml
+    │   └── reliability/<concern>/index.yaml
+    ├── deployment/
+    │   ├── index.yaml
+    │   └── <topology>/index.yaml
+    ├── decisions/
+    │   ├── index.yaml
+    │   └── <decision>/index.yaml
+    └── verification/
         ├── index.yaml
-        ├── structure/<component>/index.yaml
-        ├── contracts/<interaction>/index.yaml
-        ├── data/<boundary>/index.yaml
-        ├── runtime/<scenario>/index.yaml
-        ├── deployment/index.yaml
-        ├── concerns/<concern>/index.yaml
-        └── decisions/<decision>/index.yaml
+        └── <scenario>/index.yaml
 ```
 
-This is an expansion guide, not mandatory scaffolding. Small SDS scopes put
-several typed views in one leaf. Split only where a separate owner, reusable
-decision or independently understandable design question warrants it. Each
-semantic folder has index.yaml; parents aggregate and do not duplicate leaf
-payloads or author state. Assets may be nested beside any owning node.
+Every folder owns `index.yaml`. Parents carry `starci/sds-aggregate@1` metadata and no authored state/completion. Detailed leaves use `extensions.work3.sds`:
 
-Business splits by capability. SDS splits by design responsibility/view. Do not
-mirror each FR into every design folder, nor require one folder per FR. A runtime
-scenario may serve multiple SRS flows; exceptions that change responsibility,
-consistency or failure behavior need explicit branches/scenarios.
-
-Shared platform design has one owner. Module consumers import the particular
-component/contract/data views they use and specify their own differences. Neither
-folder nesting nor `extends Module` implies permission, shared database ownership
-or an implicit dependency. Solo and cooperator use the same contracts and tree;
-only task ownership and change coordination differ.
-
-## Authoring contract
-
-Each authored leaf carries `extensions.work3.specification`, schema
-`starci/specification@3`, op `architecture.decide`. The full JSON Schema is
-[sds.schema.json](../specifications/sds.schema.json). Business remains SRS@2.
-
-- `purpose`: the selected design responsibility.
-- `businessRefs`: canonical owner node ID and exact requirement, flow and
-  acceptance IDs. Do not copy their text into SDS. Owners must resolve through
-  the node's declared refs/dependsOn, including inherited aggregate inputs.
-- `designRefs`: exact canonical SDS owner and view IDs imported from shared
-  design. Imports use `node-id#view-id`; local links use `view-id`. `#` is reserved.
-- `views`: typed design details; IDs are stable within the owner.
-- `decisions`: problem, chosen mechanism, alternatives, rationale, tradeoffs,
-  affected views, applicable references, owner, status and revisit conditions.
-- `checks`: planned review/test method and expected result, linked to canonical
-  SRS acceptance where applicable. These are not execution results.
-- `references`: primary design/pattern documentation with explicit applicability.
-- `limitations`: what remains unverified, outside scope or dependent on a later
-  operating decision. Do not hide a material blocker here while declaring pass.
-
-| View | Required design answers |
+| Folder | Schema |
 | --- | --- |
-| overview | Scope, quality drivers, external actors, exclusions. |
-| structure | Logical owner, responsibilities, exclusions, allowed dependencies. |
-| contracts | Caller, receiver, mode, request/response/errors, authority, timeout, retry, idempotency, compatibility. |
-| data | Writer, classification, authoritative/rebuildable role, storage, isolation, consistency, lifecycle, recovery. |
-| runtime | SRS flow links, participants, ordered actions, contract/data links, commit points, failures and retry. |
-| deployment | Component/store placement, allowed connections, failure domains, configuration/credentials, rollout and rollback. |
-| concerns | Relevant problem, concrete mechanism/owner, trigger-impact-response scenarios, checks and residual risk. |
+| Flow | `starci/sds-flow@1` |
+| Code unit | `starci/sds-code-unit@1` |
+| Contract | `starci/sds-contract@1` |
+| Data model/store | `starci/sds-data-model@1` |
+| Quality concern | `starci/sds-quality@1` |
+| Deployment topology | `starci/sds-deployment@1` |
+| Design decision | `starci/sds-decision@1` |
+| Verification scenario | `starci/sds-verification@1` |
 
-A design reference resolves both identity and view kind: a contract receiver must
-be a component, not a store merely bearing a similar name. Declare direction and
-ownership. A display shell can present three modules without owning their domain
-writes. Cross-module admission is not completion of the receiver's business work.
+The machine-readable contract is `specifications/sds-map.json`. Legacy source-independent `starci/specification@3` remains readable; new SDS authoring uses the code-map tree.
 
-## Brainstorm and challenge
+## Flow is the primary route
 
-Start with one coherent proposal. Trace an ordinary journey and put failures at
-its significant boundaries. Ask who owns each fact, which transaction commits it,
-what another participant can observe, and what happens when the response is lost.
-Check invalid/unauthorized input, cancellation, concurrency, duplicate/out-of-order
-events, partial completion, exhausted resources and dependency failure when relevant.
+`flows/<flow>/index.yaml` traces the main, alternative and exception paths from SRS to an observable result. It contains:
 
-Challenge the proposal with a genuinely simpler alternative. Select patterns only
-after identifying the problem and tradeoff. A list of Saga/CQRS/Outbox names is not
-an architecture; Business must not require them as implementation mechanisms.
-Consult the applicable knowledge topic and official reference, then explain why
-it fits this scope. Do not create a universal pattern checklist from one incident.
+- exact SRS requirement, flow, branch, NFR and acceptance references;
+- app action, API, webhook, event, schedule or job entry point and receiving code-unit;
+- preconditions, validated inputs and participating code units;
+- ordered code steps with code-unit, operation, input/output, contract/data refs, transaction behavior and failure refs;
+- alternative and exception sequences with fork step, condition, code steps, resume/end and outcome;
+- recovery owner, durable state source, retry identity and safe resume condition;
+- success/failure/cancelled/unknown postconditions as applicable;
+- API/event/subscription response and the component/app state that displays immediate or late outcomes;
+- selected deployment topology and verification scenarios.
 
-For durable multi-tenant customer data, explicitly inventory authoritative stores,
-derived indexes, volumes, configuration, Secrets and encryption keys. Design a
-consistent backup point and custody outside the relevant failure domain. Explain
-how to rebuild infrastructure, restore one tenant, verify data and safely resume
-effects. Volume bytes alone do not establish database consistency or recover
-external state. A simple local tool does not require a cluster-loss design.
+A flow step must answer which file/class/function runs, who calls it, what it reads or writes, where authority is checked, when a transaction commits or rolls back, and what happens when the next boundary fails. Branch names without code steps are invalid.
 
-Do not promise to enumerate every possible edge case. State applicability,
-assumptions and residual risk. Do not invent business retention or RPO/RTO numbers;
-make technical choices within approved constraints and separate genuine product
-decisions from choices the architect can own.
+## Code units and contracts
 
-The view separation is informed by [arc42](https://arc42.org/overview/), adapted
-here to exclude source mapping. [C4](https://c4model.com/diagrams) supports selecting
-only the diagram levels that add value; no code-level diagram is required. This
-tree is a StarCi convention, not a claim of ISO/IEEE certification.
+`code-map/{frontend,backend,shared}/<code-unit>/index.yaml` owns the prescribed repository role, target path, symbols and signatures, responsibility, callers/callees and contract/data/quality/verification references. It is an implementation contract, not a claim that the current file exists. One code unit may contain several tightly related symbols; do not create one folder per line or mirror the filesystem without design meaning.
 
-## Review, completion and compatibility
+Contracts state caller, receiver, sync/async/in-process mode, transport, operation, request, response, errors, authorization, timeout, retry, idempotency and compatibility. For async paths, identify producer, consumer, message identity, ordering and duplicate handling. An API path without its frontend caller or result mapping is incomplete when the user journey depends on that UI.
 
-Review the whole scope: every selected FR has SRS flows and acceptance; significant
-flows have an SDS runtime path; contracts, authoritative data, failure controls and
-shared consumers agree. A schema can catch missing fields/IDs/owners, not prove
-optimality, correct business meaning or production safety.
+## Data and consistency
 
-`draft` and `blocked` cannot complete a node. `pass` is design readiness, not proof
-that code exists or tests ran. Passing SDS requires accepted referenced Business
-and shared design, with no unresolved blocking decision. Existing completion
-validation remains separate. Do not manufacture evidence to satisfy old records.
+Each data leaf identifies the owning writer, authoritative or derived role, store, fields, states, transaction boundaries, consistency, retention and recovery. A flow links its actual reads/writes to these owners.
 
-`done` remains editable. A semantic change requires review of affected consumers,
-not reopening every unrelated branch. Keep canonical content authoritative and
-avoid duplicate design/evidence copies. Useful diagrams/videos stay in assets.
+For a monolith, show module boundaries and in-process calls without inventing network concerns. For microservices, show service ownership, network/event contracts, independent failure, partial completion and reconciliation. Shared-database or cross-service writes require an explicit decision and consequence analysis.
 
-Legacy specification@1/@2 remains readable under its original checks. Migration
-preserves useful semantics and stable IDs, moves code mapping to Implementation
-only under the selected scope, and never carries stale pass/completion to changed
-content. Migration is not acceptance. The synthetic fixture in `fixtures/sds.mjs`
-and `tests/sds.spec.mjs` exercise source-independent and recursive behavior.
+## Security, latency and reliability
+
+Quality leaves select only concerns relevant to the SRS and topology, but they must cover every material boundary:
+
+- Security: principal, current resource/action/audience rights, credential boundary, input trust, disclosure on denial and abuse limits.
+- Performance: measurement boundary, latency/capacity driver, candidate bottleneck, safe optimizations, cache consistency and cost/tradeoff.
+- Reliability: timeout, retry, idempotency, duplicate/out-of-order events, concurrency, cancellation, partial effects, unknown results, recovery ownership and observability.
+
+Do not invent business SLAs or retention. Keep unresolved targets linked to their SRS decision. An optimization is not accepted merely because it is faster; record what correctness, privacy, freshness, cost or operability it trades.
+
+## Deployment, decisions and verification
+
+Deployment maps code units and stores to the selected monolith or microservice topology, connections, configuration and credential custody, scaling, failure domains, rollout, rollback and recovery. Decisions compare at least one viable alternative and record status, rationale, tradeoffs, affected refs and revisit conditions.
+
+Verification records the planned unit, integration, backend E2E, frontend or UAT scenario. It links Business acceptance to SDS scope and defines setup, actions, expected result, security/performance/failure checks and required evidence. A plan is not executed proof; Implementation and UAT attach current observations later.
+
+## Chatbot code-path example
+
+For `FR-CHAT-01`, one SDS flow can prescribe this path:
+
+```text
+ChatComposer.submit
+  -> useAskQuestion.mutate
+  -> POST /conversations/:id/messages
+  -> ChatController.createMessage
+  -> AskQuestionHandler.execute
+  -> ConversationPolicy.assertMember
+  -> ConversationRepository.beginRequest(requestId)
+  -> KnowledgeRetriever.search
+  -> LanguageModel.generate
+  -> ConversationRepository.commitAnswer
+  -> ConversationEvents.publish
+  -> useConversationEvents / ChatStore.apply
+  -> AnswerPanel renders answered | clarification | failed
+```
+
+Each arrow resolves to a `code-map` unit and, when it crosses a boundary, a contract. The flow records transaction behavior and the app-visible result at every significant branch:
+
+- invalid input ends before a write and returns field feedback;
+- denied access reveals no conversation content;
+- insufficient context returns a clarification state that resumes the same request;
+- a duplicate `requestId` reads the prior result instead of generating twice;
+- retrieval or model timeout records a known failed or pending state, never a false answer;
+- an accepted asynchronous request returns its ID, and a late event or refresh reconciles the same durable result;
+- concurrent cancellation and completion use one authoritative state transition and expose the winner;
+- partial event delivery is recovered from the stored request outcome.
+
+In a monolith, controller, handler, policy and repository can be separate code units connected by in-process contracts; the network boundary may only be browser-to-backend and backend-to-model. In microservices, the same Business flow can map chat API, retrieval and generation to separate deployments with versioned API/event contracts, timeout budgets, idempotent consumers, outbox or equivalent delivery ownership, reconciliation and independent failure domains. The topology is a recorded choice; the SRS behavior and acceptance IDs remain the same.
+
+Security quality leaves cover conversation authorization, prompt/input trust, tool permissions, secret boundaries, private-context filtering and abuse limits. Performance leaves allocate and measure browser, API, retrieval, model and delivery latency, then compare safe options such as bounded context, streaming, caching and async completion with their freshness, privacy, cost and complexity tradeoffs. Reliability leaves cover retries, duplicate/out-of-order events, unknown outcomes and recovery. Verification links those mechanisms back to positive, denied, timeout, duplicate, late-result and cancellation acceptance cases.
+
+## Review and completion
+
+Validate with `node bin/starci.mjs validate <work-root>`. A valid SDS map proves internal structure and traceability only. Readiness review still checks that significant SRS branches reach prescribed code and customer-visible outcomes, every contract/data writer has one owner, and material edge cases have mechanisms. Implementation separately proves which actual files and revisions conform.
+
+Changing accepted SRS invalidates dependent SDS proof. Changing the code map requires affected implementation and UAT to be rechecked. Preserve unrelated completed scopes and historical evidence.

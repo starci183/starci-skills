@@ -4,37 +4,45 @@ Work describes the current product and delivery scope. A workflow is an action
 on that tree, not a directory taxonomy. Plans remain under the backend-owned
 `.starciwork/_local/plans`; frontend source shares the same Work.
 
+SRS and SDS are the upstream source of truth for every feature. SRS owns required
+behavior; SDS owns the target technical design. UI, implementation and UAT import
+those contracts through stable references. Existing code can prove or fail to meet
+them, but cannot silently redefine them.
+
 ```text
 .starciwork/
 ├── workspace.yaml
 ├── _local/
 │   ├── plans/
 │   └── drafts/
-└── <product>/
+└── features/
     ├── index.yaml
-    ├── shared/
-    │   └── ...
-    └── <module>/
+    └── <feature>/
         ├── index.yaml
         ├── business/
         │   ├── index.yaml
         │   ├── overview/index.yaml
         │   └── srs/
         │       ├── index.yaml
-        │       └── <capability>/
-        │           ├── index.yaml
-        │           └── <function>/
-        │               ├── index.yaml
-        │               └── assets/...
+        │       ├── functional-requirements/<requirement>/index.yaml
+        │       ├── non-functional-requirements/<requirement>/index.yaml
+        │       ├── business-rules/<rule>/index.yaml
+        │       ├── policy-decisions/<decision>/index.yaml
+        │       ├── data/<definition>/index.yaml
+        │       └── customer-journeys/<journey>/index.yaml
         ├── architecture/
         │   ├── index.yaml
         │   ├── overview/index.yaml
         │   └── sds/
         │       ├── index.yaml
-        │       └── <design-scope>/
-        │           ├── index.yaml
-        │           ├── assets/...
-        │           └── <subscope>/...
+        │       ├── flows/<flow>/index.yaml
+        │       ├── code-map/{frontend,backend,shared}/<unit>/index.yaml
+        │       ├── contracts/<contract>/index.yaml
+        │       ├── data/<model>/index.yaml
+        │       ├── quality/{security,performance,reliability}/<concern>/index.yaml
+        │       ├── deployment/<topology>/index.yaml
+        │       ├── decisions/<decision>/index.yaml
+        │       └── verification/<scenario>/index.yaml
         ├── ui/
         │   ├── index.yaml
         │   └── <experience>/
@@ -74,14 +82,16 @@ a completed implementation.
 
 ## Responsibilities
 
-- Business overview explains who needs what and why in plain language. Nested SRS
-  leaves keep actors, rules, FR/NFR, preconditions, main/alternative/error flows,
-  postconditions and acceptance together. Existing code is observation, not intent.
-- Architecture maps those requirements to responsibilities, contracts, connections,
-  storage, security and context-specific failure/recovery decisions. Patterns are
-  justified choices, not compulsory Business content. Source-independent SDS uses
-  canonical Business IDs, not copied requirements, source files or symbols. See
-  [Architecture SDS](architecture-sds.md) for typed views and shared imports.
+- Business overview explains who needs what and why in plain language. SRS separates
+  functional requirements, NFRs, rules, decisions, data and customer journeys. Each
+  functional requirement keeps its own preconditions, main flow, alternatives,
+  exceptions, postconditions and acceptance. Existing code is observation, not intent.
+- Architecture maps each requirement, flow and acceptance ID through application entry
+  points, target frontend/backend/shared paths and symbols, contracts, data,
+  security/latency/reliability mechanisms, deployment, recovery and verification.
+  These prescribed code units remain design truth even before source exists. Actual
+  source paths, revisions and results are recorded by Implementation and UAT as
+  conformance proof. See [Architecture SDS](architecture-sds.md).
 - UI specifies experiences, interactions, states, component grammar and coverage.
 - Implementation links the design to actual BE/FE source; it does not copy source
   repositories into Work.

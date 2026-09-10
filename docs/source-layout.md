@@ -1,6 +1,6 @@
 # Backend/frontend source layout
 
-StarCiNext binds one product to two source repositories. The backend is the project host, so it owns the current StarCi runtime, stack knowledge, workspace routing and the only `.starciwork`. The frontend consumes the same feature contracts and does not copy those directories.
+StarCiNext binds one product to two source repositories. The selected backend is also the StarCi host, so it owns the paired `.claude` runtime and `.workspaces` route registry, stack knowledge and the only `.starciwork`. These host directories are not default folders for every source. The frontend consumes the same feature contracts and does not copy them.
 
 ```text
 starci-academy-backend/
