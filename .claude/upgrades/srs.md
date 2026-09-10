@@ -8,8 +8,10 @@ Yêu cầu là tách thành folder thật trên filesystem. Mỗi chức năng, 
 
 ## Cấu trúc folder và file
 
+Một dự án chỉ có một `.starciwork` tại gốc source đã chọn. Bên trong là `features/<feature>/`; từng feature mới sở hữu `business/`, `architecture/`, `ui/`, `implementation/` và `uat/` khi có nội dung. Tên dự án nằm trong metadata, không thêm một folder tên dự án. Ví dụ chatbot dùng `.starciwork/features/chatbot/business/` và `.starciwork/features/chatbot/architecture/`. Quy tắc/dữ liệu/journey dùng chung có một feature chịu trách nhiệm sở hữu, các feature khác tham chiếu bằng ID; không nhân bản cùng đặc tả.
+
 ```text
-.starciwork/<module>/business/
+.starciwork/features/<feature>/business/
 ├── index.yaml
 ├── overview/
 │   └── index.yaml

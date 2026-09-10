@@ -4,24 +4,36 @@ node: index.yaml
 identity: stable metadata id; folder path is not identity
 shape:
   workspace: workspace.yaml
-  businessTree: <module>/**/index.yaml
+  businessTree: features/<feature>/**/index.yaml
   nodeAssets: <node>/assets/**/<file-in-original-format>
-  uatFlow: <module>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/}
+  uatFlow: features/<feature>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/}
   designReview: Current Business overview/SRS/SDS use completion.review inside their owning
     index.yaml, without an evidence folder.
   evidence: Profiles using execution proof may retain <node>/evidence/<id>/manifest.yaml; this is not
     a required folder for every layer.
   workflowSession: internal
     .starciwork/_local/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}
-  moduleUI: <module>/ui/**/{index.yaml,assets/**}
-  implementation: <module>/implementation/{index.yaml,frontend/**/index.yaml,backend/**/index.yaml}
-  frontendCaptures: <module>/implementation/frontend/assets/<running-page-screenshot>
-  businessOverview: <module>/business/overview/index.yaml
-  businessDebt: <module>/business/debt.md (non-semantic maintenance ledger, not approval or completion proof)
-  businessSRS: <module>/business/srs/**/index.yaml
-  architectureOverview: <module>/architecture/overview/index.yaml
-  architectureSDS: <module>/architecture/sds/**/index.yaml
+  moduleUI: features/<feature>/ui/**/{index.yaml,assets/**}
+  implementation: features/<feature>/implementation/{index.yaml,frontend/**/index.yaml,backend/**/index.yaml}
+  frontendCaptures: features/<feature>/implementation/frontend/assets/<running-page-screenshot>
+  businessOverview: features/<feature>/business/overview/index.yaml
+  businessDebt: features/<feature>/business/debt.md (non-semantic maintenance ledger, not approval or
+    completion proof)
+  businessSRS: features/<feature>/business/srs/**/index.yaml
+  architectureOverview: features/<feature>/architecture/overview/index.yaml
+  architectureSDS: features/<feature>/architecture/sds/**/index.yaml
+  featureCatalog: features/index.yaml
+  feature: features/<feature>/index.yaml
 rules:
+  - One project owns one canonical .starciwork in its bound source repository. Its product catalog
+    is features/index.yaml; every actual feature owns
+    features/<feature>/{business,architecture,ui,implementation,uat}/ as applicable.
+  - The project or repository name belongs in workspace metadata, not a wrapper directory. Do not
+    author .starciwork/<project>/, .starciwork/business/ or .starciwork/features/business/.
+    Individual features, FE, BE and services do not create another project workspace.
+  - A shared rule, data definition, NFR or cross-feature journey has one accountable feature owner.
+    Other features reference its stable ID rather than copy it or create a second product-level
+    business tree. Parent indexes link to actual children and empty layers are not scaffolded.
   - Retained AI interface.draw images and real running-product screenshots both live under the bound
     backend .starciwork in their owning node assets/**. Identify generated design versus real
     capture and the actual capture environment; external/temp/chat-only media are not stored Work
@@ -100,7 +112,8 @@ rules:
     businessRefs/designRefs resolve declared canonical Work owners. Code mapping belongs to
     Implementation.
 example:
-  knowledge/:
+  features/knowledge/:
+    - index.yaml
     - business/index.yaml
     - business/overview/index.yaml
     - business/srs/index.yaml
@@ -121,3 +134,4 @@ example:
     - architecture/overview/index.yaml
     - architecture/sds/index.yaml
     - architecture/sds/runtime/update/index.yaml
+root: <bound-source-repository>/.starciwork

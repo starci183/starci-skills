@@ -14,10 +14,12 @@ SDS được phép thiết kế file/hàm chưa tồn tại và phải đánh d�
 
 ## Cấu trúc folder và file
 
+Một dự án chỉ có một `.starciwork` tại gốc source đã chọn. Bên trong là `features/<feature>/`; từng feature mới sở hữu `business/`, `architecture/`, `ui/`, `implementation/` và `uat/` khi có nội dung. Tên dự án nằm trong metadata, không thêm một folder tên dự án. Ví dụ chatbot dùng `.starciwork/features/chatbot/business/` và `.starciwork/features/chatbot/architecture/`. Quy tắc/dữ liệu/journey dùng chung có một feature chịu trách nhiệm sở hữu, các feature khác tham chiếu bằng ID; không nhân bản cùng đặc tả.
+
 Lấy flow làm trục chính. Các phần code-map, contracts, data và quality định nghĩa những thành phần mà flow tham chiếu.
 
 ```text
-.starciwork/<module>/architecture/
+.starciwork/features/<feature>/architecture/
 ├── index.yaml
 ├── overview/
 │   └── index.yaml

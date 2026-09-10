@@ -8,6 +8,12 @@ rules:
     entering another repository or worktree.
   - Resolve source-relative repository paths from Source, not from .claude or the current target
     checkout. Verify each actual Git remote against the declared repository before effects.
+  - A selected project has exactly one canonical .starciwork. Project identity is stored in
+    workspace metadata and routing references, not in a project-name directory inside that
+    workspace.
+  - All product features are owned below features/<feature>/; business, architecture, UI,
+    implementation and UAT belong inside that feature. Never bind a feature as a separate workspace
+    or place feature business at .starciwork/business/ or .starciwork/features/business/.
   - The project's backend repository owns .starciwork. FE and other sources share that Work via the
     registry; do not create duplicate Work in the central registry or frontend.
   - The same backend owns internal .starciwork/_local/plans for both BE and FE workflow state. The

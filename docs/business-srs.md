@@ -8,10 +8,12 @@ missing: complete the owning SRS flows and acceptance, review affected SDS and
 re-establish current `done` within authority. Reporting the gap alone is not
 completion of an authorized repair.
 
+A project has one bound `.starciwork`. `features/index.yaml` is its product catalog; each actual feature owns its business, architecture and other applicable layers below `features/<feature>/`. The project name is metadata, not another directory. Shared definitions and cross-feature journeys have one accountable feature owner and are referenced across features. Create only layers containing actual work.
+
 New authoring uses this actual folder tree inside the backend-owned `.starciwork`:
 
 ```text
-<module>/business/
+.starciwork/features/<feature>/business/
 ├── index.yaml                 aggregate; no stored state/completion
 ├── overview/
 │   └── index.yaml             readable purpose, outcome, scope, open questions

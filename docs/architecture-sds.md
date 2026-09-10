@@ -19,8 +19,10 @@ data models and recovery procedures are legitimate design content.
 
 ## Structure and ownership
 
+A project has one bound `.starciwork`. `features/index.yaml` is its product catalog; each actual feature owns its business, architecture and other applicable layers below `features/<feature>/`. The project name is metadata, not another directory. Shared definitions and cross-feature journeys have one accountable feature owner and are referenced across features. Create only layers containing actual work.
+
 ```text
-<scope>/
+.starciwork/features/<feature>/
 ├── business/
 │   ├── index.yaml
 │   ├── overview/index.yaml
