@@ -21,7 +21,7 @@ test('implementation records meaningful changes without duplicating Git file inv
   status:'observed',changes:[{what:'Rejected duplicate delivery in a synthetic fixture.',why:'Preserve the original intent.',repository:'fixture-repo',directory:'src/delivery',revision:'1'.repeat(40),verification:['Focused synthetic test; no real integration claim.']}],gaps:['Real integration has not run.']
  }});
  let report=f.run();assert.ok(report.ok,JSON.stringify(report.errors));assert.notEqual(report.nodes.find(n=>n.id===id).effectiveState,'done');
- f.mutate(id,m=>{m.implementation.changes[0].files=['src/delivery/handler.ts'];m.implementation.currentCodeMap=[{layer:'domain',symbol:'handle',path:'src/delivery/handler.ts',responsibility:'Optional useful anchor for original-intent dispatch.'}];});
+ f.mutate(id,m=>{m.implementation.changes[0].files=['src/delivery/handler.ts'];m.implementation.currentCodeMap=[{componentRef:'COMP-DELIVERY',layer:'domain',symbol:'handle',path:'src/delivery/handler.ts',responsibility:'Optional useful anchor for original-intent dispatch.'}];});
  report=f.run();assert.ok(report.ok,JSON.stringify(report.errors));
  f.mutate(id,m=>{m.implementation.changes[0].files='not-a-list';});
  assert.equal(f.run().ok,false);

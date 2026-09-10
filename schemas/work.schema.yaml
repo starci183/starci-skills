@@ -850,11 +850,15 @@ $defs:
           type: object
           additionalProperties: false
           required:
+            - componentRef
             - layer
             - symbol
             - path
             - responsibility
           properties:
+            componentRef:
+              $ref: "#/$defs/id"
+              description: Logical starci/sds-component@1 ID implemented by this source mapping.
             layer:
               $ref: "#/$defs/string"
               description: Application, domain, infrastructure or UI layer.
@@ -867,8 +871,8 @@ $defs:
             responsibility:
               $ref: "#/$defs/string"
               description: What the mapped code currently does.
-        description: Optional focused map for non-obvious design-to-code boundaries; not a required
-          inventory of files or symbols.
+        description: Optional focused mapping from logical SDS component IDs to actual source;
+          not a required inventory of files or symbols.
       gaps:
         $ref: "#/$defs/stringList"
         description: Explicit differences between current implementation and the required target; never

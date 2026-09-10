@@ -102,6 +102,16 @@ test('backend and frontend implementation scopes can grow recursively while thei
   assert.ok(validateWorkspace(f.root).errors.some(e=>e.code==='IMPLEMENTATION_LAYOUT'));
 });
 
+test('implementation owns the mapping from logical SDS components to source code',t=>{
+  const f=fixture(t),mapping={componentRef:'COMP-DOCUMENTS',layer:'application',symbol:'updateDocument',path:'src/documents/update.ts',responsibility:'Implement the logical document update component.'};
+  f.put('module/implementation/index.yaml',{schema:'work/node@2',id:'implementation',kind:'implementation',required:true,description:'Implementation aggregate.'});
+  f.put('module/implementation/backend/index.yaml',{schema:'work/node@2',id:'implementation.backend',kind:'implementation',required:true,state:'todo',implementation:{status:'proposed',changes:[],currentCodeMap:[mapping],gaps:['Synthetic mapping-only fixture.']}});
+  assert.ok(validateWorkspace(f.root).ok,JSON.stringify(validateWorkspace(f.root).errors));
+  delete mapping.componentRef;
+  f.put('module/implementation/backend/index.yaml',{schema:'work/node@2',id:'implementation.backend',kind:'implementation',required:true,state:'todo',implementation:{status:'proposed',changes:[],currentCodeMap:[mapping],gaps:['Synthetic mapping-only fixture.']}});
+  const invalid=validateWorkspace(f.root);assert.equal(invalid.ok,false);assert.ok(invalid.errors.some(error=>error.path==='module/implementation/backend/index.yaml'));
+});
+
 test('nested asset payload folders never follow junctions',t=>{
   const f=fixture(t);f.node('scope',{schema:'work/node@2'});f.put('_local/target/sample.txt','Not canonical');
   fs.mkdirSync(path.join(f.root,'scope/assets/captures'),{recursive:true});

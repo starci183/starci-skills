@@ -1,5 +1,5 @@
 schema: starci/sds-map@1
-purpose: A filesystem code map that traces accepted business flows through target source units, contracts, data, quality mechanisms, deployment and verification.
+purpose: A source-independent architecture map that traces accepted business flows through logical components, contracts, data, quality mechanisms, deployment and verification.
 payload: extensions.work3.sds
 aggregateSchema: starci/sds-aggregate@1
 overview:
@@ -11,18 +11,18 @@ sections:
     type: flow
     schema: starci/sds-flow@1
     required: [id, title, businessRefs, entryPoint, preconditions, inputs, participants, mainSequence, alternativeSequences, exceptionSequences, recovery, postconditions, resultMapping, topologyRefs, verificationRefs]
-  code-map:
-    type: code-unit
-    schema: starci/sds-code-unit@1
-    required: [id, title, side, repositoryRole, path, symbols, callers, callees, contractRefs, dataRefs, qualityRefs, verificationRefs]
+  components:
+    type: component
+    schema: starci/sds-component@1
+    required: [id, title, kind, responsibility, interfaceRefs, dataRefs, qualityRefs, verificationRefs]
   contracts:
     type: contract
     schema: starci/sds-contract@1
-    required: [id, title, kind, callerCodeUnitRef, receiverCodeUnitRef, mode, transport, operation, request, response, errors, authorization, timeout, retry, idempotency, compatibility]
+    required: [id, title, kind, callerComponentRef, receiverComponentRef, mode, transport, operation, request, response, errors, authorization, timeout, retry, idempotency, compatibility]
   data:
     type: data-model
     schema: starci/sds-data-model@1
-    required: [id, title, ownerCodeUnitRef, store, authoritative, classification, fields, states, transactions, consistency, retention, recovery]
+    required: [id, title, ownerComponentRef, store, authoritative, classification, fields, states, transactions, consistency, retention, recovery]
   quality:
     type: quality
     schema: starci/sds-quality@1
@@ -44,10 +44,10 @@ rules:
   - Inspect only relevant current source, configuration and installed APIs to establish feasibility and migration impact. Record retain, extend, correct, replace or add decisions with rationale; observations never override SRS or become implementation proof.
   - SDS is a source-of-truth design contract derived from SRS and design decisions, never from current source code. Source observations, revisions and implementation proof are forbidden.
   - SDS verification nodes specify scenarios and expected results only. Evidence fields and executed proof belong to excluded local run state, never SDS.
-  - Flow is the primary route. Every main, alternative and exception sequence references exact code units and ends in an observable application or receiver result.
-  - Code units prescribe repository role, target path and symbols as the design source of truth. Implementation owns actual code and revision proof.
+  - Flow is the primary route. Every main, alternative and exception sequence references logical components and ends in an observable application or receiver result.
+  - Components own logical responsibilities and interfaces only. Repository roles, paths, symbols, signatures, call graphs and all other code mappings belong to Implementation.
   - Contracts state direction, sync or async mode, request, response, errors, authorization, timeout, retry, idempotency and compatibility.
   - Data identifies its writer, store, transaction boundaries, consistency, lifecycle and recovery.
   - Security, performance and reliability record applicable scenarios, mechanisms, measurement, optimizations, tradeoffs and verification.
   - Monolith and microservice topology are explicit deployment choices; flow behavior remains traceable in either topology.
-  - SDS readiness means the target code path is implementable without guessing. SDS never claims source observation; Implementation and UAT prove code and running behavior.
+  - SDS readiness means the logical design is implementable without guessing. SDS never contains code references or claims source observation; Implementation maps code to SDS and UAT proves running behavior.

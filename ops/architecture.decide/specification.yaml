@@ -1,7 +1,7 @@
 schema: starci/specification-policy@1
 storage: .starciwork
 payload: architecture/overview/index.yaml carrying starci/sds-overview@1 plus recursive
-  architecture/sds/**/index.yaml leaves carrying extensions.work3.sds code-map sections; parent
+  architecture/sds/**/index.yaml leaves carrying source-independent extensions.work3.sds sections; parent
   indexes carry only sds-aggregate metadata.
 sourceTruth: Canonical Work intent and design decisions define the target. A concise relevant
   source/configuration/installed-API survey informs feasibility and migration; the overview then
@@ -9,7 +9,7 @@ sourceTruth: Canonical Work intent and design decisions define the target. A con
   Actual source observations and revisions remain Implementation or UAT proof, never SDS authority.
 requiredSections:
   - flows
-  - code-map
+  - components
   - contracts
   - data
   - quality
@@ -25,9 +25,9 @@ completion: Current SDS uses completion.review in the owning index.yaml, followi
   docs/source-of-trust.md; never source implementation or executed recovery. No evidence directory
   or duplicate design. Workflow authorization and result acceptance remain required; legacy records
   remain readable, not fabricated.
-handoff: Reference canonical SRS and SDS items with exact typed refs. SDS owns the target
-  repository/file/symbol/call/state/test-location map; Implementation realizes it and owns actual
-  revision/build test results.
+handoff: Reference canonical SRS and SDS items with exact typed refs. SDS owns logical components,
+  interfaces, state, failure and recovery design; Implementation owns repository/file/symbol/call
+  mappings and actual revision/build/test results.
 op: architecture.decide
 impactMaturity: logical-design
 scopeSufficiency: Proactively anticipate realistic main, alternative, failure and edge cases plus
@@ -45,9 +45,10 @@ steps:
     action:
       en: "Resolve current accepted SRS scope, drivers, actors and platform constraints from canonical
         .starciwork. Read specifications/sds-map.json, docs/architecture-sds.md and
-        docs/source-of-trust.md. Prescribe target repository roles, paths and symbols without
-        existing/planned status, revisions or source evidence. Code and green tests do not authorize
-        the target design; actual conformance belongs to Implementation and UAT."
+        docs/source-of-trust.md. Prescribe logical components, interfaces, state and failure
+        behavior without repository roles, paths, symbols, signatures, existing/planned status,
+        revisions or source evidence. Code and green tests do not authorize the target design;
+        actual code mapping and conformance belong to Implementation and UAT."
   - reads:
       - target
       - business
@@ -125,9 +126,9 @@ steps:
         cases. Gaps found during review, coding, testing, operation or later customer feedback
         require scoped SRS/SDS repair within authority and current reviewed done before dependent
         effects. Do not reopen unrelated design or rewrite requirements to justify legacy code.
-        Apply the call/signature/owner joins and admission-to-worker crash review in
-        docs/architecture-sds.md; copied happy-path calls cannot implement cancellation or recovery.
-        Schema validity alone is not review. SDS owns the target code map and planned verification;
+        Apply the component/interface/owner joins and admission-to-worker crash review in
+        docs/architecture-sds.md; copied happy paths cannot settle cancellation or recovery.
+        Schema validity alone is not review. SDS owns the source-independent design and planned verification;
         Implementation owns code effects and actual execution evidence. Done is never an edit lock."
 references:
   - topic: Architecture views and decisions
@@ -140,7 +141,7 @@ aggregateSchema: starci/sds-aggregate@1
 sectionSchemas:
   - starci/sds-overview@1
   - starci/sds-flow@1
-  - starci/sds-code-unit@1
+  - starci/sds-component@1
   - starci/sds-contract@1
   - starci/sds-data-model@1
   - starci/sds-quality@1

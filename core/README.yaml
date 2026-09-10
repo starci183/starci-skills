@@ -4,7 +4,7 @@ sections:
     blocks:
       - Canonical Work v2 uses workspace.yaml and one index.yaml per active node. New Business
         separates overview/index.yaml from typed recursive srs/**/index.yaml section leaves.
-        Architecture uses a typed target code map below architecture/sds; implementation and UAT
+        Architecture uses a typed source-independent design below architecture/sds; implementation and UAT
         later prove that map. Legacy cohesive specification@2 and source-independent
         specification@3 records remain readable.
       - Only leaves author uninvestigate, todo or done. Parents derive progress. Stable dependsOn

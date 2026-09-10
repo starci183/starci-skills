@@ -663,7 +663,6 @@ $defs:
       - expectedAppState
       - forbiddenChanges
       - measurements
-      - executionEvidence
     properties:
       businessRefs:
         type: array
@@ -699,5 +698,3 @@ $defs:
         type: array
       measurements:
         type: array
-      executionEvidence:
-        type: "null"

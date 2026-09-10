@@ -87,7 +87,6 @@ extensions:
         forbiddenChanges:
           - Shared router never performs recipient domain effects.
         measurements: []
-        executionEvidence: null
 completion:
   inputDigest: 9cde35aad17be57fca680fa3525b60dbbcc1a65ccdef85167f47744e45bff440
   review:

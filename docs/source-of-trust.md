@@ -69,7 +69,7 @@ Completion of a downstream node cannot repair a known-invalid upstream contract.
 
 ## Recording a current design review
 
-For current `work/node@2` Business overview, split SRS leaves and code-map SDS
+For current `work/node@2` Business overview, split SRS leaves and source-independent SDS
 leaves, keep the review inside `completion.review` on the owning `index.yaml`;
 do not create an evidence directory or a second specification copy. The legacy
 cohesive SRS@2 and source-independent SDS@3 formats remain reviewable while they
@@ -132,7 +132,7 @@ input to evaluate, not automatic authority to change another owner's policy.
 Within an authorized delivery or design-repair scope, whenever a relevant gap is discovered:
 
 1. Trace the significant case to the owning SRS requirement/flow/acceptance and
-   SDS view/runtime path. Inspect ancestor scope and shared imports before
+   SDS logical flow/component. Inspect ancestor scope and shared imports before
    declaring it missing. Distinguish implementation mismatch, missing elaboration,
    an invalid design assumption and a genuinely undecided business choice.
 2. If implementation alone is wrong, repair it. If SRS or SDS does not adequately

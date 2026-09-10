@@ -1,6 +1,6 @@
 schema: starci/specification-contract@1
 payloadSchema: starci/specification@1
-storage: Legacy cohesive records use extensions.work3.specification; current split SRS and code-map
+storage: Legacy cohesive records use extensions.work3.specification; current split SRS and source-independent SDS
   SDS use extensions.work3.srs and extensions.work3.sds in their typed section index.yaml files.
 statuses:
   - draft
@@ -407,9 +407,9 @@ architectureV3:
   legacy: Specification@1/@2 remain readable under their original checks. Migration never reuses stale
     completion.
 architectureMap:
-  layout: architecture/sds/{flows,code-map,contracts,data,quality,deployment,decisions,verification}/**/index.yaml
+  layout: architecture/sds/{flows,components,contracts,data,quality,deployment,decisions,verification}/**/index.yaml
   payload: extensions.work3.sds
-  source: SDS prescribes target repository paths and symbols without source status or revision evidence. Implementation and UAT prove conformance.
+  source: SDS prescribes logical components, interfaces and behavior without repository paths, symbols, signatures, source status or revision evidence. Implementation and UAT own code mapping and conformance.
   legacy: Source-independent specification@3 remains readable; new authoring uses the code map.
 compatibilityBusinessTreePayloadSchema: starci/srs@3
 compatibilityBusinessV3:
@@ -421,7 +421,7 @@ compatibilityBusinessV3:
 compatibilityCodeMapPayloadSchema: starci/sds@4
 compatibilityArchitectureV4:
   schema: specifications/sds-v4.schema.json
-  layout: architecture/{overview,sds/{flows,code-map,contracts,data,quality,deployment,decisions,verification}/**}/index.yaml
+  layout: architecture/{overview,sds/{flows,components,contracts,data,quality,deployment,decisions,verification}/**}/index.yaml
   ownership: Flow-first target design owns planned/existing code units and verification plans; Implementation owns execution results.
   refs: Typed nodeId/itemId edges resolve SRS@3 or SDS@4 owners and reject wrong-version or wrong-kind imports.
   legacy: Compatibility/recovery only. New authoring uses extensions.work3.sds section schemas; existing source-independent specification@3 leaves and their imports retain original validation and completion semantics.

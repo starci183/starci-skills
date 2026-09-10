@@ -18,6 +18,10 @@ extensions, other nodes or assets. The original request stays frozen and the
 result seals the resulting content; later semantic drift invalidates acceptance.
 Never add this permission retroactively to an existing request.
 
+When a non-obvious design-to-code map is useful, record it only in the Implementation node's
+`currentCodeMap`. Every row names the logical SDS `componentRef` plus the actual layer, source path,
+symbol and responsibility. SDS itself never carries those source fields.
+
 Work v2 implementation completion can use `sourceIdentity` with schema
 `starci/source-identity@1` and `repositories`, without a legacy resource registry.
 Each repository identifies its logical name, credential-free origin and coverage.

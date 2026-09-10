@@ -36,7 +36,7 @@ them, but cannot silently redefine them.
         │   └── sds/
         │       ├── index.yaml
         │       ├── flows/<flow>/index.yaml
-        │       ├── code-map/{frontend,backend,shared}/<unit>/index.yaml
+        │       ├── components/<component>/index.yaml
         │       ├── contracts/<contract>/index.yaml
         │       ├── data/<model>/index.yaml
         │       ├── quality/{security,performance,reliability}/<concern>/index.yaml
@@ -87,11 +87,10 @@ a completed implementation.
   functional requirement keeps its own preconditions, main flow, alternatives,
   exceptions, postconditions and acceptance. Existing code is observation, not intent.
 - Architecture maps each requirement, flow and acceptance ID through application entry
-  points, target frontend/backend/shared paths and symbols, contracts, data,
+  points, logical components and interfaces, contracts, data,
   security/latency/reliability mechanisms, deployment, recovery and verification.
-  These prescribed code units remain design truth even before source exists. Actual
-  source paths, revisions and results are recorded by Implementation and UAT as
-  conformance proof. See [Architecture SDS](architecture-sds.md).
+  Repository roles, source paths, symbols, signatures, revisions and results are recorded by
+  Implementation and UAT as conformance proof. See [Architecture SDS](architecture-sds.md).
 - UI specifies experiences, interactions, states, component grammar and coverage.
 - Implementation links the design to actual BE/FE source; it does not copy source
   repositories into Work.

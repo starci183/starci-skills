@@ -1,7 +1,7 @@
 id: architecture.decide
 goal:
-  en: Design a flow-led target code map with exact source units, contracts, state paths, recovery and
-    planned verification.
+  en: Design a flow-led, source-independent architecture with logical components, contracts, state
+    paths, recovery and planned verification.
 nodeKinds:
   - architecture
 completionProfile: architecture
@@ -68,11 +68,11 @@ writes:
       - required
       - extensions.work3.sds
     content:
-      en: Author overview plus typed extensions.work3.sds leaves in flows, code-map, contracts, data,
-        quality, deployment, decisions and verification. Parent indexes carry only
-        starci/sds-aggregate@1 metadata. Code units prescribe target repository roles, paths and
-        symbols without source status or revision evidence. Preserve Business and shared design
-        through stable IDs and exact owning Work refs.
+      en: Author overview plus typed extensions.work3.sds leaves in flows, components, contracts,
+        data, quality, deployment, decisions and verification. Parent indexes carry only
+        starci/sds-aggregate@1 metadata. Components prescribe logical responsibilities and
+        interfaces without repository roles, paths, symbols, signatures, source status or revision
+        evidence. Preserve Business and shared design through stable IDs and exact owning Work refs.
   - id: matrixHandoff
     path: E/job-result.json
     fields:

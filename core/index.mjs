@@ -313,16 +313,16 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       if(n.children.length&&spec!==undefined)issue('SDS_BRANCH_PAYLOAD',n.path,'SDS branches aggregate; do not duplicate their descendant design.');
       if(splitSds!==undefined){
         const classification=classifySDSPath(n.path,n.children.length>0);
-        if(spec!==undefined)issue('SDS_DUPLICATE',n.path,'Use either a code-map SDS section or one legacy specification, never both.');
+        if(spec!==undefined)issue('SDS_DUPLICATE',n.path,'Use either a split SDS section or one legacy specification, never both.');
         if(!classification)issue('SDS_SECTION_PATH',n.path,'Typed SDS content must live under architecture/sds.');
         else {
           if(n.children.length&&!classification.aggregate)issue('SDS_BRANCH_PAYLOAD',n.path,'A detailed SDS item cannot also aggregate child scopes.');
           if(classification.aggregate&&splitSds?.schema!==SDS_AGGREGATE_SCHEMA)issue('SDS_AGGREGATE',n.path,'SDS parent indexes use starci/sds-aggregate@1 metadata.');
-          if(n.meta.sourceRefs?.length)issue('SDS_SOURCE_MAPPING',n.path,'SDS prescribes the target code map; sourceRefs and revision proof belong to Implementation.');
+          if(n.meta.sourceRefs?.length)issue('SDS_SOURCE_MAPPING',n.path,'SDS is source-independent; sourceRefs and revision proof belong to Implementation.');
           splitSdsEntries.push({path:n.path,nodeId:n.meta.id,workRefs:n.refIds,payload:splitSds,classification});
         }
-      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&![SDS_SCHEMA,SDS_V4_SCHEMA].includes(spec?.schema))issue('SDS_VERSION',n.path,'New SDS authoring requires a typed code-map section; readable legacy leaves use starci/specification@3 or starci/sds@4.');
-      if(!n.children.length&&n.meta.state==='done'&&splitSds!==undefined&&splitSds.status!=='accepted')issue('SDS_NOT_ACCEPTED',n.path,'A reviewed SDS code-map leaf must have status accepted before it can complete.');
+      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&![SDS_SCHEMA,SDS_V4_SCHEMA].includes(spec?.schema))issue('SDS_VERSION',n.path,'New SDS authoring requires a typed source-independent section; readable legacy leaves use starci/specification@3 or starci/sds@4.');
+      if(!n.children.length&&n.meta.state==='done'&&splitSds!==undefined&&splitSds.status!=='accepted')issue('SDS_NOT_ACCEPTED',n.path,'A reviewed SDS leaf must have status accepted before it can complete.');
       if(spec?.schema===SDS_V4_SCHEMA){
         const suffix=n.path.slice((archRoot+'sds/').length), expected=suffix==='index.yaml'?null:suffix.startsWith('flows/')?'flow':suffix.startsWith('code-map/')?'code-unit':suffix.startsWith('contracts/')?'contract':suffix.startsWith('data/')?'data':suffix.startsWith('quality/')?'quality':suffix.startsWith('deployment/')?'deployment':suffix.startsWith('decisions/')?'decision':suffix.startsWith('verification/')?'verification':null;
         if(!expected||spec.nodeType!==expected)issue('SDS_NODE_TYPE',n.path,'SDS@4 nodeType must match its canonical flows/code-map/contracts/data/quality/deployment/decisions/verification folder.');
@@ -457,7 +457,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
   };
   // Split SRS/SDS payloads use semantic IDs instead of legacy nodeId/itemId
   // tuples. Resolve those IDs to their exact Work owners for digest freshness,
-  // but keep them outside the ordinary Work refs graph so reciprocal code-map
+  // but keep them outside the ordinary Work refs graph so reciprocal design
   // relationships do not manufacture dependency cycles.
   const splitOwners={srs:new Map(),sds:new Map()};
   const own=(space,id,nodeId)=>{if(text(id)&&!splitOwners[space].has(id))splitOwners[space].set(id,nodeId);};
@@ -481,13 +481,13 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     if(sds?.schema?.startsWith('starci/sds-')){
       if(sds.schema==='starci/sds-flow@1'){
         for(const business of sds.businessRefs??[])refs.push(...semantic('srs',[...(business?.requirementIds??[]),...(business?.flowIds??[]),...(business?.acceptanceIds??[])]));
-        refs.push(...semantic('sds',[sds.entryPoint?.codeUnitRef,...(sds.participants??[]),...(sds.topologyRefs??[]),...(sds.verificationRefs??[]),...[sds.mainSequence,...(sds.alternativeSequences??[]),...(sds.exceptionSequences??[])].flatMap(sequence=>(sequence?.steps??[]).flatMap(step=>[step?.codeUnitRef,...(step?.contractRefs??[]),...(step?.dataRefs??[])]))]));
+        refs.push(...semantic('sds',[sds.entryPoint?.componentRef,...(sds.participants??[]),...(sds.topologyRefs??[]),...(sds.verificationRefs??[]),...[sds.mainSequence,...(sds.alternativeSequences??[]),...(sds.exceptionSequences??[])].flatMap(sequence=>(sequence?.steps??[]).flatMap(step=>[step?.componentRef,...(step?.contractRefs??[]),...(step?.dataRefs??[])]))]));
       }
-      if(sds.schema==='starci/sds-code-unit@1')refs.push(...semantic('sds',[...(sds.callers??[]),...(sds.callees??[]),...(sds.contractRefs??[]),...(sds.dataRefs??[]),...(sds.qualityRefs??[]),...(sds.verificationRefs??[])]));
-      if(sds.schema==='starci/sds-contract@1')refs.push(...semantic('sds',[sds.callerCodeUnitRef,sds.receiverCodeUnitRef]));
-      if(sds.schema==='starci/sds-data-model@1')refs.push(...semantic('sds',[sds.ownerCodeUnitRef]));
+      if(sds.schema==='starci/sds-component@1')refs.push(...semantic('sds',[...(sds.interfaceRefs??[]),...(sds.dataRefs??[]),...(sds.qualityRefs??[]),...(sds.verificationRefs??[])]));
+      if(sds.schema==='starci/sds-contract@1')refs.push(...semantic('sds',[sds.callerComponentRef,sds.receiverComponentRef]));
+      if(sds.schema==='starci/sds-data-model@1')refs.push(...semantic('sds',[sds.ownerComponentRef]));
       if(sds.schema==='starci/sds-quality@1'){refs.push(...semantic('srs',sds.businessRefs));refs.push(...semantic('sds',[...(sds.scopeRefs??[]),...(sds.verificationRefs??[])]));}
-      if(sds.schema==='starci/sds-deployment@1')refs.push(...semantic('sds',(sds.placements??[]).map(placement=>placement?.codeUnitRef)));
+      if(sds.schema==='starci/sds-deployment@1')refs.push(...semantic('sds',(sds.placements??[]).map(placement=>placement?.componentRef)));
       if(sds.schema==='starci/sds-decision@1')refs.push(...semantic('sds',sds.affectedRefs));
       if(sds.schema==='starci/sds-verification@1'){refs.push(...semantic('srs',sds.businessAcceptanceRefs));refs.push(...semantic('sds',sds.scopeRefs));}
     }
@@ -625,7 +625,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
         (n.meta.kind==='architecture'&&spec?.schema===SDS_V4_SCHEMA&&spec.op==='architecture.decide')||
         (n.meta.kind==='business'&&srsSection?.type&&splitSrs?.schema===srsSection.expectedSchema)||
         (n.meta.kind==='architecture'&&sdsSection?.type&&splitSds?.schema===sdsSection.expectedSchema));
-      if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to current structured Business overview, split SRS, code-map SDS and their readable legacy formats; other profiles require their existing proof.');
+      if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to current structured Business overview, split source-independent SDS and their readable legacy formats; other profiles require their existing proof.');
       if(Object.hasOwn(c,'evidence')||Object.hasOwn(c,'codeRefs')||Object.hasOwn(c,'sourceIdentity'))issue('DESIGN_REVIEW_MIXED',n.path,'Design review cannot be mixed with evidence or source completion bindings.');
       const review=c.review,seen=new Set();
       if(!object(review)||review.schema!=='starci/design-review@1'||!text(review.reviewer)||!text(review.authority)||!text(review.reviewedAt)||!/^\d{4}-\d{2}-\d{2}T/.test(review.reviewedAt)||!Number.isFinite(Date.parse(review.reviewedAt)))issue('DESIGN_REVIEW',n.path,'Review needs declared reviewer, actual authority provenance and an ISO review time; the validator does not authenticate them.');
