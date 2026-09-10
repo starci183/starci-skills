@@ -1,12 +1,13 @@
 import {parseYaml} from './yaml.mjs';
 import { validateSpecification } from '../specifications/validate.mjs';
 import { validateSDSBindings, SDS_SCHEMA } from '../specifications/sds.mjs';
+import { readDistJson } from './runtime-root.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 
-export const profiles = Object.freeze(JSON.parse(fs.readFileSync(new URL('../schemas/profiles.json', import.meta.url), 'utf8')));
-const metadataSchema = JSON.parse(fs.readFileSync(new URL('../schemas/work.schema.json', import.meta.url), 'utf8'));
+export const profiles = Object.freeze(readDistJson('schemas', 'profiles.json'));
+const metadataSchema = readDistJson('schemas', 'work.schema.json');
 const text = v => typeof v === 'string' && v.trim().length > 0;
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const sha = v => typeof v === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(v);
@@ -388,6 +389,27 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     }
     return refs;
   }
+  function sourceIdentity(value,item,owner,assets) {
+    if(!object(value)||value.schema!=='starci/source-identity@1'||!Array.isArray(value.repositories)||!value.repositories.length){issue('SOURCE_IDENTITY',item.path,'Versioned nonempty direct source identity required.');return;}
+    if(owner?.meta.schema!=='work/node@2'||owner?.meta.kind!=='implementation')issue('SOURCE_IDENTITY_SCOPE',item.path,'Direct source identity is restricted to current implementation nodes.');
+    const seen=new Set();
+    const normalized=p=>typeof p==='string'&&p.trim().length>0&&p===p.trim()&&!/[\\\x00-\x1f:]/.test(p)&&!p.startsWith('/')&&p.split('/').every(s=>s&&s!=='.'&&s!=='..');
+    for(const r of value.repositories){
+      if(!object(r)){issue('SOURCE_IDENTITY',item.path,'Invalid repository identity.');continue;}
+      if(seen.has(r.repository))issue('SOURCE_IDENTITY',item.path,'Duplicate repository identity.');seen.add(r.repository);
+      let validOrigin=false;
+      try{const u=new URL(r.origin);validOrigin=['https:','ssh:'].includes(u.protocol)&&!!u.hostname&&!u.password&&!u.search&&!u.hash&&(u.protocol==='ssh:'?(!u.username||u.username==='git'):!u.username)&&u.pathname.length>1&&u.href===r.origin;}catch{}
+      if(!validOrigin)issue('SOURCE_ORIGIN',item.path,'Origin must be a normalized credential-free HTTPS or SSH repository URL.');
+      const cov=r.coverage;
+      if(!object(cov)||!['full-tree','scoped'].includes(cov.kind)||!Array.isArray(cov.paths)||!text(cov.dependencyCoverage)||!Array.isArray(cov.limitations)||cov.limitations.some(v=>!text(v))||(cov.kind==='full-tree'?cov.paths.length!==0:!cov.paths.length||cov.paths.some(p=>!normalized(p))||!cov.limitations.length))issue('SOURCE_COVERAGE',item.path,'Declare full-tree or explicit normalized scoped coverage, dependency coverage and honest limitations.');
+      if(r.state==='committed'){
+        if(!sha(r.commit)||Object.hasOwn(r,'baseCommit')||Object.hasOwn(r,'snapshot'))issue('SOURCE_STATE',item.path,'Committed identity requires only an exact commit, not dirty snapshot fields.');
+      }else if(r.state==='dirty'){
+        if(Object.hasOwn(r,'commit')||!sha(r.baseCommit)||!object(r.snapshot)||!normalized(r.snapshot.artifact)||!/^[a-f0-9]{64}$/.test(r.snapshot.sha256??''))issue('SOURCE_STATE',item.path,'Dirty identity requires baseCommit and a preserved snapshot, never a tested commit claim.');
+        if(assets&&!assets.some(a=>object(a)&&a.path===r.snapshot?.artifact&&a.sha256===r.snapshot?.sha256))issue('SOURCE_SNAPSHOT',item.path,'Dirty source snapshot must be an included byte-verified evidence asset.');
+      }else issue('SOURCE_STATE',item.path,'Unknown source state.');
+    }
+  }
   for(const e of evidence) {
     e.startErrors=errors.length;
     e.node=resolve(e.meta.nodeId,e,['node']);
@@ -411,6 +433,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       }
     }
     codeRefs(e.meta.codeRefs,e);
+    if(e.meta.sourceIdentity!==undefined){sourceIdentity(e.meta.sourceIdentity,e,e.node,Array.isArray(e.meta.assets)?e.meta.assets:[]);if(e.meta.codeRefs!==undefined)issue('SOURCE_IDENTITY_MIXED',e.path,'Do not mix direct and legacy source proof.');}
     e.images=0;
     if(!Array.isArray(e.meta.assets))issue('ASSETS',e.path,'assets must be an array (empty is allowed for non-UI evidence).');
     else for(const asset of e.meta.assets) {
@@ -444,7 +467,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
         (n.meta.kind==='business'&&spec?.schema==='starci/specification@2'&&spec.op==='business.decide')||
         (n.meta.kind==='architecture'&&spec?.schema===SDS_SCHEMA&&spec.op==='architecture.decide'));
       if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to current structured Business overview, SRS and source-independent SDS; other profiles require their existing proof.');
-      if(Object.hasOwn(c,'evidence')||Object.hasOwn(c,'codeRefs'))issue('DESIGN_REVIEW_MIXED',n.path,'Design review cannot be mixed with legacy evidence or code completion bindings.');
+      if(Object.hasOwn(c,'evidence')||Object.hasOwn(c,'codeRefs')||Object.hasOwn(c,'sourceIdentity'))issue('DESIGN_REVIEW_MIXED',n.path,'Design review cannot be mixed with evidence or source completion bindings.');
       const review=c.review,seen=new Set();
       if(!object(review)||review.schema!=='starci/design-review@1'||!text(review.reviewer)||!text(review.authority)||!text(review.reviewedAt)||!/^\d{4}-\d{2}-\d{2}T/.test(review.reviewedAt)||!Number.isFinite(Date.parse(review.reviewedAt)))issue('DESIGN_REVIEW',n.path,'Review needs declared reviewer, actual authority provenance and an ISO review time; the validator does not authenticate them.');
       if(!Array.isArray(review?.observations)||!review.observations.length)issue('DESIGN_REVIEW_OBSERVATIONS',n.path,'Review must contain concrete current assertion observations.');
@@ -457,7 +480,9 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       return true;
     }
     const evidenceIds=stringList(c.evidence,n.path,'completion.evidence',true);
-    const refs=codeRefs(c.codeRefs,n,!!profile.code);
+    const direct=Object.hasOwn(c,'sourceIdentity');
+    if(direct){sourceIdentity(c.sourceIdentity,n,n);if(c.codeRefs!==undefined)issue('SOURCE_IDENTITY_MIXED',n.path,'Do not mix direct and legacy source proof.');}
+    const refs=codeRefs(c.codeRefs,n,!!profile.code&&!direct);
     for(const r of refs)if(object(r)&&!n.effectiveRefs.some(ref=>ref.meta.id===r.repository))issue('UNBOUND_REPOSITORY',n.path,'Completion repository resources must be included in own or inherited node refs.');
     const covered=new Set();
     for(const id of evidenceIds){
@@ -468,6 +493,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       if(!e.valid || e.meta.outcome!=='pass' || !Array.isArray(e.meta.assertions) || !e.meta.assertions.length || e.meta.assertions.some(a=>!object(a)||a.outcome!=='pass'))issue('EVIDENCE_NOT_PASS',n.path,'Completion requires valid passing evidence and passing observations.');
       else e.meta.assertions.forEach(a=>covered.add(a.id));
       if(profile.code && refs.some(r=>!Array.isArray(e.meta.codeRefs)||!e.meta.codeRefs.some(er=>object(er)&&object(r)&&er.repository===r.repository&&er.commit===r.commit)))issue('CODE_EVIDENCE_BINDING',n.path,'Each code completion binding must appear in each selected evidence record.');
+      if(direct&&canonicalJSON(c.sourceIdentity)!==canonicalJSON(e.meta.sourceIdentity))issue('SOURCE_EVIDENCE_BINDING',n.path,'Every selected evidence record must bind the exact tested source identity and coverage.');
       if(profile.uat){
         const p=e.meta.provenance;
         if(!object(p)){issue('UAT_PROVENANCE',n.path,'UAT needs environment, actor or explicit anonymous, servedVersions, tool and capturedAt.');continue;}

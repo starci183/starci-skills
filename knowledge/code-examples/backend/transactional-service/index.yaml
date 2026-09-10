@@ -1,0 +1,59 @@
+schema: starci/code-example@1
+id: transactional-service
+title: Capability service transaction propagation
+purpose: |
+  Show a modules/ capability service that injects EntityManager through a named
+  connection decorator, runs a write path inside entityManager.transaction, and
+  passes the transaction-scoped manager into helpers — never this.entityManager
+  inside the callback, never Repository injection, never a store.manager facade.
+appliesTo: [backend]
+relatedRules:
+  - BE-FUNCTION-5
+  - BE-FUNCTION-7
+  - BE-FOLDER-4
+  - BE-TEST-1
+  - BE-TEST-3
+  - BE-TEST-4
+files:
+  - path: example.service.ts
+    role: Capability service with private readonly named EntityManager and transaction callback.
+  - path: example.ledger.util.ts
+    role: Pure helper that receives the transaction manager explicitly.
+  - path: example.service.spec.ts
+    role: Proves the callback uses the transactional manager, not the outer field.
+entrypoint: example.service.ts
+adapt:
+  - Replace Example* names with the target capability.
+  - Use the target's owned DB connection decorator/token; Primary example is NOT
+    permission for instance-owned data.
+  - Keep helpers receiving entityManager: manager from the transaction callback.
+dependencies:
+  packages:
+    - "@nestjs/common"
+    - "@nestjs/typeorm"
+    - typeorm
+  assumptions: |
+    Illustrative Nest/TypeORM shapes; not a runnable app. Named decorator and
+    exception imports use Academy-style @modules paths and must be remapped.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests:
+    - example.service.spec.ts
+  limitations: |
+    Focused teaching example; not full concurrency/idempotency proof against a
+    real database. Transaction mock invokes the callback inline with the same
+    manager object, matching Academy makeEntityManagerMock behavior.
+provenance:
+  sources:
+    - starci-academy-backend/src/modules/databases/postgresql/primary/primary.decorators.ts
+    - starci-academy-backend/src/modules/databases/postgresql/primary/constants/connection.ts
+    - starci-academy-backend/src/modules/bussiness/weekly-challenge/weekly-challenge.service.ts
+    - starci-academy-backend/src/modules/bussiness/weekly-challenge/weekly-challenge.service.spec.ts
+    - starci-academy-backend/src/features/api/processors/ai/shared/xp/write-coin-history.ts
+    - starci-academy-backend/src/tests/mocks/entity-manager.mock.ts
+  simplifications: |
+    Replaced weekly-challenge reward algorithm and Coin ledger with a synthetic
+    claim + ledger write. Kept named InjectPrimaryPostgreSQLEntityManager,
+    transaction(manager) propagation, and helper entityManager parameter.

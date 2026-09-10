@@ -315,6 +315,41 @@ function retireOwnedFiles(target, plan) {
   return { removedRetired: removed, preservedRetired: [...new Set(preserved)] };
 }
 
+function ensureInstalledDistIgnore(target) {
+  const ignore = path.join(target, '.gitignore');
+  const current = existsSync(ignore) ? readFileSync(ignore, 'utf8') : '';
+  const lines = current.split(/\r?\n/);
+  const required = ['/.dist/', '/.dist.staging/', '/.dist.previous/'];
+  const missing = required.filter(entry => !lines.includes(entry));
+  if (!missing.length) return;
+  appendFileSync(ignore, `${current && !current.endsWith('\n') ? '\n' : ''}${missing.join('\n')}\n`);
+}
+
+function runInstalledBuildStep(target, script, args = []) {
+  const result = spawnSync(process.execPath, [path.join(target, script), ...args], {
+    cwd: target, encoding: 'utf8', windowsHide: true
+  });
+  if (result.error || result.status !== 0) {
+    const detail = [result.error?.message, result.stderr, result.stdout].filter(Boolean).join('\n').trim();
+    throw new Error(`Installed runtime build failed (${script}${args.length ? ` ${args.join(' ')}` : ''}): ${detail || 'non-zero exit'}`);
+  }
+  return result;
+}
+
+function buildInstalledRuntime(target) {
+  // Always build the installed source, never trust a publisher-copied `.dist`.
+  // Record success only after generate + write + check all succeed.
+  ensureInstalledDistIgnore(target);
+  runInstalledBuildStep(target, 'scripts/build-workflows.mjs');
+  const check = runInstalledBuildStep(target, 'scripts/build-workflows.mjs', ['--check']);
+  try {
+    const report = JSON.parse((check.stdout || '').trim().split(/\r?\n/).filter(Boolean).at(-1) || '{}');
+    if (report.ok !== true) throw new Error(JSON.stringify(report));
+  } catch (error) {
+    throw new Error(`Installed runtime verification failed (scripts/build-workflows.mjs --check): ${error.message}`);
+  }
+}
+
 export function init(opts, log = console.log) {
   const repo = path.resolve(opts.dir);
   const target = path.join(repo, '.claude');
@@ -336,6 +371,7 @@ export function init(opts, log = console.log) {
   const localIgnore = path.join(target, '.gitignore');
   if (!existsSync(localIgnore) || !readFileSync(localIgnore,'utf8').split(/\r?\n/).includes('/config.json')) appendFileSync(localIgnore, '\n/config.json\n');
   const retired = retireOwnedFiles(target, retirement);
+  buildInstalledRuntime(target);
   const written = writeManifest(target, [], profile, hostPlan ? profile : manifest?.bootstrapProfile ?? null);
   log(`installed ${pkg.name}@${pkg.version} into ${target} (${Object.keys(written.files).length} files)`);
   if (hostPlan) writeBootstraps(repo, log, hostPlan);
@@ -374,6 +410,7 @@ export function update(opts, log = console.log) {
     kept.push(rel);
   }
   const retired = retireOwnedFiles(target, retirement);
+  buildInstalledRuntime(target);
   const written = writeManifest(target, kept, profile, hostPlan ? profile : manifest.bootstrapProfile ?? null);
   log(`updated ${manifest.name}@${manifest.version} -> ${pkg.name}@${pkg.version} in ${target}`);
   for (const rel of kept) log(`kept ${rel} (changed locally; pass --force to take the package version)`);
@@ -433,11 +470,14 @@ const HELP = `${pkg.name} ${pkg.version}
   npx ${pkg.name} impact <work-root> <id> | stale <work-root> | plan <plan.yaml>
   npx ${pkg.name} audit-legacy <legacy-root>
 
-init    copies the runtime into <repo>/.claude, adds the StarCi entry once to CLAUDE.md and AGENTS.md
-        while preserving custom instructions. Project data lives in backend .starciwork;
-        local Plan/run/evidence staging lives in .starciwork/_local. FE is source only.
-        Refuses a .claude it did not install unless --force; --no-bootstrap keeps host files unchanged.
+init    copies source payload into <repo>/.claude, builds/verifies local .dist, then records the
+        install manifest. Adds the StarCi entry once to CLAUDE.md and AGENTS.md while preserving
+        custom instructions. Project data lives in backend .starciwork; local Plan/run/evidence
+        staging lives in .starciwork/_local. FE is source only. Refuses a .claude it did not
+        install unless --force; --no-bootstrap keeps host files unchanged. A failed build does
+        not record a successful install/version.
 update  replaces current runtime paths; locally changed current files are kept unless --force.
+        Rebuilds and verifies .dist from the installed source before recording the new version.
         Retired manifest-owned unchanged files are removed; changed or unowned files are preserved.
         Personal settings, product .starciwork and legacy data are never cleanup targets.
         A major upgrade requires --upgrade-major; no existing .worktrees data is migrated/deleted.

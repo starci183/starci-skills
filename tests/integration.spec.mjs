@@ -210,9 +210,9 @@ test('packaged v3 references survive relocation; malformed commands do not creat
   const root = host(t);
   init({ dir: root, bootstrap: true }, quiet);
   assert.ok(PAYLOAD.includes('core'));
-  const catalog = JSON.parse(read(root, '.claude/ops/catalog.json'));
+  const catalog = JSON.parse(read(root, '.claude/.dist/ops/catalog.json'));
   assert.ok(catalog.ops.some(op => op.id === 'workspace.manage'));
-  for (const op of catalog.ops) assert.ok(fs.existsSync(path.resolve(root, '.claude/ops', op.document)), op.id);
+  for (const op of catalog.ops) assert.ok(fs.existsSync(path.resolve(root, '.claude/.dist/ops', op.operator)), op.id);
   const before = fs.readdirSync(root).sort();
   for (const args of [['run-everything'], ['op', 'nonexistent'], ['init']]) {
     const result = work(root, args);
@@ -400,7 +400,7 @@ test('source and relocated payload contain only current runtime, presets and dom
   assert.equal(Object.hasOwn(installed.scripts, 'test:legacy'), false);
   assert.equal(fs.existsSync(path.join(root,'.claude/skills/catalog.json')),false);
   assert.match(read(root,'.claude/SKILL.md'),/^name: starci$/m);
-  assert.equal(JSON.parse(read(root, '.claude/ops/catalog.json')).ops.length, 14);
+  assert.equal(JSON.parse(read(root, '.claude/.dist/ops/catalog.json')).ops.length, 14);
 });
 
 test('a 300-piece multi-repository tree accepts a new unfinished domain without restructuring', t => {
@@ -425,4 +425,37 @@ test('a 300-piece multi-repository tree accepts a new unfinished domain without 
   assert.equal(result.nodes.find(node => node.id === 'product').effectiveState, 'todo');
   assert.equal(result.warnings.filter(item => item.code === 'UNSUPPORTED_PROFILE').length, 100);
   assert.equal(result.nodes.some(node => node.effectiveState === 'done'), false);
+});
+
+test('init builds and verifies source-built .dist before recording success; failed update does not bump version', t => {
+  const root = host(t);
+  const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
+  assert.equal(pkg.files.includes('.dist') || pkg.files.includes('.dist/'), false);
+  assert.ok(pkg.files.includes('core/'));
+  assert.ok(pkg.files.includes('scripts/'));
+  assert.ok(pkg.files.includes('schemas/'));
+  assert.ok(pkg.files.includes('knowledge/'));
+  assert.equal(pkg.files.includes('config.json'), false);
+  assert.equal(pkg.files.some(entry => entry.includes('worktrees')), false);
+  init({ dir: root, bootstrap: true }, quiet);
+  const ignore = read(root, '.claude/.gitignore');
+  assert.match(ignore, /^\/\.dist\/$/m);
+  assert.match(ignore, /^\/\.dist\.staging\/$/m);
+  assert.match(ignore, /^\/\.dist\.previous\/$/m);
+  assert.match(ignore, /^\/config\.json$/m);
+  assert.ok(fs.existsSync(path.join(root, '.claude/.dist/manifest.json')));
+  assert.ok(fs.existsSync(path.join(root, '.claude/core/yaml.mjs')));
+  const manifestPath = path.join(root, '.claude/.starci-skills.json');
+  const written = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  assert.equal(written.version, pkg.version);
+  assert.equal(Object.keys(written.files).some(rel => rel === '.dist' || rel.startsWith('.dist/')), false);
+  const check = spawnSync(process.execPath, [path.join(root, '.claude/scripts/build-workflows.mjs'), '--check'], {
+    cwd: path.join(root, '.claude'), encoding: 'utf8', windowsHide: true,
+  });
+  assert.equal(check.status, 0, check.stderr + check.stdout);
+  assert.equal(JSON.parse(check.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1)).ok, true);
+  const before = fs.readFileSync(manifestPath, 'utf8');
+  fs.writeFileSync(path.join(root, '.claude/ops/task.execute/operator.yaml'), '{broken');
+  assert.throws(() => update({ dir: root }, quiet), /Installed runtime (build|verification) failed/);
+  assert.equal(fs.readFileSync(manifestPath, 'utf8'), before);
 });

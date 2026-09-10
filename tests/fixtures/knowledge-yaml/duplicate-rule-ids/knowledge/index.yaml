@@ -1,0 +1,15 @@
+schema: starci/knowledge-source@1
+id: knowledge
+title: Duplicate rule id fixture root
+purpose: |
+  Synthetic knowledge root for cross-topic duplicate rule ID rejection.
+appliesTo: [backend]
+topics:
+  - id: be.one
+    path: patterns/be/one
+    title: One
+    summary: First topic declaring the shared rule id.
+  - id: be.two
+    path: patterns/be/two
+    title: Two
+    summary: Second topic reusing the same rule id.

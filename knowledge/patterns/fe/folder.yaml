@@ -1,0 +1,258 @@
+schema: starci/knowledge-source@1
+id: fe.folder
+title: Folder
+purpose: |
+  Given a piece of frontend code, which directory and which file name does it get?
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - src/components/**
+    - src/hooks/**
+    - src/modules/api/**
+    - src/app/**
+    - packages/grammar/src/**
+  limitations: |
+    Cited counts and notes are historical observations at skill commit
+    edf72554425f918e80c9205e9c6db10596e722f0, not a census of the current project. Inspect actual
+    source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
+    Historical links supply provenance, not scripts or execution instructions. Counts are file counts
+    at the time of reading; old counts cannot claim a fresh scan. Verify installed Grammar exports at
+    @starci/grammar/common.
+rules:
+  - id: FE-FOLDER-1
+    title: Tier directories
+    kind: mandatory
+    requirement: |
+      src/components/ holds eight tier folders. Blocks are grouped by product domain; pages and leaves
+      are flat. Place each unit in the tier that matches its role.
+    rationale: |
+      Tier directories encode reuse vs feature-connected vs routed ownership so file location answers
+      composition questions without reading the unit body.
+    cases:
+      - id: case-1
+        when: "A reusable fixed visual unit"
+        write: "src/components/leaves/<Name>/ (40 units, flat)"
+      - id: case-2
+        when: "A feature unit with a connected half"
+        write: >
+          src/components/blocks/<domain>/<Name>/ (109 units under 11 domains:
+          ai auth coding commerce community courses dashboard learn locale profile search)
+      - id: case-3
+        when: "A routed screen"
+        write: "src/components/pages/<Name>Page/ (50 units, flat)"
+      - id: case-4
+        kind: exception
+        when: "Other composition tiers"
+        write: >
+          branches/, composites/, layouts/, overlays/. Existing product-shells/ is an unresolved
+          legacy exception, not a template for a new tier.
+    verification:
+      automated: []
+      manual:
+        - Confirm new units land in leaves/, blocks/<domain>/, or pages/, not product-shells/.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-FOLDER-2
+    title: The file set of one unit
+    kind: mandatory
+    requirement: |
+      One unit is one PascalCase folder. Its files carry fixed names; the unit name is the folder, never
+      the file. classNames.ts is present only when the unit owns class strings.
+    rationale: |
+      Fixed basenames make connected/pure split, class ownership and specs discoverable by path.
+    cases:
+      - id: case-1
+        when: "Page unit (pages/AuthenticationPage/)"
+        write: "classNames.ts · component.tsx · index.tsx"
+      - id: case-2
+        when: "Page unit with specs (pages/CartPage/)"
+        write: "component.tsx · index.spec.tsx · index.tsx"
+      - id: case-3
+        when: "Block unit (blocks/ai/StarCiAiChat/)"
+        write: "classNames.ts · component.spec.tsx · component.tsx · index.spec.tsx · index.tsx"
+      - id: case-4
+        when: "Leaf unit (leaves/ButtonStateSample/)"
+        write: >
+          classNames.ts · index.tsx — a leaf has no component.tsx, because it has no connected half
+    notes: |
+      Counts across pages (50): index.tsx 49, component.tsx 49, component.spec.tsx 42,
+      index.spec.tsx 24, audit.json 22, classNames.ts 9. Across blocks (109): component.tsx 101,
+      index.tsx 95, classNames.ts 76, index.spec.tsx 61, component.spec.tsx 55. Across leaves
+      (40): index.tsx 40, classNames.ts 33, index.spec.tsx 19.
+      A page that composes a block into a Grammar frame usually has no classNames.ts; the 9 pages
+      that have one alias a Grammar page frame. Use the current public package entry
+      @starci/grammar/common and verify each named export; historical class helper names are not
+      guaranteed APIs.
+      Example alias shape:
+        // pages/AuthenticationPage/classNames.ts
+        import { cn } from "@heroui/react"
+        /** Grammar-owned page frame; this app alias adds no visual override. */
+        export const authenticationPageClassName = cn(formPageClassName)
+    verification:
+      automated:
+        - class-names-in-colocated-file
+        - no-inline-class-name
+      manual:
+        - Confirm unit folder uses the sanctioned basename set for its tier.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-FOLDER-3
+    title: Route files mount one page
+    kind: mandatory
+    requirement: |
+      src/app/[lang]/**/page.tsx is the only place a default export exists (67 in src/app, 0 in
+      src/components). A route mounts one page and makes no drawing decision.
+    rationale: |
+      Keeping default exports in the App Router layer prevents components from becoming route-coupled.
+    cases:
+      - id: case-1
+        when: "A route"
+        write: >
+          app/[lang]/authentication/page.tsx: import { AuthenticationPage } from
+          "@/components/pages/AuthenticationPage" … const AuthenticationRoute = () =>
+          <AuthenticationPage {...{}} /> … export default AuthenticationRoute
+      - id: case-2
+        when: "Global app files"
+        write: >
+          app/globals.css, app/providers.tsx, app/global-error.tsx, app/sitemap.ts, app/robots.ts,
+          each with a sibling .spec
+    verification:
+      automated: []
+      manual:
+        - Confirm src/components has no default exports.
+    relatedExamples: []
+
+  - id: FE-FOLDER-4
+    title: Data layer placement
+    kind: mandatory
+    requirement: |
+      Read/write SWR hooks, auth/socket hooks, GraphQL documents and non-API modules live under their
+      sanctioned roots. Components reach hooks only through the hooks barrel.
+    rationale: |
+      One door for data keeps transport paths mockable and prevents deep imports from components.
+    cases:
+      - id: case-1
+        when: "A read hook"
+        write: "src/hooks/swr/useQuery<Thing>Swr.ts (80) with sibling .spec.ts"
+      - id: case-2
+        when: "A write hook"
+        write: "src/hooks/swr/useMutate<Thing>Swr.ts (32) with sibling .spec.ts"
+      - id: case-3
+        when: "Auth / socket hooks"
+        write: "src/hooks/auth/useSessionToken.ts, src/hooks/socketio/**"
+      - id: case-4
+        when: "The one door for components"
+        write: >
+          src/hooks/index.ts re-exports hooks only ("Hooks ONLY. Types, cache keys and query modules
+          stay behind their own paths")
+      - id: case-5
+        when: "A GraphQL document"
+        write: >
+          src/modules/api/graphql/queries/query-<thing>.ts,
+          src/modules/api/graphql/mutations/mutation-<thing>.ts
+      - id: case-6
+        when: "Response/request types"
+        write: "src/modules/api/graphql/queries/types/<thing>.ts"
+      - id: case-7
+        when: "Non-API modules"
+        write: "src/modules/{ai,code,learn,routing,search,theme,toast,types,utils}/"
+    verification:
+      automated: []
+      manual:
+        - Confirm components import hooks from @/hooks, not deep swr paths.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-FOLDER-5
+    title: Grammar package unit
+    kind: mandatory
+    requirement: |
+      Grammar components live under packages/grammar/src/core/<tier>/<Name>/ with collocated class
+      strings and specs. Family entries and built-output proof stay at the package roots.
+    rationale: |
+      Package layout separates primitives from app composition and keeps public entry verification
+      against dist/.
+    cases:
+      - id: case-1
+        when: "A Grammar component"
+        write: "packages/grammar/src/core/<primitive|composite|branch|composition>/<Name>/index.tsx (39 index.tsx)"
+      - id: case-2
+        when: "Its class strings"
+        write: "sibling classNames.ts (13), e.g. core/branch/Rail/classNames.ts"
+      - id: case-3
+        when: "Its spec"
+        write: "sibling index.spec.tsx (24); CSS proof in styles.spec.ts (6)"
+      - id: case-4
+        when: "Family entry"
+        write: >
+          core/index.ts, core/styles.css, core/dna.ts; common/index.ts re-exports state.js,
+          spacing.js, conformance.js, renderers.js, registry.js
+      - id: case-5
+        when: "Built-output proof"
+        write: "common/index.test.mjs, core/index.test.mjs, package-boundary.test.mjs (node:test against dist/)"
+    verification:
+      automated: []
+      manual:
+        - Verify public app imports use @starci/grammar/common and installed exports, not package root or retired @grammar/*.
+    relatedExamples: []
+
+  - id: FE-FOLDER-6
+    title: What a unit folder does not hold
+    kind: mandatory
+    requirement: |
+      A unit folder does not hold a second component, inline class strings, a __tests__/ folder, a
+      helpers/ or utils/ folder, or deployment constants read via process.env.NEXT_PUBLIC_*.
+    rationale: |
+      Keeping one export per unit and relocating env reads to modules prevents duplicated environment
+      homes and helper sprawl inside components.
+    cases:
+      - id: case-1
+        when: "A second component in the same folder"
+        write: >
+          Not observed in 87 of 109 block folders; the unit is one export per index.tsx/component.tsx
+      - id: case-2
+        when: "Class strings in component.tsx"
+        write: "Never; they go to classNames.ts (lint class-names-in-colocated-file, no-inline-class-name)"
+      - id: case-3
+        when: "A __tests__/ folder"
+        write: "0 across src/; specs sit beside their file"
+      - id: case-4
+        when: "A helpers/ or utils/ folder"
+        write: "0 under src/components (lint no-helper-folder-in-components)"
+      - id: case-5
+        when: "A deployment constant"
+        write: >
+          Never. process.env.NEXT_PUBLIC_* lives under src/modules/ and is reached through the module
+          that owns it. A component folder that reads the variable inline takes a default with it, so
+          the same environment change acquires one home per folder that read it. The occurrences are in
+          https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.json
+    verification:
+      automated:
+        - class-names-in-colocated-file
+        - no-inline-class-name
+        - no-helper-folder-in-components
+      manual:
+        - Confirm no process.env.NEXT_PUBLIC_* reads inside component folders.
+    relatedExamples: []
+openQuestions:
+  - id: currency-and-locale-literals
+    summary: |
+      A currency or locale literal is not a deployment constant. The formatter is built where the locale is
+      read, so the money literal sits in the connected half beside it, and the observations point that way
+      rather than towards a shared module — recorded in
+      https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.json.
+      FE-FOLDER-6 Case 5 therefore covers deployment constants only, and whether a currency belongs to a
+      money module of its own is an owner decision this file does not make.
+  - id: extra-files-inside-block-folders
+    summary: |
+      22 files under src/components/blocks fall outside the five canonical names: the
+      blocks/profile/overview/ sub-tree (OverviewCourses.tsx, SkillSnapshot.tsx, shared.ts,
+      useOverviewEvidence.ts, …), learn/CourseMockInterviewResultBlock/verdict.ts,
+      profile/ProfileCvBuilder/buildCvTexSource.ts, and three classNames.spec.ts/styles.spec.ts.
+      No dominant convention exists for where a block-private helper module goes, so this file does not
+      legislate one.

@@ -1,0 +1,38 @@
+# Relative paths (from skill root) mirrored into `.dist` for agent/CLI execution.
+# Authored sources remain the edit surface; ordinary runtime should import `.dist` copies.
+# Build-only modules (ops/generate.mjs, ops/contracts.mjs, scripts/**) are intentionally omitted.
+
+core/index.mjs
+core/runtime-root.mjs
+core/yaml.mjs
+cli/main.mjs
+contracts/assets.mjs
+contracts/journeys.mjs
+specifications/validate.mjs
+specifications/sds.mjs
+specifications/v2.mjs
+profiles/select.mjs
+scripts/config.mjs
+scripts/plan.mjs
+scripts/present-goal.mjs
+
+ops/basic-ops.mjs
+ops/role-authority.mjs
+ops/select.mjs
+ops/validate.mjs
+
+workflows/auto.mjs
+workflows/catalog-validate.mjs
+workflows/delegation.mjs
+workflows/evidence.mjs
+workflows/flash.mjs
+workflows/frontend.mjs
+workflows/lifecycle.mjs
+workflows/matrix.mjs
+workflows/plan.mjs
+workflows/presentation.mjs
+workflows/producer-verification.mjs
+workflows/select.mjs
+workflows/storage.mjs
+workflows/typed.mjs
+workflows/work-binding.mjs

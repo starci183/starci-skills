@@ -1,0 +1,28 @@
+schema: starci/code-example@1
+id: escape-attempt
+title: Escape attempt
+purpose: |
+  Synthetic path-traversal rejection case.
+appliesTo: [backend]
+relatedRules: []
+files:
+  - path: ../secret.ts
+    role: bad
+entrypoint: ../secret.ts
+adapt:
+  - replace names
+dependencies:
+  packages: []
+  assumptions: |
+    none
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests: []
+  limitations: |
+    none
+provenance:
+  sources: []
+  simplifications: |
+    none

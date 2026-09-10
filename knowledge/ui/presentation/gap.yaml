@@ -1,0 +1,331 @@
+schema: starci/knowledge-source@1
+id: ui.presentation.gap
+title: Gap presentation
+appliesTo:
+  - ui
+family: presentation
+purpose: |-
+  This file answers one question: given a container the application already decided to render, which
+  gap value does it get?
+  Composition has already chosen the DOM tree, the flex or grid direction, and the Grammar objects. Gap
+  presentation resolves only the distance between those objects, and only where the application owns
+  the container. Distances inside a Grammar object belong to Grammar.
+ownerVocabulary:
+  owners:
+    - name: App
+      meaning: The container belongs to the application
+      applicationWrites: The class
+    - name: A component name
+      meaning: Common already applies the gap inside that component
+      applicationWrites: Nothing. Pass the prop
+    - name: —
+      meaning: Common exposes no public path for this relationship
+      applicationWrites: The class, recorded as a workaround
+  notes: |-
+    Each case names who owns the distance. The owner decides whether the application writes a class at
+    all.
+
+    Writing a class where a component is the owner is `APP_REIMPLEMENTATION`. Writing one where the owner
+    is `—` stays linked to `COMMON_CAPABILITY_MISSING`.
+scale:
+  steps:
+    - id: GAP-0
+      class: gap-0
+      value: "0"
+    - id: GAP-1
+      class: gap-1
+      value: .25rem
+    - id: GAP-2
+      class: gap-2
+      value: .5rem
+      token: --grammar-inline-gap
+    - id: GAP-3
+      class: gap-3
+      value: .75rem
+      token: --grammar-row-gap
+    - id: GAP-4
+      class: gap-4
+      value: 1rem
+      token: --grammar-section-gap
+    - id: GAP-5
+      class: gap-6
+      value: 1.5rem
+      token: --grammar-region-gap
+    - id: GAP-6
+      class: gap-8
+      value: 2rem
+  notes: |-
+    `COMMON_SPACING_SCALE` is closed. The rule ID is the ordinal position on that scale. It is not the
+    Tailwind step number, and the two diverge from GAP-5 onward.
+
+    The rem values resolve to `0 / 4 / 8 / 12 / 16 / 24 / 32` CSS pixels only at a computed root of
+    `16px`. Runtime checks use `expectedPx = remFactor * observedRootFontPx`.
+componentOwnership:
+  title: Gaps Common already owns
+  notes: |-
+    Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](index.yaml#source-and-maintenance).
+  rows:
+    - component: ChatWorkspace
+      element: layout
+      rule: GAP-5
+    - component: Divider
+      element: root
+      rule: GAP-3
+    - component: EmptyNotice
+      element: root
+      rule: GAP-3
+    - component: Input
+      element: root
+      rule: GAP-2
+    - component: MediaFrame
+      element: root
+      rule: GAP-2
+    - component: NavigationFeatureNav
+      element: actions, actions!=undefined
+      rule: GAP-2
+    - component: NavigationFeatureNav
+      element: primary
+      rule: GAP-3
+    - component: PressableField
+      element: content
+      rule: GAP-2
+    - component: PressableField
+      element: root
+      rule: GAP-2
+    - component: PrimaryRailLayout
+      element: root
+      rule: GAP-5
+    - component: Rail
+      element: frame
+      rule: GAP-4
+    - component: SectionHeader
+      element: copy
+      rule: GAP-2
+    - component: SectionHeader
+      element: root
+      rule: GAP-5
+    - component: Sidebar
+      element: item, not collapsed
+      rule: GAP-3
+    - component: Sidebar
+      element: list
+      rule: GAP-1
+    - component: Sidebar
+      element: section
+      rule: GAP-1
+    - component: StaticStateRow
+      element: root
+      rule: GAP-3
+    - component: StaticStateRow
+      element: row copy
+      rule: GAP-1
+    - component: Subnav
+      element: identity
+      rule: GAP-2
+    - component: Subnav
+      element: root
+      rule: GAP-3
+    - component: SurfaceAccordionCard
+      element: label, label!=undefined
+      rule: GAP-2
+    - component: SurfaceCard
+      element: content, composition="joined"
+      rule: GAP-0
+    - component: SurfaceCard
+      element: label, label!=undefined
+      rule: GAP-2
+    - component: SurfaceCopyGroup
+      element: root, density!="comfortable"
+      rule: GAP-2
+    - component: SurfaceCopyGroup
+      element: root, density="comfortable"
+      rule: GAP-3
+    - component: SurfaceListCard
+      element: label, not (label === undefined
+    - component: Tabs
+      element: tab content
+      rule: GAP-2
+    - component: Text
+      element: root, not isSkeleton, showsStartContent
+      rule: GAP-2
+    - component: TextAction
+      element: root
+      rule: GAP-2
+    - component: WorkspaceShell
+      element: layout
+      rule: GAP-5
+    - component: WorkspaceShell
+      element: primary
+      rule: GAP-5
+guidance:
+  - id: axis-variants
+    title: Axis variants
+    requirement: |-
+      `gap-x-*` and `gap-y-*` are not separate rules. They apply an existing rule to one axis when the two
+      axes carry different relationships, most often on a wrapping or grid parent.
+      | Axis | Class | Meaning |
+      | --- | --- | --- |
+      | Inline | `gap-x-*` | The chosen rule applies between columns only |
+      | Block | `gap-y-*` | The chosen rule applies between rows only |
+      A wrapping list whose columns are inline companions and whose rows are peers is `gap-x-2 gap-y-3`,
+      which is GAP-2 on the inline axis and GAP-3 on the block axis. Each axis names its own case.
+rules:
+  - id: GAP-0
+    title: "`gap-0` / `0`"
+    governs: |-
+      Adjacent faces meet with no space because another element already owns the seam.
+    cases:
+      - id: case-1
+        when: Stacked bands whose boundary is drawn by a separator
+        owner: "`App`"
+        render: |-
+          `<div className="flex flex-col gap-0">` with `<Divider />` between bands
+      - id: case-2
+        when: A list whose rows are separated by a border, not by space
+        owner: "`SurfaceListCard`"
+        render: Compose the card; no gap
+      - id: case-3
+        when: Joined faces inside one surface
+        owner: "`SurfaceCard`"
+        render: '`composition="joined"` already sets `0`'
+  - id: GAP-1
+    title: "`gap-1` / `.25rem`"
+    governs: |-
+      Two stacked lines that read as one identity. The second line qualifies the first rather than
+      starting a new item.
+    cases:
+      - id: case-1
+        when: |-
+          A title and the short qualifier bound to it, such as a name under its category
+        owner: "`—`"
+        render: '`<div className="flex flex-col gap-1">` with two `<Text>`'
+      - id: case-2
+        when: A value and the unit or timestamp bound to it
+        owner: "`—`"
+        render: Same container
+      - id: case-3
+        when: The copy pair inside a status row
+        owner: "`StaticStateRow`"
+        render: Compose the row; no gap
+    notThisRule: two separately readable items, even short ones, use GAP-3.
+  - id: GAP-2
+    title: "`gap-2` / `.5rem`"
+    governs: |-
+      Inline companions inside one control, or two compact items that act as one unit.
+    cases:
+      - id: case-1
+        when: An icon beside its label inside one control
+        owner: "`Text`"
+        render: "`<Text startContent={<Icon source={check} />}>Active</Text>`"
+      - id: case-2
+        when: A title with its explanation inside a surface
+        owner: "`SurfaceCopyGroup`"
+        render: "`<SurfaceCopyGroup>` at default density"
+      - id: case-3
+        when: Two adjacent inline actions in an app-owned row
+        owner: "`App`"
+        render: |-
+          `<div className="flex items-center gap-2">` with two `<TextAction>`
+      - id: case-4
+        when: A row of badges or short status chips
+        owner: "`App`"
+        render: |-
+          `<div className="flex flex-wrap gap-2">` with `<Badge>` children
+  - id: GAP-3
+    title: "`gap-3` / `.75rem`"
+    governs: |-
+      Peer items in one row or one tightly related group. Each item is read on its own, but they belong
+      together.
+    cases:
+      - id: case-1
+        when: A field and the action that submits it, side by side
+        owner: "`App`"
+        render: |-
+          `<div className="flex items-end gap-3">` with `<Input>` and `<Button>`
+      - id: case-2
+        when: |-
+          A title and its explanation that need more air than the compact default
+        owner: "`SurfaceCopyGroup`"
+        render: '`<SurfaceCopyGroup density="comfortable">`'
+      - id: case-3
+        when: |-
+          Two peer controls sharing one decision, such as a pair of filters
+        owner: "`App`"
+        render: '`<div className="flex gap-3">`'
+      - id: case-4
+        when: |-
+          A section header whose copy and action stack because its container is narrow
+        owner: "`SectionHeader`"
+        render: Compose the header; no gap
+    notThisRule: blocks that each carry their own heading use GAP-4.
+  - id: GAP-4
+    title: "`gap-4` / `1rem`"
+    governs: |-
+      Sibling blocks inside one section. Each block is a separate piece of content, but the section still
+      reads as one group.
+    cases:
+      - id: case-1
+        when: Stacked content blocks under one section heading
+        owner: "`App`"
+        render: '`<section className="flex flex-col gap-4">`'
+      - id: case-2
+        when: Cards in a grid belonging to one collection
+        owner: "`App`"
+        render: |-
+          `<div className="grid grid-cols-2 gap-4">` with `<SurfaceCard>` children
+      - id: case-3
+        when: A form's field groups within one step
+        owner: "`App`"
+        render: |-
+          `<div className="flex flex-col gap-4">` with `<Input>` children
+      - id: case-4
+        when: Prose blocks inside rendered article content
+        owner: "`MarkdownArticle`"
+        render: Compose the article; no gap
+  - id: GAP-5
+    title: "`gap-6` / `1.5rem`"
+    governs: |-
+      Regions of a page. Each region has its own purpose and its own heading, and the reader moves between
+      them rather than through them.
+    cases:
+      - id: case-1
+        when: |-
+          Two page regions with distinct purposes, such as a summary above a history list
+        owner: "`App`"
+        render: |-
+          `<main className="flex flex-col gap-6">` with two `<section>`
+      - id: case-2
+        when: |-
+          The standing rhythm between top-level sections of a dashboard
+        owner: "`App`"
+        render: '`<div className="flex flex-col gap-6">`'
+      - id: case-3
+        when: The primary column beside its rail
+        owner: "`PrimaryRailLayout`"
+        render: Compose the layout; no gap
+      - id: case-4
+        when: Shell regions around routed page content
+        owner: "`WorkspaceShell`"
+        render: Compose the shell; no gap
+    notThisRule: blocks that share one heading and one purpose use GAP-4.
+  - id: GAP-6
+    title: "`gap-8` / `2rem`"
+    governs: |-
+      A named major transition. The strongest break the scale offers, used only when the ordinary region
+      rhythm fails to separate two parts of the page.
+    cases:
+      - id: case-1
+        when: |-
+          A page whose halves serve unrelated tasks, where `1.5rem` reads as one continuous column
+        owner: "`—`"
+        render: '`<main className="flex flex-col gap-8">`'
+      - id: case-2
+        when: A marketing surface whose sections are deliberately spacious
+        owner: "`—`"
+        render: Same container
+    notThisRule: |-
+      applying it to every region uniformly removes hierarchy. Use GAP-5.
+doesNotDecide: |-
+  Padding inside an app boundary is [Padding](padding.yaml). External offsets are [Margin](margin.yaml).
+  Which DOM structure, flex direction, or Grammar object to render was decided before this file is
+  read, and no gap value can repair a wrong composition.

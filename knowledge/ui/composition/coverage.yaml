@@ -1,0 +1,60 @@
+schema: starci/knowledge-source@1
+id: ui.composition.coverage
+title: Coverage composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  This file answers one question: what must the selected design specification actually enumerate, so that a later
+  operator can exercise the direction instead of guessing at it?
+  Every other composition topic constrains one decision at a time. This one constrains the specification as
+  a whole, folding five per-topic coverage rules into it. Retired: `ACTION-4`, `STATE-4`, `FEEDBACK-4`, `LAYOUT-5` and `RESPONSIVE-5` are retired into this rule and their numbers are never reused.
+  What the enumeration is worth is decided elsewhere: layout and taste come from the idioms and the
+  playbook in the applicable [family snapshots](../../grammars/index.yaml), checked against current source, and this rule only asserts that the specification says enough
+  for anyone to check them.
+rules:
+  - id: COVERAGE-1
+    title: What the specification must enumerate
+    governs: |-
+      Governs the coverage declared in the selected `.starciwork` design node's Markdown or namespaced extensions.
+      The categories below describe information, not additional core metadata keys or a separate receipt schema.
+      Declare the applicable categories as explicit node assertions before verification.
+    cases:
+      - id: case-1
+        when: The direction delivers any action
+        assert: |-
+          The action inventory is non-empty, and every entry names its pointer route, its keyboard route, and every reachable named state of that action, enabled, disabled, pending, and settled, so no route and no state is left implicit
+      - id: case-2
+        when: Any action accepts work that does not settle immediately
+        assert: |-
+          Every pending path in the action inventory names its settlement, cancellation included; no entry declares a pending path whose settlement is absent
+      - id: case-3
+        when: The direction declares regions
+        assert: |-
+          The region inventory is non-empty and covers every entry in the declared region model, and each entry names one idiom in the selected family playbook, verified against installed source, and one published composition; no region resolves to a bare arrangement
+      - id: case-4
+        when: The composition changes shape as space changes
+        assert: |-
+          The responsive inventory is non-empty and every branch names exactly one owner, a published container query or a published viewport query; no branch names a device and none names two owners
+      - id: case-5
+        when: The feature has more than one condition
+        assert: |-
+          The state inventory is non-empty, every entry names its meaning before its carrier, and no carrier appears against two meanings
+      - id: case-7
+        when: The direction is decided
+        assert: |-
+          The selected surface class names exactly one of `console`, `form`, `landing`, `catalog` and `reader`. The five names are a vocabulary and carry no numbers: every banded threshold lives in the proof topic that owns the measure, so a class name is how the topics agree about which surface they are looking at. A specification naming no class, or a name outside the five, leaves every banded rule without a threshold and the surface unjudgeable
+      - id: case-6
+        when: |-
+          A family or the application adds a delta over a published owner
+        assert: |-
+          Each layer is enumerated separately, so a doubled effect, a lost selected state, a lost compact trigger, or a duplicated announcement is attributable to the layer that introduced it
+    notThisRule: |-
+      taking the measurements, running the samples, and counting the announcements is the audit operator's work; this rule only fixes what the specification promised.
+doesNotDecide: |-
+  Which regions exist and who owns their tracks is [Layout](layout.yaml), and which branch survives a
+  reflow is [Responsive](responsive.yaml). Which conditions exist and which carrier holds each is
+  [State](state.yaml). What one activation does is [Action](action.yaml), and what the reader is told at
+  each outcome is [Feedback](feedback.yaml). Whether the enumerated paths actually hold once rendered is
+  [Focus](../proof/focus.yaml), [Accessibility](../proof/accessibility.yaml), and
+  [Render truth](../proof/render-truth.yaml).

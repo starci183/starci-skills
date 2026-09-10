@@ -8,6 +8,10 @@ not the required output or the truth of the checks. Never impersonate a human.
 
 ## Result review
 
+Triage form-only findings using [delivery debt](delivery-debt.md). Record safe
+cleanup in the owning `business/debt.md` and continue authorized code/UAT;
+presentation polish alone is not a substantive acceptance gate.
+
 Report the selected goal/revision, what actually changed, observed results against
 the acceptance criteria, remaining failures or limitations, and the next workflow
 or decision. Use a compact expected/actual/status comparison when several criteria

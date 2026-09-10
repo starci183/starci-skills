@@ -1,0 +1,10 @@
+schema: starci/code-example-catalog@1
+title: Frontend code examples
+purpose: |
+  Multi-file interaction examples extracted from starci-academy-fe ownership shapes.
+  They teach connected/pure splits and Grammar usage; they are not product screens
+  or Academy business copy.
+examples:
+  - id: connected-block
+    path: connected-block
+    title: Connected block and pure renderer pair

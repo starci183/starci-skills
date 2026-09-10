@@ -1,0 +1,247 @@
+schema: starci/knowledge-source@1
+id: be.imports
+title: Imports
+purpose: |-
+  Given a backend file, what may it import, through which path, in which style, and in which order?
+appliesTo:
+  - backend
+family: be
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - tsconfig.json (paths)
+    - jest.config.ts (moduleNameMapper)
+    - eslint.config.mjs
+    - features/api/core/graphql/mutations/courses/add-to-cart/*
+    - features/api/core/graphql/queries/courses/course/course.handler.ts
+    - modules/platform/exceptions/errors/ai/ai-quota-exhausted.ts
+    - modules/platform/exceptions/filters/abstract-exception-http.filter.ts
+  limitations: |-
+    Historical reference-source observations preserved at the extraction commit; not a fresh audit of current repository conformance. Counts and file totals cited in rationale or cases are provenance from that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and lint/test setup; verify reference conformance within approved .starciwork scope. Target legacy code does not override the reference. Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
+rules:
+  - id: BE-IMPORTS-1
+    title: Aliases
+    kind: mandatory
+    requirement: |-
+      Cross-tree imports use @modules, @features and @tests aliases; inside one unit or the exceptions tree, relative paths are used. Self-module aliases are banned.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: A capability
+        write: |-
+          import { ICQRSHandler } from "@modules/platform/cqrs/icqrs-handler"
+      - id: case-2
+        when: A door
+        write: |-
+          @features/<door>/… (used from apps/ and tests)
+      - id: case-3
+        when: Test helpers
+        write: |-
+          import { makeEntityManagerMock } from "@tests/mocks/entity-manager.mock"
+      - id: case-4
+        when: Inside one unit
+        write: |-
+          ./add-to-cart.command, ./graphql-types/request, ./add-to-cart.service
+      - id: case-5
+        when: Up the same door
+        write: |-
+          import { ExecuteParams } from "../../../../types/execute" — 290 files under features use this relative path at extraction; 0 use @features/api/core/types/execute (lint no-self-module-alias)
+      - id: case-6
+        when: Inside the exceptions tree
+        write: |-
+          import { AbstractException } from "../abstract"
+    verification:
+      automated:
+        - no-self-module-alias
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-IMPORTS-2
+    title: Brace style
+    kind: mandatory
+    requirement: |-
+      Every import is multi-line, one binding per line, with a trailing comma. Prefer import type for type-only bindings.
+    rationale: |-
+      Lint object-curly-newline with ImportDeclaration: "always" enforces it. 1388 of 4463 files use import type at extraction.
+    cases:
+      - id: case-1
+        when: One binding
+        write: |-
+          import {
+              Injectable,
+          } from "@nestjs/common"
+      - id: case-2
+        when: Several
+        write: |-
+          import {
+              CommandHandler,
+              ICommandHandler,
+          } from "@nestjs/cqrs"
+      - id: case-3
+        when: Type only
+        write: |-
+          import type {
+              EntityManager,
+          } from "typeorm"; import type {
+              AbstractExceptionMetadata,
+          } from "../abstract"
+    verification:
+      automated:
+        - object-curly-newline
+      manual: []
+    relatedExamples: []
+  - id: BE-IMPORTS-3
+    title: Order
+    kind: residual
+    requirement: |-
+      Import order is not lint-enforced. The dominant first import in GraphQL unit files is the Nest framework, then capabilities, then relative paths. Deviations exist and are recorded.
+    rationale: |-
+      Dominant first import in 303 of 398 sampled GraphQL files at extraction is @nestjs/*; 46 start at @modules; 41 at ../../../../types/execute; 7 at ./…
+    cases:
+      - id: case-1
+        when: Framework first
+        write: |-
+          @nestjs/graphql, @nestjs/common, @nestjs/cqrs
+      - id: case-2
+        when: Then capabilities
+        write: |-
+          @modules/api/…, @modules/integrations/…, @modules/platform/…, @modules/databases/…
+      - id: case-3
+        when: Then relative
+        write: |-
+          ../../../../types/execute, then ./… last
+      - id: case-4
+        when: Deviation
+        write: |-
+          add-to-cart.handler.ts opens with @modules/platform/cqrs/icqrs-handler and interleaves @nestjs/common after several @modules imports; the order above is dominant, not universal
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+  - id: BE-IMPORTS-4
+    title: Layering direction
+    kind: mandatory
+    requirement: |-
+      features may import modules; modules must not import features; capability modules are not imported across the tree (registered isGlobal at app root); every import names a file (no barrels); relative escapes into capabilities are banned.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: features → modules
+        write: |-
+          always allowed: a handler imports entities, exceptions, decorators from @modules/…
+      - id: case-2
+        when: modules → features (residual debt, not a pattern)
+        write: |-
+          not allowed (lint no-capability-imports-features); 6 non-spec files under modules/bussiness/{daily-quest,flashcard,kpi-reward,streak,weekly-challenge} still do at extraction — recorded debt, not a pattern
+      - id: case-3
+        when: modules/**/*.module.ts → another in-repo module
+        write: |-
+          not imported; capability modules are registered isGlobal: true at the app root (lint no-non-global-module-import, error in both src/modules and src/features)
+      - id: case-4
+        when: Folder barrel
+        write: |-
+          none exist to import; every import names a file (lint must-deep-module-import, no-folder-reexport)
+      - id: case-5
+        when: Relative escape across capabilities
+        write: |-
+          from "../../modules/…" occurs in 0 files (lint no-relative-capability-escape)
+    verification:
+      automated:
+        - no-capability-imports-features
+        - no-non-global-module-import
+        - must-deep-module-import
+        - no-folder-reexport
+        - no-relative-capability-escape
+      manual: []
+    relatedExamples:
+      - graphql-command
+      - transactional-service
+  - id: BE-IMPORTS-5
+    title: What a GraphQL unit imports
+    kind: mandatory
+    requirement: |-
+      Handler, resolver, response and module files import the fixed role-specific set below.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Handler
+        write: |-
+          @modules/platform/cqrs/icqrs-handler, entities from @modules/databases/postgresql/primary/entities/*.entity, exceptions from @modules/platform/exceptions/errors/<domain>/<name>, @nestjs/common, @nestjs/cqrs, typeorm (type), ./<name>.command
+      - id: case-2
+        when: Resolver
+        write: |-
+          @nestjs/graphql, @nestjs/common, @modules/api/apollo/server/decorators/locale.decorators, @modules/api/apollo/server/interceptors/graphql-transform.interceptor, @modules/integrations/keycloak/guards/keycloak-auth-graphql.guard, @modules/integrations/keycloak/keycloak.decorators, @modules/platform/throttler/*, ./graphql-types/request, ./graphql-types/response, ./<name>.service
+      - id: case-3
+        when: Response
+        write: |-
+          @nestjs/graphql, @modules/api/apollo/server/graphql-types/object-types/graphql-response, @modules/api/apollo/server/types/graphql-response, the entity
+      - id: case-4
+        when: Module
+        write: |-
+          @nestjs/common and the four sibling files
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-IMPORTS-6
+    title: Forbidden
+    kind: mandatory
+    requirement: |-
+      No default exports (except Jest lifecycle carve-outs). process.env only via envConfig outside parse-env. No console.* or Nest Logger in src/**. Raw cache tokens outside the cache module are banned.
+    rationale: |-
+      188 files log through WinstonService at extraction; 12 residual console. sites recorded as debt.
+    cases:
+      - id: case-1
+        when: Default export
+        write: |-
+          none (lint no-default-export; Jest lifecycle entries carved out)
+      - id: case-2
+        when: process.env
+        write: |-
+          only src/modules/platform/env/utils/parse-env.ts; everyone else calls envConfig()
+      - id: case-3
+        when: console.*
+        write: |-
+          lint error in src/**; residual console. sites are debt, not a pattern
+      - id: case-4
+        when: Nest Logger
+        write: |-
+          not used (lint no-nest-logger, no-framework-logger)
+      - id: case-5
+        when: Raw cache tokens outside the cache module
+        write: |-
+          lint must-use-cache-service
+    verification:
+      automated:
+        - no-default-export
+        - must-use-cache-service
+        - no-nest-logger
+        - no-framework-logger
+      manual: []
+    relatedExamples: []
+  - id: BE-IMPORTS-7
+    title: Jest sees the same aliases
+    kind: mandatory
+    requirement: |-
+      Jest moduleNameMapper mirrors tsconfig path aliases; specs mock module paths through those aliases.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: jest.config.ts
+        write: |-
+          moduleNameMapper: { "^@modules/(.*)$": "<rootDir>/src/modules/$1", "^@features/(.*)$": "<rootDir>/src/features/$1", "^@tests/(.*)$": "<rootDir>/src/tests/$1" }
+      - id: case-2
+        when: Spec mocking a module path
+        write: |-
+          jest.mock("@modules/platform/env/config", () => ({ envConfig: () => ({ … }) }))
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+      - transactional-service

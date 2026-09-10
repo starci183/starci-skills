@@ -8,6 +8,28 @@ than declaring a separate manual completion.
 
 ## What earns completion
 
+### Implementation output and direct source identity
+
+A new backend.implement or interface.implement request may prospectively declare
+`workPolicy: {schema: starci/implementation-output@1, targets: [...]}` for its exact
+approved backend/frontend implementation leaves. This permits the actual
+`implementation` mapping to change, not the expectations, graph, sourceRefs,
+extensions, other nodes or assets. The original request stays frozen and the
+result seals the resulting content; later semantic drift invalidates acceptance.
+Never add this permission retroactively to an existing request.
+
+Work v2 implementation completion can use `sourceIdentity` with schema
+`starci/source-identity@1` and `repositories`, without a legacy resource registry.
+Each repository identifies its logical name, credential-free origin and coverage.
+Committed state records the full commit; dirty state records `baseCommit` and a
+preserved `snapshot` artifact/hash instead of pretending HEAD was tested. Coverage
+declares full-tree or scoped paths, dependency coverage and limitations. Every
+selected evidence bundle must carry the exact same identity; dirty snapshots must
+be declared assets with matching bytes. A structural hash is not proof that Git
+contains the object or that a snapshot actually covers the claimed tree: inspect
+the real source and checks. Legacy codeRefs stay strict. This does not change UAT
+served-build provenance or turn implementation proof into UAT completion.
+
 Use each layer's supported schema and verification profile. The common question
 is whether the actual result satisfies its current inputs and acceptance, with
 enough specific support for another reviewer to judge it.

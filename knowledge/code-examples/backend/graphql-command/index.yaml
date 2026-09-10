@@ -1,0 +1,89 @@
+schema: starci/code-example@1
+id: graphql-command
+title: GraphQL CQRS command feature chain
+purpose: |
+  Show one complete GraphQL mutation unit: thin resolver → thin feature service
+  (CommandBus only) → inert command envelope → ICQRSHandler.process → Nest module
+  registration. Domain names are synthetic Example*; do not copy Academy business
+  policies from the provenance sources.
+appliesTo: [backend]
+relatedRules:
+  - BE-FUNCTION-1
+  - BE-FUNCTION-2
+  - BE-FUNCTION-3
+  - BE-FUNCTION-4
+  - BE-FUNCTION-5
+  - BE-FUNCTION-6
+  - BE-FUNCTION-8
+  - BE-FOLDER-2
+  - BE-FOLDER-3
+  - BE-TEST-1
+  - BE-TEST-2
+  - BE-TEST-4
+files:
+  - path: example.resolver.ts
+    role: Thin GraphQL door; builds ExecuteParams and calls the feature service once.
+  - path: example.service.ts
+    role: Feature service; CommandBus.execute only — no EntityManager.
+  - path: example.command.ts
+    role: Inert CQRS envelope carrying ExecuteParams only.
+  - path: example.handler.ts
+    role: ICQRSHandler + ICommandHandler; named EntityManager; overrides process.
+  - path: example.handler.spec.ts
+    role: Direct-construct handler unit tests via execute, not process.
+  - path: example.module.ts
+    role: Registers resolver, service, and handler providers.
+  - path: example.module-definition.ts
+    role: ConfigurableModuleBuilder extras (isGlobal).
+  - path: graphql-types/request.ts
+    role: GraphQL InputType for the mutation request.
+  - path: graphql-types/response.ts
+    role: GraphQL response wrapper with nullable data for the error path.
+entrypoint: example.module.ts
+adapt:
+  - Replace Example* domain names with the target feature names.
+  - Resolve @modules/... imports to the host's CQRS, auth, throttler, and DB packages.
+  - Use the target's owned DB connection decorator/token; Primary example is NOT
+    permission for instance-owned data.
+  - Register the unit via .register({ ... }) in the domain aggregator; register
+    CqrsModule in the consuming app.
+dependencies:
+  packages:
+    - "@nestjs/common"
+    - "@nestjs/cqrs"
+    - "@nestjs/graphql"
+    - "@nestjs/typeorm"
+    - typeorm
+  assumptions: |
+    Illustrative Nest/CQRS shapes; not a runnable app by itself without host module
+    wiring. Platform symbols (ICQRSHandler, ExecuteParams, guards, interceptors,
+    AbstractGraphQLResponse, named EntityManager decorator) are imported from
+    Academy-style @modules paths and must be remapped on the target.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests:
+    - example.handler.spec.ts
+  limitations: |
+    Focused teaching example; not full authz/concurrency proof. Handler uses a
+    synthetic ExampleItemEntity stand-in. Resolver decorators mirror Academy order
+    but do not prove throttling, Keycloak, or interceptor behavior.
+provenance:
+  sources:
+    - starci-academy-backend/src/modules/platform/cqrs/icqrs-handler.ts
+    - starci-academy-backend/src/features/api/core/types/execute.ts
+    - starci-academy-backend/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.command.ts
+    - starci-academy-backend/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.service.ts
+    - starci-academy-backend/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.resolver.ts
+    - starci-academy-backend/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts
+    - starci-academy-backend/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.spec.ts
+    - starci-academy-backend/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.module.ts
+    - starci-academy-backend/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.module-definition.ts
+    - starci-academy-backend/src/features/api/core/graphql/mutations/courses/add-to-cart/graphql-types/request.ts
+    - starci-academy-backend/src/features/api/core/graphql/mutations/courses/add-to-cart/graphql-types/response.ts
+    - starci-academy-backend/src/modules/databases/postgresql/primary/primary.decorators.ts
+  simplifications: |
+    Replaced cart/enrollment/legacy-sales business rules with a synthetic
+    ExampleItem create-or-return flow. Omitted MountFilesystemService optional
+    dependency. Kept Academy decorator order and ICQRSHandler/ExecuteParams shapes.

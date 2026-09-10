@@ -45,7 +45,8 @@ import {presentAutoPlan,approveAutoPlan,hasAutoAcceptance} from '../workflows/au
 import {verifyProducerResult,verifyProducerCells} from '../workflows/producer-verification.mjs';
 import {hasDirectProducerAcceptance} from '../workflows/producer-verification.mjs';
 
-const catalog=JSON.parse(fs.readFileSync(new URL('../workflows/catalog.json',import.meta.url)));
+import {readWorkflow, readExample, readPublicJson} from './helpers/read-public.mjs';
+const catalog=readWorkflow('catalog.json');
 const consumer=run=>selectJobPlan(catalog,{actions:[{action:'implement-frontend',effectful:true,requiresBackend:true}],acceptedBackendRun:run});
 const reseal=run=>{for(const [id,r]of Object.entries(run.responses))r.requestDigest=workflowDigest(run.requests[id]);run.resultDigest=workflowDigest({goalDigest:run.goalDigest,responses:run.responses});for(const a of run.approvals)if(a.phase.includes('acceptance'))a.digest=run.resultDigest;};
 function backend(t,mode,{done=false,upstream=false,referenceInput=false,omitApi=false,beforeApprove}={}){

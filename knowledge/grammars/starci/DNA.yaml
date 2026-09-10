@@ -1,0 +1,1214 @@
+schema: starci/knowledge-source@1
+id: grammar.starci.dna
+title: StarCi Core — DNA
+purpose: |
+  Package snapshot of tokens, renderers, props, claims and gaps for the StarCi Core
+  Grammar family. Historical observation only — not a claim that the currently installed
+  package has these APIs or gaps. Static source inspection does not prove runtime behavior.
+appliesTo:
+  - grammar
+family: starci
+provenance:
+  package: "@starci/grammar"
+  version: "0.4.13"
+  checkout: "41be722701c439e76910f80a8cbb65261da72e01"
+  captured: "2026-09-05"
+  publicEntry: "@starci/grammar/common"
+  styleEntrypoint: "@starci/grammar/core/styles.css"
+  limitations: |
+    Snapshot generated 2026-09-05 from package @starci/grammar@0.4.13 at the pinned checkout.
+    Before use, inspect the selected repository's manifest/lockfile, exported types, renderers
+    and CSS; record actual source/version in .starciwork. If source is unavailable, report
+    unverified; do not infer current APIs or defects from these tables. The current public
+    consumer entry observed for FE work is @starci/grammar/common — verify installed exports
+    rather than inventing APIs. Family ownership boundaries are in family.yaml; composition
+    references are idioms.yaml and playbook.yaml.
+identity:
+  package: "@starci/grammar"
+  version: "0.4.13"
+  checkout: "41be722701c439e76910f80a8cbb65261da72e01"
+  familyId: "core"
+  rootComponent: "CoreGrammarRoot"
+  familyScope: "data-grammar-family=\"core\""
+  styleEntrypoint: "@starci/grammar/core/styles.css"
+  publicEntry: "@starci/grammar/common"
+  counts:
+    renderers: 42
+    tokens: 66
+    claimEntries: 111
+    gaps: 13
+tokens:
+  - name: "--starci-core-accent"
+    value: "#7547ff"
+  - name: "--starci-core-accent-foreground"
+    value: "oklch(100% 0 0)"
+  - name: "--starci-core-band-height"
+    value: "calc(4rem + 1px)"
+  - name: "--starci-core-band-offset"
+    value: "calc(var(--starci-core-band-height, 0rem) + var(--starci-core-band-subnav-height, 0rem))"
+  - name: "--starci-core-band-subnav-height"
+    value: "calc(3.25rem + 1px)"
+  - name: "--starci-core-border"
+    value: "oklch(90% 0.0015 354.13)"
+  - name: "--starci-core-canvas"
+    value: "oklch(97.02% 0.0015 354.13)"
+  - name: "--starci-core-contained-max-height"
+    value: "calc(100dvh - 3rem)"
+  - name: "--starci-core-control-min-size"
+    value: "2.75rem"
+  - name: "--starci-core-control-radius"
+    value: "0.75rem"
+  - name: "--starci-core-copy-gap"
+    value: "0.25rem"
+  - name: "--starci-core-danger"
+    value: "oklch(65.32% 0.2335 37.78)"
+  - name: "--starci-core-danger-foreground"
+    value: "oklch(99.11% 0 0)"
+  - name: "--starci-core-disabled-opacity"
+    value: "0.55"
+  - name: "--starci-core-field-gap"
+    value: "0.5rem"
+  - name: "--starci-core-focus"
+    value: "#7248ff"
+  - name: "--starci-core-foreground"
+    value: "oklch(21.03% 0.0015 354.13)"
+  - name: "--starci-core-form-compact-measure"
+    value: "28rem"
+  - name: "--starci-core-form-measure"
+    value: "30rem"
+  - name: "--starci-core-highlight-angle"
+    value: "360deg"
+  - name: "--starci-core-highlight-inset"
+    value: "0"
+  - name: "--starci-core-info"
+    value: "oklch(72% 0.17 250)"
+  - name: "--starci-core-info-foreground"
+    value: "oklch(21.03% 0.0059 250)"
+  - name: "--starci-core-inline-gap"
+    value: "var(--grammar-inline-gap)"
+  - name: "--starci-core-motion-duration"
+    value: "180ms"
+  - name: "--starci-core-motion-easing"
+    value: "cubic-bezier(0.2, 0, 0, 1)"
+  - name: "--starci-core-muted"
+    value: "oklch(55.17% 0.003 354.13)"
+  - name: "--starci-core-navbar-z"
+    value: "50"
+  - name: "--starci-core-page-inset"
+    value: "var(--grammar-page-inset)"
+  - name: "--starci-core-page-measure"
+    value: "80rem"
+  - name: "--starci-core-pill-radius"
+    value: "999px"
+  - name: "--starci-core-rail-collapsed"
+    value: "4rem"
+  - name: "--starci-core-rail-compact"
+    value: "16rem"
+  - name: "--starci-core-rail-gap"
+    value: "1rem"
+  - name: "--starci-core-rail-gap-compact"
+    value: "0.75rem"
+  - name: "--starci-core-rail-offset"
+    value: "var(--starci-core-band-offset, 5.5rem)"
+  - name: "--starci-core-rail-standard"
+    value: "20rem"
+  - name: "--starci-core-rail-wide"
+    value: "24rem"
+  - name: "--starci-core-reading-measure"
+    value: "72ch"
+  - name: "--starci-core-region-gap"
+    value: "var(--grammar-region-gap)"
+  - name: "--starci-core-row-gap"
+    value: "var(--grammar-row-gap)"
+  - name: "--starci-core-row-gap-compact"
+    value: "0.5rem"
+  - name: "--starci-core-row-inset"
+    value: "1rem"
+  - name: "--starci-core-section-gap"
+    value: "var(--grammar-section-gap)"
+  - name: "--starci-core-separator"
+    value: "oklch(92% 0.0015 354.13)"
+  - name: "--starci-core-sidebar-collapsed-width"
+    value: "4rem"
+  - name: "--starci-core-sidebar-width"
+    value: "16rem"
+  - name: "--starci-core-subnav-offset"
+    value: "var(--starci-core-band-height, 4rem)"
+  - name: "--starci-core-subnav-z"
+    value: "40"
+  - name: "--starci-core-success"
+    value: "oklch(73.29% 0.1941 162.85)"
+  - name: "--starci-core-success-foreground"
+    value: "oklch(21.03% 0.0059 162.85)"
+  - name: "--starci-core-surface"
+    value: "oklch(100% 0.0008 354.13)"
+  - name: "--starci-core-surface-inset"
+    value: "1rem"
+  - name: "--starci-core-surface-radius"
+    value: "1rem"
+  - name: "--starci-core-surface-secondary"
+    value: "oklch(95.24% 0.0012 354.13)"
+  - name: "--starci-core-surface-shadow"
+    value: "0 8px 28px oklch(21.03% 0.0059 354.13 / 0.07)"
+  - name: "--starci-core-verdict-edge"
+    value: "inset 2px 0 0 0 var(--success, var(--starci-core-success, #15803d))"
+  - name: "--starci-core-warning"
+    value: "oklch(78.19% 0.159 84.37)"
+  - name: "--starci-core-warning-foreground"
+    value: "oklch(21.03% 0.0059 84.37)"
+  - name: "--starci-core-workspace-floating-inset"
+    value: "1rem"
+  - name: "--starci-core-workspace-floating-max"
+    value: "22rem"
+  - name: "--starci-core-workspace-floating-z"
+    value: "40"
+  - name: "--starci-core-workspace-leading-seam"
+    value: "2rem"
+  - name: "--starci-core-workspace-navigation-track"
+    value: "minmax(14rem, var(--starci-core-workspace-navigation-width, 18rem))"
+  - name: "--starci-core-workspace-navigation-width"
+    value: "18rem"
+  - name: "--starci-core-workspace-rail-track"
+    value: "minmax(16rem, var(--starci-core-rail-standard, 20rem))"
+renderers:
+  - component: "GrammarRoot"
+    propsType: "GrammarRootProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "theme"
+        values:
+          - "system"
+          - "light"
+          - "dark"
+    claims: []
+    computedClaims: []
+    classes: []
+  - component: "PageContainer"
+    propsType: "PageContainerProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "measure"
+        values:
+          - "reading"
+          - "product"
+          - "full"
+    claims: []
+    computedClaims:
+      - "MARGIN-AUTO"
+      - "MEASURE-1"
+    classes:
+      - "starci-core-page-container"
+  - component: "Badge"
+    propsType: "BadgeProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "tone"
+        values:
+          - "neutral"
+          - "accent"
+          - "success"
+          - "warning"
+          - "danger"
+    claims: []
+    computedClaims: []
+    classes: []
+  - component: "Button"
+    propsType: "ButtonProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "variant"
+        values:
+          - "primary"
+          - "secondary"
+          - "tertiary"
+          - "outline"
+          - "ghost"
+      - prop: "size"
+        values:
+          - "sm"
+          - "md"
+          - "lg"
+      - prop: "width"
+        values:
+          - "content"
+          - "fill"
+      - prop: "target"
+        values:
+          - "_blank"
+          - "_self"
+      - prop: "type"
+        values:
+          - "button"
+          - "submit"
+          - "reset"
+    claims: []
+    computedClaims:
+      - "MEASURE-2"
+    classes:
+      - "starci-core-button"
+  - component: "Divider"
+    propsType: "DividerProps"
+    kind: "primitive"
+    closedValues: []
+    claims:
+      - "BOUNDARY-5"
+      - "GAP-3"
+    computedClaims: []
+    classes:
+      - "starci-core-divider"
+      - "starci-core-divider-rule"
+  - component: "Heading"
+    propsType: "HeadingProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "level"
+        values:
+          - "1"
+          - "2"
+          - "3"
+          - "4"
+      - prop: "scale"
+        values:
+          - "standard"
+          - "display"
+    claims: []
+    computedClaims:
+      - "FONT-1"
+      - "FONT-2"
+      - "FONT-3"
+      - "FONT-4"
+      - "FONT-6"
+      - "TONE-2"
+    classes: []
+  - component: "Icon"
+    propsType: "IconProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "usage"
+        values:
+          - "heading"
+          - "leading"
+          - "chip"
+    claims: []
+    computedClaims: []
+    classes:
+      - "starci-core-icon"
+      - "starci-core-icon-skeleton"
+  - component: "IconTile"
+    propsType: "IconTileProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "source"
+        type: "IconSource"
+      - prop: "tone"
+        values:
+          - "neutral"
+          - "accent"
+          - "success"
+          - "warning"
+          - "danger"
+      - prop: "size"
+        values:
+          - "sm"
+          - "md"
+    claims: []
+    computedClaims:
+      - "OVERFLOW-2"
+      - "SURFACE-4"
+      - "SURFACE-5"
+      - "TONE-2"
+    classes:
+      - "starci-core-icon-tile"
+  - component: "IconButton"
+    propsType: "IconButtonProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "source"
+        type: "IconSource"
+    claims: []
+    computedClaims: []
+    classes:
+      - "starci-core-icon-button"
+  - component: "Label"
+    propsType: "LabelProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "depth"
+        values:
+          - "top"
+          - "nested"
+      - prop: "as"
+        values:
+          - "span"
+          - "h3"
+    claims: []
+    computedClaims:
+      - "FONT-1"
+      - "FONT-2"
+      - "MARGIN-0"
+    classes:
+      - "starci-core-label"
+  - component: "Input"
+    propsType: "InputProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "kind"
+        values:
+          - "email"
+          - "password"
+          - "newPassword"
+          - "code"
+          - "text"
+      - prop: "variant"
+        values:
+          - "primary"
+          - "secondary"
+    claims:
+      - "FONT-1"
+      - "GAP-2"
+      - "TONE-2"
+    computedClaims: []
+    classes:
+      - "starci-core-input"
+      - "starci-core-input-control"
+      - "starci-core-input-field"
+      - "starci-core-input-resting-control"
+      - "starci-core-input-resting-label"
+      - "starci-core-input-reveal"
+      - "starci-core-input-reveal-icon"
+      - "starci-core-input-reveal-label"
+  - component: "PressableField"
+    propsType: "PressableFieldProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "source"
+        type: "IconSource"
+    claims:
+      - "FLOW-4"
+      - "FONT-1"
+      - "FONT-2"
+      - "GAP-2"
+      - "MEASURE-2"
+      - "PADDING-1"
+      - "PADDING-3"
+      - "SURFACE-4"
+      - "TONE-1"
+      - "TONE-2"
+    computedClaims: []
+    classes:
+      - "starci-core-pressable-field"
+      - "starci-core-pressable-field-content"
+      - "starci-core-pressable-field-placeholder"
+      - "starci-core-pressable-field-shortcut"
+  - component: "Progress"
+    propsType: "ProgressProps"
+    kind: "primitive"
+    closedValues: []
+    claims:
+      - "MEASURE-2"
+    computedClaims: []
+    classes:
+      - "starci-core-progress"
+  - component: "Text"
+    propsType: "TextProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "as"
+        values:
+          - "div"
+          - "p"
+          - "span"
+      - prop: "size"
+        values:
+          - "xs"
+          - "sm"
+          - "md"
+          - "metric-lead"
+      - prop: "tone"
+        values:
+          - "default"
+          - "muted"
+          - "accent"
+      - prop: "weight"
+        values:
+          - "normal"
+          - "medium"
+          - "semibold"
+      - prop: "live"
+        values:
+          - "off"
+          - "polite"
+          - "assertive"
+      - prop: "overflow"
+        values:
+          - "wrap"
+          - "truncate"
+          - "clamp-2"
+    claims: []
+    computedClaims:
+      - "FONT-1"
+      - "FONT-2"
+      - "FONT-3"
+      - "FONT-5"
+      - "GAP-2"
+      - "TONE-1"
+      - "TONE-2"
+      - "TONE-3"
+    classes:
+      - "starci-core-text"
+  - component: "TextAction"
+    propsType: "TextActionProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "appearance"
+        type: "ActionAppearance"
+      - prop: "size"
+        type: "ActionTextSize"
+      - prop: "target"
+        values:
+          - "_blank"
+          - "_self"
+    claims: []
+    computedClaims:
+      - "FONT-1"
+      - "FONT-2"
+      - "FONT-3"
+      - "GAP-2"
+      - "MEASURE-3"
+      - "PADDING-1"
+      - "PADDING-2"
+      - "PADDING-3"
+      - "SURFACE-4"
+      - "TONE-1"
+      - "TONE-2"
+      - "TONE-3"
+    classes:
+      - "starci-core-text-action-resting"
+  - component: "SectionHeader"
+    propsType: "SectionHeaderProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "level"
+        values:
+          - "1"
+          - "2"
+          - "3"
+          - "4"
+      - prop: "composition"
+        values:
+          - "section-header"
+          - "context-intro"
+    claims:
+      - "FLOW-3"
+      - "GAP-2"
+      - "GAP-5"
+      - "MARGIN-0"
+    computedClaims: []
+    classes:
+      - "starci-core-section-action"
+      - "starci-core-section-description"
+      - "starci-core-section-eyebrow"
+      - "starci-core-section-header"
+      - "starci-core-section-header-copy"
+      - "starci-core-section-title"
+  - component: "MediaFrame"
+    propsType: "MediaFrameProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "aspect"
+        values:
+          - "landscape"
+          - "portrait"
+          - "square"
+          - "auto"
+      - prop: "fit"
+        values:
+          - "cover"
+          - "contain"
+      - prop: "treatment"
+        values:
+          - "framed"
+          - "plain"
+    claims:
+      - "FLOW-3"
+      - "GAP-2"
+      - "MARGIN-0"
+    computedClaims:
+      - "BOUNDARY-5"
+      - "OVERFLOW-2"
+      - "SURFACE-1"
+      - "SURFACE-3"
+    classes:
+      - "starci-core-media-caption"
+      - "starci-core-media-frame"
+      - "starci-core-media-viewport"
+  - component: "IncludedMark"
+    propsType: "IncludedMarkProps"
+    kind: "primitive"
+    closedValues: []
+    claims: []
+    computedClaims: []
+    classes:
+      - "starci-core-included-mark"
+  - component: "RankArtwork"
+    propsType: "RankArtworkProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "kind"
+        values:
+          - "first"
+          - "second"
+          - "third"
+          - "cup"
+    claims: []
+    computedClaims: []
+    classes:
+      - "starci-core-rank-artwork"
+  - component: "SurfaceCopyGroup"
+    propsType: "SurfaceCopyGroupProps"
+    kind: "primitive"
+    closedValues:
+      - prop: "density"
+        values:
+          - "compact"
+          - "comfortable"
+    claims: []
+    computedClaims:
+      - "GAP-2"
+      - "GAP-3"
+    classes:
+      - "starci-core-surface-copy-group"
+  - component: "PrimaryRailLayout"
+    propsType: "PrimaryRailLayoutProps"
+    kind: "composition"
+    closedValues:
+      - prop: "railWidth"
+        values:
+          - "compact"
+          - "standard"
+          - "wide"
+      - prop: "align"
+        values:
+          - "start"
+          - "stretch"
+      - prop: "collapsedOrder"
+        values:
+          - "primary-first"
+          - "rail-first"
+    claims:
+      - "GAP-5"
+    computedClaims: []
+    classes:
+      - "starci-core-primary-rail-container"
+      - "starci-core-primary-rail-layout"
+      - "starci-core-primary-region"
+      - "starci-core-rail-region"
+  - component: "NavigationFeatureNav"
+    propsType: "NavigationFeatureNavProps"
+    kind: "composition"
+    closedValues:
+      - prop: "position"
+        values:
+          - "static"
+          - "sticky"
+    claims:
+      - "BOUNDARY-1"
+      - "GAP-2"
+      - "GAP-3"
+      - "MEASURE-2"
+      - "PADDING-3"
+    computedClaims: []
+    classes:
+      - "starci-core-navigation-feature-nav"
+      - "starci-core-navigation-feature-nav-actions"
+      - "starci-core-navigation-feature-nav-compact-navigation"
+      - "starci-core-navigation-feature-nav-feature"
+      - "starci-core-navigation-feature-nav-identity"
+      - "starci-core-navigation-feature-nav-navigation"
+      - "starci-core-navigation-feature-nav-primary"
+  - component: "Sidebar"
+    propsType: "SidebarProps"
+    kind: "composition"
+    closedValues:
+      - prop: "source"
+        type: "IconSource"
+      - prop: "presentation"
+        values:
+          - "rail"
+          - "drawer"
+      - prop: "toggleSource"
+        type: "IconSource"
+    claims:
+      - "FLOW-4"
+      - "FONT-1"
+      - "FONT-2"
+      - "GAP-1"
+      - "PADDING-0"
+      - "PADDING-1"
+      - "PADDING-2"
+      - "PADDING-3"
+      - "TONE-2"
+    computedClaims:
+      - "GAP-3"
+      - "MEASURE-2"
+      - "MEASURE-6"
+      - "OVERFLOW-2"
+      - "SURFACE-4"
+      - "TONE-1"
+    classes:
+      - "starci-core-sidebar"
+      - "starci-core-sidebar-footer"
+      - "starci-core-sidebar-header"
+      - "starci-core-sidebar-item"
+      - "starci-core-sidebar-item-label"
+      - "starci-core-sidebar-item-trailing"
+      - "starci-core-sidebar-list"
+      - "starci-core-sidebar-section"
+      - "starci-core-sidebar-section-label"
+      - "starci-core-sidebar-toggle"
+  - component: "WorkspaceShell"
+    propsType: "WorkspaceShellProps"
+    kind: "composition"
+    closedValues:
+      - prop: "navigationTrack"
+        values:
+          - "fixed"
+          - "intrinsic"
+      - prop: "navigationVisibility"
+        values:
+          - "always"
+          - "wide"
+      - prop: "railMode"
+        values:
+          - "flow"
+          - "sticky"
+      - prop: "railWidth"
+        values:
+          - "compact"
+          - "standard"
+          - "wide"
+      - prop: "railInset"
+        values:
+          - "none"
+          - "content"
+      - prop: "railPosition"
+        values:
+          - "leading"
+          - "trailing"
+      - prop: "align"
+        values:
+          - "start"
+          - "stretch"
+    claims:
+      - "BOUNDARY-1"
+      - "BOUNDARY-4"
+      - "GAP-5"
+      - "MARGIN-5"
+      - "MEASURE-1"
+      - "OVERFLOW-4"
+    computedClaims: []
+    classes:
+      - "starci-core-workspace-shell"
+      - "starci-core-workspace-shell-compact-header"
+      - "starci-core-workspace-shell-compact-navigation"
+      - "starci-core-workspace-shell-floating-layer"
+      - "starci-core-workspace-shell-header"
+      - "starci-core-workspace-shell-layout"
+      - "starci-core-workspace-shell-leading-rule"
+      - "starci-core-workspace-shell-navigation"
+      - "starci-core-workspace-shell-primary"
+      - "starci-core-workspace-shell-rail"
+  - component: "ChatWorkspace"
+    propsType: "ChatWorkspaceProps"
+    kind: "composition"
+    closedValues:
+      - prop: "railWidth"
+        values:
+          - "compact"
+          - "standard"
+          - "wide"
+    claims:
+      - "BOUNDARY-1"
+      - "FONT-2"
+      - "GAP-5"
+      - "OVERFLOW-2"
+      - "OVERFLOW-4"
+      - "OVERFLOW-5"
+      - "PADDING-0"
+      - "PADDING-2"
+      - "PADDING-3"
+      - "PADDING-4"
+      - "SURFACE-2"
+      - "TONE-1"
+    computedClaims: []
+    classes:
+      - "starci-core-chat-workspace"
+      - "starci-core-chat-workspace-composer"
+      - "starci-core-chat-workspace-conversation"
+      - "starci-core-chat-workspace-drawer-body"
+      - "starci-core-chat-workspace-drawer-close"
+      - "starci-core-chat-workspace-drawer-content"
+      - "starci-core-chat-workspace-drawer-dialog"
+      - "starci-core-chat-workspace-header"
+      - "starci-core-chat-workspace-inline-rail"
+      - "starci-core-chat-workspace-layout"
+      - "starci-core-chat-workspace-layout-without-rail"
+      - "starci-core-chat-workspace-overlay-rail"
+      - "starci-core-chat-workspace-primary"
+      - "starci-core-chat-workspace-rail-trigger"
+      - "starci-core-chat-workspace-rail-trigger-boundary"
+  - component: "StateMark"
+    propsType: "StateMarkProps"
+    kind: "core"
+    closedValues:
+      - prop: "state"
+        type: "PresentationState"
+    claims: []
+    computedClaims: []
+    classes: []
+  - component: "LeadingNumber"
+    propsType: "LeadingNumberProps"
+    kind: "core"
+    closedValues: []
+    claims: []
+    computedClaims: []
+    classes: []
+  - component: "OtpInput"
+    propsType: "OtpInputProps"
+    kind: "core"
+    closedValues: []
+    claims:
+      - "OVERFLOW-3"
+      - "OVERFLOW-5"
+      - "PADDING-1"
+    computedClaims: []
+    classes: []
+  - component: "StaticStateRow"
+    propsType: "StaticStateRowProps"
+    kind: "composite"
+    closedValues:
+      - prop: "state"
+        type: "PresentationState"
+      - prop: "verdict"
+        values:
+          - "success"
+          - "danger"
+    claims:
+      - "BOUNDARY-3"
+      - "GAP-1"
+      - "GAP-3"
+      - "PADDING-4"
+    computedClaims: []
+    classes: []
+  - component: "EmptyNotice"
+    propsType: "EmptyNoticeProps"
+    kind: "composite"
+    closedValues:
+      - prop: "iconSource"
+        type: "IconSource"
+      - prop: "actionVariant"
+        type: "ButtonVariant"
+    claims:
+      - "GAP-3"
+      - "PADDING-4"
+    computedClaims: []
+    classes:
+      - "starci-core-empty-notice"
+  - component: "HorizontalScrollRegion"
+    propsType: "HorizontalScrollRegionProps"
+    kind: "composite"
+    closedValues:
+      - prop: "overflow"
+        values:
+          - "always"
+          - "needed"
+    claims: []
+    computedClaims:
+      - "MEASURE-3"
+      - "OVERFLOW-3"
+      - "OVERFLOW-4"
+      - "OVERFLOW-5"
+      - "PADDING-1"
+    classes:
+      - "starci-core-horizontal-scroll-region"
+  - component: "VerticalScrollRegion"
+    propsType: "VerticalScrollRegionProps"
+    kind: "composite"
+    closedValues:
+      - prop: "overflow"
+        values:
+          - "always"
+          - "needed"
+    claims: []
+    computedClaims:
+      - "MEASURE-7"
+      - "OVERFLOW-3"
+      - "OVERFLOW-4"
+    classes: []
+  - component: "SurfaceCard"
+    propsType: "SurfaceCardProps"
+    kind: "branch"
+    closedValues:
+      - prop: "depth"
+        values:
+          - "top"
+          - "nested"
+      - prop: "state"
+        type: "PresentationState"
+      - prop: "frame"
+        values:
+          - "bounded"
+          - "frameless"
+      - prop: "scroll"
+        values:
+          - "page"
+          - "contained"
+      - prop: "composition"
+        values:
+          - "single"
+          - "joined"
+      - prop: "measure"
+        values:
+          - "content"
+          - "form"
+          - "formCompact"
+      - prop: "height"
+        values:
+          - "auto"
+          - "fill"
+    claims:
+      - "GAP-2"
+    computedClaims:
+      - "BOUNDARY-5"
+      - "BOUNDARY-6"
+      - "GAP-0"
+      - "OVERFLOW-1"
+      - "OVERFLOW-2"
+      - "PADDING-0"
+      - "PADDING-4"
+      - "SURFACE-1"
+      - "SURFACE-2"
+      - "SURFACE-4"
+    classes:
+      - "starci-core-frameless-surface"
+      - "starci-core-surface"
+      - "starci-core-surface-card"
+      - "starci-core-surface-card--fill"
+      - "starci-core-surface-content"
+      - "starci-core-surface-highlight"
+      - "starci-core-surface-highlight-sweep"
+      - "starci-core-surface-label"
+  - component: "SurfaceListCard"
+    propsType: "SurfaceListCardProps"
+    kind: "branch"
+    closedValues:
+      - prop: "depth"
+        values:
+          - "top"
+          - "nested"
+    claims:
+      - "GAP-2"
+      - "OVERFLOW-2"
+      - "PADDING-0"
+      - "SURFACE-2"
+    computedClaims:
+      - "FONT-1"
+      - "FONT-2"
+      - "TONE-2"
+    classes:
+      - "starci-core-list-shell"
+      - "starci-core-owned-collection"
+      - "starci-core-surface"
+      - "starci-core-surface-fact"
+      - "starci-core-surface-footer"
+      - "starci-core-surface-label"
+      - "starci-core-surface-list"
+  - component: "FencedCodeBlock"
+    propsType: "FencedCodeBlockProps"
+    kind: "branch"
+    closedValues:
+      - prop: "measure"
+        values:
+          - "reading"
+          - "compact"
+    claims:
+      - "OVERFLOW-4"
+    computedClaims: []
+    classes:
+      - "starci-core-fenced-code-block"
+      - "starci-core-fenced-code-header"
+      - "starci-core-markdown-article"
+      - "starci-core-markdown-table-frame"
+  - component: "MarkdownArticle"
+    propsType: "MarkdownArticleProps"
+    kind: "branch"
+    closedValues:
+      - prop: "measure"
+        values:
+          - "reading"
+          - "compact"
+    claims:
+      - "OVERFLOW-4"
+    computedClaims: []
+    classes:
+      - "starci-core-fenced-code-block"
+      - "starci-core-fenced-code-header"
+      - "starci-core-markdown-article"
+      - "starci-core-markdown-table-frame"
+  - component: "MarkdownTableFrame"
+    propsType: "MarkdownTableFrameProps"
+    kind: "branch"
+    closedValues:
+      - prop: "measure"
+        values:
+          - "reading"
+          - "compact"
+    claims:
+      - "OVERFLOW-4"
+    computedClaims: []
+    classes:
+      - "starci-core-fenced-code-block"
+      - "starci-core-fenced-code-header"
+      - "starci-core-markdown-article"
+      - "starci-core-markdown-table-frame"
+  - component: "SurfaceAccordionCard"
+    propsType: "SurfaceAccordionCardProps"
+    kind: "branch"
+    closedValues:
+      - prop: "depth"
+        values:
+          - "top"
+          - "nested"
+    claims:
+      - "BOUNDARY-3"
+      - "GAP-2"
+      - "MARGIN-0"
+      - "PADDING-0"
+      - "PADDING-3"
+      - "PADDING-4"
+      - "PADDING-5"
+      - "TONE-1"
+    computedClaims:
+      - "BOUNDARY-5"
+      - "BOUNDARY-6"
+      - "OVERFLOW-1"
+      - "OVERFLOW-2"
+      - "SURFACE-1"
+      - "SURFACE-2"
+    classes:
+      - "starci-core-accordion-body"
+      - "starci-core-accordion-heading"
+      - "starci-core-accordion-panel"
+      - "starci-core-accordion-root"
+      - "starci-core-accordion-row"
+      - "starci-core-accordion-scroll-region"
+      - "starci-core-accordion-shell"
+      - "starci-core-accordion-trigger"
+      - "starci-core-surface-accordion-card"
+  - component: "Rail"
+    propsType: "RailProps"
+    kind: "branch"
+    closedValues:
+      - prop: "height"
+        values:
+          - "content"
+          - "fill"
+      - prop: "mode"
+        values:
+          - "flow"
+          - "sticky"
+      - prop: "width"
+        values:
+          - "compact"
+          - "standard"
+          - "wide"
+      - prop: "state"
+        type: "PresentationState"
+      - prop: "collapse"
+        values:
+          - "expanded"
+          - "collapsed"
+      - prop: "motion"
+        values:
+          - "static"
+          - "animated"
+          - "reduced"
+      - prop: "inset"
+        values:
+          - "none"
+          - "content"
+    claims:
+      - "GAP-4"
+    computedClaims:
+      - "MEASURE-6"
+      - "OVERFLOW-3"
+      - "PADDING-3"
+      - "PADDING-5"
+    classes:
+      - "starci-core-rail"
+      - "starci-core-rail-body"
+      - "starci-core-rail-footer"
+      - "starci-core-rail-frame"
+      - "starci-core-visually-hidden"
+  - component: "Subnav"
+    propsType: "SubnavProps"
+    kind: "branch"
+    closedValues:
+      - prop: "position"
+        values:
+          - "static"
+          - "sticky"
+      - prop: "visibility"
+        values:
+          - "always"
+          - "compact"
+    claims:
+      - "BOUNDARY-1"
+      - "FLOW-4"
+      - "GAP-2"
+      - "GAP-3"
+      - "PADDING-3"
+    computedClaims: []
+    classes:
+      - "starci-core-subnav"
+      - "starci-core-subnav-identity"
+      - "starci-core-subnav-leading"
+      - "starci-core-subnav-title"
+      - "starci-core-subnav-toggle"
+  - component: "Tabs"
+    propsType: "TabsProps"
+    kind: "branch"
+    closedValues:
+      - prop: "labelVisibility"
+        values:
+          - "responsive"
+          - "always"
+      - prop: "inset"
+        values:
+          - "page"
+          - "none"
+    claims:
+      - "FLOW-2"
+      - "GAP-2"
+      - "PADDING-3"
+    computedClaims:
+      - "PADDING-5"
+    classes:
+      - "starci-core-tab-content"
+      - "starci-core-tab-label"
+      - "starci-core-tabs"
+      - "starci-core-tabs-frame"
+      - "starci-core-tabs-scroll"
+  - component: "Tooltip"
+    propsType: "TooltipProps"
+    kind: "branch"
+    closedValues:
+      - prop: "placement"
+        values:
+          - "top"
+          - "bottom"
+    claims:
+      - "FLOW-2"
+      - "FONT-1"
+      - "PADDING-1"
+      - "PADDING-2"
+    computedClaims: []
+    classes:
+      - "starci-core-tooltip"
+      - "starci-core-tooltip-content"
+gaps:
+  - components:
+      - "SurfaceCard"
+      - "SurfaceListCard"
+      - "SurfaceAccordionCard"
+    missing: |
+      no typed heading level and no labelled-by-external-heading capability, so a surface whose
+      correct level is not 3 has no owner
+    evidence:
+      - "packages/grammar/src/core/primitive/Label/index.tsx"
+      - "packages/grammar/src/core/branch/SurfaceCard/index.tsx"
+  - components:
+      - "Common overlay owner"
+    missing: |
+      Common publishes no general overlay or elevation prop
+    evidence:
+      - "packages/grammar/src/core/branch/Tooltip/index.tsx"
+      - "packages/grammar/src/common/styles.css"
+  - components:
+      - "Badge"
+    missing: |
+      `Badge` accepts absent `children` and renders a non-breaking space, so a glyph-only chip is
+      representable and word presence is not enforced by the type
+    evidence:
+      - "packages/grammar/src/core/primitive/Badge/index.tsx"
+  - components:
+      - "Tabs"
+    missing: |
+      `leading` is an optional `ReactNode`, not a typed `Icon`, so nothing forces a glyph or its
+      `usage` on each peer
+    evidence:
+      - "packages/grammar/src/core/branch/Tabs/index.tsx"
+  - components:
+      - "Button"
+      - "TextAction"
+    missing: |
+      neither action publishes a motion anchor or attribute for its adornment, so a family has nothing
+      to animate beyond `data-component`
+    evidence:
+      - "packages/grammar/src/core/primitive/Button/index.tsx"
+      - "packages/grammar/src/core/primitive/TextAction/index.tsx"
+  - components:
+      - "Icon"
+    missing: |
+      `Icon` has no direction-aware mirroring contract; the app's registry chooses the literal glyph
+    evidence:
+      - "packages/grammar/src/core/primitive/Icon/index.tsx"
+  - components:
+      - "IconButton"
+    missing: |
+      `isActive` emits `data-active="true"` only, with no `aria-pressed`, so an active utility is
+      visual-only
+    evidence:
+      - "packages/grammar/src/core/primitive/IconButton/index.tsx"
+  - components:
+      - "Tooltip"
+    missing: |
+      `aria-describedby` is placed on the tooltip's wrapper `span`, not on the focusable control, so
+      the description is not programmatically attached to the button
+    evidence:
+      - "packages/grammar/src/core/branch/Tooltip/index.tsx"
+  - components:
+      - "Icon"
+    missing: |
+      `Icon` accepts only `source`; there is no fallback or error contract, so a missing registry
+      mapping must be resolved by the app before render
+    evidence:
+      - "packages/grammar/src/core/primitive/Icon/index.tsx"
+  - components:
+      - "MediaFrame"
+    missing: |
+      no `object-position` or focal prop, and `className` reaches the figure rather than the viewport
+      child, so a required off-centre crop has no owner
+    evidence:
+      - "packages/grammar/src/core/primitive/MediaFrame/index.tsx"
+      - "packages/grammar/src/common/styles.css"
+  - components:
+      - "MediaFrame"
+    missing: |
+      `MediaFrame` publishes no loading or error prop and renders no state
+    evidence:
+      - "packages/grammar/src/core/primitive/MediaFrame/index.tsx"
+  - components:
+      - "OtpInput"
+    missing: |
+      `OtpInput` publishes `disabled` and `invalid` (not the `isDisabled`/`isError` names) and no
+      skeleton input, so its unresolved state has no owner
+    evidence:
+      - "packages/grammar/src/core/OtpInput.tsx"
+  - components:
+      - "OtpInput"
+    missing: |
+      `OtpInput` publishes no `label`, `hint`, or `errorMessage` slot; only `describedBy` links
+      outside text, so its visible identity has no Common owner
+    evidence:
+      - "packages/grammar/src/core/OtpInput.tsx"

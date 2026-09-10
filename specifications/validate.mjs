@@ -1,10 +1,11 @@
 import { validateJourneys } from '../contracts/journeys.mjs';
 import { validateSDS, SDS_SCHEMA } from './sds.mjs';
 import { validateSRSDetails, validateArchitectureReview } from './v2.mjs';
+import { readDistJson } from '../core/runtime-root.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-const contract = JSON.parse(fs.readFileSync(new URL('./contract.json', import.meta.url), 'utf8'));
+const contract = readDistJson('specifications', 'contract.json');
 const text = x => typeof x === 'string' && x.trim().length > 0;
 const safePath = x => text(x) && !path.posix.isAbsolute(x) && !path.win32.isAbsolute(x) && !/[\\:\x00-\x1f]/.test(x) && !x.split('/').some(p => !p || p === '.' || p === '..');
 

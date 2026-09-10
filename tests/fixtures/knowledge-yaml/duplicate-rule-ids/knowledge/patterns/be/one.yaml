@@ -1,0 +1,15 @@
+schema: starci/knowledge-source@1
+id: be.one
+title: One
+purpose: |
+  First topic declaring BE-CROSS-DUP-1 for cross-topic duplicate ID rejection.
+appliesTo: [backend]
+family: be
+rules:
+  - id: BE-CROSS-DUP-1
+    title: Shared id first topic
+    kind: mandatory
+    requirement: |
+      Synthetic rule used only to detect duplicate IDs across topics.
+    rationale: |
+      Fixture only.

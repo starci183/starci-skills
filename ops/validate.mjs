@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseYaml } from '../core/yaml.mjs';
 
 const nonempty = value=>typeof value==='string'&&value.trim().length>0;
 const safeRelative = value=>nonempty(value)&&!path.posix.isAbsolute(value)&&!path.win32.isAbsolute(value)&&!value.split(/[\\/]/).some(p=>p==='..'||p==='.')&&!value.includes('\\');
@@ -7,15 +8,34 @@ const unique = values=>new Set(values).size===values.length;
 const pair = value=>value&&nonempty(value.en)&&!Object.hasOwn(value,'vi');
 const issue = (errors,code,subject,message)=>errors.push({code,subject,message});
 
+/** Public knowledge refs stay knowledge/*.json; authored YAML or .dist JSON may satisfy them. */
+export function domainReferenceExists(repositoryRoot, refPath) {
+  if (!repositoryRoot || !safeRelative(refPath)) return false;
+  const direct = path.resolve(repositoryRoot, refPath);
+  if (fs.existsSync(direct) && fs.statSync(direct).isFile()) return true;
+  const dist = path.resolve(repositoryRoot, '.dist', refPath);
+  if (fs.existsSync(dist) && fs.statSync(dist).isFile()) return true;
+  if (refPath.startsWith('knowledge/') && refPath.endsWith('.json')) {
+    const base = refPath.slice('knowledge/'.length, -'.json'.length);
+    const yamlName = /(?:^|\/)INDEX$/i.test(base)
+      ? `${base.replace(/INDEX$/i, 'index')}.yaml`
+      : `${base}.yaml`;
+    const yaml = path.resolve(repositoryRoot, 'knowledge', yamlName);
+    if (fs.existsSync(yaml) && fs.statSync(yaml).isFile()) return true;
+  }
+  return false;
+}
+
 // Validates authoring/catalogue referential integrity, NOT real-world execution or truth.
 // Never executes an op, resolves a credential, fetches a URL or mutates a workspace.
-export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
+export function validateCatalog(catalog,{root,repositoryRoot,profiles,documents=new Map()}={}) {
   const errors=[];
   if(!catalog||catalog.schema!=='work/ops@1'||!Array.isArray(catalog.ops)) return {ok:false,errors:[{code:'CATALOG_SCHEMA',subject:'catalog',message:'Expected work/ops@1 and ops array'}]};
   if(Object.keys(catalog).some(key=>!['schema','commonDocument','ops'].includes(key))) issue(errors,'CATALOG_FIELDS','catalog','Unknown catalogue root field');
   if(!catalog.ops.length) issue(errors,'CATALOG_EMPTY','catalog','At least one concrete operator is required');
   function fileRef(ref,subject,english=true) {
     if(!safeRelative(ref)||(english&&ref.endsWith('.vi.md'))) {issue(errors,'DOCUMENT_PATH',subject,'Unsafe/non-authority document path');return;}
+    if(documents.has(ref)){if(!String(documents.get(ref)).trim())issue(errors,'DOCUMENT_EMPTY',subject,'Document is empty');return;}
     if(root) {
       const full=path.resolve(root,ref), relative=path.relative(root,full);
       if(relative.startsWith('..')||!fs.existsSync(full)||!fs.statSync(full).isFile()||fs.lstatSync(full).isSymbolicLink()) issue(errors,'DOCUMENT_MISSING',subject,'Document must be a regular file inside ops root');
@@ -30,14 +50,18 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
     if(!/^[a-z]+(?:\.[a-z]+)+$/.test(at??'')) issue(errors,'OP_ID',at,'Invalid operator ID');
     fileRef(op.document,at); if(Object.hasOwn(op,'mirror')) issue(errors,'RETIRED_MIRROR',at,'Operator contracts are English only');
     fileRef(op.authority,at);
-    if (root && typeof op.authority === 'string' && safeRelative(op.authority) && fs.existsSync(path.join(root,op.authority))) {
+    if (root && typeof op.authority === 'string' && safeRelative(op.authority) && (documents.has(op.authority)||fs.existsSync(path.join(root,op.authority)))) {
       try {
-        const roles=JSON.parse(fs.readFileSync(path.join(root,op.authority),'utf8'));
+        const roles=JSON.parse(documents.has(op.authority)?documents.get(op.authority):fs.readFileSync(path.join(root,op.authority),'utf8'));
         if(roles.schema!=='starci/op-authority@1'||roles.op!==at||roles.primary?.maxSecondary!==3||roles.primary?.canAdvanceWorkflow!==false||!Array.isArray(roles.primary?.calls)||roles.primary.calls.length>3) issue(errors,'ROLE_AUTHORITY',at,'Primary role has at most three secondary jobs and cannot advance the workflow itself');
         if(Object.hasOwn(roles,'secondary')) issue(errors,'ROLE_AUTHORITY',at,'Secondary policy belongs to the caller, not the callee');
         for(const call of roles.primary.calls ?? []) {
           if(call.authority !== 'secondary.json') { issue(errors,'ROLE_AUTHORITY',at,'Caller must own secondary.json'); continue; }
-          const config=JSON.parse(fs.readFileSync(path.join(root,at,call.authority),'utf8'));
+          const yamlPath=path.join(root,at,'secondary.yaml');
+          const jsonPath=path.join(root,at,call.authority);
+          const source=fs.existsSync(yamlPath)?yamlPath:jsonPath;
+          const text=fs.readFileSync(source,'utf8');
+          const config=source.endsWith('.yaml')?parseYaml(text):JSON.parse(text);
           const policy=config.calls?.find(c=>c.op===call.op && c.role===call.role);
           if(config.schema!=='starci/op-secondary@1'||config.owner!==at||config.maxDefinitions!==3||!Array.isArray(config.calls)||config.calls.length>3||!unique(config.calls.map(c=>c.op))||config.maxJobs<1||config.maxJobs>3||!policy||policy.canCallOthers!==false||policy.canAdvanceWorkflow!==false||policy.canCompleteParent!==false) issue(errors,'ROLE_AUTHORITY',at,'Invalid caller-owned secondary permissions');
         }
@@ -45,7 +69,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
     }
     for(const ref of op.supportingReferences??[]) {
       if(!safeRelative(ref.path)||!nonempty(ref.when)) issue(errors,'DOMAIN_REFERENCE',at,'Reference requires safe repo-relative source and English applicability');
-      else if(repositoryRoot&&!fs.existsSync(path.resolve(repositoryRoot,ref.path))) issue(errors,'DOMAIN_REFERENCE',at,'Referenced domain source does not exist');
+      else if(repositoryRoot&&!domainReferenceExists(repositoryRoot,ref.path)) issue(errors,'DOMAIN_REFERENCE',at,'Referenced domain source does not exist');
     }
     if(!nonempty(op.goal)||!Array.isArray(op.nodeKinds)||!op.nodeKinds.includes(op.completionProfile)) issue(errors,'PROFILE',at,'Goal and compatible profile required');
     if(profiles&&!Object.hasOwn(profiles,op.completionProfile)) issue(errors,'UNKNOWN_PROFILE',at,'Completion profile is not supported by core');
@@ -64,7 +88,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
         }
         if(!/^[a-z]+$/.test(mode)||!selected||selected.id!==at||selected.executionModes) {issue(errors,'MODE_CONTRACT',at,'Invalid or recursive mode');continue;}
         const nested={...op,goal:selected.goal?.en,nodeKinds:selected.nodeKinds,completionProfile:selected.completionProfile,sideEffects:selected.sideEffects,writeScope:selected.writes?.map(w=>w.path),contract:selected};
-        const checked=validateCatalog({schema:'work/ops@1',commonDocument:'common.json',ops:[nested]},{profiles});
+        const checked=validateCatalog({schema:'work/ops@1',commonDocument:'common.yaml',ops:[nested]},{profiles});
         for(const error of checked.errors) issue(errors,'MODE_'+error.code,at+':'+mode,error.message);
       }
     }
@@ -123,7 +147,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles}={}) {
     if(!unique(c.blockers.map(b=>b.code))||!c.blockers.every(b=>/^[A-Z][A-Z_]+$/.test(b.code)&&pair(b.condition))) issue(errors,'BLOCKER_SHAPE',at,'Concrete English blocker conditions required');
   }
   if(root) {
-    const actualDocuments=fs.readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirectory()&&/^[a-z]+(?:\.[a-z]+)+$/.test(e.name)&&fs.existsSync(path.join(root,e.name,'operator.json'))).map(e=>e.name+'/operator.json').sort();
+    const actualDocuments=fs.readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirectory()&&/^[a-z]+(?:\.[a-z]+)+$/.test(e.name)&&(fs.existsSync(path.join(root,e.name,'operator.yaml'))||fs.existsSync(path.join(root,e.name,'operator.json')))).map(e=>fs.existsSync(path.join(root,e.name,'operator.yaml'))?e.name+'/operator.yaml':e.name+'/operator.json').sort();
     const declaredDocuments=catalog.ops.map(op=>op.document).sort();
     if(JSON.stringify(actualDocuments)!==JSON.stringify(declaredDocuments)) issue(errors,'DOCUMENT_COVERAGE','catalog','Catalogue must name each actual V3 operator document exactly once');
   }

@@ -4,8 +4,8 @@ Run `starci` through a reviewed npm archive/version, or `node <host>/.claude/bin
 
 | Command | Effect |
 | --- | --- |
-| `init --dir <host>` | Install runtime, managed host bootstraps and absent local config. |
-| `update --dir <host>` | Update installer-owned runtime; preserve local modifications by default. |
+| `init --dir <host>` | Copy source payload, build/verify local `.dist`, then record install; managed host bootstraps and absent local config. |
+| `update --dir <host>` | Update installer-owned runtime; rebuild/verify `.dist` before recording version; preserve local modifications by default. |
 | `doctor --dir <host> [--quick]` | Run installed contract tests and report drift. Tests use isolated fixtures. |
 | `version`, `--version` | Print package version. |
 | `workspace init <new-root> --id <id>` | Create metadata in an absent root or one containing only reserved `_local` Plan state; preserve that state and refuse existing Work or unrelated files. |

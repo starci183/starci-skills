@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {parseYaml} from '../core/yaml.mjs';
 import {authoredWorkspace,validateWorkspace,canonicalJSON,sha256} from '../core/index.mjs';
 
 const hash=x=>sha256(canonicalJSON(x));
@@ -7,6 +8,9 @@ const same=(a,b)=>a!==undefined&&b!==undefined&&hash(a)===hash(b);
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const recoverable=new Set(['STALE_COMPLETION','STALE_EVIDENCE','DEPENDENCY_NOT_DONE']);
 const designKinds={'business.decide':'business','architecture.decide':'architecture','interface.draw':'ui'};
+const implementationKinds={'backend.implement':'implementation','interface.implement':'implementation'};
+const implementationPolicy=cell=>cell.workPolicy?.schema==='starci/implementation-output@1';
+const authoredKind=cell=>implementationPolicy(cell)?implementationKinds[cell.op]:designKinds[cell.op];
 const inside=(root,file)=>{const r=path.relative(root,file);return r!=='..'&&!r.startsWith('..'+path.sep)&&!path.isAbsolute(r);};
 const targets=(run,cell)=>cell.workTargets??run.goal.workTargets;
 const bindings=(work,ids)=>ids.map(id=>{const n=work.nodes.find(n=>n.id===id);need(n,'Work target is missing');return {id,contextDigest:n.contextDigest,inputDigest:n.inputDigest};});
@@ -14,7 +18,7 @@ const bindings=(work,ids)=>ids.map(id=>{const n=work.nodes.find(n=>n.id===id);ne
 export function validateWorkPolicy(goal,cell){
  if(cell.workPolicy===undefined)return false;
  const p=cell.workPolicy;
- need(p&&Object.keys(p).every(k=>['schema','targets','assetWrites'].includes(k))&&p.schema==='starci/authored-work@1'&&designKinds[cell.op]&&Array.isArray(p.targets)&&p.targets.length&&p.targets.every(x=>typeof x==='string'&&x)&&new Set(p.targets).size===p.targets.length,'Explicit supported authored Work policy required');
+ need(p&&Object.keys(p).every(k=>(implementationPolicy(cell)?['schema','targets']:['schema','targets','assetWrites']).includes(k))&&(p.schema==='starci/authored-work@1'&&designKinds[cell.op]||implementationPolicy(cell)&&implementationKinds[cell.op])&&Array.isArray(p.targets)&&p.targets.length&&p.targets.every(x=>typeof x==='string'&&x)&&new Set(p.targets).size===p.targets.length,'Explicit supported authored Work policy required');
  need(same(p.targets,cell.workTargets??goal.workTargets),'Authored policy must name the exact selected cell leaves');
  if(p.assetWrites!==undefined)need(Array.isArray(p.assetWrites)&&p.assetWrites.every(a=>a&&Object.keys(a).sort().join(',')==='nodeId,path'&&p.targets.includes(a.nodeId)&&typeof a.path==='string'&&a.path.startsWith('assets/')&&!a.path.includes('\\')&&!a.path.includes(':')&&a.path.split('/').every(p=>p&&p!=='.'&&p!=='..'))&&new Set(p.assetWrites.map(a=>a.nodeId+':'+a.path)).size===p.assetWrites.length,'Asset writes need exact selected owners and normalized assets paths');
  return true;
@@ -31,10 +35,19 @@ function authored(run,cell){
  need(validateWorkPolicy(run.goal,cell),'Missing frozen authored Work policy');
  const work=authoredWorkspace(run.workRoot,targets(run,cell));
  need(work.authoredBinding&&work.errors.every(e=>recoverable.has(e.code)),'Authored Work graph is invalid');
- for(const item of work.authoredBinding){need(item.schema==='work/node@2'&&item.kind===designKinds[cell.op],'Authored operator does not own this leaf kind');assertWrite(run,path.join(run.workRoot,item.path));for(const asset of cell.workPolicy.assetWrites??[])if(asset.nodeId===item.id)assertWrite(run,path.resolve(run.workRoot,path.dirname(item.path),asset.path));}
+ for(const item of work.authoredBinding){need(item.schema==='work/node@2'&&item.kind===authoredKind(cell),'Authored operator does not own this leaf kind');assertWrite(run,path.join(run.workRoot,item.path));for(const asset of cell.workPolicy.assetWrites??[])if(asset.nodeId===item.id)assertWrite(run,path.resolve(run.workRoot,path.dirname(item.path),asset.path));}
+ if(implementationPolicy(cell))work.implementationInputs=work.authoredBinding.map(item=>{
+   const side=cell.op==='backend.implement'?'backend':'frontend';
+   need(item.path.includes('/implementation/'+side+'/'),'Implementation operator must own its backend/frontend leaf');
+   const meta=parseYaml(fs.readFileSync(path.join(run.workRoot,item.path),'utf8'));
+   // Only actual implementation payload is writable. Expectations, descriptions,
+   // sourceRefs, imports, extensions and every unknown future semantic key stay bound.
+   for(const key of ['implementation','state','activity','completion','investigation','history'])delete meta[key];
+   return {id:item.id,digest:hash(meta)};
+ });
  return work;
 }
-function invariant(work,cell){return {nodes:work.authoredBinding,assets:work.authoredAssets.map(item=>({id:item.id,assets:item.assets.filter(asset=>!(cell.workPolicy.assetWrites??[]).some(a=>a.nodeId===item.id&&a.path===asset.path))}))};}
+function invariant(work,cell){return {nodes:work.authoredBinding,assets:work.authoredAssets.map(item=>({id:item.id,assets:item.assets.filter(asset=>!(cell.workPolicy.assetWrites??[]).some(a=>a.nodeId===item.id&&a.path===asset.path))})),...(implementationPolicy(cell)?{implementationInputs:work.implementationInputs}:{})};}
 
 /** Scoped truth, not a replacement for the global validator verdict. */
 export function scopedWorkStatus(work,ids,{done=false,authored=false,requiredChildrenOnly=false}={}){

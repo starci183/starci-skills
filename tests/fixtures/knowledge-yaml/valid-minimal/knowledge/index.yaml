@@ -1,0 +1,13 @@
+schema: starci/knowledge-source@1
+id: knowledge
+title: Valid minimal fixture root
+purpose: |
+  Synthetic knowledge root used for deterministic compile, check mode, and
+  compatibility projection regression tests.
+appliesTo: [backend]
+topics:
+  - id: be.sample
+    path: patterns/be/sample.yaml
+    title: Sample
+    summary: Minimal topic for compiler regressions.
+    ruleIds: [BE-SAMPLE-1]

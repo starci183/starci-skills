@@ -1,0 +1,13 @@
+schema: starci/knowledge-source@1
+id: unknown.fields
+title: Unknown fields
+purpose: |
+  Synthetic topic with an unknown root field that schema validation must reject.
+appliesTo: [backend]
+rulse: []
+rules:
+  - id: BE-UNKNOWN-1
+    title: Sample
+    kind: mandatory
+    requirement: |
+      Synthetic unknown-field rejection case.

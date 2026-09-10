@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {readWorkflow, readExample, readPublicJson} from './helpers/read-public.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,7 +12,7 @@ import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 function fixture(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-goal-view-'));
   t.after(()=>{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));fs.rmSync(root,{recursive:true,force:true});});
-  const p=JSON.parse(fs.readFileSync(new URL('../workflows/plan.template.json',import.meta.url)));
+const p=readWorkflow('plan.template.json');
   Object.assign(p,{id:'view',requestId:'synthetic',originalRequest:'Review backend retry behavior',finalOutcome:'Report observed backend retry behavior'});
   for(const area of ['business','architecture','implementation','backend','frontend','uat'])p[area]={action:'not-applicable',outcome:'No change',targets:[],workflowIds:[],evidence:[],reason:'Read-only backend review'};
   p.backend={action:'change',outcome:'Reviewed backend behavior',targets:['synthetic.backend'],workflowIds:['review'],evidence:[],reason:''};

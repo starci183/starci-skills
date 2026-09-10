@@ -1,14 +1,15 @@
 import { validateJourneys } from '../contracts/journeys.mjs';
 import { validateAssets } from '../contracts/assets.mjs';
 import { selectProfile } from '../profiles/select.mjs';
+import { distPath, requireDist, readDistJson } from '../core/runtime-root.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
-const home = fs.existsSync(path.join(moduleDirectory, 'frontend.json')) ? moduleDirectory : path.resolve(moduleDirectory, './');
-export const workflow = JSON.parse(fs.readFileSync(path.join(home, 'frontend.json'), 'utf8'));
+requireDist();
+const home = distPath('workflows');
+export const workflow = readDistJson('workflows', 'frontend.json');
 export const matrix = JSON.parse(fs.readFileSync(path.join(home, workflow.matrix), 'utf8'));
 export const transitions = JSON.parse(fs.readFileSync(path.join(home, workflow.transitions), 'utf8'));
 export const contracts = JSON.parse(fs.readFileSync(path.join(home, workflow.contracts), 'utf8'));

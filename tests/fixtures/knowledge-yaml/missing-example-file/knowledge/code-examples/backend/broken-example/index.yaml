@@ -1,0 +1,30 @@
+schema: starci/code-example@1
+id: broken-example
+title: Missing file reference
+purpose: |
+  Manifest references a file that does not exist; compile must reject.
+appliesTo: [backend]
+relatedRules: []
+files:
+  - path: present.ts
+    role: Present source file.
+  - path: does-not-exist.ts
+    role: Missing file that must cause rejection.
+entrypoint: present.ts
+adapt:
+  - Fixture only.
+dependencies:
+  packages: []
+  assumptions: |
+    Synthetic missing-ref fixture.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests: []
+  limitations: |
+    Fixture only.
+provenance:
+  sources: []
+  simplifications: |
+    Fixture only.

@@ -1,19 +1,22 @@
 # Build and release StarCi
 
-This is the maintainer workflow, not a requirement for users installing a reviewed archive. Package preparation does not publish to npm or push Git.
+This is the maintainer workflow, not a requirement for users installing a reviewed archive. Package preparation does not publish to npm or push Git. Runtime consumers receive sources and compilers; `.dist` is built on the host during `init`/`update`. See [runtime distribution](runtime-distribution.md).
 
 ## Verify source
 
 ```sh
 npm ci
+node scripts/compile-knowledge.mjs
 npm run build
 npm test
 npm --prefix sites/skills ci
 npm run build:sites
+node scripts/compile-knowledge.mjs --check
 npm run build:check
+node scripts/ensure-build.mjs
 ```
 
-Review source changes, generated contracts and test failures. Do not weaken validators to produce a green release. The runtime bundles its YAML dependency in `core/yaml.mjs`; rebuild it with `npm run build:yaml` when deliberately changing that dependency and retain its license notice.
+Review source changes, generated contracts and test failures. Do not weaken validators to produce a green release. Knowledge is authored as YAML under `knowledge/` and compiled into `.dist/knowledge/`; see [knowledge YAML](knowledge-yaml.md). The runtime bundles its YAML dependency in `core/yaml.mjs`; rebuild it with `npm run build:yaml` when deliberately changing that dependency and retain its license notice. Never `git add -f` `.dist`; `/.dist/` stays ignored.
 
 ## Make an archive
 
@@ -21,7 +24,7 @@ Review source changes, generated contracts and test failures. Do not weaken vali
 npm pack --json --pack-destination /absolute/release-output
 ```
 
-Create that output directory first, outside the runtime and product trees. `prepack` regenerates and checks compiled contracts. It does not replace the full tests above. Inspect the resulting file inventory for local configuration, secrets, product records, Git state, `node_modules`, caches and unrelated site output. `package.json.files` explicitly bounds the installed payload; keep all runtime references, tests used by doctor and human docs available after relocation.
+Create that output directory first, outside the runtime and product trees. `prepack` regenerates and checks compiled contracts in the packing checkout; the published tarball still **excludes** `.dist`. Install/update rebuilds and verifies `.dist` on the target before recording success. `prepack` does not replace the full tests above. Inspect the resulting file inventory for local configuration, secrets, `config.json`, product records, Git state, `node_modules`, `worktrees/`, site caches (`.next`, `dist`, `out`) and unrelated site output. `package.json.files` explicitly bounds the installed payload: include sources, compilers (`scripts/`, `ops/generate.mjs`), bundled `core/yaml.mjs`, schemas needed to build, doctor tests and human docs; keep all runtime references available after relocation.
 
 Test the **archive**, not only the source checkout:
 

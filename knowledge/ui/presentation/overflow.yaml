@@ -1,0 +1,224 @@
+schema: starci/knowledge-source@1
+id: ui.presentation.overflow
+title: Overflow presentation
+appliesTo:
+  - ui
+family: presentation
+purpose: |-
+  This file answers one question: when content exceeds its region, which boundary owns that, and what
+  does it do?
+  Composition has chosen the tree and [Measure](measure.yaml) has bounded the region. Overflow resolves
+  what happens at the edge of a boundary the application owns. Clipping and scrolling inside a card,
+  rail, table frame, or shell belong to Grammar.
+ownerVocabulary:
+  owners:
+    - name: App
+      meaning: The boundary belongs to the application
+      applicationWrites: The class
+    - name: A component name
+      meaning: Common already owns this boundary
+      applicationWrites: Nothing. Compose it
+    - name: —
+      meaning: Common exposes no public path
+      applicationWrites: The class, recorded as a workaround
+  notes: |-
+    A scroll boundary is never written alone. It travels with a bound from [Measure](measure.yaml), because
+    a region with no height cap never overflows and its scroll class does nothing.
+componentOwnership:
+  title: Overflow Common already owns
+  notes: |-
+    Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](index.yaml#source-and-maintenance).
+  rows:
+    - component: ChatWorkspace
+      element: conversation
+      rule: OVERFLOW-4
+    - component: ChatWorkspace
+      element: conversation
+      rule: OVERFLOW-5
+    - component: ChatWorkspace
+      element: drawer body, hasRail, isCompactRail
+      rule: OVERFLOW-2
+    - component: ChatWorkspace
+      element: overlay rail, hasRail, isCompactRail
+      rule: OVERFLOW-4
+    - component: ChatWorkspace
+      element: overlay rail, hasRail, isCompactRail
+      rule: OVERFLOW-5
+    - component: ChatWorkspace
+      element: overlay rail, hasRail, not isCompactRail
+      rule: OVERFLOW-4
+    - component: ChatWorkspace
+      element: overlay rail, hasRail, not isCompactRail
+      rule: OVERFLOW-5
+    - component: FencedCodeBlock
+      element: root
+      rule: OVERFLOW-4
+    - component: HorizontalScrollRegion
+      element: root
+      rule: OVERFLOW-5
+    - component: HorizontalScrollRegion
+      element: root, overflow!="needed"
+      rule: OVERFLOW-3
+    - component: HorizontalScrollRegion
+      element: root, overflow="needed"
+      rule: OVERFLOW-4
+    - component: IconTile
+      element: root
+      rule: OVERFLOW-2
+    - component: MarkdownTableFrame
+      element: root
+      rule: OVERFLOW-4
+    - component: MediaFrame
+      element: root
+      rule: OVERFLOW-2
+    - component: OtpInput
+      element: root
+      rule: OVERFLOW-3
+    - component: OtpInput
+      element: root
+      rule: OVERFLOW-5
+    - component: Rail
+      element: body, height!="fill"
+      rule: OVERFLOW-3
+    - component: Sidebar
+      element: root
+      rule: OVERFLOW-2
+    - component: SurfaceAccordionCard
+      element: accordion shell
+      rule: OVERFLOW-2
+    - component: SurfaceAccordionCard
+      element: accordion shell, not bounded
+      rule: OVERFLOW-1
+    - component: SurfaceCard
+      element: card content, frame!="frameless"
+      rule: OVERFLOW-2
+    - component: SurfaceCard
+      element: card content, frame="frameless"
+      rule: OVERFLOW-1
+    - component: SurfaceListCard
+      element: root
+      rule: OVERFLOW-2
+    - component: VerticalScrollRegion
+      element: root, isScrollable, overflow!="needed"
+      rule: OVERFLOW-3
+    - component: VerticalScrollRegion
+      element: root, isScrollable, overflow="needed"
+      rule: OVERFLOW-4
+    - component: WorkspaceShell
+      element: floating layer, hasFloatingLayer
+      rule: OVERFLOW-4
+topics:
+  - {}
+  - {}
+  - {}
+  - {}
+  - {}
+catalogNotes: |-
+  Exactly one boundary owns each axis. Two nested scrollers on the same axis trap the reader between
+  them, and neither reaches the end reliably.
+rules:
+  - id: OVERFLOW-1
+    title: Visible
+    governs: |-
+      The boundary does not clip, because something must be allowed to cross it.
+    cases:
+      - id: case-1
+        when: |-
+          A region whose child carries a focus ring, shadow, or badge that sits outside the box
+        owner: "`App`"
+        render: No class. Visible is the default
+      - id: case-2
+        when: A surface that must not clip its own highlight
+        owner: "`SurfaceCard`"
+        render: The frameless variant already stays visible
+    notThisRule: |-
+      leaving a bounded region visible to avoid deciding. Content that escapes silently overlaps whatever follows it.
+  - id: OVERFLOW-2
+    title: Clipped
+    governs: Content is cut at the boundary and cannot be reached.
+    cases:
+      - id: case-1
+        when: A rounded region whose children must stay inside the radius
+        owner: "`SurfaceCard`"
+        render: Compose the card; it already clips
+      - id: case-2
+        when: A media viewport that crops its image to a fixed frame
+        owner: "`MediaFrame`"
+        render: Compose the frame; it already clips
+      - id: case-3
+        when: |-
+          An app-owned decorative region whose overflow carries no information
+        owner: "`App`"
+        render: "`overflow-hidden`"
+    notThisRule: |-
+      text that does not fit. That is [Text flow](text-flow.yaml), and it truncates visibly rather than disappearing.
+    remark: |-
+      Clipping content the reader needs is silent data loss. It looks correct in a screenshot at one width
+      and fails at another, which is why it is the hardest overflow defect to find.
+  - id: OVERFLOW-3
+    title: Scrolls on one axis
+    governs: |-
+      The boundary always scrolls one axis, because its content is expected to exceed it.
+    cases:
+      - id: case-1
+        when: A row of items intentionally wider than the viewport
+        owner: "`HorizontalScrollRegion`"
+        render: Compose the region
+      - id: case-2
+        when: A bounded panel or list whose content grows
+        owner: "`VerticalScrollRegion`"
+        render: Compose the region
+      - id: case-3
+        when: A rail body that scrolls while its shell stays put
+        owner: "`Rail`"
+        render: Compose the rail
+    notThisRule: |-
+      a region whose content usually fits. Use OVERFLOW-4 so the bar appears only when it means something.
+    remark: |-
+      The other axis stays clipped or visible on purpose. A region that scrolls both axes hides content in
+      a direction the reader has no reason to look.
+  - id: OVERFLOW-4
+    title: Scrolls when needed
+    governs: The boundary scrolls only when content actually exceeds it.
+    cases:
+      - id: case-1
+        when: A wide table inside a narrower column
+        owner: "`MarkdownTableFrame`"
+        render: Compose the frame
+      - id: case-2
+        when: Long code lines that must not wrap
+        owner: "`FencedCodeBlock`"
+        render: Compose the block
+      - id: case-3
+        when: A tab strip that exceeds its width only in some languages
+        owner: "`Tabs`"
+        render: Compose the tabs
+      - id: case-4
+        when: |-
+          An app-owned bounded region whose content sometimes exceeds it
+        owner: "`App`"
+        render: "`overflow-auto` with the matching height cap"
+    notThisRule: |-
+      an always-visible bar on a region that usually fits, which reads as a defect the first time a reader sees it empty.
+  - id: OVERFLOW-5
+    title: Contained
+    governs: |-
+      Scrolling stops at this boundary instead of continuing into the page behind it.
+    cases:
+      - id: case-1
+        when: A scrolling panel, drawer, or overlay above page content
+        owner: "`—`"
+        render: "`overscroll-contain` with the scroll rule"
+      - id: case-2
+        when: A horizontal row inside a vertically scrolling page
+        owner: "`HorizontalScrollRegion`"
+        render: Compose the region; it already contains the inline axis
+    notThisRule: |-
+      containment on the page's own scroller, which would trap the reader.
+    remark: |-
+      Without containment, reaching the end of the inner region hands the gesture to the page and the
+      reader loses their place. On a touch device the effect is worse, because the page moves under a
+      finger that was scrolling something else.
+doesNotDecide: |-
+  How large the region is, and whether it has a height cap at all, is [Measure](measure.yaml). What text
+  does when it does not fit is [Text flow](text-flow.yaml).

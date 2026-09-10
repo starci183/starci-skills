@@ -1,0 +1,51 @@
+schema: starci/knowledge-source@1
+id: grammars
+title: Grammar families
+purpose: |
+  Catalog of authored UI Grammar families. Inventory only — not a default-family rule.
+  The selected .starciwork design specification names the applicable installed family, if any.
+  A missing or ambiguous family never silently resolves to StarCi. This catalog supplies historical
+  snapshots, not a package installer, resolver or requirement that every product use Grammar.
+appliesTo:
+  - grammar
+provenance:
+  limitations: |
+    Component names, tokens and gap tables describe the reference family at observation time.
+    Verify actual package identity/version, exported types, CSS and renderer source in the selected
+    repository before using snapshot APIs or gaps. Record current source references in the selected
+    .starciwork node; an old source census is not current UAT evidence. The current public consumer
+    entry observed for FE work is @starci/grammar/common — confirm installed exports before import.
+guidance:
+  - id: catalog-not-default
+    requirement: |
+      Do not treat this catalog as selecting a default Grammar family. Family choice belongs to the
+      current .starciwork design specification.
+    rationale: |
+      Silent fallback to StarCi would invent product direction and override an absent/ambiguous design.
+  - id: verify-before-use
+    requirement: |
+      Before applying snapshot APIs or recorded gaps, inspect the selected repository's package
+      identity/version, exported types, CSS and renderer source.
+    rationale: |
+      Snapshots are historical; installed exports may differ. Inventing missing APIs is forbidden.
+  - id: ui-owns-universal
+    requirement: |
+      Common semantics, renderer anatomy, state and accessibility remain owned by knowledge/ui.
+      A family owns its scoped visual realization and promoted idioms; the product owns its facts,
+      content, routes and approved composition.
+    rationale: |
+      Keeps universal UI law separate from family-scoped DNA and product composition.
+topics:
+  - id: starci
+    path: starci/index.yaml
+    title: StarCi Core Grammar
+    summary: |
+      Historical snapshot of the StarCi Core family — DNA, idioms, playbook and family boundaries.
+families:
+  - id: starci
+    title: starci
+    authority: starci/family.yaml
+    packageSnapshot: starci/DNA.yaml
+    reusableStyle: starci/idioms.yaml
+    productComposition: starci/playbook.yaml
+    index: starci/index.yaml

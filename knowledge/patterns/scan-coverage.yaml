@@ -1,0 +1,146 @@
+schema: starci/knowledge-source@1
+id: patterns.scan-coverage
+title: Source scan coverage and enforcement limits
+purpose: |
+  Record what a partial source rescan actually inspected, which automated checks exist, and
+  which gaps remain. This is coverage and limitation evidence, not certification of all
+  knowledge or either application.
+appliesTo: [backend, frontend]
+family: cross-cutting
+provenance:
+  scannedAt: 2026-09-10
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  observedHeads:
+    backend: 1731b15ba4ed526477e3c572b9d82c31ab64f1d5
+    frontend: 44bba218685b7eed2a5d9e479689707ab6381bc8
+  limitations: |
+    Partial rescan, not certification. Observations use working-tree files, not a claim of clean
+    committed bytes. Historical counts and prior extractions do not prove a fresh full audit.
+    Remaining topics include complete folder/naming/import/type/comment/error/test coverage,
+    module registration and transport filters, remaining FE tiers, actual Grammar exports/tokens
+    and rendered UI rules.
+guidance:
+  - id: probe-helper
+    requirement: |
+      Repeat the installed-rule behavioral probes with
+      `node scripts/probe-reference-conventions.mjs <backend-reference-root>`. Passing these
+      probes confirms the documented checker behavior, including gaps; it is not a product
+      quality gate.
+  - id: collocation
+    requirement: |
+      Concrete examples and proposed enforcement upgrades are collocated under code-examples and
+      patterns/enforcement.yaml.
+observations:
+  - id: be-units
+    lane: backend
+    kind: observation
+    summary: |
+      Inspected primary/primary.decorators.ts, add-to-cart.handler.ts, UserService,
+      WeeklyChallengeService, eslint.config.mjs and installed @starci/eslint-canon-be 1.2.1
+      data-access.mjs/cqrs.mjs. GraphQL handlers and capability services both own data access
+      where applicable; not every capability service is a bus wrapper.
+  - id: be-module-and-tests
+    lane: backend
+    kind: observation
+    summary: |
+      Additional inspection: add-to-cart.module.ts registers its resolver, bus service and
+      handler; module-definition.ts uses ConfigurableModuleBuilder with isGlobal:false.
+      CourseNotFoundException extends AbstractException with one typed metadata object.
+      jest.config.ts separates unit and integration suffixes and delegates E2E/harness to their
+      own configs. These examples do not prove every module/filter/test topic has been rescanned.
+  - id: be-graphql-chain
+    lane: backend
+    kind: observation
+    summary: |
+      GraphQL chain: add-to-cart.resolver.ts delegates to its service with request/user/locale;
+      service executes AddToCartCommand on CommandBus; command has readonly params.
+      ICQRSHandler.execute delegates to protected process. The response extends
+      AbstractGraphQLResponse with nullable data for the interceptor error path.
+      courses.module.ts registers the feature, and apps/core/src/app.module.ts registers
+      CqrsModule.forRoot(). Do not infer bootable dependency injection from isolated handler
+      unit tests.
+    relatedExamples:
+      - graphql-command
+
+  - id: lint-must-inject-entity-manager
+    lane: backend
+    kind: checker-limit
+    summary: |
+      must-inject-entity-manager checks constructor parameters spelled EntityManager and
+      decorator names matching Inject*EntityManager. It does not verify the decorator body or
+      actual database token. Review the provider and connection binding separately.
+    automated:
+      - must-inject-entity-manager
+
+  - id: lint-no-injected-repository
+    lane: backend
+    kind: checker-limit
+    summary: |
+      no-injected-repository detects InjectRepository and
+      Repository/TreeRepository/MongoRepository parameter types. It does not detect custom
+      AccountingRepository/StorePort facades. Structural review must catch those; a clean report
+      cannot approve an alternative persistence architecture.
+    automated:
+      - no-injected-repository
+
+  - id: lint-no-outer-manager-in-transaction
+    lane: backend
+    kind: checker-limit
+    summary: |
+      no-outer-manager-in-transaction in the inspected version checks a first-argument arrow
+      callback. The isolation-level overload with callback in argument two is not covered. Check
+      transaction-manager propagation through helpers and refusal-after-write rollback explicitly.
+    automated:
+      - no-outer-manager-in-transaction
+    relatedExamples:
+      - transactional-service
+
+  - id: lint-handler-checks
+    lane: backend
+    kind: checker-limit
+    summary: |
+      handler-overrides-process does not prove the entire resolver/service/message/handler chain.
+      handler-has-twin-spec is off unless supplied a listing; independently verify the actual
+      test file and assertions.
+    automated:
+      - handler-overrides-process
+      - handler-has-twin-spec
+
+  - id: fe-units
+    lane: frontend
+    kind: observation
+    summary: |
+      Inspected eslint.config.mjs, installed @starci/eslint-canon-fe 3.0.2 the-split.mjs,
+      ShellNav index/component, AccountMenu component. component.tsx receives resolved
+      props/actions; connected index owns external state. Connected block twin enforcement is
+      scoped to blocks and cannot establish conformance of every tier.
+    relatedExamples:
+      - connected-block
+
+  - id: fe-config
+    lane: frontend
+    kind: observation
+    summary: |
+      Frontend configuration disables inline lint overrides for connected block halves, uses
+      generic Array/ReadonlyArray types, and enables accessibility checks. Purity rules inspect
+      known call patterns; alias/member-call escape routes and transitive dependencies still
+      require review.
+
+  - id: three-agent-rescan
+    lane: cross-cutting
+    kind: observation
+    summary: |
+      Three-agent rescan: BE config does not activate all installed canon recommendations;
+      transaction/eager-relation rules and handler-twin checks cannot be assumed active.
+      Existing non-CQRS handlers and inline suppressions are residuals, not reusable patterns.
+      FE current public entry is @starci/grammar/common; product-shells is an unresolved
+      exception. Installed FE Grammar-boundary module has no active rules, and split checks do
+      not cover every tier or aliased world access.
+
+  - id: remaining-rescan
+    lane: cross-cutting
+    kind: gap
+    summary: |
+      Remaining rescan: complete folder/naming/import/type/comment/error/test topic coverage,
+      module registration and transport filters, remaining FE tiers, actual Grammar
+      exports/tokens and rendered UI rules. Do not claim these are freshly audited yet.

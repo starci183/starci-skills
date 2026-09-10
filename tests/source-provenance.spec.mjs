@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {readExample} from './helpers/read-public.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,7 +14,7 @@ function fixture(t) {
  const put=(relative,data)=>{const file=path.join(root,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(data));};
  put('workspace.yaml',{schema:'work/workspace@1',id:'synthetic'});
  // Source example reused only as a structured fixture, never product acceptance.
- const spec=JSON.parse(fs.readFileSync(new URL('../examples/nivo-setup-business.json',import.meta.url),'utf8'));
+ const spec=readExample('nivo-setup-business.json');
  const node={schema:'work/node@2',id:'synthetic.business',kind:'business',required:true,state:'todo',assertions:['review'],description:'Synthetic metadata binding test only.',sourceRefs:spec.sources.filter(s=>s.kind==='observed').map(({repository,revision,path,symbol,observation})=>({repository,revision,path,symbol,observation})),extensions:{work3:{specification:spec}}};
  const write=()=>put('module/business/index.yaml',node);
  const check=()=>{write();return validateWorkspace(root);};

@@ -7,11 +7,14 @@ import { validateSpecification } from '../specifications/validate.mjs';
 import { validateWorkspace } from '../core/index.mjs';
 import { validateFEHandoff } from '../workflows/frontend.mjs';
 import { validateCatalog } from '../ops/validate.mjs';
-const sample = () => JSON.parse(fs.readFileSync(new URL('../examples/nivo-setup-architecture.json', import.meta.url), 'utf8'));
+import { parseYaml } from '../core/yaml.mjs';
+import {readExample} from './helpers/read-public.mjs';
+import {outputs} from '../ops/generate.mjs';
+const sample = () => readExample('nivo-setup-architecture.json');
 
 test('source-grounded examples are valid draft specifications, never approved product work', () => {
   for (const kind of ['business','architecture']) {
-    const spec = JSON.parse(fs.readFileSync(new URL('../examples/nivo-setup-' + kind + '.json', import.meta.url), 'utf8'));
+    const spec = readExample('nivo-setup-' + kind + '.json');
     assert.deepEqual(validateSpecification(spec), { ok: true, errors: [] });
     spec.status = 'pass';
     assert.equal(validateSpecification(spec).ok, false);
@@ -64,7 +67,7 @@ test('.work validates specification owner, source revision binding and non-compl
   assert.ok(validateWorkspace(root).errors.some(e => e.code === 'SPECIFICATION_NOT_ACCEPTED'));
   node.state = 'suspended'; node.kind = 'business'; write();
   assert.ok(validateWorkspace(root).errors.some(e => e.code === 'SPECIFICATION_OWNER'));
-  const businessSpec = JSON.parse(fs.readFileSync(new URL('../examples/nivo-setup-business.json', import.meta.url), 'utf8'));
+  const businessSpec = readExample('nivo-setup-business.json');
   const businessDir = path.join(root, 'business'); fs.mkdirSync(businessDir);
   fs.writeFileSync(path.join(businessDir, 'node.md'), '---\n' + JSON.stringify({schema:'work/node@1',id:'business-example',kind:'business',required:true,state:'todo',refs:repositories,assertions:['review'],extensions:{work3:{specification:businessSpec}}}) + '\n---\n# Business source example\n');
   node.kind = 'architecture'; node.dependsOn = ['business-example']; write();
@@ -84,7 +87,7 @@ test('FE standalone handoff preserves expected flow and needs actual-format comm
 });
 
 test('basic operator catalog cannot remove implement quality, commits or always-present FE flow delivery', () => {
-  const original = JSON.parse(fs.readFileSync(new URL('../ops/catalog.json', import.meta.url), 'utf8'));
+  const original = JSON.parse(outputs().get('catalog.json'));
   for (const [id, field] of [['interface.implement','qualityPolicy'],['backend.implement','qualityPolicy'],['backend.implement','commitPolicy'],['interface.implement','deliveryPolicy'],['business.decide','specificationPolicy']]) {
     const catalog = structuredClone(original);
     delete catalog.ops.find(x => x.id === id).contract[field];
@@ -105,7 +108,7 @@ test('basic operator catalog cannot remove implement quality, commits or always-
  });
 
 test('six-op map is generated from the actual contracts and business journeys feed the frontend input unchanged', async () => {
-  const map = JSON.parse(fs.readFileSync(new URL('../ops/basic-ops.json', import.meta.url), 'utf8'));
+  const map = JSON.parse(outputs().get('basic-ops.json'));
   assert.equal(map.ops.length, 6);
   assert.deepEqual(map.ops.map(o => o.id), ['business.decide','architecture.decide','interface.draw','interface.implement','backend.implement','uat.verify']);
   assert.deepEqual(map.ops.filter(o => o.secondaryCalls.length).map(o => o.id), ['interface.implement']);
@@ -118,12 +121,12 @@ test('six-op map is generated from the actual contracts and business journeys fe
 });
 
 test('backend delivery cannot hand off before unit and backend E2E proof', () => {
-  const backend = JSON.parse(fs.readFileSync(new URL('../ops/backend.implement/operator.json', import.meta.url), 'utf8'));
+  const backend = parseYaml(fs.readFileSync(new URL('../ops/backend.implement/operator.yaml', import.meta.url), 'utf8'));
   assert.deepEqual(backend.qualityPolicy.checks, ['lint','typecheck','unit','backend-e2e','coverage','build','sonar']);
   assert.equal(backend.qualityPolicy.unitGate, 'scoped-unit-pass-for-tested-revision');
   assert.equal(backend.qualityPolicy.backendE2EGate, 'scoped-backend-e2e-pass-for-tested-revision');
   assert.equal(backend.qualityPolicy.handoffBinding, 'api-contract-runtime-quality-evidence-and-tested-commit');
-  const support = JSON.parse(fs.readFileSync(new URL('../ops/interface.implement/secondary.json', import.meta.url), 'utf8')).calls[0];
+  const support = parseYaml(fs.readFileSync(new URL('../ops/interface.implement/secondary.yaml', import.meta.url), 'utf8')).calls[0];
   for (const field of ['apiContract','runtime','qualityEvidence','testedCommit']) assert.ok(support.outputFields.includes(field));
   for (const criterion of ['backend-unit-pass','backend-e2e-pass']) assert.ok(support.requiredCriteria.includes(criterion));
   for (const mutate of [
@@ -131,7 +134,7 @@ test('backend delivery cannot hand off before unit and backend E2E proof', () =>
     contract => { delete contract.qualityPolicy.backendE2EGate; },
     contract => { delete contract.qualityPolicy.handoffBinding; },
   ]) {
-    const catalog = JSON.parse(fs.readFileSync(new URL('../ops/catalog.json', import.meta.url), 'utf8'));
+    const catalog = JSON.parse(outputs().get('catalog.json'));
     mutate(catalog.ops.find(x => x.id === 'backend.implement').contract);
     assert.equal(validateCatalog(catalog).ok, false);
   }

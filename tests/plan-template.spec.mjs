@@ -1,7 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {createBundle,renderPlan} from '../scripts/plan.mjs';import {parseYaml} from '../core/yaml.mjs';
+import {readWorkflow} from './helpers/read-public.mjs';
 test('Plan template requires concrete content and creates pending four-file bundle',()=>{
- const plan=JSON.parse(fs.readFileSync(new URL('../workflows/plan.template.json',import.meta.url)));assert.throws(()=>renderPlan(plan));
+const plan=readWorkflow('plan.template.json');assert.throws(()=>renderPlan(plan));
  Object.assign(plan,{id:'test-plan',requestId:'test-request',originalRequest:'Verify retry behavior',finalOutcome:'Retry recovers from a failed request'});
  for(const s of ['business','architecture','implementation','backend','frontend','uat'])plan[s]={action:'reuse',outcome:'Verify existing behavior',targets:['retry'],workflowIds:[],evidence:['synthetic-existing-retry-proof'],reason:''};
  plan.uat={...plan.uat,action:'change',workflowIds:['verify'],evidence:[]};

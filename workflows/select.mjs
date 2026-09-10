@@ -2,21 +2,18 @@ const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 import {hasAutoAcceptance,verifyAutoEvidence} from './auto.mjs';
 import {hasDelegatedAcceptance} from './delegation.mjs';
 import {verifyProducerResult,hasDirectProducerAcceptance} from './producer-verification.mjs';
+export { validateWorkflowCatalog } from './catalog-validate.mjs';
 const verifiedAutoBackend=run=>{try{if(!hasAutoAcceptance(run))return false;verifyAutoEvidence(run);return true;}catch{return false;}};
 const exact=(x,keys,optional=[])=>plain(x)&&keys.every(k=>Object.hasOwn(x,k))&&Object.keys(x).every(k=>[...keys,...optional].includes(k));
-export function validateWorkflowCatalog(catalog,jobs,frontend) {
-  const errors=[];
-  if(!exact(catalog,['schema','skill','gates','fallback','readOnly','unknownExplicitWorkflow','limits','workflows'])||catalog.gates!=='gates.json'||catalog.schema!=='starci/workflow-catalog@1'||catalog.skill!=='../SKILL.md'||catalog.fallback!=='none'||catalog.readOnly!=='answer-or-inspect'||catalog.unknownExplicitWorkflow!=='error'||!Array.isArray(catalog.workflows))return {ok:false,errors:['Invalid workflow catalog']};
-  if(!exact(catalog.limits,['rows','columns','secondaryDefinitions'])||Object.values(catalog.limits).some(n=>n!==3))errors.push('Invalid limits');
-  const expected=new Set([frontend.id,...jobs.workflows.map(w=>w.id)]),ids=new Set(),intents=new Set();
-  for(const row of catalog.workflows){
-    if(!exact(row,['id','intent','when','definition','execution'])||Object.values(row).some(x=>typeof x!=='string'||!x.trim())){errors.push('Invalid workflow entry');continue;}
-    if(ids.has(row.id)||intents.has(row.intent)||!expected.has(row.id))errors.push('Duplicate or unknown workflow');
-    ids.add(row.id);intents.add(row.intent);
-    const isFrontend=row.id===frontend.id;if(row.definition!==(isFrontend?'frontend.json':'jobs.json')||row.execution!==(isFrontend?'frontend-gate':row.id==='analyze-request'?'read-only-analysis':'explicit-coordinator'))errors.push('Wrong workflow source or execution claim');
-  }
-  if(ids.size!==expected.size||[...expected].some(id=>!ids.has(id)))errors.push('Incomplete workflow discovery');
-  return {ok:errors.length===0,errors};
+/** Choose ceremony from scope, not line count. No route grants execution authority. */
+export function selectExecutionRoute(catalog,{readOnly=false,scope,actions=[],existingPlan=false,flashSelection}={}) {
+  if(readOnly)return {kind:'answer-or-inspect'};
+  if(!['small','bounded','large','unclear'].includes(scope)||typeof existingPlan!=='boolean'||!Array.isArray(actions))throw Error('Explicit scope classification is required');
+  if(existingPlan)return {kind:'resume-plan',reason:'Continue the current Plan; do not replan each prompt'};
+  if(scope==='large'||scope==='unclear'||actions.length>1)return {kind:'plan',reason:'Resolve or coordinate the full multi-workflow outcome'};
+  if(scope==='small'&&flashSelection?.kind==='flash')return flashSelection;
+  if(actions.length!==1)throw Error('Classify the one bounded workflow before execution');
+  return selectWorkflow(catalog,{classification:actions[0],readOnly:actions[0].action==='analyze-request'||actions[0].action==='review-code'&&!actions[0].effectful});
 }
 /** Read-only policy selection, never a dispatcher or an authorization grant. */
 export function selectWorkflow(catalog,{workflowId,classification,readOnly=false}={}) {

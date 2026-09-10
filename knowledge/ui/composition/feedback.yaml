@@ -1,0 +1,102 @@
+schema: starci/knowledge-source@1
+id: ui.composition.feedback
+title: Feedback composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  This file answers one question: when something fails, succeeds, or needs correcting, who says so,
+  and how small is that owner?
+  Feedback is decided at the smallest place that can actually be corrected or recovered. A failure
+  announced further out than it can be fixed makes the reader hunt for the cause, and a page-level
+  recovery for a single failed panel throws away work that never failed.
+  Applicability: API examples belong to the documented Grammar family; verify installed source and
+  the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands.
+rules:
+  - id: FEEDBACK-1
+    title: Correct at the nearest owner
+    governs: Governs where a validation failure lives.
+    cases:
+      - id: case-1
+        when: |-
+          One field has a current validation failure the reader can fix at that field
+        assert: |-
+          `Input.errorMessage` on that field carries the failure and the correction, and `isError` is bound to the same invalid fact
+      - id: case-2
+        when: |-
+          The field has standing guidance that is true whether or not it failed
+        assert: |-
+          That guidance sits in `hint`, and it does not appear or disappear with validation
+      - id: case-3
+        when: The same failure would also be summarised above the form
+        assert: Exactly one owner states that failure, and it is the field
+      - id: case-4
+        when: |-
+          The message is navigation or general status rather than a rejected value
+        assert: |-
+          No validation carrier holds it; it resolves to a status owner elsewhere
+      - id: case-5
+        when: The value changes, or validation runs again
+        assert: |-
+          The error updates or clears with the fact, and the reader's entry survives unchanged
+  - id: FEEDBACK-2
+    title: Recover at the smallest actionable owner
+    governs: Governs where a retry lives.
+    cases:
+      - id: case-1
+        when: One region is empty or failed and has a real next step
+        assert: |-
+          `EmptyNotice` names the affected region and carries `actionLabel` and `onAction` for that step, with `description` optional
+      - id: case-2
+        when: The recovery action has accepted work
+        assert: |-
+          `isActionPending` is bound while that action runs, and to no other action
+      - id: case-3
+        when: A page-level reload would be simpler to wire
+        assert: |-
+          The recovery is scoped to the operation that failed; no page-level reload stands in for one failed region
+      - id: case-4
+        when: Repeating the operation is not safe, as with a purchase
+        assert: |-
+          The recovery is a distinct safe operation backed by authority, not a repeat of the unsafe one
+      - id: case-5
+        when: The reader has unsaved work elsewhere on the page
+        assert: |-
+          Only the failed region is replaced, and work outside it survives the recovery
+  - id: FEEDBACK-3
+    title: Settlement must be known before it is claimed
+    governs: Governs the moment a result may be stated.
+    cases:
+      - id: case-1
+        when: A command is waiting on a result
+        assert: |-
+          Pending clears only on a real settlement, and the result copy names the outcome that actually arrived
+      - id: case-2
+        when: A non-urgent result should be announced
+        assert: |-
+          `Text live="polite"` sits on the smallest owner of that status
+      - id: case-3
+        when: |-
+          The message is genuinely urgent and interrupting is warranted
+        assert: |-
+          `live="assertive"` is bound only there, and to nothing else in the tree
+      - id: case-4
+        when: The same result would appear in two places
+        assert: |-
+          Exactly one announcement owner holds that result, and it updates only when the result changes
+      - id: case-5
+        when: The message describes navigation
+        assert: |-
+          It is produced by an actual navigation effect, and it carries no error semantics unless the navigation itself failed
+      - id: case-6
+        when: The result matters after the moment passes
+        assert: |-
+          A durable owner holds it after the announcement, where the reader can review or act on it
+    retired: |-
+      FEEDBACK-4 is retired into COVERAGE-1 and is not reused; the address stays spent.
+doesNotDecide: |-
+  Who owns pending among several controls is [Action](action.yaml), and which conditions exist at all is
+  [State](state.yaml). Which action the reader is being pushed towards is [CTA](cta.yaml). What the
+  `.starciwork` specification must enumerate about these outcome paths is [Coverage](coverage.yaml). Whether a message is
+  programmatically related to its field, and whether it is announced once, is
+  [Accessibility](../proof/accessibility.yaml) and [Render truth](../proof/render-truth.yaml).

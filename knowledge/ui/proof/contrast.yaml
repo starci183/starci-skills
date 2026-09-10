@@ -1,0 +1,121 @@
+schema: starci/knowledge-source@1
+id: ui.proof.contrast
+title: Contrast proof
+appliesTo:
+  - ui
+family: proof
+purpose: |-
+  This file answers one question: on the page that actually rendered, do the distinctions and the text
+  the direction relies on survive measurement, in every theme and state, and with colour taken away?
+  Contrast is never established by reading a token. An authored value is a formula; the evidence is the
+  computed foreground measured against the background that was actually composed beneath it, after
+  transparency, overlays, and state opacity. Each rule below names the observation that would falsify
+  it.
+  `COLOR-3` and `COLOR-5` are the two surviving addresses of the retired `ui/color.json` topic. The
+  numbers `COLOR-1`, `COLOR-2`, and `COLOR-4` were retired with it and are not reused. New rules in this topic
+  take its own prefix, `CONTRAST-`; `COLOR-6` (retired) → `CONTRAST-1`.
+rules:
+  - id: COLOR-3
+    title: Action, destination, selection, and focus stay distinguishable
+    governs: |-
+      Governs whether four different meanings sharing one region remain four different things once colour
+      is removed from the evidence.
+    cases:
+      - id: case-1
+        when: One region renders commands and destinations side by side
+        observe: |-
+          The command is a `button` element (`data-element="button"`) and the destination an anchor (`data-element="a"`) carrying an `href`, and the destination differs from surrounding copy at rest. A destination whose only resting difference is a colour value, with the underline appearing only on hover, falsifies it
+      - id: case-2
+        when: Persistent selection is rendered among peers
+        observe: |-
+          The selected peer carries `aria-selected="true"` (tabs) or `aria-current` (a current text action), and a non-colour change is measured on it: a selected-indicator rectangle of non-zero height, a computed `font-weight` change, or an underline. A selection whose only measurable change is a colour value falsifies it
+      - id: case-3
+        when: Keyboard focus lands in the same region
+        observe: |-
+          `document.activeElement` is the focused control, and its computed outline rectangle is distinct from the selection cue. Focus and selection sharing one identical fill, with no outline and no state attribute, falsifies both owners at once
+      - id: case-4
+        when: |-
+          Colour is removed from the capture, or forced colours are active
+        observe: |-
+          Each of the four distinctions still holds through element role, state attribute, outline, or indicator geometry. A distinction carried by fill alone falsifies it
+      - id: case-5
+        when: |-
+          A non-text boundary carries the distinction: an indicator, an outline, a field edge
+        observe: |-
+          Its measured contrast against the adjacent composed background is at least `3:1`. A `2px` indicator measuring `1.8:1` against its rail falsifies it, however visible it looked in the design file
+    notThisRule: |-
+      the text ratio of the selected or focused label, and how every ratio moves across themes, is COLOR-5. Where the focus indicator sits and whether an ancestor clips it is FOCUS-1. Whether every distinction survives at zoom and reflow is A11Y-4. Whether a destination should have been a command at all is decided in composition, under ACTION-1.
+  - id: COLOR-5
+    title: Themes and measured contrast
+    governs: |-
+      Governs whether text and required boundaries clear their ratios in every theme and every state the
+      family renders, measured on the composed pixels rather than on the token.
+    cases:
+      - id: case-1
+        when: Normal text renders
+        observe: |-
+          The computed `color` measured against the composed background, after transparency, overlays, and any state opacity such as `[data-grammar-state="unavailable"]`, is at least `4.5:1`. A token that looks dark enough on its own, with no composed background captured, proves nothing and is recorded as missing proof
+      - id: case-2
+        when: |-
+          Large text renders, at least `24px`, or `18.66px` at bold weight
+        observe: The same composed measurement is at least `3:1`
+      - id: case-3
+        when: |-
+          A required non-text boundary renders: a focus outline, a selected indicator, a field edge, a state edge
+        observe: |-
+          Its measured contrast against the colours on each side is at least `3:1`. A field edge that resolves to `transparent` against its canvas has no measurable boundary, and the field's identity must then be carried by something else that was measured
+      - id: case-4
+        when: |-
+          The theme changes: light, explicit dark (`data-grammar-theme="dark"` on the Grammar root), or system dark (`data-grammar-theme="system"` under `prefers-color-scheme: dark`)
+        observe: |-
+          Every pair is re-measured in each theme actually rendered. A ratio captured in one theme closes nothing in another
+      - id: case-5
+        when: Forced colours are active
+        observe: |-
+          Every pair resolves to the system palette (`Canvas`, `CanvasText`, `Highlight`, `GrayText`) and every distinction still renders. An authored colour surviving into the forced-colours capture falsifies the family's binding
+      - id: case-6
+        when: |-
+          The state changes: hover, focus, selected, disabled (`disabled` or `aria-disabled`), pending (`aria-busy` or `data-action-pending="true"`), or an outcome state (`data-grammar-state`)
+        observe: |-
+          Each state is measured on its own, and the token source is recorded separately from the numeric ratio. A single default-state measurement closes nothing for the other states
+      - id: case-7
+        when: A family or the application paints over the pair
+        observe: |-
+          The isolated published output, the family delta, and the application delta are measured separately, so the failing layer is named. The application may change its own canvas, but a failing pair inside a published owner remains a finding at the layer that painted it
+    notThisRule: |-
+      whether the distinction exists at all without colour is COLOR-3. Whether the right tone token was chosen for the copy is decided in presentation, under TONE-1 to TONE-3. Whether the text is announced at all is A11Y-1 to A11Y-3.
+  - id: CONTRAST-1
+    title: The contrast verdict
+    governs: |-
+      Governs how selected observations are summarized in the current `.starciwork` node's evidence.
+    cases:
+      - id: case-1
+        when: The lens runs
+        observe: |-
+          `COLOR-3` and `COLOR-5` are judged from measured colour in every theme and every state the coverage declares, never from a token name
+      - id: case-2
+        when: The verdict is computed
+        observe: |-
+          The gating set is the whole set: `pass` requires both to pass in every theme, because a distinction that survives one theme and not the other is not a distinction
+      - id: case-3
+        when: A theme or a state was never measured
+        observe: |-
+          The verdict is `blocked` for the topic, not a pass on the themes that were
+      - id: case-4
+        when: A failure has been measured
+        observe: |-
+          Record whether the failure is a below-threshold value or an unsupported distinction, with the measured evidence and responsible source owner; do not dispatch another op.
+    notes:
+      - |-
+        The scored set is `COLOR-3` and `COLOR-5`; this rule only summarizes and is not itself scored.
+      - |-
+        Store assertions, observations and artifact references in the selected node's evidence; there is
+    remark: |-
+      no separate receipt table or downstream verdict-copying rule. Missing evidence never earns a pass.
+doesNotDecide: |-
+  Which tone a piece of copy takes and which surface sits behind it are
+  [Tone](../presentation/tone.yaml) and [Surface](../presentation/surface.yaml); which meanings a region
+  carries and which of them is a destination is [Action](../composition/action.yaml) and
+  [State](../composition/state.yaml). Names, relationships, and target sizes are
+  [Accessibility](accessibility.yaml); where the indicator sits is [Focus](focus.yaml); whether a state
+  was reached truthfully is [Render truth](render-truth.yaml).

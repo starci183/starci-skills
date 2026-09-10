@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
-import {validatePlan} from './plan.mjs';
+import { readDistJson } from '../core/runtime-root.mjs';
+import {verifyPresentation} from './presentation.mjs';
 import {typed} from './typed.mjs';
 import {verifyWorkResult,scopedWorkStatus,inRunWorkReady} from './work-binding.mjs';
 import {validBackendRun} from './select.mjs';
@@ -12,9 +13,9 @@ const text=x=>typeof x==='string'&&x.trim().length>0;
 const list=x=>Array.isArray(x)&&x.length>0&&x.every(text)&&new Set(x).size===x.length;
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const inside=(root,file)=>{const r=path.relative(root,file);return r!=='..'&&!r.startsWith('..'+path.sep)&&!path.isAbsolute(r);};
-const catalog=JSON.parse(fs.readFileSync(new URL('./catalog.json',import.meta.url)));
-const jobs=JSON.parse(fs.readFileSync(new URL('./jobs.json',import.meta.url)));
-const frontend=JSON.parse(fs.readFileSync(new URL('./matrix.json',import.meta.url)));
+const catalog=readDistJson('workflows','catalog.json');
+const jobs=readDistJson('workflows','jobs.json');
+const frontend=readDistJson('workflows','matrix.json');
 
 /** Function-only boundary: never evaluated during module initialization.
  * The admitted nested producer must be backend, so it cannot recurse into FE. */
@@ -28,9 +29,7 @@ export function verifyRequiredProducerInputs(run){
 export function verifyProducerEnvelope(run){
  const goal=run?.goal,p=run?.presentation;
  need(goal&&run.schema==='starci/workflow-run@1'&&run.goalDigest===hash({goal,workRoot:run.workRoot,repositories:run.repositories})&&run.scopeDigest===hash({requestId:goal.requestId,originalRequest:goal.originalRequest,scope:goal.scope}),'Frozen producer goal or binding changed');
- need(p?.goalDigest===run.goalDigest&&validatePlan(p.scope,catalog).digest===p.scopeDigest,'Producer presentation or Plan changed');
- const job=p.scope.workflows.find(j=>j.id===p.jobId);
- need(job?.workflow===goal.workflow&&p.scope.requestId===goal.requestId&&p.scope.originalRequest===goal.originalRequest&&goal.workTargets.every(id=>job.workTargets.includes(id))&&goal.scope.paths.every(x=>job.paths.includes(x))&&goal.scope.resources.every(x=>job.resources.includes(x)),'Producer exceeds its presented job');
+ verifyPresentation(run,catalog);
  const definition=jobs.workflows.find(j=>j.id===goal.workflow),rows=goal.workflow==='implement-frontend'?frontend.rows:definition?.matrix;
  need(rows&&Array.isArray(goal.cells)&&goal.cells.length===rows.flat().length&&new Set(goal.cells.map(c=>c.id)).size===goal.cells.length&&list(goal.criteria)&&goal.criteria.every(id=>goal.cells.some(c=>c.criteria.includes(id))),'Producer workflow cells or criteria changed');
  for(const expected of rows.flat()){const cell=goal.cells.find(c=>c.id===expected.id);need(cell&&cell.op===expected.op&&list(cell.criteria)&&(definition?.operations?definition.operations.includes(cell.operation):cell.operation===expected.operation),'Producer operation no longer matches workflow');}

@@ -1,0 +1,237 @@
+id: business.decide
+goal:
+  en: Specify the selected business behavior precisely enough to implement and independently accept it.
+nodeKinds:
+  - business
+  - business-overview
+completionProfile: business
+sideEffects: []
+graphPolicy:
+  mode: selected-scope-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read current target, ancestor scope, refs, dependencies, assertions and validator freshness.
+        For an explicitly new target, absence is expected: inspect the nearest existing
+        ancestor/workspace, then create only that selected scope. Preserve unaffected accepted
+        content."
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: When source exists/is selected, resolve repository resource, actual checkout/root/HEAD and dirty
+        state; read applicable instructions, manifests, owning code, callers and relevant tests.
+        Greenfield/spec-only work records source not-yet-created and grounds intent in the user
+        request; no invented repository or fact citation. Source implementation still needs an
+        actual selected writable repository.
+  - id: intent
+    path: current accepted user intent + supplied domain documents
+    purpose:
+      en: Classify each statement as intent, observed fact, example, proposal, unknown or contradiction,
+        with source citation/revision. Existing behavior does not authorize a new rule.
+  - id: specification
+    path: business.decide/specification.json + specifications/contract.json
+    purpose:
+      en: Read the JSON field contract and this operator procedure before authoring the .starciwork
+        payload.
+  - id: matrix
+    path: selected complete-job matrix request + workflows/jobs.json
+    purpose:
+      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
+        input bindings, requested output JSON shapes and required criteria. Standalone execution
+        needs no fabricated matrix request. A template is not authority for extra effects.
+  - id: profile
+    path: profiles/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Select the actual host runtime codex or claude and this operator role from the V2-derived active
+        profiles. Use current host model configuration; historical model names are not availability
+        proof. Capabilities are the intersection of actual tools, selected profile policy, op
+        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
+        or extra-agent permissions.
+writes:
+  - id: node
+    path: .starciwork/<business>/business/**/index.yaml
+    fields:
+      - businessOverview
+      - extensions.work3.specification
+      - sourceRefs
+      - refs
+      - assertions
+      - dependsOn
+      - required
+    content:
+      en: Author business/overview/index.yaml with businessOverview for readable purpose, customer
+        understanding, outcome, scope and open questions. Author the sole detailed SRS in
+        extensions.work3.specification using starci/specification@2 on cohesive
+        business/srs/**/index.yaml leaves. Intermediate folders are metadata-only aggregates; scale
+        by adding folders, not editing a registry or duplicating a monolithic SRS. Stable
+        FR/BR/NFR/flow/AC IDs and explicit core refs/dependsOn provide traceability. Do not repeat
+        the detailed SRS in a compact business object. Preserve canonical user journeys and never
+        turn internal service hops into UI actions.
+  - id: evidence
+    path: E/manifest.yaml + E/coverage-review.md
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - codeRefs
+      - extensions
+    content:
+      en: Record requirement-to-acceptance coverage, concrete source observations and unresolved
+        contradictions; a specification review is not implementation evidence.
+  - id: matrixHandoff
+    path: E/job-result.yaml
+    fields:
+      - requestId
+      - requestDigest
+      - op
+      - operation when selected
+      - status
+      - criteria
+      - outputs
+      - artifacts
+    content:
+      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
+        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
+        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
+        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
+        The selected request freezes output field schemas before execution.
+steps:
+  - reads:
+      - target
+      - intent
+      - repo
+      - specification
+      - profile
+    writes:
+      - node
+    action:
+      en: Resolve the canonical .starciwork workspace and selected business leaf. Research accepted
+        intent, domain documents and current FE/BE callers at exact revisions. Classify every
+        citation as accepted intent, observed source, proposal or unknown; source behavior never
+        approves policy. Resolve the execution profile and actual tool availability before selecting
+        instruments; this does not switch the model/runtime or spawn workers.
+  - reads:
+      - intent
+      - target
+      - repo
+    writes:
+      - node
+    action:
+      en: Write purpose, scope/exclusions, glossary, assumptions, actors with
+        responsibilities/rights/restrictions, FR/BR and observable NFRs. Specify business data
+        attributes, validation, sensitivity, states/transitions and external inputs/outputs/errors.
+        State why a data or external-interface inventory is empty. Source observations and supplied
+        technical constraints are not approved business policy; unknown numeric targets retain a
+        decision owner.
+  - reads:
+      - intent
+      - repo
+    writes:
+      - node
+    action:
+      en: "Every FR resolves to a detailed flow, not a title alone: trigger, primary/supporting actors,
+        inputs, preconditions, numbered actor/request/system-response steps, guards, effects,
+        failures, repeat behavior and success/failure postconditions. Alternative and exception
+        branches identify their starting step, condition, ordered steps, resume/end and acceptance.
+        Review denied/invalid input, cancellation, duplicate/retry, concurrency and recovery where
+        relevant; explain absent branch classes without fabricating cases."
+  - reads:
+      - target
+      - intent
+      - repo
+    writes:
+      - node
+    action:
+      en: Review observable outcomes against accepted intent and observed behavior. Business states what
+        users and the system must do, not class inheritance, repositories, service placement,
+        Saga/CQRS, Kubernetes or backup tooling. Preserve genuinely supplied technical constraints
+        as sourced external constraints; hand implementation questions to Architecture instead of
+        encoding an invented design in requirements.
+  - reads:
+      - intent
+      - repo
+    writes:
+      - node
+    action:
+      en: Specify actor-action-resource permissions, tenant/owner boundaries, sensitive-data handling and
+        abuse cases. Give each security requirement an observable denial/no-side-effect acceptance
+        scenario; do not mistake a disabled UI control for server enforcement.
+  - reads:
+      - intent
+      - target
+    writes:
+      - node
+    action:
+      en: Author business/overview/index.yaml with businessOverview for readable purpose, customer
+        understanding, outcome, scope and open questions. Author the sole detailed SRS in
+        extensions.work3.specification using starci/specification@2 on cohesive
+        business/srs/**/index.yaml leaves. Intermediate folders are metadata-only aggregates; scale
+        by adding folders, not editing a registry or duplicating a monolithic SRS. Stable
+        FR/BR/NFR/flow/AC IDs and explicit core refs/dependsOn provide traceability. Do not repeat
+        the detailed SRS in a compact business object. Preserve canonical user journeys and never
+        turn internal service hops into UI actions.
+  - reads:
+      - target
+      - repo
+      - intent
+      - matrix
+    writes:
+      - evidence
+      - matrixHandoff
+    action:
+      en: Validate detailed requirement/flow/branch/acceptance coverage and the recursive Work graph.
+        Review contradictions, scope and unresolved decisions with the user. A complete branch rolls
+        up only from valid required leaves; draft placeholders and schema validity cannot earn done.
+        Output reviewed business outcomes and observable security/quality acceptance for
+        Architecture; no implementation or deployed-proof claim. Return the selected matrix's
+        request-bound typed outputs when applicable.
+proofs:
+  - id: binding
+    requirement:
+      en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
+        done.
+  - id: coverage
+    requirement:
+      en: Each applicable FR/NFR/BR has acceptance IDs and source intent; no vague
+        fast/secure/user-friendly NFR is accepted as measurable. Implementation/UAT status is
+        untouched.
+  - id: impact-security-coverage
+    requirement:
+      en: Every FR has a detailed actor flow and acceptance, every alternative/exception has ordered steps
+        and postconditions, and security has observable negative acceptance. Validate nested
+        ownership and version-2 SRS; no code/service inventory is required in Business.
+blockers:
+  - code: BUSINESS_UNKNOWN
+    condition:
+      en: A required rule, actor permission, numeric target or acceptance result has no authoritative
+        decision.
+  - code: BUSINESS_CONTRADICTION
+    condition:
+      en: Accepted sources conflict; preserve both citations and ask the actual owner, never average them.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
+        Report node/resource IDs and propose a separately selected graph update when needed; never
+        run predecessors or weaken dependsOn/refs/required to proceed.
+placeholders:
+  business: Selected business slug
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  write-ceiling: Explicit owned source paths
+  environment: Resolved environment label
+  identity: Selected actor label
+  fixture: Selected fixture path
+  resource: Selected owned asset name
+  asset: Actual selected source asset filename/format
+  piece: Stable selected piece slug
+  flow: Selected UAT journey slug
+  screen: Selected surface/state slug

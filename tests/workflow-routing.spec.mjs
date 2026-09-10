@@ -10,9 +10,11 @@ import {init,update} from '../bin/starci-skills.mjs';
 import {validateWorkflowCatalog,selectWorkflow} from '../workflows/select.mjs';
 import {validateJobMatrices} from '../workflows/matrix.mjs';
 import {validateCatalog} from '../ops/validate.mjs';
+import {outputs} from '../ops/generate.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=(dir,file)=>JSON.parse(fs.readFileSync(path.join(dir,file),'utf8'));
-const catalog=read(root,'workflows/catalog.json'),jobs=read(root,'workflows/jobs.json'),frontend=read(root,'workflows/frontend.json'),operators=read(root,'ops/catalog.json');
+import {readPublicJson} from './helpers/read-public.mjs';
+const catalog=readPublicJson('workflows','catalog.json'),jobs=readPublicJson('workflows','jobs.json'),frontend=readPublicJson('workflows','frontend.json'),operators=JSON.parse(outputs().get('catalog.json'));
 const temp=t=>{const d=fs.mkdtempSync(path.join(os.tmpdir(),'starci-routing-'));t.after(()=>{assert.equal(path.dirname(d),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(d).startsWith('starci-routing-'));fs.rmSync(d,{recursive:true,force:true});});return d;};
 test('one StarCi skill discovers all sixteen valid workflows and no preset skill layer',()=>{
   assert.match(fs.readFileSync(path.join(root,'SKILL.md'),'utf8'),/^name: starci$/m);

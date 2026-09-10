@@ -1,0 +1,257 @@
+schema: starci/knowledge-source@1
+id: fe.naming
+title: Naming
+purpose: |
+  Given a folder, export, type, constant or function in the frontend, what is it called?
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - src/components/pages/*
+    - src/components/blocks/*/*
+    - src/components/leaves/*
+    - src/hooks/swr/*
+    - src/modules/api/graphql/**
+  limitations: |
+    Historical reference-source observations at skill commit
+    edf72554425f918e80c9205e9c6db10596e722f0; not a fresh audit. Old counts cannot claim a fresh scan.
+rules:
+  - id: FE-NAMING-1
+    title: Unit folder and its two exports
+    kind: mandatory
+    requirement: |
+      The folder name is the connected export; the pure twin appends Base. Leaves have no Base twin.
+      Route wrappers use a local …Route const.
+    rationale: |
+      Matching folder and export names makes ownership discoverable; Base marks the pure half.
+    cases:
+      - id: case-1
+        when: "Page connected half, pages/CartPage/index.tsx"
+        write: "export const CartPage = (props: CartPageProps) => … (49/49 pages)"
+      - id: case-2
+        when: "Page pure half, pages/AuthenticationPage/component.tsx"
+        write: >
+          export const AuthenticationPageBase = (props: AuthenticationPageProps) => … (47/49; the two
+          CoursePlayground*Page units export …PageShell)
+      - id: case-3
+        when: "Block pure half, blocks/ai/StarCiAiChat/component.tsx"
+        write: "export const StarCiAiChatBase = … (98 of 118 component.tsx exports end in Base)"
+      - id: case-4
+        when: "Leaf, leaves/ButtonStateSample/index.tsx"
+        write: "export const ButtonStateSample = … — no Base, no twin"
+      - id: case-5
+        when: "Route wrapper, app/[lang]/authentication/page.tsx"
+        write: "const AuthenticationRoute = () => …"
+    notes: |
+      The two CoursePlayground*Page …PageShell exports are residual naming for those units, not a
+      template for new pages.
+    verification:
+      automated: []
+      manual:
+        - Confirm new split units use X / XBase, not PageShell, unless explicitly resolving that legacy pair.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-NAMING-2
+    title: Props and its parts
+    kind: mandatory
+    requirement: |
+      Props, Data, Labels, Actions and State types follow the unit name. Each half may declare its own
+      XProps with a different shape; each file owns its declaration.
+    rationale: |
+      Stable part suffixes make the three-part contract searchable across units.
+    cases:
+      - id: case-1
+        when: "The props type"
+        write: "export type StarCiAiChatProps = { … } (403 export type …Props against 6 export interface …Props)"
+      - id: case-2
+        when: "Resolved facts"
+        write: "export type StarCiAiChatData = { … }, export type ButtonStateSampleData = { … }"
+      - id: case-3
+        when: "Resolved copy"
+        write: "export type StarCiAiChatLabels = { … }, CourseAdvisorRecommendationCardLabels"
+      - id: case-4
+        when: "Handlers"
+        write: "export type StarCiAiChatActions = { … }, AuthenticationPageActions"
+      - id: case-5
+        when: "State inventory"
+        write: >
+          export type StarCiAiChatState = "sessionsPending" | …; export type StarCiAiMode = "general" |
+          "history"
+      - id: case-6
+        when: "The same name in both halves"
+        write: >
+          AuthenticationPageProps is declared in component.tsx and again in index.tsx with a different
+          shape; each file owns its own XProps
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-NAMING-3
+    title: Class-name exports
+    kind: mandatory
+    requirement: |
+      One role uses …ClassName; a map of roles uses …ClassNames; call-time variants use get…ClassName.
+    rationale: |
+      Naming encodes whether a string is fixed, mapped or derived.
+    cases:
+      - id: case-1
+        when: "One string for one role"
+        write: "export const authenticationPageClassName = cn(formPageClassName) (931 …ClassName exports)"
+      - id: case-2
+        when: "A map of roles for one unit"
+        write: >
+          export const aiChatClassNames = { root: cn(…), intro: cn(…), … } as const (9 …ClassNames
+          exports; 7 of 151 classNames.ts files use the object form)
+      - id: case-3
+        when: "A variant resolved at call time"
+        write: >
+          export const getAiChatBubbleClassName = (role: "user" | "assistant") => …; export const
+          getButtonStateSampleClassName = (variant: …) => buttonVariants({ variant, size: "sm" })
+      - id: case-4
+        when: "Grammar package"
+        write: >
+          export const railClassName, railFrameClassName, railBodyClassName, railFooterClassName
+          (core/branch/Rail/classNames.ts)
+    verification:
+      automated: []
+      manual:
+        - Verify Grammar helper names against installed @starci/grammar/common exports before copying.
+    relatedExamples: []
+
+  - id: FE-NAMING-4
+    title: Hooks and keys
+    kind: mandatory
+    requirement: |
+      Read hooks are useQuery…Swr; write hooks are useMutate…Swr; keys are QUERY_/MUTATE_…_SWR_KEY.
+      GraphQL document modules are kebab-case with queryThing / mutationThing functions.
+    rationale: |
+      Parallel suffixes make cache keys and hook roles obvious at the call site.
+    cases:
+      - id: case-1
+        when: "Read hook"
+        write: "useQueryCourseSwr, useQueryMyCartSwr (80 files useQuery…Swr.ts)"
+      - id: case-2
+        when: "Write hook"
+        write: "useMutateAddToCartSwr, useMutateClearCartSwr (32 files useMutate…Swr.ts)"
+      - id: case-3
+        when: "Key constant"
+        write: >
+          export const QUERY_COURSE_SWR_KEY = "QUERY_COURSE_SWR", export const
+          MUTATE_ADD_TO_CART_SWR_KEY = "MUTATE_ADD_TO_CART_SWR"
+      - id: case-4
+        when: "Hook params type"
+        write: >
+          export interface UseQueryCourseSwrParams { displayId?: string }; trigger arg export type
+          AddToCartArg, export type AddToCartTrigger
+      - id: case-5
+        when: "Non-data hooks"
+        write: "useSessionToken, useViewerKey, useAuthPanel under hooks/auth/"
+      - id: case-6
+        when: "GraphQL document module"
+        write: >
+          modules/api/graphql/queries/query-course.ts, mutations/mutation-add-to-cart.ts; the document
+          const is query1, the function queryCourse / mutationAddToCart
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-NAMING-5
+    title: Constants and module-level values
+    kind: mandatory
+    requirement: |
+      Frozen module values use UPPER_SNAKE. Exported state inventories use UNIT_STATES arrays.
+      Component vocabulary is not an enum; GraphQL operation-name enums live only under
+      modules/api/graphql.
+    rationale: |
+      Distinguishing frozen inventories from open props keeps state unions closed and searchable.
+    cases:
+      - id: case-1
+        when: "Frozen module value"
+        write: >
+          const HISTORY_STATES = new Set<StarCiAiChatState>([…]), const PENDING_TURN_IDS =
+          ["pending-1", "pending-2"] as const, const DEFAULT_MESSAGES: ToastMessages = { … }
+          (120 exported + 163 local UPPER_SNAKE consts)
+      - id: case-2
+        when: "Exported inventory"
+        write: "export const STARCI_AI_CHAT_STATES: ReadonlyArray<StarCiAiChatState> = […]"
+      - id: case-3
+        when: "Grammar lookup tables"
+        write: >
+          const VARIANTS = { primary: "primary", … } as const, const SIZES = { sm: "sm", md: "md",
+          lg: "lg" } as const, const SKELETON_CLASS_NAME = … (core/primitive/Button/index.tsx)
+      - id: case-4
+        when: "Operation-name enums (the only enums in src/)"
+        write: >
+          export enum MutationCvBlocks { Create = "create", Update = "update", Render = "render",
+          Rewrite = "rewrite" } (92, all in modules/api/graphql)
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+
+  - id: FE-NAMING-6
+    title: Handlers, booleans, helpers
+    kind: mandatory
+    requirement: |
+      Pure-half action handlers are bare verbs inside on. Boolean props use is/has prefixes. Local
+      helpers are camelCase; local sub-renders are PascalCase with their own props type.
+    rationale: |
+      handler-on-prefix and boolean prefixes keep the actions object distinct from DOM onX props.
+    cases:
+      - id: case-1
+        when: "Action handler"
+        write: >
+          bare verb inside the on object: on?: { signedIn?: () => void }, on?.send,
+          on?.selectMode?.("general") — never onX on the pure half (lint handler-on-prefix)
+      - id: case-2
+        when: "Boolean prop"
+        write: "is/has prefix — isLoading, isEnrolled, isPartial, isArchived, isOnline (286 of 366 boolean props)"
+      - id: case-3
+        when: "Local pure helper"
+        write: "verb or noun phrase in camelCase — stateNeedsRetry, turnMarkdown, routeState"
+      - id: case-4
+        when: "Local sub-render"
+        write: "PascalCase with its own props type — const Turn = (props: TurnProps) => …"
+    verification:
+      automated:
+        - handler-on-prefix
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-NAMING-7
+    title: File names outside component folders
+    kind: mandatory
+    requirement: |
+      Hook files are camelCase equal to the export. Module files are kebab-case. Spec files add .spec
+      to the basename. describe uses the export under test.
+    rationale: |
+      Parallel basenames keep specs and modules locatable beside their subjects.
+    cases:
+      - id: case-1
+        when: "Hook file"
+        write: "camelCase equal to the export — useQueryCourseSwr.ts, useSessionToken.ts"
+      - id: case-2
+        when: "Module file"
+        write: >
+          kebab-case — query-course.ts, course-advisor-response.ts, content-ai-selection-context.ts,
+          create-apollo-client.ts
+      - id: case-3
+        when: "Spec file"
+        write: "same basename plus .spec — useQueryCourseSwr.spec.ts, component.spec.tsx, index.spec.tsx"
+      - id: case-4
+        when: "Spec describe"
+        write: >
+          the export name — describe("StarCiAiChatBase" in component.spec.tsx (85/97),
+          describe("CartBlock" in index.spec.tsx (0 …Base there)
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []

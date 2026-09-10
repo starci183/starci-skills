@@ -1,0 +1,136 @@
+schema: starci/knowledge-source@1
+id: ui.composition.hierarchy
+title: Hierarchy composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  This file answers one question: given a piece of business meaning, which information rank does it
+  receive, and where does it sit relative to everything else in its region?
+  Hierarchy is decided from the job the content does, never from how prominent the direction wishes it
+  looked. Rank is carried by a published semantic owner, so the outline a screen reader walks and the
+  outline a reader sees are the same outline.
+  Applicability: API examples belong to the documented Grammar family; verify installed source and
+  the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands.
+rules:
+  - id: HIERARCHY-1
+    title: Rank comes from the job, not the look
+    governs: Governs which semantic owner carries a piece of content.
+    cases:
+      - id: case-1
+        when: Content names a page or a section
+        assert: "`Heading` carries it, at the level the outline requires"
+      - id: case-2
+        when: Content explains, or states a neutral fact
+        assert: |-
+          `Text` in its default role carries it, with no state owner attached
+      - id: case-3
+        when: Content reports a compact outcome backed by authority
+        assert: |-
+          `Badge`, or another published state owner for that outcome, carries it
+      - id: case-4
+        when: Content reports a verified numeric completion
+        assert: |-
+          `Progress` carries it, with a label and value that describe the same verified measurement
+      - id: case-5
+        when: Something feels important but matches no published role
+        assert: |-
+          The `.starciwork` specification names the job before any owner is bound, and no local type utility stands in for a rank
+    notThisRule: how much emphasis paint that rank receives is ACCENT-1.
+  - id: HIERARCHY-2
+    title: One strongest anchor per region
+    governs: Governs how many things may name the same region.
+    cases:
+      - id: case-1
+        when: |-
+          A region carries a name plus supporting copy, facts, statuses, or actions
+        assert: |-
+          Exactly one strongest semantic anchor names the region's job, through `SectionHeader`, `Heading`, or a labelled surface
+      - id: case-2
+        when: Two candidates both look like the region's name
+        assert: |-
+          Either the `.starciwork` specification lists two peer regions each with its own anchor, or one candidate carries a weaker rank
+      - id: case-3
+        when: A status wants to be louder than the thing it describes
+        assert: The status ranks below the name it qualifies
+      - id: case-4
+        when: Independent peer regions sit side by side
+        assert: |-
+          Each region's anchor is settled within that region; no anchor ranks against another region's anchor
+    notThisRule: which region comes first on the page is LAYOUT-1.
+  - id: HIERARCHY-3
+    title: Reading order equals task dependency
+    governs: Governs the sequence in which meaning is delivered.
+    cases:
+      - id: case-1
+        when: The reader needs context before making a choice
+        assert: |-
+          DOM order runs prerequisite, decision, consequence, then support
+      - id: case-2
+        when: |-
+          A layout would read better with the pieces rearranged at one width
+        assert: |-
+          The composition differs at that width and the meaning order does not; no CSS `order` reverses meaning
+      - id: case-3
+        when: Help text explains a field or a task
+        assert: |-
+          It follows the thing it explains in DOM order and in the accessibility tree
+      - id: case-4
+        when: A result is produced by an action on the same surface
+        assert: The action precedes the result it produces, at every width
+    notThisRule: |-
+      whether sequential keyboard focus actually follows this order once rendered is FOCUS-2.
+  - id: HIERARCHY-4
+    title: Facts, measurement, and outcome are separate ranks
+    governs: |-
+      Governs the boundary between what is merely true, what is measured, and what has been decided.
+    cases:
+      - id: case-1
+        when: The content is a neutral fact with no claim attached
+        assert: "`Text` carries it, with no status and no success treatment"
+      - id: case-2
+        when: |-
+          The content is a measurement between 0 and 100 backed by authority
+        assert: |-
+          `Progress` carries it, and its label and value describe the same verified measurement
+      - id: case-3
+        when: The measurement has not resolved yet
+        assert: |-
+          `Progress isSkeleton` carries it, and no zero value is rendered in its place
+      - id: case-4
+        when: The content is an outcome someone can act on
+        assert: |-
+          An explicit outcome word plus its state owner carries it; no colour alone states the outcome
+      - id: case-5
+        when: The direction is tempted to let one rank imply another
+        assert: |-
+          No filled bar stands for a completion, and no ordinary fact takes a warning treatment
+  - id: HIERARCHY-5
+    title: Rank survives reflow, loading, and lost colour
+    governs: |-
+      Governs the conditions under which the chosen hierarchy must still hold.
+    cases:
+      - id: case-1
+        when: The region stacks at a narrow width
+        assert: |-
+          Heading order and the count of strongest anchors are identical to the wide branch; only placement differs
+      - id: case-2
+        when: Content is still loading
+        assert: |-
+          The skeleton carries the same selected role as the resolved content, so no rank changes when real content arrives
+      - id: case-3
+        when: Optional content is missing in some states
+        assert: |-
+          Every rank present in one state has a carrier that survives the states where the optional content is absent
+      - id: case-4
+        when: Colour is removed, or the viewer is in forced colours
+        assert: |-
+          Every rank distinction still resolves to a semantic or structural cue
+    notThisRule: |-
+      capturing the zoomed, forced-colour, and colour-removed renders is the audit operator's work.
+doesNotDecide: |-
+  Which regions exist and who owns their tracks is [Layout](layout.yaml). How rank behaves as space
+  changes is [Responsive](responsive.yaml). Which action is dominant is [CTA](cta.yaml), and how scarce
+  emphasis is spent is [Accent](accent.yaml). The rendered accessibility tree that proves this outline
+  is [Accessibility](../proof/accessibility.yaml), and agreement between rank and product truth is
+  [Render truth](../proof/render-truth.yaml).

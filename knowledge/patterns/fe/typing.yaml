@@ -1,0 +1,223 @@
+schema: starci/knowledge-source@1
+id: fe.typing
+title: Typing
+purpose: |
+  Given a frontend value, how is its type declared?
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - tsconfig.json (strict: true)
+    - eslint.config.mjs (@typescript-eslint/array-type generic)
+    - src/components/**
+    - src/hooks/swr/*
+    - src/modules/toast/api.ts
+    - packages/grammar/src/common/conformance.ts
+    - core/primitive/Button/index.tsx
+  limitations: |
+    Historical reference-source observations at skill commit
+    edf72554425f918e80c9205e9c6db10596e722f0; not a fresh audit. Old counts cannot claim a fresh scan.
+    Verify Grammar type exports against installed @starci/grammar/common.
+rules:
+  - id: FE-TYPING-1
+    title: type for shapes, interface in the hook layer
+    kind: mandatory
+    requirement: |
+      Props and data shapes use export type. Hook params may use export interface in hooks/ and
+      modules/api. Grammar package uses type throughout.
+    rationale: |
+      Component contracts stay as type aliases; interface density in hooks/api is residual layering,
+      not a prompt to prefer interface in components.
+    cases:
+      - id: case-1
+        when: "Props and data shapes"
+        write: >
+          export type StarCiAiTurn = { readonly id: string; readonly role: "user" | "assistant"; … }
+          (919 export type X = { against 232 export interface in src/, 403 vs 6 for …Props)
+      - id: case-2
+        when: "Hook params"
+        write: >
+          export interface UseQueryCourseSwrParams { displayId?: string } — the interface share sits in
+          hooks/ and modules/api, not in components
+      - id: case-3
+        when: "Intersection"
+        write: >
+          export type CourseAdvisorRecommendationCardData = CourseAdvisorRecommendation & { readonly
+          title?: string; … }
+      - id: case-4
+        when: "Grammar package"
+        write: "export type ButtonProps = { … }, export type GrammarRuleConformance = { … } — type throughout"
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-TYPING-2
+    title: readonly on every field
+    kind: mandatory
+    requirement: |
+      Props fields, nested objects, collections and tuple keys are readonly.
+    rationale: |
+      Readonly contracts push mutation into the connected owner that already owns state.
+    cases:
+      - id: case-1
+        when: "Props field"
+        write: "readonly measure?: \"form\" | \"formCompact\" (2336 readonly prop lines against 69 without)"
+      - id: case-2
+        when: "Nested object"
+        write: "readonly action: { readonly href: string; readonly label: string }"
+      - id: case-3
+        when: "Collection"
+        write: >
+          readonly turns: ReadonlyArray<StarCiAiTurn>, readonly states:
+          Readonly<Record<StarCiAiChatState, string>>
+      - id: case-4
+        when: "Tuple key"
+        write: "_key: readonly [string, string]"
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-TYPING-3
+    title: Literal unions, not booleans, for state
+    kind: mandatory
+    requirement: |
+      Component state and mode vocabularies are string-literal unions with exported inventories.
+      Truly binary flags use is/has booleans. Grammar closed vocabularies use unions plus as const maps.
+    rationale: |
+      Literal unions force exhaustive handling of failure and pending states instead of collapsing them
+      into booleans.
+    cases:
+      - id: case-1
+        when: "Component state"
+        write: >
+          export type StarCiAiChatState = | "sessionsPending" | "sessionsFailed" | "noSession" | …
+          | "contextCleared" (21 members)
+      - id: case-2
+        when: "Mode"
+        write: "export type StarCiAiMode = \"general\" | \"history\"; role: \"user\" | \"assistant\""
+      - id: case-3
+        when: "Inventory of the union"
+        write: "export const STARCI_AI_CHAT_STATES: ReadonlyArray<StarCiAiChatState> = [ … ] beside the type"
+      - id: case-4
+        when: "Flag that is truly binary"
+        write: "readonly isLoading?: boolean, readonly isPartial?: boolean — is/has prefixed"
+      - id: case-5
+        when: "Closed vocabulary in Grammar"
+        write: >
+          export type ButtonVariant = "primary" | "secondary" | "tertiary" | "outline" | "ghost";
+          const VARIANTS = { … } as const
+    verification:
+      automated: []
+      manual:
+        - Verify Grammar vocabulary types against installed @starci/grammar/common exports.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-TYPING-4
+    title: Arrays
+    kind: mandatory
+    requirement: |
+      Array types use Array<T> / ReadonlyArray<T>, never T[]. Frozen literals use as const.
+    rationale: |
+      Lint @typescript-eslint/array-type: generic matches the reference config.
+    cases:
+      - id: case-1
+        when: "Any array type"
+        write: "ReadonlyArray<string>, Array<T> — never T[] (lint @typescript-eslint/array-type: generic)"
+      - id: case-2
+        when: "Frozen literal"
+        write: "const PENDING_TURN_IDS = [\"pending-1\", \"pending-2\"] as const (252 as const sites in src/)"
+    verification:
+      automated:
+        - "@typescript-eslint/array-type"
+      manual: []
+    relatedExamples: []
+
+  - id: FE-TYPING-5
+    title: Inferred and declared
+    kind: mandatory
+    requirement: |
+      Component returns are inferred. Helper returns are declared when primitive. Hook returns are
+      inferred from useSWR generics. Async utilities declare Promise returns. Narrowed literals use
+      as const in switch results.
+    rationale: |
+      Declaring only where inference would widen keeps signatures honest without JSX.Element noise.
+    cases:
+      - id: case-1
+        when: "Component return"
+        write: "inferred; no : JSX.Element on any of the 441 components"
+      - id: case-2
+        when: "Helper return"
+        write: >
+          declared when primitive: (state: StarCiAiChatState): boolean =>, (turn: StarCiAiTurn,
+          partialLabel: string): string =>
+      - id: case-3
+        when: "Hook return"
+        write: "inferred from useSWR<CourseDetail | null>(…); the generic names the data"
+      - id: case-4
+        when: "Async utility"
+        write: >
+          declared: export const runGraphQLWithToast = async <T>(action: () =>
+          Promise<GraphQLResponse<T>>, options: RunGraphQLWithToastOptions = {}): Promise<boolean>
+      - id: case-5
+        when: "Narrowed literal"
+        write: >
+          return { mode: "signIn" as const, step: "code" as const, measure: "form" as const } so a
+          switch returns a union, not string
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-TYPING-6
+    title: Casting
+    kind: mandatory
+    requirement: |
+      Double casts are forbidden. Spec mock slots may use as unknown inside vi.hoisted. Ignoring a
+      props parameter uses void props rather than an underscore or a cast.
+    rationale: |
+      no-double-cast and void props keep escape hatches narrow and visible.
+    cases:
+      - id: case-1
+        when: "Double cast"
+        write: "not written (lint no-double-cast)"
+      - id: case-2
+        when: "Spec mock slot"
+        write: "data: undefined as unknown inside vi.hoisted(() => ({ … }))"
+      - id: case-3
+        when: "Ignoring a prop"
+        write: "void props rather than an underscore or a cast"
+    verification:
+      automated:
+        - no-double-cast
+      manual: []
+    relatedExamples: []
+
+  - id: FE-TYPING-7
+    title: Enums
+    kind: mandatory
+    requirement: |
+      Component vocabulary is never an enum; use a string-literal union. The only enums in src/ are
+      GraphQL operation-name enums under modules/api/graphql.
+    rationale: |
+      Keeping enums out of components preserves serializable string unions for state and props.
+    cases:
+      - id: case-1
+        when: "Component vocabulary"
+        write: "never an enum; a string-literal union"
+      - id: case-2
+        when: "GraphQL operation names"
+        write: >
+          export enum MutationCvBlocks { Create = "create", … } — the 92 enums in src/ are all in
+          modules/api/graphql
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []

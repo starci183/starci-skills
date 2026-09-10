@@ -123,9 +123,12 @@ test('relocated workflow executes without source checkout or native agent dispat
   fs.cpSync(path.join(packageRoot, 'workflows'), path.join(relocated, 'workflows'), { recursive: true });
   fs.cpSync(path.join(packageRoot, 'contracts'), path.join(relocated, 'contracts'), { recursive: true });
   fs.cpSync(path.join(packageRoot, 'profiles'), path.join(relocated, 'profiles'), { recursive: true });
+  fs.cpSync(path.join(packageRoot, 'core'), path.join(relocated, 'core'), { recursive: true });
+  fs.cpSync(path.join(packageRoot, '.dist'), path.join(relocated, '.dist'), { recursive: true });
   fs.mkdirSync(path.join(relocated,'scripts'));
   fs.copyFileSync(path.join(packageRoot,'scripts/config.mjs'),path.join(relocated,'scripts/config.mjs'));
-  fs.copyFileSync(path.join(packageRoot,'config.example.json'),path.join(relocated,'config.example.json'));
+  if (fs.existsSync(path.join(packageRoot,'config.example.yaml'))) fs.copyFileSync(path.join(packageRoot,'config.example.yaml'),path.join(relocated,'config.example.yaml'));
+  if (fs.existsSync(path.join(packageRoot,'config.example.json'))) fs.copyFileSync(path.join(packageRoot,'config.example.json'),path.join(relocated,'config.example.json'));
   fs.copyFileSync(path.join(packageRoot, 'workflows/frontend.mjs'), path.join(relocated, 'workflows/frontend.mjs'));
   const inputFile = path.join(x.parent, 'input.json'); fs.writeFileSync(inputFile, JSON.stringify(x.input));
   const output = spawnSync(process.execPath, [path.join(relocated, 'workflows/frontend.mjs'), 'init', inputFile, path.join(x.parent, 'relocated-run')], { encoding: 'utf8' });
@@ -183,7 +186,7 @@ test('compiled JSON is reproducible and remains valid after relocation', t => {
     assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), entry.sha256);
     if (entry.path.endsWith('.json')) JSON.parse(bytes.toString('utf8'));
   }
-  assert.ok(manifest.files.every(entry=>entry.path.endsWith('.json')));
+  assert.ok(manifest.files.some(entry=>entry.path === 'workflows/lifecycle.mjs'));
   const role = read(path.join(destination, 'ops/backend.implement/authority.json'));
   assert.equal(Object.hasOwn(role, 'secondary'), false);
   const caller = read(path.join(destination, 'ops/interface.implement/secondary.json'));

@@ -1,6 +1,6 @@
 import React, {useState} from 'react'
 import {createRoot} from 'react-dom/client'
-import catalog from './catalog.generated.json'
+import catalog from '../../../.dist/docs/site-catalog.json'
 import './styles.css'
 function App(){
  const [query,setQuery]=useState('')

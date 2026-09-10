@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {validateFlashPolicy,selectFlash,recheckFlash,validateFlashResult} from '../workflows/flash.mjs';
 
-const policy=JSON.parse(fs.readFileSync(new URL('../workflows/flash.json',import.meta.url)));
+import {readWorkflow, readExample, readPublicJson} from './helpers/read-public.mjs';
+const policy=readWorkflow('flash.json');
 const flags={business:false,authorization:false,schema:false,architecture:false,external:false,destructive:false,highRisk:false};
 const facts=(overrides={})=>({schema:'starci/flash-facts@1',mode:'FLASH',operation:'edit',repository:{id:'app',root:'C:/repo/app',binding:'main@abc'},scope:{outcome:'Correct compact header spacing',paths:['src/header.css'],clear:true,cohesive:true},impact:{...flags},checks:['npm test -- header'],...overrides});
 
@@ -16,21 +17,22 @@ test('policy is complete and an explicit small cohesive repair selects FLASH wit
   assert.equal(Object.hasOwn(selected.request,'approval'),false);
 });
 
-test('normal, ambiguous, noncohesive and already-active repair scope returns Plan',()=>{
-  assert.equal(selectFlash(policy,facts({mode:null})).kind,'plan');
+test('small changes need no keyword; ambiguous, noncohesive and already-active scope returns Plan',()=>{
+  assert.equal(selectFlash(policy,facts({mode:null})).kind,'flash');
   assert.equal(selectFlash(policy,facts({scope:{...facts().scope,clear:false}})).kind,'plan');
   assert.equal(selectFlash(policy,facts({scope:{...facts().scope,cohesive:false}})).kind,'plan');
   assert.equal(selectFlash(policy,facts({active:true})).kind,'plan');
 });
 
-test('inspection stays read-only and FLASH is never inferred from wording',()=>{
+test('inspection stays read-only; eligible edits route directly without a keyword',()=>{
   assert.deepEqual(selectFlash(policy,facts({mode:null,operation:'inspect'})),{kind:'inspect',reasons:['read-only-inspection']});
-  assert.equal(selectFlash(policy,facts({mode:null,scope:{...facts().scope,outcome:'please quickly fix this obvious typo'}})).kind,'plan');
+  assert.equal(selectFlash(policy,facts({mode:null,scope:{...facts().scope,outcome:'please quickly fix this obvious typo'}})).kind,'flash');
   assert.throws(()=>selectFlash(policy,facts({mode:'fast'})),/Unknown mode/);
 });
 
-test('business, authorization, schema, architecture, external, destructive and high-risk work all return Plan',()=>{
-  for(const flag of Object.keys(flags)){const impact={...flags,[flag]:true};const selected=selectFlash(policy,facts({impact}));assert.equal(selected.kind,'plan',flag);assert.ok(selected.reasons.includes(`${flag}-impact`),flag);}
+test('clear higher-impact work selects workflow classification rather than flash or an automatic Plan',()=>{
+  for(const flag of Object.keys(flags)){const impact={...flags,[flag]:true};const selected=selectFlash(policy,facts({impact}));assert.equal(selected.kind,'workflow',flag);assert.ok(selected.reasons.includes(`${flag}-impact`),flag);}
+  for(const flag of Object.keys(flags))assert.equal(selectFlash(policy,facts({mode:null,impact:{...flags,[flag]:true}})).kind,'workflow',flag);
 });
 
 test('multiple local files are allowed only as one declared cohesive repair',()=>{

@@ -205,10 +205,10 @@ test('installed workspace.manage forward-test authors only scoped todo planning 
   install({ dir: root, bootstrap: true }, () => {});
   const installedCLI = path.join(root, '.claude/bin/starci-skills.mjs');
   const invoke = (...args) => spawnSync(process.execPath, [installedCLI, 'work', ...args], { cwd: root, encoding: 'utf8', windowsHide: true });
-  const catalog = JSON.parse(fs.readFileSync(path.join(root, '.claude/ops/catalog.json'), 'utf8'));
+  const catalog = JSON.parse(fs.readFileSync(path.join(root, '.claude/.dist/ops/catalog.json'), 'utf8'));
   const selected = catalog.ops.find(op => op.id === 'workspace.manage');
   assert.ok(selected, 'actual installed catalogue must resolve the selected op');
-  for (const relative of ['SKILL.md', 'README.json', `ops/${catalog.commonDocument}`, `ops/${selected.document}`, 'schemas/work.schema.json']) {
+  for (const relative of ['SKILL.md', 'README.md', '.dist/policy/common.json', `.dist/ops/${selected.operator}`, '.dist/schemas/work.schema.json']) {
     assert.ok(fs.readFileSync(path.join(root, '.claude', relative), 'utf8').length > 100, `missing installed authority: ${relative}`);
   }
   const workRoot = path.join(root, '.starciwork');

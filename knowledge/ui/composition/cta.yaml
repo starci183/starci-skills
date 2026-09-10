@@ -1,0 +1,138 @@
+schema: starci/knowledge-source@1
+id: ui.composition.cta
+title: Call to action composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  This file answers one question: within a decision region, which action deserves the emphasis, and
+  what does its emphasis promise the reader about the consequence?
+  A call to action is settled from consequence, never from a wish for a larger or brighter control.
+  The variant, the semantics, the blocked states, and the order of an action group are all decided
+  before the region is built, because each of them is a promise the rendered page then has to keep.
+  Applicability: API examples belong to the documented Grammar family; verify installed source and
+  the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands.
+rules:
+  - id: CTA-1
+    title: Emphasis follows consequence
+    governs: Governs which control carries the strongest treatment.
+    cases:
+      - id: case-1
+        when: A decision region has one clear next action
+        assert: |-
+          Exactly one `Button variant="primary"` sits in that decision owner, carrying `onPress`, or `href` when the next step is a destination
+      - id: case-2
+        when: Other actions in the same region are real alternatives
+        assert: |-
+          Each carries a weaker published variant from `secondary`, `tertiary`, `outline`, or `ghost` that states its actual consequence
+      - id: case-3
+        when: |-
+          The direction wants a bigger or brighter control without a change in consequence
+        assert: |-
+          The variant is unchanged, and no local button recipe appears against that control
+      - id: case-4
+        when: |-
+          The action sits in a dense toolbar, a card, or a page-level decision
+        assert: |-
+          `size` is bound through the published prop from that interaction context, and no vendor button is restyled to reach it
+    notThisRule: |-
+      counting how much dominant emphasis a whole page spends is ACCENT-1.
+  - id: CTA-2
+    title: Destination or command
+    governs: Governs which native thing the reader is actually operating.
+    cases:
+      - id: case-1
+        when: Activating the control takes the reader to a real address
+        assert: |-
+          `TextAction` or `Button` carries `href`, and the button shape changes only the paint
+      - id: case-2
+        when: Activating the control changes application state
+        assert: |-
+          `Button`, or `TextAction` where the command reads as text, carries a real handler
+      - id: case-3
+        when: The action carries a directional glyph
+        assert: |-
+          The glyph sits in `startContent` or `endContent`, and the visible text label remains
+      - id: case-4
+        when: The direction wants an icon-only arrow as the continuation
+        assert: |-
+          The dominant decision keeps a visible text label, and every glyph on it is supporting
+    notThisRule: how many effects one activation may produce is ACTION-1.
+  - id: CTA-3
+    title: Unavailable, pending, and unresolved are three conditions
+    governs: |-
+      Governs which of three temporary blocks the control is actually in.
+    cases:
+      - id: case-1
+        when: |-
+          The work cannot start at all, because permission or prerequisites are missing
+        assert: |-
+          `isDisabled` is bound on that control, and no pending carrier is
+      - id: case-2
+        when: This control accepted work that has not settled
+        assert: |-
+          `isPending` is bound on that same control, its visible label and outer box are unchanged, and duplicate activation is refused
+      - id: case-3
+        when: |-
+          Initial content has not resolved and no action has been taken
+        assert: |-
+          `isSkeleton` is bound on the owner, and no pending carrier appears anywhere for that content
+      - id: case-4
+        when: Some other request is in flight elsewhere on the page
+        assert: |-
+          Peer controls keep their own carriers, and no pending reaches a control that started nothing
+    notThisRule: |-
+      which owner holds pending once several controls are involved is ACTION-2.
+  - id: CTA-4
+    title: Destructive consequence needs its own authority
+    governs: Governs the final action that cannot be undone.
+    cases:
+      - id: case-1
+        when: |-
+          An action irreversibly deletes, revokes, or discards valuable state
+        assert: |-
+          The `.starciwork` specification carries explicit destructive copy, a confirmation proportionate to the consequence, and a typed danger action treatment
+      - id: case-2
+        when: The published `ButtonVariant` offers no danger value
+        assert: |-
+          A `GRAMMAR_REQUIRED` gap records it, and the CTA does not ship on the primary variant instead
+      - id: case-3
+        when: |-
+          The direction is tempted to import the vendor danger variant, or to add local red
+        assert: |-
+          No vendor danger variant and no local red appears against that control
+      - id: case-4
+        when: |-
+          The action is a reversible cancel or an ordinary negative outcome
+        assert: |-
+          It carries no destructive treatment and no confirmation earned by destructiveness
+  - id: CTA-5
+    title: Group order across widths
+    governs: |-
+      Governs the sequence of two or more actions that form one decision.
+    cases:
+      - id: case-1
+        when: |-
+          A decision offers a dominant action, an alternative, and a way out
+        assert: |-
+          DOM order runs dominant decision, supporting alternative, then escape or recovery, as the product requires
+      - id: case-2
+        when: The group wraps or stacks at a narrower width
+        assert: |-
+          Reading order and sequential focus order are identical at every width, and no CSS `order` reverses the group
+      - id: case-3
+        when: A translated label grows well past its original length
+        assert: |-
+          The `.starciwork` specification names the longest label the group must hold, and the group wraps or stacks rather than overlapping at that length
+      - id: case-4
+        when: Two actions live in separate regions
+        assert: |-
+          They belong to separate decision owners in the `.starciwork` specification, and neither ranks against the other
+doesNotDecide: |-
+  Which region holds the decision is [Layout](layout.yaml), and which anchor names it is
+  [Hierarchy](hierarchy.yaml). How many effects an activation may produce and who owns pending is
+  [Action](action.yaml). How scarce the dominant treatment is across the page is [Accent](accent.yaml),
+  and what happens after the action settles is [Feedback](feedback.yaml). What the `.starciwork` specification must
+  enumerate about these actions is [Coverage](coverage.yaml). Whether the rendered control is reachable,
+  named, and visibly focused is [Accessibility](../proof/accessibility.yaml) and
+  [Focus](../proof/focus.yaml).

@@ -5,10 +5,9 @@ import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {inspectStorage,assertNewStoragePath,isLocalOnlyWorkspace} from '../workflows/storage.mjs';
+import { distPath, requireDist, readDistJson } from '../core/runtime-root.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-const opsRoot = path.resolve(moduleDir, '../ops');
 const help = `StarCi 3.0 — bounded, local operations
 Usage:
   starci workspace init <work-root> --id <workspace-id>
@@ -44,17 +43,30 @@ function directory(root) {
 }
 
 function catalogue() {
-  const catalog = JSON.parse(fs.readFileSync(path.join(opsRoot, 'catalog.json'), 'utf8'));
-  if (catalog.schema !== 'work/ops@1' || !Array.isArray(catalog.ops)) throw new Error('Unsupported operator catalogue.');
+  const catalog = readDistJson('ops', 'catalog.json');
+  if (catalog.schema !== 'starci/built-ops@1' || !Array.isArray(catalog.ops)) throw new Error('Unsupported operator catalogue.');
   return catalog;
 }
 
 function readOperatorDocument(relative) {
+  requireDist();
+  const opsRoot = distPath('ops');
   if (typeof relative !== 'string' || path.isAbsolute(relative)) throw new Error('Invalid operator document path.');
   const resolved = path.resolve(opsRoot, relative);
   if (!inside(opsRoot, resolved) || !inside(fs.realpathSync(opsRoot), fs.realpathSync(resolved))) throw new Error('Operator document escapes its catalogue.');
   const stat = fs.statSync(resolved);
   if (!stat.isFile() || stat.size > 1024 * 1024) throw new Error('Operator document is not a bounded text file.');
+  return fs.readFileSync(resolved, 'utf8');
+}
+
+function readPolicyDocument(relative = 'common.json') {
+  requireDist();
+  const policyRoot = distPath('policy');
+  if (typeof relative !== 'string' || path.isAbsolute(relative)) throw new Error('Invalid policy document path.');
+  const resolved = path.resolve(policyRoot, relative);
+  if (!inside(policyRoot, resolved) || !inside(fs.realpathSync(policyRoot), fs.realpathSync(resolved))) throw new Error('Policy document escapes its root.');
+  const stat = fs.statSync(resolved);
+  if (!stat.isFile() || stat.size > 1024 * 1024) throw new Error('Policy document is not a bounded text file.');
   return fs.readFileSync(resolved, 'utf8');
 }
 
@@ -110,8 +122,8 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       if(!localOnly)fs.mkdirSync(root);
       fs.writeFileSync(path.join(root, 'workspace.yaml'), stringifyYaml({ schema: 'work/workspace@1', id: args[2] }), { flag: 'wx' });
       fs.mkdirSync(path.join(root,'_schema'));
-      for(const name of ['work.schema'])fs.writeFileSync(path.join(root,'_schema',name+'.yaml'),stringifyYaml(JSON.parse(fs.readFileSync(path.resolve(moduleDir,'../schemas',name+'.json')))));
-      fs.writeFileSync(path.join(root,'_schema/work-layout.yaml'),stringifyYaml(JSON.parse(fs.readFileSync(path.resolve(moduleDir,'../schemas/work-layout.json')))));
+      for(const name of ['work.schema'])fs.writeFileSync(path.join(root,'_schema',name+'.yaml'),stringifyYaml(readDistJson('schemas',name+'.json')));
+      fs.writeFileSync(path.join(root,'_schema/work-layout.yaml'),stringifyYaml(readDistJson('schemas','work-layout.json')));
       fs.writeFileSync(path.join(root, '.gitignore'), '_local/\n_workflows/\n', { flag: 'wx' });
       emit({ ok: true, created: root, workspaceId: args[2], productWorkExecuted: false });
       return 0;
@@ -135,8 +147,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
     }
     if (['workflows','workflow','route'].includes(command)) {
       exactArgs(args,command==='workflows'?0:1);
-      const root=path.resolve(moduleDir,'../workflows');
-      const read=name=>JSON.parse(fs.readFileSync(path.join(root,name),'utf8'));
+      const read=name=>readDistJson('workflows',name);
       const catalog=read('catalog.json'),jobs=read('jobs.json'),frontend=read('frontend.json');
       const {validateWorkflowCatalog}=await import('../workflows/select.mjs');
       const checked=validateWorkflowCatalog(catalog,jobs,frontend);
@@ -163,14 +174,15 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const catalog = catalogue();
       const selected = catalog.ops.find(op => op.id === args[0]);
       if (!selected) throw new Error('Unknown op; use work ops to inspect available IDs.');
+      const operator = JSON.parse(readOperatorDocument(selected.operator));
       if(args[1]!==undefined) {
         const {selectOperation}=await import('../ops/select.mjs');
-        emit(selectOperation(selected.contract,args[1]));
+        emit(selectOperation(operator,args[1]));
         return 0;
       }
       emit(`Selected op: ${selected.id}. Contract display only; nothing has executed.`);
-      if (catalog.commonDocument) emit(readOperatorDocument(catalog.commonDocument));
-      emit(readOperatorDocument(selected.document));
+      emit(readPolicyDocument('common.json'));
+      emit(JSON.stringify(operator, null, 2));
       return 0;
     }
     if (command === 'validate' || command === 'tree') {

@@ -1,0 +1,342 @@
+schema: starci/knowledge-source@1
+id: ui.proof.ux
+title: UX proof
+appliesTo:
+  - ui
+family: proof
+purpose: |-
+  This file answers one question: a person sat down with the running product and tried to get something
+  done, so did they get it done? Canon decides who owns a value, taste decides what the composition adds
+  up to, and this topic decides whether the surface was usable by someone who came to it with a task and
+  not with a rule book. A surface can be owned correctly, look convincing in a still frame, and still
+  strand the person who needed it, which is why the evidence here is a run rather than a screenshot.
+  The instrument is normally the UAT run: `uat.verify` exercises the selected `.starciwork` flow and
+  records evidence from the runtime with actually observed artifact/source version bindings, so an `Observe` cell names a step of a real attempt — the
+  assertion that was reached, the number of steps it took, the latency between an activation and the
+  first visible change, the state after a refresh. Where a criterion is settled by a single render and
+  needs no attempt, `interface.audit` may measure it from a capture it already took; each rule
+  below names which of the two instruments answers it. Neither instrument may substitute intent for
+  observation: an approved flow document does not prove a completed task, and a spinner in the markup
+  does not prove a progress signal ever appeared.
+  Sources: the owner ruling that everything needed to decide whether a surface has passed must be a rule
+  with a threshold, that UX is judged on a task run rather than a static screenshot, and that an average
+  may never hide a fatal; plus two anonymised flows, a sign-in and a purchase, scored end to end in
+  [the UX scorecard evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-ux-scorecard.json).
+  The pinned note above is historical, not evidence for the current product. Select applicable
+  criteria and thresholds in `.starciwork` before execution; `ship` is a rubric label, not release authority.
+  A local commit alone does not prove the served version. Findings recommend ownership without
+  starting the next op. A still capture cannot substitute for a run on behavioral assertions.
+rules:
+  - id: UX-1
+    title: The task completes
+    governs: |-
+      Governs whether the flow's declared goal was actually reached, unaided. Measured in a UAT run; a
+      failure identifies a flow-owner finding, because only a person decides what the flow was for.
+    cases:
+      - id: case-1
+        when: The run reaches the flow's terminal assertion
+        observe: |-
+          The goal state named in the selected `.starciwork` flow node is present in the capture and in the store. A run that ends on the last screen without the record the goal names falsifies it
+      - id: case-2
+        when: |-
+          The run is driven with no operator knowledge beyond what the surface shows
+        observe: |-
+          Every step was chosen from a visible label, and no step required a URL typed by hand, a console command, or a hint from the flow author. One such intervention falsifies it
+      - id: case-3
+        when: |-
+          The flow declares an alternate path such as a decline, a cancellation or a retry
+        observe: |-
+          That path also reaches a named terminal assertion. A branch that runs out of screens falsifies it
+      - id: case-4
+        when: The task completes
+        observe: |-
+          It completes within the flow's declared time budget from first activation to terminal assertion. Exceeding the budget is recorded as a fail with the measured duration, not waived
+    notThisRule: |-
+      whether the backend actually performed the work is the `behavior` lane, not this one.
+  - id: UX-2
+    title: Steps stay inside the flow's budget
+    governs: |-
+      Governs how much work the person had to do to finish. Measured in a UAT run against the budget the
+      flow declares, and against the class band this rule owns; a failure identifies a composition-owner finding.
+    cases:
+      - id: case-1
+        when: The run completes
+        observe: |-
+          The count of committed steps — each navigation, submission or confirmation the person had to perform — is at most the budget the selected `.starciwork` flow node declares for that flow. Exceeding it falsifies it
+      - id: case-2
+        when: The flow declares no budget
+        observe: |-
+          The class band applies instead and the evidence record names it: on a `console` any action the surface owns is at most three steps from entry; on a `form` at most three for a single purpose and at most seven for a declared multi-step flow; on a `landing` conversion is at most two; on a `catalog` list to detail is exactly one step and the return one; on a `reader` the return to the origin list is one. A run scored against no number at all is void
+      - id: case-3
+        when: Two steps are compared
+        observe: |-
+          No step exists only to acknowledge the previous one. An interstitial confirming a non-destructive action falsifies it
+      - id: case-4
+        when: The same task is repeated by a returning person in the run
+        observe: |-
+          The repeat costs no more steps than the first attempt: nothing the person already supplied is asked again
+    notThisRule: |-
+      which actions the surface offers at all is [CTA-1](../composition/cta.yaml).
+  - id: UX-3
+    title: A wrong input is corrected in place
+    governs: |-
+      Governs recovery: the person made a mistake, and what it cost them. Measured in a UAT run; a failure
+      identifies a composition-owner finding.
+    cases:
+      - id: case-1
+        when: The run submits a deliberately wrong value
+        observe: |-
+          The correction is made at the field that holds the wrong value, and the flow reaches its terminal assertion within two further steps. Restarting the flow to fix one field falsifies it
+      - id: case-2
+        when: The error render is captured
+        observe: |-
+          Every value the person had already entered is still present and still editable. One cleared field falsifies it
+      - id: case-3
+        when: The wrong value is a destructive or paid commitment
+        observe: |-
+          An undo, a cancellation or a reversal is reachable from the terminal screen, and the run exercises it. A commitment with no way back falsifies it
+      - id: case-4
+        when: The error message is read from the capture
+        observe: |-
+          It names the offending field and the accepted form, so the second attempt is informed. A message stating only that something is invalid falsifies it
+    notThisRule: |-
+      which owner the error belongs to is [FEEDBACK-1](../composition/feedback.yaml), and whether the message is announced to assistive technology is [A11Y-1](accessibility.yaml).
+  - id: UX-4
+    title: The surface answers within the latency bands
+    governs: |-
+      Governs whether the person ever waited without knowing they were waiting. Measured in a UAT run by
+      timing from activation to rendered change; a failure identifies a composition-owner finding, because the missing signal
+      is a composition problem even when the slow work is not.
+    cases:
+      - id: case-1
+        when: Any control is activated
+        observe: |-
+          A visible change occurs within `100ms` — a pressed treatment, a disabled control, a pending indicator. No change inside that window falsifies it
+      - id: case-2
+        when: The work outlasts `1s`
+        observe: |-
+          A progress signal is showing by then, and it sits on the initiator or the region that will change. Progress announced only in a corner toast falsifies it
+      - id: case-3
+        when: The work outlasts `10s`
+        observe: |-
+          A way out is present and operable: a cancel, a background option, or a stated expectation with an escape. A frame that only spins past ten seconds falsifies it
+      - id: case-4
+        when: The progress signal is compared with the outcome
+        observe: |-
+          The signal ends when the outcome is known, and never claims settlement before the store confirms it, as [TRUTH-3](render-truth.yaml) requires
+    notThisRule: |-
+      whether pending sits on the initiator by design is [ACTION-2](../composition/action.yaml), and whether the pending treatment is visible in a still capture is [TASTE-11](taste.yaml).
+  - id: UX-5
+    title: The destination is findable
+    governs: |-
+      Governs whether the person could locate what they came for. Measured in a UAT run for the flow's own
+      destinations, and from an audit capture for the navigation the surface exposes at rest; a failure
+      identifies a composition-owner finding.
+    cases:
+      - id: case-1
+        when: The run navigates to the flow's destination
+        observe: |-
+          It is reached within the navigation depth the declared class allows: two levels on a `console`, `catalog` or `reader`, one on a `form` or a `landing`. A level beyond it, or a search that was the only route, falsifies it
+      - id: case-2
+        when: The navigation labels are read from the capture
+        observe: |-
+          Each label is the word the person used for the thing, not the internal name of the module. A label naming a service, a table or a release falsifies it
+      - id: case-3
+        when: The destination is reached
+        observe: |-
+          The surface states where the person is: the active navigation item, the heading and the address agree. Two of the three disagreeing falsifies it
+      - id: case-4
+        when: A destination is reachable by more than one route
+        observe: |-
+          The routes land on the same surface in the same state. Two routes producing two different renders of the same destination falsifies it
+    notThisRule: |-
+      which regions exist and who owns them is [LAYOUT-1](../composition/layout.yaml).
+  - id: UX-6
+    title: No dead ends
+    governs: |-
+      Governs every state the run can land in. Measured in a UAT run, and from an audit capture for the
+      static empty, error and success renders; a failure identifies a composition-owner finding.
+    cases:
+      - id: case-1
+        when: Any state the run reaches is captured
+        observe: |-
+          It offers at least one next action or one way back, both operable. A screen whose only exit is the browser's own control falsifies it
+      - id: case-2
+        when: The empty state is reached
+        observe: |-
+          The action that ends the emptiness is present and reachable in the same region. An empty state that only explains falsifies it
+      - id: case-3
+        when: The terminal success state is reached
+        observe: |-
+          It names what happens next or returns the person to a working surface. A confirmation screen that goes nowhere falsifies it
+      - id: case-4
+        when: An error or permission refusal is reached
+        observe: |-
+          It offers a retry, an alternative, or the contact that can resolve it, and the run exercises the offer
+    notThisRule: |-
+      whether absence is rendered completely is [STATE-3](../composition/state.yaml), and whether the state has a designed composition is [TASTE-10](taste.yaml).
+  - id: UX-7
+    title: Place survives back, refresh and a shared link
+    governs: |-
+      Governs continuity: the person left and came back. Measured in a UAT run; a failure identifies a flow-owner finding, because where a route may be resumed is a product decision.
+    cases:
+      - id: case-1
+        when: The run presses back mid-flow
+        observe: |-
+          The previous step returns with its entered values intact, and no step is silently re-committed. A back that restarts the flow falsifies it
+      - id: case-2
+        when: The run reloads the current step
+        observe: |-
+          The same step renders, with the same selection, filter or tab, and nothing the person entered before the last commit is lost
+      - id: case-3
+        when: The address of a mid-flow step is opened in a fresh session
+        observe: |-
+          It either resumes at that step or states plainly why it cannot and where to start. A blank surface or a silent redirect to the root falsifies it
+      - id: case-4
+        when: The run leaves for another surface and returns
+        observe: |-
+          Scroll position, expanded groups and the active view are as they were left, unless the flow declared otherwise
+    notThisRule: |-
+      which choices are persistent peers is [STATE-6](../composition/state.yaml).
+  - id: UX-8
+    title: The form can be filled
+    governs: |-
+      Governs the ergonomics of every field the run touches. Measured from an audit capture for structure
+      and order, and in a UAT run for the keyboard and autofill passes; a failure identifies a composition-owner finding.
+    cases:
+      - id: case-1
+        when: Each field is captured
+        observe: |-
+          It carries a persistent visible label, not a placeholder standing in for one. A label that disappears on typing falsifies it
+      - id: case-2
+        when: A field is rejected
+        observe: |-
+          The message renders adjacent to that field and stays while the field is corrected. A single summary at the top with no field-level mark falsifies it
+      - id: case-3
+        when: The form is filled with the keyboard alone
+        observe: |-
+          Tab order equals reading order, the submit control is reachable, and Enter submits from a single-line field. A trap or a skipped field falsifies it
+      - id: case-4
+        when: |-
+          A known field type is measured — email, name, address, one-time code, payment
+        observe: |-
+          It declares the autofill and input-mode hints the platform expects, and the browser offers the stored value in the run. A numeric field raising an alphabetic keypad falsifies it
+    notThisRule: |-
+      whether the field's accessible name and relationships are computed is [A11Y-1](accessibility.yaml), and whether focus is visible is [FOCUS-1](focus.yaml).
+  - id: UX-9
+    title: The primary action is in reach on a phone
+    governs: |-
+      Governs whether the surface can be driven one-handed. Measured from an audit capture at the narrow
+      viewport; a failure identifies a composition-owner finding.
+    cases:
+      - id: case-1
+        when: The surface is captured at its narrowest declared viewport
+        observe: |-
+          The step's primary action sits in the lower half of the frame, or in a sticky bar pinned to the bottom edge. A primary action only reachable after scrolling past the fold falsifies it
+      - id: case-2
+        when: A sticky action bar is present
+        observe: |-
+          It does not cover content the person still needs: the last content row remains fully visible above it. Content permanently hidden behind the bar falsifies it
+      - id: case-3
+        when: Destructive and primary actions sit in the same reach zone
+        observe: |-
+          They are separated by at least one target width, so a thumb cannot hit the wrong one. Adjacent confirm and delete falsifies it
+      - id: case-4
+        when: Targets in the reach zone are measured
+        observe: |-
+          Each meets the minimum size [A11Y-4](accessibility.yaml) names, at that viewport, including its padded hit area
+    notThisRule: |-
+      what survives when space shrinks is [RESPONSIVE-1](../composition/responsive.yaml).
+  - id: UX-10
+    title: The same verb sits in the same place
+    governs: |-
+      Governs consistency across the surfaces one flow crosses. Measured across the run's captures; a
+      failure identifies a composition-owner finding.
+    cases:
+      - id: case-1
+        when: One action appears on two surfaces of the run
+        observe: |-
+          It carries the same verb in both. The same operation labelled Save on one screen and Update on the next falsifies it
+      - id: case-2
+        when: Two surfaces of the same class are compared
+        observe: |-
+          The primary action occupies the same position relative to its region. A primary at the top right on one and the bottom left on the next falsifies it
+      - id: case-3
+        when: A control's shape is compared across the run
+        observe: |-
+          The same consequence carries the same emphasis every time, as [CTA-1](../composition/cta.yaml) settled. A destructive action rendered as a quiet link on one surface falsifies it
+      - id: case-4
+        when: |-
+          An interaction pattern repeats — a picker, a confirmation, a filter
+        observe: It behaves the same way each time it appears in the run
+    notThisRule: |-
+      which action deserves the dominant accent is [ACCENT-1](../composition/accent.yaml).
+  - id: UX-11
+    title: The words say what the thing is
+    governs: |-
+      Governs the copy the run actually read. Measured from the run's captures; a failure identifies a flow-owner finding, because copy authority is not the designer's to change.
+    cases:
+      - id: case-1
+        when: Labels and headings are read from the captures
+        observe: |-
+          They are nouns naming the thing, and controls are verbs naming the effect. A control reading Information, or a heading reading Manage, falsifies it
+      - id: case-2
+        when: A number, a date or a status renders
+        observe: |-
+          It carries the unit, the currency, the timezone or the scale that makes it a fact. A bare figure whose meaning depends on the reader's guess falsifies it
+      - id: case-3
+        when: The captures are scanned for stub copy
+        observe: |-
+          No placeholder text, no untranslated key, no lorem, no debug string, and no truncated sentence survives in any state the run reached
+      - id: case-4
+        when: The same concept appears twice in the run
+        observe: |-
+          It is named identically both times. Two names for one object in one flow falsifies it
+    notThisRule: |-
+      whether the claim traces to real authority is [TRUTH-1](render-truth.yaml).
+  - id: UX-12
+    title: Scoring and the UX verdict
+    governs: Governs how the criteria above become one decision.
+    cases:
+      - id: case-1
+        when: The UX lens runs
+        observe: |-
+          Every criterion from `UX-1` to `UX-11` carries a pass or fail and a score from 1 to 5, each backed by the run step or the capture its own rule names
+      - id: case-2
+        when: The verdict is computed
+        observe: |-
+          `ship` requires no fail on `UX-1`, `UX-3`, `UX-4`, `UX-6` or `UX-7`, and a mean score of at least 4 across the eleven. Anything else is `fix-first`
+      - id: case-3
+        when: A gating criterion fails while the mean is at least 4
+        observe: |-
+          The verdict is `fix-first` regardless of the mean. An evidence record shipping on the average alone falsifies the lens
+      - id: case-4
+        when: |-
+          A criterion's evidence is a screenshot with no attempt behind it, for a rule this file assigns to a run
+        observe: |-
+          The entry is `EVIDENCE_UNAVAILABLE`, not a pass and not a fail, and the lens is incomplete
+      - id: case-5
+        when: A failure has been measured
+        observe: |-
+          Record a finding for the composition owner for layout defects, or the flow owner for intent/authority/copy defects. This recommends ownership, not automatic dispatch, spec edits or authorized mutations.
+    notes:
+      - |-
+        The scored set is `UX-1` to `UX-11`; this rule is the arithmetic and is not itself scored. The five
+    remark: |-
+      criteria that gate `ship` are the ones that strand a person mid-task: the task never finishes, the
+      mistake cannot be undone, the wait is unexplained, the state has no exit, or the place is lost on the
+      way back. A score of 3 means the criterion was met without conviction, so a flow that never actually
+      fails can still be `fix-first` on the mean, which is the intended outcome for a flow that merely
+      works. Store UX results and observations in the selected flow node's evidence, binding assertions
+      and artifacts. No separate lane/receipt format or downstream verdict copying is required.
+doesNotDecide: |-
+  Whether the product performed the work is the `behavior` lane of the run, not a knowledge rule.
+  Whether the render is perceivable and operable is [Accessibility](accessibility.yaml) and
+  [Focus](focus.yaml), whether distinctions survive measurement is [Contrast](contrast.yaml), whether
+  movement keeps meaning is [Motion](motion.yaml), whether the rendered claim traces to authority is
+  [Render truth](render-truth.yaml), and whether the composition is good enough to look at is
+  [Taste](taste.yaml). Which rank, action, region, state or emphasis the direction chose is
+  [Hierarchy](../composition/hierarchy.yaml), [CTA](../composition/cta.yaml),
+  [Layout](../composition/layout.yaml), [State](../composition/state.yaml) and
+  [Accent](../composition/accent.yaml). How the lenses combine into one shippable verdict is
+  [proof index](index.yaml).

@@ -1,17 +1,21 @@
-# Workflow goals: brief in chat, full specification in the Plan
+# Workflow goals: brief in chat, full specification in a file
 
 Every bounded workflow presents two consistent views of the same goal:
 
-- The full English goal remains in the existing Plan bundle. Supply a readable
+- The full English goal remains in its existing Plan bundle or standalone
+  workflow `goal.yaml`. Supply a readable
   rendering in the configured user language with all sections and tables intact.
 - The task chat starts with a concise explanation of the current workflow. Link
   both artifacts so the user can scan the brief or inspect the complete scope.
 
-Apply this at each workflow checkpoint, not only when first creating the Plan.
+Apply this at each workflow checkpoint, whether standalone or inside a Plan.
 Do not replace the brief with an opened YAML panel or a report to a coordinator.
 Do not duplicate the complete Plan in chat unless the user asks for it.
 
-Export the selected workflow and complete Plan for delivery with:
+For a standalone workflow, link its `goal.yaml` and readable detail directly;
+see [standalone workflow](standalone-workflow.md). Do not create a Plan merely to
+use the export command. For a Plan-bound workflow, export the selected workflow
+and complete Plan for delivery with:
 
 ```text
 node scripts/present-goal.mjs <goal/index.yaml> <job-id> <new-local-presentation-directory>

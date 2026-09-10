@@ -42,7 +42,7 @@ node bin/starci.mjs init --dir "D:/Projects/agent-host"
 node bin/starci.mjs doctor --dir "D:/Projects/agent-host" --quick
 ```
 
-Start with an empty test host. The installer writes the runtime into its `.claude` directory and adds managed bootstrap sections to `AGENTS.md` and `CLAUDE.md`. It preserves custom instructions and refuses conflicting bootstrap protocols. It does **not** install global skills, create your business requirements or change frontend source.
+Start with an empty test host. The installer writes **source** into `.claude`, builds and verifies local `.dist`, then records the install manifest only after that check succeeds. It adds managed bootstrap sections to `AGENTS.md` and `CLAUDE.md`, preserves custom instructions and refuses conflicting bootstrap protocols. It does **not** install global skills, create your business requirements or change frontend source. See [runtime distribution](docs/runtime-distribution.md).
 
 ### Install an archive with npx
 
@@ -136,7 +136,8 @@ results; it is not an accepted product change or a passing test report.
 | --- | --- | --- |
 | `manual` (default) | Step-by-step work with user checkpoints. | Present the workflow goal before effects and actual results before acceptance. Planning alone does not authorize future work. |
 | `auto` (explicit opt-in) | An approved sequence of eligible workflows in the full Plan. | Requires a scoped delegation, time budget and risk assessment. Stops for missing authority, unresolved choices, failed evidence or budget expiry. |
-| `flash` (explicit per request) | A small, clear, reversible local fix. | Skips Plan/evidence ceremony for that fix only; returns to planning if scope grows. |
+| Single workflow | Clear bounded UI, backend or other work fitting one workflow. | Goal brief and detailed goal, scope approval, implementation and verification; no Plan wrapper. |
+| Small-change direct route (`flash` keyword optional) | A small, clear, cohesive, reversible and low-risk local fix. | Execute and run focused checks without Plan/workflow ceremony. Higher impact selects a bounded workflow, or a Plan when scope is large, unclear or spans workflows. |
 
 Auto identifies the initial ASAP chain and later checkpoint. It is not limited to two workflows, does not turn a waiting stage into completion and does not create a background scheduler. No mode permits inventing approvals, silently changing business policy or granting itself publication authority.
 
@@ -161,7 +162,7 @@ Public branding and command: **StarCi / `starci`**, not `work`. Internal `work/*
 
 ## Updating and migrating
 
-Use `starci update --dir <host>` from a reviewed build, then run `doctor`. Do not use `--force` as a routine update strategy: review local changes and back up first. A runtime update does not migrate product data.
+Use `starci update --dir <host>` from a reviewed build, then run `doctor`. Update rebuilds and verifies `.dist` before recording the new version; a failed build does not claim success. Do not use `--force` as a routine update strategy: review local changes and back up first. A runtime update does not migrate product data. Interrupted install recovery is in [runtime distribution](docs/runtime-distribution.md).
 
 For older projects, `.work` becomes `.starciwork`, and `.starci` or `.starcitemp` state belongs inside `.starciwork/_local`. Stop concurrent writers, back up, preserve receipt bytes, migrate bindings and validate before resuming. Renaming a directory does not transfer an old approval to a new absolute path. Follow the [migration guide](docs/migration.md); do not delete unfinished plans as temporary junk.
 
@@ -178,13 +179,23 @@ For older projects, `.work` becomes `.starciwork`, and `.starci` or `.starcitemp
 ## Documentation
 
 - [Install, update, bind and troubleshoot](docs/installation.md)
+- [Source-built `.dist` install and recovery](docs/runtime-distribution.md)
 - [Architecture and delivery lifecycle](docs/architecture.md)
 - [Directory rename and legacy compatibility](docs/migration.md)
 - [CLI reference](docs/cli.md)
 - [Skill design and compatibility](docs/skill-design.md)
+- [Author knowledge YAML](docs/knowledge-yaml.md)
 - [Build, test, package and release](docs/releasing.md)
 
 Agent instructions live in [SKILL.md](SKILL.md); humans do not need to preload the entire knowledge catalog. Runtime maintenance rules live in [UPDATE.json](UPDATE.json). [README.json](README.json) is a machine-readable summary, not the user guide.
+
+## Knowledge sources versus `.dist`
+
+Development references under `knowledge/` are authored primarily as YAML (`schema: starci/knowledge-source@1` and example manifests). Multi-file TypeScript examples live beside their `index.yaml`. The compiler writes agent-facing JSON under `.dist/knowledge/`, mapping `index.yaml` → `INDEX.json` and keeping stable public names such as `knowledge/coding-reference.json` for operator references and `SKILL.md`.
+
+Declarative sources use YAML; duplicate JSON/YAML authority is rejected. Only explicitly allowlisted, format-required JSON remains. Do not hand-edit `.dist`. Packages exclude `.dist`; install/update and `node scripts/ensure-build.mjs` build it. Runtime CLI, contracts, knowledge and supporting documentation resolve from `.dist`. See [knowledge YAML authoring](docs/knowledge-yaml.md) and [runtime distribution](docs/runtime-distribution.md).
+
+Browser workflows require a working browser runner, not bundled browser binaries. Follow [browser setup](docs/browser-testing.md). Business/Architecture and backend-only workflows do not require a browser installation.
 
 ## Contributing
 
@@ -192,12 +203,15 @@ Read [UPDATE.json](UPDATE.json) before changing runtime contracts. Update each c
 
 ```sh
 npm ci
+node scripts/compile-knowledge.mjs
 npm run build
 npm test
+node scripts/compile-knowledge.mjs --check
 npm run build:check
+node scripts/ensure-build.mjs
 ```
 
-For documentation sites, install their build dependencies and follow [the release guide](docs/releasing.md). Verify the packaged runtime in an isolated host before distribution. Generated `.dist` files should come from the build, not manual edits. Never include project records, local configuration or credentials in a package.
+For documentation sites, install their build dependencies and follow [the release guide](docs/releasing.md). Verify the packaged runtime in an isolated host before distribution. Generated `.dist` files should come from the build, not manual edits. Never include project records, local configuration, credentials, `worktrees/` or site caches in a package, and never `git add -f` `.dist`.
 
 ## Limits
 

@@ -1,0 +1,30 @@
+schema: starci/code-example@1
+id: ok-example
+title: Ok example
+purpose: |
+  Minimal multi-file example used by valid-minimal compile regressions.
+appliesTo: [backend]
+relatedRules: [BE-SAMPLE-1]
+files:
+  - path: main.ts
+    role: Entrypoint file.
+  - path: helper.ts
+    role: Supporting file to prove multi-file bundling.
+entrypoint: main.ts
+adapt:
+  - Fixture only.
+dependencies:
+  packages: []
+  assumptions: |
+    Synthetic example.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests: []
+  limitations: |
+    Fixture only.
+provenance:
+  sources: []
+  simplifications: |
+    Fixture only.

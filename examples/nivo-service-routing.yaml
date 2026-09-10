@@ -1,0 +1,91 @@
+schema: starci/source-routing-review@1
+status: draft
+scope: Nivo Setup Apply and Chatbot workbench browser routing at pinned source revisions; no product
+  changes or runtime probes.
+revisions:
+  nivo-fe: 02eab72111f39584458ff5cd40ca31dbf3dc44e6
+  nivo-backend: d81c1f292b52e6dae2fae0ab48a97af4c761df18
+routes:
+  - id: setup-apply
+    observed:
+      - FE AgentOSSolutionModulePage
+      - console.manageAgentosModuleRuntime
+      - graphql ENDPOINT from NEXT_PUBLIC_CORE_API_URL
+      - Core manageAgentosModuleRuntime resolver
+      - Studio.manage / eligibility / primary-DB transaction
+      - Shared Setup outbox and registered module projector
+    sources:
+      - repository: nivo-fe
+        path: apps/app/src/modules/api/console.ts
+        symbol: manageAgentosModuleRuntime
+      - repository: nivo-fe
+        path: apps/app/src/modules/api/graphql.ts
+        symbol: ENDPOINT
+      - repository: nivo-backend
+        path: src/features/core/api/core/graphql/mutations/agent-workspace/manage-agentos-module-runtime/manage-agentos-module-runtime.resolver.ts
+        symbol: execute
+    limit: No Control Plane HTTP hop is present in the inspected Apply activation path; later
+      module-specific delivery needs its own traced path.
+  - id: chatbot-workbench
+    observed:
+      - FE workspace-controlplane.chatbotCoreRequest
+      - NEXT_PUBLIC_CORE_API_URL -> Core chatbotWorkspaceWorkbench/Command
+      - Core authenticates and resolves owned workspace + installation + server-stored hostname
+      - Core forwards closed operation to hostname /graphql with authorization and 15s timeout
+      - Control Plane ChatbotResolver / SupportOperatorGuard / instance store
+    sources:
+      - repository: nivo-fe
+        path: apps/app/src/modules/api/workspace-controlplane.ts
+        symbol: chatbotCoreRequest / chatbotCoreEndpoint
+      - repository: nivo-fe
+        path: apps/app/src/modules/api/workspace-controlplane.spec.ts
+        symbol: Core endpoint assertions
+      - repository: nivo-backend
+        path: src/features/core/api/core/graphql/agentos-chatbot/chatbot-workspace-gateway.resolver.ts
+        symbol: read / command
+      - repository: nivo-backend
+        path: src/features/core/api/core/graphql/agentos-chatbot/chatbot-workspace-gateway.service.ts
+        symbol: execute / endpoint / operationDocument
+      - repository: nivo-backend
+        path: apps/agentos-controlplane/src/chatbot/chatbot.resolver.ts
+        symbol: ChatbotResolver
+      - repository: nivo-backend
+        path: apps/agentos-controlplane/src/auth/support-operator.guard.ts
+        symbol: canActivate
+    limit: Source wiring and tests inspected; tests not executed and actual hostname-to-ingress/deployed
+      Control Plane binding not probed.
+conflicts:
+  - id: BOUNDARY-CONFLICT
+    observed: Current FE and Core code routes chatbot workbench through Core. Control Plane guard
+      comment says Core never proxies customer transcripts.
+    status: unresolved
+    owner: Product architecture/privacy owner
+    requiredDecision: Specify accepted transcript boundary and permitted browser routing; then reconcile
+      code, comments and tests. Do not silently route direct to Control Plane or claim current
+      routing approved.
+securityQuestions:
+  - boundary: Core to workspace endpoint
+    risk: SSRF or token disclosure if endpoint custody/DNS/redirect behavior is not constrained.
+    observedControl: Source resolves stored owned-instance hostname, restricts protocol and constructs
+      /graphql; no browser-supplied target URL.
+    verificationNeeded: Inspect hostname write authority, credentials in URL, redirect handling,
+      DNS/IP/egress controls and token audience; no exploit claim from source snippet alone.
+  - boundary: Core gateway versus Control Plane guard
+    risk: Core owner-only lookup and Control Plane support-operator claims may yield different reachable
+      permissions.
+    observedControl: Core scopes installation to owner user; Control Plane accepts bound owner or narrow
+      signed collaborator role.
+    verificationNeeded: Decide whether collaborators may reach this browser flow; negative and
+      role-matrix integration tests.
+  - boundary: Customer transcript exposure
+    risk: Routing through Core changes which service processes transcripts.
+    observedControl: Closed GraphQL operation document; installed-object ownership check.
+    verificationNeeded: Resolve contradictory boundary comment, accepted data classification/retention
+      and access logging before architecture pass.
+patternReferences:
+  - name: Saga
+    url: https://learn.microsoft.com/en-us/azure/architecture/patterns/saga
+  - name: CQRS
+    url: https://learn.microsoft.com/en-us/azure/architecture/patterns/cqrs
+  - name: API security
+    url: https://owasp.org/www-project-api-security/

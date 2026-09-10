@@ -1,0 +1,232 @@
+schema: starci/knowledge-source@1
+id: be.typing
+title: Typing
+purpose: |-
+  Given a backend value, how is its type declared?
+appliesTo:
+  - backend
+family: be
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - "tsconfig.json (strictNullChecks: true, noImplicitAny: false)"
+    - eslint.config.mjs
+    - features/api/core/types/execute.ts
+    - features/api/core/graphql/mutations/courses/add-to-cart/*
+    - modules/platform/exceptions/errors/abstract.ts
+    - errors/ai/ai-quota-exhausted.ts
+    - modules/api/apollo/server/types/graphql-response.ts
+    - modules/api/apollo/server/interceptors/graphql-transform.interceptor.ts
+    - modules/databases/postgresql/primary/enums/locale.ts
+    - modules/platform/cqrs/icqrs-handler.ts
+  limitations: |-
+    Historical reference-source observations preserved at the extraction commit; not a fresh audit of current repository conformance. Counts and file totals cited in rationale or cases are provenance from that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and lint/test setup; verify reference conformance within approved .starciwork scope. Target legacy code does not override the reference. Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
+rules:
+  - id: BE-TYPING-1
+    title: interface for object shapes, type for aliases
+    kind: mandatory
+    requirement: |-
+      Object shapes are declared with interface; type is reserved for aliases such as Record wrappers.
+    rationale: |-
+      1991 export interface against 197 export type at extraction, of which only 12 are object literals.
+    cases:
+      - id: case-1
+        when: Object shape
+        write: |-
+          export interface ExecuteParams<T> { request: T; locale?: Locale; user?: UserEntity; … }
+      - id: case-2
+        when: Exception metadata
+        write: |-
+          export interface AiQuotaExhaustedExceptionMetadata extends AbstractExceptionMetadata { window: string }
+      - id: case-3
+        when: Response contract
+        write: |-
+          export interface IAbstractGraphQLResponse<T = undefined> { success: boolean; message: string; data?: T; error?: string }
+      - id: case-4
+        when: Alias
+        write: |-
+          export type GraphQLSuccessMessage = Record<Locale, string> — shares its name with the decorator const
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-TYPING-2
+    title: Named parameter types, no inline objects
+    kind: mandatory
+    requirement: |-
+      Functions taking objects destructure a named interface. Public methods declare return types. Primitive params stay positional and annotated.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Function taking an object
+        write: |-
+          constructor({ window, originalError }: AiQuotaExhaustedExceptionMetadata) — destructured from a named interface
+      - id: case-2
+        when: Handler input
+        write: |-
+          process(command: AddToCartCommand) — the class is the type
+      - id: case-3
+        when: Return
+        write: |-
+          always declared on public methods: Promise<CartItemEntity>, Record<KpiKey, number>, Observable<GraphQLResponse<T>>
+      - id: case-4
+        when: Primitive param
+        write: |-
+          positional, annotated: execute(key: string), getOriginalError(): Error
+    verification:
+      automated:
+        - no-inline-param-type
+        - no-inline-object-type
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-TYPING-3
+    title: readonly
+    kind: mandatory
+    requirement: |-
+      Injected dependencies, message payloads and exception fields are readonly. Decorated GraphQL DTO fields are mutable.
+    rationale: |-
+      2489 private readonly against 26 without readonly at extraction.
+    cases:
+      - id: case-1
+        when: Injected dependency
+        write: |-
+          private readonly entityManager: EntityManager
+      - id: case-2
+        when: Message payload
+        write: |-
+          constructor(readonly params: ExecuteParams<AddToCartRequest>) {}
+      - id: case-3
+        when: Exception fields
+        write: |-
+          readonly code: string, readonly metadata?: Record<string, unknown>, readonly httpStatus?: number
+      - id: case-4
+        when: Decorated GraphQL field
+        write: |-
+          not readonly: @Field(() => ID, { description: "Course id." }) courseId: string — class-validator/GraphQL classes are mutable DTOs
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+      - transactional-service
+  - id: BE-TYPING-4
+    title: Enums
+    kind: mandatory
+    requirement: |-
+      Enums are string-valued with PascalCase members; const enum is banned. Boolean entity filters use an is prefix.
+    rationale: |-
+      137 enums and 0 const enum at extraction; 76 enum files under primary/enums.
+    cases:
+      - id: case-1
+        when: Declaration
+        write: |-
+          export enum Locale { Vi = "vi", En = "en" }
+      - id: case-2
+        when: Home
+        write: |-
+          modules/databases/postgresql/primary/enums/ (76 files at extraction), plus per-module enums/ folders (platform/exceptions/enums, integrations/cache/enums, ai/balancer/enums)
+      - id: case-3
+        when: GraphQL exposure
+        write: |-
+          export const GraphQLTypeLocale = createEnumType(Locale) + registerEnumType(GraphQLTypeLocale, { name: "Locale", description: "…", valuesMap: { [Locale.Vi]: { … } } })
+      - id: case-4
+        when: Boolean on an entity
+        write: |-
+          isEnrolled: true in where — is prefix
+    verification:
+      automated:
+        - no-const-enum
+      manual: []
+    relatedExamples: []
+  - id: BE-TYPING-5
+    title: unknown, never any
+    kind: mandatory
+    requirement: |-
+      Unknown payloads use unknown. Narrow foreign errors before wrapping. any is residual debt. Double casts are allowed only in specs and src/tests/**.
+    rationale: |-
+      13 any sites in 4463 files at extraction; as unknown as X in 323 specs.
+    cases:
+      - id: case-1
+        when: Unknown payload
+        write: |-
+          readonly metadata?: Record<string, unknown>
+      - id: case-2
+        when: Narrowing an error
+        write: |-
+          originalError: error instanceof Error ? error : undefined; error instanceof Error ? error : new Error(String(error))
+      - id: case-3
+        when: Apollo's untyped error
+        write: |-
+          const original = (error as { originalError?: unknown })?.originalError ?? error; if (original instanceof AbstractException) { … }
+      - id: case-4
+        when: Residual any (debt, not a pattern)
+        write: |-
+          13 any sites at extraction; lint @typescript-eslint/no-explicit-any is at error
+      - id: case-5
+        when: Double cast
+        write: |-
+          as unknown as X only inside *.spec.ts and src/tests/**; banned elsewhere by no-restricted-syntax
+    verification:
+      automated:
+        - "@typescript-eslint/no-explicit-any"
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-TYPING-6
+    title: Generics
+    kind: mandatory
+    requirement: |-
+      Generic parameters use a T prefix on descriptive names; static factories may constrain T extends AbstractException.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Template base
+        write: |-
+          export abstract class ICQRSHandler<TParams, TResponse = unknown> — T prefix on descriptive names
+      - id: case-2
+        when: Single
+        write: |-
+          IAbstractGraphQLResponse<T = undefined>, GraphQLTransformInterceptor<T = unknown>
+      - id: case-3
+        when: Static factory
+        write: |-
+          static fromJSON<T extends AbstractException>(this: new (message: string, code: string, metadata?: Record<string, unknown>) => T, json: string): T
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-TYPING-7
+    title: GraphQL classes
+    kind: mandatory
+    requirement: |-
+      Input and output GraphQL classes use decorators; Response.data is always nullable: true; every @Entity names its table and avoids eager: true relations.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Input
+        write: |-
+          @InputType({ description: "…" }) export class AddToCartRequest { @Field(() => ID, { description: "Course id." }) courseId: string }
+      - id: case-2
+        when: Output
+        write: |-
+          @ObjectType({ description: "…" }) export class AddToCartResponse extends AbstractGraphQLResponse implements IAbstractGraphQLResponse<CartItemEntity> { @Field(() => CartItemEntity, { nullable: true, description: "…" }) data: CartItemEntity }
+      - id: case-3
+        when: data nullability
+        write: |-
+          always nullable: true — the interceptor writes data = null on failure
+      - id: case-4
+        when: Entity table
+        write: |-
+          every @Entity names its table (lint require-entity-table-name, 181/181 at extraction); no eager: true relations
+    verification:
+      automated:
+        - require-entity-table-name
+      manual: []
+    relatedExamples:
+      - graphql-command

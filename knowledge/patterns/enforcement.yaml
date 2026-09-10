@@ -1,0 +1,173 @@
+schema: starci/knowledge-source@1
+id: patterns.enforcement
+title: Cross-project convention enforcement
+purpose: |
+  Anti-bypass requirements that are already mandatory across projects, plus explicitly proposed
+  upgrades that are not yet implemented enforcement. Use extracted BE/FE pattern cases and
+  code-examples, not a generic instruction to consult another repository.
+appliesTo: [backend, frontend]
+family: cross-cutting
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - starci-academy-backend
+    - starci-academy-fe
+  limitations: |
+    These proposals do not authorize editing or publishing external lint packages. Source
+    observations are not automatically best practice: classify a repeated pattern, a sanctioned
+    exception and legacy debt separately.
+rules:
+  - id: ENF-MANDATORY-1
+    title: Preserve responsibilities across projects
+    kind: mandatory
+    requirement: |
+      Use the extracted BE/FE pattern cases and code-examples, not a generic instruction to
+      consult another repository. Preserve the same responsibilities, unit layout, dependency
+      directions and public contracts across projects. Business names, database ownership and
+      actual platform constraints vary; convention consistency does not mean copying one
+      application's behavior or connection token.
+    rationale: |
+      Cross-project consistency is about coding shape, not cloned product behavior.
+
+  - id: ENF-MANDATORY-2
+    title: No weakening of effective lint
+    kind: mandatory
+    requirement: |
+      Do not weaken lint, expand ignores, add suppression directives, move production code into
+      test lanes, alias forbidden dependencies or rename a forbidden persistence facade to obtain
+      a pass. Inspect the effective config for the exact changed files, not only the published
+      plugin's available rules. A declared rule that is absent/off in the consuming config is not
+      enforced.
+    rationale: |
+      Package exports do not prove the consuming repository activates those rules.
+
+  - id: ENF-MANDATORY-3
+    title: Lane-aware severity and options
+    kind: mandatory
+    requirement: |
+      Separate production, module, unit, integration and E2E lanes. Some rules intentionally
+      differ by lane. Check required rules at their canonical severity and options, then require
+      no warnings/errors on the changed scope. Do not privately inject stronger rules into a
+      wrapper and describe the repository's normal lint as compliant.
+    rationale: |
+      Private wrappers hide the real gate and misreport repository compliance.
+
+  - id: ENF-MANDATORY-4
+    title: Inspect ignore, suppressions and test discovery
+    kind: mandatory
+    requirement: |
+      Check ignored-file status, actual lint results, suppressed messages and TypeScript
+      ignore/nocheck directives. Verify tests are discovered by the real runner. Directly
+      constructed service tests and mocked transport tests do not establish full application
+      wiring or database behavior.
+    rationale: |
+      Ignored files and undiscovered tests create false green results.
+
+  - id: ENF-MANDATORY-5
+    title: Scoped lint helper integrity only
+    kind: mandatory
+    requirement: |
+      The implemented read-only helper is
+      `node scripts/check-scoped-lint.mjs <repository> <explicit-owned-file> [...]`.
+      It rejects ignored/missing/duplicate/outside-root inputs and fails reported
+      warnings/errors/suppressed violations. It reports effective rules and inline-config state
+      without changing them. Its success means lint-result integrity only: disabled rules,
+      unused directives, TypeScript directives, semantic aliases and structural omissions still
+      need the separate config/source audit. It never grants code acceptance.
+    rationale: |
+      A scoped lint helper verifies reporting integrity; it is not product acceptance.
+    verification:
+      automated:
+        - scripts/check-scoped-lint.mjs
+      manual:
+        - Audit disabled rules, aliases and structural omissions separately.
+
+  - id: ENF-MANDATORY-6
+    title: Classify patterns, exceptions and debt
+    kind: mandatory
+    requirement: |
+      Source observations are not automatically best practice: classify a repeated pattern, a
+      sanctioned exception and legacy debt separately. Do not promote an accidental loophole such
+      as an unrecognized shell directory into a new standard.
+    rationale: |
+      Accidental loopholes become permanent debt when treated as reusable tiers.
+
+  - id: ENF-PROP-P0-1
+    title: Versioned convention set and tested skeletons
+    kind: proposal
+    priority: P0
+    requirement: |
+      Maintain one versioned BE/FE convention set and tested code skeletons. BE covers CQRS
+      feature, capability service, named connection, exception and tests. FE covers leaf,
+      connected/pure pair, page/route, hooks and paired tests. Typecheck and lint those skeletons
+      against the supported package versions before publishing them.
+    rationale: |
+      Skeletons make mandatory shape executable and reviewable across repositories.
+    relatedExamples:
+      - graphql-command
+      - transactional-service
+      - connected-block
+
+  - id: ENF-PROP-P0-2
+    title: Lane-aware effective-config CI auditing
+    kind: proposal
+    priority: P0
+    requirement: |
+      Add lane-aware effective-config auditing to consuming CI. Use explicit changed files; fail
+      ignored files, missing/lowered applicable rules and suppressions. Record canon version and
+      effective configuration identity. Upgrade the shared lint package rather than independently
+      copying rules into ten repositories.
+    rationale: |
+      Per-repo rule copies drift; CI must enforce the effective config identity.
+
+  - id: ENF-PROP-P1-BE
+    title: Stronger BE AST and transaction checks
+    kind: proposal
+    priority: P1
+    requirement: |
+      Strengthen AST checks for transaction callback overloads and outer-manager aliases; inspect
+      dependency provenance for custom persistence facades; verify named decorators bind the
+      intended database token. Keep real PostgreSQL rollback/concurrency tests, because AST
+      checks cannot prove transaction semantics.
+    rationale: |
+      Current checkers miss isolation-level overloads and custom facade architectures.
+    relatedExamples:
+      - transactional-service
+
+  - id: ENF-PROP-P1-FE
+    title: Broader FE split and Grammar checks
+    kind: proposal
+    priority: P1
+    requirement: |
+      Extend connected/pure structural checks to all sanctioned split tiers and
+      indirect/aliased world access; validate Grammar exports and props through typechecking;
+      require both connected and pure tests for new split units. Explicitly resolve the
+      product-shells legacy exception before making it a reusable tier.
+    rationale: |
+      Block-scoped twin enforcement cannot establish every tier or aliased escape route.
+    relatedExamples:
+      - connected-block
+
+  - id: ENF-PROP-P1-MUTATION
+    title: Mutation regression fixtures
+    kind: proposal
+    priority: P1
+    requirement: |
+      Add mutation regression fixtures that deliberately rename a repository, alias a hook,
+      disable a rule, ignore a changed file, omit a required test or use a second-argument
+      transaction callback. The gate must reject each applicable violation; a test of
+      documentation wording is not enforcement.
+    rationale: |
+      Keyword tests of docs do not prove the gate rejects real bypasses.
+
+  - id: ENF-PROP-P2-REPORT
+    title: Cross-repository conformance reporting
+    kind: proposal
+    priority: P2
+    requirement: |
+      Report cross-repository conformance in existing CI output: convention version,
+      package/API compatibility, template checks and unresolved deviations. Roll out upgrades by
+      coherent scope without changing accepted product behavior. These proposals do not authorize
+      editing or publishing external lint packages.
+    rationale: |
+      Visibility of unresolved deviations is required before claiming multi-repo consistency.

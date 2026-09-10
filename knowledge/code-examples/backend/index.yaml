@@ -1,0 +1,15 @@
+schema: starci/code-example-catalog@1
+title: Backend code examples
+purpose: |
+  Multi-file interaction examples extracted from starci-academy-backend shapes.
+  They teach ownership and wiring; they are not product requirements or runnable apps.
+examples:
+  - id: graphql-command
+    path: graphql-command
+    title: GraphQL CQRS command feature chain
+  - id: transactional-service
+    path: transactional-service
+    title: Capability service transaction propagation
+  - id: named-exception
+    path: named-exception
+    title: AbstractException declaration shape

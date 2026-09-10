@@ -1,0 +1,52 @@
+schema: starci/knowledge-source@1
+id: knowledge
+title: Knowledge
+purpose: |
+  This tree contains scoped development reference material, not task orchestration.
+  See patterns/scan-coverage.yaml for current source-scan coverage and known automated-check gaps.
+appliesTo: [knowledge]
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  limitations: |
+    Component names, tokens, ownership tables and source counts describe the reference family
+    at observation time. Verify the actual installed package/source before using them; do not
+    invent missing APIs or impose this family on a different stack. A source-derived business
+    description remains unapproved until its owner accepts it. Historical evidence links are
+    pinned Git provenance at the extraction commit, not current instructions or current product
+    proof. If the remote link is unavailable, inspect that exact object with
+    `git show <commit>:<path>` in this skills repository.
+guidance:
+  - id: load-order
+    requirement: |
+      Read coding-reference.yaml and the smallest applicable English topic. Knowledge has no
+      translated mirrors. Stable rule IDs identify implementation and review criteria, not
+      execution authority. Product requirements, design, scope, state and verification belong
+      in .starciwork. These references do not authorize the next op.
+branches:
+  - id: code-examples
+    title: Code examples
+    path: code-examples/index.yaml
+    use: Focused extracted examples for applying the rules directly.
+  - id: enforcement
+    title: Enforcement
+    path: patterns/enforcement.yaml
+    use: Anti-bypass requirements and explicitly proposed cross-project upgrades.
+  - id: backend-patterns
+    title: Backend patterns
+    path: patterns/be/index.yaml
+    use: Mandatory BE conventions, established from starci-academy-backend.
+  - id: frontend-patterns
+    title: Frontend patterns
+    path: patterns/fe/index.yaml
+    use: Mandatory FE conventions, established from starci-academy-fe.
+  - id: ui
+    title: UI
+    path: ui/index.yaml
+    use: Composition, presentation and rendered-proof criteria selected for the current scope.
+  - id: grammars
+    title: Grammar snapshots
+    path: grammars/index.yaml
+    use: Family-specific package observations, not a guarantee of current exports.
+related:
+  - coding-reference.yaml
+  - patterns/scan-coverage.yaml

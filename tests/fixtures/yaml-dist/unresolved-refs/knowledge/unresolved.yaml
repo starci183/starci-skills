@@ -1,0 +1,13 @@
+schema: starci/knowledge-source@1
+id: unresolved.refs
+title: Unresolved refs
+purpose: |
+  Synthetic topic that references a missing rule id.
+appliesTo: [backend]
+rules:
+  - id: BE-UNRESOLVED-1
+    title: Sample
+    kind: mandatory
+    requirement: |
+      Synthetic unresolved-ref rejection case.
+    relatedRules: [MISSING-RULE]

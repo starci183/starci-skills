@@ -1,0 +1,13 @@
+schema: starci/knowledge-source@1
+id: dup.keys
+id: dup.keys.other
+title: Duplicate keys
+purpose: |
+  This fixture repeats the id key so the safe YAML parser must reject it.
+appliesTo: [backend]
+rules:
+  - id: BE-DUPKEY-1
+    title: Sample
+    kind: mandatory
+    requirement: |
+      Synthetic duplicate-key rejection case.

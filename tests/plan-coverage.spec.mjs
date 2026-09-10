@@ -9,10 +9,11 @@ import {validatePlan,planProgress} from '../workflows/plan.mjs';
 import {createBundle,renderPlan} from '../scripts/plan.mjs';
 import {parseYaml} from '../core/yaml.mjs';
 
-const catalog=JSON.parse(fs.readFileSync(new URL('../workflows/catalog.json',import.meta.url)));
+import {readWorkflow, readExample, readPublicJson} from './helpers/read-public.mjs';
+const catalog=readWorkflow('catalog.json');
 // Synthetic complete product route, not acceptance evidence for any real project.
 function fullPlan() {
- const plan=JSON.parse(fs.readFileSync(new URL('../workflows/plan.template.json',import.meta.url)));
+ const plan=readWorkflow('plan.template.json');
  Object.assign(plan,{id:'synthetic-product',requestId:'synthetic-request',originalRequest:'Deliver a working request-to-result product with backend, frontend and UAT.',finalOutcome:'An owner submits a request and receives a persisted result verified through the UI.'});
  const make=(id,workflow,dependsOn)=>({id,workflow,purpose:`Complete ${id}`,input:'Accepted output of the preceding job, or original intent',output:`Reviewed ${id} deliverable`,criteria:[`${id}-accepted`],workTargets:[`synthetic.${id}`],paths:[],resources:[],dependsOn,openQuestions:[],estimate:{minMinutes:10,maxMinutes:30,assumptions:'Synthetic local fixture only'},selection:{requestQuote:plan.originalRequest,codeChange:workflow.startsWith('implement-'),verification:workflow==='implement-frontend'?'browser-uat':'none',separateDeliverable:false}});
  plan.workflows=[make('business','define-business',[]),make('architecture','design-architecture',['business']),make('backend','implement-backend',['architecture']),make('frontend','implement-frontend',['backend'])];

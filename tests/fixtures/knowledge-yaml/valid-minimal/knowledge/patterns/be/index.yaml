@@ -1,0 +1,13 @@
+schema: starci/knowledge-source@1
+id: be
+title: Backend patterns
+purpose: |
+  Catalog for the valid-minimal backend sample topic.
+appliesTo: [backend]
+family: be
+topics:
+  - id: be.sample
+    path: sample.yaml
+    title: Sample
+    summary: Minimal sample topic.
+    ruleIds: [BE-SAMPLE-1]

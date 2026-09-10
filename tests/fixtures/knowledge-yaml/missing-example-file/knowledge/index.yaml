@@ -1,0 +1,6 @@
+schema: starci/knowledge-source@1
+id: knowledge
+title: Missing example file fixture root
+purpose: |
+  Synthetic knowledge root for missing example file rejection.
+appliesTo: [backend]

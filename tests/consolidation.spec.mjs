@@ -4,10 +4,14 @@ import fs from 'node:fs';
 import {selectOperation} from '../ops/select.mjs';
 import {validateCatalog} from '../ops/validate.mjs';
 import {validateJobMatrices} from '../workflows/matrix.mjs';
+import {parseYaml} from '../core/yaml.mjs';
 const json=name=>JSON.parse(fs.readFileSync(new URL(name,import.meta.url),'utf8'));
-const catalogue=json('../ops/catalog.json');
-const registry=json('../ops/registry.json');
-const matrices=json('../workflows/jobs.json');
+const yaml=name=>parseYaml(fs.readFileSync(new URL(name,import.meta.url),'utf8'));
+import {outputs} from '../ops/generate.mjs';
+const catalogue=JSON.parse(outputs().get('catalog.json'));
+const registry=yaml('../ops/registry.yaml');
+import {readWorkflow} from './helpers/read-public.mjs';
+const matrices=readWorkflow('jobs.json');
 const contract=id=>catalogue.ops.find(o=>o.id===id).contract;
 
 test('fourteen complete jobs replace the old catalogue; twenty-two extras have explicit ownership',()=>{
@@ -22,10 +26,10 @@ test('fourteen complete jobs replace the old catalogue; twenty-two extras have e
   for(const id of ['identity.provision','data.plan','data.seed'])assert.equal(catalogue.ops.some(op=>op.id===id),false);
   assert.match(JSON.stringify(contract('uat.verify')),/No plan\/account\/seed predecessor/);
 });
-test('English-only JSON is the maintained operator source with no runtime mirrors',()=>{
+test('English-only YAML is the maintained operator source with no runtime mirrors',()=>{
   function inspect(value){if(Array.isArray(value))value.forEach(inspect);else if(value&&typeof value==='object')for(const[k,v]of Object.entries(value)){assert.notEqual(k,'vi');assert.notEqual(k,'mirror');assert.equal(k.endsWith('Vi'),false);inspect(v);}}
   inspect(catalogue);
-  for(const id of registry.ops){const authored=json(`../ops/${id}/operator.json`);assert.equal(authored.id,id);inspect(authored);assert.equal(fs.existsSync(new URL(`../ops/${id}.vi.md`,import.meta.url)),false);}
+  for(const id of registry.ops){const authored=yaml(`../ops/${id}/operator.yaml`);assert.equal(authored.id,id);inspect(authored);assert.equal(fs.existsSync(new URL(`../ops/${id}.vi.md`,import.meta.url)),false);}
   const changed=structuredClone(catalogue);changed.ops[0].contract.goal.vi='retired';assert.equal(validateCatalog(changed).ok,false);
 });
 test('operation selection cannot default, combine permissions or reuse a different completion profile',()=>{

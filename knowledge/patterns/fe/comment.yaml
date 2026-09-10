@@ -1,0 +1,216 @@
+schema: starci/knowledge-source@1
+id: fe.comment
+title: Comment
+purpose: |
+  Given a frontend declaration or statement, does it carry a comment, and what does that comment say?
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - src/components/pages/AuthenticationPage/*
+    - blocks/ai/StarCiAiChat/*
+    - blocks/ai/CourseAdvisorRecommendationCard/*
+    - hooks/index.ts
+    - hooks/swr/useQueryCourseSwr.ts
+    - hooks/swr/useMutateAddToCartSwr.ts
+    - modules/api/graphql/queries/query-course.ts
+    - eslint.config.mjs
+  limitations: |
+    Historical reference-source observations at skill commit
+    edf72554425f918e80c9205e9c6db10596e722f0; not a fresh audit. Old counts cannot claim a fresh scan.
+rules:
+  - id: FE-COMMENT-1
+    title: Every export carries a docblock
+    kind: mandatory
+    requirement: |
+      Every export carries a /** */ docblock. The one-liner states ownership or role ("owned by",
+      "resolved by the connected owner", "no transport lives here"), not the name. Lint
+      require-export-jsdoc enforces presence (415 of 417 non-spec component files).
+    rationale: |
+      Ownership prose survives renames better than restating the symbol name.
+    cases:
+      - id: case-1
+        when: "A component"
+        write: >
+          /** Render the connected cart route. */ · /** Draw every AI-owner state from resolved
+          fixture data; no transport or translation lives here. */
+      - id: case-2
+        when: "A props type"
+        write: >
+          /** Complete state/data/action contract for the pure advisor surface. */ · /** Closed leaf
+          props for a button-treatment sample. */
+      - id: case-3
+        when: "A class-name export"
+        write: >
+          /** Messenger-like visual roles owned by the StarCi course-advisor surface. */ · /**
+          Grammar-owned page frame; this app alias adds no visual override. */
+      - id: case-4
+        when: "A constant"
+        write: >
+          /** Canonical state inventory shared by connected owners and presentation tests. */ · /**
+          The key prefix, so a caller can revalidate every course read at once. */
+      - id: case-5
+        when: "A route"
+        write: >
+          /** The routed authentication screen. The route mounts one page and makes no drawing
+          decision. */
+    verification:
+      automated:
+        - require-export-jsdoc
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-COMMENT-2
+    title: Fields are documented when the name is not enough
+    kind: mandatory
+    requirement: |
+      Document handlers, source-sensitive props, hook params and Grammar props when the name alone
+      does not carry the constraint. Self-evident fields carry nothing.
+    rationale: |
+      Field docs capture non-obvious provenance and lifecycle without noise on id/body fields.
+    cases:
+      - id: case-1
+        when: "A handler"
+        write: "/** Called after the panel establishes a session. */ readonly signedIn?: () => void"
+      - id: case-2
+        when: "A prop whose source matters"
+        write: >
+          /** URL-owned journey rendered before the browser hydrates stored challenge metadata. */
+          readonly initialMode?: AuthMode
+      - id: case-3
+        when: "A hook param"
+        write: >
+          /** The short human-facing identifier the route carries - `fullstack-mastery`, not a UUID. */
+          displayId?: string
+      - id: case-4
+        when: "A Grammar prop"
+        write: >
+          /** Pending belongs to the action that started the work and blocks duplicate presses. */
+          readonly isPending?: boolean
+      - id: case-5
+        when: "Self-evident fields"
+        write: "readonly id: string, readonly body: string carry nothing"
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+
+  - id: FE-COMMENT-3
+    title: Decision prose on hooks and documents
+    kind: mandatory
+    requirement: |
+      Hooks and GraphQL modules carry multi-paragraph docblocks whose paragraphs open with a
+      capitalised claim and then give the measured reason. @param appears rarely and is not the norm
+      for pages.
+    rationale: |
+      Decision prose records rejected alternatives so later edits do not reopen settled measurements.
+    cases:
+      - id: case-1
+        when: "A key decision"
+        write: >
+          THE DISPLAY ID IS PART OF THE KEY, which is what makes two course pages in one session safe:
+          … (useQueryCourseSwr)
+      - id: case-2
+        when: "A rejected alternative"
+        write: >
+          IT SENDS `displayId` AND NEVER `id`, and that is a measured decision rather than a
+          preference. … The server answers that with `success: false, error: COURSE_NOT_FOUND_EXCEPTION`
+      - id: case-3
+        when: "Why the key carries an argument"
+        write: >
+          THE KEY CARRIES THE COURSE, and it has to. Every hook sharing a key shares its state, so a
+          grid of cards on one key is a grid where pressing ONE card puts every other card's control
+          into the running state (useMutateAddToCartSwr)
+      - id: case-4
+        when: "Selection rationale"
+        write: "WHY THE CONTENT FACTS ARE SELECTED AND NOT ASKED FOR. … (query-course.ts)"
+      - id: case-5
+        kind: residual
+        when: "@param"
+        write: >
+          @param courseId - The course this hook's press is about, or `undefined` to stay idle.;
+          @param input - {@link AuthenticationPageProps} appears in one page and is not the norm
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-COMMENT-4
+    title: Line comments are sentences about why
+    kind: mandatory
+    requirement: |
+      // comments sit above the statement and explain a consequence; none restates the code
+      (201 // lines under src/components non-spec). Config exceptions carry their reason in the
+      eslint config, not inline.
+    rationale: |
+      Why-comments preserve operational constraints that code alone does not show.
+    cases:
+      - id: case-1
+        when: "A guard's reason"
+        write: >
+          // A server-rendered form has no React submit handler yet. Keeping its secret-bearing
+          controls disabled until hydration prevents the browser's native GET fallback from placing an
+          email, password or OTP in the URL when a reader acts before JavaScript attaches.
+      - id: case-2
+        when: "Copy decision"
+        write: >
+          // The transport case deliberately does NOT say the details or the code were wrong, because
+          nobody knows that - the request never got an answer.
+      - id: case-3
+        when: "Cache decision"
+        write: >
+          // The sign-out drops every identity entry, whichever viewer it was cached under, and leaves
+          every other cache namespace - and every non-tuple key - exactly where it was.
+      - id: case-4
+        when: "Test stand-in"
+        write: >
+          // jsdom implements ranges but not their geometry, and the block asks a range where it is so
+          the surface can be placed over it. A fixed rect is the honest stand-in: nothing here has
+          layout.
+      - id: case-5
+        kind: exception
+        when: "Config exception"
+        write: >
+          the block comment above files: ["src/modules/api/graphql/clients/options.ts"] in
+          eslint.config.mjs states why the exception lives in config and not inline
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+
+  - id: FE-COMMENT-5
+    title: What a comment never contains
+    kind: mandatory
+    requirement: |
+      Comments never contain a second language, emoji, eslint-disable, or a restated symbol name alone.
+      User copy lives in src/messages/{en,vi}.json.
+    rationale: |
+      Keeping source English and suppression-free preserves lint as the exception registry.
+    cases:
+      - id: case-1
+        when: "A second language"
+        write: >
+          English only in source (lint no-second-language-in-source, no-second-language-in-path);
+          user copy lives in src/messages/{en,vi}.json
+      - id: case-2
+        when: "Emoji"
+        write: "none (lint no-emoji-in-source)"
+      - id: case-3
+        when: "A lint suppression"
+        write: "eslint-disable in 0 files; the config carries the exception with its reason"
+      - id: case-4
+        when: "A restated name"
+        write: >
+          /** Props for CartPage. */ alone is not observed; the docblock adds what the page owns:
+          /** The page owns only the route-level composition; CartBlock owns cart state and actions. */
+    verification:
+      automated:
+        - no-second-language-in-source
+        - no-second-language-in-path
+        - no-emoji-in-source
+      manual: []
+    relatedExamples: []

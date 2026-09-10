@@ -1,8 +1,7 @@
 import {loadConfig,validateConfig} from '../scripts/config.mjs';
-import fs from 'node:fs';
-const read=name=>JSON.parse(fs.readFileSync(new URL(name,import.meta.url),'utf8'));
-const registry=read('./registry.json');
-const runtimes=Object.fromEntries(registry.runtimes.map(name=>[name,read(`./${name}.json`)]));
+import { readDistJson } from '../core/runtime-root.mjs';
+const registry=readDistJson('profiles','registry.json');
+const runtimes=Object.fromEntries(registry.runtimes.map(name=>[name,readDistJson('profiles',`${name}.json`)]));
 /** Select policy only; never switch models, dispatch workers or grant tools. */
 export function selectProfile({runtime,op,profile,config=loadConfig(),model=config.model,effort=config.effort,language=config.language,imageGenerationAvailable=false}) {
   validateConfig({language,model,effort});

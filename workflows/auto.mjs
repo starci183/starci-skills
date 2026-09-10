@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
+import { readDistJson, skillRoot } from '../core/runtime-root.mjs';
 import {validatePlan} from './plan.mjs';
 import {hasDelegatedAcceptance} from './delegation.mjs';
 import {scopedWorkStatus} from './work-binding.mjs';
@@ -9,10 +9,10 @@ import {verifyProducerCells,verifyProducerResult,hasDirectProducerAcceptance} fr
 const digest=x=>sha256(canonicalJSON(x));
 const text=x=>typeof x==='string'&&x.trim().length>0;
 const requireThat=(ok,message)=>{if(!ok)throw Error(message);};
-const catalog=JSON.parse(fs.readFileSync(new URL('./catalog.json',import.meta.url)));
+const catalog=readDistJson('workflows','catalog.json');
 const allowed=new Set(['analyze-request','prepare-work','define-business','design-architecture','design-interface','implement-backend','implement-frontend','verify-flows','review-code','produce-content']);
 const inside=(root,file)=>{const r=path.relative(root,file);return r!=='..'&&!r.startsWith('..'+path.sep)&&!path.isAbsolute(r);};
-const runtimeRoot=fs.realpathSync(fileURLToPath(new URL('../',import.meta.url)));
+const runtimeRoot=fs.realpathSync(skillRoot);
 
 function candidateWindow(plan,start) {
  const pending=plan.workflows.slice(start),candidateJobIds=[];

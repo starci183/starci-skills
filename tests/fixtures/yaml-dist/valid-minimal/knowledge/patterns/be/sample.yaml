@@ -1,0 +1,33 @@
+schema: starci/knowledge-source@1
+id: be.sample
+title: Sample
+purpose: |
+  Minimal structured topic used to prove compatibility projection and
+  deterministic compile output.
+appliesTo: [backend]
+family: be
+provenance:
+  sources: []
+  limitations: |
+    Synthetic fixture only; not product authority.
+rules:
+  - id: BE-SAMPLE-1
+    title: Sample mandatory rule
+    kind: mandatory
+    requirement: |
+      Keep this synthetic rule stable for compiler regression tests.
+    rationale: |
+      Fixture coverage only.
+    applicability: |
+      Applies only inside tests/fixtures/knowledge-yaml/valid-minimal.
+    required: []
+    forbidden: []
+    cases:
+      - id: case-1
+        when: Compiling the valid-minimal fixture
+        write: Emit starci/knowledge@1 compatibility projection with sections.
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: [ok-example]
+    relatedRules: []

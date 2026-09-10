@@ -3,11 +3,12 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {parseYaml, stringifyYaml} from '../core/yaml.mjs';
+import { readDistJson } from '../core/runtime-root.mjs';
 import {validatePlan} from '../workflows/plan.mjs';
 import {assertNewStoragePath} from '../workflows/storage.mjs';
 import {renderPlan} from './plan.mjs';
 
-const catalog=JSON.parse(fs.readFileSync(new URL('../workflows/catalog.json',import.meta.url)));
+const catalog=readDistJson('workflows','catalog.json');
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 const samePath=(a,b)=>process.platform==='win32'?a.toLowerCase()===b.toLowerCase():a===b;
 

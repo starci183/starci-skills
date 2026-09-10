@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {selectWorkflow,selectJobPlan,validateWorkflowCatalog} from '../workflows/select.mjs';
 import {workflowDigest} from '../workflows/lifecycle.mjs';
+import {readWorkflow} from './helpers/read-public.mjs';
 
-const read=name=>JSON.parse(fs.readFileSync(new URL(`../workflows/${name}`,import.meta.url)));
-const catalog=read('catalog.json'),jobs=read('jobs.json'),frontend=read('frontend.json'),frontendMatrix=read('matrix.json');
+const catalog=readWorkflow('catalog.json'),jobs=readWorkflow('jobs.json'),frontend=readWorkflow('frontend.json'),frontendMatrix=readWorkflow('matrix.json');
 const ids=['analyze-request','prepare-work','define-business','design-architecture','design-interface','implement-backend','implement-frontend','verify-flows','review-code','publish-code','deploy-release','operate-runtime','correct-data','update-knowledge','produce-content','retire-scope'];
 const classify=(action,effectful=true,requiresBackend=false)=>action==='implement-frontend'?{action,effectful,requiresBackend}:{action,effectful};
 const acceptedBackendRun=()=>{const run={goal:{workflow:'implement-backend'},goalDigest:'b'.repeat(64),responses:{backend:{criteria:[{id:'unit-tests-pass',status:'pass',observation:'Unit suite passed.'},{id:'backend-e2e-pass',status:'pass',observation:'Backend E2E suite passed.'}],outputs:{apiContract:'GET /v1/items response contract'}}},status:'accepted',approvals:[]};run.resultDigest=workflowDigest({goalDigest:run.goalDigest,responses:run.responses});run.approvals.push({actor:'user',phase:'acceptance',approved:true,digest:run.resultDigest,messageId:'user-acceptance',quote:'Accept backend result'});return run;};
@@ -86,5 +86,6 @@ test('backend job requires distinct unit and backend E2E acceptance before front
 
 test('catalog skill path resolves to the actual project skill',()=>{
   const actual=fs.realpathSync(fileURLToPath(new URL('../SKILL.md',import.meta.url)));
-  assert.equal(fs.realpathSync(fileURLToPath(new URL(catalog.skill,new URL('../workflows/catalog.json',import.meta.url)))),actual);
+  const fromDist=fs.realpathSync(fileURLToPath(new URL(catalog.skill,new URL('../.dist/workflows/catalog.json',import.meta.url))));
+  assert.equal(fromDist,actual);
 });

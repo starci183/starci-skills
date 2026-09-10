@@ -1,0 +1,15 @@
+schema: starci/knowledge-source@1
+id: be.two
+title: Two
+purpose: |
+  Second topic reusing BE-CROSS-DUP-1 so the compiler must reject the tree.
+appliesTo: [backend]
+family: be
+rules:
+  - id: BE-CROSS-DUP-1
+    title: Shared id second topic
+    kind: mandatory
+    requirement: |
+      Duplicate of the id in one.yaml; must fail compile.
+    rationale: |
+      Fixture only.

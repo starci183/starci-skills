@@ -1,0 +1,4 @@
+schema: starci/json-exceptions@1
+exceptions:
+  - path: package.json
+    reason: npm package manifest for the disposable offender fixture

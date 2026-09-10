@@ -1,0 +1,11 @@
+schema: starci/readme@3
+purpose: One skill routes complete verified jobs through bounded workflow matrices.
+entry: SKILL.md
+layout: INDEX.json
+commands:
+  ensure: npm run build:ensure
+  build: npm run build
+  test: npm test
+  sites: npm run build:sites
+runtime: Read only selected JSON artifacts in .dist; source code is tooling, not extra prompt documents.
+legacy: Removed; history remains in Git.

@@ -45,7 +45,8 @@ import {presentAutoPlan,approveAutoPlan,hasAutoAcceptance} from '../workflows/au
 import {verifyProducerResult} from '../workflows/producer-verification.mjs';
 import {hasDirectProducerAcceptance} from '../workflows/producer-verification.mjs';
 
-const catalog=JSON.parse(fs.readFileSync(new URL('../workflows/catalog.json',import.meta.url)));
+import {readWorkflow, readExample, readPublicJson} from './helpers/read-public.mjs';
+const catalog=readWorkflow('catalog.json');
 const consumer=run=>selectJobPlan(catalog,{actions:[{action:'implement-frontend',effectful:true,requiresBackend:true}],acceptedBackendRun:run});
 const reseal=run=>{for(const [id,r]of Object.entries(run.responses))r.requestDigest=workflowDigest(run.requests[id]);run.resultDigest=workflowDigest({goalDigest:run.goalDigest,responses:run.responses});for(const a of run.approvals)if(a.phase.includes('acceptance'))a.digest=run.resultDigest;};
 function backend(t,mode,{done=false,upstream=false,referenceInput=false,omitApi=false,beforeApprove}={}){
@@ -182,7 +183,7 @@ test('producer verification loads in different entry orders and a relocated runt
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handoff-import-'));
  t.after(()=>{assert.equal(path.dirname(dir),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(dir).startsWith('starci-handoff-import-'));fs.rmSync(dir,{recursive:true,force:true});});
  const sourceRoot=new URL('../',import.meta.url);
- for(const name of ['workflows','core','schemas','specifications','contracts','SKILL.md'])fs.cpSync(new URL(name,sourceRoot),path.join(dir,name),{recursive:true});
+ for(const name of ['workflows','core','schemas','specifications','contracts','.dist','SKILL.md'])fs.cpSync(new URL(name,sourceRoot),path.join(dir,name),{recursive:true});
  for(const order of [['producer-verification','select','lifecycle'],['lifecycle','auto','delegation','select'],['select','delegation','producer-verification']]){
   const script=order.map(name=>'await import('+JSON.stringify(new URL('./workflows/'+name+'.mjs','file:///'+dir.replaceAll('\\','/')+'/').href)+');').join('');
   const result=spawnSync(process.execPath,['--input-type=module','-e',script],{encoding:'utf8',timeout:15000});assert.equal(result.status,0,result.stderr||result.error?.message);

@@ -1,0 +1,171 @@
+schema: starci/knowledge-source@1
+id: coding-reference
+title: Enforced coding conventions
+purpose: |
+  The applicable rules in knowledge/patterns/be and knowledge/patterns/fe are the concrete
+  mandatory coding conventions. Read and apply their structures, examples and prohibitions
+  directly. starci-academy-backend and starci-academy-fe are extraction provenance, not a
+  substitute instruction to rediscover the conventions on every task. Target-project legacy
+  code does not override them.
+appliesTo: [backend, frontend]
+family: cross-cutting
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - starci-academy-backend
+    - starci-academy-fe
+  limitations: |
+    Historical file counts do not prove current conformance. Reopen the extraction source when
+    a case is missing, contradictory or stale, then repair that knowledge; do not answer such a
+    gap with a generic consult-the-reference instruction.
+rules:
+  - id: REF-SCOPE-1
+    title: Specification versus coding reference
+    kind: mandatory
+    requirement: |
+      Current accepted Business/SRS and Architecture/SDS in .starciwork define what to build;
+      Academy references define how code is organized and written. Do not copy reference
+      application business behavior as product requirements.
+    rationale: |
+      Mixing product intent with reference implementation style produces incorrect requirements
+      and copied business policies.
+
+  - id: REF-SCOPE-2
+    title: Select applicable cases before writing
+    kind: mandatory
+    requirement: |
+      Before implementation or acceptance, select the applicable extracted pattern cases and
+      verify the target's actual installed APIs and lint configuration. Check boundaries,
+      handlers/services, dependency injection, transport contracts, entities, exceptions and
+      tests. Reopen the extraction source when a case is missing, contradictory or stale, then
+      repair that knowledge.
+    rationale: |
+      Conventions are concrete extracted cases, not a vague instruction to rediscover another
+      repository on every task.
+
+  - id: REF-SCOPE-3
+    title: Structure check before first production unit
+    kind: mandatory
+    requirement: |
+      Check the intended structure before writing the first production unit, not only after
+      tests pass. In the existing workflow brief/result, identify the applicable pattern cases
+      and actual reference units, then compare the changed unit's responsibilities, dependencies
+      and database binding. Recheck after refactoring. A class rename from Repository to Service
+      does not satisfy the convention if the same facade or leaked manager remains. Do not create
+      another Plan or standalone checklist file solely for this check.
+    rationale: |
+      Late structural discovery leaves forbidden facades and wrong ownership in place after
+      tests already pass.
+
+  - id: REF-SCOPE-4
+    title: No waiver by legacy, tests or preference
+    kind: mandatory
+    requirement: |
+      Every applicable pattern rule must be satisfied before code acceptance. Existing drafts,
+      frozen path lists, legacy code, passing functional tests and coordinator preference do not
+      waive a convention. Fix violations in the owned scope. If the convention itself is
+      genuinely incompatible, report the conflict for an explicit owner decision; do not silently
+      choose an alternative. Update only affected scope bindings, not the entire delivery design.
+    rationale: |
+      Acceptance without convention conformance reintroduces debt as if it were authorized design.
+
+  - id: REF-BE-1
+    title: Named EntityManager injection
+    kind: mandatory
+    requirement: |
+      Backend database-owning handlers or capability services MUST inject EntityManager using the
+      appropriate named database decorator backed by InjectEntityManager. They MUST NOT inject
+      TypeORM Repository or obtain a public manager through a store/repository facade. The
+      decorator MUST select the intended database: an instance connection cannot be replaced with
+      Core primary. Transaction callbacks use their transaction-scoped manager. Pure helpers
+      receive that manager explicitly; they do not create another data-access architecture.
+    rationale: |
+      Persistence ownership and connection tokens are part of the convention; facades and wrong
+      tokens hide the real database binding.
+    relatedExamples:
+      - graphql-command
+      - transactional-service
+    verification:
+      automated:
+        - must-inject-entity-manager
+        - no-injected-repository
+      manual:
+        - Verify decorator body and actual database token, not only decorator spelling.
+        - Catch custom AccountingRepository/StorePort facades that lint does not detect.
+
+  - id: REF-BE-2
+    title: GraphQL feature unit shape
+    kind: mandatory
+    requirement: |
+      GraphQL feature units MUST follow their pattern case: thin resolver, thin bus-facing
+      service, command/query envelope and ICQRSHandler.process. Capability services are not
+      GraphQL bus wrappers and follow their own applicable case. Apply folder, naming, import,
+      typing, documentation, module-registration, exception and test conventions as well;
+      checking only EntityManager is insufficient.
+    rationale: |
+      A single persistence check does not prove CQRS ownership, module wiring or transport shape.
+    relatedExamples:
+      - graphql-command
+    verification:
+      automated:
+        - handler-overrides-process
+      manual:
+        - Confirm resolver → service → command/query → handler → module registration chain.
+        - Do not infer bootable DI from isolated handler unit tests.
+
+  - id: REF-VERIFY-1
+    title: Lint integrity and uncovered conventions
+    kind: mandatory
+    requirement: |
+      Run installed convention lint rules on touched code without disabling them to obtain a
+      pass. Inspect structural rules not covered by lint explicitly against their rule IDs;
+      passing lint is not proof that uncovered conventions hold. Record actual checks and
+      remaining violations in the existing implementation/review result, without adding
+      ceremonial files. Test behavior separately. Expected typed business outcomes remain
+      outcomes; the exception convention applies to thrown failures, not to every refusal result.
+    rationale: |
+      Lint success is integrity of reported results, not full structural or semantic conformance.
+    verification:
+      automated:
+        - scripts/check-scoped-lint.mjs
+      manual:
+        - Audit disabled rules, unused directives, TypeScript directives and structural omissions.
+
+  - id: REF-VERIFY-2
+    title: No conformance by bypass
+    kind: mandatory
+    requirement: |
+      Never obtain conformance by adding lint/TypeScript suppressions, lowering required rule
+      severity, expanding ignores, relocating source into test/generated lanes, replacing types
+      with any/casts, aliasing forbidden dependencies or renaming a forbidden facade. Verify the
+      exact changed production files were included in the real checks. Existing suppressions and
+      tool blind spots are not permission to bypass a rule. A legitimate tool defect requires a
+      narrow reviewed correction with regression coverage; it is not a clean product result until
+      the underlying convention is independently verified.
+    rationale: |
+      Bypass techniques manufacture a pass without satisfying the convention.
+
+  - id: REF-FE-1
+    title: Frontend Grammar and composition
+    kind: mandatory
+    requirement: |
+      Frontend follows Academy coding and composition conventions using verified installed
+      Grammar exports, never invented component APIs. Missing reference access is reported, not
+      labeled compliant. Current public package entry is @starci/grammar/common.
+    rationale: |
+      Invented Grammar APIs and stale aliases produce non-portable frontend units.
+    relatedExamples:
+      - connected-block
+    verification:
+      manual:
+        - Verify installed Grammar exports before using component names or props.
+
+  - id: REF-LANG-1
+    title: English knowledge; separate behavior proof
+    kind: mandatory
+    requirement: |
+      Maintain knowledge in English only. User-facing communication may use the configured
+      language. Verify behavior and coding-reference conformance separately.
+    rationale: |
+      Knowledge mirrors and mixed proof channels obscure the mandatory English rule set and
+      conflate product behavior with convention checks.

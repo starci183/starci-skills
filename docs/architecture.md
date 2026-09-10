@@ -32,7 +32,7 @@ For implementation, backend changes must establish API/unit/E2E evidence before 
 | Complete plan and coverage | `workflows/plan.json`, `workflows/plan.mjs` |
 | Requests, receipts and delivery | `workflows/lifecycle.mjs` |
 | Durable metadata and proof | `core/`, `schemas/` |
-| Domain execution constraints | `ops/<operator>/operator.json` |
+| Domain execution constraints | `ops/<operator>/operator.yaml` |
 | Generated agent-facing contracts | `.dist/` |
 
 The CLI exposes local setup, inspection and validation. It is not a headless autonomous agent runner. Existing `work/*` wire IDs are retained, while the public product and command are StarCi.

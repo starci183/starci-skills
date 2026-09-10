@@ -1,0 +1,188 @@
+schema: starci/knowledge-source@1
+id: fe.error
+title: Error
+purpose: |
+  Given a failure in the frontend, how is it represented and where does it go?
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - src/components/blocks/**/component.tsx
+    - blocks/commerce/CartBlock/index.spec.tsx
+    - src/modules/toast/api.ts
+    - src/modules/api/graphql/types.ts
+    - src/hooks/swr/*
+    - packages/grammar/src/common/conformance.ts
+  limitations: |
+    Historical reference-source observations at skill commit
+    edf72554425f918e80c9205e9c6db10596e722f0; not a fresh audit. Old counts cannot claim a fresh scan.
+rules:
+  - id: FE-ERROR-1
+    title: Failure is a state of the pure half
+    kind: mandatory
+    requirement: |
+      Failure is a member of the pure-half state union. The connected half maps SWR error into that
+      state, resolves failure copy into labels, and exposes retry on on. Connected specs assert the
+      mapping.
+    rationale: |
+      Treating failure as renderable state keeps transport out of the pure half and makes retry an
+      explicit action.
+    cases:
+      - id: case-1
+        when: "The generic case"
+        write: >
+          "failed" is a member of the block state union in 219 component.tsx files; the connected half
+          maps SWR error to it and the pure half draws it
+      - id: case-2
+        when: "Several failure origins"
+        write: >
+          "sessionsFailed" | "historyFailed" | "streamFailed" | "quotaRejected" in StarCiAiChatState;
+          const stateNeedsRetry = (state) => state === "sessionsFailed" || state === "historyFailed"
+          || state === "streamFailed" || state === "quotaRejected"
+      - id: case-3
+        when: "Failure copy"
+        write: >
+          resolved by the connected half into labels.states[props.state] and drawn as an assistant
+          turn: { id: `state-${props.state}`, role: "assistant", body: labels.states[props.state] }
+      - id: case-4
+        when: "Retry"
+        write: >
+          an action on on: <Button variant="primary" size="sm" onPress={props.on?.retry}>{labels.retry}</Button>
+      - id: case-5
+        when: "Connected spec"
+        write: "asserts the mapping: mocks.cart.isLoading = true … expect(mocks.input?.blockState).toBe(\"pending\")"
+    verification:
+      automated: []
+      manual:
+        - Confirm pure halves draw failure from state/labels rather than catching transport errors.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-ERROR-2
+    title: The GraphQL envelope
+    kind: mandatory
+    requirement: |
+      Every GraphQL response selects { success, message, error, data } and is typed
+      GraphQLResponse<T>. Read hooks unwrap to data or null without throwing. Writes with feedback use
+      runGraphQLWithToast.
+    rationale: |
+      A shared envelope keeps transport and typed-envelope failures visible at one helper.
+    cases:
+      - id: case-1
+        when: "Every response"
+        write: >
+          { success, message, error, data } selected in each document (query Course … { success message
+          error data { … } }) and typed GraphQLResponse<T> in modules/api/graphql/types.ts
+      - id: case-2
+        when: "A read hook unwraps"
+        write: "return result.data?.course?.data ?? null — a missing payload becomes null data, not a throw"
+      - id: case-3
+        when: "A write with feedback"
+        write: >
+          runGraphQLWithToast(action, options): Promise<boolean> — "Execute one GraphQL write and
+          surface both transport and typed-envelope failures"
+      - id: case-4
+        when: "Localised default copy"
+        write: >
+          const DEFAULT_MESSAGES: ToastMessages = { successTitle: "Success", errorTitle: "Error",
+          unauthorizedTitle: "Unauthorized", … } overridable per call through messages
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-ERROR-3
+    title: throw new Error where silence would be wrong
+    kind: mandatory
+    requirement: |
+      throw new Error(…) marks results the code cannot continue without (52 sites in src/ non-spec).
+      A custom Error subclass is residual, not a pattern.
+    rationale: |
+      Hard stops prevent silent null continuation when a required payload or owner context is missing.
+    cases:
+      - id: case-1
+        when: "Empty payload on a required read"
+        write: "if (value === undefined) throw new Error(\"Course Community returned no data\")"
+      - id: case-2
+        when: "Mutation returned nothing"
+        write: "if (result === null) throw new Error(\"Flashcard review completion returned no result\")"
+      - id: case-3
+        when: "Slot used outside its owner"
+        write: >
+          if (value === undefined) throw new Error("CourseFoundationCategoryBlock slots must be
+          rendered inside CourseFoundationCategoryBlockBase")
+      - id: case-4
+        when: "Offline"
+        write: "throw new Error(\"offline\") inside a fetcher so SWR records error"
+      - id: case-5
+        kind: residual
+        when: "Custom class"
+        write: >
+          one exists: class PersonalProjectEnrollmentDeniedError extends Error in
+          useQueryPersonalProjectTaskWorkspaceSwr.ts; not a pattern
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+
+  - id: FE-ERROR-4
+    title: Propagation
+    kind: mandatory
+    requirement: |
+      Hook throws are not caught locally; SWR stores them and the connected half reads query.error.
+      Write actions use runGraphQLWithToast and local failure flags. Render crashes go to
+      global-error.tsx. Telemetry lives under config/instrumentation files.
+    rationale: |
+      Propagation stays at the layer that already owns user-visible state or process boundaries.
+    cases:
+      - id: case-1
+        when: "Inside a hook"
+        write: >
+          not caught; SWR stores it and the connected half reads query.error (catch ( appears in 3
+          files across src/)
+      - id: case-2
+        when: "Inside a write action"
+        write: "runGraphQLWithToast returns false and toasts; the caller flips a local state (payment.hasFailed)"
+      - id: case-3
+        when: "Render crash"
+        write: "src/app/global-error.tsx"
+      - id: case-4
+        when: "Telemetry"
+        write: "src/config/sentry.ts, src/instrumentation.ts, instrumentation-client.ts"
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-ERROR-5
+    title: Grammar package
+    kind: mandatory
+    requirement: |
+      Grammar throws TypeError for invalid conformance definitions at module init and for invalid
+      vocabulary values in assertPresentationState.
+    rationale: |
+      Package-level TypeError fails fast on invalid family definitions before product composition.
+    cases:
+      - id: case-1
+        when: "Invalid definition at module init"
+        write: >
+          throw new TypeError(`Invalid ${definition.familyId} Grammar conformance: missing=[…],
+          unknown=[…]`) in defineGrammarRuleConformance
+      - id: case-2
+        when: "Invalid vocabulary value"
+        write: "assertPresentationState(\"unknown\") throws TypeError (common/index.test.mjs)"
+    verification:
+      automated: []
+      manual:
+        - Verify conformance helpers against installed @starci/grammar/common exports.
+    relatedExamples: []
+openQuestions:
+  - id: typed-error-class-for-no-data
+    kind: proposal
+    summary: |
+      Whether a typed error class should replace throw new Error("…") for the "no data" cases: one
+      custom class against 52 plain throws, so the plain form is what the code does today.

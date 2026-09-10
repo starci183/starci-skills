@@ -1,0 +1,257 @@
+schema: starci/knowledge-source@1
+id: fe.test
+title: Test
+purpose: |
+  Given a frontend unit, where does its spec live, what does it assert, and what does it leave alone?
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - src/components/pages/CartPage/index.spec.tsx
+    - pages/CodingDomainPage/component.spec.tsx
+    - blocks/commerce/CartBlock/index.spec.tsx
+    - hooks/index.ts
+    - packages/grammar/src/**/*.spec.tsx
+    - packages/grammar/src/**/*.test.mjs
+    - package.json scripts (vitest run)
+    - https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.json
+  limitations: |
+    Cited counts and notes are historical observations at skill commit
+    edf72554425f918e80c9205e9c6db10596e722f0, not a census of the current project. Inspect actual
+    source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
+    Historical links supply provenance, not scripts or execution instructions.
+    One rule is retired here: FE-TEST-7 folded into FE-TEST-1 Case 7, because where a spec lives and
+    which half it measures are one law about one placement. Its number is not reused.
+rules:
+  - id: FE-TEST-1
+    title: Placement
+    kind: mandatory
+    requirement: |
+      Specs sit beside their subject. Pure halves use component.spec.tsx; connected halves use
+      index.spec.tsx; hooks and classNames use matching .spec siblings. No __tests__/ folders. Runner
+      is vitest with @testing-library/react. A new unit with both halves (FE-FUNCTION-4) needs both
+      specs; a leaf has one.
+    rationale: |
+      Colocation and one-spec-per-half prevent one half from standing in for the other.
+    cases:
+      - id: case-1
+        when: "Pure half"
+        write: "component.spec.tsx beside component.tsx (55 blocks, 42 pages)"
+      - id: case-2
+        when: "Connected half"
+        write: "index.spec.tsx beside index.tsx (61 blocks, 24 pages, 19 leaves)"
+      - id: case-3
+        when: "Hook"
+        write: "useQueryCourseSwr.spec.ts beside the hook"
+      - id: case-4
+        when: "Class strings"
+        write: "classNames.spec.ts beside classNames.ts (2 in blocks); Grammar CSS proof in styles.spec.ts (6)"
+      - id: case-5
+        when: "Anywhere else"
+        write: "0 of 497 specs live in a __tests__/ folder"
+      - id: case-6
+        when: "Runner"
+        write: "vitest, @testing-library/react; describe/it/expect/vi imported from \"vitest\""
+      - id: case-7
+        when: "A new unit that has both halves (FE-FUNCTION-4)"
+        write: >
+          Both files above, one per half. Neither stands in for the other: the connected spec replaces
+          the pure half wholesale (FE-TEST-2 Case 4) and the pure spec stubs its child owners
+          (FE-TEST-3 Case 3), so a unit carrying one spec has one uncovered half rather than partial
+          coverage of two. A leaf has no pure half and therefore one spec (FE-FOLDER-2 Case 4)
+    verification:
+      automated: []
+      manual:
+        - Confirm new split units ship both component.spec.tsx and index.spec.tsx.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-TEST-2
+    title: "Connected spec: mock the doors, assert the props handed down"
+    kind: mandatory
+    requirement: |
+      Connected specs hoist mock state, mock @/hooks and translation/router doors, replace the pure
+      twin wholesale, import the connected export after mocks, assert mapped props/actions, and reset
+      in beforeEach.
+    rationale: |
+      Mocking the barrel and the pure twin isolates connected mapping without reaching the network.
+    cases:
+      - id: case-1
+        when: "Hoisted mock state"
+        write: >
+          const mocks = vi.hoisted(() => ({ input: undefined as TestInput | undefined, token: "token"
+          as string | undefined, cart: { data: undefined as unknown, error: undefined as unknown,
+          isLoading: false, mutate: vi.fn() }, … }))
+      - id: case-2
+        when: "The hooks barrel"
+        write: >
+          vi.mock("@/hooks", () => ({ useQueryMyCartSwr: () => mocks.cart,
+          useQueryCoursesCheckoutPreviewSwr: () => mocks.preview, … })) (25 of 61 block index specs)
+      - id: case-3
+        when: "Translation and routing"
+        write: >
+          vi.mock("next-intl", () => ({ useLocale: () => "en", useTranslations: () => (key: string) =>
+          key })), vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }))
+      - id: case-4
+        when: "The pure twin"
+        write: >
+          vi.mock("./component", () => ({ CartBlockBase: (input: TestInput) => { mocks.input = input;
+          return <output data-testid="cart" /> } }))
+      - id: case-5
+        when: "Import after mocks"
+        write: "import { CartBlock } from \"./index\" placed after the vi.mock calls"
+      - id: case-6
+        when: "Assertion"
+        write: >
+          expect(mocks.input?.blockState).toBe("empty"), act(() => { mocks.input?.on.pay() }),
+          expect(mocks.checkout.trigger).toHaveBeenCalledWith(expect.objectContaining({ paymentType:
+          "payos" }))
+      - id: case-7
+        when: "Reset"
+        write: "beforeEach(() => { vi.clearAllMocks(); mocks.input = undefined; … })"
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-TEST-3
+    title: "Pure spec: render fixtures, assert what a reader would find"
+    kind: mandatory
+    requirement: |
+      Pure specs render fixtures, assert landmarks/text, stub child owners, and may iterate exported
+      state inventories. Pages that compose without owning assert the connected child presence.
+    rationale: |
+      Reader-facing assertions prove presentation without locking class strings or network behaviour.
+    cases:
+      - id: case-1
+        when: "Render"
+        write: >
+          render(<CodingDomainPageBase domain="arrays" navHome="Home" navPractice="Practice"
+          title="Arrays" />)
+      - id: case-2
+        when: "Landmarks and text"
+        write: >
+          expect(screen.getByRole("heading", { name: "Arrays" })).toBeInTheDocument() (185 specs use
+          getByRole, 173 getByText, 60 getByTestId)
+      - id: case-3
+        when: "Child owners stubbed"
+        write: >
+          vi.mock("@/components/blocks/coding/CodingDomainStanding", () => ({ CodingDomainStanding:
+          () => <div data-testid="domain-standing" /> })) then
+          expect(screen.getByTestId("domain-standing")).toBeInTheDocument()
+      - id: case-4
+        when: "Page composes without owning"
+        write: >
+          it("composes the connected cart block without owning its state", () => { render(<CartPage
+          />); expect(screen.getByTestId("cart-block")).toHaveTextContent("cart-block") })
+      - id: case-5
+        when: "State inventory"
+        write: "pure specs iterate the exported X_STATES array to render every member"
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-TEST-4
+    title: Names
+    kind: mandatory
+    requirement: |
+      describe uses the export under test. it is a sentence about behaviour.
+    rationale: |
+      Matching describe to the export ties failures to the half under measurement.
+    cases:
+      - id: case-1
+        when: "describe"
+        write: >
+          the export under test: describe("CodingDomainPageBase", describe("CartBlock",
+          describe("CartPage route" (85 of 97 component.spec use the …Base name; 0 index.spec do)
+      - id: case-2
+        when: "it"
+        write: >
+          a sentence about behaviour: "keeps topic anatomy while composing connected standing and
+          problem owners", "maps cart states and dispatches browse, clear and checkout actions"
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+
+  - id: FE-TEST-5
+    title: Not asserted
+    kind: mandatory
+    requirement: |
+      Specs do not use snapshots, reach the network, assert translation copy, or pin literal class
+      strings in component/index specs. Class proof lives in classNames.spec.ts or Grammar style specs.
+    rationale: |
+      Pinning presentation literals duplicates authority and turns correct scale moves into failures.
+    cases:
+      - id: case-1
+        when: "Snapshots"
+        write: "0 toMatchSnapshot / toMatchInlineSnapshot in src/"
+      - id: case-2
+        when: "Network"
+        write: "never reached; @/hooks is mocked wholesale, which is why the barrel exists"
+      - id: case-3
+        when: "Translation content"
+        write: "useTranslations: () => (key: string) => key — a spec asserts keys, not copy"
+      - id: case-4
+        when: "A literal class string in a component or index spec"
+        write: >
+          Nothing. Assert the role, the text, or the prop handed down. A pinned literal duplicates the
+          presentation authority in a second place, so a class that moves onto the closed scale turns a
+          spec red for a correct change, and a class that is off the scale is locked in by the spec that
+          pins it. Class proof has its own homes: classNames.spec.ts beside the classes it proves, and
+          the Grammar package's own style spec. The specs that pin a literal anyway are the open
+          question below, not a second practice
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-TEST-6
+    title: Grammar package
+    kind: mandatory
+    requirement: |
+      Grammar component behaviour uses collocated index.spec.tsx. Built output and package surface use
+      node:test against dist/. Family-wide proof lives in core/*family*.spec.tsx files.
+    rationale: |
+      Dist and peerDependency proofs keep the public package contract separate from component RTL specs.
+    cases:
+      - id: case-1
+        when: "Component behaviour"
+        write: "index.spec.tsx beside index.tsx (24)"
+      - id: case-2
+        when: "Built output"
+        write: >
+          common/index.test.mjs: import test from "node:test" … assert.equal(COMMON_UI_RULE_IDS.length,
+          117) against ../../dist/common/index.js
+      - id: case-3
+        when: "Package surface"
+        write: >
+          package-boundary.test.mjs: assert.deepEqual(Object.keys(packageJson.peerDependencies).sort(),
+          ["@heroui/react", "react"])
+      - id: case-4
+        when: "Family-wide proof"
+        write: "core/family.spec.tsx, core/surface-card-family.spec.tsx, core/scrollable-surfaces.spec.tsx"
+    verification:
+      automated: []
+      manual:
+        - Verify asserted export inventories against installed package dist, not retired @grammar paths.
+    relatedExamples: []
+openQuestions:
+  - id: minority-class-literal-pins
+    kind: residual
+    summary: |
+      A minority of component and index specs still pin a class literal. FE-TEST-5 Case 4 records the
+      majority as the rule and treats the rest as a standing debt against it rather than a second
+      practice; this file does not say which of them to delete first. The counts are in
+      https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.json.
+  - id: existing-units-single-spec-backlog
+    kind: residual
+    summary: |
+      FE-TEST-1 Case 7 binds a new unit. It is not a census of the tree: most existing units carry one
+      spec and not two, and no sweep of that backlog is legislated here.

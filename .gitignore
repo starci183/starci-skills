@@ -1,4 +1,7 @@
 dist/
+/.dist/
+/.dist.staging/
+/.dist.previous/
 
 
 # Local tools and scratch are not distributable skill sources.
@@ -19,3 +22,6 @@ __pycache__/
 
 # Local language, model and reasoning preferences
 /config.json
+/sites/docs/.next/
+/sites/docs/out/
+/sites/docs/pages/

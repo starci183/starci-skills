@@ -1,0 +1,66 @@
+schema: starci/knowledge-source@1
+id: fe
+title: Frontend code patterns
+purpose: |
+  knowledge/ui/ decides what the interface must be: which Grammar object renders, which gap, which
+  tone. knowledge/patterns/fe/ decides how the code that produces that interface is written: where
+  a unit lives, what its files are called, how a component function is shaped, where a class string
+  sits, how a failure is represented, and where the spec goes. A pattern rule never chooses a visual;
+  a ui/ rule never chooses a file name. Every rule below was extracted from
+  the reference application (src/) and its Grammar package (packages/grammar/src/) by opening files and counting,
+  and each table cites the files it was read from. Where the code is split, the file records the
+  historical variant counts. Follow ../../coding-reference.json: starci-academy-fe is the required
+  coding reference.
+  Applicability: these are historical reference-source observations preserved at skill commit
+  edf72554425f918e80c9205e9c6db10596e722f0, not universal framework rules or current-project
+  source evidence. Inspect the selected repository's actual types/APIs, aliases and lint/test setup;
+  verify reference conformance within approved .starciwork scope. Resolve incompatibilities explicitly;
+  target legacy code does not override the reference. Old counts cannot claim a fresh scan.
+  Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - "Application: the reference application's src/ (976 non-spec TypeScript files, 497 specs)."
+    - "Grammar package: its packages/grammar/src/."
+    - "Lint canon consulted for rule names only: @starci/eslint-canon-fe as installed under node_modules."
+  limitations: |
+    Historical reference-source observations; not a fresh audit of the selected repository.
+    Inspect actual source, manifest/lockfile, aliases and lint/test configuration before use.
+    Verify installed Grammar exports at the public entry @starci/grammar/common; do not revive stale
+    @grammar/* aliases as canonical.
+topics:
+  - path: folder.yaml
+    title: Folder
+    decides: "Tier directories, the file set of one unit, what a unit folder may not hold"
+    rules: "FE-FOLDER-1 … FE-FOLDER-6"
+  - path: naming.yaml
+    title: Naming
+    decides: "Folder, export, props type, class-name export, hook, constant and spec names"
+    rules: "FE-NAMING-1 … FE-NAMING-7"
+  - path: function.yaml
+    title: Function
+    decides: "Component shape, the props parameter, the three-part contract, helpers, route files"
+    rules: "FE-FUNCTION-1 … FE-FUNCTION-7"
+  - path: imports.yaml
+    title: Imports
+    decides: "The @/ alias, Grammar entry, import order, tier direction, the hooks barrel"
+    rules: "FE-IMPORTS-1 … FE-IMPORTS-7"
+  - path: comment.yaml
+    title: Comment
+    decides: "Export docblocks, field docs, decision prose, // sentences, banned content"
+    rules: "FE-COMMENT-1 … FE-COMMENT-5"
+  - path: typing.yaml
+    title: Typing
+    decides: "type over interface, readonly, literal unions, Array<T>, inferred returns"
+    rules: "FE-TYPING-1 … FE-TYPING-7"
+  - path: error.yaml
+    title: Error
+    decides: "Failure as a state, the GraphQL envelope, throw new Error, toasts"
+    rules: "FE-ERROR-1 … FE-ERROR-5"
+  - path: test.yaml
+    title: Test
+    decides: "Spec placement, connected versus pure spec, what is asserted, what is not"
+    rules: "FE-TEST-1 … FE-TEST-6"

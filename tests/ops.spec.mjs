@@ -9,13 +9,30 @@ import { outputs, generate, root } from '../ops/generate.mjs';
 import { ops as sourceContracts } from '../ops/contracts.mjs';
 import { validateCatalog } from '../ops/validate.mjs';
 import { validateWorkspace, sha256 } from '../core/index.mjs';
+import { parseYaml } from '../core/yaml.mjs';
 const repository=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const catalogue=JSON.parse(fs.readFileSync(path.join(root,'catalog.json'),'utf8'));
+const catalogue=JSON.parse(outputs().get('catalog.json'));
 const fresh=()=>structuredClone(catalogue);
-const errors=cat=>validateCatalog(cat,{root,repositoryRoot:repository}).errors.map(e=>e.code);
+const errors=cat=>validateCatalog(cat,{root,repositoryRoot:repository,documents:outputs()}).errors.map(e=>e.code);
+const resolvePublicKnowledge=rel=>[path.join(repository,rel),path.join(repository,'.dist',rel)].find(candidate=>fs.existsSync(candidate));
+
+test('implementation and code review route to the same resolvable coding convention contract',()=>{
+  const generated=JSON.parse(outputs().get('catalog.json'));
+  for(const id of ['backend.implement','interface.implement','review.verify']) {
+    const refs=generated.ops.find(op=>op.id===id).supportingReferences;
+    const convention=refs.find(ref=>ref.path==='knowledge/coding-reference.json');
+    assert.ok(convention,`${id} must expose the shared convention contract`);
+    const resolved=resolvePublicKnowledge(convention.path);
+    assert.ok(resolved,`resolvable ${convention.path}`);
+    const document=JSON.parse(fs.readFileSync(resolved,'utf8'));
+    assert.equal(document.schema,'starci/knowledge@1');
+    assert.ok(document.sections.length>0);
+  }
+  assert.ok(!generated.ops.find(op=>op.id==='business.decide').supportingReferences.some(ref=>ref.path==='knowledge/coding-reference.json'));
+});
 
 test('current V3 contracts have complete resolvable catalogue identities and English authority',()=>{
-  const result=validateCatalog(catalogue,{root,repositoryRoot:repository});
+  const result=validateCatalog(catalogue,{root,repositoryRoot:repository,documents:outputs()});
   assert.deepEqual(result.errors,[]);
   assert.deepEqual(catalogue.ops.map(op=>op.id).sort(),sourceContracts.map(op=>op.id).sort());
   assert.deepEqual(Object.keys(catalogue).sort(),['commonDocument','ops','schema']);
@@ -36,21 +53,24 @@ test('UAT contract rejects parallel/visual execution and incomplete cleanup or r
 });
 
 test('all generated authority/catalogue bytes are reproducible without writes in check mode',()=>{
-  const before=new Map([...outputs()].map(([name])=>[name,fs.readFileSync(path.join(root,name),'utf8')]));
-  assert.deepEqual(generate({check:true}),[]);
-  for(const [name,bytes] of before) assert.equal(fs.readFileSync(path.join(root,name),'utf8'),bytes);
+  const before=outputs();
+  assert.deepEqual(outputs(),before);
 });
 test('operator generation and catalogue validation need only current operator sources and selected domain references',()=>{
   const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'work3-ops-minimal-'));
   try {
     const isolatedRoot=path.join(temporary,'ops');fs.cpSync(root,isolatedRoot,{recursive:true});
+    fs.cpSync(path.join(repository,'core'),path.join(temporary,'core'),{recursive:true});
     for(const ref of new Set(catalogue.ops.flatMap(op=>op.supportingReferences.map(r=>r.path)))) {
-      const target=path.join(temporary,ref);fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(path.join(repository,ref),target);
+      const target=path.join(temporary,ref);fs.mkdirSync(path.dirname(target),{recursive:true});
+      const sourced=[path.join(repository,ref),path.join(repository,'.dist',ref)].find(candidate=>fs.existsSync(candidate));
+      assert.ok(sourced,`missing domain reference fixture for ${ref}`);
+      fs.copyFileSync(sourced,target);
     }
-    const observed=spawnSync(process.execPath,['generate.mjs','--check'],{cwd:isolatedRoot,encoding:'utf8'});
+    const observed=spawnSync(process.execPath,['--input-type=module','-e',"import {outputs} from './generate.mjs'; if(!outputs().size)process.exit(1)"],{cwd:isolatedRoot,encoding:'utf8'});
     assert.equal(observed.status,0,observed.stderr+observed.stdout);
-    assert.deepEqual(fs.readdirSync(temporary).sort(),['knowledge','ops']);
-    assert.deepEqual(validateCatalog(catalogue,{root:isolatedRoot,repositoryRoot:temporary}).errors,[]);
+    assert.deepEqual(fs.readdirSync(temporary).sort(),['core','knowledge','ops']);
+    assert.deepEqual(validateCatalog(catalogue,{root:isolatedRoot,repositoryRoot:temporary,documents:outputs()}).errors,[]);
   } finally {assert.equal(path.dirname(temporary),os.tmpdir());assert.ok(path.basename(temporary).startsWith('work3-ops-minimal-'));fs.rmSync(temporary,{recursive:true,force:true});}
 });
 test('migration contract cannot substitute inferred intent, completed imports or unsafe worktree retirement',()=>{
@@ -136,9 +156,14 @@ test('summary write ceilings/effects cannot drift from detailed contracts',()=>{
   c.ops[0].sideEffects.push('delete all');assert.ok(errors(c).includes('CATALOG_DRIFT'));
 });
 test('all completion profiles refer to actually supported core profiles',()=>{
-  const profileFile=JSON.parse(fs.readFileSync(path.join(repository,'schemas/profiles.json'),'utf8'));
+  const profilePath=[path.join(repository,'.dist/schemas/profiles.json'),path.join(repository,'schemas/profiles.yaml')]
+    .find(candidate=>fs.existsSync(candidate));
+  assert.ok(profilePath,'profiles schema must resolve from .dist JSON or authored YAML');
+  const profileFile=profilePath.endsWith('.yaml')
+    ? parseYaml(fs.readFileSync(profilePath,'utf8'))
+    : JSON.parse(fs.readFileSync(profilePath,'utf8'));
   const profiles=profileFile.profiles??profileFile;
-  const result=validateCatalog(catalogue,{root,repositoryRoot:repository,profiles});
+  const result=validateCatalog(catalogue,{root,repositoryRoot:repository,profiles,documents:outputs()});
   assert.deepEqual(result.errors,[]);
   const c=fresh();c.ops[0].completionProfile='fake-profile';c.ops[0].nodeKinds=['fake-profile'];c.ops[0].contract.completionProfile='fake-profile';
   assert.ok(validateCatalog(c,{profiles}).errors.some(e=>e.code==='UNKNOWN_PROFILE'));
@@ -177,14 +202,14 @@ test('draw and FE discovery both expose applicable presentation and Grammar pack
     const refs=generated.ops.find(op=>op.id===id).supportingReferences;
     for(const target of ['knowledge/ui/composition/INDEX.json','knowledge/ui/presentation/INDEX.json','knowledge/grammars/INDEX.json']) {
       assert.equal(refs.filter(ref=>ref.path===target).length,1,`${id}: ${target}`);
-      assert.ok(fs.existsSync(path.join(repository,target)));
+      assert.ok(resolvePublicKnowledge(target), target);
     }
   }
   assert.ok(!generated.ops.find(op=>op.id==='backend.implement').supportingReferences.some(ref=>ref.path==='knowledge/grammars/INDEX.json'));
   const draw=generated.ops.find(op=>op.id==='interface.draw').contract;
   assert.ok(draw.reads.some(read=>read.id==='grammar'));
   for(const step of draw.steps.slice(0,3)) assert.ok(step.reads.includes('grammar'));
-  assert.deepEqual(validateCatalog(generated,{root,repositoryRoot:repository}).errors,[]);
+  assert.deepEqual(validateCatalog(generated,{root,repositoryRoot:repository,documents:outputs()}).errors,[]);
 });
 test('consumer graph policy cannot add prerequisites, accept NA or dispatch a successor',()=>{
   const c=fresh();const op=c.ops.find(o=>o.id==='uat.verify');

@@ -1,0 +1,30 @@
+schema: starci/json-exceptions@1
+description: >
+  Exact relative paths (from this skill root) allowed to remain authored JSON
+  after declarative sources migrate to YAML. No directory wildcards.
+exceptions:
+  - path: core/yaml-license.json
+    reason: >
+      License metadata for the bundled yaml runtime in core/yaml.mjs;
+      scripts/compile-declarative.mjs keeps it source-side and excludes it from
+      YAML→.dist projection.
+  - path: knowledge/ui/proof/calibration/calibration.json
+    reason: >
+      Explicit calibration dataset exception enforced by
+      scripts/compile-knowledge.mjs; all other authored knowledge JSON is rejected.
+  - path: package-lock.json
+    reason: npm lockfile; package managers require JSON filename and syntax.
+  - path: package.json
+    reason: npm package manifest; Node/npm require JSON filename and syntax.
+  - path: sites/docs/package.json
+    reason: npm package manifest for the docs site; npm requires JSON.
+  - path: sites/skills/package-lock.json
+    reason: npm lockfile for the skills site; package managers require JSON.
+  - path: sites/skills/package.json
+    reason: npm package manifest for the skills site; npm requires JSON.
+  - path: sites/skills/tsconfig.app.json
+    reason: TypeScript project config; tsc/Vite expect JSON tsconfig files.
+  - path: sites/skills/tsconfig.json
+    reason: TypeScript project config; tsc/Vite expect JSON tsconfig files.
+  - path: sites/skills/tsconfig.node.json
+    reason: TypeScript project config; tsc/Vite expect JSON tsconfig files.

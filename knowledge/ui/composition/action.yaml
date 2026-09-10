@@ -1,0 +1,94 @@
+schema: starci/knowledge-source@1
+id: ui.composition.action
+title: Action composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  This file answers one question: when the reader activates something, what exactly happens, and who
+  owns it?
+  Action decisions come before the tree exists because they settle the count of owners and the count
+  of effects. A single activation reaching two handlers, or a command wearing anchor semantics, is a
+  composition mistake that no later styling can repair.
+  Applicability: API examples belong to the documented Grammar family; verify installed source and
+  the selected `.starciwork` specification before use. Gap labels here are findings, not dispatch commands.
+rules:
+  - id: ACTION-1
+    title: One activation, one effect
+    governs: Governs how many things may respond to a single press.
+    cases:
+      - id: case-1
+        when: An activation changes application state
+        assert: |-
+          Exactly one node owns the effect, and it is `Button`, or `TextAction` where the command reads as text; no second node carries `onPress` for the same activation
+      - id: case-2
+        when: The command participates in a form
+        assert: |-
+          The `.starciwork` specification names the chosen `Button.type`, so submit behaviour is stated rather than inherited from the enclosing form
+      - id: case-3
+        when: |-
+          The direction wants the whole row or container to be clickable too
+        assert: |-
+          The `.starciwork` specification names one owner for that activation; no clickable wrapper encloses a published command that owns the same effect
+      - id: case-4
+        when: |-
+          An ancestor or a document-level listener exists on the same path
+        assert: |-
+          No ancestor or document listener on that path responds to the same activation
+    notThisRule: whether the surface itself is the action is STATE-5.
+  - id: ACTION-2
+    title: Pending belongs to the initiator
+    governs: Governs which control shows that work is in flight.
+    cases:
+      - id: case-1
+        when: A command accepted work that has not settled
+        assert: |-
+          The node that initiated the work binds `isPending`; its label is unchanged, its busy state is exposed, and a second activation is refused
+      - id: case-2
+        when: |-
+          The work was started by the recovery action inside an empty or failed region
+        assert: |-
+          `EmptyNotice.isActionPending` carries it, and it resolves to the button that region owns
+      - id: case-3
+        when: Other controls are visible while that work runs
+        assert: |-
+          No other node changes state for that work, and no page-wide lock or spinner stands in for the initiator's pending
+      - id: case-4
+        when: |-
+          The direction is tempted to swap in `isDisabled` for the duration
+        assert: |-
+          The `.starciwork` specification binds `isPending`, not `isDisabled`, for accepted work; disabled appears only where the work cannot start
+      - id: case-5
+        when: The owner that needs pending publishes no pending prop
+        assert: |-
+          A `GRAMMAR_REQUIRED` gap naming that owner exists in the `.starciwork` specification, and no application-level pending substitute appears in the tree
+  - id: ACTION-3
+    title: Consequence chooses the semantics
+    governs: Governs the native element the reader operates.
+    cases:
+      - id: case-1
+        when: The consequence is following a real address
+        assert: |-
+          The node keeps `TextAction` with its `href` and stays an anchor under every appearance it is given
+      - id: case-2
+        when: The consequence is a state change
+        assert: |-
+          The node is `Button` or `TextAction` and carries a real handler, not a destination
+      - id: case-3
+        when: The direction wants to observe a follow before it happens
+        assert: |-
+          `TextAction.onFollow` is present only as an observer; the node still carries a real destination
+      - id: case-4
+        when: |-
+          An anchor is being used with a click handler and no destination
+        assert: |-
+          No such node exists in the tree; the command owner carries the effect instead
+    retired: |-
+      ACTION-4 is retired into COVERAGE-1 and is not reused; the address stays spent.
+doesNotDecide: |-
+  Which action deserves emphasis and what its variant promises is [CTA](cta.yaml). Which surface is
+  itself an action, and which controlled values persist, is [State](state.yaml). What the reader is told
+  after the action settles is [Feedback](feedback.yaml). What the `.starciwork` specification must enumerate about these
+  actions is [Coverage](coverage.yaml). Whether the rendered target is named, sized, and visibly
+  focusable is [Accessibility](../proof/accessibility.yaml) and [Focus](../proof/focus.yaml), and whether
+  the resulting claim is true is [Render truth](../proof/render-truth.yaml).

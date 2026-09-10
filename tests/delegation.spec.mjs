@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {readWorkflow, readExample, readPublicJson} from './helpers/read-public.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -200,7 +201,7 @@ test('auto does not inherit delegated technical-question classification',t=>{
 test('multi-stage frontend chain cannot reuse stale risk or stale draw proof for the next stage',t=>{
  const f=fixture(t,{count:1});f.plan.workflows[0].workflow='implement-frontend';f.plan.workflows[0].selection.verification='browser-uat';
  const reference=f.register(),goal=f.goal();goal.inputs.requiresBackend=false;
- const matrix=JSON.parse(fs.readFileSync(new URL('../workflows/matrix.json',import.meta.url))).rows.flat();
+const matrix=readWorkflow('matrix.json').rows.flat();
  goal.cells=matrix.map((cell,i)=>({...cell,purpose:'Synthetic '+cell.id,finalOutput:'Synthetic typed stage result',criteria:goal.criteria,workTargets:goal.workTargets,inputs:{request:i?{from:'cell',cell:matrix[i-1].id,key:'apiContract'}:{from:'request',key:'request'}},outputSchema:{type:'object',properties:{apiContract:{type:'string'}},required:['apiContract'],additionalProperties:false}}));
  let run=f.shown(reference,0,goal);run=authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review});
  const next=cellId=>requestCell(run,cellId,{coordinatorThreadId:'coordinator',taskThreadId:'worker',assessment:f.assessment(run,cellId)});

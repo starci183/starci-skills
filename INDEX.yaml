@@ -1,0 +1,44 @@
+schema: starci/layout@3
+entry: SKILL.md
+build:
+  command: node scripts/ensure-build.mjs
+  output: .dist
+  format: json
+  onMissingOrStale: build-immediately
+  onFailure: stop
+folders:
+  init: Host AGENTS.md and CLAUDE.md bootstrap templates; never routed-source scaffolding
+  ops: Operator JSON and authority
+  workflows: Matrices, contracts and runtime gates
+  profiles: Host profiles
+  knowledge: Lazy-loaded JSON guidance
+  contracts: Validation code
+  core: Work validation runtime
+  schemas: JSON schemas
+  specifications: Business and architecture contracts
+  cli: Inspection commands
+  scripts: Build tooling
+  tests: Regression checks
+  docs: Generated V3 JSON documentation
+  sites: V3 sites generated from catalogs
+limits:
+  rows: 3
+  parallel: 3
+  secondaryPerCaller: 3
+counts:
+  skills: 1
+  publicWorkflows: 16
+  operators: 14
+gates: workflows/gates.json
+work:
+  format: yaml-1.2
+  schema: schemas/work.schema.json
+  node: index.yaml
+  approval: goal-before-effects-and-result-before-done
+  checklist: <business>/<item>/**/index.yaml
+  evidence: <business>/<item>/evidence/<id>/manifest.yaml
+  workflowState: <backend>/.starciwork/_local/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}
+  layout: schemas/work-layout.json
+executionModes:
+  default: planned
+  explicitFlash: workflows/flash.json

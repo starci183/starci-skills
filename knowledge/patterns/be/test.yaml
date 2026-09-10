@@ -1,0 +1,248 @@
+schema: starci/knowledge-source@1
+id: be.test
+title: Test
+purpose: |-
+  Given a backend unit, where does its spec live, how is the subject built, what does it assert, and what does it leave alone?
+appliesTo:
+  - backend
+family: be
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - jest.config.ts
+    - features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.spec.ts
+    - modules/ai/ai-entitlement.service.spec.ts
+    - modules/ai/ping/classes/abstract-provider-ping.service.spec.ts
+    - src/tests/**
+    - eslint.config.mjs
+  limitations: |-
+    Historical reference-source observations preserved at the extraction commit; not a fresh audit of current repository conformance. Counts and file totals cited in rationale or cases are provenance from that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and lint/test setup; verify reference conformance within approved .starciwork scope. Target legacy code does not override the reference. Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
+
+    Open observation at extraction: 31 of 149 handlers and 125 of 396 services have no colocated spec. The twin is the pattern (lint rule exists); the gap is recorded, not excused.
+rules:
+  - id: BE-TEST-1
+    title: Placement and lanes
+    kind: mandatory
+    requirement: |-
+      Verify discovery using the consuming project's actual Jest config and test listing. The Academy suffixes describe its runner; do not rename a valid target integration spec solely to copy a suffix. Mock-only API routing tests do not prove database integration or end-to-end behavior. Record which transport, service, database and external boundary actually ran.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Unit
+        write: |-
+          <name>.spec.ts beside <name>.ts (875 at extraction; lint unit-test-colocated)
+      - id: case-2
+        when: Handler twin
+        write: |-
+          add-to-cart.handler.spec.ts beside the handler (118 of 149 handlers at extraction; lint handler-has-twin-spec)
+      - id: case-3
+        when: Service twin
+        write: |-
+          271 of 396 services under src/modules at extraction
+      - id: case-4
+        when: Integration
+        write: |-
+          *.int-spec.ts (7 at extraction), Testcontainers, globalSetup: src/tests/helpers/e2e-setup.ts, testTimeout: 120_000
+      - id: case-5
+        when: E2E and harness
+        write: |-
+          *.e2e-spec.ts, *.harness-spec.ts under src/tests/<lane>, excluded from unit by suffix
+      - id: case-6
+        when: Projects
+        write: |-
+          projects: [{ displayName: "unit", testMatch: ["**/*.spec.ts"], testPathIgnorePatterns: ["\\.int-spec\\.ts$", "\\.e2e-spec\\.ts$", "\\.harness-spec\\.ts$"] }, { displayName: "integration", testMatch: ["**/*.int-spec.ts"], … }]
+      - id: case-7
+        when: Runner
+        write: |-
+          jest with ts-jest (diagnostics: false), testEnvironment: "node"
+    verification:
+      automated:
+        - unit-test-colocated
+        - handler-has-twin-spec
+      manual:
+        - Record which transport, service, database and external boundary
+          actually ran; mock-only routing tests do not prove integration.
+    relatedExamples:
+      - graphql-command
+      - transactional-service
+  - id: BE-TEST-2
+    title: "Handler spec: construct directly, cast the mocks"
+    kind: mandatory
+    requirement: |-
+      Handler specs construct the subject directly with mock managers cast as never, build message factories, and call execute — never process.
+    rationale: |-
+      as never appears in 496 of 875 specs at extraction; as unknown as in 323.
+    cases:
+      - id: case-1
+        when: Subject
+        write: |-
+          const handler = new AddToCartHandler({ exists } as never) — the entity manager is a bare object of jest.fn()
+      - id: case-2
+        when: Message factory
+        write: |-
+          const command = (courseId: string) => new AddToCartCommand({ request: { courseId }, user: { id: "u1" } } as never)
+      - id: case-3
+        when: Ordered mock answers
+        write: |-
+          const exists = jest.fn().mockResolvedValueOnce(false); later exists.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
+      - id: case-4
+        when: Call through the public door
+        write: |-
+          handler.execute(command("missing")), never process
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-TEST-3
+    title: "Service spec: a testing module with shared mocks"
+    kind: mandatory
+    requirement: |-
+      Capability service specs use Test.createTestingModule with shared EntityManager mocks and alias-based config mocks.
+    rationale: |-
+      Test.createTestingModule appears in 274 specs at extraction.
+    cases:
+      - id: case-1
+        when: Module
+        write: |-
+          Test.createTestingModule({ … }) with getEntityManagerToken(POSTGRESQL_PRIMARY)
+      - id: case-2
+        when: Entity manager
+        write: |-
+          import { makeEntityManagerMock } from "@tests/mocks/entity-manager.mock" with EntityManagerMock, QueryBuilderMock types
+      - id: case-3
+        when: Config
+        write: |-
+          jest.mock("@modules/platform/env/config", () => ({ envConfig: () => ({ ai: { ping: mockPingConfig } }) }))
+      - id: case-4
+        when: Abstract class
+        write: |-
+          a local subclass: class TestPingService extends AbstractProviderPingService { protected readonly provider = ModelProvider.OpenAI; execute = jest.fn()…; protected executePing(key: string) { return this.execute(key) } }
+      - id: case-5
+        when: Fixture constants
+        write: |-
+          documented UPPER_SNAKE: /** Free base credit caps the mocked quota config hands back (credits per window). */ const BASE_CREDITS_5H = 30
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - transactional-service
+  - id: BE-TEST-4
+    title: What is asserted
+    kind: mandatory
+    requirement: |-
+      Assert exception types, ordering of side effects, returned rows and persisted arguments. it titles use a verb first.
+    rationale: |-
+      262 specs use rejects.toBeInstanceOf / toThrow( at extraction; 49 match a message string. Verb-first it titles: throws 83, rejects 65, returns 50, refuses 25.
+    cases:
+      - id: case-1
+        when: The exception type
+        write: |-
+          await expect(handler.execute(command("missing"))).rejects.toBeInstanceOf(CourseNotFoundException)
+      - id: case-2
+        when: Ordering of side effects
+        write: |-
+          await expect(handler.execute(…)).rejects.toBeInstanceOf(UserNotFoundException); expect(exists).not.toHaveBeenCalled()
+      - id: case-3
+        when: The returned row
+        write: |-
+          await expect(handler.execute(command("one"))).resolves.toBe(existing); .resolves.toEqual({ id: "cart-2" })
+      - id: case-4
+        when: Persisted argument
+        write: |-
+          expect(save).toHaveBeenCalledWith({ id: "draft" })
+      - id: case-5
+        when: it phrasing
+        write: |-
+          verb first: throws, rejects, returns, refuses, maps, creates — e.g. it("rejects anonymous callers before querying course state", …)
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-TEST-5
+    title: What is not asserted
+    kind: mandatory
+    requirement: |-
+      Do not ship call-only specs, e2e steps that only check success envelopes, sleep-based waits, live model calls in e2e, or branched outcomes inside one flow step.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: A call alone
+        write: |-
+          a spec that only proves a mock was invoked (lint no-call-only-spec)
+      - id: case-2
+        when: Envelope instead of state, in e2e
+        write: |-
+          an e2e step asserts the persisted row, not success: true (lint e2e-asserts-persisted-state)
+      - id: case-3
+        when: Elapsed time
+        write: |-
+          no sleep in a flow; poll for state (lint no-sleep-in-flow)
+      - id: case-4
+        when: Live model output, in e2e
+        write: |-
+          no provider call in e2e (no-model-call-in-e2e); the harness lane owns it (harness-calls-provider-directly)
+      - id: case-5
+        when: A branch inside one step
+        write: |-
+          one step proves one outcome (lint no-branch-in-flow-step)
+    verification:
+      automated:
+        - no-call-only-spec
+        - e2e-asserts-persisted-state
+        - no-sleep-in-flow
+        - no-model-call-in-e2e
+        - harness-calls-provider-directly
+        - no-branch-in-flow-step
+      manual: []
+    relatedExamples: []
+  - id: BE-TEST-6
+    title: Names and layout
+    kind: mandatory
+    requirement: |-
+      describe uses the class name; callbacks sit on a new line per function-call-argument-newline: always; imports keep multi-line brace style with subject first.
+    rationale: |-
+      367 …Service, 121 …Handler, 58 …Resolver describe titles at extraction.
+    cases:
+      - id: case-1
+        when: describe
+        write: |-
+          describe("AddToCartHandler", () => { … }), describe("AbstractProviderPingService", …)
+      - id: case-2
+        when: Formatting
+        write: |-
+          callbacks on a new line: describe("AddToCartHandler",
+              () => { and it("…",
+                  async () => { — the repo's function-call-argument-newline: always rule
+      - id: case-3
+        when: Imports
+        write: |-
+          same multi-line brace style as source; subject first, then exceptions, then mocks
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-TEST-7
+    title: Coverage and lint carve-outs
+    kind: mandatory
+    requirement: |-
+      Coverage excludes tests and entrypoints. Double casts, process.env and new Error are allowed only in the documented test lanes.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Coverage denominator
+        write: |-
+          collectCoverageFrom: ["src/**/*.ts", "apps/**/*.ts", "!src/tests/**", "!**/*.spec.ts", "!**/*.int-spec.ts", "!**/*.e2e-spec.ts", "!**/*.harness-spec.ts", "!**/*.d.ts", "!**/main.ts"]
+      - id: case-2
+        when: Allowed only in specs
+        write: |-
+          as unknown as X, process.env (under src/tests/**), new Error(…) in src/tests/** and apps/*/test/**
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []

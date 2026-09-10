@@ -1,0 +1,93 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: starci/knowledge-rule@1
+title: StarCi knowledge rule
+type: object
+additionalProperties: true
+required:
+  - id
+  - title
+properties:
+  id:
+    type: string
+    minLength: 1
+    pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]*$
+  title:
+    type: string
+    minLength: 1
+  kind:
+    type: string
+    enum:
+      - mandatory
+      - residual
+      - exception
+      - proposal
+  requirement:
+    type: string
+  governs:
+    type: string
+  rationale:
+    type: string
+  applicability:
+    type: string
+  required:
+    type: array
+    items:
+      type: string
+  forbidden:
+    type: array
+    items:
+      type: string
+  cases:
+    type: array
+    items:
+      type: object
+      additionalProperties: true
+      required:
+        - id
+        - when
+      properties:
+        id:
+          type: string
+          minLength: 1
+        when:
+          type: string
+          minLength: 1
+        write:
+          type: string
+        assert:
+          type: string
+        observe:
+          type: string
+        render:
+          type: string
+        kind:
+          type: string
+        owner:
+          type: string
+  verification:
+    type: object
+    additionalProperties: true
+    properties:
+      automated:
+        type: array
+        items: true
+      manual:
+        type: array
+        items: true
+  relatedExamples:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  relatedRules:
+    type: array
+    items:
+      type: string
+      minLength: 1
+anyOf:
+  - required:
+      - requirement
+  - required:
+      - governs
+  - required:
+      - cases

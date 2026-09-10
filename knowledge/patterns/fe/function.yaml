@@ -1,0 +1,276 @@
+schema: starci/knowledge-source@1
+id: fe.function
+title: Function
+purpose: |
+  Given a frontend component, hook or helper, what shape does the function take, what does it receive,
+  and what does it return?
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - src/components/pages/AuthenticationPage/*
+    - pages/CartPage/index.tsx
+    - blocks/ai/StarCiAiChat/*
+    - blocks/ai/CourseAdvisorRecommendationCard/*
+    - leaves/ButtonStateSample/index.tsx
+    - hooks/swr/useQueryCourseSwr.ts
+    - hooks/swr/useMutateAddToCartSwr.ts
+    - packages/grammar/src/core/primitive/Button/index.tsx
+  limitations: |
+    Cited counts and notes are historical observations at skill commit
+    edf72554425f918e80c9205e9c6db10596e722f0, not a census of the current project. Inspect actual
+    source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
+    Historical links supply provenance, not scripts or execution instructions. Verify installed Grammar
+    exports at @starci/grammar/common.
+rules:
+  - id: FE-FUNCTION-1
+    title: A component is an arrow const with one props parameter
+    kind: mandatory
+    requirement: |
+      App components are export const arrows with one props parameter typed XProps. They do not
+      destructure at the signature. Grammar package components may destructure with defaults; that
+      package convention differs from the app and stays internally consistent.
+    rationale: |
+      A single props object keeps the three-part contract readable and matches the dominant app census
+      (441 export const X = ( against 0 export function under src/components).
+    cases:
+      - id: case-1
+        when: "Any app component"
+        write: >
+          export const AuthenticationPageBase = (props: AuthenticationPageProps) => { … }
+          (441 export const X = ( against 0 export function under src/components; 428 take
+          (props: XProps), 0 destructure at the signature)
+      - id: case-2
+        when: "Reading fields"
+        write: "const { on } = props at the top, or props.props.labels, props.state inline"
+      - id: case-3
+        when: "Expression body when there is no local state"
+        write: >
+          export const ButtonStateSample = (props: ButtonStateSampleProps) => (
+          <span …>{props.props.label}</span> )
+      - id: case-4
+        kind: residual
+        when: "Grammar package component"
+        write: >
+          destructures with defaults at the signature:
+          export const Button = ({ children, variant = "secondary", size = "md", type = "button", …,
+          onPress }: ButtonProps) => … — the package convention differs from the app convention; each
+          side is internally consistent
+    verification:
+      automated: []
+      manual:
+        - Confirm app components take (props: XProps) without signature destructuring.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-FUNCTION-2
+    title: The three-part contract of a pure half
+    kind: mandatory
+    requirement: |
+      Pure halves receive resolved state, data/props and optional actions. Leaves and cards may use
+      narrower contracts; pages may carry only actions plus route-owned options.
+    rationale: |
+      Separating state, resolved facts and handlers lets the connected owner own fetching while the
+      pure half stays render-only.
+    cases:
+      - id: case-1
+        when: "Full block contract"
+        write: >
+          export type StarCiAiChatProps = { readonly state: StarCiAiChatState; readonly props:
+          StarCiAiChatData; readonly on?: StarCiAiChatActions } (state/blockState in 85, props: in 78,
+          on?: in 69 of 101 block component.tsx)
+      - id: case-2
+        when: "Leaf contract"
+        write: >
+          export type ButtonStateSampleProps = { readonly props: ButtonStateSampleData; readonly
+          isLoading?: boolean }
+      - id: case-3
+        when: "Card with an action slot"
+        write: >
+          { readonly props: CourseAdvisorRecommendationCardData; readonly isLoading?: boolean;
+          readonly action: { readonly href: string; readonly label: string } }
+      - id: case-4
+        when: "Page with only actions"
+        write: >
+          { readonly measure?: "form" | "formCompact"; readonly initialMode?: AuthMode; readonly
+          initialStep?: "details" | "code"; readonly on?: AuthenticationPageActions }
+    verification:
+      automated: []
+      manual:
+        - Confirm pure halves do not accept unresolved fetch/router/i18n handles.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-FUNCTION-3
+    title: Where the props type goes
+    kind: mandatory
+    requirement: |
+      Pure-half props types live in component.tsx with their Data/Labels/Actions/State parts.
+      Connected-half input types live in index.tsx. Local sub-renders keep unexported props types above
+      the helper.
+    rationale: |
+      Collocating the contract with the half that owns it prevents ambiguous dual XProps exports from
+      drifting unnoticed.
+    cases:
+      - id: case-1
+        when: "Pure half"
+        write: >
+          Declared in component.tsx directly above the component, together with its Data, Labels,
+          Actions, State parts
+      - id: case-2
+        when: "Connected half that takes input"
+        write: >
+          Declared in index.tsx: export type CourseAdvisorRecommendationCardProps = { readonly
+          recommendation: CourseAdvisorRecommendation }
+      - id: case-3
+        when: "Connected half that takes nothing"
+        write: >
+          export type CartPageProps = Record<never, never> and the body starts with void props
+          (59 index files; 34 use Record<never, never>)
+      - id: case-4
+        when: "Local sub-render"
+        write: "type TurnProps = { readonly turn: StarCiAiTurn; … } unexported, above const Turn"
+    verification:
+      automated: []
+      manual:
+        - Confirm each half owns its XProps declaration rather than ambiguously re-exporting a different shape under the same name.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-FUNCTION-4
+    title: What each half does
+    kind: mandatory
+    requirement: |
+      The connected half owns "use client", translations, locale, router, SWR hooks and state
+      resolution, then returns <XBase … />. The pure half has no "use client", no runtime @/hooks or
+      @/modules/api imports, and never chooses between a connected child and its Base per render.
+    rationale: |
+      Keeping world access in index.tsx makes the pure half fixture-testable and prevents hidden
+      fetch decisions inside render trees.
+    cases:
+      - id: case-1
+        when: "Connected half"
+        write: >
+          "use client"; calls useTranslations, useLocale, useRouter, useQuery…Swr; resolves every
+          label and fact; returns <XBase state=… props={{ … }} on={{ … }} /> (49/49 page index.tsx and
+          89/109 block index.tsx carry "use client")
+      - id: case-2
+        when: "Pure half"
+        write: >
+          No "use client" (0/49 pages, 3/109 blocks); no runtime import from @/hooks or
+          @/modules/api (0 of 150 component.tsx; 18 import a type only)
+      - id: case-3
+        when: "Route-derived input"
+        write: >
+          const routeState = (value: string | null) => { switch (value) { case "sign-up": return {
+          mode: "signUp" as const, step: "details" as const, measure: "form" as const } … } } in
+          index.tsx, then const initial = routeState(authState)
+      - id: case-4
+        when: "Navigation as an action"
+        write: "on={{ signedIn: () => router.replace(\"/dashboard\") }}"
+      - id: case-5
+        when: "A pure half choosing between a connected block and its Base"
+        write: >
+          Never: props.data === null ? <X /> : <XBase {...props.data} /> lets the pure half decide,
+          per render, whether a child fetches its own data. The pure half mounts one of them, the same
+          one every time; the page-level provider lives in index.tsx, which resolves the data and hands
+          XBase its props. The occurrences are in
+          https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.json
+    verification:
+      automated: []
+      manual:
+        - Confirm pure halves never import runtime hooks or choose connected vs Base per render.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-FUNCTION-5
+    title: When a helper is extracted
+    kind: mandatory
+    requirement: |
+      Boolean predicates, string builders, repeated JSX fragments and render IIFEs stay in the same
+      file. Class variants go to classNames.ts.
+    rationale: |
+      Same-file helpers preserve unit cohesion without creating helpers/ folders under components.
+    cases:
+      - id: case-1
+        when: "A boolean over the state union"
+        write: >
+          const stateNeedsRetry = (state: StarCiAiChatState): boolean => state === "sessionsFailed"
+          || … above the component (11 of 101 block component.tsx hold such consts)
+      - id: case-2
+        when: "A string builder"
+        write: "const turnMarkdown = (turn: StarCiAiTurn, partialLabel: string): string => { … }"
+      - id: case-3
+        when: "A repeated JSX fragment"
+        write: "const Turn = (props: TurnProps) => { … } in the same file, not a new folder"
+      - id: case-4
+        when: "A branch inside the render"
+        write: "an IIFE — const transcript = (() => { if (…) return …; if (…) return …; return … })()"
+      - id: case-5
+        when: "A class variant"
+        write: "goes to classNames.ts as getAiChatBubbleClassName(role)"
+    verification:
+      automated:
+        - no-helper-folder-in-components
+      manual: []
+    relatedExamples:
+      - connected-block
+
+  - id: FE-FUNCTION-6
+    title: Hook shape
+    kind: mandatory
+    requirement: |
+      Read hooks wrap useSWR with a null key when input is missing and include viewer identity in the
+      key. Write hooks wrap useSWRMutation. The SWR result is returned as-is.
+    rationale: |
+      Stable key composition and passthrough results keep cache identity and connected mapping
+      predictable.
+    cases:
+      - id: case-1
+        when: "Read"
+        write: >
+          export const useQueryCourseSwr = ({ displayId }: UseQueryCourseSwrParams = {}) => { const
+          viewer = useViewerKey(); return useSWR<CourseDetail | null>(displayId === undefined ? null :
+          [QUERY_COURSE_SWR_KEY, displayId, viewer ?? "guest"], async () => { const result = await
+          queryCourse({ request: { displayId } }); return result.data?.course?.data ?? null }) }
+      - id: case-2
+        when: "Write"
+        write: >
+          export const useMutateAddToCartSwr = (courseId?: string) => useSWRMutation(courseId ===
+          undefined ? null : [MUTATE_ADD_TO_CART_SWR_KEY, courseId], async (_key: readonly [string,
+          string], { arg }: AddToCartTrigger) => mutationAddToCart({ courseId: arg.courseId }))
+      - id: case-3
+        when: "Return"
+        write: >
+          the SWR result is returned as-is; the component reads query.data, query.isLoading,
+          checkout.trigger, checkout.isMutating
+      - id: case-4
+        when: "Key"
+        write: "null when the input is missing; the viewer identity is part of a read key"
+    verification:
+      automated: []
+      manual:
+        - Confirm missing inputs null the key and viewer identity participates in read keys.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-FUNCTION-7
+    title: Route file
+    kind: mandatory
+    requirement: |
+      Every page.tsx defines a local Route const that mounts one page with empty props and default-
+      exports that route. The route makes no drawing decision.
+    rationale: |
+      Route files stay thin so drawing ownership remains in pages/blocks.
+    cases:
+      - id: case-1
+        when: "Every page.tsx"
+        write: >
+          const AuthenticationRoute = () => <AuthenticationPage {...{}} /> then export default
+          AuthenticationRoute — the route makes no drawing decision
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []

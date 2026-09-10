@@ -1,6 +1,6 @@
 import fs from 'node:fs';import path from 'node:path';
 const root=import.meta.dirname;
-const data=JSON.parse(fs.readFileSync(path.resolve(root,'../../docs/catalog.json'),'utf8'));
+const data=JSON.parse(fs.readFileSync(path.resolve(root,'../../.dist/docs/catalog.json'),'utf8'));
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const value=v=>typeof v==='string'?v:JSON.stringify(v,null,2);
 const table=(heads,rows)=>'<div class="scroll"><table><thead><tr>'+heads.map(h=>'<th>'+escape(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+escape(value(c))+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';

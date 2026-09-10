@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
 import {canonicalJSON,sha256,validateWorkspace} from '../core/index.mjs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
+import { readDistJson, skillRoot } from '../core/runtime-root.mjs';
 import {validatePlan} from './plan.mjs';
 import {verifyAutoPredecessors} from './auto.mjs';
 import {verifyProducerResult,hasDirectProducerAcceptance} from './producer-verification.mjs';
@@ -15,8 +15,8 @@ const exact=(x,keys)=>x&&typeof x==='object'&&!Array.isArray(x)&&keys.every(k=>O
 const strings=x=>Array.isArray(x)&&x.every(text)&&new Set(x).size===x.length;
 const questionAnswers=x=>Array.isArray(x)&&x.every(a=>exact(a,['question','answer'])&&text(a.question)&&text(a.answer))&&new Set(x.map(a=>a.question)).size===x.length;
 const inside=(root,file)=>{const relative=path.relative(root,file);return relative!=='..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative);};
-const catalog=JSON.parse(fs.readFileSync(new URL('./catalog.json',import.meta.url)));
-const runtimeRoot=fs.realpathSync(fileURLToPath(new URL('../',import.meta.url)));
+const catalog=readDistJson('workflows','catalog.json');
+const runtimeRoot=fs.realpathSync(skillRoot);
 const allowed=new Set(['analyze-request','prepare-work','define-business','design-architecture','design-interface','implement-backend','implement-frontend','verify-flows','review-code','produce-content']);
 
 // This is honest contextual provenance, not identity authentication or a signature.

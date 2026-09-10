@@ -1,0 +1,10 @@
+schema: starci/knowledge-source@1
+id: broken.topic
+title: [unclosed mapping value
+purpose: intentionally-invalid
+appliesTo: [backend]
+rules:
+  - id: BE-BROKEN-1
+    title: Broken
+    kind: mandatory
+    requirement: bad

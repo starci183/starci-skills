@@ -38,13 +38,12 @@ export function selectFlash(policy,facts){
   const malformed=validateFacts(facts);
   if(malformed.length)throw Error(malformed.join('; '));
   if(facts.operation==='inspect')return {kind:'inspect',reasons:['read-only-inspection']};
-  if(facts.mode!=='FLASH')return {kind:'plan',reasons:['explicit-FLASH-opt-in-required']};
   const reasons=[];
   if(facts.active)reasons.push('FLASH-repair-already-active');
   if(!facts.scope.clear)reasons.push('scope-ambiguous');
   if(!facts.scope.cohesive)reasons.push('scope-not-cohesive');
   for(const flag of flags)if(facts.impact[flag])reasons.push(`${flag}-impact`);
-  if(reasons.length)return {kind:'plan',reasons};
+  if(reasons.length)return {kind:!facts.scope.clear||!facts.scope.cohesive||facts.active?'plan':'workflow',reasons};
   return {kind:'flash',request:{
     schema:'starci/flash-request@1',
     mode:'FLASH',

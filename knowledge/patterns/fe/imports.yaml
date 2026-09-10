@@ -1,0 +1,303 @@
+schema: starci/knowledge-source@1
+id: fe.imports
+title: Imports
+purpose: |
+  Given a frontend file, what may it import, through which path, and in which order?
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - tsconfig.json (paths)
+    - eslint.config.mjs
+    - src/hooks/index.ts
+    - src/components/**
+    - src/hooks/swr/**
+  limitations: |
+    Cited counts and notes are historical observations at skill commit
+    edf72554425f918e80c9205e9c6db10596e722f0, not a census of the current project. Inspect actual
+    source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
+    Historical links supply provenance, not scripts or execution instructions.
+    One case is retired here: FE-IMPORTS-7 Case 9 folded into Case 7, because where a band is mounted
+    and whether a band was drawn by hand are one law about one object and were drifting as two. The
+    historical observations that justified the case are recorded in
+    https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.json.
+    Verify installed Grammar exports at the public entry @starci/grammar/common; do not revive stale
+    @grammar/* aliases as canonical.
+rules:
+  - id: FE-IMPORTS-1
+    title: Paths
+    kind: mandatory
+    requirement: |
+      Cross-folder app imports use @/. Grammar objects come from @starci/grammar/common after verifying
+      installed exports. Same-unit imports use relative ./ paths. Type-only imports mark types.
+    rationale: |
+      A single alias and verified public Grammar entry prevent deep-path and retired-alias drift.
+    cases:
+      - id: case-1
+        when: "Anything under src/ from another folder"
+        write: "\"@/…\" — the only alias (\"@/*\": [\"./src/*\"]); 459 files use it"
+      - id: case-2
+        when: "A Grammar object"
+        write: >
+          import { SurfaceCard, Text, Heading, Badge, Button } from "@starci/grammar/common" —
+          current public entry, verified against the source package exports
+      - id: case-3
+        when: "HeroUI"
+        write: >
+          import { cn } from "@heroui/react" in classNames.ts (136 of 151); vendor components in leaves
+          (48) and blocks (74); page component.tsx never (0/49)
+      - id: case-4
+        when: "Files inside the same unit"
+        write: "./component, ./classNames, ./index"
+      - id: case-5
+        when: "Type only"
+        write: >
+          import type { AuthMode } from "@/hooks/auth/useAuthPanel", import { type CourseDetail } from
+          "…" (274 files)
+    verification:
+      automated: []
+      manual:
+        - Verify @starci/grammar/common exports before importing; do not use package root or retired @grammar/*.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-IMPORTS-2
+    title: Order
+    kind: residual
+    requirement: |
+      Import order is not lint-enforced (no import/order rule is configured). The dominant order, read
+      from the first import of 417 component files, is framework, then Grammar, then own tiers, then
+      own unit. Historical source interleaves Grammar and @/components/… imports; some files order
+      imports alphabetically by binding instead. The order above is dominant, not universal.
+    rationale: |
+      Recording the dominant order without claiming mechanical enforcement avoids inventing a lint
+      rule the reference did not configure.
+    cases:
+      - id: case-1
+        when: "Framework first"
+        write: "react (108 files), next-intl (45), next / next/navigation (16), swr"
+      - id: case-2
+        when: "Then Grammar"
+        write: "@starci/grammar/common"
+      - id: case-3
+        when: "Then own tiers"
+        write: >
+          @/components/branches/…, @/components/leaves/…, @/hooks, @/modules/… (88 files start with
+          @/components)
+      - id: case-4
+        when: "Own unit last"
+        write: >
+          import { aiChatClassNames, getAiChatBubbleClassName } from "./classNames", import {
+          AuthenticationPageBase } from "./component"
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+
+  - id: FE-IMPORTS-3
+    title: Data enters a block through the hooks barrel
+    kind: mandatory
+    requirement: |
+      Blocks import hooks from @/hooks, never deep @/hooks/swr/… paths. Hooks reach transport modules
+      themselves. Types are not re-exported by the barrel.
+    rationale: |
+      The barrel is the mock door for connected specs and keeps transport behind hooks.
+    cases:
+      - id: case-1
+        when: "A block reads or writes"
+        write: >
+          import { useQueryCourseSwr } from "@/hooks" (82 block files import @/hooks); the barrel
+          docblock: "A block imports @/hooks, never @/hooks/swr/useQuerySomethingSwr"
+      - id: case-2
+        when: "A hook reaches the transport"
+        write: >
+          import { queryCourse } from "../../modules/api/graphql/queries/query-course" (57 hook files)
+          or from "@/modules/api/…" (56 hook files) — evenly split, see open question
+      - id: case-3
+        when: "A type from the data layer"
+        write: >
+          import type { CourseAdvisorRecommendation } from "@/modules/ai/course-advisor-response" —
+          types are not re-exported by the barrel
+      - id: case-4
+        when: "Auth identity"
+        write: >
+          import { useViewerKey } from "@/hooks/auth/useViewerKey" inside hooks; components mock
+          "@/hooks/auth/useSessionToken" in specs
+    verification:
+      automated: []
+      manual:
+        - Confirm components do not deep-import @/hooks/swr/*.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-IMPORTS-4
+    title: Tier direction
+    kind: mandatory
+    requirement: |
+      Pages import blocks (and sometimes leaves/hooks). Blocks import leaves, branches, Grammar, hooks
+      and modules. Leaves import Grammar and vendor only. Pure halves never import the data layer at
+      runtime. Upward imports are not a pattern.
+    rationale: |
+      One-way tier direction keeps connected ownership above pure presentation.
+    cases:
+      - id: case-1
+        when: "Page → block"
+        write: >
+          import { AuthenticationPanel } from "@/components/blocks/auth/AuthenticationPanel" (48 of 50
+          pages import blocks; 11 import leaves; 8 import hooks; 1 imports modules)
+      - id: case-2
+        when: "Block → leaf, branch, Grammar, hooks, modules"
+        write: >
+          import { CodeBlock } from "@/components/leaves/CodeBlock", import { Article } from
+          "@/components/branches/Article" (82 blocks import hooks, 67 import modules)
+      - id: case-3
+        when: "Leaf → Grammar and vendor only"
+        write: >
+          import type { ButtonVariant } from "@starci/grammar/common"; world-reading hooks or imports
+          from higher tiers are not valid leaf precedents
+      - id: case-4
+        kind: residual
+        when: "Upward import"
+        write: "block → page observed once; leaf → block observed once; neither is a pattern"
+      - id: case-5
+        when: "Pure half → data layer"
+        write: "never at runtime; 18 component.tsx files use import type from @/modules/api/graphql/queries/… only"
+    verification:
+      automated: []
+      manual:
+        - Confirm leaves do not import higher tiers or world-reading hooks.
+    relatedExamples:
+      - connected-block
+
+  - id: FE-IMPORTS-5
+    title: Vendor boundaries
+    kind: mandatory
+    requirement: |
+      Only the Icon leaf imports @heroicons/react. Headings come from Grammar Heading, never raw h2.
+      Grammar peerDependencies are exactly @heroui/react and react.
+    rationale: |
+      Vendor glyph and heading ownership stays behind Grammar so product units compose one surface.
+    cases:
+      - id: case-1
+        when: "Glyphs"
+        write: >
+          only the Icon leaf imports @heroicons/react (1 component file); everything else takes the
+          Grammar Icon with a source prop (lint no-vendor-icon-outside-icon-leaf,
+          heroicons-is-the-glyph-vendor)
+      - id: case-2
+        when: "Headings"
+        write: "Heading from Grammar, never a raw <h2> (lint no-heading-tag-outside-heading-component)"
+      - id: case-3
+        when: "Grammar package dependencies"
+        write: >
+          peerDependencies are exactly @heroui/react and react; dependencies is empty
+          (package-boundary.test.mjs)
+    verification:
+      automated:
+        - no-vendor-icon-outside-icon-leaf
+        - heroicons-is-the-glyph-vendor
+        - no-heading-tag-outside-heading-component
+      manual: []
+    relatedExamples: []
+
+  - id: FE-IMPORTS-6
+    title: Re-exports
+    kind: mandatory
+    requirement: |
+      The hooks barrel re-exports one named hook per line, never export *. Grammar family entries use
+      named re-exports with .js suffixes. Block/page index re-exporting ./component is residual, not
+      required.
+    rationale: |
+      Explicit named re-exports keep the public surface auditable.
+    cases:
+      - id: case-1
+        when: "The hooks barrel"
+        write: "export { useMutateAddToCartSwr } from \"./swr/useMutateAddToCartSwr\" — one line per hook, no export *"
+      - id: case-2
+        when: "Grammar family entry"
+        write: >
+          export { COMMON_SPACING_SCALE, COMMON_SPACING_TOKENS, type CommonSpacingStep, … } from
+          "./spacing.js" — named, with .js suffix
+      - id: case-3
+        kind: residual
+        when: "Block index re-exporting its twin"
+        write: >
+          export * from "./component" at the end of index.tsx — 19 of 95 block indexes and 19 of 49
+          page indexes do this; the majority do not
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+
+  - id: FE-IMPORTS-7
+    title: Forbidden
+    kind: mandatory
+    requirement: |
+      Do not deep-import hooks from components, default-export from src/components, inline
+      eslint-disable, use namespace outside the configured exception, import Grammar from the package
+      root or mixed families, load a second family stylesheet under one root, clone Common shell
+      geometry, or put product names/business logic into Grammar public exports.
+    rationale: |
+      These bans protect mockability, lint integrity and Grammar family boundaries.
+    cases:
+      - id: case-1
+        when: "Deep hook path from a component"
+        write: "\"@/hooks/swr/useQueryCourseSwr\" — escapes vi.mock(\"@/hooks\")"
+      - id: case-2
+        when: "Default export from src/components"
+        write: "0 exist"
+      - id: case-3
+        when: "Inline lint config"
+        write: >
+          eslint-disable appears in 0 files; src/components/blocks/**/{index,component}.tsx run with
+          noInlineConfig: true
+      - id: case-4
+        kind: exception
+        when: "namespace"
+        write: "only src/modules/api/graphql/clients/options.ts, by config exception"
+      - id: case-5
+        when: "Mixing families, or importing the package root"
+        write: >
+          renderers and prop types come from the installed public family entry or
+          @starci/grammar/common; never from the package root or mixed families. Verify the exact
+          exported entry and do not copy retired @grammar aliases.
+      - id: case-6
+        when: "A second family stylesheet under one root"
+        write: >
+          select one family at the composition root and load its verified stylesheet once; do not
+          invent an entry from an old package version
+      - id: case-7
+        when: >
+          An app-local clone of a Common renderer, an anonymous layout, or a shell band the application
+          draws itself
+        write: >
+          Use the Common renderer and pass props. A shell unit — a folder whose name ends in Layout,
+          Shell, TopBar, Navbar, Nav, Sidebar or Rail — composes a Grammar shell object and writes
+          classes only inside the slots it is handed. The test is not whether a shell folder holds
+          classes, it is whether it composes a shell object at all: a bar assembled from divs is shell
+          geometry whatever it is named, and the band, its inset and its separator belong to the
+          composed object. The same case places the band. It is mounted beside the page in the route
+          layout, never inside a shell object's header slot, because that slot is wrapped in a banner by
+          its owner while a band already is one, so the nesting publishes two banner landmarks for one
+          band; the slot is the page-level hero and takes page copy
+      - id: case-8
+        when: "A product name in a Grammar public export, or business logic inside Common/Core"
+        write: >
+          Learn, Console, Dashboard stay in product code; routes, permissions, persistence and effects
+          never enter the package
+    verification:
+      automated: []
+      manual:
+        - Confirm Grammar imports use verified @starci/grammar/common exports only.
+    relatedExamples: []
+openQuestions:
+  - id: hooks-to-modules-api-path-style
+    summary: |
+      Hooks reach modules/api through ../../modules/api/… in 57 files and @/modules/api/… in 56.
+      No variant dominates; this file does not choose.
+  - id: connected-index-reexport-component
+    summary: |
+      export * from "./component" at the end of a connected index.tsx is present in 19/95 blocks
+      and absent in the rest. Not legislated.

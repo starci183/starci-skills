@@ -1,0 +1,84 @@
+schema: starci/knowledge-source@1
+id: ui.composition
+title: UI composition
+appliesTo:
+  - ui
+family: composition
+purpose: |-
+  Composition is the decision layer that runs before any DOM exists:
+  ```text
+  business
+  -> composition decides regions, rank, actions, states and emphasis
+  -> presentation resolves CSS values on app-owned boundaries
+  -> rendered UI
+  ```
+  The selected composition op may use these rules to answer the questions
+  that must be settled while the page is still a description: which regions the page has, which
+  content outranks which, which action carries the decision, which conditions the feature can be in,
+  what the reader is told at each outcome, and where the scarce dominant emphasis is spent. These
+  topics belong together because each of them is a commitment made before rendering, and because they
+  constrain one another — a region without an anchor has no hierarchy to spend accent on, and a state
+  with no carrier has nothing for feedback to describe. Nothing here can be repaired by a later CSS
+  value, which is exactly why it is decided first.
+topics:
+  - title: Layout
+    path: layout.yaml
+    decides: Which visible task regions exist, who owns their tracks and scrolling
+    rules: LAYOUT-1 to LAYOUT-4
+  - title: Hierarchy
+    path: hierarchy.yaml
+    decides: Which information rank each piece of meaning receives
+    rules: HIERARCHY-1 to HIERARCHY-5
+  - title: Responsive
+    path: responsive.yaml
+    decides: What survives as space changes, and which query owns the change
+    rules: RESPONSIVE-1 to RESPONSIVE-4
+  - title: CTA
+    path: cta.yaml
+    decides: Which action carries the decision, and what its emphasis promises
+    rules: CTA-1 to CTA-5
+  - title: Action
+    path: action.yaml
+    decides: What one activation does, and who owns the effect and the pending state
+    rules: ACTION-1 to ACTION-3
+  - title: State
+    path: state.yaml
+    decides: Which conditions exist, and which published carrier holds each one
+    rules: STATE-1 to STATE-7
+  - title: Feedback
+    path: feedback.yaml
+    decides: Who reports a failure, a correction, a recovery, and a result
+    rules: FEEDBACK-1 to FEEDBACK-3
+  - title: Accent
+    path: accent.yaml
+    decides: Where the scarce strongest emphasis is spent
+    rules: ACCENT-1 to ACCENT-5
+  - title: Coverage
+    path: coverage.yaml
+    decides: What the selected design specification must enumerate
+    rules: COVERAGE-1
+catalogNotes: |-
+  Five per-topic coverage rules were merged into COVERAGE-1, and a retired address is never reused:
+  retired are `ACTION-4`, `STATE-4`, `FEEDBACK-4`, `LAYOUT-5`, and `RESPONSIVE-5`.
+guidance:
+  - id: rule-shape
+    requirement: |-
+      `LAYOUT-1`, `STATE-5`, and the other `PREFIX-n` names are stable ordinal addresses within their
+      topic. The number is not a severity, a component variant, or a value on a scale.
+      Every rule carries its heading, one line naming what the rule governs, and one table:
+      | Case | When | Assert |
+      | --- | --- | --- |
+      | Case 1 | The concrete situation that reaches this rule. | A falsifiable statement about the selected design specification or the composed tree, in language the product can read. |
+      The `Assert` cell states a predicate the specification or the composed tree either satisfies or fails, not
+      advice and not a class name. It may name a published component or prop where that is what must be
+      carried, but it never resolves a CSS value; that belongs to presentation. Taste and layout are
+      decided in the applicable [family snapshots](../../grammars/index.yaml), after checking current source; these rules only say what a direction must satisfy.
+      A case that belongs to a neighbouring rule is not a table row. It goes on one line after the table,
+      as `Not this rule: <condition> is PREFIX-n`. Each file closes with a
+      `## What this file does not decide` section linking its siblings and the proof knowledge that
+      observes the result.
+      Component and prop examples describe the documented Grammar family, not universal product requirements.
+      Verify exports and ownership against the selected project's installed source before using them.
+      Record an unavailable capability as a gap; do not invent an API or automatically dispatch another op.
+      Store selected design decisions in the current `.starciwork` node's Markdown or namespaced extensions,
+      with explicit acceptance assertions; this folder defines no separate receipt format.

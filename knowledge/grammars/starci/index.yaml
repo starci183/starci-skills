@@ -1,0 +1,55 @@
+schema: starci/knowledge-source@1
+id: grammar.starci
+title: StarCi Core Grammar — snapshot index
+purpose: |
+  Index for the StarCi Core Grammar historical snapshot. Preserves observations about one visual
+  family; does not choose a default family or override business requirements. UI knowledge supplies
+  scope-selected reference criteria; the product owns facts, content, routes, permissions,
+  persistence and effects.
+appliesTo:
+  - grammar
+family: starci
+provenance:
+  package: "@starci/grammar"
+  version: "0.4.13"
+  checkout: 41be722701c439e76910f80a8cbb65261da72e01
+  captured: "2026-09-05"
+  publicEntry: "@starci/grammar/common"
+  limitations: |
+    This is not a claim that the currently installed package has these APIs or gaps. Before use,
+    inspect the selected repository's manifest/lockfile, exported types, renderers and CSS; record
+    actual source/version in .starciwork. If source is unavailable, report unverified; do not infer
+    current APIs or defects from old tables. Prefer @starci/grammar/common as the current public
+    consumer entry where the installed package supports it; verify exports rather than inventing APIs.
+topics:
+  - id: dna
+    path: DNA.yaml
+    title: DNA
+    summary: Tokens, renderers, props, claims and gaps at the pinned version.
+  - id: idioms
+    path: idioms.yaml
+    title: Idioms
+    summary: Compositions observed in historical source samples, not current UAT.
+  - id: playbook
+    path: playbook.yaml
+    title: Playbook
+    summary: Composition references for approved business shapes.
+  - id: family
+    path: family.yaml
+    title: Family
+    summary: Common/family boundaries, CSS direction and snapshot gaps.
+guidance:
+  - id: confirm-family-root
+    requirement: |
+      Confirm the actually selected family and one appropriate family root. In the snapshot, Common
+      owns renderers/semantics while Core supplies scoped style and a re-export entry; distinguish
+      consumer imports from Common's own dependencies. Do not infer valid exports/imports from a
+      package name. Current public consumer entry: @starci/grammar/common (verify installed).
+    rationale: |
+      Package names do not prove export graphs; consumer entry and Common internals differ.
+  - id: gaps-are-findings
+    requirement: |
+      A recorded gap is a finding; extending the library needs separately authorized scope and op.
+      This catalog supplies no generator, router or mandatory op sequence.
+    rationale: |
+      Knowledge snapshots do not authorize library edits or product ops.

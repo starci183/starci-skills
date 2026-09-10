@@ -1,0 +1,6 @@
+schema: starci/knowledge-source@1
+id: knowledge
+title: Path escape fixture root
+purpose: |
+  Synthetic knowledge root for path-escape rejection.
+appliesTo: [backend]

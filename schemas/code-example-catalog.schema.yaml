@@ -1,0 +1,49 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: starci/code-example-catalog@1
+title: StarCi code example catalog
+type: object
+additionalProperties: false
+required:
+  - schema
+  - title
+  - purpose
+  - examples
+properties:
+  schema:
+    type: string
+    enum:
+      - starci/code-example-catalog@1
+      - starci/code-examples-catalog@1
+  title:
+    type: string
+    minLength: 1
+  purpose:
+    type: string
+    minLength: 1
+  examples:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: true
+      required:
+        - id
+        - path
+      properties:
+        id:
+          type: string
+          minLength: 1
+        path:
+          type: string
+          minLength: 1
+        title:
+          type: string
+        lane:
+          type: string
+        summary:
+          type: string
+        relatedRules:
+          type: array
+          items:
+            type: string
+            minLength: 1

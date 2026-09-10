@@ -1,0 +1,355 @@
+schema: starci/knowledge-source@1
+id: ui.proof.taste
+title: Taste proof
+appliesTo:
+  - ui
+family: proof
+purpose: |-
+  This file answers one question: the surface passed every canon rule, so is it any good to look at?
+  A render can satisfy each owner, each token and each contract and still be rejected, because canon
+  decides who owns a value while taste decides what the composition adds up to. The rules below turn
+  that judgement into criteria measured from a capture, so a rejection names a number rather than a
+  mood, and so an approval cannot be bought by conformance alone.
+  Nothing here is settled by reading source. Every `Observe` cell names something countable in the
+  screenshot the audit already took: a ranked list of element areas, a rectangle of empty band, a set
+  of left edges, a count of accents, a count of type sizes. Where a criterion overlaps a decision that
+  was already made before the tree existed, this file cites that composition rule instead of restating
+  it, because taste tests the outcome and composition tested the intent.
+  Sources: the owner ruling that a surface which is correct by grammar and ugly by eye is still thrown
+  away, and the worked example of a console overview that passed every canon rule and still scored
+  about three out of five, recorded in
+  [the taste rubric evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-taste-rubric.json); and a historical worked example
+  of density measured against representative data and an explicitly shown user choice, recorded in
+  [the dominant-candidate evidence](https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-dominant-candidate.json).
+  The sources above are historical notes at a pinned commit, not current operating authority.
+  Use thresholds/rubrics selected in the `.starciwork` scope; a `ship` label grants no release authority,
+  and a historical decision cannot replace approval of the current product's business requirements.
+rules:
+  - id: TASTE-1
+    title: One focal point in three seconds
+    governs: |-
+      Governs whether a first glance lands somewhere, and on one place only.
+    cases:
+      - id: case-1
+        when: The capture is viewed for three seconds
+        observe: |-
+          Exactly one element is the largest and heaviest thing in the frame. Two candidates within roughly ten percent of each other in visual weight falsifies it
+      - id: case-2
+        when: The page has a title and section titles
+        observe: |-
+          The page title is at least one scale step above every section title in rendered size, weight, or both. Equal rendered sizes falsifies it
+      - id: case-3
+        when: The strongest element by weight is measured
+        observe: |-
+          It is the element the direction named as the surface's job. A decorative panel or an artwork winning the frame falsifies it
+      - id: case-4
+        when: A region carries several candidates for its own anchor
+        observe: |-
+          One anchor per region wins by a visible step, at every captured viewport
+    notThisRule: |-
+      which content was entitled to the strongest rank in the first place is [HIERARCHY-2](../composition/hierarchy.yaml).
+  - id: TASTE-2
+    title: No meaningless void
+    governs: Governs empty area that pays no rent.
+    cases:
+      - id: case-1
+        when: A band, cell or panel is measured in the capture
+        observe: |-
+          No such area taller than `64px` carries neither content nor a function such as separation, grouping or a deliberate rest between regions
+      - id: case-2
+        when: A tinted or bordered band is drawn
+        observe: |-
+          The tint marks a real boundary. A tinted band whose only occupant is an image or an icon falsifies it
+      - id: case-3
+        when: A grid row is partly filled
+        observe: |-
+          The remaining cells either hold content or the row collapses. A half-row of blank cells at the captured width falsifies it
+      - id: case-4
+        when: The surface is captured at its narrowest viewport
+        observe: |-
+          The void does not grow: a band that was tight when wide and cavernous when narrow falsifies the composition
+    notThisRule: |-
+      which regions exist at all is [LAYOUT-1](../composition/layout.yaml).
+  - id: TASTE-3
+    title: Grid and edges
+    governs: Governs whether the eye can find a straight line.
+    cases:
+      - id: case-1
+        when: Text blocks are stacked inside one region
+        observe: |-
+          Their left edges resolve to the same x within `1px`. A stack of two or three different left edges falsifies it
+      - id: case-2
+        when: Sibling cards or columns sit in one row
+        observe: |-
+          Every gutter between them measures the same. One gutter differing from its neighbours falsifies it
+      - id: case-3
+        when: |-
+          A region's outer edge is measured against the region above it
+        observe: |-
+          Both align to the same container edge, or the difference is a declared inset rather than a drift of a few pixels
+      - id: case-4
+        when: An element is centred while its neighbours are aligned left
+        observe: |-
+          The centring carries meaning. A single centred item inside a left-aligned stack falsifies it
+  - id: TASTE-4
+    title: Monotonic vertical rhythm
+    governs: Governs whether vertical distance still means anything.
+    cases:
+      - id: case-1
+        when: Gaps between regions, sections and rows are measured
+        observe: |-
+          The order holds: region gap is greater than section gap, which is greater than row gap. Any inversion falsifies it
+      - id: case-2
+        when: Two siblings of the same kind are compared
+        observe: |-
+          Their separation from the previous sibling is identical. Two different gaps between equal peers falsifies it
+      - id: case-3
+        when: |-
+          The number of distinct vertical gaps in the capture is counted
+        observe: |-
+          The surface uses a small closed set of steps rather than a continuum of near-equal values
+      - id: case-4
+        when: The surface is captured at a second viewport
+        observe: The same order survives; only the values change
+    notThisRule: |-
+      which exact spacing value an app-owned boundary takes is resolved in presentation.
+  - id: TASTE-5
+    title: Colour economy
+    governs: Governs how much colour is spent, and on what.
+    cases:
+      - id: case-1
+        when: Accent-filled controls are counted in the capture
+        observe: |-
+          Exactly one accent-filled call to action per view, except on a `landing`, which may carry two. A filled accent beyond that allowance, competing with the one that was budgeted, falsifies it
+      - id: case-2
+        when: A semantic colour appears
+        observe: |-
+          It reports a real outcome backed by authority. Success green on a neutral fact, or a status hue used as decoration, falsifies it
+      - id: case-3
+        when: The view carries a warning or an error
+        observe: |-
+          It is visibly distinct from a neutral row in the capture: a different surface, border or icon, not the same grey row with different words
+      - id: case-4
+        when: |-
+          Distinct hues in the frame are counted, excluding photography
+        observe: |-
+          The count stays within the family's published palette roles. A page reading as a swatch board falsifies it
+    notThisRule: |-
+      which action deserves the dominant accent is [CTA-1](../composition/cta.yaml), how the scarce emphasis budget is spent is [ACCENT-1](../composition/accent.yaml), and whether the chosen colours survive measurement is [COLOR-3](contrast.yaml).
+  - id: TASTE-6
+    title: Type
+    governs: Governs how many voices the text speaks in.
+    cases:
+      - id: case-1
+        when: Rendered font sizes inside one region are counted
+        observe: |-
+          At most three distinct sizes, and at most two weights. A region with five sizes falsifies it
+      - id: case-2
+        when: A paragraph of running text is measured
+        observe: |-
+          Its measure falls between roughly 45 and 80 characters at the captured width. A line running the full width of a wide viewport falsifies it
+      - id: case-3
+        when: A heading or a label wraps
+        observe: |-
+          No last line carries a single orphan word, and no heading breaks mid-phrase in the capture
+      - id: case-4
+        when: Two pieces of text carry the same rank
+        observe: |-
+          They render at the same size and weight. Two same-rank labels rendered differently falsifies it
+  - id: TASTE-7
+    title: Shape consistency
+    governs: Governs whether the surface was cut by one hand.
+    cases:
+      - id: case-1
+        when: Corner radii in the capture are collected
+        observe: |-
+          They resolve to one family of steps. A view mixing a sharp card, a soft card and a pill container with no reason falsifies it
+      - id: case-2
+        when: Card nesting depth is counted
+        observe: |-
+          No card sits more than two levels deep. A bordered box inside a card inside a card falsifies it
+      - id: case-3
+        when: Borders and shadows are compared across peers
+        observe: |-
+          Equal peers carry equal elevation treatment. One shadowed card among flat siblings falsifies it
+      - id: case-4
+        when: A control sits inside a container
+        observe: |-
+          The control's radius is equal to or smaller than the container's, so the shapes nest rather than collide
+  - id: TASTE-8
+    title: Imagery earns its place
+    governs: Governs pictures, illustration and decorative artwork.
+    cases:
+      - id: case-1
+        when: An image renders
+        observe: |-
+          It carries meaning or brand identity. An illustration whose removal changes nothing but the amount of empty space falsifies it
+      - id: case-2
+        when: Decorative images are counted in the view
+        observe: |-
+          At most one. Two or more ornaments in a single view falsifies it
+      - id: case-3
+        when: An image sits in an otherwise empty band
+        observe: |-
+          It is not the band's justification: the same area with the image removed must still read as a deliberate region, or the band fails TASTE-2 as well
+      - id: case-4
+        when: The image is measured against the focal element
+        observe: |-
+          It is not the heaviest thing in the frame unless the surface's job is the image itself
+  - id: TASTE-9
+    title: Density fits the surface class
+    governs: Governs how much of the surface is doing work.
+    cases:
+      - id: case-1
+        when: The density of a capture is taken
+        observe: |-
+          It is the summed bounding rectangles of content and action nodes divided by the captured area. The class the coverage declared sets the band: `console` at least sixty percent, `catalog` at least fifty, `reader` between forty and seventy, `form` between twenty-five and fifty, `landing` at most forty
+      - id: case-2
+        when: |-
+          The class's band is a ceiling rather than a floor, as it is for `landing` and for the upper half of `form` and `reader`
+        observe: |-
+          The breathing room that keeps density under it is continuous rather than scattered pockets. Empty area broken into unrelated gaps falsifies it
+      - id: case-3
+        when: The estimate is taken
+        observe: |-
+          The rectangles counted are named in the evidence record, so a second reader can repeat the estimate and land within about ten percent
+      - id: case-4
+        when: A dense class is captured at a narrow viewport
+        observe: |-
+          Density is achieved by ordering and grouping, not by shrinking targets below their minimum
+      - id: case-5
+        when: Density depends on record count
+        observe: |-
+          Measure against the representative fixture volume declared for the selected `.starciwork` flow and identify the observed dataset. Below-volume evidence records actual and expected counts and remains insufficient. Data creation or reseeding requires its own authorized op; this rubric never mutates data or bypasses a needed user decision.
+      - id: case-6
+        when: The density still fails at representative volume
+        observe: |-
+          The Measured cell reads `data-bound` with the volume it was measured at; the row keeps its score and its fail, and `TASTE-13` Case 6 leaves it out of the verdict, so it blocks neither quality nor UAT
+    notThisRule: |-
+      whether a target is still operable at that density is [A11Y-4](accessibility.yaml).
+  - id: TASTE-10
+    title: Designed states
+    governs: Governs the renders that are not the happy path.
+    cases:
+      - id: case-1
+        when: The loading state is captured
+        observe: |-
+          It has a composition: skeletons occupy the same regions, at the same ranks, as the resolved content. A blank frame or a lone spinner in a void falsifies it
+      - id: case-2
+        when: The empty state is captured
+        observe: |-
+          It carries a title, one line of explanation and the action that ends the emptiness. A bare sentence centred in the region falsifies it
+      - id: case-3
+        when: The error state is captured
+        observe: |-
+          It states what failed and what to do next, inside the region that failed rather than replacing the page
+      - id: case-4
+        when: The states are compared with the loaded state
+        observe: |-
+          No region moves or resizes when content arrives, so the layout does not jump between them
+  - id: TASTE-11
+    title: Touch and feedback
+    governs: Governs whether the surface answers when touched.
+    cases:
+      - id: case-1
+        when: Interactive targets are measured
+        observe: |-
+          Every one meets the minimum [A11Y-4](accessibility.yaml) names, including its padded hit area. A row of icon-only controls under that size falsifies it
+      - id: case-2
+        when: |-
+          Hover and focus captures are compared with the resting capture
+        observe: |-
+          Each state is visibly different from resting and from each other. A hover indistinguishable from rest falsifies it
+      - id: case-3
+        when: The hover or focus capture is diffed against the resting one
+        observe: |-
+          No element changes position or size. A border appearing on hover that shifts the row falsifies it
+      - id: case-4
+        when: A control performs work
+        observe: |-
+          The capture during that work shows a pending treatment on the control itself, not only elsewhere on the page
+    notThisRule: |-
+      whether the focus indicator is perceivable and where focus travels is [FOCUS-1](focus.yaml).
+  - id: TASTE-12
+    title: Reference match
+    governs: Governs whether the surface belongs to the class it claims.
+    cases:
+      - id: case-1
+        when: The direction decision is read and it composed something
+        observe: |-
+          It names the reference standards this surface is aiming at, by class rather than by adjective. A direction naming none falsifies the audit before any capture is scored
+      - id: case-2
+        when: The capture is placed beside those references
+        observe: |-
+          A reader who knows neither product would sort the surface into the same class. Sorting it into a plainer class falsifies it
+      - id: case-3
+        when: The gap is described
+        observe: |-
+          The evidence record names which of the criteria above accounts for the distance, so the difference is a finding rather than an impression
+      - id: case-4
+        when: The references disagree with a canon rule
+        observe: |-
+          Canon wins and the reference is dropped, because taste may reject a conforming surface but may never license a non-conforming one
+      - id: case-5
+        when: The direction declares a presentation delta of `none`
+        observe: |-
+          The delivery composed nothing to be sorted, so the criterion does not apply: its row reads `n/a`, carries no score, and is left out of the mean and out of the gating set. The class the surface belongs to is the one the direction it refines was scored against, and this round neither re-earns it nor loses it
+  - id: TASTE-13
+    title: Scoring and the taste verdict
+    governs: Governs how the criteria above become one decision.
+    cases:
+      - id: case-1
+        when: The taste lens runs
+        observe: |-
+          Every criterion from `TASTE-1` to `TASTE-12` carries a pass or fail and a score from 1 to 5, each backed by the measurement its own rule names
+      - id: case-2
+        when: The verdict is computed
+        observe: |-
+          `ship` requires no fail on `TASTE-1`, `TASTE-2`, `TASTE-5`, `TASTE-8` or `TASTE-12`, and a mean score of at least 4 across the twelve. Anything else is `fix-first`
+      - id: case-3
+        when: Every canon rule passed and the taste verdict is `fix-first`
+        observe: |-
+          The surface is still `fix-first`. An evidence record shipping a surface because canon was green falsifies the lens
+      - id: case-4
+        when: A taste criterion fails
+        observe: |-
+          Record the composition defect and responsible owner with evidence. This finding does not authorize an automatic next op.
+      - id: case-5
+        when: A score is recorded with no measurement
+        observe: |-
+          The entry is void, and the lens is incomplete until the measurement is captured
+      - id: case-6
+        when: A row is below-volume or data-bound
+        observe: |-
+          Below-volume observations cannot complete the assessment. Exclude a data-bound criterion only when the approved current scope explicitly makes it inapplicable, with the reason recorded. A mandatory failed assertion remains failed; no seed or mutation is implicit.
+      - id: case-7
+        when: A user explicitly accepts a measured design exception
+        observe: |-
+          Record the exact current-scope decision reference and the measurement shown to the user. Keep the original failing observation; an agent cannot invent approval or silently turn a required failed assertion into pass. Applicability/acceptance changes belong to an explicitly approved spec edit.
+      - id: case-8
+        when: |-
+          Audit scope selects primary surfaces or an exhaustive state matrix
+        observe: |-
+          Read the selected `.starciwork` node's approved scope. Missing selected entries prevent completion. Name secondary states outside scope as untested, never passed; no obsolete audit schema or round budget is required. An exhaustive audit missing a declared state is incomplete; scope-limited results prove only the selected surfaces.
+      - id: case-9
+        when: The lens is scored
+        observe: |-
+          The same auditor scored the three anchor sheets of [the calibration set](calibration/calibration.json) in the same round, and each anchor landed inside its `taste` band within the tolerance that file publishes; the evidence record carries the three anchor scores beside the surface's. An anchor that drifts further, or a lens scored with no anchors, is void, because a score taken on a scale nobody proved cannot be compared with another sheet's or with an earlier round's
+    notes:
+      - |-
+        The scored set is `TASTE-1` to `TASTE-12`; this rule is the arithmetic and is not itself scored. The
+    remark: |-
+      five criteria that gate `ship` are the ones a reader notices before reading a word: the focal point,
+      the void, the colour spend, the imagery, and the class the surface lands in. A score of 3 means the
+      criterion is met without conviction, so a surface can pass every criterion and still be `fix-first`
+      on the mean alone, which is the intended outcome for a merely inoffensive page. Taste findings never
+      carry a canon base verdict and never become a `grammar-gap`: a criterion that cannot be satisfied
+      with the published family is a direction problem until composition proves otherwise.
+doesNotDecide: |-
+  Which rank, action, region or emphasis the direction chose is
+  [Hierarchy](../composition/hierarchy.yaml), [CTA](../composition/cta.yaml),
+  [Layout](../composition/layout.yaml) and [Accent](../composition/accent.yaml). Which CSS value an
+  app-owned boundary takes is presentation. Whether the render is perceivable and operable is
+  [Accessibility](accessibility.yaml) and [Focus](focus.yaml), whether distinctions survive measurement is
+  [Contrast](contrast.yaml), whether movement keeps meaning is [Motion](motion.yaml), and whether the
+  rendered claim traces to authority is [Render truth](render-truth.yaml).

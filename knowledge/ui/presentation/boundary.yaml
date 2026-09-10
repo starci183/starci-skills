@@ -1,0 +1,244 @@
+schema: starci/knowledge-source@1
+id: ui.presentation.boundary
+title: Boundary presentation
+appliesTo:
+  - ui
+family: presentation
+purpose: |-
+  This file answers one question: given an edge the application owns, which separator or border draws
+  it, and which edge in a repeating set drops it?
+  The theme publishes two hairline tokens and they mean different things: `--separator` draws the line
+  between things, and `--border` draws the outline of one thing. A boundary inside a Grammar component
+  is that component's, never the application's, and no application edge may be drawn with a raw colour
+  value.
+ownerVocabulary:
+  owners:
+    - name: App
+      meaning: The edge belongs to the application
+      applicationWrites: The class
+    - name: A component name
+      meaning: Common already draws this edge inside that component
+      applicationWrites: Nothing. Pass the prop
+    - name: —
+      meaning: Common exposes no public path for this edge
+      applicationWrites: The class, recorded as a workaround
+  notes: |-
+    Each case names who owns the edge. The owner decides whether the application writes a class at all.
+
+    Writing a class where a component is the owner is `APP_REIMPLEMENTATION`. Writing one where the owner
+    is `—` stays linked to `COMMON_CAPABILITY_MISSING`. Adding an application line beside one a component
+    already draws is `DOUBLE_OWNER`, and it renders as a visible double hairline.
+componentOwnership:
+  title: Boundaries Common already owns
+  notes: |-
+    Retained ownership reference, not proof of the current package/API. Verify actual installed source/props/tokens before use; correct outdated rows within selected maintenance scope using [source and maintenance](index.yaml#source-and-maintenance).
+  rows:
+    - component: ChatWorkspace
+      element: composer
+      rule: BOUNDARY-1
+    - component: ChatWorkspace
+      element: rail trigger boundary, hasRail, isCompactRail
+      rule: BOUNDARY-1
+    - component: Divider
+      element: rule
+      rule: BOUNDARY-5
+    - component: MediaFrame
+      element: root, treatment!="plain"
+      rule: BOUNDARY-5
+    - component: NavigationFeatureNav
+      element: root
+      rule: BOUNDARY-1
+    - component: StaticStateRow
+      element: root
+      rule: BOUNDARY-3
+    - component: Subnav
+      element: root
+      rule: BOUNDARY-1
+    - component: SurfaceAccordionCard
+      element: accordion row
+      rule: BOUNDARY-3
+    - component: SurfaceAccordionCard
+      element: accordion shell, depth="nested"
+      rule: BOUNDARY-5
+    - component: SurfaceAccordionCard
+      element: accordion shell, depth="top"
+      rule: BOUNDARY-6
+    - component: SurfaceCard
+      element: card content, depth!="nested"
+      rule: BOUNDARY-6
+    - component: SurfaceCard
+      element: card content, depth="nested"
+      rule: BOUNDARY-5
+    - component: WorkspaceShell
+      element: compact navigation, hasCompactNavigation
+      rule: BOUNDARY-1
+    - component: WorkspaceShell
+      element: leading rule, railPosition="leading"
+      rule: BOUNDARY-4
+topics:
+  - {}
+  - {}
+  - {}
+  - {}
+  - {}
+  - {}
+catalogNotes: |-
+  Boundaries have no value ramp, so the rule ID is an address over edge kinds rather than a position on
+  a scale. Prefer the earliest rule that works: one seam before a per-row seam, a per-row seam before a
+  parent declaration, a hairline before an outline.
+
+  A repeating set has one line fewer than it has rows. Whichever rule draws the set, the outer edge of
+  the last row is closed by the surface itself, so a set that renders a trailing line at its own edge
+  has one boundary too many.
+rules:
+  - id: BOUNDARY-1
+    title: "`border-t border-separator` / `--separator`"
+    governs: |-
+      One seam between two stacked bands inside a flush surface. The bands touch, and the line is what
+      tells them apart.
+    cases:
+      - id: case-1
+        when: Two app-owned bands stacked inside one joined card
+        owner: "`—`"
+        render: |-
+          `<div aria-hidden className="border-t border-separator" />` between them
+      - id: case-2
+        when: |-
+          A band that carries its own leading seam rather than a separate element
+        owner: "`—`"
+        render: |-
+          `<div className="min-w-0 border-t border-separator">` on the band itself
+      - id: case-3
+        when: |-
+          A card's closing action band, separated from the content above it
+        owner: "`—`"
+        render: '`<div className="border-t border-separator px-4 pb-4 pt-3">`'
+      - id: case-4
+        when: The block edge of page chrome against the content below it
+        owner: "`Subnav`, `NavigationFeatureNav`"
+        render: Compose the component; no border class
+    notThisRule: |-
+      three or more rows of the same kind. Use BOUNDARY-2 or BOUNDARY-3. A separator element is decorative and takes `aria-hidden`; the bands it divides carry the meaning.
+  - id: BOUNDARY-2
+    title: "`border-b border-separator last:border-b-0` / `--separator`"
+    governs: |-
+      A repeating set where every row draws its own trailing line, and the last row drops it because the
+      surface's own edge already closes the set.
+    cases:
+      - id: case-1
+        when: |-
+          Rows of one collection rendered edge to edge inside a joined card
+        owner: "`—`"
+        render: |-
+          `<li className="border-b border-separator px-4 py-3 last:border-b-0">`
+      - id: case-2
+        when: |-
+          The same set where the trailing row also opens up to the card's outer inset
+        owner: "`—`"
+        render: The same class plus `last:pb-4`
+      - id: case-3
+        when: |-
+          A grid of the same rows, where the last full row of the set drops the line
+        owner: "`—`"
+        render: "`sm:[&:nth-last-child(-n+2)]:border-b-0` on a two-column set"
+    notThisRule: |-
+      a set whose rows carry no class of their own. Use BOUNDARY-3. `last:border-b-0` is the whole point of this rule, not an embellishment. Without it the set renders a line against the surface edge and the card reads as unfinished. Case 3 exists because in a two-column grid the last row is the last two children, so `last:` alone drops one line and leaves its neighbour.
+  - id: BOUNDARY-3
+    title: "`divide-y divide-separator` / `--separator`"
+    governs: |-
+      One declaration on the parent draws every line inside a set. The rows say nothing, so no row can be
+      missed and no row can render a line the set did not intend.
+    cases:
+      - id: case-1
+        when: A list whose rows are uniform and need no per-row exception
+        owner: "`—`"
+        render: |-
+          `<ul className="m-0 list-none p-0 divide-y divide-separator">`
+      - id: case-2
+        when: A grid of peer measures stacked on one axis
+        owner: "`—`"
+        render: |-
+          `<div className="grid min-w-0 grid-cols-1 divide-y divide-separator">`
+      - id: case-3
+        when: A list or disclosure whose rows Common already separates
+        owner: "`StaticStateRow`, `SurfaceAccordionCard`"
+        render: Compose the rows; no divide class
+    notThisRule: |-
+      a set where individual rows need a different edge. Use BOUNDARY-2. Common draws Case 3 with an adjacent-sibling rule rather than a parent declaration. Both mean the same thing, one line between consecutive rows and none at either outer edge, so both satisfy this rule.
+  - id: BOUNDARY-4
+    title: "`border-l` / `divide-x` / `--separator`"
+    governs: |-
+      A seam on the inline axis, between columns of a grid or between the two halves of a split region. It
+      appears only at the width where the columns exist.
+    cases:
+      - id: case-1
+        when: |-
+          A set that stacks on narrow widths and becomes columns on wide ones
+        owner: "`—`"
+        render: |-
+          `divide-y divide-separator lg:divide-y-0 lg:divide-x` on the parent
+      - id: case-2
+        when: |-
+          A two-column grid where only the starting column carries the column seam
+        owner: "`—`"
+        render: "`sm:[&:nth-child(odd)]:border-r` on the row class"
+      - id: case-3
+        when: |-
+          A panel that becomes a side region and needs one seam against the primary column
+        owner: "`—`"
+        render: "`lg:border-l lg:border-separator` on the panel"
+      - id: case-4
+        when: |-
+          A shell whose leading rail is separated from the primary region by a rule
+        owner: "`WorkspaceShell`"
+        render: Compose the shell; no border class
+    notThisRule: |-
+      the block-axis lines of the same set. Those stay BOUNDARY-2 or BOUNDARY-3, and the two axes each name their own case. The `nth-child` selector in Case 2 is what keeps the trailing column from drawing a line against the surface edge. It is the inline-axis form of `last:border-b-0`.
+  - id: BOUNDARY-5
+    title: "`border` / `--border`"
+    governs: |-
+      The outline enclosing one object, rather than a line between two. Every case belongs to a Grammar
+      component, because the objects that need an outline are Grammar's.
+    cases:
+      - id: case-1
+        when: A card nested inside another bounded surface
+        owner: "`SurfaceCard`"
+        render: '`depth="nested"` already draws the outline'
+      - id: case-2
+        when: A framed media viewport
+        owner: "`MediaFrame`"
+        render: Compose the frame; no border class
+      - id: case-3
+        when: A code block or a table frame inside article content
+        owner: "`FencedCodeBlock`, `MarkdownTableFrame`"
+        render: Compose the block; no border class
+      - id: case-4
+        when: |-
+          A labelled boundary offering an alternative between two paths
+        owner: "`Divider`"
+        render: '`<Divider label="or" />`'
+    notThisRule: |-
+      the line between two touching bands. That is a hairline on `--separator`, so use BOUNDARY-1.
+  - id: BOUNDARY-6
+    title: no border / `--shadow-surface`
+    governs: |-
+      An object separated from the page by elevation rather than by a line. This is the default face of a
+      top-level card, and it is a boundary decision even though it draws no border.
+    cases:
+      - id: case-1
+        when: A top-level card sitting directly on the page canvas
+        owner: "`SurfaceCard`"
+        render: |-
+          `depth="top"` already clears the border and applies the shadow
+      - id: case-2
+        when: The same card once it is nested inside another surface
+        owner: "`SurfaceCard`"
+        render: '`depth="nested"` replaces the shadow with BOUNDARY-5'
+    notThisRule: |-
+      adding an outline to a top-level card. The border and the shadow are alternatives, and drawing both is `DOUBLE_OWNER`. `--shadow-surface` is a theme hook rather than a fixed value, and a theme may resolve it to no shadow at all. A top-level card is then separated by its face against the page canvas alone, which is a surface decision and belongs to [Surface](surface.yaml).
+doesNotDecide: |-
+  Which face sits on either side of an edge is [Surface](surface.yaml). The space between an edge and its
+  content is [Padding](padding.yaml), and a boundary drawn by a line rather than by space is why a
+  separator-facing side takes less inset than an outer edge. Distance between siblings that need no line
+  is [Gap](gap.yaml), and the clipping that keeps a full-bleed band inside its card is
+  [Overflow](overflow.yaml).

@@ -1,0 +1,242 @@
+schema: starci/knowledge-source@1
+id: be.error
+title: Error
+purpose: |-
+  Given a failure in the backend, how is it declared, thrown, wrapped, logged, and mapped onto HTTP and GraphQL?
+appliesTo:
+  - backend
+family: be
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - modules/platform/exceptions/errors/abstract.ts
+    - errors/ai/ai-quota-exhausted.ts
+    - errors/courses/challenge-not-found.ts
+    - errors/api/graphql.ts
+    - modules/platform/exceptions/filters/abstract-exception-http.filter.ts
+    - apps/core/src/app.module.ts
+    - modules/api/apollo/server/interceptors/graphql-transform.interceptor.ts
+    - modules/api/apollo/server/monolithic/monolithic-apollo-server.module.ts
+    - modules/api/apollo/server/types/graphql-response.ts
+    - features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts
+  limitations: |-
+    Historical reference-source observations preserved at the extraction commit; not a fresh audit of current repository conformance. Counts and file totals cited in rationale or cases are provenance from that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and lint/test setup; verify reference conformance within approved .starciwork scope. Target legacy code does not override the reference. Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
+
+    Verified at extraction: 294 files under errors/** declare a class that extends AbstractException; the only class extending Error directly is AbstractException itself; lint throw-abstract-exception, exception-extends-abstract and exception-in-errors-folder are at error for src/** and off only under src/tests/** and apps/*/test/**.
+rules:
+  - id: BE-ERROR-1
+    title: The base
+    kind: mandatory
+    requirement: |-
+      All domain failures extend AbstractException with code, optional metadata and optional httpStatus; undefined status means 500 at both transports.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Shape
+        write: |-
+          export class AbstractException extends Error { readonly code: string; readonly metadata?: Record<string, unknown>; readonly httpStatus?: number; constructor(message: string, name: string, metadata?: Record<string, unknown>, httpStatus?: number) { super(message); this.code = name; this.name = name; this.metadata = metadata; this.httpStatus = httpStatus } … }
+      - id: case-2
+        when: Serialisation
+        write: |-
+          toJSON(): string → { message, code, metadata }; static fromJSON<T extends AbstractException>(…)
+      - id: case-3
+        when: Cause
+        write: |-
+          getOriginalError(): Error { return this.metadata?.originalError as Error }; export interface AbstractExceptionMetadata { originalError?: Error }
+      - id: case-4
+        when: Status
+        write: |-
+          httpStatus is optional; undefined means 500 at both transports
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-ERROR-2
+    title: Declaring one exception
+    kind: mandatory
+    requirement: |-
+      Declare a metadata interface first, then the class extending AbstractException with a single metadata object argument.
+    rationale: |-
+      httpStatus set in 94 of 294 files at extraction, left undefined in the rest.
+    cases:
+      - id: case-1
+        when: Metadata interface first
+        write: |-
+          export interface ChallengeNotFoundExceptionMetadata extends AbstractExceptionMetadata { id?: string }
+      - id: case-2
+        when: Class
+        write: |-
+          export class ChallengeNotFoundException extends AbstractException { constructor({ id, originalError }: ChallengeNotFoundExceptionMetadata) { super("Challenge not found", "CHALLENGE_NOT_FOUND_EXCEPTION", { id, originalError }) } }
+      - id: case-3
+        when: Interpolated message
+        write: |-
+          super(`AI quota exhausted (${window})`, "AI_QUOTA_EXHAUSTED_EXCEPTION", { window, originalError })
+      - id: case-4
+        when: With a status
+        write: |-
+          fourth argument HttpStatus.<X>
+      - id: case-5
+        when: Single object argument
+        write: |-
+          always one metadata object, even when empty: throw new UserNotFoundException({}) (lint require-exception-object-arg)
+    verification:
+      automated:
+        - require-exception-object-arg
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-ERROR-3
+    title: Throwing
+    kind: mandatory
+    requirement: |-
+      Throw the named AbstractException for a failed operation. Do not hide failures in an ad hoc success:false envelope. Explicitly specified typed business dispositions remain normal domain results. Never new Error in src/** outside test lanes.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Guard in a handler
+        write: |-
+          if (!courseExists) { throw new CourseNotFoundException({ id: courseId }) }
+      - id: case-2
+        when: Conflict
+        write: |-
+          throw new CourseAlreadyEnrolledException({ courseId, userId: user.id })
+      - id: case-3
+        when: Thrown failures versus business outcomes
+        write: |-
+          throw the named AbstractException for a failed operation; do not hide it in an ad hoc success:false envelope. An explicitly specified typed business disposition (for example pending verification or refused by policy) remains a normal domain result. The installed no-handler-encoded-failure rule is a warning and is not authority to change SRS outcomes.
+      - id: case-4
+        when: Never new Error
+        write: |-
+          NewExpression[callee.name="Error"] is banned in src/** outside the test lanes
+    verification:
+      automated: []
+      manual:
+        - Distinguish thrown AbstractException failures from explicitly typed
+          business disposition results required by SRS.
+    relatedExamples:
+      - graphql-command
+  - id: BE-ERROR-4
+    title: Wrapping a foreign error
+    kind: mandatory
+    requirement: |-
+      Catch foreign errors and rethrow a named AbstractException carrying originalError in metadata.
+    rationale: |-
+      25 non-exception files wrap this way at extraction.
+    cases:
+      - id: case-1
+        when: Crypto
+        write: |-
+          catch (error) { throw new DecryptionFailedException({ originalError: error instanceof Error ? error : new Error(String(error)) }) }
+      - id: case-2
+        when: Cursor parsing
+        write: |-
+          catch (error) { throw new CourseCommunityCursorException({ originalError: error as Error }) }
+      - id: case-3
+        when: At-least-once consumer
+        write: |-
+          catch (error) { const exception = new KafkaCdcMessageException({ topic, originalError: error instanceof Error ? error : undefined }); … log and continue }
+      - id: case-4
+        when: Upstream GraphQL
+        write: |-
+          GraphQLDataNotFoundException({ query, variables, url, originalError })
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+      - transactional-service
+  - id: BE-ERROR-5
+    title: HTTP mapping
+    kind: mandatory
+    requirement: |-
+      AbstractExceptionHttpFilter catches AbstractException for HTTP hosts, logs, and responds with status/code/message. GraphQL hosts rethrow untouched.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: The filter
+        write: |-
+          @Catch(AbstractException) export class AbstractExceptionHttpFilter implements ExceptionFilter { catch(exception: AbstractException, host: ArgumentsHost): void { if (host.getType<string>() === "graphql") { throw exception } const status = exception.httpStatus ?? HttpStatus.INTERNAL_SERVER_ERROR; … response.status(status).json({ statusCode: status, code: exception.code, message: exception.message }) } }
+      - id: case-2
+        when: Registration
+        write: |-
+          apps/core/src/app.module.ts: { provide: APP_FILTER, useClass: AbstractExceptionHttpFilter }
+      - id: case-3
+        when: Logged before responding
+        write: |-
+          this.winstonService.log(WinstonLog.HttpExceptionLogged, { op: "http.exception.logged", error: exception.message, meta: { code: exception.code, status } })
+      - id: case-4
+        when: GraphQL host
+        write: |-
+          rethrown untouched so Apollo's pipeline owns it
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-ERROR-6
+    title: GraphQL mapping
+    kind: mandatory
+    requirement: |-
+      Two layers: GraphQLTransformInterceptor shapes the resolver body envelope; formatError shapes the GraphQL errors entry and transport status. Clients match on error code, not status alone.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Success envelope
+        write: |-
+          GraphQLTransformInterceptor maps every resolver result to { data, message, success: true } with message from @GraphQLSuccessMessage({ [Locale.En]: "…", [Locale.Vi]: "…" }) resolved by locale
+      - id: case-2
+        when: Failure envelope
+        write: |-
+          catchError((err) => … observer.next({ success: false, message: err?.message ?? "Internal server error", error: err?.name ?? "Error" })) — error carries the exception code because AbstractException sets this.name = name
+      - id: case-3
+        when: formatError
+        write: |-
+          in MonolithicApolloServerModule: if (original instanceof AbstractException) { return { ...formattedError, extensions: { ...formattedError.extensions, code: original.code, http: { status: original.httpStatus ?? 500 }, …retryAfterSeconds } } }
+      - id: case-4
+        when: Everything else
+        write: |-
+          return { ...formattedError, extensions: { ...formattedError.extensions, http: { status: 500, ...(formattedError.extensions?.http as ApolloHttpExtension | undefined) } } }
+      - id: case-5
+        when: Transport status
+        write: |-
+          httpStatusFromExceptionsPlugin reads extensions.http.status and sets the real HTTP status
+      - id: case-6
+        when: Client contract
+        write: |-
+          interface GraphQLResponse<T = unknown> { data?: T; message: string; success: boolean; error?: string }; the FE matches on error code, not on status
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-ERROR-7
+    title: Logging a failure
+    kind: mandatory
+    requirement: |-
+      Failures log through Winston with an enum identity and structured payload. Never console.error or Nest Logger.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Identity
+        write: |-
+          an enum member: WinstonLog.HttpExceptionLogged (lint no-interpolated-log-message, no-error-wording-as-log-identity)
+      - id: case-2
+        when: Payload
+        write: |-
+          { op: "http.exception.logged", error: exception.message, meta: { code, status } }
+      - id: case-3
+        when: Never
+        write: |-
+          console.error, Nest Logger
+    verification:
+      automated:
+        - no-interpolated-log-message
+        - no-error-wording-as-log-identity
+      manual: []
+    relatedExamples: []

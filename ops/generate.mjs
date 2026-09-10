@@ -10,6 +10,7 @@ const clean = value => String(value).replaceAll('|','\\|').replaceAll('\n',' ');
 const table = (headers, rows) => '| '+headers.map(clean).join(' | ')+' |\n| '+headers.map(()=> '---').join(' | ')+' |\n'+rows.map(row=>'| '+row.map(clean).join(' | ')+' |').join('\n')+'\n';
 function supportingReferences(op) {
   const refs=[];
+  if(['backend.implement','interface.implement','review.verify'].includes(op.id)) refs.push({path:'knowledge/coding-reference.json',when:'Before code changes or code acceptance, enforce applicable Academy BE/FE conventions. Verify the actual reference chain, named database injection and transaction ownership; passing tests or lint alone does not establish conformance. Review reads the applicable BE/FE pattern topics, including structural checks not covered by installed lint.'});
   if(op.id==='backend.implement') refs.push({path:'knowledge/patterns/be/INDEX.json',when:'Use only topics matching the actual selected backend family and source conventions.'});
   if(op.id==='architecture.decide') refs.push({path:'knowledge/patterns/be/INDEX.json',when:'Consult only applicable logical design mechanisms; source convention examples do not require source mapping in SDS.'});
   if(['interface.implement'].includes(op.id)) refs.push({path:'knowledge/patterns/fe/INDEX.json',when:'Use applicable topics for the actual installed frontend family and owner packages.'});
@@ -23,20 +24,14 @@ function supportingReferences(op) {
 }
 export function outputs() {
   const sorted=[...ops].sort((a,b)=>a.id.localeCompare(b.id));
-  const catalogue={schema:'work/ops@1',commonDocument:'common.json',ops:sorted.map(op=>({id:op.id,document:op.id+'/operator.json',authority:op.id+'/authority.json',goal:op.goal.en,nodeKinds:op.nodeKinds,writeScope:op.writes.map(w=>w.path),sideEffects:op.sideEffects,completionProfile:op.completionProfile,supportingReferences:supportingReferences(op),contract:op}))};
+  const catalogue={schema:'work/ops@1',commonDocument:'common.yaml',ops:sorted.map(op=>({id:op.id,document:op.id+'/operator.yaml',authority:op.id+'/authority.json',goal:op.goal.en,nodeKinds:op.nodeKinds,writeScope:op.writes.map(w=>w.path),sideEffects:op.sideEffects,completionProfile:op.completionProfile,supportingReferences:supportingReferences(op),contract:op}))};
   const json=x=>JSON.stringify(x,null,2)+'\n';
   const files=new Map([['catalog.json',json(catalogue)],['basic-ops.json',json(basicOps(sorted))],['consolidation.json',json(registry.consolidation)]]);
   for(const op of sorted){files.set(op.id+'/authority.json',json(authorityFor(op)));}
   return files;
 }
 export function generate({check=false}={}) {
-  const failures=[];
-  for(const [name,contents]of outputs()){
-    const file=path.join(root,name);
-    if(check){if(!fs.existsSync(file)||fs.readFileSync(file,'utf8')!==contents)failures.push(name);}
-    else{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,contents);}
-  }
-  return failures;
+  throw Error('Source-tree generation is retired. Use npm run build (or build:check) to publish the complete .dist runtime.');
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const failures=generate({check:process.argv.includes('--check')});

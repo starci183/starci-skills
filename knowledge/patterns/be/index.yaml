@@ -1,0 +1,69 @@
+schema: starci/knowledge-source@1
+id: be.index
+title: Backend code patterns
+purpose: |-
+  knowledge/ui/ decides what the interface must be. knowledge/patterns/be/ decides how the NestJS code behind it is written: which root a file lives under, what a GraphQL unit's files are called, how a handler is shaped, which alias an import uses, where a docblock sits relative to a decorator, how an exception is declared and where it is mapped to HTTP and GraphQL, and where the spec goes. Every rule below was extracted from the historical reference backend source by opening files and counting; each topic cites its sources. Where the code is split, the file records historical variant counts. Follow ../../coding-reference.json: starci-academy-backend is the required coding reference. Lint rule names from the reference project's ESLint config are quoted only where the code already follows them.
+
+  Applicability: these are historical reference-source observations preserved at skill commit edf72554425f918e80c9205e9c6db10596e722f0, not universal framework rules or current-project source evidence. Inspect the selected repository's actual types/APIs, aliases and lint/test setup; verify reference conformance within approved .starciwork scope. Resolve incompatibilities explicitly; target legacy code does not override the reference. Old counts cannot claim a fresh scan. Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
+appliesTo:
+  - backend
+family: be
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - the historical reference backend source
+    - apps/core/src/app.module.ts for filter registration
+    - tsconfig.json
+    - jest.config.ts
+    - eslint.config.mjs
+  limitations: |-
+    Historical reference-source observations preserved at the extraction commit; not a fresh audit of current repository conformance. Counts and file totals cited in rationale or cases are provenance from that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and lint/test setup; verify reference conformance within approved .starciwork scope. Target legacy code does not override the reference. Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
+topics:
+  - id: be.folder
+    title: Folder
+    path: folder.yaml
+    decides: |-
+      features/ versus modules/, the file set of one GraphQL unit, where exceptions, entities and tests live
+    rules: BE-FOLDER-1 … BE-FOLDER-7
+  - id: be.naming
+    title: Naming
+    path: naming.yaml
+    decides: |-
+      Kebab file suffixes, class role suffixes, exception identity, enums, constants, methods
+    rules: BE-NAMING-1 … BE-NAMING-8
+  - id: be.function
+    title: Function
+    path: function.yaml
+    decides: |-
+      Handler process, message envelope, service and resolver execute, constructor injection, helpers
+    rules: BE-FUNCTION-1 … BE-FUNCTION-8
+  - id: be.imports
+    title: Imports
+    path: imports.yaml
+    decides: |-
+      @modules/@features/@tests aliases, brace style, order, layering direction, banned imports
+    rules: BE-IMPORTS-1 … BE-IMPORTS-7
+  - id: be.comment
+    title: Comment
+    path: comment.yaml
+    decides: |-
+      Docblock after decorators, responsibility over name, enum member docs, // prose, ASCII and vn-ok
+    rules: BE-COMMENT-1 … BE-COMMENT-7
+  - id: be.typing
+    title: Typing
+    path: typing.yaml
+    decides: |-
+      interface over type, named params, readonly, enums, no any, GraphQL classes
+    rules: BE-TYPING-1 … BE-TYPING-7
+  - id: be.error
+    title: Error
+    path: error.yaml
+    decides: |-
+      AbstractException shape, metadata, wrapping, the HTTP filter, the GraphQL interceptor and formatError
+    rules: BE-ERROR-1 … BE-ERROR-7
+  - id: be.test
+    title: Test
+    path: test.yaml
+    decides: |-
+      Colocated .spec.ts, lanes by suffix, direct construction with as never, what an assertion proves
+    rules: BE-TEST-1 … BE-TEST-7

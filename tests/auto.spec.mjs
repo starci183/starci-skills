@@ -11,7 +11,8 @@ import {autoASAPWindow,autoASAPStatus} from '../workflows/auto.mjs';
 import {presentAutoPlan,approveAutoPlan,assessAutoGoal,nextAutoJob,hasAutoAcceptance,assertAutoAuthority} from '../workflows/auto.mjs';
 import {propose,presentGoal,authorizeAutoGoal,requestCell,acceptCell,acceptAutoDelivery,markWorkDone,saveRun,saveAutoCompletion,workflowDigest} from '../workflows/lifecycle.mjs';
 import {validBackendRun} from '../workflows/select.mjs';
-const catalog=JSON.parse(fs.readFileSync(new URL('../workflows/catalog.json',import.meta.url)));
+import {readWorkflow, readExample, readPublicJson} from './helpers/read-public.mjs';
+const catalog=readWorkflow('catalog.json');
 function fixture(t,{count=2,workflow='define-business'}={}) {
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-auto-'));
  t.after(()=>{assert.equal(path.dirname(dir),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(dir).startsWith('starci-auto-'));fs.rmSync(dir,{recursive:true,force:true});});

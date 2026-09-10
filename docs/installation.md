@@ -11,7 +11,7 @@ npx --yes --package=./starci-3.0.0-alpha.3.tgz starci init --dir /absolute/host
 npx --yes --package=./starci-3.0.0-alpha.3.tgz starci doctor --dir /absolute/host --quick
 ```
 
-The installer copies its declared payload to `/absolute/host/.claude`, installs the managed entry in both `AGENTS.md` and `CLAUDE.md`, and creates local config only if absent. It preserves custom instructions. Conflicting bootstrap protocols fail before runtime writes. `init` refuses an unmanaged `.claude` by default. It does not run Git commands, create project records, install global skills, or change FE sources.
+The installer copies its declared **source** payload to `/absolute/host/.claude`, builds and verifies local `.dist` from that tree, then records `.starci-skills.json` only if verification succeeds. It installs the managed entry in both `AGENTS.md` and `CLAUDE.md`, and creates local config only if absent. Installed `.claude/.gitignore` includes `/.dist/` and `/config.json`. It preserves custom instructions. Conflicting bootstrap protocols fail before runtime writes. `init` refuses an unmanaged `.claude` by default. It does not run Git commands, create project records, install global skills, or change FE sources. See [runtime distribution](runtime-distribution.md).
 
 `--no-bootstrap` deliberately leaves host entry files untouched; you must provide the runtime path to the agent yourself. Do not use `--force` as routine setup: it can replace locally edited runtime files. Back up and inspect before explicitly opting in.
 
@@ -57,7 +57,7 @@ npx --yes --package=./starci-3.0.0-alpha.3.tgz starci update --dir /absolute/hos
 npx --yes --package=./starci-3.0.0-alpha.3.tgz starci doctor --dir /absolute/host
 ```
 
-Updates replace unchanged installer-owned runtime files. Locally changed or unowned content is preserved and reported. Inspect that report: a successful copy is not proof a mixed/custom installation is compatible. Major upgrades require `--upgrade-major`. Keep a backup or Git checkpoint of runtime and host instructions before upgrading. Existing business data, active plans, receipts, local settings and Git metadata are not migration targets.
+Updates replace unchanged installer-owned runtime files, rebuild and verify `.dist` from the installed source, then record the new version only after a successful check. Locally changed or unowned content is preserved and reported. Inspect that report: a successful copy is not proof a mixed/custom installation is compatible. Major upgrades require `--upgrade-major`. Keep a backup or Git checkpoint of runtime and host instructions before upgrading. Existing business data, active plans, receipts, local settings and Git metadata are not migration targets.
 
 The ownership manifest retains the historical filename `.starci-skills.json` for installer compatibility; this is not the public command name.
 
@@ -71,4 +71,5 @@ The ownership manifest retains the historical filename `.starci-skills.json` for
 | No project binding | Supply backend/FE paths and verified remotes. Do not initialize inside FE. |
 | Invalid metadata or evidence | Run `starci validate <explicit-root>` and repair the specific proof. Do not weaken schemas to claim completion. |
 | Generated build stale | Run `node .claude/scripts/ensure-build.mjs`; report build errors before workflow execution. |
+| Interrupted init/update (no new version recorded) | Re-run `init`/`update` from the same reviewed package, or `node .claude/scripts/ensure-build.mjs`, then `doctor --quick`. See [runtime distribution](runtime-distribution.md). |
 | Runtime has local changes after update | Review kept files and run doctor. Never erase them just to remove a warning. |

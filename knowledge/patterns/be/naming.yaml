@@ -1,0 +1,280 @@
+schema: starci/knowledge-source@1
+id: be.naming
+title: Naming
+purpose: |-
+  Given a backend file, class, type, constant or method, what is it called?
+appliesTo:
+  - backend
+family: be
+provenance:
+  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  sources:
+    - features/api/core/graphql/mutations/courses/add-to-cart/*
+    - features/api/core/graphql/queries/courses/course/*
+    - modules/platform/exceptions/errors/**
+    - modules/databases/postgresql/primary/enums/locale.ts
+    - modules/ai/ai-entitlement.service.ts
+    - modules/ai/constants/
+    - modules/api/apollo/server/interceptors/graphql-transform.interceptor.ts
+  limitations: |-
+    Historical reference-source observations preserved at the extraction commit; not a fresh audit of current repository conformance. Counts and file totals cited in rationale or cases are provenance from that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and lint/test setup; verify reference conformance within approved .starciwork scope. Target legacy code does not override the reference. Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
+rules:
+  - id: BE-NAMING-1
+    title: "Files: kebab-case plus a role suffix"
+    kind: mandatory
+    requirement: |-
+      File basenames are kebab-case with a role suffix that matches the unit's responsibility.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: GraphQL unit
+        write: |-
+          add-to-cart.handler.ts, add-to-cart.service.ts, add-to-cart.resolver.ts, add-to-cart.command.ts, course.query.ts, add-to-cart.module.ts, add-to-cart.module-definition.ts
+      - id: case-2
+        when: Capability
+        write: |-
+          winston.service.ts, winston.providers.ts, winston.decorators.ts, keycloak-auth-graphql.guard.ts, graphql-transform.interceptor.ts, abstract-exception-http.filter.ts
+      - id: case-3
+        when: Data
+        write: |-
+          cart-item.entity.ts, enums/locale.ts, kpi-current.util.ts
+      - id: case-4
+        when: Exception
+        write: |-
+          errors/courses/challenge-not-found.ts — no suffix (289 of 294 at extraction)
+      - id: case-5
+        when: Spec
+        write: |-
+          same basename plus .spec / .int-spec: add-to-cart.handler.spec.ts, schema-builds.int-spec.ts
+      - id: case-6
+        when: Migration
+        write: |-
+          1719200000000-AddIsEnrolledToEnrollments.ts
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-NAMING-2
+    title: "Classes: PascalCase subject plus role"
+    kind: mandatory
+    requirement: |-
+      Classes use PascalCase with a role suffix that matches the file role.
+    rationale: |-
+      Historical counts at extraction: 154 …Handler, 701 …Service, 309 …Resolver, 83 …Command, 67 …Query, 209 …Request, 303 …Response, 552 …Module, 200 …Entity.
+    cases:
+      - id: case-1
+        when: Handler / Service / Resolver
+        write: |-
+          AddToCartHandler, AddToCartService, AddToCartResolver, CourseHandler
+      - id: case-2
+        when: Message
+        write: |-
+          AddToCartCommand, CourseQuery
+      - id: case-3
+        when: GraphQL types
+        write: |-
+          AddToCartRequest, AddToCartResponse
+      - id: case-4
+        when: Unit module
+        write: |-
+          AddToCartSingleMutationModule extends ConfigurableModuleClass; query units …SingleQueryModule
+      - id: case-5
+        when: Capability module
+        write: |-
+          AiModule, AiBalancerModule, WinstonModule
+      - id: case-6
+        when: Entity
+        write: |-
+          CartItemEntity, CourseEntity, EnrollmentEntity, UserEntity
+      - id: case-7
+        when: Others
+        write: |-
+          KeycloakAuthGraphQLGuard, GraphQLTransformInterceptor, AbstractExceptionHttpFilter, ICQRSHandler (abstract base, I prefix kept)
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-NAMING-3
+    title: Exception identity
+    kind: mandatory
+    requirement: |-
+      Exception class, code, metadata interface and message follow the AbstractException identity contract.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Class
+        write: |-
+          ChallengeNotFoundException, AiQuotaExhaustedException — ends in Exception (337 at extraction; lint exception-name-ends-in-exception)
+      - id: case-2
+        when: Code
+        write: |-
+          "CHALLENGE_NOT_FOUND_EXCEPTION", "AI_QUOTA_EXHAUSTED_EXCEPTION" — the class name in UPPER_SNAKE (lint exception-code-matches-class-name)
+      - id: case-3
+        when: Metadata
+        write: |-
+          interface ChallengeNotFoundExceptionMetadata extends AbstractExceptionMetadata (285 of 294 files at extraction; lint exception-metadata-type-named-for-class)
+      - id: case-4
+        when: Message
+        write: |-
+          a short sentence: "Challenge not found", `AI quota exhausted (${window})`
+    verification:
+      automated:
+        - exception-name-ends-in-exception
+        - exception-code-matches-class-name
+        - exception-metadata-type-named-for-class
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-NAMING-4
+    title: Enums
+    kind: mandatory
+    requirement: |-
+      Enums are PascalCase with PascalCase members and string values; log and throttle identities are enum members.
+    rationale: |-
+      137 enums and 0 const enum at extraction.
+    cases:
+      - id: case-1
+        when: Declaration
+        write: |-
+          export enum Locale { Vi = "vi", En = "en" }, export enum ActionType { … }
+      - id: case-2
+        when: GraphQL registration
+        write: |-
+          export const GraphQLTypeLocale = createEnumType(Locale) then registerEnumType(GraphQLTypeLocale, { name: "Locale", … })
+      - id: case-3
+        when: Log identity
+        write: |-
+          WinstonLog.HttpExceptionLogged — an enum member, never a string message
+      - id: case-4
+        when: Throttle level
+        write: |-
+          ThrottlerConfig.Medium
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+  - id: BE-NAMING-5
+    title: Constants
+    kind: mandatory
+    requirement: |-
+      Module-level constants use UPPER_SNAKE; exported function values are camelCase arrows; decorator factories keep PascalCase.
+    rationale: |-
+      194 exported UPPER_SNAKE consts at extraction.
+    cases:
+      - id: case-1
+        when: Module-level value
+        write: |-
+          const SUCCESS_MESSAGE_METADATA = "graphqlSuccessMessage", TIER_ALLOWED_CATEGORIES, const POSTGRESQL_PRIMARY = "primary"
+      - id: case-2
+        when: Constants file
+        write: |-
+          modules/ai/constants/ai-entitlement.constants.ts, constants/credit-cost.ts
+      - id: case-3
+        when: Exported function value
+        write: |-
+          camelCase arrow: export const getKpiCurrentValues = …; decorator factories keep PascalCase: export const GraphQLSuccessMessage = (message) => SetMetadata(…)
+      - id: case-4
+        when: Spec fixtures
+        write: |-
+          const BASE_CREDITS_5H = 30, const futureDate = (): Date => …
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - transactional-service
+  - id: BE-NAMING-6
+    title: Methods
+    kind: mandatory
+    requirement: |-
+      Handlers override process; feature services and resolvers expose execute; capability services use descriptive verbs; no bare verb exports or versioned names.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Handler body
+        write: |-
+          protected override async process(command: AddToCartCommand) — always process (140/140 at extraction)
+      - id: case-2
+        when: Service and resolver door
+        write: |-
+          async execute(params: ExecuteParams<AddToCartRequest>)
+      - id: case-3
+        when: Capability service
+        write: |-
+          verbs: resolve, consume, history, snapshot, assertNotOverQuota, getSettings, grantTier (AiEntitlementService)
+      - id: case-4
+        when: Not a bare verb export
+        write: |-
+          lint no-bare-verb-export; getKpiCurrentValues, not get
+      - id: case-5
+        when: No version in a name
+        write: |-
+          lint no-version-in-name
+    verification:
+      automated:
+        - no-bare-verb-export
+        - no-version-in-name
+      manual: []
+    relatedExamples:
+      - graphql-command
+  - id: BE-NAMING-7
+    title: Type names
+    kind: mandatory
+    requirement: |-
+      Object type names use Params/Result/Options/ExceptionMetadata suffixes; decorated classes may keep a companion I… interface.
+    rationale: |-
+      Historical counts at extraction: 614 …Params, 216 …Result, 35 …Options, 290 …ExceptionMetadata.
+    cases:
+      - id: case-1
+        when: Input object
+        write: |-
+          …Params: ExecuteParams<T>, UseQueryCourseSwrParams
+      - id: case-2
+        when: Output object
+        write: |-
+          …Result: UserStatsResult
+      - id: case-3
+        when: Options
+        write: |-
+          …Options
+      - id: case-4
+        when: Exception payload
+        write: |-
+          …ExceptionMetadata
+      - id: case-5
+        when: Plain interface for a decorated class
+        write: |-
+          IAbstractGraphQLResponse<T> beside AbstractGraphQLResponse
+    verification:
+      automated: []
+      manual: []
+    relatedExamples: []
+  - id: BE-NAMING-8
+    title: GraphQL surface
+    kind: mandatory
+    requirement: |-
+      GraphQL field names are camelCase; the request argument is always named request; house decorators keep their established names.
+    rationale: |
+
+    cases:
+      - id: case-1
+        when: Field name
+        write: |-
+          camelCase in the decorator: @Mutation(() => AddToCartResponse, { name: "addToCart", … })
+      - id: case-2
+        when: Argument
+        write: |-
+          always "request": @Args("request", { description: "Course id to add to the cart." }) request: AddToCartRequest
+      - id: case-3
+        when: Own decorators
+        write: |-
+          @InjectPrimaryPostgreSQLEntityManager(), @KeycloakGraphQLUser(), @GraphQLLocale(), @UseThrottler(…), @GraphQLSuccessMessage({…})
+    verification:
+      automated: []
+      manual: []
+    relatedExamples:
+      - graphql-command

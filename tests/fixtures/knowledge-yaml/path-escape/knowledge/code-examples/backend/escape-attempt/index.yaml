@@ -1,0 +1,30 @@
+schema: starci/code-example@1
+id: escape-attempt
+title: Path escape attempt
+purpose: |
+  Manifest uses ../ path segments; compile must reject path escape.
+appliesTo: [backend]
+relatedRules: []
+files:
+  - path: ../outside-escape.ts
+    role: Attempt to read outside the example folder.
+  - path: local.ts
+    role: Local file that must not authorize the escape.
+entrypoint: local.ts
+adapt:
+  - Fixture only.
+dependencies:
+  packages: []
+  assumptions: |
+    Synthetic path-escape fixture.
+verification:
+  syntax: true
+  typecheck: false
+  lint: false
+  tests: []
+  limitations: |
+    Fixture only.
+provenance:
+  sources: []
+  simplifications: |
+    Fixture only.
