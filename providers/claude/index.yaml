@@ -44,9 +44,12 @@ soloOperation:
     - manager-does-not-perform-operation
     - no-worktree-created-by-solo-operation
 orcaManagedForm:
+  environmentBinding:
+    currentRuntime: omit---on
+    namedRuntime: observed-environment-id-only
   start:
     api: orchestration.worker-start
-    cli: 'orca orchestration worker-start --task <task-id> --on windows --worktree <current|new-child> --agent claude --setup run --json'
+    cli: 'orca orchestration worker-start --task <task-id> --worktree <current|new-child> --agent claude --setup run --json'
   name:
     api: terminal.rename
     cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "<canonical-role-name>" --json'
@@ -60,3 +63,4 @@ forbidden:
   - operation-agent-spawns-agent
   - manager-direct-operation-execution
   - assume-Agent-or-AgentOutput-tool-without-runtime-schema
+  - literal-or-guessed-worker-start-environment

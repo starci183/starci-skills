@@ -10,6 +10,8 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.equal(contract.names.workflowWorktree,'[Workflow] <Workflow>');
   assert.equal(contract.names.workflowCoordinator,'[Coordinator] <Workflow>');
   assert.equal(contract.names.operationAgent,'[Op] <operation> - <scope>');
+  assert.equal(contract.environmentBinding.currentRuntime,'omit---on');
+  assert.equal(contract.environmentBinding.namedRuntimeAuthority,'live-runtime-inventory-only');
   assert.match(contract.planCoordinator.calls.startAgent.cli,/orchestration worker-start .*--agent codex/);
   assert.match(contract.workflowCoordinator.calls.startChildAgent.cli,/--worktree new-child .*--agent codex/);
   assert.match(contract.workflowCoordinator.calls.nameAgent.cli,/\[Coordinator\] <Workflow>/);
@@ -32,6 +34,12 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.ok(contract.forbiddenCalls.includes('terminal-send-operation-prompt'));
   assert.ok(contract.forbiddenCalls.includes('orchestration.dispatch-to-existing-terminal-for-operation'));
   assert.ok(contract.forbiddenCalls.includes('operation-agent-tool-agent'));
+  for(const cli of [
+    contract.planCoordinator.calls.startAgent.cli,
+    contract.workflowCoordinator.calls.startChildAgent.cli,
+    contract.operationAgent.qwen38Flash.calls.startAgent.cli,
+    contract.operationAgent.managedFallback.calls.startAgent.cli
+  ])assert.doesNotMatch(cli,/--on\s+(?:windows|macos|linux)(?:\s|$)/i);
 });
 
 test('Codex and Claude contracts expose solo operation APIs but forbid hosted orchestration',()=>{
@@ -55,6 +63,8 @@ test('Codex and Claude contracts expose solo operation APIs but forbid hosted or
     assert.ok(contract.soloOperation.invariants.includes('one-operation-instance-one-agent'));
     assert.ok(contract.soloOperation.invariants.includes('no-subagent-created-by-operation-agent'));
     assert.match(contract.orcaManagedForm.start.cli,/orchestration worker-start/);
+    assert.equal(contract.orcaManagedForm.environmentBinding.currentRuntime,'omit---on');
+    assert.doesNotMatch(contract.orcaManagedForm.start.cli,/--on\s+(?:windows|macos|linux)(?:\s|$)/i);
   }
 });
 

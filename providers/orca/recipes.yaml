@@ -11,6 +11,7 @@ recipes:
       - terminal.rename
       - orchestration.run-use
     terminalName: "[Coordinator] <Plan>"
+    environmentBinding: current-runtime-by-omitting---on
     then: external-bootstrap-leaves-control-loop
   start-workflow-coordinator:
     mode: orchestrated
@@ -22,6 +23,7 @@ recipes:
       - terminal.rename
     worktreeName: "[Workflow] <Workflow>"
     terminalName: "[Coordinator] <Workflow>"
+    environmentBinding: current-runtime-by-omitting---on
   start-qwen-operation:
     mode: orchestrated
     actor: workflow-coordinator
@@ -39,6 +41,7 @@ recipes:
     taskCardinality: one
     dispatchCardinality: one
     agentCardinality: one
+    environmentBinding: current-runtime-by-omitting---on
   start-managed-operation:
     mode: orchestrated
     actor: workflow-coordinator
@@ -95,3 +98,4 @@ forbiddenSequences:
   - infer-architecture-sidearm-from-review
   - create-task-before-dag-operation-admission
   - accept-operation-effect-before-provider-attestation
+  - worker-start-with-literal-or-guessed-environment

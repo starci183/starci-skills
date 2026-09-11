@@ -38,6 +38,8 @@ export function validateProviderContracts(){
   add(errors,orca.index?.names?.workflowWorktree==='[Workflow] <Workflow>','Invalid Orca workflow worktree name');
   add(errors,orca.index?.names?.workflowCoordinator==='[Coordinator] <Workflow>','Invalid Orca Workflow Coordinator name');
   add(errors,orca.index?.names?.operationAgent==='[Op] <operation> - <scope>','Invalid Orca operation name');
+  add(errors,orca.index?.environmentBinding?.currentRuntime==='omit---on','Current Orca runtime must omit --on');
+  add(errors,orca.index?.environmentBinding?.namedRuntimeAuthority==='live-runtime-inventory-only','Named Orca runtime must come from live inventory');
   add(errors,orca.index?.operationAgent?.admission?.expectedOperation==='active-dag-node','Orca operation admission must bind the active DAG node');
   add(errors,orca.index?.operationAgent?.admission?.providerSelection==='profiles-registry-resolver-output','Orca operation admission must use the profile resolver');
   add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.api==='orchestration.worker-show','Orca provider attestation must use worker-show');
@@ -62,16 +64,29 @@ export function validateProviderContracts(){
   add(errors,qwen?.forbidden?.includes('terminal-create-qwen-command')&&qwen?.forbidden?.includes('worker-start-by-terminal-handle'),'Qwen adapter does not forbid command-terminal attachment');
   add(errors,orca.index?.operationAgent?.qwen38Flash?.launch==='direct-native-worker-start','Orca index must launch Qwen natively');
   add(errors,orca.index?.operationAgent?.qwen38Flash?.agent===qwen?.agent&&orca.index?.operationAgent?.qwen38Flash?.model===qwen?.requiredModel,'Orca index and Qwen adapter identities disagree');
+  const workerStartTemplates=[
+    orca.index?.planCoordinator?.calls?.startAgent?.cli,
+    orca.index?.workflowCoordinator?.calls?.startChildAgent?.cli,
+    orca.index?.operationAgent?.qwen38Flash?.calls?.startAgent?.cli,
+    orca.index?.operationAgent?.managedFallback?.calls?.startAgent?.cli,
+    codex.index?.orcaManagedForm?.start?.cli,
+    claude.index?.orcaManagedForm?.start?.cli
+  ];
+  for(const cli of workerStartTemplates){
+    add(errors,typeof cli==='string'&&!/--on\s+(?:windows|macos|linux)(?:\s|$)/i.test(cli),'Worker-start template contains a literal environment label');
+  }
 
   add(errors,codex.api?.schema==='starci/codex-api@1','Missing Codex provider API');
   const codexCalls=Object.values(codex.api?.collaborationApi||{}).map(value=>value?.call);
   for(const call of ['collaboration.spawn_agent','collaboration.followup_task','collaboration.send_message','collaboration.interrupt_agent','collaboration.list_agents','collaboration.wait_agent'])add(errors,codexCalls.includes(call),`Missing Codex collaboration API: ${call}`);
   add(errors,codex.index?.modes?.orchestratedHost?.supported===false,'Codex must not host orchestrated mode');
+  add(errors,codex.index?.orcaManagedForm?.environmentBinding?.currentRuntime==='omit---on','Codex Orca form must omit --on for the current runtime');
 
   add(errors,claude.api?.schema==='starci/claude-api@1','Missing Claude provider API');
   add(errors,claude.api?.subagentApi?.task?.call==='Task','Claude operation API must be Task');
   add(errors,claude.api?.unavailableAssumptions?.Agent===false&&claude.api?.unavailableAssumptions?.AgentOutput===false,'Claude invented-agent guards are missing');
   add(errors,claude.index?.modes?.orchestratedHost?.supported===false,'Claude must not host orchestrated mode');
+  add(errors,claude.index?.orcaManagedForm?.environmentBinding?.currentRuntime==='omit---on','Claude Orca form must omit --on for the current runtime');
   return {ok:errors.length===0,errors};
 }
 

@@ -14,6 +14,13 @@ purpose: |-
   Canonical Orca API call templates for StarCi orchestrated execution. These calls are the
   only supported construction path; prompts may fill placeholders but may not invent a
   different hierarchy, launch sequence, display role or lifecycle shortcut.
+environmentBinding:
+  currentRuntime: omit---on
+  namedRuntime: '--on <observed-environment-id>'
+  namedRuntimeAuthority: live-runtime-inventory-only
+  forbidden:
+    - literal-windows-environment
+    - guessed-environment-name
 ui:
   activitySubtitle: last-tool-activity-not-agent-identity
   identitySource:
@@ -34,7 +41,7 @@ planCoordinator:
       cli: 'orca orchestration task-create --run <run-id> --spec "<plan-coordinator-contract>" --json'
     startAgent:
       api: orchestration.worker-start
-      cli: 'orca orchestration worker-start --task <task-id> --on windows --worktree current --agent codex --json'
+      cli: 'orca orchestration worker-start --task <task-id> --worktree current --agent codex --json'
     nameAgent:
       api: terminal.rename
       cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Coordinator] <Plan>" --json'
@@ -49,7 +56,7 @@ workflowCoordinator:
       cli: 'orca orchestration task-create --run <run-id> --spec "<workflow-coordinator-contract>" --json'
     startChildAgent:
       api: orchestration.worker-start
-      cli: 'orca orchestration worker-start --task <task-id> --on windows --worktree new-child --repo <exact-repo-selector> --name <workflow-slug> --agent codex --setup run --json'
+      cli: 'orca orchestration worker-start --task <task-id> --worktree new-child --repo <exact-repo-selector> --name <workflow-slug> --agent codex --setup run --json'
     nameWorktree:
       api: worktree.set
       cli: 'orca worktree set --worktree <worker.worktree_id> --display-name "[Workflow] <Workflow>" --json'
@@ -101,7 +108,7 @@ operationAgent:
     calls:
       startAgent:
         api: orchestration.worker-start
-        cli: 'orca orchestration worker-start --task <operation-task-id> --on windows --worktree current --agent qwen-code --json'
+        cli: 'orca orchestration worker-start --task <operation-task-id> --worktree current --agent qwen-code --json'
       restoreName:
         api: terminal.rename
         cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
@@ -109,7 +116,7 @@ operationAgent:
     calls:
       startAgent:
         api: orchestration.worker-start
-        cli: 'orca orchestration worker-start --task <operation-task-id> --on windows --worktree current --agent <resolved-native-agent-id> --model <resolved-model-id> --effort <resolved-effort> --json'
+        cli: 'orca orchestration worker-start --task <operation-task-id> --worktree current --agent <resolved-native-agent-id> --model <resolved-model-id> --effort <resolved-effort> --json'
       nameAgent:
         api: terminal.rename
         cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
@@ -143,3 +150,4 @@ forbiddenCalls:
   - task-create-for-non-dag-operation
   - operation-effect-without-provider-attestation
   - architecture-sidearm-inferred-from-review
+  - literal-or-guessed-worker-start-environment
