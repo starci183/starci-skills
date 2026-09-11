@@ -32,6 +32,7 @@ invariants:
   - The Workflow Manager decides, dispatches, retries, replaces and waits; implementation, repair, test execution and output production belong exclusively to operation agents.
   - The Workflow Manager waits for operation boundaries, while the parent Coordinator waits for normalized Workflow Manager boundaries.
   - A Qwen, Claude, Codex or other operation agent executes exactly one operation and never substitutes for the Workflow Manager.
+  - The persistent agent inside each workflow child is displayed as [Coordinator] <Workflow>; [Monitor] is not a StarCi agent role.
   - Every operation message targets its Workflow Manager; module-local decisions are settled there without notifying the parent Coordinator.
   - A Workflow Manager emits only normalized cross-workflow, shared-owner, authority, human-decision, manager-failure or workflow-done boundaries to the parent Coordinator.
   - The parent Coordinator replies through the Workflow Manager and never controls an operation agent directly.
@@ -39,6 +40,7 @@ invariants:
   - A higher management layer never substitutes for or performs work owned by a lower layer.
   - If a Workflow Manager fails, the Coordinator replaces or recovers that manager; it never bypasses the missing layer.
   - Each operation attempt owns exactly one supervised agent and that agent is never reused by another operation.
+  - A Qwen operation starts with qwen --exclude-tools agent; provider-native nested agents are forbidden even when the outer terminal remains supervised.
   - A Qwen operation terminal is named, prewarmed to tui-idle and attached to its Task with worker-start by exact terminal handle before any operation prompt is accepted.
   - Returned-preamble, dispatch injection, manual prompt submission and retained unsupervised fallbacks are forbidden for operation execution.
   - If supervised attachment fails with agent_prompt_stalled or session_not_reported, the exact attempt is fenced and reconciled before another provider is selected.

@@ -15,6 +15,10 @@ agent in the Orca main worktree, hands off the Run/DAG, and leaves the control l
 operation and its concrete provider binding are two agent layers at the same boundary: changing the
 concrete model does not change the operation's goal, ownership, input, output or authority.
 
+Provider-specific call forms are canonical in `providers/codex/index.yaml`,
+`providers/claude/index.yaml` and `providers/orca/index.yaml`. A runtime must use the declared mode and call form instead of inferring an
+agent topology from a terminal, prompt or UI subtitle.
+
 ## Wrapper-owned handoff
 
 Before an operation starts, the wrapper resolves dependencies and freezes a normalized input envelope:
@@ -65,16 +69,16 @@ normalized manager boundaries and never performs workflow-local or operation wor
 Orca main worktree
 └─ [Coordinator] AgentOS Backend
    ├─ [Workflow] Core (child worktree)
-   │  └─ [Monitor] Core
+   │  └─ [Coordinator] Core
    │     └─ [Op] <operation> - Core
    ├─ [Workflow] Accounting (child worktree)
-   │  └─ [Monitor] Accounting
+   │  └─ [Coordinator] Accounting
    │     └─ [Op] <operation> - Accounting
    ├─ [Workflow] Chatbot (child worktree)
-   │  └─ [Monitor] Chatbot
+   │  └─ [Coordinator] Chatbot
    │     └─ [Op] <operation> - Chatbot
    └─ [Workflow] Sales (child worktree)
-      └─ [Monitor] Sales
+      └─ [Coordinator] Sales
          └─ [Op] <operation> - Sales
 ```
 

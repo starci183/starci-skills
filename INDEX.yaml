@@ -11,6 +11,7 @@ folders:
   ops: Operator JSON and authority
   workflows: Matrices, contracts and runtime gates
   profiles: Host profiles
+  providers: Provider capabilities, full API inventories, adapters, recipes and fail-closed validation
   knowledge: Lazy-loaded JSON guidance
   contracts: Validation code
   core: Work validation runtime
@@ -42,3 +43,4 @@ work:
 executionModes:
   default: planned
   explicitFlash: workflows/flash.json
+  providerCatalog: providers/catalog.json

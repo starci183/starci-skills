@@ -1,0 +1,21 @@
+schema: starci/codex-provider-validation@1
+preflight:
+  - Read the active collaboration tool schemas.
+  - Confirm collaboration.spawn_agent and collaboration.wait_agent are exposed.
+  - Confirm the operation count will not exceed three concurrent subagents.
+  - Confirm every operation prompt contains the normalized input and output envelopes.
+launchAcceptance:
+  - A returned agent ID and canonical task name exist.
+  - The agent appears under the current Codex task tree.
+  - The operation agent is named `[Op] <operation> - <scope>`.
+completionAcceptance:
+  - Completion is received through the collaboration mailbox.
+  - Output validates against the normalized operation output envelope.
+  - No nested agent exists below the operation agent.
+failClosed:
+  - missing-active-tool-schema
+  - missing-spawn-agent
+  - missing-wait-agent
+  - concurrency-limit-exceeded
+  - operation-created-as-user-owned-codex-task
+

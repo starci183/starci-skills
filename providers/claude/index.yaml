@@ -1,0 +1,62 @@
+schema: starci/claude-provider@1
+provider: claude
+purpose: Canonical Claude execution forms and agent API calls for StarCi.
+files:
+  capabilities: capabilities.json
+  api: api.json
+  recipes: recipes.json
+  validation: validation.json
+modes:
+  solo:
+    supported: true
+    host: current-claude-chat
+    controlPlane: combined-plan-coordinator-workflow-wrapper
+    operationForm: isolated-task-subagent
+    maximumConcurrentOperations: 3
+  orchestratedHost:
+    supported: false
+    rule: Orca only; an external Claude chat may bootstrap the Orca Plan Coordinator and must then leave the control loop.
+  orcaManagedAgent:
+    supported: true
+    roles:
+      - plan-coordinator
+      - workflow-coordinator
+      - operation-fallback
+soloOperation:
+  names:
+    description: "[Op] <operation> - <scope>"
+  calls:
+    createAndWait:
+      api: Task
+      form:
+        description: "[Op] <operation> - <scope>"
+        prompt: <normalized-operation-input-envelope>
+        subagent_type: general-purpose
+      returns:
+        result: <operation-result>
+        usage: <usage-or-null>
+        total_cost_usd: <cost-or-null>
+        duration_ms: <duration-or-null>
+  output: normalized-operation-output-envelope
+  invariants:
+    - one-operation-instance-one-agent
+    - no-subagent-created-by-operation-agent
+    - manager-does-not-perform-operation
+    - no-worktree-created-by-solo-operation
+orcaManagedForm:
+  start:
+    api: orchestration.worker-start
+    cli: 'orca orchestration worker-start --task <task-id> --on windows --worktree <current|new-child> --agent claude --setup run --json'
+  name:
+    api: terminal.rename
+    cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "<canonical-role-name>" --json'
+  settle:
+    api: orchestration.worker-release
+    cli: 'orca orchestration worker-release --dispatch <dispatch-id> --json'
+forbidden:
+  - claude-hosted-orchestration
+  - solo-child-worktree
+  - one-operation-many-agents
+  - operation-agent-spawns-agent
+  - manager-direct-operation-execution
+  - assume-Agent-or-AgentOutput-tool-without-runtime-schema

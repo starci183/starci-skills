@@ -1,0 +1,69 @@
+schema: starci/codex-provider@1
+provider: codex
+purpose: Canonical Codex execution forms and agent API calls for StarCi.
+files:
+  capabilities: capabilities.json
+  api: api.json
+  recipes: recipes.json
+  validation: validation.json
+modes:
+  solo:
+    supported: true
+    host: current-codex-chat
+    controlPlane: combined-plan-coordinator-workflow-wrapper
+    operationForm: isolated-background-subagent
+    maximumConcurrentOperations: 3
+  orchestratedHost:
+    supported: false
+    rule: Orca only; an external Codex chat may bootstrap the Orca Plan Coordinator and must then leave the control loop.
+  orcaManagedAgent:
+    supported: true
+    roles:
+      - plan-coordinator
+      - workflow-coordinator
+      - operation-fallback
+soloOperation:
+  names:
+    task: "[Op] <operation> - <scope>"
+  calls:
+    create:
+      api: collaboration.spawn_agent
+      form:
+        task_name: <operation-slug>
+        message: <normalized-operation-input-envelope>
+        fork_turns: <minimum-required-context>
+    wait:
+      api: collaboration.wait_agent
+      form:
+        timeout_ms: <bounded-wait>
+    followup:
+      api: collaboration.followup_task
+      form:
+        target: <operation-agent-id>
+        message: <attempt-scoped-correction>
+    stop:
+      api: collaboration.interrupt_agent
+      form:
+        target: <operation-agent-id>
+  output: normalized-operation-output-envelope
+  invariants:
+    - one-operation-instance-one-agent
+    - no-subagent-created-by-operation-agent
+    - manager-does-not-perform-operation
+    - no-worktree-created-by-solo-operation
+orcaManagedForm:
+  start:
+    api: orchestration.worker-start
+    cli: 'orca orchestration worker-start --task <task-id> --on windows --worktree <current|new-child> --agent codex --setup run --json'
+  name:
+    api: terminal.rename
+    cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "<canonical-role-name>" --json'
+  settle:
+    api: orchestration.worker-release
+    cli: 'orca orchestration worker-release --dispatch <dispatch-id> --json'
+forbidden:
+  - codex-hosted-orchestration
+  - solo-child-worktree
+  - one-operation-many-agents
+  - operation-agent-spawns-agent
+  - manager-direct-operation-execution

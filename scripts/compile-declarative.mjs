@@ -52,6 +52,12 @@ export function compileDeclarative({ root: skillRoot = root } = {}) {
   }), 'profiles');
 
   merge(collectDeclarativeTree(skillRoot, {
+    dir: 'providers',
+    outPrefix: 'providers/',
+    recursive: true
+  }), 'providers');
+
+  merge(collectDeclarativeTree(skillRoot, {
     dir: 'approvals',
     outPrefix: 'approvals/',
     recursive: false

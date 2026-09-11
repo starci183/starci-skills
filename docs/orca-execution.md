@@ -112,10 +112,10 @@ retains the nested Task/Dispatch/operation correlation. It must not silently con
 launch into success.
 
 For Qwen 3.8 Flash, the Workflow Manager creates a terminal in the existing workflow worktree with
-command `qwen` and title `[Op] <operation> - <scope>`, waits for `tui-idle`, then calls
+command `qwen --exclude-tools agent` and title `[Op] <operation> - <scope>`, waits for `tui-idle`, then calls
 `worker-start --task <task-id> --terminal <terminal-handle>`. It reapplies the same title with
 `terminal rename` after attachment so the Orca tree and tab never fall back to `worker-task_<id>`.
-This sequence keeps one Task, one Dispatch, one terminal and one supervised worker resource while
+This executable tool fence prevents Qwen from creating hidden local subagents. The sequence keeps one Task, one Dispatch, one terminal and one supervised worker resource while
 avoiding the installed direct adapter's premature prompt acknowledgement.
 
 If attachment still reports `agent_prompt_stalled` or `session_not_reported`, fence and reconcile
@@ -127,8 +127,13 @@ The display contract is mandatory at creation time:
 
 - main agent: `[Coordinator] <Plan>`;
 - child worktree: `[Workflow] <Workflow>`;
-- persistent child manager: `[Monitor] <Workflow>`;
+- persistent child manager: `[Coordinator] <Workflow>`;
 - isolated operation agent: `[Op] <operation> - <scope>`.
+
+The executable call contract is `providers/orca/index.yaml`. It records the exact `orca` API/CLI call for
+creating, attaching, naming, waiting, reporting, releasing and acknowledging every layer. A visible
+`Bash: ...` subtitle is only the native agent's current tool activity; identity comes from the native
+agent icon, canonical terminal title and supervised worker receipt.
 
 ## Normal execution
 

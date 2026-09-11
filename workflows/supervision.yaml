@@ -83,7 +83,7 @@ workerLifecycle:
   displayNames:
     coordinator: "[Coordinator] <Plan>"
     workflowWorktree: "[Workflow] <Workflow>"
-    workflowManager: "[Monitor] <Workflow>"
+    workflowManager: "[Coordinator] <Workflow>"
     operationAgent: "[Op] <operation> - <scope>"
     applyAgentNameWith: terminal-create-and-rename-after-attach
   coordinator:
@@ -109,11 +109,13 @@ workerLifecycle:
     reuse: forbidden
     qwenLaunch:
       agent: qwen-code
+      command: qwen --exclude-tools agent
       create: prewarm-native-terminal
       readiness: tui-idle
       supervise: worker-start-by-terminal-handle
       promptDelivery: supervised-worker-start-only
       directAgentStart: forbidden-until-adapter-ack-compatible
+      nestedAgents: forbidden
     nativeLaunchFailure:
       recognizedFailures:
         - agent_prompt_stalled
@@ -182,6 +184,7 @@ forbidden:
   - shell-only-main-without-coordinator-agent
   - workflow-child-without-manager-agent
   - operation-agent-acts-as-workflow-manager
+  - operation-agent-creates-nested-agent
   - operation-agent-messages-parent-coordinator-directly
   - parent-coordinator-controls-operation-directly
   - workflow-manager-implements-operation

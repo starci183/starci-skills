@@ -1,0 +1,16 @@
+schema: starci/codex-capabilities@1
+hostModes:
+  solo: supported
+  orchestrated: bootstrap-only-to-orca
+solo:
+  controlPlane: current-chat
+  operationIsolation: collaboration-subagent
+  maximumConcurrentOperationAgents: 3
+  childWorktrees: forbidden
+orca:
+  nativeManagedAgent: supported
+  agentId: codex
+  roles:
+    - plan-coordinator
+    - workflow-coordinator
+    - operation-fallback

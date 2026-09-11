@@ -1,0 +1,37 @@
+schema: starci/provider-catalog@1
+shared:
+  envelopes: common/envelopes.json
+providers:
+  orca:
+    index: orca/index.json
+    capabilities: orca/capabilities.json
+    api: orca/api.json
+    recipes: orca/recipes.json
+    validation: orca/validation.json
+    adapters:
+      codex: orca/adapters/codex.json
+      claude: orca/adapters/claude.json
+      qwen: orca/adapters/qwen.json
+  codex:
+    index: codex/index.json
+    capabilities: codex/capabilities.json
+    api: codex/api.json
+    recipes: codex/recipes.json
+    validation: codex/validation.json
+  claude:
+    index: claude/index.json
+    capabilities: claude/capabilities.json
+    api: claude/api.json
+    recipes: claude/recipes.json
+    validation: claude/validation.json
+selection:
+  orchestrated: orca
+  solo:
+    - codex
+    - claude
+    - orca
+rules:
+  - Resolve host mode before loading a recipe.
+  - Resolve every call from the provider API contract; never infer a call name or argument.
+  - Validate the live provider surface before effects.
+  - One operation instance owns one isolated agent on every host.

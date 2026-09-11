@@ -1,0 +1,18 @@
+schema: starci/orca-agent-adapter@1
+agent: claude
+kind: native-managed-agent
+start:
+  api: orchestration.worker-start
+  agentArgument: claude
+readiness: worker-start-receipt
+roles:
+  - plan-coordinator
+  - workflow-coordinator
+  - operation-fallback
+name:
+  api: terminal.rename
+release:
+  api: orchestration.worker-release
+forbidden:
+  - shell-only-role
+  - unsupervised-dispatch-inject-as-success

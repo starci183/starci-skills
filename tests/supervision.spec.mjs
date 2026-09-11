@@ -55,7 +55,7 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.equal(policy.waitHierarchy.coordinator.actsBy,'decide-schedule-recover-or-replace-workflow-manager');
   assert.equal(policy.waitHierarchy.coordinator.workflowLocalExecution,'forbidden');
   assert.equal(policy.waitHierarchy.coordinator.operationExecution,'forbidden');
-  assert.equal(policy.workerLifecycle.displayNames.workflowManager,'[Monitor] <Workflow>');
+  assert.equal(policy.workerLifecycle.displayNames.workflowManager,'[Coordinator] <Workflow>');
   assert.equal(policy.workerLifecycle.displayNames.operationAgent,'[Op] <operation> - <scope>');
   assert.equal(policy.workerLifecycle.displayNames.applyAgentNameWith,'terminal-create-and-rename-after-attach');
   assert.equal(policy.workerLifecycle.operationAgent.launch,'supervised-native-agent');
@@ -63,6 +63,8 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.equal(policy.workerLifecycle.operationAgent.reuse,'forbidden');
   assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.supervise,'worker-start-by-terminal-handle');
   assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.promptDelivery,'supervised-worker-start-only');
+  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.command,'qwen --exclude-tools agent');
+  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.nestedAgents,'forbidden');
   assert.deepEqual(policy.workerLifecycle.operationAgent.nativeLaunchFailure.recognizedFailures,['agent_prompt_stalled','session_not_reported']);
   assert.equal(policy.workerLifecycle.operationAgent.nativeLaunchFailure.unsupervisedFallback,'forbidden');
   assert.equal(policy.workerLifecycle.operationAgent.nativeLaunchFailure.duplicateSubmit,'forbidden');
@@ -70,6 +72,7 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.ok(policy.forbidden.includes('shell-only-main-without-coordinator-agent'));
   assert.ok(policy.forbidden.includes('workflow-child-without-manager-agent'));
   assert.ok(policy.forbidden.includes('operation-agent-acts-as-workflow-manager'));
+  assert.ok(policy.forbidden.includes('operation-agent-creates-nested-agent'));
   assert.ok(policy.forbidden.includes('operation-agent-messages-parent-coordinator-directly'));
   assert.ok(policy.forbidden.includes('parent-coordinator-controls-operation-directly'));
   assert.ok(policy.forbidden.includes('workflow-manager-implements-operation'));
@@ -79,22 +82,22 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.ok(policy.forbidden.includes('periodic-terminal-poll'));
 });
 
-test('display names distinguish coordinator, workflow, monitor and operation roles',()=>{
+test('display names distinguish plan coordinator, workflow coordinator and operation roles',()=>{
   assert.equal(formatOrcaDisplayName('coordinator',{plan:'AgentOS Backend'}),'[Coordinator] AgentOS Backend');
   assert.equal(formatOrcaDisplayName('workflow-worktree',{workflow:'Chatbot'}),'[Workflow] Chatbot');
-  assert.equal(formatOrcaDisplayName('workflow-manager',{workflow:'Chatbot'}),'[Monitor] Chatbot');
+  assert.equal(formatOrcaDisplayName('workflow-manager',{workflow:'Chatbot'}),'[Coordinator] Chatbot');
   assert.equal(formatOrcaDisplayName('operation-agent',{operation:'review.verify',scope:'Chatbot'}),'[Op] review.verify - Chatbot');
 });
 
 test('Qwen operation launch is named, prewarmed and attached as one supervised worker',()=>{
   const launch=planOperationAgentLaunch({
     taskId:'task-1',worktree:'path:C:/work/chatbot',operation:'backend.implement',scope:'Chatbot',
-    selection:{orcaLaunch:{kind:'managed-agent',agent:'qwen-code'}}
+    selection:{orcaLaunch:{kind:'managed-agent',agent:'qwen-code',command:'qwen --exclude-tools agent'}}
   });
   assert.equal(launch.mode,'prewarm-and-attach');
   assert.equal(launch.displayName,'[Op] backend.implement - Chatbot');
   assert.deepEqual(launch.steps.map(step=>step.command),['terminal-create','terminal-wait','worker-start','terminal-rename']);
-  assert.deepEqual(launch.steps[0].args,{worktree:'path:C:/work/chatbot',title:'[Op] backend.implement - Chatbot',command:'qwen'});
+  assert.deepEqual(launch.steps[0].args,{worktree:'path:C:/work/chatbot',title:'[Op] backend.implement - Chatbot',command:'qwen --exclude-tools agent'});
   assert.deepEqual(launch.steps[2].args,{task:'task-1',terminal:'$terminalHandle'});
   assert.ok(launch.forbidden.includes('dispatch-return-preamble'));
   assert.ok(launch.forbidden.includes('unsupervised-retain'));

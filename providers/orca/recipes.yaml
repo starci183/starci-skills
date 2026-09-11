@@ -1,0 +1,75 @@
+schema: starci/orca-recipes@1
+api: api.json
+recipes:
+  bootstrap-plan-coordinator:
+    mode: orchestrated
+    actor: external-bootstrap-chat
+    sequence:
+      - orchestration.run-create
+      - orchestration.task-create
+      - orchestration.worker-start
+      - terminal.rename
+      - orchestration.run-use
+    terminalName: "[Coordinator] <Plan>"
+    then: external-bootstrap-leaves-control-loop
+  start-workflow-coordinator:
+    mode: orchestrated
+    actor: plan-coordinator
+    sequence:
+      - orchestration.task-create
+      - orchestration.worker-start-new-child
+      - worktree.set-display-name
+      - terminal.rename
+    worktreeName: "[Workflow] <Workflow>"
+    terminalName: "[Coordinator] <Workflow>"
+  start-qwen-operation:
+    mode: orchestrated
+    actor: workflow-coordinator
+    sequence:
+      - orchestration.task-create
+      - terminal.create-qwen-fenced
+      - terminal.wait-tui-idle
+      - orchestration.worker-start-by-terminal
+      - terminal.rename
+    terminalName: "[Op] <operation> - <scope>"
+    taskCardinality: one
+    dispatchCardinality: one
+    agentCardinality: one
+  start-managed-operation:
+    mode: orchestrated
+    actor: workflow-coordinator
+    sequence:
+      - orchestration.task-create
+      - orchestration.worker-start-current-worktree
+      - terminal.rename
+    terminalName: "[Op] <operation> - <scope>"
+  operation-boundary:
+    actor: operation-agent
+    sequence:
+      - orchestration.send-worker-result
+      - idle
+  accept-operation:
+    actor: workflow-coordinator
+    sequence:
+      - validate-normalized-operation-output
+      - orchestration.worker-release
+      - orchestration.check-ack
+      - schedule-ready-operation-or-report-workflow-boundary
+  wait-workflow:
+    actor: workflow-coordinator
+    sequence:
+      - orchestration.check-wait
+    timeoutAction: rearm-only
+  wait-plan:
+    actor: plan-coordinator
+    sequence:
+      - orchestration.check-wait
+    timeoutAction: rearm-only
+forbiddenSequences:
+  - external-chat-runs-plan-loop
+  - plan-coordinator-calls-operation
+  - workflow-coordinator-implements-op
+  - qwen-op-uses-agent-tool
+  - terminal-send-operation-prompt
+  - dispatch-inject-operation
+  - unsupervised-operation-retain-as-success

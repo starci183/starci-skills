@@ -1,0 +1,118 @@
+schema: starci/orca-provider@1
+provider: orca
+executable: orca
+files:
+  capabilities: capabilities.json
+  api: api.json
+  recipes: recipes.json
+  validation: validation.json
+  adapters:
+    codex: adapters/codex.json
+    claude: adapters/claude.json
+    qwen: adapters/qwen.json
+purpose: |-
+  Canonical Orca API call templates for StarCi orchestrated execution. These calls are the
+  only supported construction path; prompts may fill placeholders but may not invent a
+  different hierarchy, launch sequence, display role or lifecycle shortcut.
+ui:
+  activitySubtitle: last-tool-activity-not-agent-identity
+  identitySource:
+    - native-agent-icon
+    - terminal-title
+    - supervised-worker-receipt
+  note: 'A sidebar subtitle such as "Bash: orca orchestration check" means the native agent is currently using Bash; it does not mean the terminal is a shell-only worker.'
+names:
+  planCoordinator: "[Coordinator] <Plan>"
+  workflowWorktree: "[Workflow] <Workflow>"
+  workflowCoordinator: "[Coordinator] <Workflow>"
+  operationAgent: "[Op] <operation> - <scope>"
+planCoordinator:
+  role: persistent-native-agent
+  calls:
+    createTask:
+      api: orchestration.task-create
+      cli: 'orca orchestration task-create --run <run-id> --spec "<plan-coordinator-contract>" --json'
+    startAgent:
+      api: orchestration.worker-start
+      cli: 'orca orchestration worker-start --task <task-id> --on windows --worktree current --agent codex --json'
+    nameAgent:
+      api: terminal.rename
+      cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Coordinator] <Plan>" --json'
+    waitBoundary:
+      api: orchestration.check
+      cli: 'orca orchestration check --wait --types worker_done,worker_failed,escalation,question --timeout-ms 900000 --json'
+workflowCoordinator:
+  role: persistent-native-agent-in-isolated-child-worktree
+  calls:
+    createTask:
+      api: orchestration.task-create
+      cli: 'orca orchestration task-create --run <run-id> --spec "<workflow-coordinator-contract>" --json'
+    startChildAgent:
+      api: orchestration.worker-start
+      cli: 'orca orchestration worker-start --task <task-id> --on windows --worktree new-child --repo <exact-repo-selector> --name <workflow-slug> --agent codex --setup run --json'
+    nameWorktree:
+      api: worktree.set
+      cli: 'orca worktree set --worktree <worker.worktree_id> --display-name "[Workflow] <Workflow>" --json'
+    nameAgent:
+      api: terminal.rename
+      cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Coordinator] <Workflow>" --json'
+    waitOperationBoundary:
+      api: orchestration.check
+      cli: 'orca orchestration check --wait --types worker_done,worker_failed,escalation,question --timeout-ms 900000 --json'
+    reportParentBoundary:
+      api: orchestration.send
+      cli: 'orca orchestration send --type <worker_done|worker_failed|escalation|question> --subject "<normalized-subject>" --body "<normalized-workflow-envelope>" --task-id <workflow-task-id> --dispatch-id <workflow-dispatch-id> --json'
+operationAgent:
+  role: one-supervised-native-agent-per-operation-attempt
+  createTask:
+    api: orchestration.task-create
+    cli: 'orca orchestration task-create --run <run-id> --spec "<one-operation-contract>" --json'
+  qwen38Flash:
+    agent: qwen-code
+    model: qwen3.8-flash
+    command: qwen --exclude-tools agent
+    nestedAgents: forbidden
+    calls:
+      createAgent:
+        api: terminal.create
+        cli: 'orca terminal create --worktree <workflow-worktree-id> --title "[Op] <operation> - <scope>" --command "qwen --exclude-tools agent" --json'
+      waitReady:
+        api: terminal.wait
+        cli: 'orca terminal wait --terminal <terminal-handle> --for tui-idle --timeout-ms 60000 --json'
+      attachTask:
+        api: orchestration.worker-start
+        cli: 'orca orchestration worker-start --task <operation-task-id> --terminal <terminal-handle> --json'
+      restoreName:
+        api: terminal.rename
+        cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
+  managedFallback:
+    calls:
+      startAgent:
+        api: orchestration.worker-start
+        cli: 'orca orchestration worker-start --task <operation-task-id> --on windows --worktree current --agent <resolved-native-agent-id> --json'
+      nameAgent:
+        api: terminal.rename
+        cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
+  settle:
+    report:
+      api: orchestration.send
+      cli: 'orca orchestration send --type worker_done --subject "<status>" --body "<three-sentence-summary>" --task-id <operation-task-id> --dispatch-id <operation-dispatch-id> --outcome <succeeded|failed> --files-modified "<paths>" --json'
+    release:
+      api: orchestration.worker-release
+      cli: 'orca orchestration worker-release --dispatch <operation-dispatch-id> --json'
+    acknowledge:
+      api: orchestration.check
+      cli: 'orca orchestration check --ack <delivery-id> --json'
+routing:
+  coordinatorToWorkflow:
+    api: orchestration.send
+    cli: 'orca orchestration send --to dispatch:<workflow-dispatch-id> --subject "<decision>" --body "<normalized-decision-envelope>" --json'
+  coordinatorToOperation: forbidden
+  operationToParentCoordinator: forbidden
+forbiddenCalls:
+  - orchestration.dispatch-inject-for-operation
+  - orchestration.dispatch-return-preamble-for-operation
+  - terminal-send-operation-prompt
+  - terminal-create-shell-only-coordinator
+  - operation-agent-tool-agent
+  - parent-coordinator-direct-operation-control

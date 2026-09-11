@@ -114,6 +114,7 @@ targets:
     orcaLaunch:
       kind: managed-agent
       agent: qwen-code
+      command: qwen --exclude-tools agent
       startup: prewarm-terminal-then-worker-start-by-handle
       readiness: tui-idle
       supervision: worker-start-terminal
@@ -156,6 +157,7 @@ targets:
     orcaLaunch:
       kind: managed-agent
       agent: qwen-code
+      command: qwen --exclude-tools agent
       startup: prewarm-terminal-then-worker-start-by-handle
       readiness: tui-idle
       supervision: worker-start-terminal

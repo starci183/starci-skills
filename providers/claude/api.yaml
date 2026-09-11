@@ -1,0 +1,39 @@
+schema: starci/claude-api@1
+surface: claude-code-active-subagent-tool
+authority:
+  discovery: active-tool-schema
+  requiredBeforeUse: true
+  rule: Use the active Claude Code subagent tool exactly as exposed; do not invent Agent, AgentOutput or SendMessage calls.
+subagentApi:
+  task:
+    call: Task
+    purpose: Run exactly one isolated operation subagent.
+    input:
+      required:
+        description: string
+        prompt: string
+        subagent_type: string
+    output:
+      required:
+        result: string
+      optional:
+        usage: object
+        total_cost_usd: number
+        duration_ms: integer
+operationProtocol:
+  createAndWait: Task
+  parallelCreate: multiple-Task-calls-in-one-tool-turn
+  maximumConcurrentOperations: 3
+  correction: new-Task-attempt-with-normalized-prior-evidence
+  stop: runtime-specific-only-when-exposed
+unavailableAssumptions:
+  Agent: false
+  AgentOutput: false
+  SendMessage: false
+  backgroundTaskHandle: false
+forbidden:
+  - assume-unexposed-agent-api
+  - shell-process-presented-as-native-subagent
+  - operation-subagent-spawns-subagent
+  - claude-code-task-used-as-orca-plan-coordinator
+

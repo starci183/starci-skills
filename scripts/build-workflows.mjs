@@ -2,7 +2,7 @@
  * Unified StarCi runtime build → `.dist`.
  *
  * Mapping (authored → public `.dist` path):
- * - workflows|profiles|schemas|specifications|examples|docs catalogs `*.yaml` → `…/*.json`
+ * - workflows|profiles|providers|schemas|specifications|examples|docs catalogs `*.yaml` → `…/*.json`
  *   (no authored JSON fallback or duplicate YAML/JSON authority)
  * - knowledge/** via scripts/compile-knowledge.mjs → knowledge JSON under .dist (no JSON fallback)
  * - ops authored: secondary.yaml → ops/<id>/secondary.json; common.yaml → policy/common.json

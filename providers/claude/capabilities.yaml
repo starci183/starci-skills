@@ -1,0 +1,16 @@
+schema: starci/claude-capabilities@1
+hostModes:
+  solo: supported
+  orchestrated: bootstrap-only-to-orca
+solo:
+  controlPlane: current-chat
+  operationIsolation: Task-subagent
+  maximumConcurrentOperationAgents: 3
+  childWorktrees: forbidden
+orca:
+  nativeManagedAgent: supported
+  agentId: claude
+  roles:
+    - plan-coordinator
+    - workflow-coordinator
+    - operation-fallback

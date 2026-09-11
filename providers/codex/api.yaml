@@ -1,0 +1,71 @@
+schema: starci/codex-api@1
+surface: codex-runtime-injected-collaboration-tools
+authority:
+  discovery: active-tool-schema
+  requiredBeforeUse: true
+  rule: Use only the collaboration tools and fields exposed in the active Codex runtime; never substitute a REST API, Codex task API or remembered signature.
+officialApiDistinction:
+  openAiAgentsRest:
+    endpoint: POST /agents
+    usableAsCodexOperationSubagent: false
+    reason: The OpenAI Agents REST resource is not the Codex runtime collaboration surface.
+collaborationApi:
+  spawn_agent:
+    call: collaboration.spawn_agent
+    purpose: Create exactly one isolated operation subagent.
+    input:
+      required:
+        task_name: string
+        message: string
+      optional:
+        fork_turns: string
+        model: string
+        reasoning_effort: string
+    output:
+      agent_id: string
+      canonical_task_name: string
+  followup_task:
+    call: collaboration.followup_task
+    purpose: Send a scoped correction and trigger a turn when the operation agent is idle.
+    input:
+      required:
+        target: string
+        message: string
+  send_message:
+    call: collaboration.send_message
+    purpose: Queue non-triggering context for a running operation agent.
+    input:
+      required:
+        target: string
+        message: string
+  interrupt_agent:
+    call: collaboration.interrupt_agent
+    purpose: Interrupt one exact operation agent attempt.
+    input:
+      required:
+        target: string
+  list_agents:
+    call: collaboration.list_agents
+    purpose: Inspect the current native subagent tree.
+    input:
+      optional:
+        path_prefix: string
+  wait_agent:
+    call: collaboration.wait_agent
+    purpose: Wait for a mailbox update without polling the operation transcript.
+    input:
+      optional:
+        timeout_ms: integer
+operationProtocol:
+  create: collaboration.spawn_agent
+  observe: collaboration.wait_agent
+  correct: collaboration.followup_task
+  context: collaboration.send_message
+  stop: collaboration.interrupt_agent
+  inspectTree: collaboration.list_agents
+forbidden:
+  - mcp__codex_app__create_thread-for-operation-subagent
+  - openai-agents-rest-for-codex-operation-subagent
+  - shell-process-presented-as-native-subagent
+  - operation-subagent-spawns-subagent
+

@@ -1,5 +1,6 @@
 import {canonicalJSON,sha256} from '../core/index.mjs';
 import {readDistJson} from '../core/runtime-root.mjs';
+import {loadProviderContract,requireProviderContracts} from '../providers/validate.mjs';
 
 const POLICY_SCHEMA='starci/orchestration-supervision@1';
 const STATE_SCHEMA='starci/orchestration-supervision-state@1';
@@ -17,26 +18,31 @@ const oneLine=(value,label)=>text(value,label).replace(/\s+/g,' ');
 export function formatOrcaDisplayName(kind,{plan,workflow,operation,scope}={}){
   if(kind==='coordinator')return `[Coordinator] ${oneLine(plan,'plan name')}`;
   if(kind==='workflow-worktree')return `[Workflow] ${oneLine(workflow,'workflow name')}`;
-  if(kind==='workflow-manager')return `[Monitor] ${oneLine(workflow,'workflow name')}`;
+  if(kind==='workflow-manager')return `[Coordinator] ${oneLine(workflow,'workflow name')}`;
   if(kind==='operation-agent')return `[Op] ${oneLine(operation,'operation name')} - ${oneLine(scope,'operation scope')}`;
   throw Error(`Unsupported Orca display-name kind: ${kind}`);
 }
 
 /** Produce the exact supervised launch plan for one Orca operation agent. */
 export function planOperationAgentLaunch({taskId,worktree,selection,operation,scope}){
+  requireProviderContracts();
   const task=text(taskId,'operation Task ID'),target=text(worktree,'workflow worktree selector');
   need(plain(selection?.orcaLaunch),'Missing Orca launch selection');
   const displayName=formatOrcaDisplayName('operation-agent',{operation,scope});
-  if(selection.orcaLaunch.kind==='managed-agent'&&selection.orcaLaunch.agent==='qwen-code')return {
+  if(selection.orcaLaunch.kind==='managed-agent'&&selection.orcaLaunch.agent==='qwen-code'){
+    const qwen=loadProviderContract('orca').adapters.qwen;
+    need(selection.orcaLaunch.command===qwen.launchCommand,'Resolved Qwen launch does not match the provider adapter');
+    return {
     schema:'starci/orca-operation-launch@1',mode:'prewarm-and-attach',displayName,
     steps:[
-      {command:'terminal-create',args:{worktree:target,title:displayName,command:'qwen'},save:'terminalHandle'},
+      {command:'terminal-create',args:{worktree:target,title:displayName,command:text(qwen.launchCommand,'Qwen launch command')},save:'terminalHandle'},
       {command:'terminal-wait',args:{terminal:'$terminalHandle',for:'tui-idle'}},
       {command:'worker-start',args:{task,terminal:'$terminalHandle'}},
       {command:'terminal-rename',args:{terminal:'$terminalHandle',title:displayName}}
     ],
     forbidden:['dispatch-inject','dispatch-return-preamble','manual-terminal-prompt','unsupervised-retain']
   };
+  }
   need(selection.orcaLaunch.kind==='managed-agent','Operation launch must use a supervised managed agent');
   return {
     schema:'starci/orca-operation-launch@1',mode:'native-worker-start',displayName,
@@ -61,9 +67,9 @@ export function validateSupervisionPolicy(policy){
   const operationAgent=policy?.workerLifecycle?.operationAgent;
   const names=policy?.workerLifecycle?.displayNames;
   const qwenLaunch=operationAgent?.qwenLaunch,nativeFailure=operationAgent?.nativeLaunchFailure;
-  if(names?.coordinator!=='[Coordinator] <Plan>'||names?.workflowWorktree!=='[Workflow] <Workflow>'||names?.workflowManager!=='[Monitor] <Workflow>'||names?.operationAgent!=='[Op] <operation> - <scope>'||names?.applyAgentNameWith!=='terminal-create-and-rename-after-attach')errors.push('Orca display naming contract is invalid');
+  if(names?.coordinator!=='[Coordinator] <Plan>'||names?.workflowWorktree!=='[Workflow] <Workflow>'||names?.workflowManager!=='[Coordinator] <Workflow>'||names?.operationAgent!=='[Op] <operation> - <scope>'||names?.applyAgentNameWith!=='terminal-create-and-rename-after-attach')errors.push('Orca display naming contract is invalid');
   if(operationAgent?.lifetime!=='operation-attempt'||operationAgent?.launch!=='supervised-native-agent'||operationAgent?.isolation!=='one-operation-one-agent'||operationAgent?.release!=='after-accepted-worker_done'||operationAgent?.reuse!=='forbidden')errors.push('Operation agent lifecycle is invalid');
-  if(qwenLaunch?.agent!=='qwen-code'||qwenLaunch?.create!=='prewarm-native-terminal'||qwenLaunch?.readiness!=='tui-idle'||qwenLaunch?.supervise!=='worker-start-by-terminal-handle'||qwenLaunch?.promptDelivery!=='supervised-worker-start-only'||qwenLaunch?.directAgentStart!=='forbidden-until-adapter-ack-compatible')errors.push('Qwen supervised launch is invalid');
+  if(qwenLaunch?.agent!=='qwen-code'||qwenLaunch?.command!=='qwen --exclude-tools agent'||qwenLaunch?.create!=='prewarm-native-terminal'||qwenLaunch?.readiness!=='tui-idle'||qwenLaunch?.supervise!=='worker-start-by-terminal-handle'||qwenLaunch?.promptDelivery!=='supervised-worker-start-only'||qwenLaunch?.directAgentStart!=='forbidden-until-adapter-ack-compatible'||qwenLaunch?.nestedAgents!=='forbidden')errors.push('Qwen supervised launch is invalid');
   if(!uniqueStrings(nativeFailure?.recognizedFailures)||!['agent_prompt_stalled','session_not_reported'].every(reason=>nativeFailure.recognizedFailures.includes(reason))||nativeFailure?.action!=='fence-and-reconcile-exact-attempt'||nativeFailure?.nextCandidate!=='only-after-verified-no-effects'||nativeFailure?.unsupervisedFallback!=='forbidden'||nativeFailure?.release!=='release-or-retain-from-worker-receipt'||nativeFailure?.duplicateSubmit!=='forbidden')errors.push('Native operation failure policy is invalid');
   const routing=policy?.routing;
   if(routing?.operationToWorkflow?.recipient!=='workflow-manager'||!uniqueStrings(routing?.operationToWorkflow?.events)||!['question','escalation','heartbeat','worker_done','worker_failed'].every(event=>routing.operationToWorkflow.events.includes(event)))errors.push('Operation events must route to the Workflow Manager');
@@ -84,7 +90,7 @@ export function validateSupervisionPolicy(policy){
   if(!uniqueStrings(required)||!['messageId','deliveryId','runId','workflowTaskId','dispatchId','attempt','eventType','emittedAt'].every(field=>required.includes(field)))errors.push('Message identity fields are incomplete');
   if(policy?.messages?.deduplicateBy!=='messageId'||policy?.messages?.acknowledgeAfter!=='successful-processing'||policy?.messages?.changedRedelivery!=='reject')errors.push('Message delivery semantics are invalid');
   for(const event of BOUNDARY_EVENTS)if(!plain(policy?.transitions?.[event])||typeof policy.transitions[event].action!=='string'||typeof policy.transitions[event].next!=='string')errors.push(`Missing transition ${event}`);
-  if(!uniqueStrings(policy?.forbidden)||!['external-bootstrap-retains-coordinator-loop','shell-only-main-without-coordinator-agent','workflow-child-without-manager-agent','operation-agent-acts-as-workflow-manager','operation-agent-messages-parent-coordinator-directly','parent-coordinator-controls-operation-directly','workflow-manager-implements-operation','workflow-manager-runs-operation-tests','coordinator-performs-workflow-local-work','higher-manager-performs-lower-layer-work','periodic-terminal-poll','periodic-log-read','periodic-diff-read','progress-prompt','restart-healthy-workflow','coordinator-implements-worker-scope','user-report-on-unchanged-state'].every(rule=>policy.forbidden.includes(rule)))errors.push('Coordinator anti-polling and layer-ownership invariants are incomplete');
+  if(!uniqueStrings(policy?.forbidden)||!['external-bootstrap-retains-coordinator-loop','shell-only-main-without-coordinator-agent','workflow-child-without-manager-agent','operation-agent-acts-as-workflow-manager','operation-agent-creates-nested-agent','operation-agent-messages-parent-coordinator-directly','parent-coordinator-controls-operation-directly','workflow-manager-implements-operation','workflow-manager-runs-operation-tests','coordinator-performs-workflow-local-work','higher-manager-performs-lower-layer-work','periodic-terminal-poll','periodic-log-read','periodic-diff-read','progress-prompt','restart-healthy-workflow','coordinator-implements-worker-scope','user-report-on-unchanged-state'].every(rule=>policy.forbidden.includes(rule)))errors.push('Coordinator anti-polling and layer-ownership invariants are incomplete');
   return {ok:errors.length===0,errors};
 }
 

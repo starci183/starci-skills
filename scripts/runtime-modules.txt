@@ -22,6 +22,7 @@ execution/resolve.mjs
 execution/solo.mjs
 execution/orca.mjs
 execution/supervision.mjs
+providers/validate.mjs
 scripts/config.mjs
 scripts/plan.mjs
 scripts/present-goal.mjs

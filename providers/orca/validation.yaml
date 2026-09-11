@@ -1,0 +1,33 @@
+schema: starci/orca-provider-validation@1
+liveDiscovery:
+  call: orca agent-context --json
+  expectedSchemaVersion: 1
+  compare:
+    - command-count
+    - command-name
+    - usage
+    - flags
+    - positional-arguments
+  onMismatch: stop-before-effects-and-request-runtime-contract-upgrade
+preflight:
+  - orca status --json
+  - orca agent-context --json
+  - orca skills get orca-cli --json
+  - orca skills get orchestration --json
+receipts:
+  required:
+    - run-id
+    - task-id
+    - dispatch-id
+    - agent-terminal-handle
+    - worktree-id
+  qwenAdditional:
+    - tui-idle-before-attach
+    - supervised-worker-state-after-attach
+    - no-agent-tool-in-launch-command
+uiAssertions:
+  - Main terminal title equals [Coordinator] <Plan>.
+  - Workflow child display name equals [Workflow] <Workflow>.
+  - Workflow coordinator title equals [Coordinator] <Workflow>.
+  - Operation title equals [Op] <operation> - <scope>.
+  - Bash in the subtitle is accepted only as activity metadata beneath a native agent identity.

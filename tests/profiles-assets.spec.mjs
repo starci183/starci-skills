@@ -4,7 +4,7 @@ import {resolveExecutionChain,selectExecutionTarget,selectProfile} from '../prof
 import {readPublicJson} from './helpers/read-public.mjs';
 import {validateAssets} from '../contracts/assets.mjs';
 
-const qwenLaunch={kind:'managed-agent',agent:'qwen-code',startup:'prewarm-terminal-then-worker-start-by-handle',readiness:'tui-idle',supervision:'worker-start-terminal'};
+const qwenLaunch={kind:'managed-agent',agent:'qwen-code',command:'qwen --exclude-tools agent',startup:'prewarm-terminal-then-worker-start-by-handle',readiness:'tui-idle',supervision:'worker-start-terminal'};
 
 test('active roles select Codex, Claude or Qwen without reviving retired profiles or granting tools',()=>{
   const codex=selectProfile({runtime:'codex',op:'interface.implement',imageGenerationAvailable:true});

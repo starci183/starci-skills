@@ -1,0 +1,300 @@
+schema: starci/orca-api@1
+snapshot:
+  source: orca agent-context --json
+  schemaVersion: 1
+  observedCommandCount: 232
+  capturedAt: 2026-09-12
+authority:
+  commandNames: publicCommands
+  signatures: live-agent-context.commands
+  rule: Resolve command usage, flags and positional arguments from the live agent-context entry before invoking it; never invent or reuse an unverified signature.
+publicCommands:
+  - 'account add'
+  - 'account list'
+  - 'agent hooks off'
+  - 'agent hooks on'
+  - 'agent hooks prepare-codex'
+  - 'agent hooks status'
+  - 'agent-context'
+  - 'artifacts delete'
+  - 'artifacts list'
+  - 'artifacts share'
+  - 'artifacts unshare'
+  - 'artifacts update'
+  - 'automations create'
+  - 'automations edit'
+  - 'automations list'
+  - 'automations remove'
+  - 'automations run'
+  - 'automations runs'
+  - 'automations show'
+  - 'back'
+  - 'capture start'
+  - 'capture stop'
+  - 'check'
+  - 'claude-teams'
+  - 'clear'
+  - 'click'
+  - 'clipboard read'
+  - 'clipboard write'
+  - 'computer capabilities'
+  - 'computer click'
+  - 'computer drag'
+  - 'computer get-app-state'
+  - 'computer hotkey'
+  - 'computer list-apps'
+  - 'computer list-windows'
+  - 'computer paste-text'
+  - 'computer perform-secondary-action'
+  - 'computer permissions'
+  - 'computer press-key'
+  - 'computer scroll'
+  - 'computer set-value'
+  - 'computer type-text'
+  - 'console'
+  - 'cookie delete'
+  - 'cookie get'
+  - 'cookie set'
+  - 'dblclick'
+  - 'diagnostics memory'
+  - 'dialog accept'
+  - 'dialog dismiss'
+  - 'download'
+  - 'drag'
+  - 'emulator attach'
+  - 'emulator ax'
+  - 'emulator button'
+  - 'emulator devices'
+  - 'emulator exec'
+  - 'emulator gesture'
+  - 'emulator install'
+  - 'emulator kill'
+  - 'emulator launch'
+  - 'emulator list'
+  - 'emulator logcat'
+  - 'emulator permissions'
+  - 'emulator rotate'
+  - 'emulator shutdown'
+  - 'emulator tap'
+  - 'emulator type'
+  - 'environment add'
+  - 'environment list'
+  - 'environment rm'
+  - 'environment show'
+  - 'eval'
+  - 'exec'
+  - 'file diff'
+  - 'file open'
+  - 'file open-changed'
+  - 'fill'
+  - 'find'
+  - 'focus'
+  - 'forward'
+  - 'full-screenshot'
+  - 'geolocation'
+  - 'get'
+  - 'goto'
+  - 'highlight'
+  - 'host list'
+  - 'hover'
+  - 'inserttext'
+  - 'intercept disable'
+  - 'intercept enable'
+  - 'intercept list'
+  - 'is'
+  - 'keypress'
+  - 'linear assignee clear'
+  - 'linear assignee set'
+  - 'linear attach'
+  - 'linear comment add'
+  - 'linear create'
+  - 'linear due-date clear'
+  - 'linear due-date set'
+  - 'linear estimate clear'
+  - 'linear estimate set'
+  - 'linear issue'
+  - 'linear label add'
+  - 'linear label remove'
+  - 'linear label set'
+  - 'linear list'
+  - 'linear list-issues'
+  - 'linear priority clear'
+  - 'linear priority set'
+  - 'linear project list'
+  - 'linear relation add'
+  - 'linear relation remove'
+  - 'linear save-issue'
+  - 'linear search'
+  - 'linear status set'
+  - 'linear team labels'
+  - 'linear team list'
+  - 'linear team members'
+  - 'linear team states'
+  - 'mouse down'
+  - 'mouse move'
+  - 'mouse up'
+  - 'mouse wheel'
+  - 'network'
+  - 'open'
+  - 'orchestration ask'
+  - 'orchestration check'
+  - 'orchestration coordinator-start'
+  - 'orchestration coordinator-stop'
+  - 'orchestration dispatch'
+  - 'orchestration dispatch-show'
+  - 'orchestration gate-create'
+  - 'orchestration gate-list'
+  - 'orchestration gate-resolve'
+  - 'orchestration inbox'
+  - 'orchestration reply'
+  - 'orchestration reset'
+  - 'orchestration run-create'
+  - 'orchestration run-current'
+  - 'orchestration run-list'
+  - 'orchestration run-show'
+  - 'orchestration run-use'
+  - 'orchestration send'
+  - 'orchestration task-create'
+  - 'orchestration task-list'
+  - 'orchestration task-update'
+  - 'orchestration worker-abandon'
+  - 'orchestration worker-list'
+  - 'orchestration worker-read'
+  - 'orchestration worker-release'
+  - 'orchestration worker-retain'
+  - 'orchestration worker-show'
+  - 'orchestration worker-start'
+  - 'orchestration worker-stop'
+  - 'pdf'
+  - 'project list'
+  - 'project setup-clone'
+  - 'project setup-create'
+  - 'project setup-delete'
+  - 'project setup-existing-folder'
+  - 'project setup-update'
+  - 'project setups'
+  - 'reload'
+  - 'repo add'
+  - 'repo list'
+  - 'repo search-refs'
+  - 'repo set-base-ref'
+  - 'repo show'
+  - 'screenshot'
+  - 'scroll'
+  - 'scrollintoview'
+  - 'select'
+  - 'select-all'
+  - 'serve'
+  - 'set credentials'
+  - 'set device'
+  - 'set headers'
+  - 'set media'
+  - 'set offline'
+  - 'skills get'
+  - 'skills install'
+  - 'skills installed'
+  - 'skills list'
+  - 'skills share'
+  - 'skills update'
+  - 'snapshot'
+  - 'status'
+  - 'storage local clear'
+  - 'storage local get'
+  - 'storage local set'
+  - 'storage session clear'
+  - 'storage session get'
+  - 'storage session set'
+  - 'tab close'
+  - 'tab create'
+  - 'tab current'
+  - 'tab list'
+  - 'tab profile clone'
+  - 'tab profile create'
+  - 'tab profile delete'
+  - 'tab profile list'
+  - 'tab profile set'
+  - 'tab profile show'
+  - 'tab profile use-default'
+  - 'tab show'
+  - 'tab switch'
+  - 'terminal close'
+  - 'terminal create'
+  - 'terminal list'
+  - 'terminal read'
+  - 'terminal rename'
+  - 'terminal send'
+  - 'terminal show'
+  - 'terminal split'
+  - 'terminal stop'
+  - 'terminal switch'
+  - 'terminal wait'
+  - 'type'
+  - 'uncheck'
+  - 'upload'
+  - 'viewport'
+  - 'vm recipe doctor'
+  - 'wait'
+  - 'worktree create'
+  - 'worktree current'
+  - 'worktree list'
+  - 'worktree ps'
+  - 'worktree rm'
+  - 'worktree set'
+  - 'worktree show'
+starciOrchestrationAllowlist:
+  bootstrap:
+    - status
+    - agent-context
+    - skills get
+    - repo list
+    - repo show
+    - host list
+    - orchestration run-create
+    - orchestration run-use
+    - orchestration run-current
+  planCoordinator:
+    - orchestration task-create
+    - orchestration task-list
+    - orchestration task-update
+    - orchestration worker-start
+    - orchestration worker-show
+    - orchestration worker-list
+    - orchestration send
+    - orchestration check
+    - orchestration reply
+    - orchestration gate-create
+    - orchestration gate-resolve
+    - orchestration gate-list
+    - worktree set
+    - terminal rename
+  workflowCoordinator:
+    - orchestration task-create
+    - orchestration task-list
+    - orchestration task-update
+    - orchestration worker-start
+    - orchestration worker-show
+    - orchestration worker-read
+    - orchestration worker-stop
+    - orchestration worker-abandon
+    - orchestration worker-release
+    - orchestration worker-retain
+    - orchestration worker-list
+    - orchestration send
+    - orchestration check
+    - orchestration ask
+    - orchestration reply
+    - terminal create
+    - terminal wait
+    - terminal rename
+  operationAgent:
+    - orchestration send
+    - orchestration ask
+    - orchestration check
+forbiddenForStarciOrchestration:
+  - orchestration coordinator-start
+  - orchestration coordinator-stop
+  - orchestration reset
+  - orchestration dispatch
+  - terminal send
+  - terminal close
+  - terminal stop

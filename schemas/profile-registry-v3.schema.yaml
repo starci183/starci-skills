@@ -138,6 +138,7 @@ $defs:
             properties:
               kind: {const: managed-agent}
               agent: {type: string, minLength: 1}
+              command: {type: string, minLength: 1}
               startup:
                 enum: [prewarm-terminal-then-worker-start-by-handle]
               readiness:
