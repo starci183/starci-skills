@@ -48,17 +48,21 @@ test('orchestrated requests fail closed unless Orca is the control plane and eve
   const noModel=request();delete noModel.operations[1].selection.model;
   assert.throws(()=>planOrcaExecution(noModel),/model selection/);
   const plan=planOrcaExecution(request());
-  assert.deepEqual(plan.coordinator,{role:'coordinator',implementsChanges:false,owns:['ownership','review','integration']});
+  assert.deepEqual(plan.coordinator,{role:'parent-orchestrator',implementsChanges:false,owns:['workflow-dependencies','ownership','review','integration']});
+  assert.equal(plan.workflow.role,'workflow-wrapper');
   assert.equal(plan.operations.frontend.selection.provider,'anthropic');
 });
 
-test('one coordinator starts only ready Task/Dispatch workers in unique isolated worktrees with no Git integration authority',async()=>{
+test('the parent creates one workflow child and its wrapper launches ready operation subagents without extra worktrees',async()=>{
   const {adapter,calls}=fakeOrca();const plan=await startOrcaExecution({request:request(),adapter});
-  assert.equal(calls.runs.length,1);assert.equal(calls.tasks.length,1);assert.equal(calls.dispatches.length,1);
+  assert.equal(calls.runs.length,1);assert.equal(calls.tasks.length,2);assert.equal(calls.dispatches.length,2);
   assert.equal(plan.operations.prepare.status,'dispatched');assert.equal(plan.operations.backend.status,'pending');
   assert.equal(calls.dispatches[0].worktree.kind,'new-child');assert.equal(calls.dispatches[0].worktree.isolated,true);
-  assert.deepEqual(calls.dispatches[0].permissions,{merge:false,rebase:false,cherryPick:false,push:false});
-  assert.match(calls.dispatches[0].prompt,/Do not merge, rebase, cherry-pick, or push/);
+  assert.equal(calls.dispatches[1].worktree.kind,'existing-child');
+  assert.equal(calls.dispatches[1].worktree.name,calls.dispatches[0].worktree.name);
+  assert.equal(calls.dispatches[1].agent.kind,'isolated-subagent');
+  assert.deepEqual(calls.dispatches[1].permissions,{merge:false,rebase:false,cherryPick:false,push:false});
+  assert.match(calls.dispatches[1].prompt,/Do not merge, rebase, cherry-pick, or push/);
 });
 
 test('completion validates exact Dispatch identity and allowlisted file outcomes before releasing dependent branches',async()=>{
@@ -68,9 +72,9 @@ test('completion validates exact Dispatch identity and allowlisted file outcomes
   await assert.rejects(()=>acceptOrcaWorkerDone({plan,event:done(prepare,'succeeded',['README.md']),adapter}),/Out-of-scope/);
   plan=await acceptOrcaWorkerDone({plan,event:done(prepare,'succeeded',['work/prepare/context.yaml']),adapter});
   assert.equal(plan.operations.backend.status,'dispatched');assert.equal(plan.operations.frontend.status,'dispatched');
-  assert.equal(plan.operations['backend-review'].status,'pending');assert.equal(calls.dispatches.length,3);
+  assert.equal(plan.operations['backend-review'].status,'pending');assert.equal(calls.dispatches.length,4);
   assert.equal(calls.releases.length,1);assert.equal(calls.releases[0].dispatchId,prepare.attempts[0].dispatchId);
-  assert.notEqual(plan.operations.backend.attempts[0].worktree.name,plan.operations.frontend.attempts[0].worktree.name);
+  assert.equal(plan.operations.backend.attempts[0].worktree.name,plan.operations.frontend.attempts[0].worktree.name);
   assert.equal(calls.dispatches.find(call=>call.operationId==='backend').input.schema,'starci/operation-input@1');
   assert.equal(calls.dispatches.find(call=>call.operationId==='backend').input.dependencyOutputs[0].operationId,'prepare');
   assert.equal(calls.dispatches.find(call=>call.operationId==='backend').input.dependencyOutputs[0].output.schema,'starci/operation-output@1');
@@ -91,7 +95,8 @@ test('a shared out-of-scope escalation creates an authorized conflict-owner Task
   assert.equal(plan.operations.frontend.status,'dispatched');
   assert.equal(plan.conflicts['conflict-1'].status,'dispatched');
   assert.equal(calls.stops.length,1);assert.equal(calls.stops[0].dispatchId,attempt.dispatchId);
-  assert.equal(calls.tasks.at(-1).kind,'conflict-owner');
+  assert.equal(calls.tasks.at(-1).kind,'conflict-owner-subagent');
+  assert.equal(calls.dispatches.at(-1).worktree.kind,'existing-child');
   assert.deepEqual(calls.dispatches.at(-1).permissions,{merge:false,rebase:false,cherryPick:false,push:false});
 });
 
@@ -112,7 +117,7 @@ test('conflict outcomes are scoped, then coordinator integration creates explici
   assert.equal(plan.operations.backend.status,'dispatched');assert.equal(plan.operations.backend.attempts.length,2);
   assert.equal(plan.operations.backend.attempts[0].status,'superseded');
   assert.ok(plan.operations.backend.sharedDependencies.includes(conflict.taskId));
-  const resumeTask=calls.tasks.find(task=>task.kind==='resume-operation');
+  const resumeTask=calls.tasks.find(task=>task.kind==='resume-operation-subagent');
   assert.ok(resumeTask.deps.includes(conflict.taskId));
   assert.deepEqual(plan.events.at(-1).syncResumeDependencies,[
     {operationId:'backend',dependsOnTaskId:conflict.taskId},
@@ -134,7 +139,8 @@ test('implementation SDS gap creates a separate architecture sidearm and resumes
   assert.equal(plan.operations.frontend.status,'dispatched');
   const sidearm=plan.sidearms['architecture-1'];
   assert.equal(sidearm.operator,'architecture.decide');
-  assert.equal(calls.tasks.at(-1).kind,'secondary-operation');
+  assert.equal(calls.tasks.at(-1).kind,'secondary-operation-subagent');
+  assert.equal(calls.dispatches.at(-1).worktree.kind,'existing-child');
   assert.deepEqual(calls.dispatches.at(-1).permissions,{merge:false,rebase:false,cherryPick:false,push:false});
   plan=await acceptOrcaWorkerDone({plan,adapter,event:{type:'worker_done',taskId:sidearm.taskId,dispatchId:sidearm.dispatchId,operationId:sidearm.id,outcome:'succeeded',filesModified:decision.allowedFiles}});
   assert.equal(plan.sidearms['architecture-1'].status,'awaiting-review');
@@ -143,7 +149,7 @@ test('implementation SDS gap creates a separate architecture sidearm and resumes
   assert.equal(calls.integrations.at(-1).kind,'architecture-sidearm');
   assert.equal(plan.operations.backend.status,'dispatched');
   assert.equal(plan.operations.backend.attempts.length,2);
-  assert.ok(calls.tasks.find(task=>task.kind==='resume-operation').deps.includes(sidearm.taskId));
+  assert.ok(calls.tasks.find(task=>task.kind==='resume-operation-subagent').deps.includes(sidearm.taskId));
   assert.equal(plan.operations.frontend.attempts.length,1,'unrelated implementation stays on its original worktree');
 });
 

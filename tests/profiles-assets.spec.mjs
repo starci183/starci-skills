@@ -29,7 +29,10 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.equal(registry.executionModes.solo.operationAgent,'inline-background-agent');
   assert.equal(registry.executionModes.solo.maxConcurrentOperationAgents,3);
   assert.equal(registry.executionModes.solo.fanOutWithinOperation,'forbidden');
-  assert.equal(registry.executionModes.orchestrated.operationAgent,'child-worktree-agent');
+  assert.equal(registry.executionModes.orchestrated.workflowWrapperAgent,'child-worktree-agent');
+  assert.equal(registry.executionModes.orchestrated.operationAgent,'workflow-inline-subagent');
+  assert.equal(registry.executionModes.orchestrated.worktree,'isolated-child-per-workflow-attempt');
+  assert.equal(registry.executionModes.orchestrated.maxConcurrentOperationAgents,3);
   assert.deepEqual(Object.keys(registry.operators).sort(),[...ops].sort());
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});

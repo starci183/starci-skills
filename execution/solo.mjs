@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 const RECEIPT_SCHEMA = 'starci/solo-execution-receipt@2';
 const INPUT_SCHEMA = 'starci/operation-input@1';
 const OUTPUT_SCHEMA = 'starci/operation-output@1';
-const SOLO_HOSTS = new Set(['codex', 'claude']);
+const SOLO_HOSTS = new Set(['codex', 'claude', 'orca']);
 const MAX_INLINE_OPERATION_AGENTS = 3;
 const OPERATION_STATES = new Set(['pending', 'running', 'paused', 'gating', 'completed', 'failed', 'blocked']);
 const GATE_STATES = new Set(['pending', 'evaluating', 'passed', 'failed', 'skipped', 'blocked']);
@@ -188,7 +188,7 @@ function assertAdapters(adapters) {
 async function currentSession({host, workflow, receipt, adapter}) {
   const requiredSession = receipt.session ?? workflow.session ?? null;
   const session = await adapter.current({host, workflowId: workflow.id, requiredSession: clone(requiredSession)});
-  requireThat(isPlainObject(session) && isText(session.id) && session.kind === 'chat-session', 'Solo execution requires the current Codex or Claude chat session');
+  requireThat(isPlainObject(session) && isText(session.id) && session.kind === 'chat-session', 'Solo execution requires the current Codex, Claude or Orca session');
   if (requiredSession !== null) requireThat(session.id === requiredSession.id, 'Solo resume must re-enter the receipt chat session');
   return clone(session);
 }
@@ -381,9 +381,9 @@ function requiresOrcaReceipt({host, definition, orderedOperations, reason, recei
   return next;
 }
 
-/** Execute a fixed workflow in the current Codex or Claude chat session. */
+/** Execute one fixed workflow in the current Codex, Claude or Orca session. */
 export async function runSoloWorkflow({host, workflow, adapters, receipt}) {
-  requireThat(SOLO_HOSTS.has(host), 'Solo host must be codex or claude');
+  requireThat(SOLO_HOSTS.has(host), 'Solo host must be codex, claude or orca');
   const orderedOperations = normalizeOperations(workflow);
   const definition = definitionFor(workflow, orderedOperations);
   const maxConcurrentOperationAgents = concurrencyFor(workflow);
@@ -431,7 +431,7 @@ export function isSoloHost(host) {
 }
 
 export function validateSoloReceipt({host, workflow, receipt}) {
-  requireThat(SOLO_HOSTS.has(host), 'Solo host must be codex or claude');
+  requireThat(SOLO_HOSTS.has(host), 'Solo host must be codex, claude or orca');
   const orderedOperations = normalizeOperations(workflow);
   assertReceipt(receipt, {
     host,

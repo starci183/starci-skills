@@ -49,8 +49,10 @@ test('WorkflowRequest is closed, ordered and has host-specific mode constraints'
   solo.spec = {...solo.spec, mode: 'solo', soloHost: 'codex'};
   delete solo.spec.controlPlane;
   assert.equal(validateWorkflowRequest(solo), true);
+  solo.spec.soloHost = 'orca';
+  assert.equal(validateWorkflowRequest(solo), true);
   solo.spec.soloHost = 'qwen';
-  assert.throws(() => validateWorkflowRequest(solo), /soloHost must be codex or claude/);
+  assert.throws(() => validateWorkflowRequest(solo), /soloHost must be codex, claude or orca/);
   const wrongPlane = workflow();
   wrongPlane.spec.controlPlane = 'custom';
   assert.throws(() => validateWorkflowRequest(wrongPlane), /requires controlPlane orca/);

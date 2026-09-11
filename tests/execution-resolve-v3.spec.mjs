@@ -60,10 +60,14 @@ test('unknown observations are unavailable and unsafe fallback never advances th
   }), /requires reconciliation/);
 });
 
-test('solo resolution cannot escape the approved codex or claude host', () => {
+test('Codex and Claude solo stay host-local while Orca solo may resolve provider chains', () => {
   const solo = request('backend.implement');
   solo.spec.mode = 'solo'; solo.spec.soloHost = 'claude'; delete solo.spec.controlPlane;
   const result = resolveOperationExecution({workflowRequest: solo, operationId: 'work', registry, inventory: ['qwen', 'codex', 'claude']});
   assert.equal(result.selected.environment, 'claude');
   assert.equal(result.observations.length, 1);
+  solo.spec.soloHost = 'orca';
+  const orca = resolveOperationExecution({workflowRequest: solo, operationId: 'work', registry, inventory: ['qwen', 'codex', 'claude']});
+  assert.equal(orca.selected.environment, 'qwen');
+  assert.equal(orca.observations.length, 4);
 });

@@ -54,7 +54,7 @@ $defs:
         required: [mode, source, operations]
         properties:
           mode: {enum: [solo, orchestrated]}
-          soloHost: {enum: [codex, claude]}
+          soloHost: {enum: [codex, claude, orca]}
           controlPlane: {const: orca}
           source: {$ref: "#/$defs/source"}
           operations:
@@ -69,7 +69,7 @@ $defs:
             then:
               required: [soloHost]
               properties:
-                soloHost: {enum: [codex, claude]}
+                soloHost: {enum: [codex, claude, orca]}
                 controlPlane: false
           - if:
               properties:

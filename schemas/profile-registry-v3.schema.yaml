@@ -24,7 +24,7 @@ properties:
         required: [hosts, controlPlane, operationAgent, maxConcurrentOperationAgents, isolation, worktree, scheduling, fanOutWithinOperation]
         properties:
           hosts:
-            const: [codex, claude]
+            const: [codex, claude, orca]
           controlPlane: {const: current-chat-session}
           operationAgent: {const: inline-background-agent}
           maxConcurrentOperationAgents: {const: 3}
@@ -35,16 +35,18 @@ properties:
       orchestrated:
         type: object
         additionalProperties: false
-        required: [controlPlane, workers, operationAgent, isolation, worktree, scheduling, fanOutWithinOperation]
+        required: [controlPlane, workers, workflowWrapperAgent, operationAgent, maxConcurrentOperationAgents, isolation, worktree, scheduling, fanOutWithinOperation]
         properties:
           controlPlane: {const: orca}
           workers:
             const: [codex, claude, qwen]
-          operationAgent: {const: child-worktree-agent}
+          workflowWrapperAgent: {const: child-worktree-agent}
+          operationAgent: {const: workflow-inline-subagent}
+          maxConcurrentOperationAgents: {const: 3}
           isolation: {const: isolated-per-operation}
-          worktree: {const: isolated-child-per-operation-attempt}
+          worktree: {const: isolated-child-per-workflow-attempt}
           scheduling: {const: dependency-dag}
-          fanOutWithinOperation: {const: explicit-operation-instances-only}
+          fanOutWithinOperation: {const: forbidden}
   agentArchitecture:
     type: object
     additionalProperties: false

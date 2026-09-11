@@ -62,7 +62,7 @@ export function validateWorkflowRequest(request) {
   const common = ['mode', 'source', 'operations'];
   if (request.spec.mode === 'solo') {
     exact(request.spec, [...common, 'soloHost'], 'WorkflowRequest.spec');
-    if (!['codex', 'claude'].includes(request.spec.soloHost)) throw Error('WorkflowRequest.spec.soloHost must be codex or claude');
+    if (!['codex', 'claude', 'orca'].includes(request.spec.soloHost)) throw Error('WorkflowRequest.spec.soloHost must be codex, claude or orca');
   } else if (request.spec.mode === 'orchestrated') {
     exact(request.spec, [...common, 'controlPlane'], 'WorkflowRequest.spec');
     if (request.spec.controlPlane !== 'orca') throw Error('Orchestrated WorkflowRequest requires controlPlane orca');

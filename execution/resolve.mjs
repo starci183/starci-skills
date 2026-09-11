@@ -18,9 +18,13 @@ function validateRegistry(registry) {
     || solo?.isolation !== 'isolated-per-operation'
     || solo?.fanOutWithinOperation !== 'forbidden'
     || orchestrated?.controlPlane !== 'orca'
-    || orchestrated?.operationAgent !== 'child-worktree-agent'
-    || orchestrated?.isolation !== 'isolated-per-operation') {
-    throw Error('Profile registry execution modes must keep per-operation agent isolation and the Codex/Claude versus Orca host boundaries');
+    || orchestrated?.workflowWrapperAgent !== 'child-worktree-agent'
+    || orchestrated?.operationAgent !== 'workflow-inline-subagent'
+    || orchestrated?.maxConcurrentOperationAgents !== 3
+    || orchestrated?.worktree !== 'isolated-child-per-workflow-attempt'
+    || orchestrated?.isolation !== 'isolated-per-operation'
+    || orchestrated?.fanOutWithinOperation !== 'forbidden') {
+    throw Error('Profile registry execution modes must keep workflow-child worktrees, per-operation subagent isolation and the Codex/Claude versus Orca host boundaries');
   }
   if (registry.agentArchitecture?.isolationBoundary !== 'operation'
     || registry.agentArchitecture?.operationMapping !== 'one-operation-instance-one-agent'
@@ -119,7 +123,9 @@ export function resolveOperation({workflowRequest, operationId, registry, invent
   const operation = workflowRequest.spec.operations.find(value => value.id === operationId);
   if (!operation) throw Error(`Workflow operation not found: ${operationId}`);
   let candidates = flattenOperationCandidates({operation, registry});
-  if (workflowRequest.spec.mode === 'solo') candidates = candidates.filter(candidate => candidate.environment === workflowRequest.spec.soloHost);
+  if (workflowRequest.spec.mode === 'solo' && workflowRequest.spec.soloHost !== 'orca') {
+    candidates = candidates.filter(candidate => candidate.environment === workflowRequest.spec.soloHost);
+  }
   if (!candidates.length) throw Error(`No execution candidates for operation ${operationId} in requested mode`);
   const observed = inventoryByEnvironment(inventory, registry);
   const attempted = attemptsByTarget(attempts, candidates, registry.fallback);

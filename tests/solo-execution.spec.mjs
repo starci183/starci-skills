@@ -51,14 +51,17 @@ function adapters({run, gate, openAgent} = {}) {
   };
 }
 
-test('only Codex and Claude own solo chat sessions and the inline-agent ceiling is three', async () => {
+test('Codex, Claude and Orca host solo workflows while Qwen remains an operation provider', async () => {
   assert.equal(isSoloHost('codex'), true);
   assert.equal(isSoloHost('claude'), true);
+  assert.equal(isSoloHost('orca'), true);
   assert.equal(isSoloHost('qwen'), false);
   assert.equal(soloExecutionLimits.maxConcurrentOperationAgents, 3);
   const injected = adapters();
-  await assert.rejects(() => runSoloWorkflow({host: 'qwen', workflow: workflow(), adapters: injected.value}), /codex or claude/);
-  assert.equal(injected.calls.session.length, 0);
+  const orcaReceipt = await runSoloWorkflow({host: 'orca', workflow: workflow(), adapters: injected.value});
+  assert.equal(orcaReceipt.status, 'completed');
+  await assert.rejects(() => runSoloWorkflow({host: 'qwen', workflow: workflow(), adapters: injected.value}), /codex, claude or orca/);
+  assert.equal(injected.calls.session.length, 1);
 });
 
 test('each dependency operation gets exactly one isolated inline agent and normalized handoff envelopes', async () => {

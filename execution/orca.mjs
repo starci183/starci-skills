@@ -11,7 +11,8 @@ const idOf=(receipt,...keys)=>{
   throw Error(`Orca adapter receipt is missing ${keys.join(' or ')}`);
 };
 const slug=value=>value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,38)||'operation';
-const worktreeName=(plan,operation,attempt)=>`starci-${slug(operation.id).slice(0,20)}-${operation.index}-${attempt}`;
+const workflowWorktreeName=workflowId=>`starci-workflow-${slug(workflowId).slice(0,22)}`;
+const DEFAULT_WRAPPER_SELECTION={provider:'openai',model:'gpt-5.6-sol',requestedModel:'gpt-5.6-sol',effort:'high',orcaLaunch:{kind:'managed-agent',agent:'codex'}};
 
 function controlPlane(request){return request.controlPlane??request.execution?.controlPlane;}
 function executionMode(request){return request.mode??request.execution?.mode;}
@@ -115,9 +116,11 @@ function validateRequest(request){
 /** Build the effect-free coordinator/worker plan. No CLI or repository command is run here. */
 export function planOrcaExecution(request){
   const operations=validateRequest(request),workflowId=text(request.id??request.workflowId,'workflow request id');
+  const wrapperSelection=validateSelection(request.workflowSelection??DEFAULT_WRAPPER_SELECTION,`${workflowId} workflow wrapper`);
   return {
     schema:PLAN_SCHEMA,workflowId,controlPlane:'orca',status:'planned',runId:null,source:copy(request.source??request.spec?.source??null),
-    coordinator:{role:'coordinator',implementsChanges:false,owns:['ownership','review','integration']},
+    coordinator:{role:'parent-orchestrator',implementsChanges:false,owns:['workflow-dependencies','ownership','review','integration']},
+    workflow:{id:workflowId,role:'workflow-wrapper',selection:wrapperSelection,status:'planned',taskId:null,dispatchId:null,worktree:null},
     operations:Object.fromEntries(operations.map(op=>[op.id,{
       id:op.id,index:op.index,spec:op.input.spec??op.input.prompt??op.id,dependsOn:op.deps,
       operator:op.operator,allowedFiles:op.allowedFiles,capabilities:copy(op.capabilities),outputContract:copy(op.outputContract),selection:op.selection,status:op.deps.length?'pending':'ready',
@@ -141,19 +144,31 @@ function workerPrompt(operation,{resume=false}={}){
     'Do not merge, rebase, cherry-pick, or push. Report worker_done exactly once with the Task/Dispatch IDs and every modified file.';
 }
 
+function workflowPrompt(plan){
+  return `Run workflow ${plan.workflowId} inside this child worktree. Schedule only dependency-ready operations, `+
+    'launch exactly one isolated subagent per operation, allow at most three operation subagents at once, '+
+    'validate normalized operation outputs, and never create another worktree. Do not merge, rebase, cherry-pick, or push.';
+}
+
+function existingWorkflowWorktree(plan){
+  need(plan.workflow?.worktree,'Workflow child worktree is not started');
+  return {kind:'existing-child',id:plan.workflow.worktree.id,name:plan.workflow.worktree.name,isolated:true};
+}
+
 async function dispatchOperation(plan,operationId,adapter,{resume=false}={}){
   const operation=plan.operations[operationId],attemptNumber=operation.attempts.length+1;
   const input=operationInputEnvelope(plan,operation);operation.input=copy(input);
   const createTask=adapterMethod(adapter,'createTask'),dispatchWorker=adapterMethod(adapter,'dispatchWorker');
   const taskReceipt=await createTask({
-    runId:plan.runId,kind:resume?'resume-operation':'operation',operationId,
+    runId:plan.runId,kind:resume?'resume-operation-subagent':'operation-subagent',parentTaskId:plan.workflow.taskId,operationId,
     title:`${resume?'Resume ':'Operation '}${operationId}`,spec:`${operation.spec}\n${workerPrompt(operation,{resume})}`,
     deps:operationTaskDeps(plan,operation),allowedFiles:copy(operation.allowedFiles),selection:copy(operation.selection),input:copy(input)
   });
   const taskId=idOf(taskReceipt,'taskId','id');
-  const worktree={kind:'new-child',name:worktreeName(plan,operation,attemptNumber),isolated:true};
+  const worktree=existingWorkflowWorktree(plan);
   const dispatchReceipt=await dispatchWorker({
-    runId:plan.runId,taskId,operationId,worktree,selection:copy(operation.selection),
+    runId:plan.runId,taskId,operationId,parentTaskId:plan.workflow.taskId,parentDispatchId:plan.workflow.dispatchId,
+    role:'operation-subagent',agent:{kind:'isolated-subagent',operationId},worktree,selection:copy(operation.selection),
     prompt:workerPrompt(operation,{resume}),input:copy(input),permissions:{merge:false,rebase:false,cherryPick:false,push:false}
   });
   const dispatchId=idOf(dispatchReceipt,'dispatchId','id');
@@ -182,11 +197,20 @@ export async function dispatchReadyOrcaOperations(plan,adapter){
   return next;
 }
 
-/** Create the Orca Run, then Task+Dispatch pairs for the first runnable wave. */
-export async function startOrcaExecution({request,adapter}){
+/** Attach one workflow child to an Orca parent Run, then launch its first operation-subagent wave. */
+export async function startOrcaExecution({request,parentRunId=null,adapter}){
   let plan=planOrcaExecution(request);
-  const receipt=await adapterMethod(adapter,'createRun')({objective:`Execute StarCi workflow ${plan.workflowId}`,controlPlane:'orca'});
-  plan.runId=idOf(receipt,'runId','id');plan.status='running';
+  if(parentRunId){plan.runId=text(parentRunId,'parent Orca run id');}
+  else {
+    const receipt=await adapterMethod(adapter,'createRun')({objective:`Coordinate StarCi workflow DAG containing ${plan.workflowId}`,controlPlane:'orca'});
+    plan.runId=idOf(receipt,'runId','id');
+  }
+  const taskReceipt=await adapterMethod(adapter,'createTask')({runId:plan.runId,kind:'workflow-wrapper',workflowId:plan.workflowId,title:`Workflow ${plan.workflowId}`,spec:workflowPrompt(plan),deps:[]});
+  const taskId=idOf(taskReceipt,'taskId','id'),worktree={kind:'new-child',name:workflowWorktreeName(plan.workflowId),isolated:true};
+  const dispatchReceipt=await adapterMethod(adapter,'dispatchWorker')({runId:plan.runId,taskId,workflowId:plan.workflowId,role:'workflow-wrapper',worktree,selection:copy(plan.workflow.selection),prompt:workflowPrompt(plan),permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
+  const dispatchId=idOf(dispatchReceipt,'dispatchId','id'),worktreeId=dispatchReceipt.worktreeId??worktree.name;
+  plan.workflow={...plan.workflow,status:'running',taskId,dispatchId,worktree:{...worktree,id:worktreeId}};
+  plan.status='running';
   return dispatchReadyOrcaOperations(plan,adapter);
 }
 
@@ -227,9 +251,9 @@ export async function createConflictOwner({plan,event,decision,selection:ownerSe
   }
   const selected=validateSelection(ownerSelection,conflictId),createTask=adapterMethod(adapter,'createTask'),dispatchWorker=adapterMethod(adapter,'dispatchWorker');
   const upstream=source.dependsOn.map(id=>next.operations[id].attempts.at(-1)?.taskId).filter(Boolean);
-  const taskReceipt=await createTask({runId:next.runId,kind:'conflict-owner',parentTaskId:active.taskId,title:`Shared change owner: ${sharedFiles.join(', ')}`,spec:decision.spec??`Implement the authorized shared change in ${sharedFiles.join(', ')}`,deps:upstream,allowedFiles:ownerFiles,selection:selected});
-  const taskId=idOf(taskReceipt,'taskId','id'),worktree={kind:'new-child',name:slug(`${next.workflowId}-${conflictId}`),isolated:true};
-  const dispatchReceipt=await dispatchWorker({runId:next.runId,taskId,conflictId,worktree,selection:selected,prompt:`Implement only the coordinator-authorized shared change: ${sharedFiles.join(', ')}. Do not merge, rebase, cherry-pick, or push.`,permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
+  const taskReceipt=await createTask({runId:next.runId,kind:'conflict-owner-subagent',parentTaskId:next.workflow.taskId,title:`Shared change owner: ${sharedFiles.join(', ')}`,spec:decision.spec??`Implement the authorized shared change in ${sharedFiles.join(', ')}`,deps:upstream,allowedFiles:ownerFiles,selection:selected});
+  const taskId=idOf(taskReceipt,'taskId','id'),worktree=existingWorkflowWorktree(next);
+  const dispatchReceipt=await dispatchWorker({runId:next.runId,taskId,conflictId,parentTaskId:next.workflow.taskId,parentDispatchId:next.workflow.dispatchId,role:'operation-subagent',agent:{kind:'isolated-subagent',operationId:conflictId},worktree,selection:selected,prompt:`Implement only the coordinator-authorized shared change: ${sharedFiles.join(', ')}. Do not create a worktree; do not merge, rebase, cherry-pick, or push.`,permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
   const dispatchId=idOf(dispatchReceipt,'dispatchId','id');
   next.conflicts[conflictId]={id:conflictId,sourceOperationId:source.id,sharedFiles,allowedFiles:ownerFiles,affectedOperations:[...affected],selection:selected,status:'dispatched',taskId,dispatchId,worktree,review:null,integration:null};
   next.events.push({type:'conflict-owner-created',conflictId,taskId,dispatchId});
@@ -264,10 +288,10 @@ export async function createArchitectureSidearm({plan,event,decision,selection:a
   }
   const selected=validateSelection(architectureSelection,sidearmId),createTask=adapterMethod(adapter,'createTask'),dispatchWorker=adapterMethod(adapter,'dispatchWorker');
   const upstream=source.dependsOn.map(id=>next.operations[id].attempts.at(-1)?.taskId).filter(Boolean);
-  const taskReceipt=await createTask({runId:next.runId,kind:'secondary-operation',role:'implementation.architecture',operator:'architecture.decide',parentTaskId:active.taskId,title:`Architecture sidearm for ${source.id}`,spec:decision.spec??event.problem??'Correct the selected SDS technical gap without changing business or SRS.',deps:upstream,allowedFiles,selection:selected});
-  const taskId=idOf(taskReceipt,'taskId','id'),worktree={kind:'new-child',name:slug(`${next.workflowId}-${sidearmId}`),isolated:true};
-  const prompt='Run architecture.decide for only the selected SDS index.yaml files. Preserve business and SRS, write all canonical SDS content in English, store no source paths/symbols/evidence, edit no product source, call no secondary, and do not merge, rebase, cherry-pick, or push.';
-  const dispatchReceipt=await dispatchWorker({runId:next.runId,taskId,sidearmId,operator:'architecture.decide',role:'implementation.architecture',worktree,selection:selected,prompt,permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
+  const taskReceipt=await createTask({runId:next.runId,kind:'secondary-operation-subagent',role:'implementation.architecture',operator:'architecture.decide',parentTaskId:next.workflow.taskId,title:`Architecture sidearm for ${source.id}`,spec:decision.spec??event.problem??'Correct the selected SDS technical gap without changing business or SRS.',deps:upstream,allowedFiles,selection:selected});
+  const taskId=idOf(taskReceipt,'taskId','id'),worktree=existingWorkflowWorktree(next);
+  const prompt='Run architecture.decide as one isolated operation subagent in the existing workflow worktree for only the selected SDS index.yaml files. Preserve business and SRS, write all canonical SDS content in English, store no source paths/symbols/evidence, edit no product source, call no secondary, create no worktree, and do not merge, rebase, cherry-pick, or push.';
+  const dispatchReceipt=await dispatchWorker({runId:next.runId,taskId,sidearmId,operator:'architecture.decide',parentTaskId:next.workflow.taskId,parentDispatchId:next.workflow.dispatchId,role:'operation-subagent',agent:{kind:'isolated-subagent',operationId:sidearmId},worktree,selection:selected,prompt,permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
   const dispatchId=idOf(dispatchReceipt,'dispatchId','id');
   next.sidearms[sidearmId]={id:sidearmId,sourceOperationId:source.id,operator:'architecture.decide',role:'implementation.architecture',allowedFiles,affectedOperations:[...affected],selection:selected,status:'dispatched',taskId,dispatchId,worktree,review:null,integration:null};
   next.events.push({type:'architecture-sidearm-created',sidearmId,sourceOperationId:source.id,taskId,dispatchId});

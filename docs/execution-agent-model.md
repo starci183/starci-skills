@@ -28,9 +28,9 @@ After the agent stops, the wrapper validates the gate and seals a normalized out
 receive that envelope, never the producing agent's hidden chat history. A no-effect fallback may bind a
 new concrete agent to the same logical operation; partial or unknown effects require reconciliation.
 
-## Codex and Claude solo hosts
+## Solo hosts
 
-The current Codex or Claude chat is the Plan/Coordinator/workflow session. Each ready operation instance
+The current Codex, Claude or Orca session hosts one unrelated workflow. Each ready operation instance
 opens one isolated inline background agent and closes it after its gate. Up to three distinct operation
 agents may be active when the fixed workflow DAG says they are independent. One operation instance may
 not be divided among several agents, and the solo host cannot create child worktrees, dynamically fan out
@@ -49,15 +49,26 @@ operation instances; the three-agent ceiling is not permission to shard one oper
 
 ## Orca host
 
-Orca represents every operation instance with one Task/Dispatch attempt and one isolated child worktree.
-The workflow DAG may contain several instances of the same operator for separate owned scopes:
+Orca adds an outer Plan coordinator above the workflow wrappers. The parent schedules the dependency
+DAG of related workflows and creates exactly one isolated child worktree per workflow attempt. A child
+workflow wrapper then schedules its own operation DAG and opens exactly one isolated subagent per
+operation in that existing workflow worktree. An operation subagent never creates a worktree.
 
 ```text
-Orca workflow
-├─ OP-ACCOUNTING: backend.implement → child worktree A
-├─ OP-CHATBOT: backend.implement   → child worktree B
-└─ OP-SALES: backend.implement     → child worktree C
+Orca parent: AgentOS backend Plan
+├─ workflow child: Core backend
+│  └─ ready operations → isolated subagents in the Core worktree
+├─ workflow child: Accounting backend
+│  └─ ready operations → isolated subagents in the Accounting worktree
+├─ workflow child: Chatbot backend
+│  └─ ready operations → isolated subagents in the Chatbot worktree
+└─ workflow child: Sales backend
+   └─ ready operations → isolated subagents in the Sales worktree
 ```
 
-This is explicit workflow fan-out: three operation instances, not three workers hidden inside one
-operation. Orca owns conflict workers, provider-spanning chains and integration between worktrees.
+The parent exposes cross-workflow dependencies; each child wrapper exposes operation dependencies.
+Independent operations in one workflow may overlap up to the three-agent ceiling. One operation still
+maps to one subagent and cannot fan out. Related workflows use the Orca parent; an unrelated bounded
+workflow should run solo instead of being attached to this Plan merely to gain concurrency. Orca
+orchestrated mode owns conflict operations, provider-spanning chains and integration between workflow
+worktrees.

@@ -10,7 +10,7 @@ aliases:
   alibaba: qwen
 executionModes:
   solo:
-    hosts: [codex, claude]
+    hosts: [codex, claude, orca]
     controlPlane: current-chat-session
     operationAgent: inline-background-agent
     maxConcurrentOperationAgents: 3
@@ -21,11 +21,13 @@ executionModes:
   orchestrated:
     controlPlane: orca
     workers: [codex, claude, qwen]
-    operationAgent: child-worktree-agent
+    workflowWrapperAgent: child-worktree-agent
+    operationAgent: workflow-inline-subagent
+    maxConcurrentOperationAgents: 3
     isolation: isolated-per-operation
-    worktree: isolated-child-per-operation-attempt
+    worktree: isolated-child-per-workflow-attempt
     scheduling: dependency-dag
-    fanOutWithinOperation: explicit-operation-instances-only
+    fanOutWithinOperation: forbidden
 agentArchitecture:
   levels: [plan, coordinator, workflow-wrapper, operation-wrapper-agent, concrete-operation-agent]
   flexibleLayers: [plan, coordinator, workflow-wrapper]
@@ -39,8 +41,9 @@ orchestration:
   workspaceRouting: .workspaces/projects/<project>/work.json
   approvalPolicy: approvals/policy.json
   approvalMode: accepted-brief-then-auto
-  dispatch: One shared Orca workflow resolves the workspace/project, emits StarCi operator cells and
-    launches the first ready external agent in each cell's execution chain.
+  dispatch: The Orca parent coordinates the Plan DAG and creates one isolated child worktree for each
+    ready workflow. The child workflow wrapper resolves dependencies and launches one isolated
+    subagent for each ready operation, using the first ready external agent in that operation's chain.
 defaults:
   codex:
     working: gpt-5.6-sol

@@ -1,14 +1,14 @@
 # Solo execution
 
-`execution/solo.mjs` hosts a fixed StarCi workflow inside the current Codex or Claude chat. The
-chat may combine Plan, Coordinator and workflow-wrapper responsibilities. Each operation instance,
+`execution/solo.mjs` hosts one fixed StarCi workflow inside the current Codex, Claude or Orca session.
+The session may combine Plan, Coordinator and workflow-wrapper responsibilities. Each operation instance,
 not the whole workflow, is the mandatory isolation boundary. See the shared
 [execution agent model](execution-agent-model.md).
 
 ## Entry contract
 
-Call `runSoloWorkflow({host, workflow, adapters, receipt})` with `host` equal to `codex` or
-`claude`. A workflow has a stable ID, explicit dependencies and one gate per operation:
+Call `runSoloWorkflow({host, workflow, adapters, receipt})` with `host` equal to `codex`,
+`claude` or `orca`. A workflow has a stable ID, explicit dependencies and one gate per operation:
 
 ```js
 const workflow = {
@@ -28,7 +28,7 @@ operation to fan out into several agents.
 
 ## Session and operation adapters
 
-The host supplies the current chat session and the inline-agent implementation:
+The host supplies the current session and the inline-agent implementation:
 
 ```js
 const adapters = {
@@ -83,7 +83,7 @@ three-agent ceiling, operation-agent identities, normalized input digests, outpu
 per-operation resume cursors. Completed operations never rerun. Resumption must use the same chat
 session and the same agent for every paused operation.
 
-## Orca boundary
+## Mode boundary
 
 The solo runner returns `requiresOrca` before opening a session when the request requires:
 
@@ -92,5 +92,7 @@ The solo runner returns `requiresOrca` before opening a session when the request
 - dynamic worker creation or provider-spanning orchestration;
 - child worktrees, conflict ownership or cross-worktree integration.
 
-Orca may represent parallel modules as separate operation instances with separate child worktrees.
-Codex and Claude solo hosts must not imitate that by hiding several workers behind one operation.
+Orca solo still runs exactly one workflow and has no outer multi-workflow parent. Switch to Orca
+orchestrated mode only when related workflows have cross-workflow dependencies, shared conflict
+ownership or integration needs. Operations inside every solo host remain one-to-one isolated
+subagents. Codex and Claude must not imitate the outer cross-workflow coordinator.
