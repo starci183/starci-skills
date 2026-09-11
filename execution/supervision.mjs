@@ -44,7 +44,9 @@ export function planOperationAgentLaunch({taskId,worktree,selection,operation,sc
     schema:'starci/orca-operation-launch@1',mode:'native-worker-start',displayName,
     steps:[
       {command:'worker-start',args:workerArgs},
-      {command:'terminal-rename',args:{terminal:'$workerTerminalHandle',title:displayName}}
+      {command:'worker-show',phase:'provider-identity',args:{dispatch:'$workerDispatchId'}},
+      {command:'terminal-rename',args:{terminal:'$workerTerminalHandle',title:displayName}},
+      {command:'worker-show',phase:'canonical-title',args:{dispatch:'$workerDispatchId'}}
     ],
     forbidden:['manual-terminal-prompt','unsupervised-retain','terminal-create-provider-command','worker-start-by-terminal-handle']
   };
@@ -62,8 +64,9 @@ function startOptions(worker){
  * Verify the exact Orca worker receipt against the resolver output before accepting any
  * operation effect. A mismatch fences the attempt; it never authorizes a fallback.
  */
-export function attestOperationWorker({taskId,operation,scope,selection,taskRecord,workerShow}){
+export function attestOperationWorker({taskId,operation,scope,selection,taskRecord,workerShow,phase='canonical-title'}){
   requireProviderContracts();
+  need(['provider-identity','canonical-title','runtime'].includes(phase),`Unsupported operation attestation phase: ${phase}`);
   const task=text(taskId,'operation Task ID');
   const displayName=formatOrcaDisplayName('operation-agent',{operation,scope});
   need(plain(selection)&&plain(selection.orcaLaunch),'Missing resolved operation selection');
@@ -81,11 +84,14 @@ export function attestOperationWorker({taskId,operation,scope,selection,taskReco
   const expectedModel=selection.model??selection.requestedModel??null;
   if(expectedModel!==null)need(effective.model===expectedModel,`Provider mismatch: expected model ${expectedModel}, received ${effective.model??'unknown'}`);
   need(typeof result.worker.agent_terminal_handle==='string'&&result.worker.agent_terminal_handle,'Worker receipt is missing the agent terminal handle');
-  need(result.terminal?.title===displayName,`Operation terminal name mismatch: expected ${displayName}, received ${result.terminal?.title??'unknown'}`);
+  const observedTitle=result.terminal?.title??null,titleCanonical=observedTitle===displayName;
+  if(phase==='canonical-title')need(titleCanonical,`Operation terminal name mismatch: expected ${displayName}, received ${observedTitle??'unknown'}`);
   return {
     schema:'starci/orca-operation-provider-attestation@1',ok:true,taskId:task,
     dispatchId:result.dispatch.id,terminalHandle:result.worker.agent_terminal_handle,
-    displayName,target:selection.target??null,agent:effective.agent,model:effective.model??null
+    displayName,target:selection.target??null,agent:effective.agent,model:effective.model??null,
+    terminalTitle:{observed:observedTitle,canonical:titleCanonical,mutableUiMetadata:true,
+      action:titleCanonical?'none':'recanonicalize-without-fencing'}
   };
 }
 
@@ -102,11 +108,13 @@ export function validateSupervisionPolicy(policy){
   const operationAgent=policy?.workerLifecycle?.operationAgent;
   const names=policy?.workerLifecycle?.displayNames;
   const qwenLaunch=operationAgent?.qwenLaunch,nativeFailure=operationAgent?.nativeLaunchFailure;
-  if(names?.coordinator!=='[Coordinator] <Plan>'||names?.workflowWorktree!=='[Workflow] <Workflow>'||names?.workflowManager!=='[Coordinator] <Workflow>'||names?.operationAgent!=='[Op] <operation> - <scope>'||names?.applyAgentNameWith!=='task-display-name-and-terminal-rename-after-start')errors.push('Orca display naming contract is invalid');
+  if(names?.coordinator!=='[Coordinator] <Plan>'||names?.workflowWorktree!=='[Workflow] <Workflow>'||names?.workflowManager!=='[Coordinator] <Workflow>'||names?.operationAgent!=='[Op] <operation> - <scope>'||names?.applyAgentNameWith!=='task-display-name-then-provider-attestation-then-terminal-canonicalization')errors.push('Orca display naming contract is invalid');
   if(operationAgent?.lifetime!=='operation-attempt'||operationAgent?.launch!=='supervised-native-agent'||operationAgent?.isolation!=='one-operation-one-agent'||operationAgent?.release!=='after-accepted-worker_done'||operationAgent?.reuse!=='forbidden')errors.push('Operation agent lifecycle is invalid');
   const admission=operationAgent?.dispatchAdmission,sidearm=operationAgent?.architectureSidearm;
   if(!uniqueStrings(admission?.required)||!['expected-operation-from-active-dag-node','exact-operation-contract','resolved-provider-selection','canonical-display-name'].every(rule=>admission.required.includes(rule))||admission?.providerProof!=='worker-show-exact-effective-agent-model'||admission?.effectAcceptance!=='only-after-provider-proof'||admission?.onOperationMismatch!=='fence-reconcile-release-and-dispatch-expected-operation'||admission?.onProviderMismatch!=='fence-reconcile-release-and-retry-resolved-target')errors.push('Operation dispatch admission is invalid');
   if(sidearm?.onlyTrigger!=='active-implementation-secondary_request'||sidearm?.requiredReason!=='sds-technical-gap'||sidearm?.requiredSecondaryOp!=='architecture.decide'||sidearm?.requiredAuthority!=='explicit-bounded-sds-allowlist'||!uniqueStrings(sidearm?.forbiddenTriggers)||!['review-finding','review-suggestion','unanswered-design-question','inferred-sds-gap'].every(rule=>sidearm.forbiddenTriggers.includes(rule)))errors.push('Architecture sidearm admission is invalid');
+  const titleStability=operationAgent?.displayNameStability;
+  if(titleStability?.identityAuthority!=='task-display-name-plus-worker-provider-receipt'||titleStability?.terminalTitle!=='mutable-native-ui-metadata'||titleStability?.launch!=='provider-attest-then-rename-and-verify'||titleStability?.runtimeDrift!=='recanonicalize-without-fencing-when-immutable-identity-is-exact'||titleStability?.settlement!=='recanonicalize-before-release'||titleStability?.effectDecision!=='never-reject-solely-for-runtime-terminal-title-drift')errors.push('Operation display-name stability policy is invalid');
   if(qwenLaunch?.agent!=='qwen-code'||qwenLaunch?.model!=='qwen3.8-flash'||qwenLaunch?.modelAuthority!=='verified-qwen-runtime-configuration'||qwenLaunch?.create!=='direct-native-worker-start'||qwenLaunch?.readiness!=='supervised-worker-receipt'||qwenLaunch?.supervise!=='worker-start-by-agent-id'||qwenLaunch?.promptDelivery!=='supervised-worker-start-only'||qwenLaunch?.terminalCommand!=='forbidden'||qwenLaunch?.nestedAgents!=='forbidden')errors.push('Qwen supervised launch is invalid');
   if(!uniqueStrings(nativeFailure?.recognizedFailures)||!['agent_prompt_stalled','session_not_reported'].every(reason=>nativeFailure.recognizedFailures.includes(reason))||nativeFailure?.action!=='fence-and-reconcile-exact-attempt'||nativeFailure?.nextCandidate!=='only-after-verified-no-effects'||nativeFailure?.unsupervisedFallback!=='forbidden'||nativeFailure?.release!=='release-or-retain-from-worker-receipt'||nativeFailure?.duplicateSubmit!=='forbidden')errors.push('Native operation failure policy is invalid');
   const routing=policy?.routing;

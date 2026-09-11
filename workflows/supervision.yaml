@@ -91,7 +91,7 @@ workerLifecycle:
     workflowWorktree: "[Workflow] <Workflow>"
     workflowManager: "[Coordinator] <Workflow>"
     operationAgent: "[Op] <operation> - <scope>"
-    applyAgentNameWith: task-display-name-and-terminal-rename-after-start
+    applyAgentNameWith: task-display-name-then-provider-attestation-then-terminal-canonicalization
   coordinator:
     lifetime: parent-run
     host: orca-main-worktree
@@ -123,6 +123,13 @@ workerLifecycle:
       effectAcceptance: only-after-provider-proof
       onOperationMismatch: fence-reconcile-release-and-dispatch-expected-operation
       onProviderMismatch: fence-reconcile-release-and-retry-resolved-target
+    displayNameStability:
+      identityAuthority: task-display-name-plus-worker-provider-receipt
+      terminalTitle: mutable-native-ui-metadata
+      launch: provider-attest-then-rename-and-verify
+      runtimeDrift: recanonicalize-without-fencing-when-immutable-identity-is-exact
+      settlement: recanonicalize-before-release
+      effectDecision: never-reject-solely-for-runtime-terminal-title-drift
     architectureSidearm:
       onlyTrigger: active-implementation-secondary_request
       requiredReason: sds-technical-gap

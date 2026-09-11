@@ -103,6 +103,14 @@ While the Orca parent coordinates the Core/shared, Accounting, Chatbot, and Sale
 - Impact: stale processes can consume resources, retain filesystem handles, and confuse a subsequent run.
 - Upgrade candidate: require terminal disconnect plus process settlement before worktree removal, and report unresolved settlement as a reset failure rather than success.
 
+### Native Codex activity titles can drift after canonical operation naming
+
+- Expected: an operation remains visibly named `[Op] <operation> - <scope>` while its immutable Task, Dispatch and provider identity remain stable.
+- Observed: after a successful canonical rename, native Codex later changed the terminal title to `Report terminal task outcome | <worktree>` while the Task `display_name`, exact Dispatch/worker, `codex` agent and `gpt-5.6-sol` model remained correct. A Workflow Coordinator treated that mutable title as an identity mismatch and stopped a valid Accounting implementation attempt.
+- Impact: correct operation effects can be discarded because native activity metadata is mistaken for ownership or provider provenance.
+- Resolution in StarCi: attest immutable Task/Dispatch/worker/provider identity first, then rename and verify the canonical title. During execution, recanonicalize title drift without fencing when immutable identity still matches; before release, rename once more. Never reject verified effects solely because the native terminal activity title drifted.
+- Upgrade candidate: Orca should separate a stable user-assigned display title from its generated activity title so native adapters cannot overwrite the role label.
+
 ### DeepSeek V4.1 Flash is a conditional candidate, not a Token Plan alias
 
 - Expected: a newly released lower-cost coding model can be added to an operation chain only when the configured provider accepts its exact model ID and reports the same observed model.

@@ -26,6 +26,9 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.equal(contract.operationAgent.admission.providerSelection,'profiles-registry-resolver-output');
   assert.equal(contract.operationAgent.admission.afterWorkerStart.api,'orchestration.worker-show');
   assert.equal(contract.operationAgent.admission.afterWorkerStart.beforeEffectAcceptance,'required');
+  assert.equal(contract.operationAgent.admission.afterWorkerStart.canonicalizeTitle.renameApi,'terminal.rename');
+  assert.equal(contract.operationAgent.admission.afterWorkerStart.canonicalizeTitle.verifyApi,'orchestration.worker-show');
+  assert.equal(contract.operationAgent.admission.afterWorkerStart.runtimeTitleDrift.whenImmutableIdentityRemainsExact,'recanonicalize-without-fencing');
   assert.equal(contract.operationAgent.admission.architectureSidearm.onlyTrigger,'active implementation secondary_request');
   assert.equal(contract.operationAgent.admission.architectureSidearm.exactReason,'sds-technical-gap');
   assert.match(contract.operationAgent.qwen38Flash.calls.startAgent.cli,/worker-start .*--agent qwen-code/);
@@ -102,5 +105,10 @@ test('provider catalog exposes explicit API and validation contracts',()=>{
   assert.equal(qwen.kind,'direct-native-managed-agent');
   assert.equal(qwen.start[0].api,'orchestration.worker-start');
   assert.equal(qwen.start[0].binding,'agent-qwen-code');
+  assert.equal(qwen.start[1].api,'orchestration.worker-show');
+  assert.equal(qwen.start[1].phase,'provider-identity');
+  assert.equal(qwen.start[2].api,'terminal.rename');
+  assert.equal(qwen.start[3].api,'orchestration.worker-show');
+  assert.equal(qwen.start[3].phase,'canonical-title');
   assert.ok(qwen.forbidden.includes('terminal-create-qwen-command'));
 });

@@ -61,10 +61,18 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.equal(policy.waitHierarchy.coordinator.operationExecution,'forbidden');
   assert.equal(policy.workerLifecycle.displayNames.workflowManager,'[Coordinator] <Workflow>');
   assert.equal(policy.workerLifecycle.displayNames.operationAgent,'[Op] <operation> - <scope>');
-  assert.equal(policy.workerLifecycle.displayNames.applyAgentNameWith,'task-display-name-and-terminal-rename-after-start');
+  assert.equal(policy.workerLifecycle.displayNames.applyAgentNameWith,'task-display-name-then-provider-attestation-then-terminal-canonicalization');
   assert.equal(policy.workerLifecycle.operationAgent.launch,'supervised-native-agent');
   assert.equal(policy.workerLifecycle.operationAgent.release,'after-accepted-worker_done');
   assert.equal(policy.workerLifecycle.operationAgent.reuse,'forbidden');
+  assert.deepEqual(policy.workerLifecycle.operationAgent.displayNameStability,{
+    identityAuthority:'task-display-name-plus-worker-provider-receipt',
+    terminalTitle:'mutable-native-ui-metadata',
+    launch:'provider-attest-then-rename-and-verify',
+    runtimeDrift:'recanonicalize-without-fencing-when-immutable-identity-is-exact',
+    settlement:'recanonicalize-before-release',
+    effectDecision:'never-reject-solely-for-runtime-terminal-title-drift'
+  });
   assert.deepEqual(policy.workerLifecycle.operationAgent.dispatchAdmission.required,[
     'expected-operation-from-active-dag-node','exact-operation-contract','resolved-provider-selection','canonical-display-name'
   ]);
@@ -109,9 +117,11 @@ test('Qwen operation launch uses one direct native worker and restores the canon
   });
   assert.equal(launch.mode,'native-worker-start');
   assert.equal(launch.displayName,'[Op] backend.implement - Chatbot');
-  assert.deepEqual(launch.steps.map(step=>step.command),['worker-start','terminal-rename']);
+  assert.deepEqual(launch.steps.map(step=>step.command),['worker-start','worker-show','terminal-rename','worker-show']);
   assert.deepEqual(launch.steps[0].args,{task:'task-1',worktree:'path:C:/work/chatbot',agent:'qwen-code'});
-  assert.deepEqual(launch.steps[1].args,{terminal:'$workerTerminalHandle',title:'[Op] backend.implement - Chatbot'});
+  assert.deepEqual(launch.steps[1],{command:'worker-show',phase:'provider-identity',args:{dispatch:'$workerDispatchId'}});
+  assert.deepEqual(launch.steps[2].args,{terminal:'$workerTerminalHandle',title:'[Op] backend.implement - Chatbot'});
+  assert.deepEqual(launch.steps[3],{command:'worker-show',phase:'canonical-title',args:{dispatch:'$workerDispatchId'}});
   assert.ok(launch.forbidden.includes('terminal-create-provider-command'));
   assert.ok(launch.forbidden.includes('worker-start-by-terminal-handle'));
   assert.ok(launch.forbidden.includes('unsupervised-retain'));
@@ -138,11 +148,16 @@ test('worker provider attestation rejects Sol when the resolved operation target
   }});
   assert.deepEqual(attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord,workerShow:receipt()}),{
     schema:'starci/orca-operation-provider-attestation@1',ok:true,taskId:'task-1',dispatchId:'ctx-1',terminalHandle:'term-1',
-    displayName,target:'qwen-qwen3.8-flash-worker',agent:'qwen-code',model:'qwen3.8-flash'
+    displayName,target:'qwen-qwen3.8-flash-worker',agent:'qwen-code',model:'qwen3.8-flash',
+    terminalTitle:{observed:displayName,canonical:true,mutableUiMetadata:true,action:'none'}
   });
   assert.throws(()=>attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord,workerShow:receipt('codex','gpt-5.6-sol')}),/Provider mismatch/);
   assert.throws(()=>attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord:{...taskRecord,display_name:'worker-task_1'},workerShow:receipt()}),/Task name mismatch/);
   assert.throws(()=>attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord,workerShow:{result:{...receipt().result,terminal:{title:'Qwen - accounting'}}}}),/terminal name mismatch/);
+  assert.deepEqual(
+    attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord,workerShow:{result:{...receipt().result,terminal:{title:'Report terminal task outcome | accounting'}}},phase:'runtime'}).terminalTitle,
+    {observed:'Report terminal task outcome | accounting',canonical:false,mutableUiMetadata:true,action:'recanonicalize-without-fencing'}
+  );
 });
 
 test('a management layer cannot claim operation execution work',()=>{

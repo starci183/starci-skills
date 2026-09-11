@@ -143,11 +143,31 @@ function taskRecordOf(receipt,taskId){
   return record;
 }
 async function attestDispatch({adapter,taskReceipt,taskId,dispatchId,operation,scope,selection}){
-  const workerShow=await adapterMethod(adapter,'showWorker')({dispatchId,taskId});
-  return attestOperationWorker({
+  const taskRecord=taskRecordOf(taskReceipt,taskId);
+  const before=await adapterMethod(adapter,'showWorker')({dispatchId,taskId});
+  const provider=attestOperationWorker({
     taskId,operation,scope,selection,
-    taskRecord:taskRecordOf(taskReceipt,taskId),workerShow
+    taskRecord,workerShow:before,phase:'provider-identity'
   });
+  await adapterMethod(adapter,'renameTerminal')({
+    runId:null,taskId,dispatchId,terminalHandle:provider.terminalHandle,title:provider.displayName,reason:'canonicalize-after-provider-attestation'
+  });
+  const after=await adapterMethod(adapter,'showWorker')({dispatchId,taskId});
+  const canonical=attestOperationWorker({taskId,operation,scope,selection,taskRecord,workerShow:after,phase:'canonical-title'});
+  return {...canonical,titleCanonicalized:true,initialTerminalTitle:provider.terminalTitle.observed};
+}
+
+async function recanonicalizeBeforeRelease(adapter,worker){
+  const proof=worker?.providerAttestation;
+  if(!proof?.ok||!proof.terminalHandle||!proof.displayName)return {attempted:false,ok:false,reason:'missing-provider-attestation'};
+  try{
+    await adapterMethod(adapter,'renameTerminal')({
+      taskId:worker.taskId,dispatchId:worker.dispatchId,terminalHandle:proof.terminalHandle,title:proof.displayName,reason:'recanonicalize-before-release'
+    });
+    return {attempted:true,ok:true,title:proof.displayName};
+  }catch(error){
+    return {attempted:true,ok:false,title:proof.displayName,error:error instanceof Error?error.message:String(error)};
+  }
 }
 function operationTaskDeps(plan,operation){
   const ids=[];
@@ -346,17 +366,20 @@ export async function acceptOrcaWorkerDone({plan,event,adapter}){
   const next=copy(plan),found=activeWorker(next,event);
   if(found.kind==='sidearm'){
     const done=validateWorkerDone(found.worker,event);found.sidearm.status=done.outcome==='succeeded'?'awaiting-review':'failed';found.sidearm.filesModified=done.filesModified;
+    found.sidearm.titleSettlement=await recanonicalizeBeforeRelease(adapter,found.sidearm);
     await adapterMethod(adapter,'releaseWorker')({runId:next.runId,taskId:event.taskId,dispatchId:event.dispatchId,outcome:done.outcome});
     if(done.outcome==='failed')for(const id of found.sidearm.affectedOperations)next.operations[id].status='blocked';
     return next;
   }
   if(found.kind==='conflict'){
     const done=validateWorkerDone(found.worker,event);found.conflict.status=done.outcome==='succeeded'?'awaiting-review':'failed';found.conflict.filesModified=done.filesModified;
+    found.conflict.titleSettlement=await recanonicalizeBeforeRelease(adapter,found.conflict);
     await adapterMethod(adapter,'releaseWorker')({runId:next.runId,taskId:event.taskId,dispatchId:event.dispatchId,outcome:done.outcome});
     if(done.outcome==='failed')for(const id of found.conflict.affectedOperations){next.operations[id].status='blocked';}
     return next;
   }
   const done=validateWorkerDone({...found.attempt,operationId:found.operation.id},event);
+  found.attempt.titleSettlement=await recanonicalizeBeforeRelease(adapter,found.attempt);
   await adapterMethod(adapter,'releaseWorker')({runId:next.runId,taskId:event.taskId,dispatchId:event.dispatchId,outcome:done.outcome});
   found.attempt.status=done.outcome==='succeeded'?'completed':'failed';found.attempt.filesModified=done.filesModified;
   found.operation.status=found.attempt.status;

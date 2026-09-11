@@ -36,8 +36,18 @@ receipts:
       - effective-model
       - agent-terminal-handle
       - canonical-task-display-name
-      - canonical-terminal-title
     onMismatch: fence-reconcile-release-and-retry-before-effect-acceptance
+  titleCanonicalization:
+    afterProviderAttestation:
+      - terminal-rename-to-canonical-op-name
+      - worker-show-verifies-canonical-title
+    duringRuntime:
+      classification: mutable-native-ui-metadata
+      onDriftWithExactImmutableIdentity: recanonicalize-without-fencing
+      effectDecision: never-reject-solely-for-runtime-title-drift
+    beforeRelease:
+      - terminal-rename-to-canonical-op-name
+      - record-ui-defect-if-terminal-is-no-longer-writable
 dispatchAssertions:
   - A workflow child is explicitly bound with worktree set --parent-worktree to the exact main Coordinator worktree and worktree show attests that parentWorktreeId before any operation Task is created.
   - A null, stale or wrong workflow-child parentWorktreeId stops dispatch; orchestration Task membership alone never substitutes for Orca worktree lineage.
@@ -45,7 +55,9 @@ dispatchAssertions:
   - architecture.decide is admitted only by an active implementation secondary_request with reason sds-technical-gap and an explicit bounded SDS allowlist.
   - Review findings, suggestions and open questions never create architecture.decide.
   - Provider selection is resolved before launch and attested from worker-show before any effect is accepted.
-  - Task display_name and terminal title both equal [Op] <operation> - <scope>; worker-task_<id> is never accepted as operation identity.
+  - Task display_name equals [Op] <operation> - <scope> and is the immutable operation name; worker-task_<id> is never accepted as operation identity.
+  - After provider attestation, terminal title is renamed and verified as [Op] <operation> - <scope> before effects are admitted.
+  - A native activity-title drift during execution is mutable UI metadata; with exact Task, Dispatch, worker, agent and model identity it is recanonicalized rather than used to reject valid effects.
   - An operation is never dispatched to an existing terminal; only worker-start creates its supervised native agent.
   - Current-runtime worker-start omits --on; a named --on value is used only after live runtime inventory returns that exact environment id.
   - Literal or guessed environment labels such as windows are rejected before worker-start.
@@ -53,7 +65,7 @@ uiAssertions:
   - Main terminal title equals [Coordinator] <Plan>.
   - Workflow child display name equals [Workflow] <Workflow>.
   - Workflow coordinator title equals [Coordinator] <Workflow>.
-  - Operation title equals [Op] <operation> - <scope>.
+  - Operation title is canonicalized to [Op] <operation> - <scope> after native readiness and again before release.
   - Bash in the subtitle is accepted only as activity metadata beneath a native agent identity.
 messageAssertions:
   - Coordinator-to-Workflow control instructions use type escalation.

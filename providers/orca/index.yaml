@@ -95,9 +95,18 @@ operationAgent:
         - worker.startOptions.launch.effective.agent equals resolved Orca agent
         - worker.startOptions.launch.effective.model equals resolved model
         - worker.agent_terminal_handle is present
-        - terminal.title equals [Op] <operation> - <scope>
       beforeEffectAcceptance: required
       mismatch: fence-reconcile-release-and-retry-resolved-target
+      canonicalizeTitle:
+        renameApi: terminal.rename
+        renameCli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
+        verifyApi: orchestration.worker-show
+        verifyCli: 'orca orchestration worker-show --dispatch <operation-dispatch-id> --json'
+        acceptOnlyWhen: 'terminal.title equals [Op] <operation> - <scope>'
+      runtimeTitleDrift:
+        classification: mutable-native-ui-metadata
+        whenImmutableIdentityRemainsExact: recanonicalize-without-fencing
+        effectDecision: never-reject-solely-for-title-drift
     architectureSidearm:
       onlyTrigger: active implementation secondary_request
       exactReason: sds-technical-gap
@@ -129,6 +138,10 @@ operationAgent:
         api: terminal.rename
         cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
   settle:
+    restoreName:
+      api: terminal.rename
+      cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
+      failureEffect: record-ui-defect-without-rejecting-valid-operation-effects
     report:
       api: orchestration.send
       cli: 'orca orchestration send --type worker_done --subject "<status>" --body "<three-sentence-summary>" --task-id <operation-task-id> --dispatch-id <operation-dispatch-id> --outcome <succeeded|failed> --files-modified "<paths>" --json'

@@ -36,10 +36,10 @@ recipes:
       - orchestration.task-create
       - assert-canonical-task-display-name
       - orchestration.worker-start-current-worktree-agent-qwen-code
+      - orchestration.worker-show-and-attest-provider-identity
       - terminal.rename
       - assert-canonical-terminal-title
-      - orchestration.worker-show
-      - attest-exact-effective-provider
+      - orchestration.worker-show-and-verify-canonical-title
     terminalName: "[Op] <operation> - <scope>"
     taskCardinality: one
     dispatchCardinality: one
@@ -54,10 +54,10 @@ recipes:
       - orchestration.task-create
       - assert-canonical-task-display-name
       - orchestration.worker-start-current-worktree-with-resolved-model
+      - orchestration.worker-show-and-attest-provider-identity
       - terminal.rename
       - assert-canonical-terminal-title
-      - orchestration.worker-show
-      - attest-exact-effective-provider
+      - orchestration.worker-show-and-verify-canonical-title
     terminalName: "[Op] <operation> - <scope>"
   coordinator-instruction:
     actor: plan-coordinator
@@ -76,6 +76,7 @@ recipes:
     actor: workflow-coordinator
     sequence:
       - validate-normalized-operation-output
+      - terminal.rename-canonical-before-release
       - orchestration.worker-release
       - orchestration.check-ack
       - schedule-ready-operation-or-report-workflow-boundary

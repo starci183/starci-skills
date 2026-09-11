@@ -24,7 +24,7 @@ const request=()=>({
 
 function fakeOrca(){
   let tasks=0,dispatches=0;
-  const calls={runs:[],tasks:[],dispatches:[],worktreeParents:[],worktreeShows:[],stops:[],releases:[],integrations:[]};
+  const calls={runs:[],tasks:[],dispatches:[],worktreeParents:[],worktreeShows:[],workerShows:[],renames:[],stops:[],releases:[],integrations:[]};
   return {calls,adapter:{
     async createRun(input){calls.runs.push(input);return {runId:'run-1'};},
     async createTask(input){
@@ -42,12 +42,15 @@ function fakeOrca(){
     async showWorker({dispatchId}){
       const launched=calls.dispatches.find(call=>call.dispatchId===dispatchId);
       assert.ok(launched?.displayName,'operation dispatch needs a canonical display name');
+      calls.workerShows.push({dispatchId});
+      const renamed=calls.renames.findLast(call=>call.dispatchId===dispatchId);
       return {result:{
         dispatch:{id:dispatchId,task_id:launched.taskId},
         worker:{state:'ready',agent_terminal_handle:`term-${dispatchId}`,startOptions:{launch:{effective:{agent:launched.selection.orcaLaunch.agent,model:launched.selection.model}}}},
-        observation:{exactWorker:true},terminal:{title:launched.displayName}
+        observation:{exactWorker:true},terminal:{title:renamed?.title??`Working | ${launched.taskId}`}
       }};
     },
+    async renameTerminal(input){calls.renames.push(structuredClone(input));return {status:'renamed',title:input.title};},
     async stopWorker(input){calls.stops.push(structuredClone(input));return {status:'stopped'};},
     async releaseWorker(input){calls.releases.push(structuredClone(input));return {status:'released'};},
     async integrateChange(input){calls.integrations.push(structuredClone(input));return {status:'integrated'};}
@@ -89,6 +92,10 @@ test('the parent creates one workflow child and its wrapper launches ready opera
   assert.equal(calls.tasks[1].displayName,'[Op] workspace.manage - release-widget');
   assert.equal(calls.dispatches[1].displayName,'[Op] workspace.manage - release-widget');
   assert.equal(plan.operations.prepare.attempts[0].providerAttestation.ok,true);
+  assert.equal(plan.operations.prepare.attempts[0].providerAttestation.titleCanonicalized,true);
+  assert.equal(plan.operations.prepare.attempts[0].providerAttestation.initialTerminalTitle,'Working | task-2');
+  assert.equal(calls.workerShows.length,2);
+  assert.equal(calls.renames[0].title,'[Op] workspace.manage - release-widget');
   assert.deepEqual(calls.dispatches[1].permissions,{merge:false,rebase:false,cherryPick:false,push:false});
   assert.match(calls.dispatches[1].prompt,/Do not merge, rebase, cherry-pick, or push/);
 });
@@ -102,6 +109,8 @@ test('completion validates exact Dispatch identity and allowlisted file outcomes
   assert.equal(plan.operations.backend.status,'dispatched');assert.equal(plan.operations.frontend.status,'dispatched');
   assert.equal(plan.operations['backend-review'].status,'pending');assert.equal(calls.dispatches.length,4);
   assert.equal(calls.releases.length,1);assert.equal(calls.releases[0].dispatchId,prepare.attempts[0].dispatchId);
+  assert.equal(plan.operations.prepare.attempts[0].titleSettlement.ok,true);
+  assert.equal(calls.renames.filter(call=>call.dispatchId===prepare.attempts[0].dispatchId).length,2);
   assert.equal(plan.operations.backend.attempts[0].worktree.name,plan.operations.frontend.attempts[0].worktree.name);
   assert.equal(calls.dispatches.find(call=>call.operationId==='backend').input.schema,'starci/operation-input@1');
   assert.equal(calls.dispatches.find(call=>call.operationId==='backend').input.dependencyOutputs[0].operationId,'prepare');

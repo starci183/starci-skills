@@ -6,7 +6,11 @@ requiredModel: qwen3.8-flash
 start:
   - api: orchestration.worker-start
     binding: agent-qwen-code
+  - api: orchestration.worker-show
+    phase: provider-identity
   - api: terminal.rename
+  - api: orchestration.worker-show
+    phase: canonical-title
 readiness:
   - supervised-worker-receipt
   - effective-agent-qwen-code

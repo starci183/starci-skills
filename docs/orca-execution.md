@@ -101,6 +101,8 @@ The runtime functions use only these injected methods:
 - `dispatchWorker(input)` returns `{dispatchId, worktreeId}` for a wrapper and `{dispatchId}` for an operation. For a wrapper it creates the workflow child; for an operation it launches the selected managed agent in that existing child. A recognized provider must use its native Orca agent id; Qwen 3.8 Flash uses `qwen-code` and inherits the verified model from Qwen runtime configuration.
 - `setWorktreeParent(input)` explicitly binds the new child to the exact main Coordinator worktree.
 - `showWorktree(input)` returns the exact child record used to attest `parentWorktreeId` before any operation Task is created.
+- `showWorker(input)` returns the exact Task/Dispatch/worker/provider receipt used before UI naming.
+- `renameTerminal(input)` canonicalizes the native terminal title after provider readiness and again before release.
 - `stopWorker(input)` retires an operation attempt superseded by a shared change.
 - `releaseWorker(input)` releases the exact settled worker after an accepted `worker_done`.
 - `integrateChange(input)` performs a coordinator-owned integration action and returns only after the shared change is on the base used by new worktrees.
@@ -115,9 +117,9 @@ launch into success.
 
 For Qwen 3.8 Flash, the Workflow Manager creates the operation Task with display name
 `[Op] <operation> - <scope>`, then calls `worker-start --task <task-id> --worktree current --agent qwen-code`.
-It reads the resulting agent terminal handle, reapplies the same title with `terminal rename`, and
-uses `worker-show` to attest the exact Task, worker, native `qwen-code` agent, configured
-`qwen3.8-flash` model and terminal title before accepting effects. This sequence keeps one Task, one
+It first uses `worker-show` to attest the exact Task, worker, native `qwen-code` agent and configured
+`qwen3.8-flash` model. It then reapplies the canonical title with `terminal rename` and verifies that
+title with a second `worker-show` before accepting effects. This sequence keeps one Task, one
 Dispatch, one native branded agent and one supervised worker resource. Nested provider agents remain
 forbidden by the operation contract and are verified at the boundary rather than by replacing the
 native launch with a shell command.
@@ -138,7 +140,10 @@ The display contract is mandatory at creation time:
 The executable call contract is `providers/orca/index.yaml`. It records the exact `orca` API/CLI call for
 creating, attaching, naming, waiting, reporting, releasing and acknowledging every layer. A visible
 `Bash: ...` subtitle is only the native agent's current tool activity; identity comes from the native
-agent icon, canonical terminal title and supervised worker receipt.
+immutable Task display name and supervised worker/provider receipt. The terminal title is mutable UI
+metadata: native activity may change it while the agent works. The Workflow Coordinator restores the
+canonical `[Op] ...` title without fencing the worker when the immutable identities still match, and
+restores it once more before release. Title drift alone never invalidates otherwise valid operation effects.
 
 Send a parent Coordinator control instruction to a Workflow Coordinator with
 `orchestration send --type escalation`. Workflow Coordinators block on escalation plus operation
@@ -152,7 +157,7 @@ parent Run; omitting `parentRunId` creates a compatibility parent Run. `parentWo
 `dispatchReadyOrcaOperations(plan, adapter)` starts every currently independent operation in that
 same child, up to the configured ceiling; it does not serialize unrelated branches.
 
-`acceptOrcaWorkerDone({plan, event, adapter})` requires an exact Task ID, Dispatch ID, operation ID, and explicit `succeeded` or `failed` outcome. Every `filesModified` entry must be a safe relative path matched by that worker's allowlist. Absolute paths, traversal, duplicate entries, wrong attempt identities, and out-of-scope files are rejected without advancing dependencies. An accepted completion releases that exact worker before dependencies advance. A failed operation blocks its dependent branch only; already runnable unrelated workers remain runnable.
+`acceptOrcaWorkerDone({plan, event, adapter})` requires an exact Task ID, Dispatch ID, operation ID, and explicit `succeeded` or `failed` outcome. Every `filesModified` entry must be a safe relative path matched by that worker's allowlist. Absolute paths, traversal, duplicate entries, wrong attempt identities, and out-of-scope files are rejected without advancing dependencies. An accepted completion reapplies the canonical operation title and releases that exact worker before dependencies advance; a closed terminal that cannot be renamed is recorded as a UI defect and does not invalidate verified effects. A failed operation blocks its dependent branch only; already runnable unrelated workers remain runnable.
 
 Allowlist patterns are repository-relative paths. Exact paths and whole-segment `*` or `**` wildcards are supported. Backslashes and partial-segment wildcards are rejected to keep validation consistent across operating systems.
 

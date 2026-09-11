@@ -34,6 +34,7 @@ communication:
     - operation-to-parent-plan-coordinator
     - parent-plan-coordinator-to-operation
 identity:
-  role: canonical-terminal-title
+  role: immutable-task-display-name
   provider: native-agent-icon-and-supervised-worker-receipt
-  activity: sidebar-subtitle
+  terminalTitle: mutable-ui-metadata-canonicalized-after-readiness-and-before-release
+  activity: sidebar-subtitle-or-native-activity-title
