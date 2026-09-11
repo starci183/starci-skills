@@ -75,6 +75,7 @@ function copySkillForBuild(t) {
     'ops',
     'workflows',
     'profiles',
+    'approvals',
     'execution',
     'knowledge',
     'contracts',

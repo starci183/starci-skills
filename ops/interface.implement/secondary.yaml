@@ -2,6 +2,73 @@ schema: starci/op-secondary@1
 owner: interface.implement
 maxJobs: 3
 calls:
+  - op: architecture.decide
+    role: implementation.architecture
+    scope: Bounded SDS correction required to implement an already accepted frontend outcome.
+    parentState: waiting
+    matrixCell: same
+    allowedChangeKinds:
+      - design-gap
+      - technical-flow-correction
+    owns:
+      - the selected SDS correction and its reviewed architecture response
+    allowedEffects:
+      - Inspect accepted SRS, selected SDS, and observed source/render facts supplied by the parent.
+      - Edit only the selected architecture/SDS index.yaml leaves in a separate worktree.
+      - Run StarCi validation and return the reviewed SDS revision.
+    requiredCriteria:
+      - business-unchanged
+      - srs-preserved
+      - sds-source-independent
+      - sds-vietnamese-prose
+      - sds-validated
+      - architecture-review-accepted
+    canCallOthers: false
+    maxSecondary: 0
+    canAdvanceWorkflow: false
+    canCompleteParent: false
+    businessChanged: false
+    sourceChanged: false
+    rules:
+      - Run architecture.decide in its own Orca child worktree; the frontend worker never edits SDS.
+      - Keep YAML/schema keys, stable IDs/refs, enum/API/type/variable/operation identifiers in English
+        and write natural-language SRS/SDS prose in Vietnamese.
+      - Do not add product behavior, change accepted business policy, write product source, or store
+        source paths/symbols/evidence in SDS.
+      - Return the exact changed architecture paths and validation/review result. The Coordinator
+        integrates the accepted SDS before creating a fresh frontend resume attempt.
+      - A business change, scope expansion, missing authority, or unresolved alternative returns
+        blocked instead of being invented by architecture or implementation.
+    callSite:
+      step: discovery-or-verification
+      trigger: An observed source, API, render, or test fact proves that the selected SDS is missing,
+        contradictory, or technically insufficient for the already accepted frontend outcome.
+      skipWhen: The selected SDS is sufficient and consistent with the accepted SRS.
+      inputs:
+        - problem
+        - changeKind
+        - srsRefs
+        - sdsRefs
+        - architecturePaths
+        - observedSourceFacts
+      wait: Pause the frontend primary and its dependents until the architecture response is reviewed,
+        integrated, and bound as a dependency.
+      resume: Start a fresh frontend attempt from the integrated SDS revision, preserve the original
+        goal/criteria, and rerun every affected implementation, render, and quality check.
+      reentryFrom:
+        - discovery
+        - implementation
+        - verification
+      blockedWhen: The correction changes business intent, exceeds selected architecture ownership,
+        needs another secondary, or lacks review authority.
+    inputKind: design
+    outputFields:
+      - architectureRefs
+      - changedPaths
+      - validation
+      - review
+      - businessChanged
+      - sourceChanged
   - op: backend.implement
     role: interface.backend
     scope: Compatible API or rendering-data repair required by this FE outcome.

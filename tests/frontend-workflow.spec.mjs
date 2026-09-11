@@ -192,8 +192,10 @@ test('compiled JSON is reproducible and remains valid after relocation', t => {
   const caller = read(path.join(destination, 'ops/interface.implement/secondary.json'));
   assert.equal(caller.owner, 'interface.implement');
   assert.equal(caller.maxDefinitions, 3);
-  assert.deepEqual(caller.calls.map(c => c.op), ['backend.implement']);
-  assert.equal(caller.calls[0].businessChanged, false); assert.equal(caller.calls[0].canCallOthers, false);
+  assert.deepEqual(caller.calls.map(c => c.op), ['architecture.decide','backend.implement']);
+  assert.ok(caller.calls.every(call => call.businessChanged === false && call.canCallOthers === false));
+  const backendCaller = read(path.join(destination, 'ops/backend.implement/secondary.json'));
+  assert.deepEqual(backendCaller.calls.map(call => call.op), ['architecture.decide']);
 });
 
 test('Claude decorative assets stay deferred through FE to UAT; missing functional art and fake ready assets block', t => {

@@ -111,7 +111,7 @@ test('six-op map is generated from the actual contracts and business journeys fe
   const map = JSON.parse(outputs().get('basic-ops.json'));
   assert.equal(map.ops.length, 6);
   assert.deepEqual(map.ops.map(o => o.id), ['business.decide','architecture.decide','interface.draw','interface.implement','backend.implement','uat.verify']);
-  assert.deepEqual(map.ops.filter(o => o.secondaryCalls.length).map(o => o.id), ['interface.implement']);
+  assert.deepEqual(map.ops.filter(o => o.secondaryCalls.length).map(o => o.id), ['interface.implement','backend.implement']);
   const spec = sample();
   const { validateInput } = await import('../workflows/frontend.mjs');
   const input = {schema:'starci/frontend-input@1',runId:'synthetic-integration',context:{business:['business'],architecture:['architecture'],knowledge:['knowledge'],repository:'nivo-fe',environment:'synthetic',accounts:[],fixtures:[],authorization:['Synthetic validation only']},journeys:spec.journeys};
@@ -126,7 +126,7 @@ test('backend delivery cannot hand off before unit and backend E2E proof', () =>
   assert.equal(backend.qualityPolicy.unitGate, 'scoped-unit-pass-for-tested-revision');
   assert.equal(backend.qualityPolicy.backendE2EGate, 'scoped-backend-e2e-pass-for-tested-revision');
   assert.equal(backend.qualityPolicy.handoffBinding, 'api-contract-runtime-quality-evidence-and-tested-commit');
-  const support = parseYaml(fs.readFileSync(new URL('../ops/interface.implement/secondary.yaml', import.meta.url), 'utf8')).calls[0];
+  const support = parseYaml(fs.readFileSync(new URL('../ops/interface.implement/secondary.yaml', import.meta.url), 'utf8')).calls.find(call => call.op === 'backend.implement');
   for (const field of ['apiContract','runtime','qualityEvidence','testedCommit']) assert.ok(support.outputFields.includes(field));
   for (const criterion of ['backend-unit-pass','backend-e2e-pass']) assert.ok(support.requiredCriteria.includes(criterion));
   for (const mutate of [

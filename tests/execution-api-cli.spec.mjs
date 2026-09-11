@@ -77,6 +77,9 @@ test('execution CLI creates, resolves, plans and inspects without invoking Orca'
   assert.equal(map.status, 0, map.stderr);
   assert.deepEqual(JSON.parse(map.stdout).modes.solo.hosts, ['codex', 'claude']);
   assert.equal(JSON.parse(map.stdout).modes.orchestrated.controlPlane, 'orca');
+  assert.equal(JSON.parse(map.stdout).approvals.schema, 'starci/approval-policy@1');
+  assert.deepEqual(JSON.parse(map.stdout).secondaryRoutes['backend.implement'].calls.map(call => call.op), ['architecture.decide']);
+  assert.deepEqual(JSON.parse(map.stdout).secondaryRoutes['interface.implement'].calls.map(call => call.op), ['architecture.decide','backend.implement']);
   const receiptFile = path.join(dir, 'receipt.yaml');
   fs.writeFileSync(receiptFile, stringifyYaml(JSON.parse(created.stdout)));
   const planned = await invoke(['execution', 'plan', requestFile, 'codex,claude,qwen']);

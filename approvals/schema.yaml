@@ -1,0 +1,53 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: starci/approval-context@1
+title: StarCi approval decision context
+type: object
+additionalProperties: false
+required: [schema, brief, action]
+properties:
+  schema:
+    const: starci/approval-context@1
+  brief:
+    type: object
+    additionalProperties: false
+    required: [status, digest, allowedActions, repositories, scopes, reservedCheckpoints]
+    properties:
+      status:
+        enum: [missing, presented, accepted, superseded]
+      digest:
+        type: [string, "null"]
+        pattern: "^[a-f0-9]{64}$"
+      allowedActions:
+        type: array
+        uniqueItems: true
+        items: {type: string, minLength: 1}
+      repositories:
+        type: array
+        uniqueItems: true
+        items: {type: string, minLength: 1}
+      scopes:
+        type: array
+        uniqueItems: true
+        items: {type: string, minLength: 1}
+      reservedCheckpoints:
+        type: array
+        uniqueItems: true
+        items: {type: string, minLength: 1}
+  action:
+    type: object
+    additionalProperties: false
+    required: [type, effectState]
+    properties:
+      type: {type: string, minLength: 1}
+      repository: {type: [string, "null"]}
+      scope: {type: [string, "null"]}
+      effectState: {enum: [none, known-within-brief, partial, unknown]}
+      fallbackReason: {type: [string, "null"]}
+      materialGoalChange: {type: boolean}
+      businessOrSrsChange: {type: boolean}
+      scopeExpansion: {type: boolean}
+      repositoryExpansion: {type: boolean}
+      ownershipExpansion: {type: boolean}
+      missingSecretOrCredential: {type: boolean}
+      unresolvedBusinessAlternatives: {type: boolean}
+      safetyBlocked: {type: boolean}

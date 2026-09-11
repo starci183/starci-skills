@@ -29,6 +29,13 @@ sections:
         unrelated user Work.
   - title: Mandatory lifecycle gates
     blocks:
+      - "Use approvals/policy.json as the common decision boundary. Before the first workflow
+        effect, present one complete brief containing goal, scope, repositories, worktree topology,
+        operators, allowed action/effect ceilings, exclusions and completion criteria; bind the
+        actual subsequent user acceptance to its digest. After that acceptance, procedural actions
+        inside the unchanged envelope are automatic and must not create repetitive command,
+        worktree, secondary-op, retry, integration or technical-review questions. Ask the user
+        again only when the policy returns need-user."
       - "User-confirmation checkpoints in this policy describe manual mode. Explicit Plan mode:auto
         follows workflows/auto.json: a real Plan delegation plus assistant risk assessment may
         authorize bounded goals and technical result acceptance. Keep those receipts distinct from
@@ -48,9 +55,12 @@ sections:
       - Typed request/response mapping can adapt field names and shape using exact accepted producer
         values, but cannot enlarge scope or change expected business behavior. Changed goal requires
         renewed user approval.
-      - Technical pass is not done. Present results and wait for user acceptance of the result
-        digest, then update only selected Work nodes and validate their completion proof. Parent
-        completion is derived.
+      - Technical pass is not done until every accepted completion criterion is verified. When the
+        accepted brief delegates technical acceptance and approvals/policy.json returns auto, the
+        coordinator records that bounded technical acceptance, updates only selected Work nodes,
+        validates their completion proof and reports the result without another formal question.
+        A reserved exit checkpoint, changed envelope or undeclared external effect still requires
+        the user. Parent completion is derived.
   - title: Build before reading
     blocks:
       - Before every skill invocation run node scripts/ensure-build.mjs from the skill directory.
@@ -78,6 +88,13 @@ sections:
         completion. Agent/tool availability and higher-priority delegation rules still apply.
         Ordinary tool steps and bounded repair stay inside the same cell, never hide unrelated
         successor jobs."
+      - "backend.implement and interface.implement may call only their declared
+        implementation.architecture secondary when an observed implementation/test fact proves an
+        accepted SDS technically missing or contradictory. The code worker waits and never edits
+        SDS. Orca creates a separate architecture.decide worktree, the coordinator reviews and
+        integrates its bounded Vietnamese-prose/source-independent SDS correction, and a fresh
+        implementation attempt reruns affected checks. This is automatic procedure inside an
+        accepted brief; a business/SRS change or wider owner/scope returns need-user."
       - Before transitions, preserve exact accepted output → input bindings and require every
         request/response criterion and real evidence to pass. The frontend has a local runtime gate;
         other matrices require the current explicit coordinator and are not automatic executors.

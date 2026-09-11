@@ -15,6 +15,7 @@ specifications/srs-sections.mjs
 specifications/srs-v3.mjs
 specifications/v2.mjs
 profiles/select.mjs
+approvals/policy.mjs
 execution/contracts.mjs
 execution/api.mjs
 execution/resolve.mjs

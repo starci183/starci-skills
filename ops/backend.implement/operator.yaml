@@ -163,7 +163,14 @@ steps:
         in this same implementation; never publish a package implicitly. Keep shared paths exclusive
         and report a missing required external authority rather than inventing a helper. Resolve the
         execution profile and actual tool availability before selecting instruments; this does not
-        switch the model/runtime or spawn workers."
+        switch the model/runtime or spawn workers. CALL POINT (discovery, implementation or
+        verification): when an observed source/test fact proves the accepted SDS technically
+        missing or contradictory while business and SRS stay unchanged, read
+        backend.implement/secondary.json and request its implementation.architecture role. The
+        backend worker waits and never edits SDS. Orca runs architecture.decide in a separate child
+        worktree; after coordinator review/integration, start a fresh backend attempt from that SDS
+        revision and rerun every affected check. If business/SRS, owner or accepted scope must
+        change, return blocked for a user decision instead of invoking the sidearm."
   - reads:
       - business
       - architecture

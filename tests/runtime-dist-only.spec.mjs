@@ -32,5 +32,5 @@ test('relocated runtime uses only .dist and bootstrap, never authored code or da
     const result=selectWorkflow(readDistJson('workflows','catalog.json'),{classification:{action:'implement-backend',effectful:true}});
     if(result.id!=='implement-backend')throw Error('wrong route');
     selectProfile({runtime:'codex',op:'backend.implement'});`]);
-  for(const name of ['core','cli','scripts','contracts','specifications','workflows','knowledge','profiles','schemas'])assert.equal(fs.existsSync(path.join(base,name)),false,'source dependency leaked: '+name);
+  for(const name of ['core','cli','scripts','contracts','specifications','workflows','knowledge','profiles','approvals','schemas'])assert.equal(fs.existsSync(path.join(base,name)),false,'source dependency leaked: '+name);
 });

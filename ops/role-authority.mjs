@@ -18,8 +18,18 @@ export function authorityFor(op) {
     authority.primary.rules.push('Select exactly one mode; its permissions and profile replace the selector envelope. Never union permissions or chain modes.');
   }
   if (op.id === 'interface.implement') {
-    authority.primary.calls = [{ op: 'backend.implement', role: 'interface.backend', authority: 'secondary.json' }];
-    authority.primary.rules.push('Wait for the secondary response; then inspect backend changes and rerun affected FE integration/render checks before final response.');
+    authority.primary.calls = [
+      { op: 'architecture.decide', role: 'implementation.architecture', authority: 'secondary.json' },
+      { op: 'backend.implement', role: 'interface.backend', authority: 'secondary.json' }
+    ];
+    authority.primary.rules.push('A design gap pauses implementation and delegates the SDS correction to the separately owned architecture.decide secondary; after accepted integration, resume implementation from the new design revision.');
+    authority.primary.rules.push('Wait for every secondary response; then inspect returned changes and rerun affected FE integration/render checks before final response.');
+  }
+  if (op.id === 'backend.implement') {
+    authority.primary.calls = [
+      { op: 'architecture.decide', role: 'implementation.architecture', authority: 'secondary.json' }
+    ];
+    authority.primary.rules.push('A design gap pauses implementation and delegates the SDS correction to the separately owned architecture.decide secondary; after accepted integration, resume implementation from the new design revision.');
   }
   return authority;
 }

@@ -23,6 +23,8 @@ orchestration:
   runtime: orca
   owner: source-host
   workspaceRouting: .workspaces/projects/<project>/work.json
+  approvalPolicy: approvals/policy.json
+  approvalMode: accepted-brief-then-auto
   dispatch: One shared Orca workflow resolves the workspace/project, emits StarCi operator cells and
     launches the first ready external agent in each cell's execution chain.
 defaults:

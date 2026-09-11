@@ -19,6 +19,7 @@
     "workflows/",
     "ops/",
     "profiles/",
+    "approvals/",
     "execution/",
     "contracts/",
     "core/",

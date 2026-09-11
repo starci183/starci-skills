@@ -30,6 +30,8 @@ Usage:
   starci execution show <workflow-request.yaml> <receipt.yaml>
   starci execution resume <workflow-request.yaml> <receipt.yaml>
   starci execution escalate <orca-plan.yaml> <operation-id> <task-id> <dispatch-id> <shared-files>
+  starci approval policy
+  starci approval decide <approval-context.yaml>
   starci plan <plan.yaml>
   starci audit-legacy <legacy-root>
 Work metadata uses YAML 1.2. No command runs an op,
@@ -93,6 +95,19 @@ function readPolicyDocument(relative = 'common.json') {
   return fs.readFileSync(resolved, 'utf8');
 }
 
+function secondaryRoutes() {
+  const map=readDistJson('basic-ops.json'),routes={};
+  for(const operation of map.ops??[]){
+    if(!Array.isArray(operation.secondaryCalls)||!operation.secondaryCalls.length)continue;
+    const authority=readDistJson('ops',operation.id,'secondary.json');
+    routes[operation.id]={maxJobs:authority.maxJobs,calls:authority.calls.map(call=>({
+      op:call.op,role:call.role,parentState:call.parentState,callSite:call.callSite,
+      canCallOthers:call.canCallOthers,canCompleteParent:call.canCompleteParent
+    }))};
+  }
+  return routes;
+}
+
 /** Inventory only: no link following, known credential-path reads, script execution, or verdict import. */
 export function auditLegacy(root) {
   const resolved = directory(root);
@@ -132,6 +147,15 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
   try {
     const [command, ...args] = argv;
     if (!command || ['--help', '-h', 'help'].includes(command)) { emit(help); return 0; }
+    if(command==='approval'){
+      const [action,...input]=args;
+      if(!['policy','decide'].includes(action))throw Error('Use starci approval policy|decide.');
+      const policy=readDistJson('approvals','policy.json');
+      if(action==='policy'){exactArgs(input,0);emit(policy);return 0;}
+      exactArgs(input,1);
+      const {decideApproval}=await import('../approvals/policy.mjs');
+      emit(decideApproval(policy,dataFile(input[0])));return 0;
+    }
     if(command==='execution'){
       const [action,...input]=args;
       if(!['create','map','plan','resolve','show','resume','escalate'].includes(action))throw Error('Use starci execution create|map|plan|resolve|show|resume|escalate.');
@@ -139,7 +163,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const {planWorkflowExecution,inspectWorkflowExecution,createSharedConflictEscalation}=await import('../execution/api.mjs');
       if(action==='map'){
         exactArgs(input,0);const registry=readDistJson('profiles','registry.json');
-        emit({schema:'starci/execution-map@1',modes:registry.executionModes,skills:registry.skills,operators:registry.operators,targets:registry.targets,fallback:registry.fallback});return 0;
+        emit({schema:'starci/execution-map@1',modes:registry.executionModes,skills:registry.skills,operators:registry.operators,targets:registry.targets,fallback:registry.fallback,approvals:readDistJson('approvals','policy.json'),secondaryRoutes:secondaryRoutes()});return 0;
       }
       if(action==='create'){
         exactArgs(input,1);const request=dataFile(input[0]);validateWorkflowRequest(request);emit(createWorkflowReceipt(request));return 0;

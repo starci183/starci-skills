@@ -18,6 +18,7 @@ function executionMode(request){return request.mode??request.execution?.mode;}
 function dependencies(operation){return operation.dependsOn??operation.dependencies??[];}
 function allowlist(operation){return operation.allowedFiles??operation.fileAllowlist??operation.scope?.allowedFiles;}
 function selection(operation){return operation.selection??operation.executionSelection;}
+function operatorOf(operation){return operation.operation??operation.operator??null;}
 
 function safePattern(value){
   need(typeof value==='string'&&value.length>0&&!value.includes('\\'),'Invalid file allowlist entry');
@@ -81,7 +82,7 @@ function validateRequest(request){
     const id=text(input.id,'operation id');need(!ids.has(id),'Duplicate operation id');ids.add(id);
     const deps=dependencies(input);need(Array.isArray(deps)&&new Set(deps).size===deps.length,`Invalid dependencies for ${id}`);
     const allowed=allowlist(input);need(Array.isArray(allowed)&&allowed.length>0,`Operation ${id} needs a file allowlist`);
-    operations.push({input,id,index,deps:[...deps],allowedFiles:allowed.map(safePattern),selection:validateSelection(selection(input),id)});
+    operations.push({input,id,index,deps:[...deps],allowedFiles:allowed.map(safePattern),selection:validateSelection(selection(input),id),operator:operatorOf(input)});
   }
   for(const op of operations){
     for(const dep of op.deps)need(ids.has(dep)&&operations.find(x=>x.id===dep).index<op.index,`Operation ${op.id} has an unknown or forward dependency`);
@@ -97,10 +98,10 @@ export function planOrcaExecution(request){
     coordinator:{role:'coordinator',implementsChanges:false,owns:['ownership','review','integration']},
     operations:Object.fromEntries(operations.map(op=>[op.id,{
       id:op.id,index:op.index,spec:op.input.spec??op.input.prompt??op.id,dependsOn:op.deps,
-      allowedFiles:op.allowedFiles,selection:op.selection,status:op.deps.length?'pending':'ready',
+      operator:op.operator,allowedFiles:op.allowedFiles,selection:op.selection,status:op.deps.length?'pending':'ready',
       attempts:[],sharedDependencies:[],blockedBy:[]
     }])),
-    order:operations.map(op=>op.id),conflicts:{},events:[]
+    order:operations.map(op=>op.id),conflicts:{},sidearms:{},events:[]
   };
 }
 
@@ -212,15 +213,60 @@ export async function createConflictOwner({plan,event,decision,selection:ownerSe
   return next;
 }
 
+function exactSdsFiles(values){
+  const files=values.map(safePattern);
+  need(files.length&&files.every(file=>!file.includes('*')&&file.startsWith('.starciwork/')&&file.includes('/architecture/')&&file.endsWith('/index.yaml')),'Architecture sidearm allowlist must contain exact architecture index.yaml paths');
+  return files;
+}
+
+/** Pause one implementation branch and create its separately owned architecture.decide SDS worker. */
+export async function createArchitectureSidearm({plan,event,decision,selection:architectureSelection,adapter}){
+  need(plan?.schema===PLAN_SCHEMA&&plain(event)&&event.type==='secondary_request','Invalid architecture secondary request');
+  need(event.reason==='sds-technical-gap'&&event.secondaryOp==='architecture.decide','Secondary request is not an architecture SDS correction');
+  const source=plan.operations[event.operationId];need(source,'Unknown requesting operation');
+  need(['backend.implement','interface.implement'].includes(source.operator),'Only implementation operators may request the architecture sidearm');
+  const active=source.attempts.at(-1);need(active&&active.taskId===event.taskId&&active.dispatchId===event.dispatchId,'Secondary request does not belong to the active Dispatch');
+  need(plain(decision)&&decision.action==='create-architecture-sidearm','Coordinator must assign the architecture sidearm');
+  need(decision.businessChanged===false&&decision.srsChanged===false&&decision.sourceChanged===false,'Architecture sidearm cannot change business, SRS or product source');
+  const allowedFiles=exactSdsFiles(decision.allowedFiles??[]),next=copy(plan),sidearmId=`architecture-${Object.keys(next.sidearms??{}).length+1}`;
+  const affected=descendants(next,[source.id]),stopWorker=adapterMethod(adapter,'stopWorker');
+  for(const id of affected){
+    const op=next.operations[id];op.blockedBy=[...new Set([...op.blockedBy,sidearmId])];
+    if(op.status==='dispatched'){
+      const attempt=op.attempts.at(-1);
+      await stopWorker({runId:next.runId,taskId:attempt.taskId,dispatchId:attempt.dispatchId,reason:'paused-for-architecture-sidearm'});
+      attempt.status='superseded';
+    }
+    if(['dispatched','ready','pending'].includes(op.status))op.status='waiting-sidearm';
+  }
+  const selected=validateSelection(architectureSelection,sidearmId),createTask=adapterMethod(adapter,'createTask'),dispatchWorker=adapterMethod(adapter,'dispatchWorker');
+  const upstream=source.dependsOn.map(id=>next.operations[id].attempts.at(-1)?.taskId).filter(Boolean);
+  const taskReceipt=await createTask({runId:next.runId,kind:'secondary-operation',role:'implementation.architecture',operator:'architecture.decide',parentTaskId:active.taskId,title:`Architecture sidearm for ${source.id}`,spec:decision.spec??event.problem??'Correct the selected SDS technical gap without changing business or SRS.',deps:upstream,allowedFiles,selection:selected});
+  const taskId=idOf(taskReceipt,'taskId','id'),worktree={kind:'new-child',name:slug(`${next.workflowId}-${sidearmId}`),isolated:true};
+  const prompt='Run architecture.decide for only the selected SDS index.yaml files. Preserve business and SRS, write Vietnamese natural-language prose with English identifiers, store no source paths/symbols/evidence, edit no product source, call no secondary, and do not merge, rebase, cherry-pick, or push.';
+  const dispatchReceipt=await dispatchWorker({runId:next.runId,taskId,sidearmId,operator:'architecture.decide',role:'implementation.architecture',worktree,selection:selected,prompt,permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
+  const dispatchId=idOf(dispatchReceipt,'dispatchId','id');
+  next.sidearms[sidearmId]={id:sidearmId,sourceOperationId:source.id,operator:'architecture.decide',role:'implementation.architecture',allowedFiles,affectedOperations:[...affected],selection:selected,status:'dispatched',taskId,dispatchId,worktree,review:null,integration:null};
+  next.events.push({type:'architecture-sidearm-created',sidearmId,sourceOperationId:source.id,taskId,dispatchId});
+  return next;
+}
+
 function activeWorker(plan,event){
   for(const id of plan.order){const op=plan.operations[id],attempt=op.attempts.at(-1);if(attempt?.taskId===event.taskId&&attempt?.dispatchId===event.dispatchId)return {kind:'operation',operation:op,attempt};}
   for(const conflict of Object.values(plan.conflicts))if(conflict.taskId===event.taskId&&conflict.dispatchId===event.dispatchId)return {kind:'conflict',conflict,worker:{...conflict,operationId:conflict.id}};
+  for(const sidearm of Object.values(plan.sidearms??{}))if(sidearm.taskId===event.taskId&&sidearm.dispatchId===event.dispatchId)return {kind:'sidearm',sidearm,worker:{...sidearm,operationId:sidearm.id}};
   throw Error('worker_done is outside this Orca execution plan');
 }
 
 /** Accept an allowlisted completion and dispatch only newly unblocked ordinary work. */
 export async function acceptOrcaWorkerDone({plan,event,adapter}){
   const next=copy(plan),found=activeWorker(next,event);
+  if(found.kind==='sidearm'){
+    const done=validateWorkerDone(found.worker,event);found.sidearm.status=done.outcome==='succeeded'?'awaiting-review':'failed';found.sidearm.filesModified=done.filesModified;
+    await adapterMethod(adapter,'releaseWorker')({runId:next.runId,taskId:event.taskId,dispatchId:event.dispatchId,outcome:done.outcome});
+    if(done.outcome==='failed')for(const id of found.sidearm.affectedOperations)next.operations[id].status='blocked';
+    return next;
+  }
   if(found.kind==='conflict'){
     const done=validateWorkerDone(found.worker,event);found.conflict.status=done.outcome==='succeeded'?'awaiting-review':'failed';found.conflict.filesModified=done.filesModified;
     await adapterMethod(adapter,'releaseWorker')({runId:next.runId,taskId:event.taskId,dispatchId:event.dispatchId,outcome:done.outcome});
@@ -232,6 +278,24 @@ export async function acceptOrcaWorkerDone({plan,event,adapter}){
   found.attempt.status=done.outcome==='succeeded'?'completed':'failed';found.attempt.filesModified=done.filesModified;
   found.operation.status=found.attempt.status;
   next.events.push({type:'worker-completed',operationId:found.operation.id,outcome:done.outcome});
+  refreshReadiness(next);
+  return dispatchReadyOrcaOperations(next,adapter);
+}
+
+/** Integrate a reviewed SDS-only sidearm and resume only its affected implementation branch. */
+export async function integrateOrcaArchitectureSidearm({plan,sidearmId,decision,adapter}){
+  const next=copy(plan),sidearm=next.sidearms?.[sidearmId];need(sidearm?.status==='awaiting-review','Architecture sidearm result is not ready for review');
+  need(plain(decision)&&decision.review==='accepted'&&decision.integration==='integrate','Coordinator must explicitly accept and integrate the architecture sidearm');
+  need(decision.businessChanged===false&&decision.srsChanged===false&&decision.sourceChanged===false,'Architecture review cannot accept business, SRS or product-source changes');
+  await adapterMethod(adapter,'integrateChange')({runId:next.runId,kind:'architecture-sidearm',sidearmId,taskId:sidearm.taskId,dispatchId:sidearm.dispatchId,worktree:copy(sidearm.worktree),files:copy(sidearm.filesModified),performedBy:'coordinator'});
+  sidearm.status='integrated';sidearm.review={status:'accepted',notes:decision.notes??null};sidearm.integration={status:'integrated',performedBy:'coordinator'};
+  const resume=[];
+  for(const id of sidearm.affectedOperations){
+    const op=next.operations[id];op.sharedDependencies=[...new Set([...op.sharedDependencies,sidearm.taskId])];op.blockedBy=op.blockedBy.filter(value=>value!==sidearmId);
+    if(op.status==='waiting-sidearm'){op.status=op.dependsOn.every(dep=>next.operations[dep].status==='completed')?'ready':'pending';if(op.attempts.length)resume.push(id);}
+  }
+  next.events.push({type:'architecture-sidearm-integrated',sidearmId,syncResumeDependencies:sidearm.affectedOperations.map(operationId=>({operationId,dependsOnTaskId:sidearm.taskId}))});
+  for(const id of resume)if(next.operations[id].status==='ready')await dispatchOperation(next,id,adapter,{resume:true});
   refreshReadiness(next);
   return dispatchReadyOrcaOperations(next,adapter);
 }

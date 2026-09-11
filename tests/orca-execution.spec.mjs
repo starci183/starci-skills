@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   acceptOrcaWorkerDone,
+  createArchitectureSidearm,
   createConflictOwner,
+  integrateOrcaArchitectureSidearm,
   integrateOrcaSharedChange,
   planOrcaExecution,
   startOrcaExecution,
@@ -12,10 +14,10 @@ import {
 const selection=(provider='openai',model='gpt-5.6-sol')=>({provider,model,effort:'high',orcaLaunch:{kind:'managed-agent',agent:'codex'}});
 const request=()=>({
   id:'release-widget',mode:'orchestrated',controlPlane:'orca',operations:[
-    {id:'prepare',spec:'Prepare inputs',dependsOn:[],allowedFiles:['work/prepare/**'],selection:selection()},
-    {id:'backend',spec:'Implement backend',dependsOn:['prepare'],allowedFiles:['services/api/**'],selection:selection()},
-    {id:'frontend',spec:'Implement frontend',dependsOn:['prepare'],allowedFiles:['apps/web/**'],selection:selection('anthropic','claude-opus-4-1')},
-    {id:'backend-review',spec:'Review backend',dependsOn:['backend'],allowedFiles:['reviews/backend.md'],selection:selection()}
+    {id:'prepare',operation:'workspace.manage',spec:'Prepare inputs',dependsOn:[],allowedFiles:['work/prepare/**'],selection:selection()},
+    {id:'backend',operation:'backend.implement',spec:'Implement backend',dependsOn:['prepare'],allowedFiles:['services/api/**'],selection:selection()},
+    {id:'frontend',operation:'interface.implement',spec:'Implement frontend',dependsOn:['prepare'],allowedFiles:['apps/web/**'],selection:selection('anthropic','claude-opus-4-1')},
+    {id:'backend-review',operation:'review.verify',spec:'Review backend',dependsOn:['backend'],allowedFiles:['reviews/backend.md'],selection:selection()}
   ]
 });
 
@@ -113,6 +115,32 @@ test('conflict outcomes are scoped, then coordinator integration creates explici
     {operationId:'backend-review',dependsOnTaskId:conflict.taskId}
   ]);
   assert.equal(plan.operations.frontend.attempts.length,1,'unrelated worker was not restarted');
+});
+
+test('implementation SDS gap creates a separate architecture sidearm and resumes only the affected branch after review',async()=>{
+  const {adapter,calls}=fakeOrca();let plan=await startOrcaExecution({request:request(),adapter});
+  plan=await acceptOrcaWorkerDone({plan,event:done(plan.operations.prepare,'succeeded',['work/prepare/context.yaml']),adapter});
+  const firstBackend=plan.operations.backend.attempts[0],event={type:'secondary_request',reason:'sds-technical-gap',secondaryOp:'architecture.decide',operationId:'backend',taskId:firstBackend.taskId,dispatchId:firstBackend.dispatchId,problem:'Missing recovery result mapping'};
+  const decision={action:'create-architecture-sidearm',allowedFiles:['.starciwork/features/agentos/architecture/sds/contracts/recovery/index.yaml'],businessChanged:false,srsChanged:false,sourceChanged:false};
+  await assert.rejects(()=>createArchitectureSidearm({plan,event,decision:{...decision,businessChanged:true},selection:selection(),adapter}),/cannot change business/);
+  await assert.rejects(()=>createArchitectureSidearm({plan,event,decision:{...decision,allowedFiles:['.starciwork/features/agentos/architecture/**']},selection:selection(),adapter}),/exact architecture index.yaml/);
+  plan=await createArchitectureSidearm({plan,event,decision,selection:selection('openai','gpt-5.6-sol'),adapter});
+  assert.equal(plan.operations.backend.status,'waiting-sidearm');
+  assert.equal(plan.operations['backend-review'].status,'waiting-sidearm');
+  assert.equal(plan.operations.frontend.status,'dispatched');
+  const sidearm=plan.sidearms['architecture-1'];
+  assert.equal(sidearm.operator,'architecture.decide');
+  assert.equal(calls.tasks.at(-1).kind,'secondary-operation');
+  assert.deepEqual(calls.dispatches.at(-1).permissions,{merge:false,rebase:false,cherryPick:false,push:false});
+  plan=await acceptOrcaWorkerDone({plan,adapter,event:{type:'worker_done',taskId:sidearm.taskId,dispatchId:sidearm.dispatchId,operationId:sidearm.id,outcome:'succeeded',filesModified:decision.allowedFiles}});
+  assert.equal(plan.sidearms['architecture-1'].status,'awaiting-review');
+  plan=await integrateOrcaArchitectureSidearm({plan,sidearmId:'architecture-1',decision:{review:'accepted',integration:'integrate',businessChanged:false,srsChanged:false,sourceChanged:false},adapter});
+  assert.equal(plan.sidearms['architecture-1'].status,'integrated');
+  assert.equal(calls.integrations.at(-1).kind,'architecture-sidearm');
+  assert.equal(plan.operations.backend.status,'dispatched');
+  assert.equal(plan.operations.backend.attempts.length,2);
+  assert.ok(calls.tasks.find(task=>task.kind==='resume-operation').deps.includes(sidearm.taskId));
+  assert.equal(plan.operations.frontend.attempts.length,1,'unrelated implementation stays on its original worktree');
 });
 
 test('a failed branch blocks only its dependents, not independent dispatched work',async()=>{

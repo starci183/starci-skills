@@ -278,7 +278,14 @@ steps:
         selected frontend source. Draw is only needed when the request requires a new visual
         decision; do not add a mandatory planning predecessor. Resolve the execution profile and
         actual tool availability before selecting instruments; this does not switch the
-        model/runtime or spawn workers."
+        model/runtime or spawn workers. CALL POINT (discovery, implementation or verification):
+        when an observed source/API/render/test fact proves the accepted SDS technically missing or
+        contradictory while business and SRS stay unchanged, read interface.implement/secondary.json
+        and request its implementation.architecture role. The frontend worker waits and never edits
+        SDS. Orca runs architecture.decide in a separate child worktree; after coordinator
+        review/integration, start a fresh frontend attempt from that SDS revision and rerun affected
+        implementation, render and quality checks. A business/SRS, owner or accepted-scope change
+        is blocked for the user instead."
   - reads:
       - target
       - business

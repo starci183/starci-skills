@@ -4,6 +4,21 @@
 
 The module never invokes a shell or the Orca CLI. Callers inject an Orca adapter, which makes unit tests deterministic and lets the installed runtime translate calls to the version-matched `orca orchestration` commands.
 
+## Approval boundary
+
+Before the first effect, the Coordinator presents one complete workflow/Plan brief and binds the
+actual subsequent user acceptance to its digest. `approvals/policy.json` and
+`starci approval decide <context.yaml>` classify each next action. Worktree creation, worker
+dispatch, bounded edits, tests, retries, technical review/integration, no-effect provider fallback,
+conflict-owner work and SDS sidearms are automatic when they remain inside the accepted action,
+repository and scope ceilings. The Coordinator does not ask again for those procedures.
+
+The decision is `need-user` for a material goal, business/SRS, scope, repository or ownership
+change; an undeclared push/deploy/migration/delete; a missing credential; unresolved business
+alternatives; a reserved checkpoint; a safety block; or partial/unknown effects. Completion is
+reported automatically when the accepted brief delegated technical acceptance and reserved no
+exit checkpoint.
+
 ## Request boundary
 
 The adapter consumes the shared request contract with these orchestration fields:
@@ -70,6 +85,20 @@ The adapter computes affected dependents, stops and supersedes active attempts o
 
 The conflict owner's `worker_done` receives the same exact identity and allowlist validation. A successful result enters `awaiting-review`; it does not silently unblock consumers. `integrateOrcaSharedChange` requires the coordinator's explicit `{review: 'accepted', integration: 'integrate'}` decision, stops superseded affected attempts, and calls the injected coordinator integration method. It then records the conflict Task ID as a `sharedDependency`, emits `syncResumeDependencies`, and creates fresh resume Task/Dispatch attempts from the integrated base. Workers never merge, rebase, cherry-pick, or push to synchronize themselves.
 
+## Implementation architecture sidearm
+
+`backend.implement` and `interface.implement` declare an `implementation.architecture` secondary.
+When observed source, API, render or test facts prove that accepted SDS is technically missing or
+contradictory—and business/SRS remain unchanged—the implementation attempt waits. Orca creates a
+separate `architecture.decide` Task/Dispatch/worktree whose allowlist covers only the selected SDS
+paths. The code worker never edits SDS.
+
+The sidearm may not change product source, business behavior, SRS, ownership or accepted scope and
+may not create another secondary. Its successful result enters architecture review; the Coordinator
+integrates only validated Vietnamese-prose, source-independent SDS. The architecture Task becomes an
+explicit dependency of a fresh implementation attempt, which reruns affected checks. Independent
+branches keep running. A material change is `need-user`, not a sidearm.
+
 This makes shared-change recovery visible in both layers:
 
 1. the Orca conflict-owner Task/Dispatch is durable execution provenance;
@@ -83,5 +112,7 @@ This makes shared-change recovery visible in both layers:
 - `dispatchReadyOrcaOperations(plan, adapter)` — dispatch only ready operations.
 - `validateWorkerDone(worker, event)` — exact identity and write-scope validation.
 - `acceptOrcaWorkerDone({plan, event, adapter})` — settle one operation or conflict-owner attempt.
+- `createArchitectureSidearm({plan, event, decision, selection, adapter})` — pause one implementation branch and create its SDS-only `architecture.decide` worker.
+- `integrateOrcaArchitectureSidearm({plan, sidearmId, decision, adapter})` — integrate reviewed SDS and resume affected implementation from a fresh worktree.
 - `createConflictOwner({plan, event, decision, selection, adapter})` — create the authorized shared-change worker.
 - `integrateOrcaSharedChange({plan, conflictId, decision, adapter})` — record coordinator review/integration and resume affected work from the integrated base.

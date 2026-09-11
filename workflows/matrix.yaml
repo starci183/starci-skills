@@ -25,3 +25,7 @@ semantics:
     flows[] execute in request order inside uat.verify, never as parallel cells.
 secondaryDefinitions: |-
   Each primary operator may define at most three distinct secondary operator types in its own secondary.json, with permissions specific to that caller. Unlisted types cannot be called.
+implementationArchitectureSidearm: |-
+  backend.implement and interface.implement may call architecture.decide in a separate Orca child
+  worktree for a bounded SDS technical correction. The parent waits, never edits SDS, and resumes
+  from the coordinator-integrated design revision. A business/SRS or scope change is not a sidearm.

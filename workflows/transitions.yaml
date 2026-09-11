@@ -9,6 +9,33 @@ gate:
     Every required request criterion must pass with evidence.
   handoff: |-
     Copy accepted outputs into the declared next input fields without rewriting them.
+designCorrection:
+  parents:
+    - backend.implement
+    - interface.implement
+  role: implementation.architecture
+  operator: architecture.decide
+  countsAs: |-
+    A caller-owned secondary inside the same selected implementation cell; never a new business
+    workflow or a second user checkpoint.
+  parentState: waiting
+  worktree: isolated-child
+  authoritySource: |-
+    The selected implementation operator's secondary.json owns the bounded design-correction
+    request. The code worker has no SDS write authority.
+  trigger:
+    - observed implementation or test fact
+    - accepted SDS is technically missing or contradictory
+    - business intent and SRS remain unchanged
+  forbidden:
+    - product source changes by architecture.decide
+    - business or SRS changes
+    - source paths, source symbols or evidence stored in SDS
+    - secondary grandchildren
+  resume: |-
+    Coordinator reviews and integrates the validated SDS correction, binds its Task as a dependency,
+    then creates a fresh affected implementation attempt and reruns affected checks. Unrelated
+    branches continue.
 support:
   parent: interface.implement
   role: interface.backend
