@@ -53,6 +53,7 @@ export function flattenOperationCandidates({operation, registry}) {
       seenTargets.add(target);
       const configured = registry.targets[target];
       if (!plain(configured)) throw Error(`Unknown execution target: ${target}`);
+      if (configured.orcaLaunch?.kind !== 'managed-agent') throw Error(`Automatic operation target must be a supervised managed agent: ${target}`);
       const targetEnvironment = canonicalEnvironment(registry, configured.runtime);
       if (targetEnvironment !== environment) throw Error(`Execution target ${target} does not belong to environment ${environment}`);
       if (!text(configured.profile) || !(configured.requestedModel === null || text(configured.requestedModel))) throw Error(`Execution target ${target} has invalid profile or requestedModel`);

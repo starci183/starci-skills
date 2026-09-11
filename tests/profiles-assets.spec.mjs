@@ -54,6 +54,7 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.deepEqual(resolveExecutionChain({op:'backend.implement'}).candidates.map(x=>x.target),['qwen-qwen3.8-flash-worker','codex-gpt-5.6-sol']);
   assert.deepEqual(resolveExecutionChain({op:'backend.implement'}).candidates[0].orcaLaunch,qwenLaunch);
   assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates[0].orcaLaunch,qwenLaunch);
+  assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates.map(x=>x.target),['qwen-qwen3.8-flash-reviewer','codex-gpt-5.6-sol-reviewer']);
   assert.deepEqual(registry.skills.starci.chains.working,['qwen-qwen3.8-flash-worker','codex-gpt-5.6-sol']);
   assert.deepEqual(registry.skills.starci.chains.reasoning,['codex-gpt-6-astra-reviewer','claude-fable-5.1']);
 });
@@ -87,13 +88,7 @@ test('Qwen Flash executes and reviews, Sol draws, while Astra and Fable own stra
   assert.deepEqual(uat[0].orcaLaunch,qwenLaunch);
   assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['codex-gpt-6-astra-reviewer','claude-fable-5.1']);
   assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['codex-gpt-6-astra-reviewer','claude-fable-5.1']);
-  for(const candidate of [...backend,...review].filter(candidate=>candidate.orcaLaunch.kind==='command-terminal')){
-    assert.match(candidate.orcaLaunch.command,/--exclude-tools agent/);
-    assert.match(candidate.orcaLaunch.command,/--max-session-turns \d+/);
-    assert.match(candidate.orcaLaunch.command,/--max-wall-time \d+m/);
-    assert.match(candidate.orcaLaunch.command,/--max-tool-calls \d+/);
-    assert.match(candidate.orcaLaunch.command,/--chat-recording false/);
-  }
+  assert.ok([...backend,...review].every(candidate=>candidate.orcaLaunch.kind==='managed-agent'));
 });
 const pending=()=>({reviewedDrawIds:['draw-1'],items:[{id:'hero',drawIds:['draw-1'],usage:'Decorative hero artwork',requiredForFlow:false,status:'deferred',sourcePath:null,artifact:null,provenance:'Claude profile has no image generator; inspected existing repository assets first.',brief:{prompt:'Create the approved abstract hero illustration',width:1200,height:800,format:'webp',placement:'Hero right column',placeholder:'blank-reserved-slot'}}]});
 test('deferred artwork needs exact draw coverage, a real brief and no fabricated file or functional acceptance',()=>{

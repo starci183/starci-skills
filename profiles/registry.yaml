@@ -219,9 +219,10 @@ operators:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
   review.verify:
     skill: starci
-    chain: [qwen-qwen3.8-flash-reviewer, qwen-deepseek-v4-pro-reviewer]
+    chain: [qwen-qwen3.8-flash-reviewer, codex-gpt-5.6-sol-reviewer]
     environments:
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-reviewer, qwen-deepseek-v4-pro-reviewer]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-reviewer]}
+      - {environment: codex, profiles: [codex-gpt-5.6-sol-reviewer]}
   runtime.operate:
     skill: starci
     chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
@@ -279,10 +280,10 @@ costPolicy: |-
   Qwen 3.8 Flash is the default execution and independent-review target, including backend,
   frontend and UAT. Codex gpt-5.6-sol remains first only for interface.draw. Strategy and analysis
   operations business.decide and architecture.decide use Codex gpt-6-astra first and Claude Fable 5.1
-  second. Automatic chains contain two candidates: execution falls back to gpt-5.6-sol, independent
-  review falls back to DeepSeek V4 Pro, and drawing falls back to Qwen 3.8 Flash. Qwen 3.8 Max and
-  Claude Opus remain installed explicit or user-approved exception targets but are excluded from
-  automatic chains. Command-terminal agents disable nested agents and have explicit turn, wall-time
+  second. Automatic chains contain two native managed-agent candidates: execution and independent
+  review fall back to gpt-5.6-sol, while drawing falls back to Qwen 3.8 Flash. DeepSeek V4 Pro,
+  Qwen 3.8 Max and Claude Opus remain installed explicit or user-approved exception targets but are
+  excluded from automatic chains. Command-terminal agents disable nested agents and have explicit turn, wall-time
   and tool-call ceilings; a ceiling stop is a failed attempt and never proof of completion. Never infer
   price or quality superiority from a subscription label; benchmark bounded representative
   operations before proposing another routing change. A native Qwen worker is released after its

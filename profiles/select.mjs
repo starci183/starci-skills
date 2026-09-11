@@ -35,7 +35,7 @@ export function resolveExecutionChain({skill='starci',op}){
     if(!plain(route))throw Error('Unknown execution target');
     const runtime=normalizeRuntime(route.runtime),profiles=runtimes[runtime]?.profiles,selected=profiles?.[route.profile];
     if(!selected||selected.role!==role)throw Error('Execution target role mismatch');
-    if(!plain(route.orcaLaunch)||!['managed-agent','command-terminal'].includes(route.orcaLaunch.kind))throw Error('Invalid Orca launch strategy');
+    if(!plain(route.orcaLaunch)||route.orcaLaunch.kind!=='managed-agent')throw Error('Automatic Orca chains require supervised managed agents');
     return {priority,target,runtime,provider:runtimes[runtime].provider,profile:route.profile,role,model:selected.model,orcaLaunch:structuredClone(route.orcaLaunch)};
   });
   return {schema:'starci/execution-chain@1',skill,op,role,candidates};

@@ -26,8 +26,15 @@ test('resolver preserves each exact operator chain and its environment metadata'
   ]);
   const review = flattenOperationCandidates({operation: 'review.verify', registry});
   assert.deepEqual(review.map(value => value.target), [
-    'qwen-qwen3.8-flash-reviewer', 'qwen-deepseek-v4-pro-reviewer'
+    'qwen-qwen3.8-flash-reviewer', 'codex-gpt-5.6-sol-reviewer'
   ]);
+});
+
+test('automatic Orca chains reject command-terminal targets', () => {
+  const invalid = structuredClone(registry);
+  invalid.operators['review.verify'].chain[1] = 'qwen-deepseek-v4-pro-reviewer';
+  invalid.operators['review.verify'].environments = [{environment:'qwen',profiles:['qwen-qwen3.8-flash-reviewer','qwen-deepseek-v4-pro-reviewer']}];
+  assert.throws(() => flattenOperationCandidates({operation:'review.verify',registry:invalid}), /supervised managed agent/);
 });
 
 test('resolver selects deterministically and preserves unavailable observations', () => {
