@@ -91,7 +91,7 @@ workerLifecycle:
     workflowWorktree: "[Workflow] <Workflow>"
     workflowManager: "[Coordinator] <Workflow>"
     operationAgent: "[Op] <operation> - <scope>"
-    applyAgentNameWith: terminal-create-and-rename-after-attach
+    applyAgentNameWith: task-display-name-and-terminal-rename-after-start
   coordinator:
     lifetime: parent-run
     host: orca-main-worktree
@@ -113,14 +113,35 @@ workerLifecycle:
     isolation: one-operation-one-agent
     release: after-accepted-worker_done
     reuse: forbidden
+    dispatchAdmission:
+      required:
+        - expected-operation-from-active-dag-node
+        - exact-operation-contract
+        - resolved-provider-selection
+        - canonical-display-name
+      providerProof: worker-show-exact-effective-agent-model
+      effectAcceptance: only-after-provider-proof
+      onOperationMismatch: fence-reconcile-release-and-dispatch-expected-operation
+      onProviderMismatch: fence-reconcile-release-and-retry-resolved-target
+    architectureSidearm:
+      onlyTrigger: active-implementation-secondary_request
+      requiredReason: sds-technical-gap
+      requiredSecondaryOp: architecture.decide
+      requiredAuthority: explicit-bounded-sds-allowlist
+      forbiddenTriggers:
+        - review-finding
+        - review-suggestion
+        - unanswered-design-question
+        - inferred-sds-gap
     qwenLaunch:
       agent: qwen-code
-      command: qwen --exclude-tools agent
-      create: prewarm-native-terminal
-      readiness: tui-idle
-      supervise: worker-start-by-terminal-handle
+      model: qwen3.8-flash
+      modelAuthority: verified-qwen-runtime-configuration
+      create: direct-native-worker-start
+      readiness: supervised-worker-receipt
+      supervise: worker-start-by-agent-id
       promptDelivery: supervised-worker-start-only
-      directAgentStart: forbidden-until-adapter-ack-compatible
+      terminalCommand: forbidden
       nestedAgents: forbidden
     nativeLaunchFailure:
       recognizedFailures:
@@ -205,3 +226,7 @@ forbidden:
   - restart-healthy-workflow
   - coordinator-implements-worker-scope
   - user-report-on-unchanged-state
+  - dispatch-operation-not-selected-by-active-dag-node
+  - accept-effect-before-provider-attestation
+  - dispatch-operation-to-existing-terminal
+  - infer-architecture-sidearm-from-review

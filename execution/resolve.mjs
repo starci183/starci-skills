@@ -13,13 +13,13 @@ function validateRegistry(registry) {
   if (!plain(registry.targets) || !plain(registry.operators) || !plain(registry.fallback)) throw Error('Profile registry targets, operators and fallback are required');
   const solo = registry.executionModes?.solo, orchestrated = registry.executionModes?.orchestrated;
   if (solo?.controlPlane !== 'current-chat-session'
-    || solo?.operationAgent !== 'inline-background-agent'
+    || solo?.operationAgent !== 'isolated-background-agent'
     || solo?.maxConcurrentOperationAgents !== 3
     || solo?.isolation !== 'isolated-per-operation'
     || solo?.fanOutWithinOperation !== 'forbidden'
     || orchestrated?.controlPlane !== 'orca'
     || orchestrated?.workflowWrapperAgent !== 'persistent-native-manager-agent-in-child-worktree'
-    || orchestrated?.operationAgent !== 'workflow-inline-subagent'
+    || orchestrated?.operationAgent !== 'supervised-native-agent-in-workflow-worktree'
     || orchestrated?.maxConcurrentOperationAgents !== 3
     || orchestrated?.worktree !== 'isolated-child-per-workflow-attempt'
     || orchestrated?.isolation !== 'isolated-per-operation'

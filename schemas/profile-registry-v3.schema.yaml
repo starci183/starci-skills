@@ -26,7 +26,7 @@ properties:
           hosts:
             const: [codex, claude, orca]
           controlPlane: {const: current-chat-session}
-          operationAgent: {const: inline-background-agent}
+          operationAgent: {const: isolated-background-agent}
           maxConcurrentOperationAgents: {const: 3}
           isolation: {const: isolated-per-operation}
           worktree: {const: current-session-worktree}
@@ -49,7 +49,7 @@ properties:
           workflowManagerReportsTo: {const: parent-coordinator}
           workflowManagerExecutionPolicy: {const: decision-dispatch-wait-only}
           higherLayerSubstitution: {const: forbidden}
-          operationAgent: {const: workflow-inline-subagent}
+          operationAgent: {const: supervised-native-agent-in-workflow-worktree}
           maxConcurrentOperationAgents: {const: 3}
           isolation: {const: isolated-per-operation}
           worktree: {const: isolated-child-per-workflow-attempt}
@@ -138,13 +138,12 @@ $defs:
             properties:
               kind: {const: managed-agent}
               agent: {type: string, minLength: 1}
-              command: {type: string, minLength: 1}
               startup:
-                enum: [prewarm-terminal-then-worker-start-by-handle]
-              readiness:
-                enum: [tui-idle]
+                enum: [direct-native-worker-start]
+              modelAuthority:
+                enum: [verified-qwen-runtime-configuration]
               supervision:
-                enum: [worker-start-terminal]
+                enum: [worker-start-agent]
           - type: object
             additionalProperties: false
             required: [kind, command, dispatch]

@@ -1,6 +1,6 @@
 import {canonicalJSON,sha256} from '../core/index.mjs';
 import {readDistJson} from '../core/runtime-root.mjs';
-import {loadProviderContract,requireProviderContracts} from '../providers/validate.mjs';
+import {requireProviderContracts} from '../providers/validate.mjs';
 
 const POLICY_SCHEMA='starci/orchestration-supervision@1';
 const STATE_SCHEMA='starci/orchestration-supervision-state@1';
@@ -29,28 +29,63 @@ export function planOperationAgentLaunch({taskId,worktree,selection,operation,sc
   const task=text(taskId,'operation Task ID'),target=text(worktree,'workflow worktree selector');
   need(plain(selection?.orcaLaunch),'Missing Orca launch selection');
   const displayName=formatOrcaDisplayName('operation-agent',{operation,scope});
-  if(selection.orcaLaunch.kind==='managed-agent'&&selection.orcaLaunch.agent==='qwen-code'){
-    const qwen=loadProviderContract('orca').adapters.qwen;
-    need(selection.orcaLaunch.command===qwen.launchCommand,'Resolved Qwen launch does not match the provider adapter');
-    return {
-    schema:'starci/orca-operation-launch@1',mode:'prewarm-and-attach',displayName,
-    steps:[
-      {command:'terminal-create',args:{worktree:target,title:displayName,command:text(qwen.launchCommand,'Qwen launch command')},save:'terminalHandle'},
-      {command:'terminal-wait',args:{terminal:'$terminalHandle',for:'tui-idle'}},
-      {command:'worker-start',args:{task,terminal:'$terminalHandle'}},
-      {command:'terminal-rename',args:{terminal:'$terminalHandle',title:displayName}}
-    ],
-    forbidden:['dispatch-inject','dispatch-return-preamble','manual-terminal-prompt','unsupervised-retain']
-  };
-  }
   need(selection.orcaLaunch.kind==='managed-agent','Operation launch must use a supervised managed agent');
+  const workerArgs={task,worktree:target,agent:text(selection.orcaLaunch.agent,'Orca agent ID')};
+  const qwen=workerArgs.agent==='qwen-code';
+  if(qwen){
+    need(selection.model==='qwen3.8-flash','Native qwen-code must resolve to Qwen 3.8 Flash');
+    need(selection.orcaLaunch.startup==='direct-native-worker-start','Qwen must use direct native worker-start');
+  }else if(selection.model!==null&&selection.model!==undefined)workerArgs.model=text(selection.model,'resolved provider model');
+  if(!qwen&&selection.effort!==null&&selection.effort!==undefined){
+    need(workerArgs.model,'Orca effort requires an explicit provider model');
+    workerArgs.effort=text(selection.effort,'resolved provider effort');
+  }
   return {
     schema:'starci/orca-operation-launch@1',mode:'native-worker-start',displayName,
     steps:[
-      {command:'worker-start',args:{task,worktree:target,agent:text(selection.orcaLaunch.agent,'Orca agent ID')}},
+      {command:'worker-start',args:workerArgs},
       {command:'terminal-rename',args:{terminal:'$workerTerminalHandle',title:displayName}}
     ],
-    forbidden:['manual-terminal-prompt','unsupervised-retain']
+    forbidden:['manual-terminal-prompt','unsupervised-retain','terminal-create-provider-command','worker-start-by-terminal-handle']
+  };
+}
+
+function startOptions(worker){
+  if(plain(worker?.startOptions))return worker.startOptions;
+  if(typeof worker?.start_options==='string'){
+    try{return JSON.parse(worker.start_options);}catch{throw Error('Worker receipt start_options is not valid JSON');}
+  }
+  throw Error('Worker receipt is missing startOptions');
+}
+
+/**
+ * Verify the exact Orca worker receipt against the resolver output before accepting any
+ * operation effect. A mismatch fences the attempt; it never authorizes a fallback.
+ */
+export function attestOperationWorker({taskId,operation,scope,selection,taskRecord,workerShow}){
+  requireProviderContracts();
+  const task=text(taskId,'operation Task ID');
+  const displayName=formatOrcaDisplayName('operation-agent',{operation,scope});
+  need(plain(selection)&&plain(selection.orcaLaunch),'Missing resolved operation selection');
+  need(plain(taskRecord)&&taskRecord.id===task,'Missing exact operation Task record');
+  need(taskRecord.display_name===displayName,`Operation Task name mismatch: expected ${displayName}, received ${taskRecord.display_name??'unknown'}`);
+  const result=plain(workerShow?.result)?workerShow.result:workerShow;
+  need(plain(result?.dispatch)&&plain(result?.worker)&&plain(result?.observation),'Invalid worker-show receipt');
+  need(result.dispatch.task_id===task,'Worker receipt belongs to another Task');
+  need(result.observation.exactWorker===true,'Worker receipt is not the exact active worker');
+  need(['ready','running'].includes(result.worker.state),'Worker is not ready for provider attestation');
+  const options=startOptions(result.worker),effective=options?.launch?.effective;
+  need(plain(effective),'Worker receipt is missing effective provider identity');
+  const expectedAgent=text(selection.orcaLaunch.agent,'resolved Orca agent ID');
+  need(effective.agent===expectedAgent,`Provider mismatch: expected agent ${expectedAgent}, received ${effective.agent??'unknown'}`);
+  const expectedModel=selection.model??selection.requestedModel??null;
+  if(expectedModel!==null)need(effective.model===expectedModel,`Provider mismatch: expected model ${expectedModel}, received ${effective.model??'unknown'}`);
+  need(typeof result.worker.agent_terminal_handle==='string'&&result.worker.agent_terminal_handle,'Worker receipt is missing the agent terminal handle');
+  need(result.terminal?.title===displayName,`Operation terminal name mismatch: expected ${displayName}, received ${result.terminal?.title??'unknown'}`);
+  return {
+    schema:'starci/orca-operation-provider-attestation@1',ok:true,taskId:task,
+    dispatchId:result.dispatch.id,terminalHandle:result.worker.agent_terminal_handle,
+    displayName,target:selection.target??null,agent:effective.agent,model:effective.model??null
   };
 }
 
@@ -67,9 +102,12 @@ export function validateSupervisionPolicy(policy){
   const operationAgent=policy?.workerLifecycle?.operationAgent;
   const names=policy?.workerLifecycle?.displayNames;
   const qwenLaunch=operationAgent?.qwenLaunch,nativeFailure=operationAgent?.nativeLaunchFailure;
-  if(names?.coordinator!=='[Coordinator] <Plan>'||names?.workflowWorktree!=='[Workflow] <Workflow>'||names?.workflowManager!=='[Coordinator] <Workflow>'||names?.operationAgent!=='[Op] <operation> - <scope>'||names?.applyAgentNameWith!=='terminal-create-and-rename-after-attach')errors.push('Orca display naming contract is invalid');
+  if(names?.coordinator!=='[Coordinator] <Plan>'||names?.workflowWorktree!=='[Workflow] <Workflow>'||names?.workflowManager!=='[Coordinator] <Workflow>'||names?.operationAgent!=='[Op] <operation> - <scope>'||names?.applyAgentNameWith!=='task-display-name-and-terminal-rename-after-start')errors.push('Orca display naming contract is invalid');
   if(operationAgent?.lifetime!=='operation-attempt'||operationAgent?.launch!=='supervised-native-agent'||operationAgent?.isolation!=='one-operation-one-agent'||operationAgent?.release!=='after-accepted-worker_done'||operationAgent?.reuse!=='forbidden')errors.push('Operation agent lifecycle is invalid');
-  if(qwenLaunch?.agent!=='qwen-code'||qwenLaunch?.command!=='qwen --exclude-tools agent'||qwenLaunch?.create!=='prewarm-native-terminal'||qwenLaunch?.readiness!=='tui-idle'||qwenLaunch?.supervise!=='worker-start-by-terminal-handle'||qwenLaunch?.promptDelivery!=='supervised-worker-start-only'||qwenLaunch?.directAgentStart!=='forbidden-until-adapter-ack-compatible'||qwenLaunch?.nestedAgents!=='forbidden')errors.push('Qwen supervised launch is invalid');
+  const admission=operationAgent?.dispatchAdmission,sidearm=operationAgent?.architectureSidearm;
+  if(!uniqueStrings(admission?.required)||!['expected-operation-from-active-dag-node','exact-operation-contract','resolved-provider-selection','canonical-display-name'].every(rule=>admission.required.includes(rule))||admission?.providerProof!=='worker-show-exact-effective-agent-model'||admission?.effectAcceptance!=='only-after-provider-proof'||admission?.onOperationMismatch!=='fence-reconcile-release-and-dispatch-expected-operation'||admission?.onProviderMismatch!=='fence-reconcile-release-and-retry-resolved-target')errors.push('Operation dispatch admission is invalid');
+  if(sidearm?.onlyTrigger!=='active-implementation-secondary_request'||sidearm?.requiredReason!=='sds-technical-gap'||sidearm?.requiredSecondaryOp!=='architecture.decide'||sidearm?.requiredAuthority!=='explicit-bounded-sds-allowlist'||!uniqueStrings(sidearm?.forbiddenTriggers)||!['review-finding','review-suggestion','unanswered-design-question','inferred-sds-gap'].every(rule=>sidearm.forbiddenTriggers.includes(rule)))errors.push('Architecture sidearm admission is invalid');
+  if(qwenLaunch?.agent!=='qwen-code'||qwenLaunch?.model!=='qwen3.8-flash'||qwenLaunch?.modelAuthority!=='verified-qwen-runtime-configuration'||qwenLaunch?.create!=='direct-native-worker-start'||qwenLaunch?.readiness!=='supervised-worker-receipt'||qwenLaunch?.supervise!=='worker-start-by-agent-id'||qwenLaunch?.promptDelivery!=='supervised-worker-start-only'||qwenLaunch?.terminalCommand!=='forbidden'||qwenLaunch?.nestedAgents!=='forbidden')errors.push('Qwen supervised launch is invalid');
   if(!uniqueStrings(nativeFailure?.recognizedFailures)||!['agent_prompt_stalled','session_not_reported'].every(reason=>nativeFailure.recognizedFailures.includes(reason))||nativeFailure?.action!=='fence-and-reconcile-exact-attempt'||nativeFailure?.nextCandidate!=='only-after-verified-no-effects'||nativeFailure?.unsupervisedFallback!=='forbidden'||nativeFailure?.release!=='release-or-retain-from-worker-receipt'||nativeFailure?.duplicateSubmit!=='forbidden')errors.push('Native operation failure policy is invalid');
   const routing=policy?.routing;
   if(routing?.operationToWorkflow?.recipient!=='workflow-manager'||!uniqueStrings(routing?.operationToWorkflow?.events)||!['question','escalation','heartbeat','worker_done','worker_failed'].every(event=>routing.operationToWorkflow.events.includes(event)))errors.push('Operation events must route to the Workflow Manager');
@@ -91,7 +129,7 @@ export function validateSupervisionPolicy(policy){
   if(!uniqueStrings(required)||!['messageId','deliveryId','runId','workflowTaskId','dispatchId','attempt','eventType','emittedAt'].every(field=>required.includes(field)))errors.push('Message identity fields are incomplete');
   if(policy?.messages?.deduplicateBy!=='messageId'||policy?.messages?.acknowledgeAfter!=='successful-processing'||policy?.messages?.changedRedelivery!=='reject')errors.push('Message delivery semantics are invalid');
   for(const event of BOUNDARY_EVENTS)if(!plain(policy?.transitions?.[event])||typeof policy.transitions[event].action!=='string'||typeof policy.transitions[event].next!=='string')errors.push(`Missing transition ${event}`);
-  if(!uniqueStrings(policy?.forbidden)||!['external-bootstrap-retains-coordinator-loop','shell-only-main-without-coordinator-agent','workflow-child-without-manager-agent','operation-agent-acts-as-workflow-manager','operation-agent-creates-nested-agent','operation-agent-messages-parent-coordinator-directly','parent-coordinator-controls-operation-directly','workflow-manager-implements-operation','workflow-manager-runs-operation-tests','coordinator-performs-workflow-local-work','higher-manager-performs-lower-layer-work','periodic-terminal-poll','periodic-log-read','periodic-diff-read','progress-prompt','restart-healthy-workflow','coordinator-implements-worker-scope','user-report-on-unchanged-state'].every(rule=>policy.forbidden.includes(rule)))errors.push('Coordinator anti-polling and layer-ownership invariants are incomplete');
+  if(!uniqueStrings(policy?.forbidden)||!['external-bootstrap-retains-coordinator-loop','shell-only-main-without-coordinator-agent','workflow-child-without-manager-agent','operation-agent-acts-as-workflow-manager','operation-agent-creates-nested-agent','operation-agent-messages-parent-coordinator-directly','parent-coordinator-controls-operation-directly','workflow-manager-implements-operation','workflow-manager-runs-operation-tests','coordinator-performs-workflow-local-work','higher-manager-performs-lower-layer-work','periodic-terminal-poll','periodic-log-read','periodic-diff-read','progress-prompt','restart-healthy-workflow','coordinator-implements-worker-scope','user-report-on-unchanged-state','dispatch-operation-not-selected-by-active-dag-node','accept-effect-before-provider-attestation','dispatch-operation-to-existing-terminal','infer-architecture-sidearm-from-review'].every(rule=>policy.forbidden.includes(rule)))errors.push('Coordinator anti-polling and layer-ownership invariants are incomplete');
   return {ok:errors.length===0,errors};
 }
 

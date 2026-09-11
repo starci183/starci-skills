@@ -1,4 +1,4 @@
-import {formatOrcaDisplayName,planOperationAgentLaunch} from './supervision.mjs';
+import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} from './supervision.mjs';
 
 const PLAN_SCHEMA='starci/orca-execution-plan@1';
 const TERMINAL=new Set(['completed','failed','blocked']);
@@ -133,6 +133,18 @@ export function planOrcaExecution(request){
 }
 
 function adapterMethod(adapter,name){need(plain(adapter)&&typeof adapter[name]==='function',`Orca adapter method ${name} is required`);return adapter[name].bind(adapter);}
+function taskRecordOf(receipt,taskId){
+  const record=receipt?.taskRecord??receipt?.task??receipt?.result?.task;
+  need(plain(record)&&record.id===taskId,'Orca task-create receipt is missing the exact Task record');
+  return record;
+}
+async function attestDispatch({adapter,taskReceipt,taskId,dispatchId,operation,scope,selection}){
+  const workerShow=await adapterMethod(adapter,'showWorker')({dispatchId,taskId});
+  return attestOperationWorker({
+    taskId,operation,scope,selection,
+    taskRecord:taskRecordOf(taskReceipt,taskId),workerShow
+  });
+}
 function operationTaskDeps(plan,operation){
   const ids=[];
   for(const dep of operation.dependsOn){
@@ -161,15 +173,15 @@ async function dispatchOperation(plan,operationId,adapter,{resume=false}={}){
   const operation=plan.operations[operationId],attemptNumber=operation.attempts.length+1;
   const input=operationInputEnvelope(plan,operation);operation.input=copy(input);
   const createTask=adapterMethod(adapter,'createTask'),dispatchWorker=adapterMethod(adapter,'dispatchWorker');
+  const operationName=operation.operator??operationId;
+  const displayName=formatOrcaDisplayName('operation-agent',{operation:operationName,scope:plan.workflowId});
   const taskReceipt=await createTask({
     runId:plan.runId,kind:resume?'resume-operation-subagent':'operation-subagent',parentTaskId:plan.workflow.taskId,operationId,
-    title:`${resume?'Resume ':'Operation '}${operationId}`,spec:`${operation.spec}\n${workerPrompt(operation,{resume})}`,
+    title:`${resume?'Resume ':'Operation '}${operationId}`,displayName,spec:`${operation.spec}\n${workerPrompt(operation,{resume})}`,
     deps:operationTaskDeps(plan,operation),allowedFiles:copy(operation.allowedFiles),selection:copy(operation.selection),input:copy(input)
   });
   const taskId=idOf(taskReceipt,'taskId','id');
   const worktree=existingWorkflowWorktree(plan);
-  const operationName=operation.operator??operationId;
-  const displayName=formatOrcaDisplayName('operation-agent',{operation:operationName,scope:plan.workflowId});
   const launchPlan=planOperationAgentLaunch({taskId,worktree:`path:${worktree.id}`,selection:operation.selection,operation:operationName,scope:plan.workflowId});
   const dispatchReceipt=await dispatchWorker({
     runId:plan.runId,taskId,operationId,parentTaskId:plan.workflow.taskId,parentDispatchId:plan.workflow.dispatchId,
@@ -177,7 +189,8 @@ async function dispatchOperation(plan,operationId,adapter,{resume=false}={}){
     prompt:workerPrompt(operation,{resume}),input:copy(input),permissions:{merge:false,rebase:false,cherryPick:false,push:false}
   });
   const dispatchId=idOf(dispatchReceipt,'dispatchId','id');
-  operation.attempts.push({taskId,dispatchId,attempt:attemptNumber,worktree,allowedFiles:copy(operation.allowedFiles),status:'dispatched'});
+  const providerAttestation=await attestDispatch({adapter,taskReceipt,taskId,dispatchId,operation:operationName,scope:plan.workflowId,selection:operation.selection});
+  operation.attempts.push({taskId,dispatchId,attempt:attemptNumber,worktree,allowedFiles:copy(operation.allowedFiles),status:'dispatched',providerAttestation});
   operation.status='dispatched';operation.blockedBy=[];
 }
 
@@ -258,11 +271,14 @@ export async function createConflictOwner({plan,event,decision,selection:ownerSe
   }
   const selected=validateSelection(ownerSelection,conflictId),createTask=adapterMethod(adapter,'createTask'),dispatchWorker=adapterMethod(adapter,'dispatchWorker');
   const upstream=source.dependsOn.map(id=>next.operations[id].attempts.at(-1)?.taskId).filter(Boolean);
-  const taskReceipt=await createTask({runId:next.runId,kind:'conflict-owner-subagent',parentTaskId:next.workflow.taskId,title:`Shared change owner: ${sharedFiles.join(', ')}`,spec:decision.spec??`Implement the authorized shared change in ${sharedFiles.join(', ')}`,deps:upstream,allowedFiles:ownerFiles,selection:selected});
+  const operationName='conflict.resolve',displayName=formatOrcaDisplayName('operation-agent',{operation:operationName,scope:next.workflowId});
+  const taskReceipt=await createTask({runId:next.runId,kind:'conflict-owner-subagent',parentTaskId:next.workflow.taskId,title:`Shared change owner: ${sharedFiles.join(', ')}`,displayName,spec:decision.spec??`Implement the authorized shared change in ${sharedFiles.join(', ')}`,deps:upstream,allowedFiles:ownerFiles,selection:selected});
   const taskId=idOf(taskReceipt,'taskId','id'),worktree=existingWorkflowWorktree(next);
-  const dispatchReceipt=await dispatchWorker({runId:next.runId,taskId,conflictId,parentTaskId:next.workflow.taskId,parentDispatchId:next.workflow.dispatchId,role:'operation-subagent',agent:{kind:'isolated-subagent',operationId:conflictId},worktree,selection:selected,prompt:`Implement only the coordinator-authorized shared change: ${sharedFiles.join(', ')}. Do not create a worktree; do not merge, rebase, cherry-pick, or push.`,permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
+  const launchPlan=planOperationAgentLaunch({taskId,worktree:`path:${worktree.id}`,selection:selected,operation:operationName,scope:next.workflowId});
+  const dispatchReceipt=await dispatchWorker({runId:next.runId,taskId,conflictId,parentTaskId:next.workflow.taskId,parentDispatchId:next.workflow.dispatchId,role:'operation-subagent',agent:{kind:'isolated-subagent',operationId:conflictId},displayName,launchPlan,worktree,selection:selected,prompt:`Implement only the coordinator-authorized shared change: ${sharedFiles.join(', ')}. Do not create a worktree; do not merge, rebase, cherry-pick, or push.`,permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
   const dispatchId=idOf(dispatchReceipt,'dispatchId','id');
-  next.conflicts[conflictId]={id:conflictId,sourceOperationId:source.id,sharedFiles,allowedFiles:ownerFiles,affectedOperations:[...affected],selection:selected,status:'dispatched',taskId,dispatchId,worktree,review:null,integration:null};
+  const providerAttestation=await attestDispatch({adapter,taskReceipt,taskId,dispatchId,operation:operationName,scope:next.workflowId,selection:selected});
+  next.conflicts[conflictId]={id:conflictId,sourceOperationId:source.id,sharedFiles,allowedFiles:ownerFiles,affectedOperations:[...affected],selection:selected,status:'dispatched',taskId,dispatchId,worktree,providerAttestation,review:null,integration:null};
   next.events.push({type:'conflict-owner-created',conflictId,taskId,dispatchId});
   return next;
 }
@@ -295,12 +311,15 @@ export async function createArchitectureSidearm({plan,event,decision,selection:a
   }
   const selected=validateSelection(architectureSelection,sidearmId),createTask=adapterMethod(adapter,'createTask'),dispatchWorker=adapterMethod(adapter,'dispatchWorker');
   const upstream=source.dependsOn.map(id=>next.operations[id].attempts.at(-1)?.taskId).filter(Boolean);
-  const taskReceipt=await createTask({runId:next.runId,kind:'secondary-operation-subagent',role:'implementation.architecture',operator:'architecture.decide',parentTaskId:next.workflow.taskId,title:`Architecture sidearm for ${source.id}`,spec:decision.spec??event.problem??'Correct the selected SDS technical gap without changing business or SRS.',deps:upstream,allowedFiles,selection:selected});
+  const displayName=formatOrcaDisplayName('operation-agent',{operation:'architecture.decide',scope:next.workflowId});
+  const taskReceipt=await createTask({runId:next.runId,kind:'secondary-operation-subagent',role:'implementation.architecture',operator:'architecture.decide',parentTaskId:next.workflow.taskId,title:`Architecture sidearm for ${source.id}`,displayName,spec:decision.spec??event.problem??'Correct the selected SDS technical gap without changing business or SRS.',deps:upstream,allowedFiles,selection:selected});
   const taskId=idOf(taskReceipt,'taskId','id'),worktree=existingWorkflowWorktree(next);
   const prompt='Run architecture.decide as one isolated operation subagent in the existing workflow worktree for only the selected SDS index.yaml files. Preserve business and SRS, write all canonical SDS content in English, store no source paths/symbols/evidence, edit no product source, call no secondary, create no worktree, and do not merge, rebase, cherry-pick, or push.';
-  const dispatchReceipt=await dispatchWorker({runId:next.runId,taskId,sidearmId,operator:'architecture.decide',parentTaskId:next.workflow.taskId,parentDispatchId:next.workflow.dispatchId,role:'operation-subagent',agent:{kind:'isolated-subagent',operationId:sidearmId},worktree,selection:selected,prompt,permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
+  const launchPlan=planOperationAgentLaunch({taskId,worktree:`path:${worktree.id}`,selection:selected,operation:'architecture.decide',scope:next.workflowId});
+  const dispatchReceipt=await dispatchWorker({runId:next.runId,taskId,sidearmId,operator:'architecture.decide',parentTaskId:next.workflow.taskId,parentDispatchId:next.workflow.dispatchId,role:'operation-subagent',agent:{kind:'isolated-subagent',operationId:sidearmId},displayName,launchPlan,worktree,selection:selected,prompt,permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
   const dispatchId=idOf(dispatchReceipt,'dispatchId','id');
-  next.sidearms[sidearmId]={id:sidearmId,sourceOperationId:source.id,operator:'architecture.decide',role:'implementation.architecture',allowedFiles,affectedOperations:[...affected],selection:selected,status:'dispatched',taskId,dispatchId,worktree,review:null,integration:null};
+  const providerAttestation=await attestDispatch({adapter,taskReceipt,taskId,dispatchId,operation:'architecture.decide',scope:next.workflowId,selection:selected});
+  next.sidearms[sidearmId]={id:sidearmId,sourceOperationId:source.id,operator:'architecture.decide',role:'implementation.architecture',allowedFiles,affectedOperations:[...affected],selection:selected,status:'dispatched',taskId,dispatchId,worktree,providerAttestation,review:null,integration:null};
   next.events.push({type:'architecture-sidearm-created',sidearmId,sourceOperationId:source.id,taskId,dispatchId});
   return next;
 }

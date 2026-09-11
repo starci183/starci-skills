@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   acknowledgeSupervisionDelivery,
   assessSupervisionLiveness,
+  attestOperationWorker,
   createSupervisionState,
   formatOrcaDisplayName,
   loadSupervisionPolicy,
@@ -60,13 +61,21 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.equal(policy.waitHierarchy.coordinator.operationExecution,'forbidden');
   assert.equal(policy.workerLifecycle.displayNames.workflowManager,'[Coordinator] <Workflow>');
   assert.equal(policy.workerLifecycle.displayNames.operationAgent,'[Op] <operation> - <scope>');
-  assert.equal(policy.workerLifecycle.displayNames.applyAgentNameWith,'terminal-create-and-rename-after-attach');
+  assert.equal(policy.workerLifecycle.displayNames.applyAgentNameWith,'task-display-name-and-terminal-rename-after-start');
   assert.equal(policy.workerLifecycle.operationAgent.launch,'supervised-native-agent');
   assert.equal(policy.workerLifecycle.operationAgent.release,'after-accepted-worker_done');
   assert.equal(policy.workerLifecycle.operationAgent.reuse,'forbidden');
-  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.supervise,'worker-start-by-terminal-handle');
+  assert.deepEqual(policy.workerLifecycle.operationAgent.dispatchAdmission.required,[
+    'expected-operation-from-active-dag-node','exact-operation-contract','resolved-provider-selection','canonical-display-name'
+  ]);
+  assert.equal(policy.workerLifecycle.operationAgent.dispatchAdmission.providerProof,'worker-show-exact-effective-agent-model');
+  assert.equal(policy.workerLifecycle.operationAgent.dispatchAdmission.effectAcceptance,'only-after-provider-proof');
+  assert.equal(policy.workerLifecycle.operationAgent.architectureSidearm.onlyTrigger,'active-implementation-secondary_request');
+  assert.equal(policy.workerLifecycle.operationAgent.architectureSidearm.requiredReason,'sds-technical-gap');
+  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.supervise,'worker-start-by-agent-id');
   assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.promptDelivery,'supervised-worker-start-only');
-  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.command,'qwen --exclude-tools agent');
+  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.create,'direct-native-worker-start');
+  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.terminalCommand,'forbidden');
   assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.nestedAgents,'forbidden');
   assert.deepEqual(policy.workerLifecycle.operationAgent.nativeLaunchFailure.recognizedFailures,['agent_prompt_stalled','session_not_reported']);
   assert.equal(policy.workerLifecycle.operationAgent.nativeLaunchFailure.unsupervisedFallback,'forbidden');
@@ -83,6 +92,7 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.ok(policy.forbidden.includes('coordinator-performs-workflow-local-work'));
   assert.ok(policy.forbidden.includes('higher-manager-performs-lower-layer-work'));
   assert.ok(policy.forbidden.includes('periodic-terminal-poll'));
+  assert.ok(policy.forbidden.includes('dispatch-operation-to-existing-terminal'));
 });
 
 test('display names distinguish plan coordinator, workflow coordinator and operation roles',()=>{
@@ -92,18 +102,47 @@ test('display names distinguish plan coordinator, workflow coordinator and opera
   assert.equal(formatOrcaDisplayName('operation-agent',{operation:'review.verify',scope:'Chatbot'}),'[Op] review.verify - Chatbot');
 });
 
-test('Qwen operation launch is named, prewarmed and attached as one supervised worker',()=>{
+test('Qwen operation launch uses one direct native worker and restores the canonical title',()=>{
   const launch=planOperationAgentLaunch({
     taskId:'task-1',worktree:'path:C:/work/chatbot',operation:'backend.implement',scope:'Chatbot',
-    selection:{orcaLaunch:{kind:'managed-agent',agent:'qwen-code',command:'qwen --exclude-tools agent'}}
+    selection:{model:'qwen3.8-flash',orcaLaunch:{kind:'managed-agent',agent:'qwen-code',startup:'direct-native-worker-start'}}
   });
-  assert.equal(launch.mode,'prewarm-and-attach');
+  assert.equal(launch.mode,'native-worker-start');
   assert.equal(launch.displayName,'[Op] backend.implement - Chatbot');
-  assert.deepEqual(launch.steps.map(step=>step.command),['terminal-create','terminal-wait','worker-start','terminal-rename']);
-  assert.deepEqual(launch.steps[0].args,{worktree:'path:C:/work/chatbot',title:'[Op] backend.implement - Chatbot',command:'qwen --exclude-tools agent'});
-  assert.deepEqual(launch.steps[2].args,{task:'task-1',terminal:'$terminalHandle'});
-  assert.ok(launch.forbidden.includes('dispatch-return-preamble'));
+  assert.deepEqual(launch.steps.map(step=>step.command),['worker-start','terminal-rename']);
+  assert.deepEqual(launch.steps[0].args,{task:'task-1',worktree:'path:C:/work/chatbot',agent:'qwen-code'});
+  assert.deepEqual(launch.steps[1].args,{terminal:'$workerTerminalHandle',title:'[Op] backend.implement - Chatbot'});
+  assert.ok(launch.forbidden.includes('terminal-create-provider-command'));
+  assert.ok(launch.forbidden.includes('worker-start-by-terminal-handle'));
   assert.ok(launch.forbidden.includes('unsupervised-retain'));
+});
+
+test('managed operation launch carries the exact resolved model and effort',()=>{
+  const launch=planOperationAgentLaunch({
+    taskId:'task-2',worktree:'path:C:/work/accounting',operation:'architecture.decide',scope:'Accounting',
+    selection:{model:'gpt-6-astra',effort:'high',orcaLaunch:{kind:'managed-agent',agent:'codex'}}
+  });
+  assert.deepEqual(launch.steps[0].args,{
+    task:'task-2',worktree:'path:C:/work/accounting',agent:'codex',model:'gpt-6-astra',effort:'high'
+  });
+});
+
+test('worker provider attestation rejects Sol when the resolved operation target is Qwen',()=>{
+  const operation='backend.implement',scope='Accounting',displayName='[Op] backend.implement - Accounting';
+  const selection={target:'qwen-qwen3.8-flash-worker',model:'qwen3.8-flash',orcaLaunch:{kind:'managed-agent',agent:'qwen-code',startup:'direct-native-worker-start'}};
+  const taskRecord={id:'task-1',display_name:displayName};
+  const receipt=(agent='qwen-code',model='qwen3.8-flash')=>({result:{
+    dispatch:{id:'ctx-1',task_id:'task-1'},
+    worker:{state:'ready',agent_terminal_handle:'term-1',startOptions:{launch:{effective:{agent,model}}}},
+    observation:{exactWorker:true},terminal:{title:displayName}
+  }});
+  assert.deepEqual(attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord,workerShow:receipt()}),{
+    schema:'starci/orca-operation-provider-attestation@1',ok:true,taskId:'task-1',dispatchId:'ctx-1',terminalHandle:'term-1',
+    displayName,target:'qwen-qwen3.8-flash-worker',agent:'qwen-code',model:'qwen3.8-flash'
+  });
+  assert.throws(()=>attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord,workerShow:receipt('codex','gpt-5.6-sol')}),/Provider mismatch/);
+  assert.throws(()=>attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord:{...taskRecord,display_name:'worker-task_1'},workerShow:receipt()}),/Task name mismatch/);
+  assert.throws(()=>attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord,workerShow:{result:{...receipt().result,terminal:{title:'Qwen - accounting'}}}}),/terminal name mismatch/);
 });
 
 test('a management layer cannot claim operation execution work',()=>{

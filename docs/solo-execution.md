@@ -28,7 +28,7 @@ operation to fan out into several agents.
 
 ## Session and operation adapters
 
-The host supplies the current session and the inline-agent implementation:
+The host supplies the current session and the isolated background-agent implementation:
 
 ```js
 const adapters = {
@@ -41,7 +41,7 @@ const adapters = {
     async openAgent({operation, requiredAgent}) {
       return requiredAgent ?? {
         id: `agent-${operation.id}`,
-        kind: 'inline-background-agent',
+        kind: 'isolated-background-agent',
         isolated: true,
         operationId: operation.id,
       };

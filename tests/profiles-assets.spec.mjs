@@ -4,7 +4,7 @@ import {resolveExecutionChain,selectExecutionTarget,selectProfile} from '../prof
 import {readPublicJson} from './helpers/read-public.mjs';
 import {validateAssets} from '../contracts/assets.mjs';
 
-const qwenLaunch={kind:'managed-agent',agent:'qwen-code',command:'qwen --exclude-tools agent',startup:'prewarm-terminal-then-worker-start-by-handle',readiness:'tui-idle',supervision:'worker-start-terminal'};
+const qwenLaunch={kind:'managed-agent',agent:'qwen-code',startup:'direct-native-worker-start',modelAuthority:'verified-qwen-runtime-configuration',supervision:'worker-start-agent'};
 
 test('active roles select Codex, Claude or Qwen without reviving retired profiles or granting tools',()=>{
   const codex=selectProfile({runtime:'codex',op:'interface.implement',imageGenerationAvailable:true});
@@ -32,11 +32,11 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.equal(registry.agentArchitecture.isolationBoundary,'operation');
   assert.equal(registry.agentArchitecture.operationMapping,'one-operation-instance-one-agent');
   assert.equal(registry.executionModes.solo.controlPlane,'current-chat-session');
-  assert.equal(registry.executionModes.solo.operationAgent,'inline-background-agent');
+  assert.equal(registry.executionModes.solo.operationAgent,'isolated-background-agent');
   assert.equal(registry.executionModes.solo.maxConcurrentOperationAgents,3);
   assert.equal(registry.executionModes.solo.fanOutWithinOperation,'forbidden');
   assert.equal(registry.executionModes.orchestrated.workflowWrapperAgent,'persistent-native-manager-agent-in-child-worktree');
-  assert.equal(registry.executionModes.orchestrated.operationAgent,'workflow-inline-subagent');
+  assert.equal(registry.executionModes.orchestrated.operationAgent,'supervised-native-agent-in-workflow-worktree');
   assert.equal(registry.executionModes.orchestrated.worktree,'isolated-child-per-workflow-attempt');
   assert.equal(registry.executionModes.orchestrated.maxConcurrentOperationAgents,3);
   assert.deepEqual(Object.keys(registry.operators).sort(),[...ops].sort());

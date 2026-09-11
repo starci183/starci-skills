@@ -37,7 +37,7 @@ new concrete agent to the same logical operation; partial or unknown effects req
 ## Solo hosts
 
 The current Codex, Claude or Orca session hosts one unrelated workflow. Each ready operation instance
-opens one isolated inline background agent and closes it after its gate. Up to three distinct operation
+opens one isolated background agent and closes it after its gate. Up to three distinct operation
 agents may be active when the fixed workflow DAG says they are independent. One operation instance may
 not be divided among several agents, and the solo host cannot create child worktrees, dynamically fan out
 work, span providers or integrate shared conflicts.
@@ -45,9 +45,9 @@ work, span providers or integrate shared conflicts.
 ```text
 current chat
 └─ fixed workflow
-   ├─ OP-1 → one inline background agent
-   ├─ OP-2 → one inline background agent
-   └─ OP-3 → one inline background agent
+   ├─ OP-1 → one isolated background agent
+   ├─ OP-2 → one isolated background agent
+   └─ OP-3 → one isolated background agent
 ```
 
 If OP-2 depends on OP-1, they run sequentially. Concurrency is permitted only between different ready

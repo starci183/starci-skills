@@ -38,6 +38,12 @@ export function validateProviderContracts(){
   add(errors,orca.index?.names?.workflowWorktree==='[Workflow] <Workflow>','Invalid Orca workflow worktree name');
   add(errors,orca.index?.names?.workflowCoordinator==='[Coordinator] <Workflow>','Invalid Orca Workflow Coordinator name');
   add(errors,orca.index?.names?.operationAgent==='[Op] <operation> - <scope>','Invalid Orca operation name');
+  add(errors,orca.index?.operationAgent?.admission?.expectedOperation==='active-dag-node','Orca operation admission must bind the active DAG node');
+  add(errors,orca.index?.operationAgent?.admission?.providerSelection==='profiles-registry-resolver-output','Orca operation admission must use the profile resolver');
+  add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.api==='orchestration.worker-show','Orca provider attestation must use worker-show');
+  add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.beforeEffectAcceptance==='required','Orca provider attestation must precede effect acceptance');
+  add(errors,orca.index?.operationAgent?.admission?.architectureSidearm?.onlyTrigger==='active implementation secondary_request','Architecture sidearm trigger is too broad');
+  add(errors,orca.index?.operationAgent?.admission?.architectureSidearm?.exactReason==='sds-technical-gap','Architecture sidearm reason is invalid');
   add(errors,/--type escalation/.test(orca.index?.routing?.coordinatorToWorkflow?.cli||'')&&orca.index?.routing?.coordinatorToWorkflow?.forbiddenType==='status','Coordinator-to-Workflow control must use escalation, not status');
   const commands=orca.api?.publicCommands;
   add(errors,Array.isArray(commands)&&commands.length===orca.api?.snapshot?.observedCommandCount,'Orca API inventory count mismatch');
@@ -49,9 +55,13 @@ export function validateProviderContracts(){
   }
   const qwen=orca.adapters?.qwen;
   add(errors,qwen?.agent==='qwen-code','Missing native Orca Qwen adapter');
-  add(errors,qwen?.launchCommand==='qwen --exclude-tools agent','Qwen adapter must disable nested agents');
+  add(errors,qwen?.kind==='direct-native-managed-agent','Qwen adapter must use direct native worker-start');
+  add(errors,qwen?.requiredModel==='qwen3.8-flash','Qwen adapter must attest Qwen 3.8 Flash');
+  add(errors,qwen?.start?.length===2&&qwen.start[0]?.api==='orchestration.worker-start'&&qwen.start[0]?.binding==='agent-qwen-code'&&qwen.start[1]?.api==='terminal.rename','Qwen adapter start sequence is invalid');
   add(errors,qwen?.forbidden?.includes('qwen-agent-tool'),'Qwen adapter does not forbid its agent tool');
-  add(errors,orca.index?.operationAgent?.qwen38Flash?.command===qwen?.launchCommand,'Orca index and Qwen adapter launch commands disagree');
+  add(errors,qwen?.forbidden?.includes('terminal-create-qwen-command')&&qwen?.forbidden?.includes('worker-start-by-terminal-handle'),'Qwen adapter does not forbid command-terminal attachment');
+  add(errors,orca.index?.operationAgent?.qwen38Flash?.launch==='direct-native-worker-start','Orca index must launch Qwen natively');
+  add(errors,orca.index?.operationAgent?.qwen38Flash?.agent===qwen?.agent&&orca.index?.operationAgent?.qwen38Flash?.model===qwen?.requiredModel,'Orca index and Qwen adapter identities disagree');
 
   add(errors,codex.api?.schema==='starci/codex-api@1','Missing Codex provider API');
   const codexCalls=Object.values(codex.api?.collaborationApi||{}).map(value=>value?.call);

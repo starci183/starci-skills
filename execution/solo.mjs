@@ -4,7 +4,7 @@ const RECEIPT_SCHEMA = 'starci/solo-execution-receipt@2';
 const INPUT_SCHEMA = 'starci/operation-input@1';
 const OUTPUT_SCHEMA = 'starci/operation-output@1';
 const SOLO_HOSTS = new Set(['codex', 'claude', 'orca']);
-const MAX_INLINE_OPERATION_AGENTS = 3;
+const MAX_ISOLATED_OPERATION_AGENTS = 3;
 const OPERATION_STATES = new Set(['pending', 'running', 'paused', 'gating', 'completed', 'failed', 'blocked']);
 const GATE_STATES = new Set(['pending', 'evaluating', 'passed', 'failed', 'skipped', 'blocked']);
 
@@ -47,7 +47,7 @@ function definitionFor(workflow, orderedOperations) {
 }
 
 function concurrencyFor(workflow) {
-  const requested = workflow.maxConcurrentOperationAgents ?? MAX_INLINE_OPERATION_AGENTS;
+  const requested = workflow.maxConcurrentOperationAgents ?? MAX_ISOLATED_OPERATION_AGENTS;
   requireThat(Number.isInteger(requested) && requested > 0, 'Solo maxConcurrentOperationAgents must be a positive integer');
   return requested;
 }
@@ -90,7 +90,7 @@ function normalizeOperations(workflow) {
 }
 
 function requiresOrcaReason(workflow, operations) {
-  if (concurrencyFor(workflow) > MAX_INLINE_OPERATION_AGENTS) return 'more-than-three-concurrent-operation-agents';
+  if (concurrencyFor(workflow) > MAX_ISOLATED_OPERATION_AGENTS) return 'more-than-three-concurrent-operation-agents';
   for (const candidate of [workflow, workflow.execution]) {
     if (!isPlainObject(candidate)) continue;
     if (candidate.requiresOrca === true || candidate.childWorktrees === true || candidate.crossWorktreeIntegration === true || candidate.dynamicWorkers === true || candidate.crossProviderOrchestration === true) return 'orca-control-plane-required';
@@ -134,10 +134,10 @@ function newReceipt({host, definition, orderedOperations, maxConcurrentOperation
 function validateAgent(agent, operationId) {
   requireThat(isPlainObject(agent)
     && isText(agent.id)
-    && agent.kind === 'inline-background-agent'
+    && agent.kind === 'isolated-background-agent'
     && agent.isolated === true
     && agent.operationId === operationId,
-  `Operation ${operationId} requires one isolated inline background agent`);
+  `Operation ${operationId} requires one isolated background agent`);
 }
 
 function assertReceipt(receipt, {host, definition, orderedOperations, maxConcurrentOperationAgents}) {
@@ -162,7 +162,7 @@ function assertReceipt(receipt, {host, definition, orderedOperations, maxConcurr
     requireThat(state.resumeCursor === null || state.state === 'paused', `Only paused operation ${operation.id} may retain a resume cursor`);
     if (state.agent !== null) {
       validateAgent(state.agent, operation.id);
-      requireThat(!agentIds.has(state.agent.id), `Inline agent ${state.agent.id} is reused across operations`);
+      requireThat(!agentIds.has(state.agent.id), `Operation agent ${state.agent.id} is reused across operations`);
       agentIds.add(state.agent.id);
     }
     if (state.state === 'completed') {
@@ -265,9 +265,9 @@ async function executeOperation({host, workflow, operation, state, receipt, adap
       requiredAgent: clone(requiredAgent),
     });
     validateAgent(agent, operation.id);
-    if (requiredAgent !== null) requireThat(agent.id === requiredAgent.id, `Operation ${operation.id} must resume the same inline agent`);
+    if (requiredAgent !== null) requireThat(agent.id === requiredAgent.id, `Operation ${operation.id} must resume the same isolated agent`);
     const duplicate = receipt.operations.find(candidate => candidate.id !== operation.id && candidate.agent?.id === agent.id);
-    requireThat(!duplicate, `Inline agent ${agent.id} cannot own both ${duplicate?.id} and ${operation.id}`);
+    requireThat(!duplicate, `Operation agent ${agent.id} cannot own both ${duplicate?.id} and ${operation.id}`);
     state.agent = clone(agent);
   } catch (error) {
     state.state = 'failed';
@@ -375,7 +375,7 @@ function requiresOrcaReceipt({host, definition, orderedOperations, reason, recei
   next.status = 'requiresOrca';
   next.requiresOrca = {
     reason,
-    rule: 'Solo hosts allow one isolated inline background agent per operation and at most three operation agents; intra-operation fan-out and child-worktree orchestration require Orca',
+    rule: 'Solo hosts allow one isolated background agent per operation and at most three operation agents; intra-operation fan-out and child-worktree orchestration require Orca',
   };
   next.activeOperations = [];
   return next;
@@ -442,4 +442,4 @@ export function validateSoloReceipt({host, workflow, receipt}) {
   return true;
 }
 
-export const soloExecutionLimits = Object.freeze({maxConcurrentOperationAgents: MAX_INLINE_OPERATION_AGENTS});
+export const soloExecutionLimits = Object.freeze({maxConcurrentOperationAgents: MAX_ISOLATED_OPERATION_AGENTS});

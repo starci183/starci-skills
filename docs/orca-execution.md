@@ -23,10 +23,10 @@ not an executing workflow. The manager owns its operation DAG, provider resoluti
 lifecycle and operation boundary events, and reports only normalized workflow boundaries to the
 parent Coordinator. Each operation is a fresh supervised native agent started inside that workflow
 child and released immediately after its exact
-`worker_done` is accepted. Operation agents are never reused. A Qwen operation is first opened as a
-named native TUI, observed at `tui-idle`, and attached to its Task with `worker-start --terminal`.
-The Task preamble is delivered only by that supervised attachment; an untracked returned-preamble or
-manual terminal-send fallback is forbidden. The workflow child is retained until reviewed
+`worker_done` is accepted. Operation agents are never reused. A Qwen operation is created only with
+`worker-start --agent qwen-code`; creating a `qwen` command terminal and attaching it by handle is
+forbidden. The Task preamble is delivered only by the supervised native start; an untracked
+returned-preamble, `dispatch --to <terminal>` or manual terminal-send fallback is forbidden. The workflow child is retained until reviewed
 integration settles, then it may be removed; unrelated workflows may instead run in solo mode.
 The Workflow Manager only decides, dispatches, retries, replaces and waits for operation boundaries;
 it never writes implementation code, repairs an operation or runs the operation's tests. Those effects
@@ -111,16 +111,19 @@ native adapter cannot represent. It starts the declared CLI in the existing work
 retains the nested Task/Dispatch/operation correlation. It must not silently convert an unsupported
 launch into success.
 
-For Qwen 3.8 Flash, the Workflow Manager creates a terminal in the existing workflow worktree with
-command `qwen --exclude-tools agent` and title `[Op] <operation> - <scope>`, waits for `tui-idle`, then calls
-`worker-start --task <task-id> --terminal <terminal-handle>`. It reapplies the same title with
-`terminal rename` after attachment so the Orca tree and tab never fall back to `worker-task_<id>`.
-This executable tool fence prevents Qwen from creating hidden local subagents. The sequence keeps one Task, one Dispatch, one terminal and one supervised worker resource while
-avoiding the installed direct adapter's premature prompt acknowledgement.
+For Qwen 3.8 Flash, the Workflow Manager creates the operation Task with display name
+`[Op] <operation> - <scope>`, then calls `worker-start --task <task-id> --worktree current --agent qwen-code`.
+It reads the resulting agent terminal handle, reapplies the same title with `terminal rename`, and
+uses `worker-show` to attest the exact Task, worker, native `qwen-code` agent, configured
+`qwen3.8-flash` model and terminal title before accepting effects. This sequence keeps one Task, one
+Dispatch, one native branded agent and one supervised worker resource. Nested provider agents remain
+forbidden by the operation contract and are verified at the boundary rather than by replacing the
+native launch with a shell command.
 
-If attachment still reports `agent_prompt_stalled` or `session_not_reported`, fence and reconcile
-that exact attempt. Retry the next provider only after effects are verified absent. Never use
-`dispatch --inject`, `dispatch --return-preamble`, manual prompt submission or a retained
+If native start reports `agent_prompt_stalled` or `session_not_reported`, fence and reconcile that
+exact attempt. Retry the same resolved target or the next declared provider only after effects are
+verified absent. Never convert the failed attempt into a command terminal, or use `dispatch --inject`,
+`dispatch --return-preamble`, `dispatch --to <terminal>`, manual prompt submission or a retained
 unsupervised terminal as a successful operation.
 
 The display contract is mandatory at creation time:

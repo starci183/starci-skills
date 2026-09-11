@@ -29,8 +29,8 @@ function adapters({run, gate, openAgent} = {}) {
         async openAgent(request) {
           calls.open.push(structuredClone(request));
           return openAgent ? openAgent(request, calls) : request.requiredAgent ?? {
-            id: `inline-${request.operation.id}`,
-            kind: 'inline-background-agent',
+            id: `isolated-${request.operation.id}`,
+            kind: 'isolated-background-agent',
             isolated: true,
             operationId: request.operation.id,
           };
@@ -64,7 +64,7 @@ test('Codex, Claude and Orca host solo workflows while Qwen remains an operation
   assert.equal(injected.calls.session.length, 1);
 });
 
-test('each dependency operation gets exactly one isolated inline agent and normalized handoff envelopes', async () => {
+test('each dependency operation gets exactly one isolated background agent and normalized handoff envelopes', async () => {
   const injected = adapters();
   const receipt = await runSoloWorkflow({host: 'codex', workflow: workflow(), adapters: injected.value});
   assert.equal(receipt.schema, 'starci/solo-execution-receipt@2');
@@ -104,7 +104,7 @@ test('up to three distinct dependency-safe op agents run in one wave without sha
   assert.equal(injected.calls.open[3].operation.id, 'four');
 });
 
-test('one operation cannot fan out to several inline agents and larger orchestration routes to Orca', async () => {
+test('one operation cannot fan out to several isolated agents and larger orchestration routes to Orca', async () => {
   for (const candidate of [
     workflow({maxConcurrentOperationAgents: 4}),
     workflow({operations: [{id: 'backend', operation: 'backend.implement', agents: 3, gate: {id: 'pass'}}]}),
@@ -113,13 +113,13 @@ test('one operation cannot fan out to several inline agents and larger orchestra
     const injected = adapters();
     const receipt = await runSoloWorkflow({host: 'codex', workflow: candidate, adapters: injected.value});
     assert.equal(receipt.status, 'requiresOrca');
-    assert.match(receipt.requiresOrca.rule, /one isolated inline background agent per operation/);
+    assert.match(receipt.requiresOrca.rule, /one isolated background agent per operation/);
     assert.equal(injected.calls.session.length, 0);
     assert.equal(injected.calls.open.length, 0);
   }
 });
 
-test('a paused op resumes the same inline agent and completed ops never rerun', async () => {
+test('a paused op resumes the same isolated agent and completed ops never rerun', async () => {
   let paused = false;
   const first = adapters({
     run: ({operation}) => {
@@ -132,14 +132,14 @@ test('a paused op resumes the same inline agent and completed ops never rerun', 
   });
   const partial = await runSoloWorkflow({host: 'claude', workflow: workflow(), adapters: first.value});
   assert.equal(partial.status, 'paused');
-  assert.equal(partial.operations.find(row => row.id === 'implement').agent.id, 'inline-implement');
+  assert.equal(partial.operations.find(row => row.id === 'implement').agent.id, 'isolated-implement');
 
   const resumed = adapters();
   const receipt = await runSoloWorkflow({host: 'claude', workflow: workflow(), adapters: resumed.value, receipt: partial});
   assert.equal(receipt.status, 'completed');
   assert.deepEqual(resumed.calls.run.map(call => call.operation.id), ['implement', 'deliver']);
   assert.equal(resumed.calls.open[0].mode, 'resume');
-  assert.equal(resumed.calls.open[0].requiredAgent.id, 'inline-implement');
+  assert.equal(resumed.calls.open[0].requiredAgent.id, 'isolated-implement');
   assert.deepEqual(resumed.calls.run[0].resumeCursor, {step: 4});
 
   const terminal = adapters();
@@ -188,7 +188,7 @@ test('invalid graphs, changed receipts, unsafe agent reuse and session drift fai
   }), /definition changed/);
 
   const duplicate = adapters({openAgent: request => ({
-    id: 'same-agent', kind: 'inline-background-agent', isolated: true, operationId: request.operation.id,
+    id: 'same-agent', kind: 'isolated-background-agent', isolated: true, operationId: request.operation.id,
   })});
   const duplicateReceipt = await runSoloWorkflow({host: 'codex', workflow: workflow(), adapters: duplicate.value});
   assert.equal(duplicateReceipt.status, 'failed');

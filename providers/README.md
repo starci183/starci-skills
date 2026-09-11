@@ -17,7 +17,7 @@ providers/
 │  └─ adapters/
 │     ├─ codex.yaml            # Orca-native Codex adapter
 │     ├─ claude.yaml           # Orca-native Claude adapter
-│     └─ qwen.yaml             # prewarm-and-attach Qwen adapter with nested agents disabled
+│     └─ qwen.yaml             # direct native qwen-code adapter with receipt attestation
 ├─ codex/
 │  ├─ index.yaml               # Codex solo and Orca-managed forms
 │  ├─ capabilities.yaml        # mode/capability limits
@@ -33,4 +33,3 @@ providers/
 ```
 
 Orca command names are snapshotted completely in `orca/api.yaml`. Command signatures remain live-runtime facts: resolve the selected entry from `orca agent-context --json` immediately before effects and fail closed on mismatch. Codex and Claude likewise require the active injected tool schema before a call.
-

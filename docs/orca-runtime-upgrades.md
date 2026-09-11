@@ -56,14 +56,14 @@ While the Orca parent coordinates the Core/shared, Accounting, Chatbot, and Sale
 - Expected: every isolated operation agent has one Task, one Dispatch, one terminal identity, liveness, settlement, and a worker resource visible to the parent DAG.
 - Observed: Qwen launched through `terminal create`, then received a Dispatch using `--return-preamble` followed by `terminal send`. The Task and Dispatch were tracked, and lifecycle mail worked, but `worker-list` reported `workerState: unsupervised`, `terminalState: retained`, and no resource ownership record.
 - Impact: provider/profile routing works, but the Coordinator lacks the same resource-accounting and stop/release guarantees available for Codex or Claude workers launched through `worker-start`.
-- Resolution in StarCi: prewarm a named Qwen terminal, wait for `tui-idle`, and attach it to the operation Task with `worker-start --terminal`. Returned-preamble and manual terminal-send fallbacks are forbidden because they cannot produce a supervised worker resource.
+- Resolution in StarCi: this command-terminal path is forbidden. Create a canonically named Task and launch it directly with `worker-start --agent qwen-code`; rename the returned native terminal and require `worker-show` provider/name attestation before accepting effects.
 
 ### Native Qwen branding can succeed while supervised prompt delivery fails
 
 - Expected: `worker-start --agent qwen-code` creates one branded Qwen operation agent, injects its Task contract, reports a stable session identity, and owns the terminal until `worker-release`.
 - Observed: Orca created a branded Qwen Code 0.23.3 TUI running the configured `qwen3.8-flash`, but the launch failed at `dispatch_input` with `agent_prompt_stalled`; another attempt surfaced `session_not_reported`, and `dispatch --inject` then rejected the live Qwen terminal as an unrecognized agent. The TUI remained alive and accepted the exact preamble returned by a fresh tracked Dispatch through `terminal send`.
 - Impact: native identity and model visibility alone do not prove Task delivery or supervised resource ownership. Blind retry creates idle duplicate Qwen terminals and failed Tasks; treating the live TUI as fully supervised makes stop/release accounting false.
-- Immediate containment: fence or abandon the failed launch Dispatch, reconcile its exact effects and retry only after no effects are verified. New Qwen attempts use prewarm, `tui-idle`, and `worker-start --terminal`; never adopt the failed TUI through manual prompt submission.
+- Immediate containment: fence or abandon the failed launch Dispatch, reconcile its exact effects and retry only after no effects are verified. New Qwen attempts use direct `worker-start --agent qwen-code`; never adopt the failed TUI through manual prompt submission or a command-terminal fallback.
 - Upgrade candidate: teach the native Qwen adapter to recognize the Qwen session, submit multiline prompts deterministically, and return a supervised resource only after the Task contract is observed as consumed; add regressions for both `agent_prompt_stalled` and `session_not_reported`.
 
 ### Manual external-provider identity is not represented in the Orca agent tree
@@ -71,14 +71,14 @@ While the Orca parent coordinates the Core/shared, Accounting, Chatbot, and Sale
 - Expected: an isolated operation launched with Qwen 3.8 Max or DeepSeek V4 Pro is visibly attributed to that provider/model in the Orca worktree tree as well as inside its terminal.
 - Observed: Orca retained the explicit tab name and Qwen rendered `qwen3.8-max (Token Plan Singapore)` in its own footer, but terminal metadata reported `agentWait: null`; the worktree tree therefore kept the Codex workflow-wrapper icon and treated that manually launched Qwen operation as a generic command terminal. The installed Orca build does include native agent id `qwen-code`; `worker-start --model` remains limited to Claude, Codex and Cursor.
 - Impact: the operation uses the resolved external model, but the sidebar icon cannot prove provider/model provenance and can mislead an operator into believing that the Codex wrapper executed the operation.
-- Resolution: launch configured Qwen 3.8 Flash with `qwen --exclude-tools agent` in a terminal named `[Op] <operation> - <scope>`, wait for `tui-idle`, then attach that exact handle with `worker-start --terminal` and reapply the name after attachment. A DeepSeek or other exact Qwen-compatible model override remains a separate adapter gap until Orca can pass that model through a supervised native launch.
+- Resolution: create the Task with display name `[Op] <operation> - <scope>`, launch configured Qwen 3.8 Flash directly with `worker-start --agent qwen-code`, rename the returned native terminal, then attest agent/model/title through `worker-show`. A DeepSeek or other exact Qwen-compatible model override remains a separate adapter gap until Orca can pass that model through a supervised native launch.
 
 ### Dispatch injection cannot adopt an agent that is already working
 
 - Expected: when an operation terminal was opened before its Task/Dispatch, the Coordinator can safely attach the missing contract or receive a precise recovery path.
 - Observed: `dispatch --inject` against an active Codex TUI returned `agent_prompt_stalled`; the attempted Dispatch failed and remained visible as a retained unsupervised attempt. Returned-preamble plus terminal-send could execute the task, but did not create supervised resource ownership.
 - Impact: late adoption cannot repair an already-running untracked operation and leaves extra failed-attempt accounting unless the Coordinator explicitly settles it.
-- Upgrade candidate: make prewarm-and-attach an explicit native adapter operation with deterministic prompt acknowledgement, rollback and failed-attempt cleanup.
+- Upgrade candidate: make direct native start return atomic prompt acknowledgement, canonical task/terminal naming, rollback and failed-attempt cleanup.
 
 ### An external operation agent can create hidden fan-out inside one Orca operation
 

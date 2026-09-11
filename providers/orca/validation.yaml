@@ -22,9 +22,28 @@ receipts:
     - agent-terminal-handle
     - worktree-id
   qwenAdditional:
-    - tui-idle-before-attach
-    - supervised-worker-state-after-attach
-    - no-agent-tool-in-launch-command
+    - direct-native-worker-start-agent-qwen-code
+    - no-terminal-create-qwen-command
+    - supervised-worker-state-after-start
+    - effective-qwen3.8-flash-model
+  providerAttestation:
+    source: orchestration.worker-show
+    required:
+      - exact-worker
+      - active-task-id
+      - effective-agent
+      - effective-model
+      - agent-terminal-handle
+      - canonical-task-display-name
+      - canonical-terminal-title
+    onMismatch: fence-reconcile-release-and-retry-before-effect-acceptance
+dispatchAssertions:
+  - Operation equals the expected active DAG node before Task creation.
+  - architecture.decide is admitted only by an active implementation secondary_request with reason sds-technical-gap and an explicit bounded SDS allowlist.
+  - Review findings, suggestions and open questions never create architecture.decide.
+  - Provider selection is resolved before launch and attested from worker-show before any effect is accepted.
+  - Task display_name and terminal title both equal [Op] <operation> - <scope>; worker-task_<id> is never accepted as operation identity.
+  - An operation is never dispatched to an existing terminal; only worker-start creates its supervised native agent.
 uiAssertions:
   - Main terminal title equals [Coordinator] <Plan>.
   - Workflow child display name equals [Workflow] <Workflow>.

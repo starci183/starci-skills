@@ -26,11 +26,15 @@ recipes:
     mode: orchestrated
     actor: workflow-coordinator
     sequence:
+      - assert-expected-active-dag-operation
+      - resolve-operation-provider-chain
       - orchestration.task-create
-      - terminal.create-qwen-fenced
-      - terminal.wait-tui-idle
-      - orchestration.worker-start-by-terminal
+      - assert-canonical-task-display-name
+      - orchestration.worker-start-current-worktree-agent-qwen-code
       - terminal.rename
+      - assert-canonical-terminal-title
+      - orchestration.worker-show
+      - attest-exact-effective-provider
     terminalName: "[Op] <operation> - <scope>"
     taskCardinality: one
     dispatchCardinality: one
@@ -39,9 +43,15 @@ recipes:
     mode: orchestrated
     actor: workflow-coordinator
     sequence:
+      - assert-expected-active-dag-operation
+      - resolve-operation-provider-chain
       - orchestration.task-create
-      - orchestration.worker-start-current-worktree
+      - assert-canonical-task-display-name
+      - orchestration.worker-start-current-worktree-with-resolved-model
       - terminal.rename
+      - assert-canonical-terminal-title
+      - orchestration.worker-show
+      - attest-exact-effective-provider
     terminalName: "[Op] <operation> - <scope>"
   coordinator-instruction:
     actor: plan-coordinator
@@ -79,5 +89,9 @@ forbiddenSequences:
   - workflow-coordinator-implements-op
   - qwen-op-uses-agent-tool
   - terminal-send-operation-prompt
+  - dispatch-to-existing-terminal-operation
   - dispatch-inject-operation
   - unsupervised-operation-retain-as-success
+  - infer-architecture-sidearm-from-review
+  - create-task-before-dag-operation-admission
+  - accept-operation-effect-before-provider-attestation

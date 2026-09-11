@@ -1,25 +1,25 @@
 schema: starci/orca-agent-adapter@1
 agent: qwen-code
-kind: prewarmed-native-managed-agent
+kind: direct-native-managed-agent
 modelAuthority: qwen-runtime-configuration
 requiredModel: qwen3.8-flash
-launchCommand: qwen --exclude-tools agent
 start:
-  - api: terminal.create
-  - api: terminal.wait
-    condition: tui-idle
   - api: orchestration.worker-start
-    binding: exact-terminal-handle
+    binding: agent-qwen-code
   - api: terminal.rename
 readiness:
-  - qwen-tui-idle
   - supervised-worker-receipt
+  - effective-agent-qwen-code
+  - effective-model-qwen3.8-flash
 release:
   api: orchestration.worker-release
 forbidden:
   - qwen-agent-tool
   - provider-native-subagent
+  - terminal-create-qwen-command
+  - worker-start-by-terminal-handle
   - manual-prompt-send
+  - dispatch-to-existing-terminal
   - dispatch-inject
   - return-preamble
   - unsupervised-retain-as-success

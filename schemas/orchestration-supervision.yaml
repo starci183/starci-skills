@@ -41,8 +41,9 @@ invariants:
   - A higher management layer never substitutes for or performs work owned by a lower layer.
   - If a Workflow Manager fails, the Coordinator replaces or recovers that manager; it never bypasses the missing layer.
   - Each operation attempt owns exactly one supervised agent and that agent is never reused by another operation.
-  - A Qwen operation starts with qwen --exclude-tools agent; provider-native nested agents are forbidden even when the outer terminal remains supervised.
-  - A Qwen operation terminal is named, prewarmed to tui-idle and attached to its Task with worker-start by exact terminal handle before any operation prompt is accepted.
+  - A Qwen operation starts only through orchestration worker-start with agent qwen-code; provider-native nested agents are forbidden.
+  - Its Task receives the exact canonical display name before launch, its native terminal is renamed after start, and worker-show must attest qwen-code plus qwen3.8-flash before any operation effect is accepted.
+  - Creating a terminal with a qwen command or attaching Qwen by terminal handle is forbidden because those paths lose native worker identity, logo or prompt-delivery guarantees.
   - Returned-preamble, dispatch injection, manual prompt submission and retained unsupervised fallbacks are forbidden for operation execution.
   - If supervised attachment fails with agent_prompt_stalled or session_not_reported, the exact attempt is fenced and reconciled before another provider is selected.
   - Accepting worker_done releases the operation agent; it does not remove the workflow child before reviewed integration.

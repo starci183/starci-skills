@@ -26,8 +26,25 @@ function fakeOrca(){
   const calls={runs:[],tasks:[],dispatches:[],stops:[],releases:[],integrations:[]};
   return {calls,adapter:{
     async createRun(input){calls.runs.push(input);return {runId:'run-1'};},
-    async createTask(input){calls.tasks.push(structuredClone(input));return {taskId:`task-${++tasks}`};},
-    async dispatchWorker(input){calls.dispatches.push(structuredClone(input));return {dispatchId:`dispatch-${++dispatches}`};},
+    async createTask(input){
+      calls.tasks.push(structuredClone(input));
+      const taskId=`task-${++tasks}`;
+      return {taskId,taskRecord:{id:taskId,display_name:input.displayName??null}};
+    },
+    async dispatchWorker(input){
+      const dispatchId=`dispatch-${++dispatches}`;
+      calls.dispatches.push({...structuredClone(input),dispatchId});
+      return {dispatchId};
+    },
+    async showWorker({dispatchId}){
+      const launched=calls.dispatches.find(call=>call.dispatchId===dispatchId);
+      assert.ok(launched?.displayName,'operation dispatch needs a canonical display name');
+      return {result:{
+        dispatch:{id:dispatchId,task_id:launched.taskId},
+        worker:{state:'ready',agent_terminal_handle:`term-${dispatchId}`,startOptions:{launch:{effective:{agent:launched.selection.orcaLaunch.agent,model:launched.selection.model}}}},
+        observation:{exactWorker:true},terminal:{title:launched.displayName}
+      }};
+    },
     async stopWorker(input){calls.stops.push(structuredClone(input));return {status:'stopped'};},
     async releaseWorker(input){calls.releases.push(structuredClone(input));return {status:'released'};},
     async integrateChange(input){calls.integrations.push(structuredClone(input));return {status:'integrated'};}
@@ -61,6 +78,9 @@ test('the parent creates one workflow child and its wrapper launches ready opera
   assert.equal(calls.dispatches[1].worktree.kind,'existing-child');
   assert.equal(calls.dispatches[1].worktree.name,calls.dispatches[0].worktree.name);
   assert.equal(calls.dispatches[1].agent.kind,'isolated-subagent');
+  assert.equal(calls.tasks[1].displayName,'[Op] workspace.manage - release-widget');
+  assert.equal(calls.dispatches[1].displayName,'[Op] workspace.manage - release-widget');
+  assert.equal(plan.operations.prepare.attempts[0].providerAttestation.ok,true);
   assert.deepEqual(calls.dispatches[1].permissions,{merge:false,rebase:false,cherryPick:false,push:false});
   assert.match(calls.dispatches[1].prompt,/Do not merge, rebase, cherry-pick, or push/);
 });

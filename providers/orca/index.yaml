@@ -64,24 +64,44 @@ workflowCoordinator:
       cli: 'orca orchestration send --type <worker_done|worker_failed|escalation|question> --subject "<normalized-subject>" --body "<normalized-workflow-envelope>" --task-id <workflow-task-id> --dispatch-id <workflow-dispatch-id> --json'
 operationAgent:
   role: one-supervised-native-agent-per-operation-attempt
+  admission:
+    expectedOperation: active-dag-node
+    providerSelection: profiles-registry-resolver-output
+    beforeTaskCreate:
+      - assert-exact-operation
+      - assert-operation-contract
+      - assert-resolved-target
+    afterWorkerStart:
+      api: orchestration.worker-show
+      cli: 'orca orchestration worker-show --dispatch <operation-dispatch-id> --json'
+      attest:
+        - dispatch.task_id equals operation-task-id
+        - observation.exactWorker equals true
+        - worker.startOptions.launch.effective.agent equals resolved Orca agent
+        - worker.startOptions.launch.effective.model equals resolved model
+        - worker.agent_terminal_handle is present
+        - terminal.title equals [Op] <operation> - <scope>
+      beforeEffectAcceptance: required
+      mismatch: fence-reconcile-release-and-retry-resolved-target
+    architectureSidearm:
+      onlyTrigger: active implementation secondary_request
+      exactReason: sds-technical-gap
+      exactSecondaryOp: architecture.decide
+      requires: explicit-bounded-sds-allowlist
+      neverFrom: [review-finding, review-suggestion, open-question, inferred-gap]
   createTask:
     api: orchestration.task-create
-    cli: 'orca orchestration task-create --run <run-id> --spec "<one-operation-contract>" --json'
+    cli: 'orca orchestration task-create --run <run-id> --task-title "<concise-operation-title>" --display-name "[Op] <operation> - <scope>" --spec "<one-operation-contract>" --json'
   qwen38Flash:
     agent: qwen-code
     model: qwen3.8-flash
-    command: qwen --exclude-tools agent
+    modelAuthority: verified-qwen-runtime-configuration
+    launch: direct-native-worker-start
     nestedAgents: forbidden
     calls:
-      createAgent:
-        api: terminal.create
-        cli: 'orca terminal create --worktree <workflow-worktree-id> --title "[Op] <operation> - <scope>" --command "qwen --exclude-tools agent" --json'
-      waitReady:
-        api: terminal.wait
-        cli: 'orca terminal wait --terminal <terminal-handle> --for tui-idle --timeout-ms 60000 --json'
-      attachTask:
+      startAgent:
         api: orchestration.worker-start
-        cli: 'orca orchestration worker-start --task <operation-task-id> --terminal <terminal-handle> --json'
+        cli: 'orca orchestration worker-start --task <operation-task-id> --on windows --worktree current --agent qwen-code --json'
       restoreName:
         api: terminal.rename
         cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
@@ -89,7 +109,7 @@ operationAgent:
     calls:
       startAgent:
         api: orchestration.worker-start
-        cli: 'orca orchestration worker-start --task <operation-task-id> --on windows --worktree current --agent <resolved-native-agent-id> --json'
+        cli: 'orca orchestration worker-start --task <operation-task-id> --on windows --worktree current --agent <resolved-native-agent-id> --model <resolved-model-id> --effort <resolved-effort> --json'
       nameAgent:
         api: terminal.rename
         cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
@@ -114,8 +134,12 @@ routing:
 forbiddenCalls:
   - orchestration.dispatch-inject-for-operation
   - orchestration.dispatch-return-preamble-for-operation
+  - orchestration.dispatch-to-existing-terminal-for-operation
   - terminal-send-operation-prompt
   - terminal-create-shell-only-coordinator
   - operation-agent-tool-agent
   - orchestration-send-status-for-coordinator-instruction
   - parent-coordinator-direct-operation-control
+  - task-create-for-non-dag-operation
+  - operation-effect-without-provider-attestation
+  - architecture-sidearm-inferred-from-review

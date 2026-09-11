@@ -32,7 +32,7 @@ test('execution planner keeps Codex solo and Orca orchestration boundaries expli
   const solo = planWorkflowExecution({request: request(), registry: registry(), inventory: ['codex', 'claude', 'qwen']});
   assert.equal(solo.host, 'codex');
   assert.equal(solo.controlPlane, null);
-  assert.equal(solo.executionBoundary, 'current-host-session-with-isolated-inline-operation-agents');
+  assert.equal(solo.executionBoundary, 'current-host-session-with-isolated-background-operation-agents');
   assert.equal(solo.operationMapping, 'one-operation-instance-one-agent');
   assert.equal(solo.maxConcurrentOperationAgents, 3);
   assert.ok(solo.resolutions.every(row => row.selected.environment === 'codex'));
@@ -82,7 +82,7 @@ test('execution CLI creates, resolves, plans and inspects without invoking Orca'
   assert.equal(map.status, 0, map.stderr);
   assert.deepEqual(JSON.parse(map.stdout).modes.solo.hosts, ['codex', 'claude', 'orca']);
   assert.equal(JSON.parse(map.stdout).modes.solo.maxConcurrentOperationAgents, 3);
-  assert.equal(JSON.parse(map.stdout).modes.solo.operationAgent, 'inline-background-agent');
+  assert.equal(JSON.parse(map.stdout).modes.solo.operationAgent, 'isolated-background-agent');
   assert.equal(JSON.parse(map.stdout).modes.orchestrated.controlPlane, 'orca');
   assert.equal(JSON.parse(map.stdout).approvals.schema, 'starci/approval-policy@1');
   assert.deepEqual(JSON.parse(map.stdout).secondaryRoutes['backend.implement'].calls.map(call => call.op), ['architecture.decide']);

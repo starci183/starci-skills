@@ -13,14 +13,24 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.match(contract.planCoordinator.calls.startAgent.cli,/orchestration worker-start .*--agent codex/);
   assert.match(contract.workflowCoordinator.calls.startChildAgent.cli,/--worktree new-child .*--agent codex/);
   assert.match(contract.workflowCoordinator.calls.nameAgent.cli,/\[Coordinator\] <Workflow>/);
-  assert.equal(contract.operationAgent.qwen38Flash.command,'qwen --exclude-tools agent');
+  assert.equal(contract.operationAgent.qwen38Flash.launch,'direct-native-worker-start');
+  assert.equal(contract.operationAgent.qwen38Flash.agent,'qwen-code');
+  assert.equal(contract.operationAgent.qwen38Flash.model,'qwen3.8-flash');
   assert.equal(contract.operationAgent.qwen38Flash.nestedAgents,'forbidden');
-  assert.match(contract.operationAgent.qwen38Flash.calls.createAgent.cli,/terminal create .*qwen --exclude-tools agent/);
-  assert.match(contract.operationAgent.qwen38Flash.calls.attachTask.cli,/worker-start .*--terminal <terminal-handle>/);
+  assert.equal(contract.operationAgent.admission.expectedOperation,'active-dag-node');
+  assert.equal(contract.operationAgent.admission.providerSelection,'profiles-registry-resolver-output');
+  assert.equal(contract.operationAgent.admission.afterWorkerStart.api,'orchestration.worker-show');
+  assert.equal(contract.operationAgent.admission.afterWorkerStart.beforeEffectAcceptance,'required');
+  assert.equal(contract.operationAgent.admission.architectureSidearm.onlyTrigger,'active implementation secondary_request');
+  assert.equal(contract.operationAgent.admission.architectureSidearm.exactReason,'sds-technical-gap');
+  assert.match(contract.operationAgent.qwen38Flash.calls.startAgent.cli,/worker-start .*--agent qwen-code/);
+  assert.doesNotMatch(contract.operationAgent.qwen38Flash.calls.startAgent.cli,/--terminal|--model/);
+  assert.match(contract.operationAgent.qwen38Flash.calls.restoreName.cli,/terminal rename .*\[Op\] <operation> - <scope>/);
   assert.equal(contract.routing.coordinatorToOperation,'forbidden');
   assert.match(contract.routing.coordinatorToWorkflow.cli,/--type escalation/);
   assert.equal(contract.routing.coordinatorToWorkflow.forbiddenType,'status');
   assert.ok(contract.forbiddenCalls.includes('terminal-send-operation-prompt'));
+  assert.ok(contract.forbiddenCalls.includes('orchestration.dispatch-to-existing-terminal-for-operation'));
   assert.ok(contract.forbiddenCalls.includes('operation-agent-tool-agent'));
 });
 
@@ -75,5 +85,9 @@ test('provider catalog exposes explicit API and validation contracts',()=>{
   assert.equal(claudeApi.unavailableAssumptions.Agent,false);
   assert.equal(claudeApi.unavailableAssumptions.AgentOutput,false);
   assert.equal(validateProviderContracts().ok,true);
-  assert.equal(loadProviderContract('orca').adapters.qwen.launchCommand,'qwen --exclude-tools agent');
+  const qwen=loadProviderContract('orca').adapters.qwen;
+  assert.equal(qwen.kind,'direct-native-managed-agent');
+  assert.equal(qwen.start[0].api,'orchestration.worker-start');
+  assert.equal(qwen.start[0].binding,'agent-qwen-code');
+  assert.ok(qwen.forbidden.includes('terminal-create-qwen-command'));
 });

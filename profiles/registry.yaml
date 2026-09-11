@@ -13,7 +13,7 @@ executionModes:
   solo:
     hosts: [codex, claude, orca]
     controlPlane: current-chat-session
-    operationAgent: inline-background-agent
+    operationAgent: isolated-background-agent
     maxConcurrentOperationAgents: 3
     isolation: isolated-per-operation
     worktree: current-session-worktree
@@ -31,7 +31,7 @@ executionModes:
     workflowManagerReportsTo: parent-coordinator
     workflowManagerExecutionPolicy: decision-dispatch-wait-only
     higherLayerSubstitution: forbidden
-    operationAgent: workflow-inline-subagent
+    operationAgent: supervised-native-agent-in-workflow-worktree
     maxConcurrentOperationAgents: 3
     isolation: isolated-per-operation
     worktree: isolated-child-per-workflow-attempt
@@ -114,10 +114,9 @@ targets:
     orcaLaunch:
       kind: managed-agent
       agent: qwen-code
-      command: qwen --exclude-tools agent
-      startup: prewarm-terminal-then-worker-start-by-handle
-      readiness: tui-idle
-      supervision: worker-start-terminal
+      startup: direct-native-worker-start
+      modelAuthority: verified-qwen-runtime-configuration
+      supervision: worker-start-agent
   qwen-qwen3.8-max-worker:
     runtime: qwen
     profile: qwen3.8-max-worker
@@ -157,10 +156,9 @@ targets:
     orcaLaunch:
       kind: managed-agent
       agent: qwen-code
-      command: qwen --exclude-tools agent
-      startup: prewarm-terminal-then-worker-start-by-handle
-      readiness: tui-idle
-      supervision: worker-start-terminal
+      startup: direct-native-worker-start
+      modelAuthority: verified-qwen-runtime-configuration
+      supervision: worker-start-agent
 skills:
   starci:
     chains:
@@ -274,7 +272,8 @@ selection: Orca supplies the observed external-agent inventory. Resolve the sele
   authenticates a provider, grants tools or expands the workflow authority. Use managed-agent
   launch when Orca recognizes the provider. This Orca build recognizes Qwen through native agent
   id qwen-code; Qwen 3.8 Flash therefore uses supervised worker-start and inherits its exact model
-  from the verified Qwen runtime configuration. Use a declared command-terminal only when an exact
+  from the verified Qwen runtime configuration. Launch it directly with `worker-start --agent qwen-code`;
+  never create or attach a terminal by running the `qwen` command. Use a declared command-terminal only when an exact
   per-operation model override is required and the native adapter cannot carry that model.
 costPolicy: |-
   Qwen 3.8 Flash is the default execution and independent-review target, including backend,
