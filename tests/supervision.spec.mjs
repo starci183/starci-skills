@@ -46,6 +46,9 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.equal(policy.routing.workflowInternal.execution,'operation-agent-only');
   assert.equal(policy.routing.workflowInternal.coordinatorNotification,'none');
   assert.equal(policy.routing.workflowToCoordinator.envelope,'normalized-workflow-boundary');
+  assert.equal(policy.routing.coordinatorToWorkflow.recipient,'workflow-manager');
+  assert.equal(policy.routing.coordinatorToWorkflow.eventType,'escalation');
+  assert.equal(policy.routing.coordinatorToWorkflow.statusEvent,'forbidden-for-control-instruction');
   assert.equal(policy.routing.coordinatorToOperation.direct,'forbidden');
   assert.equal(policy.routing.managerRecovery.bypassManager,'forbidden');
   assert.equal(policy.waitHierarchy.workflowManager.waitsFor,'operation-boundary');

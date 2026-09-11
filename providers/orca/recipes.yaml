@@ -43,6 +43,14 @@ recipes:
       - orchestration.worker-start-current-worktree
       - terminal.rename
     terminalName: "[Op] <operation> - <scope>"
+  coordinator-instruction:
+    actor: plan-coordinator
+    recipient: workflow-coordinator
+    sequence:
+      - orchestration.send-type-escalation
+      - workflow-coordinator-blocking-check-wakes
+      - workflow-coordinator-routes-to-operation-when-needed
+    forbiddenType: status
   operation-boundary:
     actor: operation-agent
     sequence:

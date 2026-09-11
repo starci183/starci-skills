@@ -106,7 +106,9 @@ operationAgent:
 routing:
   coordinatorToWorkflow:
     api: orchestration.send
-    cli: 'orca orchestration send --to dispatch:<workflow-dispatch-id> --subject "<decision>" --body "<normalized-decision-envelope>" --json'
+    cli: 'orca orchestration send --to dispatch:<workflow-dispatch-id> --type escalation --subject "<decision>" --body "<normalized-decision-envelope>" --json'
+    forbiddenType: status
+    reason: Workflow Coordinators block on escalation but do not subscribe to status.
   coordinatorToOperation: forbidden
   operationToParentCoordinator: forbidden
 forbiddenCalls:
@@ -115,4 +117,5 @@ forbiddenCalls:
   - terminal-send-operation-prompt
   - terminal-create-shell-only-coordinator
   - operation-agent-tool-agent
+  - orchestration-send-status-for-coordinator-instruction
   - parent-coordinator-direct-operation-control

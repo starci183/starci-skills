@@ -31,3 +31,6 @@ uiAssertions:
   - Workflow coordinator title equals [Coordinator] <Workflow>.
   - Operation title equals [Op] <operation> - <scope>.
   - Bash in the subtitle is accepted only as activity metadata beneath a native agent identity.
+messageAssertions:
+  - Coordinator-to-Workflow control instructions use type escalation.
+  - Status messages are informational only and never carry a control instruction.

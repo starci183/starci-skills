@@ -38,6 +38,7 @@ export function validateProviderContracts(){
   add(errors,orca.index?.names?.workflowWorktree==='[Workflow] <Workflow>','Invalid Orca workflow worktree name');
   add(errors,orca.index?.names?.workflowCoordinator==='[Coordinator] <Workflow>','Invalid Orca Workflow Coordinator name');
   add(errors,orca.index?.names?.operationAgent==='[Op] <operation> - <scope>','Invalid Orca operation name');
+  add(errors,/--type escalation/.test(orca.index?.routing?.coordinatorToWorkflow?.cli||'')&&orca.index?.routing?.coordinatorToWorkflow?.forbiddenType==='status','Coordinator-to-Workflow control must use escalation, not status');
   const commands=orca.api?.publicCommands;
   add(errors,Array.isArray(commands)&&commands.length===orca.api?.snapshot?.observedCommandCount,'Orca API inventory count mismatch');
   add(errors,Array.isArray(commands)&&new Set(commands).size===commands.length,'Orca API inventory contains duplicates');
@@ -69,4 +70,3 @@ export function requireProviderContracts(){
   if(!result.ok)throw Error(result.errors.join('; '));
   return result;
 }
-

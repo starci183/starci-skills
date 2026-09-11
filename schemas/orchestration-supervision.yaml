@@ -36,6 +36,7 @@ invariants:
   - Every operation message targets its Workflow Manager; module-local decisions are settled there without notifying the parent Coordinator.
   - A Workflow Manager emits only normalized cross-workflow, shared-owner, authority, human-decision, manager-failure or workflow-done boundaries to the parent Coordinator.
   - The parent Coordinator replies through the Workflow Manager and never controls an operation agent directly.
+  - A Coordinator-to-Workflow control instruction is sent as an escalation event because escalation is part of the Workflow Manager blocking subscription; a status event cannot carry control.
   - The parent Coordinator decides, schedules, integrates, recovers or replaces Workflow Managers and never performs workflow-local or operation work.
   - A higher management layer never substitutes for or performs work owned by a lower layer.
   - If a Workflow Manager fails, the Coordinator replaces or recovers that manager; it never bypasses the missing layer.

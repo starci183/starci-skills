@@ -49,6 +49,12 @@ routing:
       - workflow-manager-terminal-failure
       - normalized-workflow-done
     envelope: normalized-workflow-boundary
+  coordinatorToWorkflow:
+    recipient: workflow-manager
+    transport: orchestration-send
+    eventType: escalation
+    reason: escalation-is-in-the-workflow-manager-blocking-subscription
+    statusEvent: forbidden-for-control-instruction
   coordinatorToOperation:
     direct: forbidden
     route: coordinator-to-workflow-manager-to-operation

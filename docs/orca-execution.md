@@ -135,6 +135,11 @@ creating, attaching, naming, waiting, reporting, releasing and acknowledging eve
 `Bash: ...` subtitle is only the native agent's current tool activity; identity comes from the native
 agent icon, canonical terminal title and supervised worker receipt.
 
+Send a parent Coordinator control instruction to a Workflow Coordinator with
+`orchestration send --type escalation`. Workflow Coordinators block on escalation plus operation
+question/outcome events; `status` is informational and cannot carry control because it does not wake
+that subscription.
+
 ## Normal execution
 
 `startOrcaExecution({request, parentRunId, adapter})` attaches one workflow child to an existing Orca

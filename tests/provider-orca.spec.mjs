@@ -18,6 +18,8 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.match(contract.operationAgent.qwen38Flash.calls.createAgent.cli,/terminal create .*qwen --exclude-tools agent/);
   assert.match(contract.operationAgent.qwen38Flash.calls.attachTask.cli,/worker-start .*--terminal <terminal-handle>/);
   assert.equal(contract.routing.coordinatorToOperation,'forbidden');
+  assert.match(contract.routing.coordinatorToWorkflow.cli,/--type escalation/);
+  assert.equal(contract.routing.coordinatorToWorkflow.forbiddenType,'status');
   assert.ok(contract.forbiddenCalls.includes('terminal-send-operation-prompt'));
   assert.ok(contract.forbiddenCalls.includes('operation-agent-tool-agent'));
 });
