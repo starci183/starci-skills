@@ -1,0 +1,52 @@
+schema: starci/orchestration-supervision-schema@1
+policy: workflows/supervision.yaml
+runtimeState:
+  location: bound Work root .starciwork/_local/plans/<plan-id>/runtime.json
+  excludedFromCanonicalWork: true
+  required:
+    - runId
+    - workflowTaskId
+    - dispatchId
+    - attempt
+    - cursor
+    - latestHeartbeatAt
+    - deadlineAt
+    - heartbeatIntervalMs
+    - heartbeatGraceMs
+    - processedMessages
+    - pendingAcknowledgements
+messageIdentity:
+  messageId: Stable logical event identity used for idempotent processing.
+  deliveryId: Exact delivery instance acknowledged only after successful processing.
+  runId: Parent Orca Run identity.
+  workflowTaskId: Workflow-wrapper Task identity, never an operation Task substitute.
+  dispatchId: Exact active workflow attempt identity.
+  attempt: Positive workflow attempt number; stale attempts cannot advance the DAG.
+  eventType: One subscribed boundary event or heartbeat.
+  emittedAt: Finite Unix epoch milliseconds supplied by the event source.
+invariants:
+  - The parent Coordinator is a persistent native agent in the Orca main worktree and remains alive for the Run while operation agents are created and released dynamically.
+  - An external Codex or Claude session may bootstrap the Coordinator but hands off the Run and does not retain the coordinator event loop.
+  - Every workflow child worktree has one persistent native Workflow Manager agent for the workflow attempt; the worktree alone is not a workflow wrapper.
+  - The Workflow Manager owns its operation DAG, provider resolution, operation lifecycle and operation boundary events, then reports normalized workflow boundaries to the parent Coordinator.
+  - The Workflow Manager decides, dispatches, retries, replaces and waits; implementation, repair, test execution and output production belong exclusively to operation agents.
+  - The Workflow Manager waits for operation boundaries, while the parent Coordinator waits for normalized Workflow Manager boundaries.
+  - A Qwen, Claude, Codex or other operation agent executes exactly one operation and never substitutes for the Workflow Manager.
+  - Every operation message targets its Workflow Manager; module-local decisions are settled there without notifying the parent Coordinator.
+  - A Workflow Manager emits only normalized cross-workflow, shared-owner, authority, human-decision, manager-failure or workflow-done boundaries to the parent Coordinator.
+  - The parent Coordinator replies through the Workflow Manager and never controls an operation agent directly.
+  - The parent Coordinator decides, schedules, integrates, recovers or replaces Workflow Managers and never performs workflow-local or operation work.
+  - A higher management layer never substitutes for or performs work owned by a lower layer.
+  - If a Workflow Manager fails, the Coordinator replaces or recovers that manager; it never bypasses the missing layer.
+  - Each operation attempt owns exactly one supervised agent and that agent is never reused by another operation.
+  - A Qwen operation terminal is named, prewarmed to tui-idle and attached to its Task with worker-start by exact terminal handle before any operation prompt is accepted.
+  - Returned-preamble, dispatch injection, manual prompt submission and retained unsupervised fallbacks are forbidden for operation execution.
+  - If supervised attachment fails with agent_prompt_stalled or session_not_reported, the exact attempt is fenced and reconciled before another provider is selected.
+  - Accepting worker_done releases the operation agent; it does not remove the workflow child before reviewed integration.
+  - Authored policy never stores runtime message IDs, delivery IDs, cursors or terminal handles.
+  - A wait timeout rearms the event wait and never triggers terminal inspection by itself.
+  - Healthy heartbeat is acknowledged without progress prompting, log reading or user reporting.
+  - Message ID redelivery is idempotent only when its logical payload is unchanged.
+  - Delivery acknowledgement occurs after successful event processing.
+  - Liveness inspection begins only after an explicit terminal signal, missed heartbeat grace or deadline.
+  - At most one bounded terminal tail may resolve ambiguous task-level liveness.

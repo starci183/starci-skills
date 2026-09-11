@@ -35,12 +35,20 @@ properties:
       orchestrated:
         type: object
         additionalProperties: false
-        required: [controlPlane, workers, workflowWrapperAgent, operationAgent, maxConcurrentOperationAgents, isolation, worktree, scheduling, fanOutWithinOperation]
+        required: [controlPlane, bootstrapHosts, bootstrapRole, coordinatorAgent, coordinatorAuthority, workers, workflowWrapperAgent, workflowManagerAuthority, workflowManagerReportsTo, workflowManagerExecutionPolicy, higherLayerSubstitution, operationAgent, maxConcurrentOperationAgents, isolation, worktree, scheduling, fanOutWithinOperation]
         properties:
           controlPlane: {const: orca}
+          bootstrapHosts: {const: [codex, claude, orca]}
+          bootstrapRole: {const: create-native-coordinator-and-handoff}
+          coordinatorAgent: {const: persistent-native-agent-in-main-worktree}
+          coordinatorAuthority: {const: owns-plan-run-and-dag}
           workers:
             const: [codex, claude, qwen]
-          workflowWrapperAgent: {const: child-worktree-agent}
+          workflowWrapperAgent: {const: persistent-native-manager-agent-in-child-worktree}
+          workflowManagerAuthority: {const: owns-operation-dag-and-boundary-loop}
+          workflowManagerReportsTo: {const: parent-coordinator}
+          workflowManagerExecutionPolicy: {const: decision-dispatch-wait-only}
+          higherLayerSubstitution: {const: forbidden}
           operationAgent: {const: workflow-inline-subagent}
           maxConcurrentOperationAgents: {const: 3}
           isolation: {const: isolated-per-operation}
@@ -130,6 +138,12 @@ $defs:
             properties:
               kind: {const: managed-agent}
               agent: {type: string, minLength: 1}
+              startup:
+                enum: [prewarm-terminal-then-worker-start-by-handle]
+              readiness:
+                enum: [tui-idle]
+              supervision:
+                enum: [worker-start-terminal]
           - type: object
             additionalProperties: false
             required: [kind, command, dispatch]

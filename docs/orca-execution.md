@@ -13,6 +13,26 @@ before the adapter creates a workflow child.
 
 The module never invokes a shell or the Orca CLI. Callers inject an Orca adapter, which makes unit tests deterministic and lets the installed runtime translate calls to the version-matched `orca orchestration` commands.
 
+The parent Coordinator is a persistent native agent running in the Orca main worktree for the
+lifetime of the Run. An external Codex or Claude chat may prepare the accepted Plan and bootstrap
+that agent, but it hands off the Run and leaves the event loop; it is not the active Coordinator.
+The main-worktree Coordinator owns the Run/DAG, cross-workflow boundary-event wait, decisions and
+integration. Every workflow wrapper is itself one persistent native Workflow Manager agent running
+in its isolated child worktree for one workflow attempt; a child worktree without that manager is
+not an executing workflow. The manager owns its operation DAG, provider resolution, operation-agent
+lifecycle and operation boundary events, and reports only normalized workflow boundaries to the
+parent Coordinator. Each operation is a fresh supervised native agent started inside that workflow
+child and released immediately after its exact
+`worker_done` is accepted. Operation agents are never reused. A Qwen operation is first opened as a
+named native TUI, observed at `tui-idle`, and attached to its Task with `worker-start --terminal`.
+The Task preamble is delivered only by that supervised attachment; an untracked returned-preamble or
+manual terminal-send fallback is forbidden. The workflow child is retained until reviewed
+integration settles, then it may be removed; unrelated workflows may instead run in solo mode.
+The Workflow Manager only decides, dispatches, retries, replaces and waits for operation boundaries;
+it never writes implementation code, repairs an operation or runs the operation's tests. Those effects
+belong exclusively to the operation agent. The Coordinator waits for normalized Workflow Manager
+boundaries and never performs workflow-local or operation work.
+
 ## Approval boundary
 
 Before the first effect, the Coordinator presents one complete workflow/Plan brief and binds the
@@ -58,7 +78,7 @@ The adapter consumes the shared request contract with these orchestration fields
 }
 ```
 
-The workflow selection chooses the wrapper hosted in the child worktree. Operations are ordered.
+The workflow selection chooses the persistent native Workflow Manager hosted in the child worktree. Operations are ordered.
 Dependencies may reference only earlier operations, and every operation carries its own resolved
 provider/model selection and nonempty file allowlist. An operation selection chooses its subagent; it
 does not change ownership, scope, criteria, authority or workflow worktree.
@@ -78,7 +98,7 @@ The runtime functions use only these injected methods:
 
 - `createRun(input)` returns `{runId}`.
 - `createTask(input)` creates either a workflow-wrapper Task or a nested operation-subagent Task and returns `{taskId}`.
-- `dispatchWorker(input)` returns `{dispatchId}`. For a wrapper it creates the workflow child; for an operation it launches the selected managed agent or command terminal in that existing child.
+- `dispatchWorker(input)` returns `{dispatchId}`. For a wrapper it creates the workflow child; for an operation it launches the selected managed agent or command terminal in that existing child. A recognized provider must use its native Orca agent id; Qwen 3.8 Flash uses `qwen-code` and inherits the verified model from Qwen runtime configuration.
 - `stopWorker(input)` retires an operation attempt superseded by a shared change.
 - `releaseWorker(input)` releases the exact settled worker after an accepted `worker_done`.
 - `integrateChange(input)` performs a coordinator-owned integration action and returns only after the shared change is on the base used by new worktrees.
@@ -86,9 +106,29 @@ The runtime functions use only these injected methods:
 The wrapper Dispatch receives `worktree: {kind: 'new-child', isolated: true}` exactly once. Every
 operation Dispatch receives `worktree: {kind: 'existing-child', ...}` plus
 `agent: {kind: 'isolated-subagent'}` and explicit false permissions for merge, rebase, cherry-pick and
-push. A command-terminal adapter starts the declared CLI in the existing workflow worktree and retains
-the nested Task/Dispatch/operation correlation. It must not silently convert an unsupported launch
-into success.
+push. A command-terminal adapter is reserved for an exact per-operation model override that the
+native adapter cannot represent. It starts the declared CLI in the existing workflow worktree and
+retains the nested Task/Dispatch/operation correlation. It must not silently convert an unsupported
+launch into success.
+
+For Qwen 3.8 Flash, the Workflow Manager creates a terminal in the existing workflow worktree with
+command `qwen` and title `[Op] <operation> - <scope>`, waits for `tui-idle`, then calls
+`worker-start --task <task-id> --terminal <terminal-handle>`. It reapplies the same title with
+`terminal rename` after attachment so the Orca tree and tab never fall back to `worker-task_<id>`.
+This sequence keeps one Task, one Dispatch, one terminal and one supervised worker resource while
+avoiding the installed direct adapter's premature prompt acknowledgement.
+
+If attachment still reports `agent_prompt_stalled` or `session_not_reported`, fence and reconcile
+that exact attempt. Retry the next provider only after effects are verified absent. Never use
+`dispatch --inject`, `dispatch --return-preamble`, manual prompt submission or a retained
+unsupervised terminal as a successful operation.
+
+The display contract is mandatory at creation time:
+
+- main agent: `[Coordinator] <Plan>`;
+- child worktree: `[Workflow] <Workflow>`;
+- persistent child manager: `[Monitor] <Workflow>`;
+- isolated operation agent: `[Op] <operation> - <scope>`.
 
 ## Normal execution
 
@@ -101,6 +141,43 @@ same child, up to the configured ceiling; it does not serialize unrelated branch
 `acceptOrcaWorkerDone({plan, event, adapter})` requires an exact Task ID, Dispatch ID, operation ID, and explicit `succeeded` or `failed` outcome. Every `filesModified` entry must be a safe relative path matched by that worker's allowlist. Absolute paths, traversal, duplicate entries, wrong attempt identities, and out-of-scope files are rejected without advancing dependencies. An accepted completion releases that exact worker before dependencies advance. A failed operation blocks its dependent branch only; already runnable unrelated workers remain runnable.
 
 Allowlist patterns are repository-relative paths. Exact paths and whole-segment `*` or `**` wildcards are supported. Backslashes and partial-segment wildcards are rejected to keep validation consistent across operating systems.
+
+## Event-driven coordinator wait
+
+After dispatch, the native main-worktree Coordinator does not supervise operation terminals. Each
+Workflow Manager uses the version-matched orchestration event wait with a cursor, waits for, and receives its
+operations' `question`, `escalation`, `heartbeat`, `worker_done` and `worker_failed` events. It handles
+operation progress by deciding and dispatching operation agents for bounded repair, safe local approval,
+provider fallback and module-local SDS sidearms; it does not execute those operations itself. Only a
+normalized cross-workflow/shared-owner/authority/human-decision boundary,
+manager failure or workflow completion is sent to the parent Coordinator. The parent returns decisions
+through the Workflow Manager, never directly to an operation. A healthy heartbeat confirms liveness
+but requires no parent reply, terminal read or user update.
+
+A wait timeout means only that no matching boundary event arrived. Re-arm the wait;
+do not turn the timeout into a terminal poll. Inspect liveness only after the workflow's
+declared deadline or heartbeat grace is breached, or when Orca reports a closed,
+crashed or otherwise terminal worker. Start with task/dispatch state and the latest
+heartbeat. Read at most one bounded terminal tail when those signals cannot determine
+whether the worker is slow or stopped.
+
+The Workflow Manager acts only by deciding and dispatching at operation boundaries; the parent acts only
+by deciding and scheduling at normalized workflow boundaries. Neither manager performs lower-layer work:
+
+- receive a cross-workflow/shared-owner/authority/human-decision escalation from the manager;
+- return the decision to that manager for delivery to its operation;
+- accept a normalized workflow completion and schedule newly ready workflows;
+- recover or replace a genuinely stopped Workflow Manager while preserving its child worktree.
+
+Do not repeatedly call terminal read/list, inspect partial diffs, duplicate tests,
+send progress prompts, restart healthy operations or surface unchanged state to the
+user. The child remains responsible for reaching its own terminal event.
+
+The canonical machine-readable contract is authored in
+`workflows/supervision.yaml`, compiled to `.dist/workflows/supervision.json`, and
+enforced by `execution/supervision.mjs`. Authored policy contains no run-specific
+identifiers. Each bound Plan stores its current cursor, message/delivery identities,
+attempt identity and liveness timestamps under excluded `_local` runtime state.
 
 ## Shared-change escalation
 

@@ -19,3 +19,9 @@ profiles:
       decision, plan or verification artifacts the operator owns; never repair the product being
       judged.
     toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
+  gpt-6-astra-reviewer:
+    role: reasoning
+    model: gpt-6-astra
+    imageGeneration: false
+    roleDescription: Plan strategy, analyze complex evidence and make architecture or business decisions without executing implementation work.
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization

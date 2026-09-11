@@ -54,6 +54,53 @@ work. A separate implementation role requires explicit ownership and scope; it i
 not implied by being coordinator. In solo execution, keep the same entry/exit
 boundaries without inventing a second task or repeated self-approval checkpoints.
 
+## Event-driven supervision between workflow boundaries
+
+Once a workflow has an accepted input envelope and an active executor, the workflow
+wrapper owns its internal operation scheduling, provider fallback, bounded retries,
+diagnosis, edits, tests and in-scope repairs. The coordinator becomes an event-driven
+consumer of workflow state; it is not a live terminal supervisor.
+
+The coordinator waits quietly for one of these actionable boundary events:
+
+- `question`: the executor needs a decision that it cannot make inside its accepted
+  authority;
+- `escalation`: ownership, scope, effects, safety or a cross-workflow dependency must
+  be resolved outside the workflow;
+- `worker_done`: the workflow has produced a terminal outcome for exit review;
+- an explicit runtime `blocked`, `failed`, `closed` or `crashed` state that the
+  workflow wrapper cannot recover internally;
+- a liveness breach: the declared deadline has expired or expected heartbeats have
+  been absent beyond the configured interval and grace period.
+
+Everything else remains executor-owned and is non-actionable to the coordinator:
+ordinary command output, status prose, healthy heartbeats, long-running tests inside
+their deadline, transient tool or check failures under bounded repair, provider
+fallback with no effects, and an unchanged wait timeout. These signals do not permit
+the coordinator to read logs repeatedly, rerun commands, send prompts asking for
+progress, restart a healthy worker, create replacement work or report unchanged state
+to the user.
+
+Use one cursor-based blocking event wait and re-arm it after a timeout without treating
+the timeout as failure. Do not create a fixed polling loop around terminal reads,
+source diffs, task listings or event snapshots. A monitoring interval controls when
+the coordinator may evaluate liveness; it does not authorize periodic inspection of
+healthy work.
+
+When a liveness breach is suspected, inspect the smallest task-level signal first:
+workflow/dispatch state, terminal existence and most recent heartbeat. Read one bounded
+terminal tail only if those signals are inconsistent or insufficient to distinguish a
+slow worker from a stopped one. If the worker is alive, return to the event wait. If it
+is stopped, preserve its effects, classify known versus partial/unknown state, and use
+the workflow's recovery or escalation path. Never take over implementation merely
+because a workflow is slow.
+
+On `question` or `escalation`, answer only the reported boundary and let the workflow
+resume its own operations. On `worker_done`, perform the exit review once, accept or
+return the complete output, release the settled worker and unlock dependents. The
+coordinator does not replay the executor's work to establish that it was busy; it
+reviews the output contract and the proof required by the accepted goal.
+
 If a workflow does not make sense in actual use, distinguish a product defect, an
 executor deviation and a runtime defect. Record the expected/actual mismatch and
 its impact once. Under explicit runtime-maintenance authority, repair the smallest

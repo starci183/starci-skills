@@ -76,7 +76,7 @@ test('ExecutionRequest keeps requested model explicit and validates its source b
     kind: 'ExecutionRequest',
     metadata: {workflowId: 'workflow-1', operationId: 'design', requestId: 'request-1'},
     spec: {
-      operation: 'architecture.decide', environment: 'claude', profile: 'fable', requestedModel: null,
+      operation: 'architecture.decide', environment: 'claude', profile: 'fable-5.1', requestedModel: null,
       source: {repository: 'starci-academy-backend', baseRef: 'main'}, gate: 'approved-goal', capabilities: ['read']
     }
   };
@@ -90,10 +90,10 @@ test('workflow receipts preserve operation order and requested/observed models i
   assert.deepEqual(receipt.operations.map(value => value.operationId), ['design', 'implement']);
   const recorded = recordOperationReceipt(receipt, {
     operationId: 'design', operation: 'architecture.decide', status: 'completed',
-    environment: 'codex', profile: 'gpt-5.6-sol-reviewer', requestedModel: 'gpt-5.6-sol', observedModel: 'gpt-5.7', observations: []
+    environment: 'codex', profile: 'gpt-6-astra-reviewer', requestedModel: 'gpt-6-astra', observedModel: 'gpt-6-astra', observations: []
   });
-  assert.equal(recorded.operations[0].requestedModel, 'gpt-5.6-sol');
-  assert.equal(recorded.operations[0].observedModel, 'gpt-5.7');
+  assert.equal(recorded.operations[0].requestedModel, 'gpt-6-astra');
+  assert.equal(recorded.operations[0].observedModel, 'gpt-6-astra');
   assert.equal(recorded.status, 'running');
   assert.equal(receipt.operations[0].status, 'pending');
 });

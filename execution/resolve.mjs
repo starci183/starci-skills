@@ -18,7 +18,7 @@ function validateRegistry(registry) {
     || solo?.isolation !== 'isolated-per-operation'
     || solo?.fanOutWithinOperation !== 'forbidden'
     || orchestrated?.controlPlane !== 'orca'
-    || orchestrated?.workflowWrapperAgent !== 'child-worktree-agent'
+    || orchestrated?.workflowWrapperAgent !== 'persistent-native-manager-agent-in-child-worktree'
     || orchestrated?.operationAgent !== 'workflow-inline-subagent'
     || orchestrated?.maxConcurrentOperationAgents !== 3
     || orchestrated?.worktree !== 'isolated-child-per-workflow-attempt'
@@ -124,7 +124,17 @@ export function resolveOperation({workflowRequest, operationId, registry, invent
   if (!operation) throw Error(`Workflow operation not found: ${operationId}`);
   let candidates = flattenOperationCandidates({operation, registry});
   if (workflowRequest.spec.mode === 'solo' && workflowRequest.spec.soloHost !== 'orca') {
-    candidates = candidates.filter(candidate => candidate.environment === workflowRequest.spec.soloHost);
+    const soloHost = canonicalEnvironment(registry, workflowRequest.spec.soloHost);
+    candidates = candidates.filter(candidate => candidate.environment === soloHost);
+    if (!candidates.length) {
+      const role = (registry.reasoningOps ?? []).includes(operation.operation) ? 'reasoning' : 'working';
+      const profile = registry.defaults?.[soloHost]?.[role];
+      const match = Object.entries(registry.targets).find(([, target]) => canonicalEnvironment(registry, target.runtime) === soloHost && target.profile === profile);
+      if (match) {
+        const [target, configured] = match;
+        candidates = [{priority:0,environmentPriority:0,profilePriority:0,target,environment:soloHost,runtime:soloHost,profile:configured.profile,requestedModel:configured.requestedModel,orcaLaunch:clone(configured.orcaLaunch)}];
+      }
+    }
   }
   if (!candidates.length) throw Error(`No execution candidates for operation ${operationId} in requested mode`);
   const observed = inventoryByEnvironment(inventory, registry);

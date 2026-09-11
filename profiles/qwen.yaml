@@ -14,7 +14,19 @@ profiles:
     role: working
     model: qwen3.8-max
     imageGeneration: false
-    roleDescription: Execute complex bounded implementation or repair when the Flash worker is insufficient or unavailable.
+    roleDescription: Execute complex bounded implementation or repair only when explicitly selected for a benchmark or user-approved exception.
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
+  deepseek-v4-pro-worker:
+    role: working
+    model: deepseek-v4-pro
+    imageGeneration: false
+    roleDescription: Execute the preferred cost-aware backend implementation and repair work through the QwenCloud-compatible DeepSeek V4 Pro model.
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
+  deepseek-v4-pro-reviewer:
+    role: reasoning
+    model: deepseek-v4-pro
+    imageGeneration: false
+    roleDescription: Perform the preferred deep independent review through the QwenCloud-compatible DeepSeek V4 Pro model.
     toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
   qwen3.8-max-reviewer:
     role: reasoning

@@ -1,3 +1,5 @@
+import {formatOrcaDisplayName,planOperationAgentLaunch} from './supervision.mjs';
+
 const PLAN_SCHEMA='starci/orca-execution-plan@1';
 const TERMINAL=new Set(['completed','failed','blocked']);
 
@@ -166,9 +168,12 @@ async function dispatchOperation(plan,operationId,adapter,{resume=false}={}){
   });
   const taskId=idOf(taskReceipt,'taskId','id');
   const worktree=existingWorkflowWorktree(plan);
+  const operationName=operation.operator??operationId;
+  const displayName=formatOrcaDisplayName('operation-agent',{operation:operationName,scope:plan.workflowId});
+  const launchPlan=planOperationAgentLaunch({taskId,worktree:`path:${worktree.id}`,selection:operation.selection,operation:operationName,scope:plan.workflowId});
   const dispatchReceipt=await dispatchWorker({
     runId:plan.runId,taskId,operationId,parentTaskId:plan.workflow.taskId,parentDispatchId:plan.workflow.dispatchId,
-    role:'operation-subagent',agent:{kind:'isolated-subagent',operationId},worktree,selection:copy(operation.selection),
+    role:'operation-subagent',agent:{kind:'isolated-subagent',operationId},displayName,launchPlan,worktree,selection:copy(operation.selection),
     prompt:workerPrompt(operation,{resume}),input:copy(input),permissions:{merge:false,rebase:false,cherryPick:false,push:false}
   });
   const dispatchId=idOf(dispatchReceipt,'dispatchId','id');
@@ -205,9 +210,11 @@ export async function startOrcaExecution({request,parentRunId=null,adapter}){
     const receipt=await adapterMethod(adapter,'createRun')({objective:`Coordinate StarCi workflow DAG containing ${plan.workflowId}`,controlPlane:'orca'});
     plan.runId=idOf(receipt,'runId','id');
   }
-  const taskReceipt=await adapterMethod(adapter,'createTask')({runId:plan.runId,kind:'workflow-wrapper',workflowId:plan.workflowId,title:`Workflow ${plan.workflowId}`,spec:workflowPrompt(plan),deps:[]});
-  const taskId=idOf(taskReceipt,'taskId','id'),worktree={kind:'new-child',name:workflowWorktreeName(plan.workflowId),isolated:true};
-  const dispatchReceipt=await adapterMethod(adapter,'dispatchWorker')({runId:plan.runId,taskId,workflowId:plan.workflowId,role:'workflow-wrapper',worktree,selection:copy(plan.workflow.selection),prompt:workflowPrompt(plan),permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
+  const managerName=formatOrcaDisplayName('workflow-manager',{workflow:plan.workflowId});
+  const worktreeDisplayName=formatOrcaDisplayName('workflow-worktree',{workflow:plan.workflowId});
+  const taskReceipt=await adapterMethod(adapter,'createTask')({runId:plan.runId,kind:'workflow-wrapper',workflowId:plan.workflowId,title:managerName,spec:workflowPrompt(plan),deps:[]});
+  const taskId=idOf(taskReceipt,'taskId','id'),worktree={kind:'new-child',name:workflowWorktreeName(plan.workflowId),displayName:worktreeDisplayName,isolated:true};
+  const dispatchReceipt=await adapterMethod(adapter,'dispatchWorker')({runId:plan.runId,taskId,workflowId:plan.workflowId,role:'workflow-wrapper',displayName:managerName,worktree,selection:copy(plan.workflow.selection),prompt:workflowPrompt(plan),permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
   const dispatchId=idOf(dispatchReceipt,'dispatchId','id'),worktreeId=dispatchReceipt.worktreeId??worktree.name;
   plan.workflow={...plan.workflow,status:'running',taskId,dispatchId,worktree:{...worktree,id:worktreeId}};
   plan.status='running';

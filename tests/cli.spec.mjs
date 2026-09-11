@@ -69,7 +69,8 @@ test('agent-route exposes the first ready external worker for Orca without execu
   assert.equal(result.selected.model,'qwen3.8-flash');
   const fallback=run('agent-route','starci','interface.implement','claude');
   assert.equal(fallback.status,0,fallback.stderr);
-  assert.equal(JSON.parse(fallback.stdout).selected.target,'claude-opus');
+  assert.equal(JSON.parse(fallback.stdout).selected,null);
+  assert.equal(JSON.parse(fallback.stdout).skipped.length,2);
 });
 
 test('legacy audit inventories credentials without echoing values and does not execute scripts', t => {

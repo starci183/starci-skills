@@ -21,6 +21,7 @@ execution/api.mjs
 execution/resolve.mjs
 execution/solo.mjs
 execution/orca.mjs
+execution/supervision.mjs
 scripts/config.mjs
 scripts/plan.mjs
 scripts/present-goal.mjs

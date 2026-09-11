@@ -8,6 +8,7 @@ aliases:
   anthropic: claude
   qwencloud: qwen
   alibaba: qwen
+  deepseek: qwen
 executionModes:
   solo:
     hosts: [codex, claude, orca]
@@ -20,8 +21,16 @@ executionModes:
     fanOutWithinOperation: forbidden
   orchestrated:
     controlPlane: orca
+    bootstrapHosts: [codex, claude, orca]
+    bootstrapRole: create-native-coordinator-and-handoff
+    coordinatorAgent: persistent-native-agent-in-main-worktree
+    coordinatorAuthority: owns-plan-run-and-dag
     workers: [codex, claude, qwen]
-    workflowWrapperAgent: child-worktree-agent
+    workflowWrapperAgent: persistent-native-manager-agent-in-child-worktree
+    workflowManagerAuthority: owns-operation-dag-and-boundary-loop
+    workflowManagerReportsTo: parent-coordinator
+    workflowManagerExecutionPolicy: decision-dispatch-wait-only
+    higherLayerSubstitution: forbidden
     operationAgent: workflow-inline-subagent
     maxConcurrentOperationAgents: 3
     isolation: isolated-per-operation
@@ -38,22 +47,26 @@ agentArchitecture:
 orchestration:
   runtime: orca
   owner: source-host
+  defaultOperationTarget: qwen-qwen3.8-flash-worker
   workspaceRouting: .workspaces/projects/<project>/work.json
   approvalPolicy: approvals/policy.json
   approvalMode: accepted-brief-then-auto
-  dispatch: The Orca parent coordinates the Plan DAG and creates one isolated child worktree for each
-    ready workflow. The child workflow wrapper resolves dependencies and launches one isolated
-    subagent for each ready operation, using the first ready external agent in that operation's chain.
+  dispatch: A bootstrap session creates a persistent native Coordinator agent in the Orca main
+    worktree and hands off the Plan Run. That Coordinator owns the DAG and creates one isolated child
+    worktree for each ready workflow and launches one persistent native Workflow Manager in that child. The
+    Workflow Manager resolves operation dependencies, launches one isolated subagent for each ready
+    operation and waits for its boundary, using the first ready external agent in that operation's chain.
+    Managers never implement, repair or test on behalf of a lower layer.
 defaults:
   codex:
     working: gpt-5.6-sol
-    reasoning: gpt-5.6-sol-reviewer
+    reasoning: gpt-6-astra-reviewer
   claude:
     working: opus
-    reasoning: fable
+    reasoning: fable-5.1
   qwen:
     working: qwen3.8-flash-worker
-    reasoning: qwen3.8-max-reviewer
+    reasoning: qwen3.8-flash-reviewer
 reasoningOps:
   - business.decide
   - architecture.decide
@@ -73,6 +86,13 @@ targets:
     orcaLaunch:
       kind: managed-agent
       agent: codex
+  codex-gpt-6-astra-reviewer:
+    runtime: codex
+    profile: gpt-6-astra-reviewer
+    requestedModel: gpt-6-astra
+    orcaLaunch:
+      kind: managed-agent
+      agent: codex
   claude-opus:
     runtime: claude
     profile: opus
@@ -80,9 +100,9 @@ targets:
     orcaLaunch:
       kind: managed-agent
       agent: claude
-  claude-fable:
+  claude-fable-5.1:
     runtime: claude
-    profile: fable
+    profile: fable-5.1
     requestedModel: null
     orcaLaunch:
       kind: managed-agent
@@ -92,16 +112,34 @@ targets:
     profile: qwen3.8-flash-worker
     requestedModel: qwen3.8-flash
     orcaLaunch:
-      kind: command-terminal
-      command: qwen --model qwen3.8-flash --approval-mode auto
-      dispatch: return-preamble-and-send
+      kind: managed-agent
+      agent: qwen-code
+      startup: prewarm-terminal-then-worker-start-by-handle
+      readiness: tui-idle
+      supervision: worker-start-terminal
   qwen-qwen3.8-max-worker:
     runtime: qwen
     profile: qwen3.8-max-worker
     requestedModel: qwen3.8-max
     orcaLaunch:
       kind: command-terminal
-      command: qwen --model qwen3.8-max --approval-mode auto
+      command: qwen --model qwen3.8-max --approval-mode auto --exclude-tools agent --max-session-turns 80 --max-wall-time 30m --max-tool-calls 160 --chat-recording false
+      dispatch: return-preamble-and-send
+  qwen-deepseek-v4-pro-worker:
+    runtime: qwen
+    profile: deepseek-v4-pro-worker
+    requestedModel: deepseek-v4-pro
+    orcaLaunch:
+      kind: command-terminal
+      command: qwen --model deepseek-v4-pro --approval-mode auto --exclude-tools agent --max-session-turns 80 --max-wall-time 30m --max-tool-calls 160 --chat-recording false
+      dispatch: return-preamble-and-send
+  qwen-deepseek-v4-pro-reviewer:
+    runtime: qwen
+    profile: deepseek-v4-pro-reviewer
+    requestedModel: deepseek-v4-pro
+    orcaLaunch:
+      kind: command-terminal
+      command: qwen --model deepseek-v4-pro --approval-mode auto --exclude-tools agent --max-session-turns 40 --max-wall-time 20m --max-tool-calls 80 --chat-recording false
       dispatch: return-preamble-and-send
   qwen-qwen3.8-max-reviewer:
     runtime: qwen
@@ -109,128 +147,111 @@ targets:
     requestedModel: qwen3.8-max
     orcaLaunch:
       kind: command-terminal
-      command: qwen --model qwen3.8-max --approval-mode auto
+      command: qwen --model qwen3.8-max --approval-mode auto --exclude-tools agent --max-session-turns 40 --max-wall-time 20m --max-tool-calls 80 --chat-recording false
       dispatch: return-preamble-and-send
   qwen-qwen3.8-flash-reviewer:
     runtime: qwen
     profile: qwen3.8-flash-reviewer
     requestedModel: qwen3.8-flash
     orcaLaunch:
-      kind: command-terminal
-      command: qwen --model qwen3.8-flash --approval-mode auto
-      dispatch: return-preamble-and-send
+      kind: managed-agent
+      agent: qwen-code
+      startup: prewarm-terminal-then-worker-start-by-handle
+      readiness: tui-idle
+      supervision: worker-start-terminal
 skills:
   starci:
     chains:
       working:
-        - codex-gpt-5.6-sol
-        - claude-opus
         - qwen-qwen3.8-flash-worker
-        - qwen-qwen3.8-max-worker
+        - codex-gpt-5.6-sol
       reasoning:
-        - codex-gpt-5.6-sol-reviewer
-        - claude-fable
-        - qwen-qwen3.8-max-reviewer
-        - qwen-qwen3.8-flash-reviewer
+        - codex-gpt-6-astra-reviewer
+        - claude-fable-5.1
 operators:
   architecture.decide:
     skill: starci
-    chain: [codex-gpt-5.6-sol-reviewer, claude-fable, qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]
+    chain: [codex-gpt-6-astra-reviewer, claude-fable-5.1]
     environments:
-      - {environment: codex, profiles: [codex-gpt-5.6-sol-reviewer]}
-      - {environment: claude, profiles: [claude-fable]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]}
+      - {environment: codex, profiles: [codex-gpt-6-astra-reviewer]}
+      - {environment: claude, profiles: [claude-fable-5.1]}
   backend.implement:
     skill: starci
-    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
     environments:
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   business.decide:
     skill: starci
-    chain: [codex-gpt-5.6-sol-reviewer, claude-fable, qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]
+    chain: [codex-gpt-6-astra-reviewer, claude-fable-5.1]
     environments:
-      - {environment: codex, profiles: [codex-gpt-5.6-sol-reviewer]}
-      - {environment: claude, profiles: [claude-fable]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]}
+      - {environment: codex, profiles: [codex-gpt-6-astra-reviewer]}
+      - {environment: claude, profiles: [claude-fable-5.1]}
   content.generate:
     skill: starci
-    chain: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker, codex-gpt-5.6-sol, claude-opus]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
     environments:
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
   interface.draw:
     skill: starci
-    chain: [codex-gpt-5.6-sol, qwen-qwen3.8-max-worker, claude-opus, qwen-qwen3.8-flash-worker]
+    chain: [codex-gpt-5.6-sol, qwen-qwen3.8-flash-worker]
     environments:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]}
-      - {environment: claude, profiles: [claude-opus]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
   interface.implement:
     skill: starci
-    chain: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker, codex-gpt-5.6-sol, claude-opus]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
     environments:
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
   knowledge.repair:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
     environments:
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   release.deliver:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
     environments:
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   review.verify:
     skill: starci
-    chain: [codex-gpt-5.6-sol-reviewer, claude-fable, qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]
+    chain: [qwen-qwen3.8-flash-reviewer, qwen-deepseek-v4-pro-reviewer]
     environments:
-      - {environment: codex, profiles: [codex-gpt-5.6-sol-reviewer]}
-      - {environment: claude, profiles: [claude-fable]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-reviewer, qwen-deepseek-v4-pro-reviewer]}
   runtime.operate:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
     environments:
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   scope.retire:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
     environments:
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   task.execute:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
     environments:
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   uat.verify:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
     environments:
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   workspace.manage:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol]
     environments:
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker]}
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
 fallback:
   allowedReasons:
     - unavailable
@@ -249,8 +270,22 @@ selection: Orca supplies the observed external-agent inventory. Resolve the sele
   operator chain from top to bottom, choosing the first ready runtime/profile. Fall through only
   after an allowed failure with verified no-effect state. This policy never installs an agent,
   authenticates a provider, grants tools or expands the workflow authority. Use managed-agent
-  launch when Orca recognizes the provider; use the declared command-terminal strategy for a
-  usable CLI such as Qwen that this Orca build does not recognize for supervised worker-start.
+  launch when Orca recognizes the provider. This Orca build recognizes Qwen through native agent
+  id qwen-code; Qwen 3.8 Flash therefore uses supervised worker-start and inherits its exact model
+  from the verified Qwen runtime configuration. Use a declared command-terminal only when an exact
+  per-operation model override is required and the native adapter cannot carry that model.
+costPolicy: |-
+  Qwen 3.8 Flash is the default execution and independent-review target, including backend,
+  frontend and UAT. Codex gpt-5.6-sol remains first only for interface.draw. Strategy and analysis
+  operations business.decide and architecture.decide use Codex gpt-6-astra first and Claude Fable 5.1
+  second. Automatic chains contain two candidates: execution falls back to gpt-5.6-sol, independent
+  review falls back to DeepSeek V4 Pro, and drawing falls back to Qwen 3.8 Flash. Qwen 3.8 Max and
+  Claude Opus remain installed explicit or user-approved exception targets but are excluded from
+  automatic chains. Command-terminal agents disable nested agents and have explicit turn, wall-time
+  and tool-call ceilings; a ceiling stop is a failed attempt and never proof of completion. Never infer
+  price or quality superiority from a subscription label; benchmark bounded representative
+  operations before proposing another routing change. A native Qwen worker is released after its
+  exact worker_done result is accepted; the workflow child remains until integration is complete.
 assetFallback: When image generation is unavailable, reuse verified assets first; Claude may leave
   decorative image slots blank with a concrete deferred brief. Never mark missing artwork generated
   or satisfy a functional criterion with a blank slot.

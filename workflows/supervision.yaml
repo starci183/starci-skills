@@ -1,0 +1,198 @@
+schema: starci/orchestration-supervision@1
+purpose: |-
+  Define the Orca parent Coordinator control loop between workflow boundaries. This is
+  an orchestration protocol, not a product workflow, workflow child or operation.
+ownership:
+  coordinator:
+    - workflow-dependency-resolution
+    - question-resolution
+    - escalation-resolution
+    - final-outcome-review
+    - conflict-workflow-dispatch
+  workflowWrapper:
+    - operation-scheduling
+    - bounded-retry
+    - provider-fallback-with-no-effects
+    - operation-boundary-decision
+    - normalized-workflow-reporting
+  operationAgent:
+    - implementation-and-repair
+    - test-and-verification-execution
+    - operation-output-production
+routing:
+  operationToWorkflow:
+    recipient: workflow-manager
+    events:
+      - question
+      - escalation
+      - heartbeat
+      - worker_done
+      - worker_failed
+  workflowInternal:
+    execution: operation-agent-only
+    resolveWithoutCoordinator:
+      - operation-dependency
+      - safe-command-approval
+      - no-effect-provider-fallback
+      - bounded-retry
+      - module-owned-small-fix
+      - module-local-architecture-sidearm
+      - focused-test-failure
+    coordinatorNotification: none
+  workflowToCoordinator:
+    onlyWhen:
+      - cross-workflow-dependency
+      - shared-owner-change
+      - cross-workflow-conflict
+      - accepted-scope-or-authority-change
+      - human-product-decision
+      - workflow-manager-terminal-failure
+      - normalized-workflow-done
+    envelope: normalized-workflow-boundary
+  coordinatorToOperation:
+    direct: forbidden
+    route: coordinator-to-workflow-manager-to-operation
+  managerRecovery:
+    onManagerFailure: coordinator-replaces-or-recovers-manager
+    bypassManager: forbidden
+waitHierarchy:
+  workflowManager:
+    waitsFor: operation-boundary
+    accepts:
+      - question
+      - escalation
+      - heartbeat
+      - worker_done
+      - worker_failed
+    actsBy: decide-dispatch-retry-or-replace-operation
+    directExecution: forbidden
+  coordinator:
+    waitsFor: normalized-workflow-boundary
+    accepts:
+      - cross-workflow-dependency
+      - shared-owner-change
+      - cross-workflow-conflict
+      - accepted-scope-or-authority-change
+      - human-product-decision
+      - workflow-manager-terminal-failure
+      - normalized-workflow-done
+    actsBy: decide-schedule-recover-or-replace-workflow-manager
+    workflowLocalExecution: forbidden
+    operationExecution: forbidden
+workerLifecycle:
+  displayNames:
+    coordinator: "[Coordinator] <Plan>"
+    workflowWorktree: "[Workflow] <Workflow>"
+    workflowManager: "[Monitor] <Workflow>"
+    operationAgent: "[Op] <operation> - <scope>"
+    applyAgentNameWith: terminal-create-and-rename-after-attach
+  coordinator:
+    lifetime: parent-run
+    host: orca-main-worktree
+    launch: persistent-native-agent
+    bootstrap: external-chat-creates-and-hands-off
+    authority: owns-plan-run-and-dag
+    release: after-final-run-settlement
+  workflowWrapper:
+    lifetime: workflow-attempt
+    host: workflow-child-worktree
+    launch: persistent-native-manager-agent
+    authority: owns-operation-dag-and-boundary-loop
+    reportsTo: parent-coordinator
+    worktree: one-isolated-child
+    release: after-reviewed-integration
+  operationAgent:
+    lifetime: operation-attempt
+    launch: supervised-native-agent
+    isolation: one-operation-one-agent
+    release: after-accepted-worker_done
+    reuse: forbidden
+    qwenLaunch:
+      agent: qwen-code
+      create: prewarm-native-terminal
+      readiness: tui-idle
+      supervise: worker-start-by-terminal-handle
+      promptDelivery: supervised-worker-start-only
+      directAgentStart: forbidden-until-adapter-ack-compatible
+    nativeLaunchFailure:
+      recognizedFailures:
+        - agent_prompt_stalled
+        - session_not_reported
+      action: fence-and-reconcile-exact-attempt
+      nextCandidate: only-after-verified-no-effects
+      unsupervisedFallback: forbidden
+      release: release-or-retain-from-worker-receipt
+      duplicateSubmit: forbidden
+wait:
+  mode: blocking-event-wait
+  subscribe:
+    - question
+    - escalation
+    - worker_done
+    - worker_failed
+  onTimeout:
+    action: rearm
+    inspectWorker: false
+    notifyUser: false
+  onHealthyHeartbeat:
+    action: none
+    inspectWorker: false
+    notifyUser: false
+liveness:
+  checkWhen:
+    - heartbeat-grace-expired
+    - workflow-deadline-expired
+    - terminal-closed
+    - terminal-crashed
+  inspectionOrder:
+    - workflow-state
+    - task-and-dispatch-state
+    - latest-heartbeat
+    - bounded-terminal-tail
+  maxTerminalTailReads: 1
+messages:
+  identity:
+    required:
+      - messageId
+      - deliveryId
+      - runId
+      - workflowTaskId
+      - dispatchId
+      - attempt
+      - eventType
+      - emittedAt
+  deduplicateBy: messageId
+  acknowledgeAfter: successful-processing
+  changedRedelivery: reject
+transitions:
+  question:
+    action: reply
+    next: wait
+  escalation:
+    action: resolve-boundary
+    next: wait
+  worker_done:
+    action: validate-review-release
+    next: unlock-dependent-workflows
+  worker_failed:
+    action: reconcile-effects
+    next: recover-or-escalate
+forbidden:
+  - external-bootstrap-retains-coordinator-loop
+  - shell-only-main-without-coordinator-agent
+  - workflow-child-without-manager-agent
+  - operation-agent-acts-as-workflow-manager
+  - operation-agent-messages-parent-coordinator-directly
+  - parent-coordinator-controls-operation-directly
+  - workflow-manager-implements-operation
+  - workflow-manager-runs-operation-tests
+  - coordinator-performs-workflow-local-work
+  - higher-manager-performs-lower-layer-work
+  - periodic-terminal-poll
+  - periodic-log-read
+  - periodic-diff-read
+  - progress-prompt
+  - duplicate-test-run
+  - restart-healthy-workflow
+  - coordinator-implements-worker-scope
+  - user-report-on-unchanged-state
