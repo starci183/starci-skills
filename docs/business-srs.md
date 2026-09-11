@@ -2,6 +2,11 @@
 
 Business defines observable product behavior. SRS is a source-of-truth contract derived from product intent, stakeholder authority, policy and customer outcomes. It is independent of source code. Architecture maps SRS behavior to a target technical design; Implementation later proves whether actual code conforms.
 
+Write all natural-language prose in current canonical SRS in Vietnamese. Keep YAML and schema keys,
+stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types, operation
+names and source symbols in English, including when they appear inside Vietnamese sentences. This
+language rule does not translate runtime contracts, knowledge topics or implementation identifiers.
+
 One project has one backend-owned `.starciwork`. `features/index.yaml` is the product catalog and every actual capability owns `features/<feature>/`. Shared rules, data, NFRs, decisions and cross-feature journeys have one accountable feature owner; other features reference their stable IDs.
 
 ## Required tree
@@ -63,7 +68,7 @@ The machine-readable contract is `specifications/srs-sections.json`. A legacy co
 - success and failure postconditions;
 - references to business rules, data, NFRs and unresolved policy decisions;
 - Given/When/Then acceptance linked back to its flow and steps;
-- an SDS handoff requiring every path to be mapped to code and verification.
+- an SDS handoff requiring every path to be mapped to logical design and planned verification.
 
 Authority references identify product briefs, stakeholder decisions, policies or approved research as `authorityRefs`. Do not put repository roles, code paths, symbols, commits, `sourceRefs` or implementation observations into SRS.
 
@@ -71,7 +76,7 @@ Main, alternative and exception flows remain inside the same functional requirem
 
 ## NFR, rules, data and decisions
 
-Each NFR states its business reason, exact FR/flow/journey scope, measurement boundary, metric, conditions and required evidence. A missing target stays tied to an open policy decision; never invent an SLA, latency percentile, retention period or capacity budget.
+Each NFR states its business reason, exact FR/flow/journey scope, measurement boundary, metric, conditions and acceptance criteria. It defines what must be measurable, not what execution evidence must be stored. A missing target stays tied to an open policy decision; never invent an SLA, latency percentile, retention period or capacity budget.
 
 Business rules state reusable invariants and link acceptance. Data definitions own meaning, fields, validation, sensitivity, state transitions, invariants, relations and privacy handling. Policy decisions name the accountable role, open question, required decisions, safe behavior while open, affected FR/data/NFR IDs and evidence that closes the decision.
 

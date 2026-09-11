@@ -72,7 +72,10 @@ writes:
         data, quality, deployment, decisions and verification. Parent indexes carry only
         starci/sds-aggregate@1 metadata. Components prescribe logical responsibilities and
         interfaces without repository roles, paths, symbols, signatures, source status or revision
-        evidence. Preserve Business and shared design through stable IDs and exact owning Work refs.
+        evidence. Write natural-language SDS prose in Vietnamese. Keep YAML/schema keys, stable
+        IDs/refs, enum literals, protocol identifiers, API fields, variables, types, operation names
+        and source symbols in English even inside Vietnamese prose. Preserve Business and shared
+        design through stable IDs and exact owning Work refs.
   - id: matrixHandoff
     path: E/job-result.json
     fields:
@@ -183,20 +186,23 @@ steps:
     action:
       en: Validate recursive layout and exact canonical SRS/shared-design references. Review full
         requirement/flow/acceptance coverage across the owning architecture scope. Resolve material
-        design blockers before pass; schema validity alone is not review. Implementation owns source
-        mapping and test execution. Done means current reviewed design, never an edit lock.
+        design blockers before pass. Confirm that natural-language SDS prose is Vietnamese and the
+        reserved machine/source token classes remain English; schema validity alone is not review.
+        Implementation owns source mapping and test execution. Done means current reviewed design,
+        never an edit lock.
 proofs:
   - id: binding
     requirement:
       en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
-        done. Legacy specification@3 and sds@4 remain readable compatibility inputs, never new
+        done. Legacy specification@3 remains a readable compatibility input, never new
         authoring output.
   - id: implementability
     requirement:
-      en: Each significant operation resolves logical owner, contract, data/commit boundary, target
-        repo/path/symbol/signature, caller/callee, authorization, state/transaction, return/recovery
-        and planned test location for the selected implementation slice. Proactively walk realistic
+      en: Each significant operation resolves logical owner, contract, data/commit boundary,
+        authorization, state/transaction, return/recovery and planned verification for the selected
+        implementation slice. The Implementation handoff names the required source-mapping scope
+        without putting repository paths or symbols into SDS. Proactively walk realistic
         main, alternative, failure and edge cases and relevant constraints; foreseeable material cases
         and core choices must not be left for implementers to invent. Explicit unknowns and subsequent
         empirical refinement do not require theoretical perfection before coding.

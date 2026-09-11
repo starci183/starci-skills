@@ -1,5 +1,0 @@
-schema: work/node@2
-id: module.architecture.sds
-kind: architecture
-required: true
-description: Synthetic flow-led SDS aggregate.

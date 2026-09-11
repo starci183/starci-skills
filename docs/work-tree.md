@@ -85,10 +85,13 @@ a completed implementation.
 - Business overview explains who needs what and why in plain language. SRS separates
   functional requirements, NFRs, rules, decisions, data and customer journeys. Each
   functional requirement keeps its own preconditions, main flow, alternatives,
-  exceptions, postconditions and acceptance. Existing code is observation, not intent.
+  exceptions, postconditions and acceptance. Canonical SRS prose is Vietnamese while structural
+  keys, stable identifiers and machine/source tokens remain English. Existing code is observation,
+  not intent.
 - Architecture maps each requirement, flow and acceptance ID through application entry
   points, logical components and interfaces, contracts, data,
   security/latency/reliability mechanisms, deployment, recovery and verification.
+  Canonical SDS prose follows the same Vietnamese-prose/English-token policy.
   Repository roles, source paths, symbols, signatures, revisions and results are recorded by
   Implementation and UAT as conformance proof. See [Architecture SDS](architecture-sds.md).
 - UI specifies experiences, interactions, states, component grammar and coverage.

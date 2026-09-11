@@ -1,5 +1,0 @@
-schema: work/node@2
-id: sds-contracts
-kind: architecture
-required: true
-description: Contract aggregate.

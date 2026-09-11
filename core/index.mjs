@@ -4,7 +4,6 @@ import { validateSDSBindings, SDS_SCHEMA } from '../specifications/sds.mjs';
 import {classifySDSPath,validateSDSMap,SDS_AGGREGATE_SCHEMA} from '../specifications/sds-map.mjs';
 import {classifySRSPath,validateSRSGraph,SRS_AGGREGATE_SCHEMA} from '../specifications/srs-sections.mjs';
 import { validateSRSV3Bindings, SRS_V3_SCHEMA } from '../specifications/srs-v3.mjs';
-import { validateSDSV4Bindings, SDS_V4_SCHEMA } from '../specifications/sds-v4.mjs';
 import { readDistJson } from './runtime-root.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -296,7 +295,6 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     const spec = n.meta.extensions?.work3?.specification;
     const splitSrs=n.meta.extensions?.work3?.srs;
     const splitSds=n.meta.extensions?.work3?.sds;
-    if(/(?:^|\/)architecture\/overview\/index\.yaml$/.test(n.path)&&spec?.schema===SDS_V4_SCHEMA&&spec.nodeType!=='overview')issue('SDS_NODE_TYPE',n.path,'Architecture overview SDS@4 payload requires nodeType overview.');
     const overviewClassification=splitSds===undefined?null:classifySDSPath(n.path,n.children.length>0);
     if(overviewClassification?.type==='overview'){
       if(n.meta.kind!=='architecture'||n.children.length)issue('SDS_LAYOUT',n.path,'Structured architecture overview is an architecture leaf.');
@@ -321,14 +319,8 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
           if(n.meta.sourceRefs?.length)issue('SDS_SOURCE_MAPPING',n.path,'SDS is source-independent; sourceRefs and revision proof belong to Implementation.');
           splitSdsEntries.push({path:n.path,nodeId:n.meta.id,workRefs:n.refIds,payload:splitSds,classification});
         }
-      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&![SDS_SCHEMA,SDS_V4_SCHEMA].includes(spec?.schema))issue('SDS_VERSION',n.path,'New SDS authoring requires a typed source-independent section; readable legacy leaves use starci/specification@3 or starci/sds@4.');
+      } else if(!n.children.length&&(spec!==undefined||n.meta.state!=='uninvestigate')&&spec?.schema!==SDS_SCHEMA)issue('SDS_VERSION',n.path,'New SDS authoring requires a typed source-independent section; readable legacy leaves use starci/specification@3.');
       if(!n.children.length&&n.meta.state==='done'&&splitSds!==undefined&&splitSds.status!=='accepted')issue('SDS_NOT_ACCEPTED',n.path,'A reviewed SDS leaf must have status accepted before it can complete.');
-      if(spec?.schema===SDS_V4_SCHEMA){
-        const suffix=n.path.slice((archRoot+'sds/').length), expected=suffix==='index.yaml'?null:suffix.startsWith('flows/')?'flow':suffix.startsWith('code-map/')?'code-unit':suffix.startsWith('contracts/')?'contract':suffix.startsWith('data/')?'data':suffix.startsWith('quality/')?'quality':suffix.startsWith('deployment/')?'deployment':suffix.startsWith('decisions/')?'decision':suffix.startsWith('verification/')?'verification':null;
-        if(!expected||spec.nodeType!==expected)issue('SDS_NODE_TYPE',n.path,'SDS@4 nodeType must match its canonical flows/code-map/contracts/data/quality/deployment/decisions/verification folder.');
-        if(expected==='code-unit'){const layer=suffix.split('/')[1];if(!['frontend','backend','shared'].includes(layer)||spec.content?.layer!==layer)issue('SDS_CODE_LAYER',n.path,'Code-unit layer must match code-map/frontend|backend|shared.');}
-        if(expected==='quality'){const category=suffix.split('/')[1];if(!['security','performance','reliability'].includes(category)||spec.content?.category!==category)issue('SDS_QUALITY_CATEGORY',n.path,'Quality category must match quality/security|performance|reliability.');}
-      }
     }
     const srsMatch = n.path.match(/^(.*(?:^|\/)business\/)srs\/(?:[^/]+\/)*index\.yaml$/);
     if(srsMatch){
@@ -363,13 +355,6 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
           const allowedNodeIds=new Set([...n.effectiveRefs,...n.effectiveDeps].flatMap(businessInputs).map(x=>x.meta.id));
           for(const message of validateSDSBindings(spec,{nodes,allowedNodeIds}))issue('SDS_BINDING',n.path,message);
         }
-        if(spec.schema===SDS_V4_SCHEMA&&review.ok){
-          if(n.meta.architecture!==undefined)issue('SDS_DUPLICATE',n.path,'SDS@4 is the sole target code-map payload; do not duplicate it in architecture.');
-          const walk=item=>item.type==='node'?[item,...item.children.flatMap(walk)]:[item];
-          const rootPrefix=n.path.split('architecture/')[0]+'architecture/';const scope=nodes.filter(item=>item.type==='node'&&item.path.startsWith(rootPrefix));for(const item of [...n.effectiveRefs,...n.effectiveDeps])scope.push(...walk(item));
-          const allowedNodeIds=new Set(scope.map(x=>x.meta.id));
-          for(const message of validateSDSV4Bindings(spec,{nodes,allowedNodeIds}))issue('SDS_BINDING',n.path,message);
-        }
         const businesses = [...n.effectiveRefs,...n.effectiveDeps].flatMap(businessInputs).filter(r=>r.meta.kind==='business'&&r.meta.extensions?.work3?.specification).map(r=>r.meta.extensions.work3.specification);
         if(spec.schema==='starci/specification@2') for(const business of businesses.filter(b=>b.schema==='starci/specification@2')) {
           for(const field of ['requirements','flows','actors','data','externalInterfaces','acceptance']) for(const input of business[field]??[]) {
@@ -397,48 +382,11 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
         if (!resource) issue('SPECIFICATION_SOURCE_UNBOUND', n.path, 'Observed source repository must be a bound repository resource.');
         else if (resource.meta.revision !== source.revision) issue('SPECIFICATION_SOURCE_STALE', n.path, 'Source citation revision must match the bound repository revision.');
       }
-      if(spec?.schema===SDS_V4_SCHEMA&&spec.nodeType==='code-unit'&&spec.content.existence==='existing'){
-        const source=spec.content.sourceObservation, bindings=Array.isArray(n.meta.sourceRefs)?n.meta.sourceRefs:[];
-        if(!bindings.some(ref=>ref.repository===source.repository&&ref.path===source.path&&ref.revision===source.revision))issue('SDS_SOURCE_UNBOUND',n.path,'Existing SDS@4 code units require an owning-node sourceRefs binding with exact repository/path/revision.');
-      }
     }
   }
   for(const finding of validateSRSGraph(splitSrsEntries))issue(finding.code,finding.path,finding.message);
   const businessEntries=nodes.filter(node=>node.meta.kind==='business'||node.meta.kind==='business-overview').map(node=>({nodeId:node.meta.id,path:node.path}));
   for(const finding of validateSDSMap(splitSdsEntries,splitSrsEntries,businessEntries))issue(finding.code,finding.path,finding.message);
-  // Cross-leaf SDS@4 graph checks. These validate declared target-map connectivity,
-  // never source existence or executed behavior.
-  const sds4=nodes.filter(n=>{const s=n.meta.extensions?.work3?.specification;return s?.schema===SDS_V4_SCHEMA&&validateSpecification(s).ok;});
-  const sdsRoot=n=>n.path.includes('/architecture/')?n.path.slice(0,n.path.indexOf('/architecture/')+14):n.path.split('architecture/')[0]+'architecture/';
-  const sdsGroups=new Map();for(const n of sds4){const key=sdsRoot(n);if(!sdsGroups.has(key))sdsGroups.set(key,[]);sdsGroups.get(key).push(n);}for(const group of sdsGroups.values()){
-    const specs=group.map(n=>n.meta.extensions.work3.specification), byId=new Map(), selected=specs.filter(s=>s.nodeType==='deployment'&&s.content.selected);for(const s of specs){if(byId.has(s.id))issue('SDS_ITEM_ID',group.find(n=>n.meta.extensions.work3.specification===s).path,`Duplicate SDS item id ${s.id}.`);else byId.set(s.id,s);}
-    if(specs.some(s=>s.nodeType!=='overview')&&selected.length!==1)for(const n of group)issue('SDS_TOPOLOGY',n.path,'Each SDS@4 scope needs exactly one selected deployment topology.');
-    const compatibleTypes={"code-unit":new Set(['code-unit','legacy-code-unit']),contract:new Set(['contract','legacy-contract']),data:new Set(['data','legacy-data'])};
-    const declared=(spec,type,id)=>{
-      const compatible=spec.refs.filter(r=>(compatibleTypes[type]?.has(r.type)??r.type===type));
-      const split=id.indexOf('#');
-      if(split>=0){const nodeId=id.slice(0,split),itemId=id.slice(split+1);return compatible.some(r=>r.nodeId===nodeId&&r.itemId===itemId);}
-      return compatible.filter(r=>r.itemId===id).length===1;
-    };
-    for(const n of group){const spec=n.meta.extensions.work3.specification,c=spec.content;
-      const requireRefs=(ids,type,label)=>{for(const id of ids??[])if(!declared(spec,type,id))issue('SDS_GRAPH',n.path,`${label} ${id} needs an explicit typed ${type} ref.`);};
-      if(spec.nodeType==='overview')requireRefs([c.selectedTopologyRef],'deployment','Selected topology');
-      if(spec.nodeType==='flow'){
-        for(const id of c.businessRefs)if(!spec.refs.some(r=>r.itemId===id&&['functional-requirement','non-functional-requirement','business-rule','business-data','customer-journey','acceptance','branch','srs-flow'].includes(r.type)))issue('SDS_GRAPH',n.path,`Business reference ${id} needs an explicit typed SRS ref.`);
-        requireRefs([c.entryPoint.codeUnitRef,...c.participants],'code-unit','Flow participant');requireRefs(c.topologyRefs,'deployment','Flow topology');requireRefs(c.verificationRefs,'verification','Flow verification');
-        for(const step of [...c.mainSequence,...c.alternativeSequences.flatMap(b=>b.steps),...c.exceptionSequences.flatMap(b=>b.steps)]){requireRefs([step.codeUnitRef],'code-unit','Flow step');if(/^actor:[A-Za-z0-9][A-Za-z0-9._-]*$/.test(step.callerRef)){/* Explicit external actor, not an internal symbol. */}else requireRefs([step.callerRef],'code-unit','Step caller');requireRefs(step.verificationRefs,'verification','Step verification');}
-      }
-      if(spec.nodeType==='code-unit'){requireRefs(c.callers.filter(id=>!/^actor:[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)),'code-unit','Caller');requireRefs(c.callees,'code-unit','Callee');requireRefs(c.contractRefs,'contract','Contract');requireRefs(c.dataRefs,'data','Data');requireRefs(c.flowRefs,'flow','Flow');requireRefs(c.qualityRefs,'quality','Quality');requireRefs(c.testRefs,'verification','Verification');}
-      if(spec.nodeType==='contract'){requireRefs([c.callerRef,c.receiverRef],'code-unit','Contract endpoint');}
-      if(spec.nodeType==='data'){requireRefs([c.writeOwnerRef,...c.readerRefs],'code-unit','Data access');}
-      if(spec.nodeType==='data'){requireRefs(c.modelCodeRefs,'code-unit','Data model code');for(const id of c.businessDataRefs)if(!spec.refs.some(r=>r.type==='business-data'&&r.itemId===id))issue('SDS_GRAPH',n.path,`Business data ${id} needs an explicit typed business-data ref.`);}
-      if(spec.nodeType==='quality'){requireRefs(c.codeRefs,'code-unit','Quality code');requireRefs(c.flowRefs,'flow','Quality flow');for(const id of c.nfrRefs)if(!spec.refs.some(r=>r.type==='non-functional-requirement'&&r.itemId===id))issue('SDS_GRAPH',n.path,`Quality NFR ${id} needs an explicit typed ref.`);}
-      if(spec.nodeType==='verification'){requireRefs(c.flowRefs,'flow','Verification flow');requireRefs(c.codeUnitRefs,'code-unit','Verification code unit');for(const id of c.businessRefs)if(!spec.refs.some(r=>r.itemId===id&&['functional-requirement','acceptance','branch','srs-flow'].includes(r.type)))issue('SDS_GRAPH',n.path,`Verification business ref ${id} needs an explicit typed SRS ref.`);for(const branch of c.branchRefs){const owner=specs.find(s=>s.nodeType==='flow'&&[...s.content.alternativeSequences,...s.content.exceptionSequences].some(b=>b.id===branch));if(!owner||!declared(spec,'flow',owner.id))issue('SDS_BRANCH_COVERAGE',n.path,`Verification branch ${branch} must resolve through a referenced flow.`);}}
-      if(spec.nodeType==='verification')for(const id of c.nfrRefs)if(!spec.refs.some(r=>r.type==='non-functional-requirement'&&r.itemId===id))issue('SDS_GRAPH',n.path,`Verification NFR ${id} needs an explicit typed ref.`);
-      if(spec.nodeType==='decision')for(const id of c.affectedRefs)if(!spec.refs.some(r=>r.itemId===id))issue('SDS_GRAPH',n.path,`Decision affected ref ${id} needs an explicit typed ref.`);
-    }
-    for(const flow of specs.filter(s=>s.nodeType==='flow'))for(const branch of [...flow.content.alternativeSequences,...flow.content.exceptionSequences])if(!specs.some(v=>v.nodeType==='verification'&&v.content.flowRefs.includes(flow.id)&&v.content.branchRefs.includes(branch.id)))issue('SDS_BRANCH_COVERAGE',group.find(n=>n.meta.extensions.work3.specification===flow).path,`Flow branch ${branch.id} needs a verification scenario.`);
-  }
   const srs3=nodes.filter(n=>{const s=n.meta.extensions?.work3?.specification;return s?.schema===SRS_V3_SCHEMA&&validateSpecification(s).ok;});
   const srsIds=new Map();for(const n of srs3){const spec=n.meta.extensions.work3.specification;if(srsIds.has(spec.id))issue('SRS_ITEM_ID',n.path,`Duplicate SRS item id ${spec.id}.`);else srsIds.set(spec.id,n);}for(const n of srs3){const spec=n.meta.extensions.work3.specification,c=spec.content,declared=(type,id)=>spec.refs.some(r=>r.type===type&&r.itemId===id);const requireRefs=(ids,type,label)=>{for(const id of ids??[])if(!declared(type,id))issue('SRS_GRAPH',n.path,`${label} ${id} needs an explicit typed ${type} ref.`);};
     if(spec.nodeType==='functional-requirement'){requireRefs(c.businessRuleRefs,'business-rule','FR business rule');requireRefs(c.nfrRefs,'non-functional-requirement','FR NFR');}
@@ -494,14 +442,14 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     return refs.map(ref=>splitOwners[ref.space].get(ref.id)).filter(ownerId=>text(ownerId)&&ownerId!==node.meta.id).map(nodeId=>({nodeId}));
   };
   // Untagged SDS@3 designRefs predate typed freshness and must not change the
-  // digest of an untouched legacy owner. Explicit v4 and split schemas opt in;
-  // after that boundary, all owner context is followed.
+  // digest of an untouched legacy owner. Split schemas opt in; after that
+  // boundary, all owner context is followed.
   const specificationOwnerRefs=node=>{const spec=node.meta.extensions?.work3?.specification;return [...(spec?.refs??[]),...(spec?.designRefs??[]),...splitSemanticRefs(node)].filter(ref=>text(ref?.nodeId));};
   const specificationSeedRefs=node=>{
     const spec=node.meta.extensions?.work3?.specification,split=splitSemanticRefs(node);
     if(split.length)return split;
-    if(spec?.schema===SRS_V3_SCHEMA||spec?.schema===SDS_V4_SCHEMA)return (spec.refs??[]).filter(ref=>text(ref?.nodeId));
-    return (spec?.designRefs??[]).filter(ref=>ref?.schema==='starci/sds@4'&&text(ref.nodeId));
+    if(spec?.schema===SRS_V3_SCHEMA)return (spec.refs??[]).filter(ref=>text(ref?.nodeId));
+    return [];
   };
   function input(n) {
     if(n.inputDigest)return n.inputDigest;
@@ -622,7 +570,6 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
         (n.meta.kind==='business'&&spec?.schema==='starci/specification@2'&&spec.op==='business.decide')||
         (n.meta.kind==='architecture'&&spec?.schema===SDS_SCHEMA&&spec.op==='architecture.decide')||
         (n.meta.kind==='business'&&spec?.schema===SRS_V3_SCHEMA&&spec.op==='business.decide')||
-        (n.meta.kind==='architecture'&&spec?.schema===SDS_V4_SCHEMA&&spec.op==='architecture.decide')||
         (n.meta.kind==='business'&&srsSection?.type&&splitSrs?.schema===srsSection.expectedSchema)||
         (n.meta.kind==='architecture'&&sdsSection?.type&&splitSds?.schema===sdsSection.expectedSchema));
       if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to current structured Business overview, split source-independent SDS and their readable legacy formats; other profiles require their existing proof.');

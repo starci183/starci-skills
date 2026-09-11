@@ -6,6 +6,11 @@ are the upstream source of truth. SDS never contains repository roles, file path
 signatures, call graphs, source revisions or executed proof. Implementation owns the mapping from
 this logical design to actual code.
 
+Write all natural-language prose in current canonical SDS in Vietnamese. Keep YAML and schema keys,
+stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types, operation
+names and source symbols in English, including when they appear inside Vietnamese sentences. This
+language rule does not translate runtime contracts, knowledge topics or implementation identifiers.
+
 Architecture may inspect a small relevant source/configuration/API surface to check feasibility and
 migration impact. Those observations inform a design decision but never become SDS content or
 authority. Record the selected logical design, rationale, impact and migration; record actual code
@@ -120,7 +125,3 @@ mechanisms. Implementation separately maps actual source to these IDs and proves
 
 Changing accepted SRS invalidates dependent SDS review. Changing logical SDS invalidates affected
 Implementation and UAT. Preserve unrelated completed scopes and historical local run state.
-
-The pre-upstream `starci/sds@4` reader exists only for explicit recovery/migration of historical
-data. Its code-shaped fields are not valid new SDS and must be moved to Implementation during
-migration.

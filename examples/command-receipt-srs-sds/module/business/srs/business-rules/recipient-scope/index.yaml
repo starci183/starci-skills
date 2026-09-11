@@ -47,4 +47,4 @@ completion:
         observation: The synthetic specification is complete enough to exercise runtime bindings; no product
           or code acceptance is claimed.
     limitations:
-      - All code units and verification tests are planned and were not executed.
+      - Architecture, implementation and verification were not executed.

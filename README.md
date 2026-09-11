@@ -121,7 +121,7 @@ Finishing one workflow does not finish the Plan. Passing metadata validation doe
 
 See [Business overview and nested SRS](docs/business-srs.md) for the split functional, non-functional, business-rule, policy-decision, data and customer-journey section contracts. See [Architecture SDS](docs/architecture-sds.md) for the sectioned source-independent design. Legacy and pre-upstream compatibility specifications remain readable; new authoring uses `specifications/srs-sections.json` and `specifications/sds-map.json`, and migration requires current review.
 
-`examples/command-receipt-srs-sds/` is retained only as a regression fixture for the pre-upstream `starci/srs@3` and `starci/sds@4` compatibility readers. Do not copy it as the current authoring template.
+`examples/command-receipt-srs-sds/` is retained only as a Business regression fixture for the pre-upstream `starci/srs@3` compatibility reader. Do not copy it as the current authoring template.
 
 See [Expandable Work tree](docs/work-tree.md) for recursive Business, Architecture,
 UI, BE/FE and UAT scopes, collocated images/videos, `interface.draw` ownership and
@@ -143,7 +143,7 @@ results; it is not an accepted product change or a passing test report.
 
 Auto identifies the initial ASAP chain and later checkpoint. It is not limited to two workflows, does not turn a waiting stage into completion and does not create a background scheduler. No mode permits inventing approvals, silently changing business policy or granting itself publication authority.
 
-User-facing language and execution preferences live in the installed `.claude/config.json`; defaults are Vietnamese (`vi`), inherited model and `medium` effort. Persisted Work and runtime contracts are English. Installation does not change the current agent's model or enable auto.
+User-facing language and execution preferences live in the installed `.claude/config.json`; defaults are Vietnamese (`vi`), inherited model and `medium` effort. Runtime contracts and knowledge remain English. Natural-language prose in current canonical SRS and SDS is Vietnamese, while structural keys and machine/source identifiers remain English. Installation does not change the current agent's model or enable auto.
 
 ## CLI
 

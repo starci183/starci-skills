@@ -1,5 +1,0 @@
-schema: work/node@2
-id: sds-data
-kind: architecture
-required: true
-description: Architecture data aggregate.

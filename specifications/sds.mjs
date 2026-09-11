@@ -118,16 +118,9 @@ export function validateSDSBindings(spec, {nodes, allowedNodeIds}) {
   const imported = new Map();
   for (const ref of spec.designRefs) {
     const node = find(ref.nodeId), design = node?.meta.extensions?.work3?.specification;
-    if(ref.schema==='starci/sds@4'){
-      if(!allowedNodeIds.has(ref.nodeId)||node?.meta.kind!=='architecture'||design?.schema!=='starci/sds@4'){errors.push(`Unbound SDS@4 owner ${ref.nodeId}`);continue;}
-      const reverse={structure:'code-unit',contracts:'contract',data:'data'};
-      for(const item of ref.items){if(design.id!==item.id||design.nodeType!==reverse[item.kind])errors.push(`Missing/wrong-kind SDS@4 item ${ref.nodeId}#${item.id}`);else imported.set(`${ref.nodeId}#${item.id}`,{kind:item.kind});}
-      if(spec.status==='pass'&&design.status!=='pass')errors.push(`Shared design not accepted: ${ref.nodeId}`);
-    }else{
-      if (!allowedNodeIds.has(ref.nodeId) || node?.meta.kind !== 'architecture' || design?.schema !== SDS_SCHEMA) { errors.push(`Unbound SDS owner ${ref.nodeId}`); continue; }
-      for (const id of ref.viewIds) {const view = design.views.find(v => v.id === id);if (!view) errors.push(`Missing SDS view ${ref.nodeId}#${id}`);else imported.set(`${ref.nodeId}#${id}`, view);}
-      if (spec.status === 'pass' && design.status !== 'pass') errors.push(`Shared design not accepted: ${ref.nodeId}`);
-    }
+    if (!allowedNodeIds.has(ref.nodeId) || node?.meta.kind !== 'architecture' || design?.schema !== SDS_SCHEMA) { errors.push(`Unbound SDS owner ${ref.nodeId}`); continue; }
+    for (const id of ref.viewIds) {const view = design.views.find(v => v.id === id);if (!view) errors.push(`Missing SDS view ${ref.nodeId}#${id}`);else imported.set(`${ref.nodeId}#${id}`, view);}
+    if (spec.status === 'pass' && design.status !== 'pass') errors.push(`Shared design not accepted: ${ref.nodeId}`);
   }
   for (const view of spec.views) for (const ref of designEdges(view)) {
     if (ref.id.includes('#') && (!imported.has(ref.id) || !ref.kinds.includes(imported.get(ref.id).kind))) errors.push(`Wrong-kind imported SDS view ${ref.id}`);

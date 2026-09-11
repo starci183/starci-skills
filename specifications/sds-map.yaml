@@ -1,6 +1,17 @@
 schema: starci/sds-map@1
 purpose: A source-independent architecture map that traces accepted business flows through logical components, contracts, data, quality mechanisms, deployment and verification.
 payload: extensions.work3.sds
+proseLanguage: vi
+preserveEnglish:
+  - yaml-schema-keys
+  - stable-ids-and-refs
+  - enum-literals
+  - protocol-identifiers
+  - api-fields
+  - variables
+  - types
+  - operation-names
+  - source-symbols
 aggregateSchema: starci/sds-aggregate@1
 overview:
   type: overview
@@ -40,6 +51,7 @@ sections:
     schema: starci/sds-verification@1
     required: [id, title, businessAcceptanceRefs, scopeRefs, level, setup, steps, expected, securityChecks, performanceChecks, failureChecks]
 rules:
+  - Natural-language prose in canonical SDS is Vietnamese. Keep YAML and schema keys, stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types, operation names and source symbols in English, including when embedded in Vietnamese prose.
   - Architecture overview is one structured starci/sds-overview@1 payload at architecture/overview/index.yaml. It summarizes accepted SRS scope, context and independently selected target-design dispositions; prose alone cannot complete it.
   - Inspect only relevant current source, configuration and installed APIs to establish feasibility and migration impact. Record retain, extend, correct, replace or add decisions with rationale; observations never override SRS or become implementation proof.
   - SDS is a source-of-truth design contract derived from SRS and design decisions, never from current source code. Source observations, revisions and implementation proof are forbidden.

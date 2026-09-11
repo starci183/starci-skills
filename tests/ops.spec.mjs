@@ -48,6 +48,8 @@ test('decide operator dispatch selects split SRS and SDS authoring while legacy 
   assert.equal(business.specificationPolicy.payloadField,'extensions.work3.srs');
   assert.equal(business.specificationPolicy.aggregateSchema,'starci/srs-aggregate@1');
   assert.deepEqual(business.specificationPolicy.compatibilitySchemas,['starci/specification@2','starci/srs@3']);
+  assert.equal(business.specificationPolicy.proseLanguage,'vi');
+  assert.deepEqual(business.specificationPolicy.preserveEnglish,srsContract.preserveEnglish);
   assert.equal(business.specificationPolicy.payloadSchema,srsContract.schema);
   assert.deepEqual(business.specificationPolicy.requiredSections,Object.keys(srsContract.sections));
   assert.deepEqual(business.specificationPolicy.sectionSchemas,Object.values(srsContract.sections).map(section=>section.schema));
@@ -57,7 +59,9 @@ test('decide operator dispatch selects split SRS and SDS authoring while legacy 
   assert.equal(architecture.specificationPolicy.payloadSchema,'starci/sds-map@1');
   assert.equal(architecture.specificationPolicy.payloadField,'extensions.work3.sds');
   assert.equal(architecture.specificationPolicy.aggregateSchema,'starci/sds-aggregate@1');
-  assert.deepEqual(architecture.specificationPolicy.compatibilitySchemas,['starci/specification@3','starci/sds@4']);
+  assert.deepEqual(architecture.specificationPolicy.compatibilitySchemas,['starci/specification@3']);
+  assert.equal(architecture.specificationPolicy.proseLanguage,'vi');
+  assert.deepEqual(architecture.specificationPolicy.preserveEnglish,sdsContract.preserveEnglish);
   assert.equal(architecture.specificationPolicy.payloadSchema,sdsContract.schema);
   assert.deepEqual(architecture.specificationPolicy.requiredSections,Object.keys(sdsContract.sections));
   assert.deepEqual(architecture.specificationPolicy.sectionSchemas,[sdsContract.overview.schema,...Object.values(sdsContract.sections).map(section=>section.schema)]);
@@ -66,10 +70,14 @@ test('decide operator dispatch selects split SRS and SDS authoring while legacy 
   assert.ok(!architecture.writes.some(write=>write.fields.includes('sourceRefs')));
   for(const mutate of [
     contract=>{contract.specificationPolicy.payloadSchema='starci/srs@3';},
+    contract=>{contract.specificationPolicy.proseLanguage='en';},
+    contract=>{contract.specificationPolicy.preserveEnglish.pop();},
     contract=>{contract.writes.find(write=>write.id==='node').fields=['extensions.work3.specification','sourceRefs'];},
   ]){const changed=fresh();mutate(changed.ops.find(op=>op.id==='business.decide').contract);assert.ok(errors(changed).includes('SPECIFICATION_POLICY'));}
   for(const mutate of [
-    contract=>{contract.specificationPolicy.payloadSchema='starci/sds@4';},
+    contract=>{contract.specificationPolicy.payloadSchema='starci/unsupported-sds@1';},
+    contract=>{delete contract.specificationPolicy.proseLanguage;},
+    contract=>{contract.specificationPolicy.preserveEnglish=['stable-ids-and-refs'];},
     contract=>{contract.reads.push({id:'source',path:'repository:<repo-id>/<bound-paths>',purpose:{en:'Inspect a current revision.'}});contract.steps[0].reads.push('source');},
   ]){const changed=fresh();mutate(changed.ops.find(op=>op.id==='architecture.decide').contract);const observed=errors(changed);assert.ok(observed.includes('SPECIFICATION_POLICY')||observed.includes('ARCHITECTURE_DEPTH'));}
 });

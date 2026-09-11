@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateSDSMap,classifySDSPath} from '../specifications/sds-map.mjs';
+import {validateSDSMap,classifySDSPath,SDS_MAP_CONTRACT} from '../specifications/sds-map.mjs';
 
 const entry=(path,type,payload)=>({path,nodeId:payload.id,workRefs:[],payload,classification:{aggregate:false,type}});
+test('canonical SDS authoring publishes Vietnamese prose and English token preservation policy',()=>{assert.equal(SDS_MAP_CONTRACT.proseLanguage,'vi');assert.deepEqual(SDS_MAP_CONTRACT.preserveEnglish,['yaml-schema-keys','stable-ids-and-refs','enum-literals','protocol-identifiers','api-fields','variables','types','operation-names','source-symbols']);});
 function fixture(){
  const srs=[{path:'features/chatbot/business/srs/functional-requirements/answer/index.yaml',nodeId:'chatbot.fr',workRefs:[],classification:{aggregate:false,type:'functional-requirement'},payload:{id:'FR-CHAT-01',mainFlow:{id:'FR-CHAT-01.MAIN'},alternativeFlows:[{id:'FR-CHAT-01.ALT1'}],exceptionFlows:[{id:'FR-CHAT-01.EX1'}],acceptanceCriteria:[{id:'FR-CHAT-01.AC1'}]}}];
  const component={schema:'starci/sds-component@1',id:'COMP-CHAT',title:'Conversation application',status:'draft',kind:'service',responsibility:'Accept an authorized chat request and coordinate its durable outcome.',interfaceRefs:['CONTRACT-CHAT'],dataRefs:['DATA-CHAT'],qualityRefs:['QUALITY-CHAT'],verificationRefs:['VERIFY-CHAT']};

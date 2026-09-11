@@ -1,5 +1,0 @@
-schema: work/node@2
-id: sds-code-backend
-kind: architecture
-required: true
-description: Backend code aggregate.

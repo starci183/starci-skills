@@ -35,9 +35,7 @@ properties:
   designRefs:
     type: array
     items:
-      oneOf:
-        - $ref: "#/$defs/designRef"
-        - $ref: "#/$defs/v4DesignRef"
+      $ref: "#/$defs/designRef"
   views:
     type: array
     minItems: 1
@@ -102,36 +100,6 @@ $defs:
         $ref: "#/$defs/text"
       viewIds:
         $ref: "#/$defs/nonemptyTexts"
-  v4DesignRef:
-    type: object
-    additionalProperties: false
-    required:
-      - schema
-      - nodeId
-      - items
-    properties:
-      schema:
-        const: starci/sds@4
-      nodeId:
-        $ref: "#/$defs/text"
-      items:
-        type: array
-        minItems: 1
-        uniqueItems: true
-        items:
-          type: object
-          additionalProperties: false
-          required:
-            - id
-            - kind
-          properties:
-            id:
-              $ref: "#/$defs/text"
-            kind:
-              enum:
-                - structure
-                - contracts
-                - data
   view:
     type: object
     additionalProperties: false

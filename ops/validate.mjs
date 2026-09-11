@@ -5,18 +5,19 @@ import { parseYaml } from '../core/yaml.mjs';
 // Operator validation must run while bootstrapping a source package before .dist exists.
 // Keep these authoring identities explicit here and regression-check them against the
 // published specification contracts; importing runtime readers would create a build cycle.
+const PRESERVED_ENGLISH=Object.freeze(['yaml-schema-keys','stable-ids-and-refs','enum-literals','protocol-identifiers','api-fields','variables','types','operation-names','source-symbols']);
 const AUTHORING_POLICIES=Object.freeze({
   'business.decide':Object.freeze({
     contractSchema:'starci/srs-sections@1',payloadField:'extensions.work3.srs',aggregateSchema:'starci/srs-aggregate@1',
     sections:Object.freeze(['functional-requirements','non-functional-requirements','business-rules','policy-decisions','data','customer-journeys']),
     sectionSchemas:Object.freeze(['starci/srs-functional-requirement@1','starci/srs-non-functional-requirement@1','starci/srs-business-rule@1','starci/srs-policy-decision@1','starci/srs-data-definition@1','starci/srs-customer-journey@1']),
-    compatibilitySchemas:Object.freeze(['starci/specification@2','starci/srs@3'])
+    compatibilitySchemas:Object.freeze(['starci/specification@2','starci/srs@3']),proseLanguage:'vi',preserveEnglish:PRESERVED_ENGLISH
   }),
   'architecture.decide':Object.freeze({
     contractSchema:'starci/sds-map@1',payloadField:'extensions.work3.sds',aggregateSchema:'starci/sds-aggregate@1',
     sections:Object.freeze(['flows','components','contracts','data','quality','deployment','decisions','verification']),
     sectionSchemas:Object.freeze(['starci/sds-overview@1','starci/sds-flow@1','starci/sds-component@1','starci/sds-contract@1','starci/sds-data-model@1','starci/sds-quality@1','starci/sds-deployment@1','starci/sds-decision@1','starci/sds-verification@1']),
-    compatibilitySchemas:Object.freeze(['starci/specification@3','starci/sds@4'])
+    compatibilitySchemas:Object.freeze(['starci/specification@3']),proseLanguage:'vi',preserveEnglish:PRESERVED_ENGLISH
   })
 });
 
@@ -122,7 +123,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles,documents=
       const architecture=at==='architecture.decide';
       const expected=AUTHORING_POLICIES[at],payloadField=expected.payloadField;
       const nodeWrite=c.writes.find(w=>w.id==='node'),policy=c.specificationPolicy;
-      if(policy?.storage!=='.starciwork'||!policy?.payload?.includes(architecture?'architecture':'business')||!policy?.payload?.includes(payloadField)||!nodeWrite?.fields.includes(payloadField)||nodeWrite?.fields.includes('extensions.work3.specification')||nodeWrite?.fields.includes('sourceRefs')||policy?.payloadSchema!==expected.contractSchema||policy?.payloadField!==payloadField||policy?.aggregateSchema!==expected.aggregateSchema||JSON.stringify(policy?.requiredSections)!==JSON.stringify(expected.sections)||JSON.stringify(policy?.sectionSchemas)!==JSON.stringify(expected.sectionSchemas)||JSON.stringify(policy?.compatibilitySchemas)!==JSON.stringify(expected.compatibilitySchemas)||!c.proofs.some(p=>p.id==='impact-security-coverage')) issue(errors,'SPECIFICATION_POLICY',at,'Business must author split SRS section@1 payloads and Architecture must author split source-independent SDS section@1 payloads; specification@2/@3 and srs@3/sds@4 are compatibility readers only');
+      if(policy?.storage!=='.starciwork'||!policy?.payload?.includes(architecture?'architecture':'business')||!policy?.payload?.includes(payloadField)||!nodeWrite?.fields.includes(payloadField)||nodeWrite?.fields.includes('extensions.work3.specification')||nodeWrite?.fields.includes('sourceRefs')||policy?.payloadSchema!==expected.contractSchema||policy?.payloadField!==payloadField||policy?.aggregateSchema!==expected.aggregateSchema||JSON.stringify(policy?.requiredSections)!==JSON.stringify(expected.sections)||JSON.stringify(policy?.sectionSchemas)!==JSON.stringify(expected.sectionSchemas)||JSON.stringify(policy?.compatibilitySchemas)!==JSON.stringify(expected.compatibilitySchemas)||policy?.proseLanguage!==expected.proseLanguage||JSON.stringify(policy?.preserveEnglish)!==JSON.stringify(expected.preserveEnglish)||!c.proofs.some(p=>p.id==='impact-security-coverage')) issue(errors,'SPECIFICATION_POLICY',at,'Business and Architecture must author Vietnamese natural-language prose in current split SRS/SDS payloads while preserving machine and source identifiers in English; specification@2/@3 and srs@3 are compatibility readers only');
     }
     if(at==='interface.draw'&&(!['repo','architecture','knowledge'].every(id=>c.reads.some(r=>r.id===id))||!c.writes.some(w=>w.id==='draws'))) issue(errors,'DRAW_HANDOFF',at,'Draw must read source/architecture/knowledge and always return draws');
     if(at==='architecture.decide'&&(c.specificationPolicy?.analysisPolicy!=='context-driven'||c.reads.some(r=>r.id==='source')||c.writes.some(w=>w.id==='source'||w.fields?.includes('sourceRefs')||/repository:<repo-id>/.test(w.path??'')))) issue(errors,'ARCHITECTURE_DEPTH',at,'Architecture requires a context-driven source-independent design without source observations, revisions or product-code effects');
