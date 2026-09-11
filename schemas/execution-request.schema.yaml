@@ -1,0 +1,112 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: starci://schemas/execution-request.schema.json
+title: StarCi execution requests
+oneOf:
+  - $ref: "#/$defs/workflowRequest"
+  - $ref: "#/$defs/executionRequest"
+$defs:
+  nonEmptyString:
+    type: string
+    minLength: 1
+  nullableModel:
+    type: [string, "null"]
+    minLength: 1
+  source:
+    type: object
+    additionalProperties: false
+    required: [repository, baseRef]
+    properties:
+      repository: {$ref: "#/$defs/nonEmptyString"}
+      baseRef: {$ref: "#/$defs/nonEmptyString"}
+  operation:
+    type: object
+    additionalProperties: false
+    required: [id, operation, dependsOn, gate, capabilities]
+    properties:
+      id: {$ref: "#/$defs/nonEmptyString"}
+      operation: {$ref: "#/$defs/nonEmptyString"}
+      dependsOn:
+        type: array
+        uniqueItems: true
+        items: {$ref: "#/$defs/nonEmptyString"}
+      gate: {$ref: "#/$defs/nonEmptyString"}
+      capabilities:
+        type: array
+        uniqueItems: true
+        items: {$ref: "#/$defs/nonEmptyString"}
+  workflowRequest:
+    type: object
+    additionalProperties: false
+    required: [apiVersion, kind, metadata, spec]
+    properties:
+      apiVersion: {const: starci.workflow/v1}
+      kind: {const: WorkflowRequest}
+      metadata:
+        type: object
+        additionalProperties: false
+        required: [workflowId, project]
+        properties:
+          workflowId: {$ref: "#/$defs/nonEmptyString"}
+          project: {$ref: "#/$defs/nonEmptyString"}
+      spec:
+        type: object
+        additionalProperties: false
+        required: [mode, source, operations]
+        properties:
+          mode: {enum: [solo, orchestrated]}
+          soloHost: {enum: [codex, claude]}
+          controlPlane: {const: orca}
+          source: {$ref: "#/$defs/source"}
+          operations:
+            type: array
+            minItems: 1
+            items: {$ref: "#/$defs/operation"}
+        allOf:
+          - if:
+              properties:
+                mode: {const: solo}
+              required: [mode]
+            then:
+              required: [soloHost]
+              properties:
+                soloHost: {enum: [codex, claude]}
+                controlPlane: false
+          - if:
+              properties:
+                mode: {const: orchestrated}
+              required: [mode]
+            then:
+              required: [controlPlane]
+              properties:
+                controlPlane: {const: orca}
+                soloHost: false
+  executionRequest:
+    type: object
+    additionalProperties: false
+    required: [apiVersion, kind, metadata, spec]
+    properties:
+      apiVersion: {const: starci.execution/v1}
+      kind: {const: ExecutionRequest}
+      metadata:
+        type: object
+        additionalProperties: false
+        required: [workflowId, operationId, requestId]
+        properties:
+          workflowId: {$ref: "#/$defs/nonEmptyString"}
+          operationId: {$ref: "#/$defs/nonEmptyString"}
+          requestId: {$ref: "#/$defs/nonEmptyString"}
+      spec:
+        type: object
+        additionalProperties: false
+        required: [operation, environment, profile, requestedModel, source, gate, capabilities]
+        properties:
+          operation: {$ref: "#/$defs/nonEmptyString"}
+          environment: {$ref: "#/$defs/nonEmptyString"}
+          profile: {$ref: "#/$defs/nonEmptyString"}
+          requestedModel: {$ref: "#/$defs/nullableModel"}
+          source: {$ref: "#/$defs/source"}
+          gate: {$ref: "#/$defs/nonEmptyString"}
+          capabilities:
+            type: array
+            uniqueItems: true
+            items: {$ref: "#/$defs/nonEmptyString"}

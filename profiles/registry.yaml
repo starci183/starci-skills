@@ -8,6 +8,17 @@ aliases:
   anthropic: claude
   qwencloud: qwen
   alibaba: qwen
+executionModes:
+  solo:
+    hosts: [codex, claude]
+    workers: 1
+    worktree: isolated-single
+    scheduling: sequential
+  orchestrated:
+    controlPlane: orca
+    workers: [codex, claude, qwen]
+    worktree: isolated-per-worker
+    scheduling: dependency-dag
 orchestration:
   runtime: orca
   owner: source-host
@@ -95,8 +106,8 @@ skills:
       working:
         - codex-gpt-5.6-sol
         - claude-opus
-        - qwen-qwen3.8-max-worker
         - qwen-qwen3.8-flash-worker
+        - qwen-qwen3.8-max-worker
       reasoning:
         - codex-gpt-5.6-sol-reviewer
         - claude-fable
@@ -112,11 +123,11 @@ operators:
       - {environment: qwen, profiles: [qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]}
   backend.implement:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
     environments:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   business.decide:
     skill: starci
     chain: [codex-gpt-5.6-sol-reviewer, claude-fable, qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]
@@ -147,18 +158,18 @@ operators:
       - {environment: claude, profiles: [claude-opus]}
   knowledge.repair:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
     environments:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   release.deliver:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
     environments:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   review.verify:
     skill: starci
     chain: [codex-gpt-5.6-sol-reviewer, claude-fable, qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]
@@ -168,39 +179,39 @@ operators:
       - {environment: qwen, profiles: [qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]}
   runtime.operate:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
     environments:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   scope.retire:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
     environments:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   task.execute:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
     environments:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   uat.verify:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
     environments:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
   workspace.manage:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
     environments:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]}
+      - {environment: qwen, profiles: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]}
 fallback:
   allowedReasons:
     - unavailable

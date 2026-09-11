@@ -21,7 +21,7 @@ test('active roles select Codex, Claude or Qwen without reviving retired profile
 });
 test('every operator has an ordered external-agent chain and skill-level defaults remain usable',()=>{
   const registry=readPublicJson('profiles/registry.json'),ops=readPublicJson('ops/catalog.json').ops.map(x=>x.id);
-  assert.equal(registry.schema,'starci/profile-registry@2');
+  assert.equal(registry.schema,'starci/profile-registry@3');
   assert.deepEqual(Object.keys(registry.operators).sort(),[...ops].sort());
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
@@ -34,7 +34,7 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.equal(resolveExecutionChain({op:'interface.implement'}).candidates[0].orcaLaunch.kind,'command-terminal');
   assert.equal(resolveExecutionChain({op:'interface.implement'}).candidates[0].orcaLaunch.command,'qwen --model qwen3.8-flash --approval-mode auto');
   assert.equal(resolveExecutionChain({op:'backend.implement'}).candidates[0].orcaLaunch.agent,'codex');
-  assert.deepEqual(registry.skills.starci.chains.working,['codex-gpt-5.6-sol','claude-opus','qwen-qwen3.8-max-worker','qwen-qwen3.8-flash-worker']);
+  assert.deepEqual(registry.skills.starci.chains.working,['codex-gpt-5.6-sol','claude-opus','qwen-qwen3.8-flash-worker','qwen-qwen3.8-max-worker']);
 });
 test('Orca selects the first ready candidate and only falls through after verified no-effect failures',()=>{
   let selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen']});

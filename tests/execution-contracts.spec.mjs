@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020.js';
+import {parseYaml} from '../core/yaml.mjs';
 import {
   createWorkflowReceipt,
   recordOperationReceipt,
@@ -26,8 +27,8 @@ const workflow = () => ({
 
 test('execution request and receipt schemas compile in strict draft-2020 mode', () => {
   const ajv = new Ajv2020({strict: true});
-  for (const name of ['execution-request.schema.json', 'execution-receipt.schema.json', 'profile-registry-v3.schema.json']) {
-    assert.doesNotThrow(() => ajv.compile(JSON.parse(fs.readFileSync(new URL(`../schemas/${name}`, import.meta.url), 'utf8'))));
+  for (const name of ['execution-request.schema.yaml', 'execution-receipt.schema.yaml', 'profile-registry-v3.schema.yaml']) {
+    assert.doesNotThrow(() => ajv.compile(parseYaml(fs.readFileSync(new URL(`../schemas/${name}`, import.meta.url), 'utf8'))));
   }
 });
 

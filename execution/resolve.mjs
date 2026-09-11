@@ -11,6 +11,7 @@ function canonicalEnvironment(registry, environment) {
 function validateRegistry(registry) {
   if (!plain(registry) || registry.schema !== 'starci/profile-registry@3') throw Error('Profile registry starci/profile-registry@3 is required');
   if (!plain(registry.targets) || !plain(registry.operators) || !plain(registry.fallback)) throw Error('Profile registry targets, operators and fallback are required');
+  if (registry.executionModes?.solo?.workers !== 1 || registry.executionModes?.orchestrated?.controlPlane !== 'orca') throw Error('Profile registry execution modes must keep Codex/Claude solo and Orca orchestration boundaries');
   if (!Array.isArray(registry.fallback.allowedReasons) || registry.fallback.requiredEffectState !== 'none') throw Error('Profile registry fallback policy is invalid');
 }
 

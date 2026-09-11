@@ -23,6 +23,13 @@ Usage:
   starci workflow <workflow-id>
   starci route <intent>
   starci agent-route <skill-id> <op-id> <ready-runtimes>
+  starci execution create <workflow-request.yaml>
+  starci execution map
+  starci execution plan <workflow-request.yaml> <ready-runtimes>
+  starci execution resolve <workflow-request.yaml> <operation-id> <ready-runtimes>
+  starci execution show <workflow-request.yaml> <receipt.yaml>
+  starci execution resume <workflow-request.yaml> <receipt.yaml>
+  starci execution escalate <orca-plan.yaml> <operation-id> <task-id> <dispatch-id> <shared-files>
   starci plan <plan.yaml>
   starci audit-legacy <legacy-root>
 Work metadata uses YAML 1.2. No command runs an op,
@@ -42,6 +49,20 @@ function directory(root) {
   const stat = fs.lstatSync(resolved);
   if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error('Root must be a real directory, not a symbolic link.');
   return resolved;
+}
+
+function dataFile(file) {
+  const resolved = path.resolve(file);
+  const stat = fs.lstatSync(resolved);
+  if (stat.isSymbolicLink() || !stat.isFile() || stat.size > 4 * 1024 * 1024) throw new Error('Execution input must be a bounded real file.');
+  const source = fs.readFileSync(resolved, 'utf8');
+  return path.extname(resolved).toLowerCase() === '.json' ? JSON.parse(source) : parseYaml(source);
+}
+
+function csv(value, label) {
+  const items = value.split(',').map(item => item.trim()).filter(Boolean);
+  if (!items.length || new Set(items).size !== items.length) throw new Error(`${label} must be a non-empty comma-separated list without duplicates.`);
+  return items;
 }
 
 function catalogue() {
@@ -111,6 +132,33 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
   try {
     const [command, ...args] = argv;
     if (!command || ['--help', '-h', 'help'].includes(command)) { emit(help); return 0; }
+    if(command==='execution'){
+      const [action,...input]=args;
+      if(!['create','map','plan','resolve','show','resume','escalate'].includes(action))throw Error('Use starci execution create|map|plan|resolve|show|resume|escalate.');
+      const {createWorkflowReceipt,validateWorkflowRequest}=await import('../execution/contracts.mjs');
+      const {planWorkflowExecution,inspectWorkflowExecution,createSharedConflictEscalation}=await import('../execution/api.mjs');
+      if(action==='map'){
+        exactArgs(input,0);const registry=readDistJson('profiles','registry.json');
+        emit({schema:'starci/execution-map@1',modes:registry.executionModes,skills:registry.skills,operators:registry.operators,targets:registry.targets,fallback:registry.fallback});return 0;
+      }
+      if(action==='create'){
+        exactArgs(input,1);const request=dataFile(input[0]);validateWorkflowRequest(request);emit(createWorkflowReceipt(request));return 0;
+      }
+      if(action==='plan'){
+        exactArgs(input,2);const request=dataFile(input[0]);const inventory=csv(input[1],'Ready runtimes');
+        emit(planWorkflowExecution({request,registry:readDistJson('profiles','registry.json'),inventory}));return 0;
+      }
+      if(action==='resolve'){
+        exactArgs(input,3);const request=dataFile(input[0]);const {resolveOperationExecution}=await import('../execution/resolve.mjs');
+        emit(resolveOperationExecution({workflowRequest:request,operationId:input[1],registry:readDistJson('profiles','registry.json'),inventory:csv(input[2],'Ready runtimes')}));return 0;
+      }
+      if(action==='show'||action==='resume'){
+        exactArgs(input,2);const result=inspectWorkflowExecution({request:dataFile(input[0]),receipt:dataFile(input[1])});
+        emit(action==='resume'?{...result,action:'resume-from-receipt',executed:false}:result);return 0;
+      }
+      exactArgs(input,5);
+      emit(createSharedConflictEscalation({plan:dataFile(input[0]),operationId:input[1],taskId:input[2],dispatchId:input[3],files:csv(input[4],'Shared files')}));return 0;
+    }
     if(command==='storage'){exactArgs(args,1);const result=inspectStorage(directory(args[0]));emit(result);return result.newWorkAllowed?0:1;}
     if(command==='source-layout'){
       exactArgs(args,2);

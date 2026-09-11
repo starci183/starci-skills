@@ -15,6 +15,11 @@ specifications/srs-sections.mjs
 specifications/srs-v3.mjs
 specifications/v2.mjs
 profiles/select.mjs
+execution/contracts.mjs
+execution/api.mjs
+execution/resolve.mjs
+execution/solo.mjs
+execution/orca.mjs
 scripts/config.mjs
 scripts/plan.mjs
 scripts/present-goal.mjs
