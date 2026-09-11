@@ -19,11 +19,14 @@ recipes:
     sequence:
       - orchestration.task-create
       - orchestration.worker-start-new-child
+      - worktree.set-parent-to-exact-main-coordinator
+      - worktree.show-and-attest-parent-lineage
       - worktree.set-display-name
       - terminal.rename
     worktreeName: "[Workflow] <Workflow>"
     terminalName: "[Coordinator] <Workflow>"
     environmentBinding: current-runtime-by-omitting---on
+    beforeOperationTaskCreate: parent-lineage-attested
   start-qwen-operation:
     mode: orchestrated
     actor: workflow-coordinator
@@ -99,3 +102,4 @@ forbiddenSequences:
   - create-task-before-dag-operation-admission
   - accept-operation-effect-before-provider-attestation
   - worker-start-with-literal-or-guessed-environment
+  - workflow-child-with-null-or-wrong-parent-lineage

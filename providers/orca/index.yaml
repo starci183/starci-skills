@@ -57,6 +57,14 @@ workflowCoordinator:
     startChildAgent:
       api: orchestration.worker-start
       cli: 'orca orchestration worker-start --task <task-id> --worktree new-child --repo <exact-repo-selector> --name <workflow-slug> --agent codex --setup run --json'
+    bindParent:
+      api: worktree.set
+      cli: 'orca worktree set --worktree <worker.worktree_id> --parent-worktree <exact-main-worktree-selector> --json'
+    attestParent:
+      api: worktree.show
+      cli: 'orca worktree show --worktree <worker.worktree_id> --json'
+      acceptOnlyWhen: 'result.worktree.parentWorktreeId equals the exact main Coordinator worktree id'
+      onMismatch: stop-before-operation-task-creation
     nameWorktree:
       api: worktree.set
       cli: 'orca worktree set --worktree <worker.worktree_id> --display-name "[Workflow] <Workflow>" --json'

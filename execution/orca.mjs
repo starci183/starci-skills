@@ -22,6 +22,10 @@ function dependencies(operation){return operation.dependsOn??operation.dependenc
 function allowlist(operation){return operation.allowedFiles??operation.fileAllowlist??operation.scope?.allowedFiles;}
 function selection(operation){return operation.selection??operation.executionSelection;}
 function operatorOf(operation){return operation.operation??operation.operator??null;}
+function parentWorktreeRef(value){
+  need(plain(value),'Orca workflow start requires the exact parent main worktree reference');
+  return {selector:text(value.selector,'parent main worktree selector'),id:text(value.id,'parent main worktree id')};
+}
 
 function operationInputEnvelope(plan,operation){
   const dependencyOutputs=operation.dependsOn.map(operationId=>{
@@ -216,8 +220,9 @@ export async function dispatchReadyOrcaOperations(plan,adapter){
 }
 
 /** Attach one workflow child to an Orca parent Run, then launch its first operation-subagent wave. */
-export async function startOrcaExecution({request,parentRunId=null,adapter}){
+export async function startOrcaExecution({request,parentRunId=null,parentWorktree,adapter}){
   let plan=planOrcaExecution(request);
+  const parent=parentWorktreeRef(parentWorktree);
   if(parentRunId){plan.runId=text(parentRunId,'parent Orca run id');}
   else {
     const receipt=await adapterMethod(adapter,'createRun')({objective:`Coordinate StarCi workflow DAG containing ${plan.workflowId}`,controlPlane:'orca'});
@@ -226,10 +231,15 @@ export async function startOrcaExecution({request,parentRunId=null,adapter}){
   const managerName=formatOrcaDisplayName('workflow-manager',{workflow:plan.workflowId});
   const worktreeDisplayName=formatOrcaDisplayName('workflow-worktree',{workflow:plan.workflowId});
   const taskReceipt=await adapterMethod(adapter,'createTask')({runId:plan.runId,kind:'workflow-wrapper',workflowId:plan.workflowId,title:managerName,spec:workflowPrompt(plan),deps:[]});
-  const taskId=idOf(taskReceipt,'taskId','id'),worktree={kind:'new-child',name:workflowWorktreeName(plan.workflowId),displayName:worktreeDisplayName,isolated:true};
+  const taskId=idOf(taskReceipt,'taskId','id'),worktree={kind:'new-child',name:workflowWorktreeName(plan.workflowId),displayName:worktreeDisplayName,isolated:true,parentWorktree:copy(parent)};
   const dispatchReceipt=await adapterMethod(adapter,'dispatchWorker')({runId:plan.runId,taskId,workflowId:plan.workflowId,role:'workflow-wrapper',displayName:managerName,worktree,selection:copy(plan.workflow.selection),prompt:workflowPrompt(plan),permissions:{merge:false,rebase:false,cherryPick:false,push:false}});
-  const dispatchId=idOf(dispatchReceipt,'dispatchId','id'),worktreeId=dispatchReceipt.worktreeId??worktree.name;
-  plan.workflow={...plan.workflow,status:'running',taskId,dispatchId,worktree:{...worktree,id:worktreeId}};
+  const dispatchId=idOf(dispatchReceipt,'dispatchId','id'),worktreeId=text(dispatchReceipt.worktreeId,'created workflow child worktree id');
+  await adapterMethod(adapter,'setWorktreeParent')({worktreeId,parentWorktree:copy(parent)});
+  const lineageReceipt=await adapterMethod(adapter,'showWorktree')({worktreeId});
+  const record=lineageReceipt?.worktree??lineageReceipt?.result?.worktree;
+  need(plain(record)&&record.id===worktreeId,'Orca worktree-show did not return the exact workflow child');
+  need(record.parentWorktreeId===parent.id,'Workflow child is detached from the parent Coordinator worktree');
+  plan.workflow={...plan.workflow,status:'running',taskId,dispatchId,worktree:{...worktree,id:worktreeId,parentWorktreeId:record.parentWorktreeId,lineageAttested:true}};
   plan.status='running';
   return dispatchReadyOrcaOperations(plan,adapter);
 }

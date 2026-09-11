@@ -12,6 +12,7 @@ import {
 } from '../execution/orca.mjs';
 
 const selection=(provider='openai',model='gpt-5.6-sol')=>({provider,model,effort:'high',orcaLaunch:{kind:'managed-agent',agent:'codex'}});
+const parentWorktree={selector:'path:D:/Repositories/example',id:'repo-1::D:/Repositories/example'};
 const request=()=>({
   id:'release-widget',mode:'orchestrated',controlPlane:'orca',operations:[
     {id:'prepare',operation:'workspace.manage',spec:'Prepare inputs',dependsOn:[],allowedFiles:['work/prepare/**'],selection:selection()},
@@ -23,7 +24,7 @@ const request=()=>({
 
 function fakeOrca(){
   let tasks=0,dispatches=0;
-  const calls={runs:[],tasks:[],dispatches:[],stops:[],releases:[],integrations:[]};
+  const calls={runs:[],tasks:[],dispatches:[],worktreeParents:[],worktreeShows:[],stops:[],releases:[],integrations:[]};
   return {calls,adapter:{
     async createRun(input){calls.runs.push(input);return {runId:'run-1'};},
     async createTask(input){
@@ -34,8 +35,10 @@ function fakeOrca(){
     async dispatchWorker(input){
       const dispatchId=`dispatch-${++dispatches}`;
       calls.dispatches.push({...structuredClone(input),dispatchId});
-      return {dispatchId};
+      return input.worktree.kind==='new-child'?{dispatchId,worktreeId:'worktree-child-1'}:{dispatchId};
     },
+    async setWorktreeParent(input){calls.worktreeParents.push(structuredClone(input));return {status:'updated'};},
+    async showWorktree(input){calls.worktreeShows.push(structuredClone(input));return {worktree:{id:input.worktreeId,parentWorktreeId:parentWorktree.id}};},
     async showWorker({dispatchId}){
       const launched=calls.dispatches.find(call=>call.dispatchId===dispatchId);
       assert.ok(launched?.displayName,'operation dispatch needs a canonical display name');
@@ -71,10 +74,15 @@ test('orchestrated requests fail closed unless Orca is the control plane and eve
 });
 
 test('the parent creates one workflow child and its wrapper launches ready operation subagents without extra worktrees',async()=>{
-  const {adapter,calls}=fakeOrca();const plan=await startOrcaExecution({request:request(),adapter});
+  const {adapter,calls}=fakeOrca();const plan=await startOrcaExecution({request:request(),parentWorktree,adapter});
   assert.equal(calls.runs.length,1);assert.equal(calls.tasks.length,2);assert.equal(calls.dispatches.length,2);
   assert.equal(plan.operations.prepare.status,'dispatched');assert.equal(plan.operations.backend.status,'pending');
   assert.equal(calls.dispatches[0].worktree.kind,'new-child');assert.equal(calls.dispatches[0].worktree.isolated,true);
+  assert.deepEqual(calls.dispatches[0].worktree.parentWorktree,parentWorktree);
+  assert.deepEqual(calls.worktreeParents,[{worktreeId:'worktree-child-1',parentWorktree}]);
+  assert.deepEqual(calls.worktreeShows,[{worktreeId:'worktree-child-1'}]);
+  assert.equal(plan.workflow.worktree.parentWorktreeId,parentWorktree.id);
+  assert.equal(plan.workflow.worktree.lineageAttested,true);
   assert.equal(calls.dispatches[1].worktree.kind,'existing-child');
   assert.equal(calls.dispatches[1].worktree.name,calls.dispatches[0].worktree.name);
   assert.equal(calls.dispatches[1].agent.kind,'isolated-subagent');
@@ -86,7 +94,7 @@ test('the parent creates one workflow child and its wrapper launches ready opera
 });
 
 test('completion validates exact Dispatch identity and allowlisted file outcomes before releasing dependent branches',async()=>{
-  const {adapter,calls}=fakeOrca();let plan=await startOrcaExecution({request:request(),adapter});
+  const {adapter,calls}=fakeOrca();let plan=await startOrcaExecution({request:request(),parentWorktree,adapter});
   const prepare=plan.operations.prepare;
   assert.throws(()=>validateWorkerDone({...prepare.attempts[0],operationId:'prepare'},{...done(prepare),dispatchId:'other'}),/does not belong/);
   await assert.rejects(()=>acceptOrcaWorkerDone({plan,event:done(prepare,'succeeded',['README.md']),adapter}),/Out-of-scope/);
@@ -102,7 +110,7 @@ test('completion validates exact Dispatch identity and allowlisted file outcomes
 });
 
 test('a shared out-of-scope escalation creates an authorized conflict-owner Task while unrelated work remains runnable',async()=>{
-  const {adapter,calls}=fakeOrca();let plan=await startOrcaExecution({request:request(),adapter});
+  const {adapter,calls}=fakeOrca();let plan=await startOrcaExecution({request:request(),parentWorktree,adapter});
   plan=await acceptOrcaWorkerDone({plan,event:done(plan.operations.prepare,'succeeded',['work/prepare/context.yaml']),adapter});
   const backend=plan.operations.backend,attempt=backend.attempts[0];
   plan=await createConflictOwner({
@@ -121,7 +129,7 @@ test('a shared out-of-scope escalation creates an authorized conflict-owner Task
 });
 
 test('conflict outcomes are scoped, then coordinator integration creates explicit sync/resume dependencies and a fresh worker',async()=>{
-  const {adapter,calls}=fakeOrca();let plan=await startOrcaExecution({request:request(),adapter});
+  const {adapter,calls}=fakeOrca();let plan=await startOrcaExecution({request:request(),parentWorktree,adapter});
   plan=await acceptOrcaWorkerDone({plan,event:done(plan.operations.prepare,'succeeded',['work/prepare/context.yaml']),adapter});
   const firstBackend=plan.operations.backend.attempts[0];
   plan=await createConflictOwner({plan,adapter,selection:selection(),event:{type:'escalation',reason:'out-of-scope-shared-change',operationId:'backend',taskId:firstBackend.taskId,dispatchId:firstBackend.dispatchId,sharedFiles:['packages/contracts/widget.ts']},decision:{action:'create-conflict-owner',affectedOperations:['backend'],allowedFiles:['packages/contracts/**']}});
@@ -147,7 +155,7 @@ test('conflict outcomes are scoped, then coordinator integration creates explici
 });
 
 test('implementation SDS gap creates a separate architecture sidearm and resumes only the affected branch after review',async()=>{
-  const {adapter,calls}=fakeOrca();let plan=await startOrcaExecution({request:request(),adapter});
+  const {adapter,calls}=fakeOrca();let plan=await startOrcaExecution({request:request(),parentWorktree,adapter});
   plan=await acceptOrcaWorkerDone({plan,event:done(plan.operations.prepare,'succeeded',['work/prepare/context.yaml']),adapter});
   const firstBackend=plan.operations.backend.attempts[0],event={type:'secondary_request',reason:'sds-technical-gap',secondaryOp:'architecture.decide',operationId:'backend',taskId:firstBackend.taskId,dispatchId:firstBackend.dispatchId,problem:'Missing recovery result mapping'};
   const decision={action:'create-architecture-sidearm',allowedFiles:['.starciwork/features/agentos/architecture/sds/contracts/recovery/index.yaml'],businessChanged:false,srsChanged:false,sourceChanged:false};
@@ -174,7 +182,7 @@ test('implementation SDS gap creates a separate architecture sidearm and resumes
 });
 
 test('a failed branch blocks only its dependents, not independent dispatched work',async()=>{
-  const {adapter}=fakeOrca();let plan=await startOrcaExecution({request:request(),adapter});
+  const {adapter}=fakeOrca();let plan=await startOrcaExecution({request:request(),parentWorktree,adapter});
   plan=await acceptOrcaWorkerDone({plan,event:done(plan.operations.prepare,'succeeded',['work/prepare/context.yaml']),adapter});
   plan=await acceptOrcaWorkerDone({plan,event:done(plan.operations.backend,'failed',['services/api/widget.ts']),adapter});
   assert.equal(plan.operations.backend.status,'failed');assert.equal(plan.operations['backend-review'].status,'blocked');

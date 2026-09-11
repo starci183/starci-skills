@@ -14,6 +14,9 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.equal(contract.environmentBinding.namedRuntimeAuthority,'live-runtime-inventory-only');
   assert.match(contract.planCoordinator.calls.startAgent.cli,/orchestration worker-start .*--agent codex/);
   assert.match(contract.workflowCoordinator.calls.startChildAgent.cli,/--worktree new-child .*--agent codex/);
+  assert.match(contract.workflowCoordinator.calls.bindParent.cli,/worktree set .*--parent-worktree/);
+  assert.match(contract.workflowCoordinator.calls.attestParent.cli,/worktree show/);
+  assert.match(contract.workflowCoordinator.calls.attestParent.acceptOnlyWhen,/parentWorktreeId/);
   assert.match(contract.workflowCoordinator.calls.nameAgent.cli,/\[Coordinator\] <Workflow>/);
   assert.equal(contract.operationAgent.qwen38Flash.launch,'direct-native-worker-start');
   assert.equal(contract.operationAgent.qwen38Flash.agent,'qwen-code');

@@ -28,6 +28,8 @@ invariants:
   - The parent Coordinator is a persistent native agent in the Orca main worktree and remains alive for the Run while operation agents are created and released dynamically.
   - An external Codex or Claude session may bootstrap the Coordinator but hands off the Run and does not retain the coordinator event loop.
   - Every workflow child worktree has one persistent native Workflow Manager agent for the workflow attempt; the worktree alone is not a workflow wrapper.
+  - Every workflow child has parentWorktreeId equal to the main Coordinator worktree id; the parent is explicitly set and attested before the child creates any operation Task.
+  - A workflow Task belonging to the parent Run does not prove UI/worktree lineage; null or mismatched lineage is a blocking topology defect, never an accepted root-level workflow.
   - The Workflow Manager owns its operation DAG, provider resolution, operation lifecycle and operation boundary events, then reports normalized workflow boundaries to the parent Coordinator.
   - The Workflow Manager decides, dispatches, retries, replaces and waits; implementation, repair, test execution and output production belong exclusively to operation agents.
   - The Workflow Manager waits for operation boundaries, while the parent Coordinator waits for normalized Workflow Manager boundaries.

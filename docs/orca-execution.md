@@ -98,12 +98,14 @@ The runtime functions use only these injected methods:
 
 - `createRun(input)` returns `{runId}`.
 - `createTask(input)` creates either a workflow-wrapper Task or a nested operation-subagent Task and returns `{taskId}`.
-- `dispatchWorker(input)` returns `{dispatchId}`. For a wrapper it creates the workflow child; for an operation it launches the selected managed agent or command terminal in that existing child. A recognized provider must use its native Orca agent id; Qwen 3.8 Flash uses `qwen-code` and inherits the verified model from Qwen runtime configuration.
+- `dispatchWorker(input)` returns `{dispatchId, worktreeId}` for a wrapper and `{dispatchId}` for an operation. For a wrapper it creates the workflow child; for an operation it launches the selected managed agent in that existing child. A recognized provider must use its native Orca agent id; Qwen 3.8 Flash uses `qwen-code` and inherits the verified model from Qwen runtime configuration.
+- `setWorktreeParent(input)` explicitly binds the new child to the exact main Coordinator worktree.
+- `showWorktree(input)` returns the exact child record used to attest `parentWorktreeId` before any operation Task is created.
 - `stopWorker(input)` retires an operation attempt superseded by a shared change.
 - `releaseWorker(input)` releases the exact settled worker after an accepted `worker_done`.
 - `integrateChange(input)` performs a coordinator-owned integration action and returns only after the shared change is on the base used by new worktrees.
 
-The wrapper Dispatch receives `worktree: {kind: 'new-child', isolated: true}` exactly once. Every
+The wrapper Dispatch receives `worktree: {kind: 'new-child', isolated: true, parentWorktree: {selector, id}}` exactly once. The adapter then sets and reads back the parent lineage. A null or different `parentWorktreeId` is a blocking topology defect; membership in the same orchestration Run is not sufficient. Every
 operation Dispatch receives `worktree: {kind: 'existing-child', ...}` plus
 `agent: {kind: 'isolated-subagent'}` and explicit false permissions for merge, rebase, cherry-pick and
 push. A command-terminal adapter is reserved for an exact per-operation model override that the
@@ -145,9 +147,8 @@ that subscription.
 
 ## Normal execution
 
-`startOrcaExecution({request, parentRunId, adapter})` attaches one workflow child to an existing Orca
-parent Run; omitting `parentRunId` creates a compatibility parent Run. It creates one wrapper
-Task/Dispatch/worktree and then starts the first ready operation-subagent wave.
+`startOrcaExecution({request, parentRunId, parentWorktree, adapter})` attaches one workflow child to an existing Orca
+parent Run; omitting `parentRunId` creates a compatibility parent Run. `parentWorktree` carries the exact main selector and id. It creates one wrapper Task/Dispatch/worktree, binds and attests the child lineage, and only then starts the first ready operation-subagent wave.
 `dispatchReadyOrcaOperations(plan, adapter)` starts every currently independent operation in that
 same child, up to the configured ceiling; it does not serialize unrelated branches.
 
@@ -235,7 +236,7 @@ This makes shared-change recovery visible in both layers:
 ## Exported API
 
 - `planOrcaExecution(request)` — validate and create an effect-free plan.
-- `startOrcaExecution({request, adapter})` — create the Run and first Task/Dispatch wave.
+- `startOrcaExecution({request, parentWorktree, adapter})` — create the Run, bind the workflow child to the exact main worktree, and start the first Task/Dispatch wave.
 - `dispatchReadyOrcaOperations(plan, adapter)` — dispatch only ready operations.
 - `validateWorkerDone(worker, event)` — exact identity and write-scope validation.
 - `acceptOrcaWorkerDone({plan, event, adapter})` — settle one operation or conflict-owner attempt.
