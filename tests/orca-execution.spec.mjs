@@ -71,6 +71,10 @@ test('completion validates exact Dispatch identity and allowlisted file outcomes
   assert.equal(plan.operations['backend-review'].status,'pending');assert.equal(calls.dispatches.length,3);
   assert.equal(calls.releases.length,1);assert.equal(calls.releases[0].dispatchId,prepare.attempts[0].dispatchId);
   assert.notEqual(plan.operations.backend.attempts[0].worktree.name,plan.operations.frontend.attempts[0].worktree.name);
+  assert.equal(calls.dispatches.find(call=>call.operationId==='backend').input.schema,'starci/operation-input@1');
+  assert.equal(calls.dispatches.find(call=>call.operationId==='backend').input.dependencyOutputs[0].operationId,'prepare');
+  assert.equal(calls.dispatches.find(call=>call.operationId==='backend').input.dependencyOutputs[0].output.schema,'starci/operation-output@1');
+  assert.equal(plan.operations.prepare.output.operationId,'prepare');
 });
 
 test('a shared out-of-scope escalation creates an authorized conflict-owner Task while unrelated work remains runnable',async()=>{

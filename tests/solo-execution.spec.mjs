@@ -1,39 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  isSoloHost,
-  runSoloWorkflow,
-  validateSoloReceipt,
-} from '../execution/solo.mjs';
+import {isSoloHost, runSoloWorkflow, soloExecutionLimits, validateSoloReceipt} from '../execution/solo.mjs';
 
 function workflow(overrides = {}) {
   return {
     id: 'synthetic-solo',
     operations: [
-      {id: 'inspect', dependsOn: [], gate: {id: 'inspection-complete'}},
-      {id: 'implement', dependsOn: ['inspect'], gate: {id: 'checks-pass'}},
-      {id: 'deliver', dependsOn: ['implement'], gate: {id: 'delivery-complete'}},
+      {id: 'inspect', operation: 'business.decide', dependsOn: [], gate: {id: 'inspection-complete'}},
+      {id: 'implement', operation: 'backend.implement', dependsOn: ['inspect'], gate: {id: 'checks-pass'}},
+      {id: 'deliver', operation: 'review.verify', dependsOn: ['implement'], gate: {id: 'delivery-complete'}},
     ],
     ...overrides,
   };
 }
 
-function adapters({run, gate} = {}) {
-  const calls = {
-    worktree: [],
-    run: [],
-    gate: [],
-  };
+function adapters({run, gate, openAgent} = {}) {
+  const calls = {session: [], open: [], run: [], gate: [], close: []};
   return {
     calls,
     value: {
-      worktree: {
-        async enter(request) {
-          calls.worktree.push(structuredClone(request));
-          return request.requiredWorktree ?? {id: 'isolated-worktree', isolated: true, created: true};
+      session: {
+        async current(request) {
+          calls.session.push(structuredClone(request));
+          return request.requiredSession ?? {id: 'current-chat', kind: 'chat-session'};
         },
       },
       operation: {
+        async openAgent(request) {
+          calls.open.push(structuredClone(request));
+          return openAgent ? openAgent(request, calls) : request.requiredAgent ?? {
+            id: `inline-${request.operation.id}`,
+            kind: 'inline-background-agent',
+            isolated: true,
+            operationId: request.operation.id,
+          };
+        },
         async run(request) {
           calls.run.push(structuredClone(request));
           return run ? run(request, calls) : {status: 'completed', output: {operation: request.operation.id}};
@@ -42,120 +43,129 @@ function adapters({run, gate} = {}) {
           calls.gate.push(structuredClone(request));
           return gate ? gate(request, calls) : {status: 'passed', observation: `${request.operation.id} passed`};
         },
+        async closeAgent(request) {
+          calls.close.push(structuredClone(request));
+        },
       },
     },
   };
 }
 
-test('only codex and claude can enter the solo host', async () => {
+test('only Codex and Claude own solo chat sessions and the inline-agent ceiling is three', async () => {
   assert.equal(isSoloHost('codex'), true);
   assert.equal(isSoloHost('claude'), true);
-  assert.equal(isSoloHost('gemini'), false);
+  assert.equal(isSoloHost('qwen'), false);
+  assert.equal(soloExecutionLimits.maxConcurrentOperationAgents, 3);
   const injected = adapters();
-  await assert.rejects(() => runSoloWorkflow({host: 'gemini', workflow: workflow(), adapters: injected.value}), /codex or claude/);
-  assert.equal(injected.calls.worktree.length, 0);
+  await assert.rejects(() => runSoloWorkflow({host: 'qwen', workflow: workflow(), adapters: injected.value}), /codex or claude/);
+  assert.equal(injected.calls.session.length, 0);
 });
 
-test('one isolated worktree is created at entry and dependency operations run with explicit passing gates', async () => {
+test('each dependency operation gets exactly one isolated inline agent and normalized handoff envelopes', async () => {
   const injected = adapters();
   const receipt = await runSoloWorkflow({host: 'codex', workflow: workflow(), adapters: injected.value});
+  assert.equal(receipt.schema, 'starci/solo-execution-receipt@2');
   assert.equal(receipt.status, 'completed');
-  assert.equal(receipt.currentOperation, null);
-  assert.equal(receipt.resumeCursor, null);
-  assert.equal(injected.calls.worktree.length, 1);
-  assert.equal(injected.calls.worktree[0].mode, 'create');
-  assert.deepEqual(injected.calls.run.map((call) => call.operation.id), ['inspect', 'implement', 'deliver']);
-  assert.deepEqual(injected.calls.gate.map((call) => call.operation.id), ['inspect', 'implement', 'deliver']);
-  assert.deepEqual(receipt.operations.map((operation) => [operation.state, operation.gate.state]), [
-    ['completed', 'passed'],
-    ['completed', 'passed'],
-    ['completed', 'passed'],
+  assert.equal(receipt.session.id, 'current-chat');
+  assert.deepEqual(injected.calls.open.map(call => call.operation.id), ['inspect', 'implement', 'deliver']);
+  assert.deepEqual(injected.calls.open.map(call => call.mode), ['create', 'create', 'create']);
+  assert.equal(new Set(injected.calls.open.map(call => call.operation.id)).size, 3);
+  assert.equal(injected.calls.close.length, 3);
+  assert.equal(injected.calls.run[1].input.schema, 'starci/operation-input@1');
+  assert.equal(injected.calls.run[1].input.dependencyOutputs[0].operationId, 'inspect');
+  assert.equal(injected.calls.run[1].input.dependencyOutputs[0].output.schema, 'starci/operation-output@1');
+  assert.deepEqual(receipt.operations.map(operation => [operation.state, operation.gate.state]), [
+    ['completed', 'passed'], ['completed', 'passed'], ['completed', 'passed'],
   ]);
   assert.equal(validateSoloReceipt({host: 'codex', workflow: workflow(), receipt}), true);
 });
 
-test('dependency ordering is topological and stable rather than blindly following declaration order', async () => {
-  const injected = adapters();
-  const unordered = workflow({
-    operations: [
-      {id: 'deliver', dependsOn: ['implement'], gate: {id: 'delivery-complete'}},
-      {id: 'inspect', dependsOn: [], gate: {id: 'inspection-complete'}},
-      {id: 'implement', dependsOn: ['inspect'], gate: {id: 'checks-pass'}},
-    ],
-  });
-  await runSoloWorkflow({host: 'claude', workflow: unordered, adapters: injected.value});
-  assert.deepEqual(injected.calls.run.map((call) => call.operation.id), ['inspect', 'implement', 'deliver']);
-});
-
-test('a failed gate blocks every later operation', async () => {
+test('up to three distinct dependency-safe op agents run in one wave without sharding an operation', async () => {
+  let active = 0, peak = 0;
   const injected = adapters({
-    gate: ({operation}) => operation.id === 'implement'
-      ? {status: 'failed', reason: 'focused checks failed', observation: 'one failing assertion'}
-      : {status: 'passed'},
+    run: async request => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await Promise.resolve();
+      active -= 1;
+      return {status: 'completed', output: request.operation.id};
+    },
   });
-  const receipt = await runSoloWorkflow({host: 'codex', workflow: workflow(), adapters: injected.value});
-  assert.equal(receipt.status, 'blocked');
-  assert.equal(receipt.currentOperation, 'implement');
-  assert.deepEqual(injected.calls.run.map((call) => call.operation.id), ['inspect', 'implement']);
-  assert.deepEqual(receipt.operations.map((operation) => [operation.state, operation.gate.state]), [
-    ['completed', 'passed'],
-    ['failed', 'failed'],
-    ['blocked', 'blocked'],
-  ]);
-  assert.equal(receipt.operations[2].blockedBy, 'implement');
+  const independent = workflow({
+    operations: ['one', 'two', 'three', 'four'].map(id => ({id, operation: 'task.execute', dependsOn: [], gate: {id: `${id}-pass`}})),
+  });
+  const receipt = await runSoloWorkflow({host: 'claude', workflow: independent, adapters: injected.value});
+  assert.equal(receipt.status, 'completed');
+  assert.equal(peak, 3);
+  assert.deepEqual(injected.calls.open.slice(0, 3).map(call => call.operation.id), ['one', 'two', 'three']);
+  assert.equal(injected.calls.open[3].operation.id, 'four');
 });
 
-test('resume requires the receipt worktree, passes the cursor, and never reruns completed operations', async () => {
+test('one operation cannot fan out to several inline agents and larger orchestration routes to Orca', async () => {
+  for (const candidate of [
+    workflow({maxConcurrentOperationAgents: 4}),
+    workflow({operations: [{id: 'backend', operation: 'backend.implement', agents: 3, gate: {id: 'pass'}}]}),
+    workflow({execution: {childWorktrees: true}}),
+  ]) {
+    const injected = adapters();
+    const receipt = await runSoloWorkflow({host: 'codex', workflow: candidate, adapters: injected.value});
+    assert.equal(receipt.status, 'requiresOrca');
+    assert.match(receipt.requiresOrca.rule, /one isolated inline background agent per operation/);
+    assert.equal(injected.calls.session.length, 0);
+    assert.equal(injected.calls.open.length, 0);
+  }
+});
+
+test('a paused op resumes the same inline agent and completed ops never rerun', async () => {
   let paused = false;
   const first = adapters({
     run: ({operation}) => {
       if (operation.id === 'implement' && !paused) {
         paused = true;
-        return {status: 'paused', resumeCursor: {step: 4, token: 'opaque'}};
+        return {status: 'paused', resumeCursor: {step: 4}};
       }
       return {status: 'completed', output: operation.id};
     },
   });
   const partial = await runSoloWorkflow({host: 'claude', workflow: workflow(), adapters: first.value});
   assert.equal(partial.status, 'paused');
-  assert.equal(partial.currentOperation, 'implement');
-  assert.deepEqual(partial.resumeCursor, {step: 4, token: 'opaque'});
-  assert.deepEqual(first.calls.run.map((call) => call.operation.id), ['inspect', 'implement']);
+  assert.equal(partial.operations.find(row => row.id === 'implement').agent.id, 'inline-implement');
 
   const resumed = adapters();
   const receipt = await runSoloWorkflow({host: 'claude', workflow: workflow(), adapters: resumed.value, receipt: partial});
   assert.equal(receipt.status, 'completed');
-  assert.equal(resumed.calls.worktree[0].mode, 'require');
-  assert.equal(resumed.calls.worktree[0].requiredWorktree.id, 'isolated-worktree');
-  assert.deepEqual(resumed.calls.run.map((call) => call.operation.id), ['implement', 'deliver']);
-  assert.deepEqual(resumed.calls.run[0].resumeCursor, {step: 4, token: 'opaque'});
-  assert.equal(receipt.operations[0].attempts, 1);
-  assert.equal(receipt.operations[1].attempts, 2);
+  assert.deepEqual(resumed.calls.run.map(call => call.operation.id), ['implement', 'deliver']);
+  assert.equal(resumed.calls.open[0].mode, 'resume');
+  assert.equal(resumed.calls.open[0].requiredAgent.id, 'inline-implement');
+  assert.deepEqual(resumed.calls.run[0].resumeCursor, {step: 4});
 
   const terminal = adapters();
   const sameReceipt = await runSoloWorkflow({host: 'claude', workflow: workflow(), adapters: terminal.value, receipt});
   assert.deepEqual(sameReceipt, receipt);
-  assert.equal(terminal.calls.worktree.length, 0);
-  assert.equal(terminal.calls.run.length, 0);
+  assert.equal(terminal.calls.session.length, 0);
 });
 
-test('parallel, multi-writer, and native agent needs return requiresOrca without entering a worktree', async () => {
-  for (const declaration of [
-    {parallel: true},
-    {writers: ['backend', 'frontend']},
-    {execution: {nativeOrchestration: true}},
-    {operations: [{id: 'one', gate: {id: 'one-pass'}, team: true}]},
-  ]) {
-    const injected = adapters();
-    const receipt = await runSoloWorkflow({host: 'codex', workflow: workflow(declaration), adapters: injected.value});
-    assert.equal(receipt.status, 'requiresOrca');
-    assert.equal(typeof receipt.requiresOrca.reason, 'string');
-    assert.equal(injected.calls.worktree.length, 0);
-    assert.equal(injected.calls.run.length, 0);
-  }
+test('a failed operation blocks only its dependent branch while an unrelated op can finish', async () => {
+  const injected = adapters({
+    gate: ({operation}) => operation.id === 'bad'
+      ? {status: 'failed', reason: 'failed check'}
+      : {status: 'passed'},
+  });
+  const branched = workflow({
+    operations: [
+      {id: 'bad', operation: 'backend.implement', dependsOn: [], gate: {id: 'bad-pass'}},
+      {id: 'dependent', operation: 'review.verify', dependsOn: ['bad'], gate: {id: 'dependent-pass'}},
+      {id: 'unrelated', operation: 'content.generate', dependsOn: [], gate: {id: 'unrelated-pass'}},
+    ],
+  });
+  const receipt = await runSoloWorkflow({host: 'codex', workflow: branched, adapters: injected.value});
+  assert.equal(receipt.status, 'failed');
+  assert.equal(receipt.operations.find(row => row.id === 'bad').state, 'failed');
+  assert.equal(receipt.operations.find(row => row.id === 'dependent').state, 'blocked');
+  assert.equal(receipt.operations.find(row => row.id === 'unrelated').state, 'completed');
 });
 
-test('invalid graph, missing gate, changed receipt definition, and non-isolated entry fail closed', async () => {
+test('invalid graphs, changed receipts, unsafe agent reuse and session drift fail closed', async () => {
   const injected = adapters();
   await assert.rejects(() => runSoloWorkflow({
     host: 'codex',
@@ -163,9 +173,7 @@ test('invalid graph, missing gate, changed receipt definition, and non-isolated 
     adapters: injected.value,
   }), /unknown operation/);
   await assert.rejects(() => runSoloWorkflow({
-    host: 'codex',
-    workflow: workflow({operations: [{id: 'one'}]}),
-    adapters: injected.value,
+    host: 'codex', workflow: workflow({operations: [{id: 'one'}]}), adapters: injected.value,
   }), /explicit gate/);
 
   const receipt = await runSoloWorkflow({host: 'codex', workflow: workflow(), adapters: adapters().value});
@@ -175,16 +183,19 @@ test('invalid graph, missing gate, changed receipt definition, and non-isolated 
     adapters: injected.value,
     receipt,
   }), /definition changed/);
-  const forged = structuredClone(receipt);
-  forged.operations[0].gate.state = 'pending';
-  await assert.rejects(() => runSoloWorkflow({
-    host: 'codex',
-    workflow: workflow(),
-    adapters: injected.value,
-    receipt: forged,
-  }), /lacks a passed gate/);
 
-  const unsafe = adapters();
-  unsafe.value.worktree.enter = async () => ({id: 'main-checkout', isolated: false});
-  await assert.rejects(() => runSoloWorkflow({host: 'codex', workflow: workflow(), adapters: unsafe.value}), /isolated worktree/);
+  const duplicate = adapters({openAgent: request => ({
+    id: 'same-agent', kind: 'inline-background-agent', isolated: true, operationId: request.operation.id,
+  })});
+  const duplicateReceipt = await runSoloWorkflow({host: 'codex', workflow: workflow(), adapters: duplicate.value});
+  assert.equal(duplicateReceipt.status, 'failed');
+  assert.match(duplicateReceipt.operations.find(row => row.id === 'implement').failure, /cannot own both/);
+
+  const partialAdapters = adapters({run: ({operation}) => operation.id === 'inspect'
+    ? {status: 'paused', resumeCursor: {at: 1}}
+    : {status: 'completed'}});
+  const partial = await runSoloWorkflow({host: 'codex', workflow: workflow(), adapters: partialAdapters.value});
+  const drifted = adapters();
+  drifted.value.session.current = async () => ({id: 'other-chat', kind: 'chat-session'});
+  await assert.rejects(() => runSoloWorkflow({host: 'codex', workflow: workflow(), adapters: drifted.value, receipt: partial}), /receipt chat session/);
 });

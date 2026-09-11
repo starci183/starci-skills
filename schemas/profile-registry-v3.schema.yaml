@@ -2,7 +2,7 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: starci://schemas/profile-registry-v3.schema.json
 title: StarCi profile registry v3
 type: object
-required: [schema, runtimes, aliases, executionModes, defaults, targets, skills, operators, fallback]
+required: [schema, runtimes, aliases, executionModes, agentArchitecture, defaults, targets, skills, operators, fallback]
 properties:
   schema: {const: starci/profile-registry@3}
   runtimes:
@@ -21,23 +21,44 @@ properties:
       solo:
         type: object
         additionalProperties: false
-        required: [hosts, workers, worktree, scheduling]
+        required: [hosts, controlPlane, operationAgent, maxConcurrentOperationAgents, isolation, worktree, scheduling, fanOutWithinOperation]
         properties:
           hosts:
             const: [codex, claude]
-          workers: {const: 1}
-          worktree: {const: isolated-single}
-          scheduling: {const: sequential}
+          controlPlane: {const: current-chat-session}
+          operationAgent: {const: inline-background-agent}
+          maxConcurrentOperationAgents: {const: 3}
+          isolation: {const: isolated-per-operation}
+          worktree: {const: current-session-worktree}
+          scheduling: {const: dependency-dag}
+          fanOutWithinOperation: {const: forbidden}
       orchestrated:
         type: object
         additionalProperties: false
-        required: [controlPlane, workers, worktree, scheduling]
+        required: [controlPlane, workers, operationAgent, isolation, worktree, scheduling, fanOutWithinOperation]
         properties:
           controlPlane: {const: orca}
           workers:
             const: [codex, claude, qwen]
-          worktree: {const: isolated-per-worker}
+          operationAgent: {const: child-worktree-agent}
+          isolation: {const: isolated-per-operation}
+          worktree: {const: isolated-child-per-operation-attempt}
           scheduling: {const: dependency-dag}
+          fanOutWithinOperation: {const: explicit-operation-instances-only}
+  agentArchitecture:
+    type: object
+    additionalProperties: false
+    required: [levels, flexibleLayers, isolationBoundary, wrapperResponsibilities, operationMapping, concreteAgentBinding]
+    properties:
+      levels:
+        const: [plan, coordinator, workflow-wrapper, operation-wrapper-agent, concrete-operation-agent]
+      flexibleLayers:
+        const: [plan, coordinator, workflow-wrapper]
+      isolationBoundary: {const: operation}
+      wrapperResponsibilities:
+        const: [resolve-dependencies, normalize-input, resolve-agent-chain, validate-output, route-output, retry-no-effect]
+      operationMapping: {const: one-operation-instance-one-agent}
+      concreteAgentBinding: {const: provider-profile-model}
   defaults: {type: object}
   targets:
     type: object

@@ -32,11 +32,16 @@ test('execution planner keeps Codex solo and Orca orchestration boundaries expli
   const solo = planWorkflowExecution({request: request(), registry: registry(), inventory: ['codex', 'claude', 'qwen']});
   assert.equal(solo.host, 'codex');
   assert.equal(solo.controlPlane, null);
+  assert.equal(solo.executionBoundary, 'current-chat-session-with-isolated-inline-operation-agents');
+  assert.equal(solo.operationMapping, 'one-operation-instance-one-agent');
+  assert.equal(solo.maxConcurrentOperationAgents, 3);
   assert.ok(solo.resolutions.every(row => row.selected.environment === 'codex'));
   const orches = planWorkflowExecution({request: request('orchestrated'), registry: registry(), inventory: ['codex', 'claude', 'qwen']});
   assert.equal(orches.host, null);
   assert.equal(orches.controlPlane, 'orca');
-  assert.equal(orches.executionBoundary, 'orca-supervised-multi-agent');
+  assert.equal(orches.executionBoundary, 'orca-supervised-child-worktree-operation-agents');
+  assert.equal(orches.operationMapping, 'one-operation-instance-one-agent');
+  assert.equal(orches.maxConcurrentOperationAgents, null);
 });
 
 test('receipt inspection is effect-free and respects dependency completion', () => {
@@ -76,6 +81,8 @@ test('execution CLI creates, resolves, plans and inspects without invoking Orca'
   const map = await invoke(['execution', 'map']);
   assert.equal(map.status, 0, map.stderr);
   assert.deepEqual(JSON.parse(map.stdout).modes.solo.hosts, ['codex', 'claude']);
+  assert.equal(JSON.parse(map.stdout).modes.solo.maxConcurrentOperationAgents, 3);
+  assert.equal(JSON.parse(map.stdout).modes.solo.operationAgent, 'inline-background-agent');
   assert.equal(JSON.parse(map.stdout).modes.orchestrated.controlPlane, 'orca');
   assert.equal(JSON.parse(map.stdout).approvals.schema, 'starci/approval-policy@1');
   assert.deepEqual(JSON.parse(map.stdout).secondaryRoutes['backend.implement'].calls.map(call => call.op), ['architecture.decide']);

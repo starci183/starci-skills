@@ -22,6 +22,14 @@ test('active roles select Codex, Claude or Qwen without reviving retired profile
 test('every operator has an ordered external-agent chain and skill-level defaults remain usable',()=>{
   const registry=readPublicJson('profiles/registry.json'),ops=readPublicJson('ops/catalog.json').ops.map(x=>x.id);
   assert.equal(registry.schema,'starci/profile-registry@3');
+  assert.deepEqual(registry.agentArchitecture.levels,['plan','coordinator','workflow-wrapper','operation-wrapper-agent','concrete-operation-agent']);
+  assert.equal(registry.agentArchitecture.isolationBoundary,'operation');
+  assert.equal(registry.agentArchitecture.operationMapping,'one-operation-instance-one-agent');
+  assert.equal(registry.executionModes.solo.controlPlane,'current-chat-session');
+  assert.equal(registry.executionModes.solo.operationAgent,'inline-background-agent');
+  assert.equal(registry.executionModes.solo.maxConcurrentOperationAgents,3);
+  assert.equal(registry.executionModes.solo.fanOutWithinOperation,'forbidden');
+  assert.equal(registry.executionModes.orchestrated.operationAgent,'child-worktree-agent');
   assert.deepEqual(Object.keys(registry.operators).sort(),[...ops].sort());
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
@@ -33,7 +41,7 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates.map(x=>x.target),['qwen-qwen3.8-flash-worker','qwen-qwen3.8-max-worker','codex-gpt-5.6-sol','claude-opus']);
   assert.equal(resolveExecutionChain({op:'interface.implement'}).candidates[0].orcaLaunch.kind,'command-terminal');
   assert.equal(resolveExecutionChain({op:'interface.implement'}).candidates[0].orcaLaunch.command,'qwen --model qwen3.8-flash --approval-mode auto');
-  assert.equal(resolveExecutionChain({op:'backend.implement'}).candidates[0].orcaLaunch.agent,'codex');
+  assert.equal(resolveExecutionChain({op:'backend.implement'}).candidates[0].orcaLaunch.command,'qwen --model qwen3.8-flash --approval-mode auto');
   assert.deepEqual(registry.skills.starci.chains.working,['codex-gpt-5.6-sol','claude-opus','qwen-qwen3.8-flash-worker','qwen-qwen3.8-max-worker']);
 });
 test('Orca selects the first ready candidate and only falls through after verified no-effect failures',()=>{

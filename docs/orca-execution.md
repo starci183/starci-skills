@@ -1,5 +1,9 @@
 # Orca execution adapter
 
+This is the Orca realization of the shared [five-layer agent model](execution-agent-model.md).
+Plan, Coordinator and workflow wrapper remain flexible; each operation instance is the mandatory
+isolation boundary and maps one-to-one to one concrete provider agent in one child worktree.
+
 `execution/orca.mjs` is the StarCi planning/runtime boundary for supervised multi-agent execution. It accepts only a `WorkflowRequest` whose execution mode is `orchestrated` and whose control plane is exactly `orca`. A request for native teams, generic subagents, or an omitted control plane fails before the adapter creates a Run or worktree.
 
 The module never invokes a shell or the Orca CLI. Callers inject an Orca adapter, which makes unit tests deterministic and lets the installed runtime translate calls to the version-matched `orca orchestration` commands.
@@ -44,6 +48,11 @@ The adapter consumes the shared request contract with these orchestration fields
 ```
 
 Operations are ordered. Dependencies may reference only earlier operations, and every operation must carry its own resolved provider/model selection and nonempty file allowlist. Selection chooses a worker; it does not change operation ownership, scope, criteria, or authority.
+
+The workflow wrapper freezes dependency outputs into the operation input before dispatch and accepts
+only the operation's normalized output afterward. A module fan-out is valid only when the DAG declares
+separate operation instances, each with its own Task, Dispatch, ownership and output contract. Several
+workers hidden behind one operation instance are invalid.
 
 `planOrcaExecution(request)` performs validation and returns an effect-free plan. The plan has one coordinator, logical operation state, and no hidden scheduler. The coordinator owns ownership, review, and integration decisions but has `implementsChanges: false`.
 

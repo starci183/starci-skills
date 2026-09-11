@@ -11,14 +11,28 @@ aliases:
 executionModes:
   solo:
     hosts: [codex, claude]
-    workers: 1
-    worktree: isolated-single
-    scheduling: sequential
+    controlPlane: current-chat-session
+    operationAgent: inline-background-agent
+    maxConcurrentOperationAgents: 3
+    isolation: isolated-per-operation
+    worktree: current-session-worktree
+    scheduling: dependency-dag
+    fanOutWithinOperation: forbidden
   orchestrated:
     controlPlane: orca
     workers: [codex, claude, qwen]
-    worktree: isolated-per-worker
+    operationAgent: child-worktree-agent
+    isolation: isolated-per-operation
+    worktree: isolated-child-per-operation-attempt
     scheduling: dependency-dag
+    fanOutWithinOperation: explicit-operation-instances-only
+agentArchitecture:
+  levels: [plan, coordinator, workflow-wrapper, operation-wrapper-agent, concrete-operation-agent]
+  flexibleLayers: [plan, coordinator, workflow-wrapper]
+  isolationBoundary: operation
+  wrapperResponsibilities: [resolve-dependencies, normalize-input, resolve-agent-chain, validate-output, route-output, retry-no-effect]
+  operationMapping: one-operation-instance-one-agent
+  concreteAgentBinding: provider-profile-model
 orchestration:
   runtime: orca
   owner: source-host
@@ -125,7 +139,7 @@ operators:
       - {environment: qwen, profiles: [qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]}
   backend.implement:
     skill: starci
-    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker]
+    chain: [qwen-qwen3.8-flash-worker, codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker]
     environments:
       - {environment: codex, profiles: [codex-gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}

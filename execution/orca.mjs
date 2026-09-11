@@ -20,6 +20,28 @@ function allowlist(operation){return operation.allowedFiles??operation.fileAllow
 function selection(operation){return operation.selection??operation.executionSelection;}
 function operatorOf(operation){return operation.operation??operation.operator??null;}
 
+function operationInputEnvelope(plan,operation){
+  const dependencyOutputs=operation.dependsOn.map(operationId=>{
+    const dependency=plan.operations[operationId];
+    need(dependency?.status==='completed'&&dependency.output?.schema==='starci/operation-output@1',`Operation ${operation.id} is missing normalized dependency output ${operationId}`);
+    return {operationId,output:copy(dependency.output)};
+  });
+  return {
+    schema:'starci/operation-input@1',workflowId:plan.workflowId,operationId:operation.id,
+    operation:operation.operator??operation.id,source:copy(plan.source),goal:operation.spec,
+    scope:{allowedFiles:copy(operation.allowedFiles)},capabilities:copy(operation.capabilities),
+    dependencyOutputs,outputContract:copy(operation.outputContract),agentBinding:copy(operation.selection)
+  };
+}
+
+function operationOutputEnvelope(plan,operation,attempt,event){
+  return {
+    schema:'starci/operation-output@1',workflowId:plan.workflowId,operationId:operation.id,
+    operation:operation.operator??operation.id,agentId:attempt.dispatchId,
+    payload:copy(event.output??event.result??{outcome:event.outcome,filesModified:event.filesModified})
+  };
+}
+
 function safePattern(value){
   need(typeof value==='string'&&value.length>0&&!value.includes('\\'),'Invalid file allowlist entry');
   need(!value.startsWith('/')&&!/^[A-Za-z]:/.test(value),'File allowlist entries must be relative');
@@ -82,7 +104,7 @@ function validateRequest(request){
     const id=text(input.id,'operation id');need(!ids.has(id),'Duplicate operation id');ids.add(id);
     const deps=dependencies(input);need(Array.isArray(deps)&&new Set(deps).size===deps.length,`Invalid dependencies for ${id}`);
     const allowed=allowlist(input);need(Array.isArray(allowed)&&allowed.length>0,`Operation ${id} needs a file allowlist`);
-    operations.push({input,id,index,deps:[...deps],allowedFiles:allowed.map(safePattern),selection:validateSelection(selection(input),id),operator:operatorOf(input)});
+    operations.push({input,id,index,deps:[...deps],allowedFiles:allowed.map(safePattern),selection:validateSelection(selection(input),id),operator:operatorOf(input),capabilities:input.capabilities??[],outputContract:input.outputContract??null});
   }
   for(const op of operations){
     for(const dep of op.deps)need(ids.has(dep)&&operations.find(x=>x.id===dep).index<op.index,`Operation ${op.id} has an unknown or forward dependency`);
@@ -94,12 +116,12 @@ function validateRequest(request){
 export function planOrcaExecution(request){
   const operations=validateRequest(request),workflowId=text(request.id??request.workflowId,'workflow request id');
   return {
-    schema:PLAN_SCHEMA,workflowId,controlPlane:'orca',status:'planned',runId:null,
+    schema:PLAN_SCHEMA,workflowId,controlPlane:'orca',status:'planned',runId:null,source:copy(request.source??request.spec?.source??null),
     coordinator:{role:'coordinator',implementsChanges:false,owns:['ownership','review','integration']},
     operations:Object.fromEntries(operations.map(op=>[op.id,{
       id:op.id,index:op.index,spec:op.input.spec??op.input.prompt??op.id,dependsOn:op.deps,
-      operator:op.operator,allowedFiles:op.allowedFiles,selection:op.selection,status:op.deps.length?'pending':'ready',
-      attempts:[],sharedDependencies:[],blockedBy:[]
+      operator:op.operator,allowedFiles:op.allowedFiles,capabilities:copy(op.capabilities),outputContract:copy(op.outputContract),selection:op.selection,status:op.deps.length?'pending':'ready',
+      input:null,output:null,attempts:[],sharedDependencies:[],blockedBy:[]
     }])),
     order:operations.map(op=>op.id),conflicts:{},sidearms:{},events:[]
   };
@@ -121,17 +143,18 @@ function workerPrompt(operation,{resume=false}={}){
 
 async function dispatchOperation(plan,operationId,adapter,{resume=false}={}){
   const operation=plan.operations[operationId],attemptNumber=operation.attempts.length+1;
+  const input=operationInputEnvelope(plan,operation);operation.input=copy(input);
   const createTask=adapterMethod(adapter,'createTask'),dispatchWorker=adapterMethod(adapter,'dispatchWorker');
   const taskReceipt=await createTask({
     runId:plan.runId,kind:resume?'resume-operation':'operation',operationId,
     title:`${resume?'Resume ':'Operation '}${operationId}`,spec:`${operation.spec}\n${workerPrompt(operation,{resume})}`,
-    deps:operationTaskDeps(plan,operation),allowedFiles:copy(operation.allowedFiles),selection:copy(operation.selection)
+    deps:operationTaskDeps(plan,operation),allowedFiles:copy(operation.allowedFiles),selection:copy(operation.selection),input:copy(input)
   });
   const taskId=idOf(taskReceipt,'taskId','id');
   const worktree={kind:'new-child',name:worktreeName(plan,operation,attemptNumber),isolated:true};
   const dispatchReceipt=await dispatchWorker({
     runId:plan.runId,taskId,operationId,worktree,selection:copy(operation.selection),
-    prompt:workerPrompt(operation,{resume}),permissions:{merge:false,rebase:false,cherryPick:false,push:false}
+    prompt:workerPrompt(operation,{resume}),input:copy(input),permissions:{merge:false,rebase:false,cherryPick:false,push:false}
   });
   const dispatchId=idOf(dispatchReceipt,'dispatchId','id');
   operation.attempts.push({taskId,dispatchId,attempt:attemptNumber,worktree,allowedFiles:copy(operation.allowedFiles),status:'dispatched'});
@@ -277,6 +300,7 @@ export async function acceptOrcaWorkerDone({plan,event,adapter}){
   await adapterMethod(adapter,'releaseWorker')({runId:next.runId,taskId:event.taskId,dispatchId:event.dispatchId,outcome:done.outcome});
   found.attempt.status=done.outcome==='succeeded'?'completed':'failed';found.attempt.filesModified=done.filesModified;
   found.operation.status=found.attempt.status;
+  found.operation.output=done.outcome==='succeeded'?operationOutputEnvelope(next,found.operation,found.attempt,done):null;
   next.events.push({type:'worker-completed',operationId:found.operation.id,outcome:done.outcome});
   refreshReadiness(next);
   return dispatchReadyOrcaOperations(next,adapter);

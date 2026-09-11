@@ -11,18 +11,34 @@ function canonicalEnvironment(registry, environment) {
 function validateRegistry(registry) {
   if (!plain(registry) || registry.schema !== 'starci/profile-registry@3') throw Error('Profile registry starci/profile-registry@3 is required');
   if (!plain(registry.targets) || !plain(registry.operators) || !plain(registry.fallback)) throw Error('Profile registry targets, operators and fallback are required');
-  if (registry.executionModes?.solo?.workers !== 1 || registry.executionModes?.orchestrated?.controlPlane !== 'orca') throw Error('Profile registry execution modes must keep Codex/Claude solo and Orca orchestration boundaries');
+  const solo = registry.executionModes?.solo, orchestrated = registry.executionModes?.orchestrated;
+  if (solo?.controlPlane !== 'current-chat-session'
+    || solo?.operationAgent !== 'inline-background-agent'
+    || solo?.maxConcurrentOperationAgents !== 3
+    || solo?.isolation !== 'isolated-per-operation'
+    || solo?.fanOutWithinOperation !== 'forbidden'
+    || orchestrated?.controlPlane !== 'orca'
+    || orchestrated?.operationAgent !== 'child-worktree-agent'
+    || orchestrated?.isolation !== 'isolated-per-operation') {
+    throw Error('Profile registry execution modes must keep per-operation agent isolation and the Codex/Claude versus Orca host boundaries');
+  }
+  if (registry.agentArchitecture?.isolationBoundary !== 'operation'
+    || registry.agentArchitecture?.operationMapping !== 'one-operation-instance-one-agent'
+    || registry.agentArchitecture?.concreteAgentBinding !== 'provider-profile-model') {
+    throw Error('Profile registry must preserve the five-layer operation-agent architecture');
+  }
   if (!Array.isArray(registry.fallback.allowedReasons) || registry.fallback.requiredEffectState !== 'none') throw Error('Profile registry fallback policy is invalid');
 }
 
-/** Flatten strict environment priority first, then each environment-local profile chain. */
+/** Resolve the exact operator chain while validating every target against its declared environment. */
 export function flattenOperationCandidates({operation, registry}) {
   validateRegistry(registry);
   const operationName = typeof operation === 'string' ? operation : operation?.operation;
   if (!text(operationName)) throw Error('Operation name is required');
   const route = registry.operators[operationName];
   if (!plain(route) || !Array.isArray(route.environments) || !route.environments.length) throw Error(`Unknown operation route: ${operationName}`);
-  const seenEnvironments = new Set(), seenTargets = new Set(), candidates = [];
+  if (!Array.isArray(route.chain) || !route.chain.length) throw Error(`Operation route needs an exact target chain: ${operationName}`);
+  const seenEnvironments = new Set(), seenTargets = new Set(), declaredTargets = new Map();
   for (const [environmentPriority, group] of route.environments.entries()) {
     if (!plain(group) || !text(group.environment) || !Array.isArray(group.profiles) || !group.profiles.length) throw Error(`Invalid environment chain for operation ${operationName}`);
     const environment = canonicalEnvironment(registry, group.environment);
@@ -36,20 +52,26 @@ export function flattenOperationCandidates({operation, registry}) {
       const targetEnvironment = canonicalEnvironment(registry, configured.runtime);
       if (targetEnvironment !== environment) throw Error(`Execution target ${target} does not belong to environment ${environment}`);
       if (!text(configured.profile) || !(configured.requestedModel === null || text(configured.requestedModel))) throw Error(`Execution target ${target} has invalid profile or requestedModel`);
-      candidates.push({
-        priority: candidates.length,
-        environmentPriority,
-        profilePriority,
-        target,
-        environment,
-        runtime: environment,
-        profile: configured.profile,
-        requestedModel: configured.requestedModel,
-        orcaLaunch: clone(configured.orcaLaunch)
-      });
+      declaredTargets.set(target, {environmentPriority, profilePriority, environment, configured});
     }
   }
-  return candidates;
+  if (route.chain.length !== declaredTargets.size || new Set(route.chain).size !== route.chain.length) throw Error(`Operation route chain must contain every declared target exactly once: ${operationName}`);
+  return route.chain.map((target, priority) => {
+    const declared = declaredTargets.get(target);
+    if (!declared) throw Error(`Operation route chain contains an undeclared target: ${target}`);
+    const {environmentPriority, profilePriority, environment, configured} = declared;
+    return {
+      priority,
+      environmentPriority,
+      profilePriority,
+      target,
+      environment,
+      runtime: environment,
+      profile: configured.profile,
+      requestedModel: configured.requestedModel,
+      orcaLaunch: clone(configured.orcaLaunch)
+    };
+  });
 }
 
 function inventoryByEnvironment(inventory, registry) {

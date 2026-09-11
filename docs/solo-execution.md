@@ -1,104 +1,96 @@
 # Solo execution
 
-`execution/solo.mjs` is the constrained workflow host for Codex and Claude when Orca is not
-needed to coordinate several agents. It executes one workflow as an ordered sequence of
-operations. It does not provide a subagent API, a team abstraction, parallel scheduling, or
-shared-write coordination.
+`execution/solo.mjs` hosts a fixed StarCi workflow inside the current Codex or Claude chat. The
+chat may combine Plan, Coordinator and workflow-wrapper responsibilities. Each operation instance,
+not the whole workflow, is the mandatory isolation boundary. See the shared
+[execution agent model](execution-agent-model.md).
 
 ## Entry contract
 
-Call `runSoloWorkflow({ host, workflow, adapters, receipt })` with `host` equal to `codex` or
-`claude`. Any other host is rejected. A workflow has a stable `id`, at least one operation,
-and an explicit gate for every operation:
+Call `runSoloWorkflow({host, workflow, adapters, receipt})` with `host` equal to `codex` or
+`claude`. A workflow has a stable ID, explicit dependencies and one gate per operation:
 
 ```js
 const workflow = {
   id: 'implement-example',
+  maxConcurrentOperationAgents: 3,
   operations: [
-    {id: 'inspect', dependsOn: [], gate: {id: 'inspection-complete'}},
-    {id: 'implement', dependsOn: ['inspect'], gate: {id: 'focused-checks-pass'}},
+    {id: 'design', operation: 'architecture.decide', dependsOn: [], gate: {id: 'design-pass'}},
+    {id: 'backend', operation: 'backend.implement', dependsOn: ['design'], gate: {id: 'checks-pass'}},
+    {id: 'review', operation: 'review.verify', dependsOn: ['backend'], gate: {id: 'review-pass'}},
   ],
 };
 ```
 
-Dependencies are topologically sorted with declaration order as the stable tie breaker. A
-cycle, unknown dependency, duplicate operation, or missing gate fails before an adapter can
-perform work.
+The runner validates the DAG before effects. It opens at most three dependency-safe operation
+agents. The concurrency ceiling limits distinct operation instances; it never permits one
+operation to fan out into several agents.
 
-Workflow entry invokes `adapters.worktree.enter` exactly once. On a new run it receives
-`mode: "create"`, unless `workflow.worktree` names an existing isolated worktree to require.
-On resume it receives `mode: "require"` and the worktree stored in the receipt. The adapter
-must return `{ id, isolated: true, ... }`; resumption must return the same `id`. This keeps all
-operations in one isolated workflow worktree without coupling the state machine to Git or the
-Orca CLI.
+## Session and operation adapters
 
-## Operation and gate adapters
-
-The operation adapter is deliberately small and injectable:
+The host supplies the current chat session and the inline-agent implementation:
 
 ```js
 const adapters = {
-  worktree: {
-    async enter({mode, requiredWorktree}) {
-      // Create or require one isolated worktree, then return its descriptor.
+  session: {
+    async current({requiredSession}) {
+      return requiredSession ?? {id: 'current-chat', kind: 'chat-session'};
     },
   },
   operation: {
-    async run({operation, worktree, resumeCursor}) {
-      return {status: 'completed', output: {artifact: 'result'}};
+    async openAgent({operation, requiredAgent}) {
+      return requiredAgent ?? {
+        id: `agent-${operation.id}`,
+        kind: 'inline-background-agent',
+        isolated: true,
+        operationId: operation.id,
+      };
     },
-    async evaluateGate({operation, result, worktree}) {
-      return {status: 'passed', observation: 'Focused checks passed'};
+    async run({agent, input, resumeCursor}) {
+      return {status: 'completed', output: {result: 'bounded operation result'}};
     },
+    async evaluateGate({agent, input, output}) {
+      return {status: 'passed', observation: 'Operation contract passed'};
+    },
+    async closeAgent({agent, outcome}) {},
   },
 };
 ```
 
-`run` returns `completed`, `paused`, or `failed`. A paused result must include an opaque
-`resumeCursor`. Only a completed result reaches `evaluateGate`, whose result is `passed` or
-`failed`. Adapter exceptions become operation or gate failures in the receipt, allowing the
-caller to report durable state rather than losing the resume boundary.
+One operation instance must retain one unique isolated agent identity. A paused operation resumes
+that same agent. Reusing one agent for two operation instances or returning a non-isolated agent
+fails closed.
 
-Operations never overlap. An operation runs only after every declared dependency is
-completed with a passed gate. A failed operation skips its gate; a failed gate marks the
-operation failed. Either failure blocks every later operation in the ordered workflow.
+## Normalized handoffs
 
-## Receipt and resume behavior
+The workflow wrapper creates `starci/operation-input@1` for every ready operation. It contains the
+operation identity, goal, scope, capabilities, expected output, concrete agent binding and only the
+sealed outputs of declared dependencies. The agent does not receive another operation's hidden chat.
 
-The `starci/solo-execution-receipt@1` receipt records:
+On completion the wrapper creates `starci/operation-output@1`, evaluates the declared gate and stores
+the sealed output in the receipt. A dependent operation cannot start until every required output is
+present and passed. Provider fallback changes the concrete agent binding only; it does not alter the
+logical operation contract.
 
-- the host, workflow ID, and a digest of the worktree/operation/gate definition;
-- the one isolated worktree descriptor;
-- workflow status, `currentOperation`, and `resumeCursor`;
-- each operation's dependencies, state, attempt count, result, and explicit gate state.
+## Scheduling and resume
 
-Operation states are `pending`, `running`, `paused`, `gating`, `completed`, `failed`, and
-`blocked`. Gate states are `pending`, `evaluating`, `passed`, `failed`, `skipped`, and
-`blocked`.
+Independent operations may run concurrently, up to three. Dependencies determine the waves, so a
+design → implementation → review workflow remains sequential. A failed operation blocks only its
+dependent branch; an unrelated branch may finish.
 
-Pass the returned receipt back unchanged to resume. The runner validates the host, workflow,
-definition, dependency completion, and passed gates before entering the worktree. Completed
-operations are skipped. A paused operation alone is invoked again with its stored cursor.
-Blocked, failed, and completed receipts are terminal snapshots and cause no operation calls.
-Changing the workflow definition requires a new run; it is never treated as a safe resume.
+The `starci/solo-execution-receipt@2` receipt binds the host, current chat session, workflow digest,
+three-agent ceiling, operation-agent identities, normalized input digests, outputs, gate states and
+per-operation resume cursors. Completed operations never rerun. Resumption must use the same chat
+session and the same agent for every paused operation.
 
 ## Orca boundary
 
-The solo host refuses host-native subagent or team orchestration. A declared parallel need or
-more than one writer also cannot be reduced to serial calls because that would hide ownership
-and conflict semantics. These declarations return a receipt with `status: "requiresOrca"`
-before worktree entry:
+The solo runner returns `requiresOrca` before opening a session when the request requires:
 
-- `nativeOrchestration`, `subagents`, or `team` set to `true`;
-- `parallel`, `requiresParallel`, or `mode: "parallel"`;
-- `requiresMultipleWriters`, or more than one distinct `writers`/`writeOwners` entry.
+- more than three concurrent operation agents;
+- several agents or shards inside one operation instance;
+- dynamic worker creation or provider-spanning orchestration;
+- child worktrees, conflict ownership or cross-worktree integration.
 
-The caller should then route the unchanged workflow through Orca's supervised orchestration.
-The solo module itself never launches agents or coordinates multiple writers.
-
-## Pure testing
-
-Tests use in-memory adapters that record calls and return synthetic descriptors and results.
-No test needs to create, remove, or inspect a real repository or worktree. Production hosts
-remain responsible for implementing the same adapter contract using their authorized
-worktree and operation mechanisms.
+Orca may represent parallel modules as separate operation instances with separate child worktrees.
+Codex and Claude solo hosts must not imitate that by hiding several workers behind one operation.

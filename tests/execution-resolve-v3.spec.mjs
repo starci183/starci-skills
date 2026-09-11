@@ -14,12 +14,16 @@ const request = (operation = 'interface.implement') => ({
   }
 });
 
-test('resolver flattens environment order before each environment-local profile chain', () => {
+test('resolver preserves each exact operator chain and its environment metadata', () => {
   const candidates = flattenOperationCandidates({operation: 'interface.implement', registry});
   assert.deepEqual(candidates.map(value => value.target), [
     'qwen-qwen3.8-flash-worker', 'qwen-qwen3.8-max-worker', 'codex-gpt-5.6-sol', 'claude-opus'
   ]);
   assert.deepEqual(candidates.map(value => [value.environmentPriority, value.profilePriority]), [[0, 0], [0, 1], [1, 0], [2, 0]]);
+  const backend = flattenOperationCandidates({operation: 'backend.implement', registry});
+  assert.deepEqual(backend.map(value => value.target), [
+    'qwen-qwen3.8-flash-worker', 'codex-gpt-5.6-sol', 'claude-opus', 'qwen-qwen3.8-max-worker'
+  ]);
 });
 
 test('resolver selects deterministically and preserves unavailable observations', () => {

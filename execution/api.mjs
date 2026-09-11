@@ -55,8 +55,10 @@ export function planWorkflowExecution({request, registry, inventory, attemptsByO
     host: request.spec.mode === 'solo' ? request.spec.soloHost : null,
     controlPlane: request.spec.mode === 'orchestrated' ? 'orca' : null,
     executionBoundary: request.spec.mode === 'solo'
-      ? 'one-agent-one-isolated-worktree-step-by-step'
-      : 'orca-supervised-multi-agent',
+      ? 'current-chat-session-with-isolated-inline-operation-agents'
+      : 'orca-supervised-child-worktree-operation-agents',
+    operationMapping: 'one-operation-instance-one-agent',
+    maxConcurrentOperationAgents: request.spec.mode === 'solo' ? 3 : null,
     receipt,
     resolutions,
   };

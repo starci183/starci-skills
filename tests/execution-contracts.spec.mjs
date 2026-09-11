@@ -32,6 +32,16 @@ test('execution request and receipt schemas compile in strict draft-2020 mode', 
   }
 });
 
+test('profile registry fixes only the operation isolation boundary and keeps five logical layers', () => {
+  const ajv = new Ajv2020({strict: true});
+  const schema = parseYaml(fs.readFileSync(new URL('../schemas/profile-registry-v3.schema.yaml', import.meta.url), 'utf8'));
+  const registry = parseYaml(fs.readFileSync(new URL('../profiles/registry.yaml', import.meta.url), 'utf8'));
+  const validate = ajv.compile(schema);
+  assert.equal(validate(registry), true, JSON.stringify(validate.errors));
+  assert.equal(registry.agentArchitecture.isolationBoundary, 'operation');
+  assert.equal(registry.executionModes.solo.maxConcurrentOperationAgents, 3);
+});
+
 test('WorkflowRequest is closed, ordered and has host-specific mode constraints', () => {
   const request = workflow();
   assert.equal(validateWorkflowRequest(request), true);
