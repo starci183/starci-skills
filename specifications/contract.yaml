@@ -2,9 +2,9 @@ schema: starci/specification-contract@1
 payloadSchema: starci/specification@1
 storage: Legacy cohesive records use extensions.work3.specification; current split SRS and source-independent SDS
   SDS use extensions.work3.srs and extensions.work3.sds in their typed section index.yaml files.
-canonicalProseLanguage: Vietnamese for all natural-language prose in current canonical SRS and SDS.
+canonicalProseLanguage: English for all natural-language prose in current canonical SRS and SDS.
 preservedEnglishTokens: YAML/schema keys, stable IDs/refs, enum literals, protocol identifiers, API fields,
-  variables, types, operation names and source symbols remain English, including when embedded in Vietnamese prose.
+  variables, types, operation names and source symbols remain English.
 statuses:
   - draft
   - blocked

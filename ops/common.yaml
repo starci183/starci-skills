@@ -92,7 +92,7 @@ sections:
         implementation.architecture secondary when an observed implementation/test fact proves an
         accepted SDS technically missing or contradictory. The code worker waits and never edits
         SDS. Orca creates a separate architecture.decide worktree, the coordinator reviews and
-        integrates its bounded Vietnamese-prose/source-independent SDS correction, and a fresh
+        integrates its bounded English/source-independent SDS correction, and a fresh
         implementation attempt reruns affected checks. This is automatic procedure inside an
         accepted brief; a business/SRS change or wider owner/scope returns need-user."
       - Before transitions, preserve exact accepted output → input bindings and require every

@@ -20,7 +20,7 @@ calls:
       - business-unchanged
       - srs-preserved
       - sds-source-independent
-      - sds-vietnamese-prose
+      - sds-english-content
       - sds-validated
       - architecture-review-accepted
     canCallOthers: false
@@ -31,8 +31,8 @@ calls:
     sourceChanged: false
     rules:
       - Run architecture.decide in its own Orca child worktree; the backend worker never edits SDS.
-      - Keep YAML/schema keys, stable IDs/refs, enum/API/type/variable/operation identifiers in English
-        and write natural-language SRS/SDS prose in Vietnamese.
+      - Keep all canonical SRS/SDS content in English, including natural-language prose and
+        YAML/schema keys, stable IDs/refs, enum/API/type/variable/operation identifiers.
       - Do not add product behavior, change accepted business policy, write product source, or store
         source paths/symbols/evidence in SDS.
       - Return the exact changed architecture paths and validation/review result. The Coordinator

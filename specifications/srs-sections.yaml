@@ -1,7 +1,7 @@
 schema: starci/srs-sections@1
 purpose: Typed contracts for a filesystem-split SRS. Each detailed item owns one index.yaml while parent indexes aggregate scope.
 payload: extensions.work3.srs
-proseLanguage: vi
+proseLanguage: en
 preserveEnglish:
   - yaml-schema-keys
   - stable-ids-and-refs
@@ -104,7 +104,8 @@ sections:
       - exit
       - acceptanceCriteria
 rules:
-  - Natural-language prose in canonical SRS is Vietnamese. Keep YAML and schema keys, stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types, operation names and source symbols in English, including when embedded in Vietnamese prose.
+  - All canonical SRS content is English, including natural-language prose, YAML and schema keys, stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types, operation names and source symbols.
+  - Accepted and reviewed SRS leaves are authored as done. Todo is reserved for genuinely unfinished drafts or unresolved business-design tasks and must not be inferred from stale metadata alone.
   - SRS is a source-of-truth product contract derived from accepted intent and authority, never from source code. Code paths, symbols, revisions and implementation proof are forbidden.
   - SRS defines acceptance and decision-closure criteria, never evidence requirements or executed-proof fields. Runtime proof belongs only to excluded local run state.
   - Product briefs, stakeholder decisions, policy and research may be cited as authorityRefs; this is distinct from implementation sourceRefs.

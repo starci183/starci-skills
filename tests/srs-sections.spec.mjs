@@ -7,7 +7,7 @@ import {stringifyYaml,parseYaml} from '../core/yaml.mjs';
 import {validateWorkspace} from '../core/index.mjs';
 import {SRS_SECTION_CONTRACT} from '../specifications/srs-sections.mjs';
 
-test('canonical SRS authoring publishes Vietnamese prose and English token preservation policy',()=>{assert.equal(SRS_SECTION_CONTRACT.proseLanguage,'vi');assert.deepEqual(SRS_SECTION_CONTRACT.preserveEnglish,['yaml-schema-keys','stable-ids-and-refs','enum-literals','protocol-identifiers','api-fields','variables','types','operation-names','source-symbols']);});
+test('canonical SRS authoring publishes English prose and token policy',()=>{assert.equal(SRS_SECTION_CONTRACT.proseLanguage,'en');assert.deepEqual(SRS_SECTION_CONTRACT.preserveEnglish,['yaml-schema-keys','stable-ids-and-refs','enum-literals','protocol-identifiers','api-fields','variables','types','operation-names','source-symbols']);});
 
 function fixture(t){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-split-srs-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));

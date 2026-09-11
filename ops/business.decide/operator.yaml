@@ -68,9 +68,9 @@ writes:
         policy-decisions, data and customer-journeys. Every item owns a folder/index.yaml; every
         intermediate index carries only starci/srs-aggregate@1 metadata. Keep each FR's main,
         alternative and exception flows, branch review, postconditions and acceptance together.
-        Write natural-language SRS prose in Vietnamese. Keep YAML/schema keys, stable IDs/refs,
-        enum literals, protocol identifiers, API fields, variables, types, operation names and
-        source symbols in English even inside Vietnamese prose. Stable semantic refs resolve
+        Write all canonical SRS content in English, including natural-language prose, YAML/schema
+        keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables, types,
+        operation names and source symbols. Stable semantic refs resolve
         through exact owning Work refs without copying.
   - id: review
     path: N/index.yaml
@@ -174,10 +174,10 @@ steps:
         leaves under functional-requirements, non-functional-requirements, business-rules,
         policy-decisions, data and customer-journeys. Every item owns a folder/index.yaml;
         intermediate indexes carry only starci/srs-aggregate@1 metadata. Keep each FR's flows,
-        branch review, postconditions and acceptance cohesive. Write natural-language SRS prose in
-        Vietnamese while preserving YAML/schema keys, stable IDs/refs, enum literals, protocol
-        identifiers, API fields, variables, types, operation names and source symbols in English,
-        including inside prose. Connect semantic IDs to exact owning Work refs.
+        branch review, postconditions and acceptance cohesive. Write all canonical SRS content in
+        English, including natural-language prose, YAML/schema keys, stable IDs/refs, enum literals,
+        protocol identifiers, API fields, variables, types, operation names and source symbols.
+        Connect semantic IDs to exact owning Work refs.
   - reads:
       - target
       - repo

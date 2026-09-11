@@ -85,13 +85,12 @@ a completed implementation.
 - Business overview explains who needs what and why in plain language. SRS separates
   functional requirements, NFRs, rules, decisions, data and customer journeys. Each
   functional requirement keeps its own preconditions, main flow, alternatives,
-  exceptions, postconditions and acceptance. Canonical SRS prose is Vietnamese while structural
-  keys, stable identifiers and machine/source tokens remain English. Existing code is observation,
-  not intent.
+  exceptions, postconditions and acceptance. All canonical SRS content is English. Existing code is
+  observation, not intent.
 - Architecture maps each requirement, flow and acceptance ID through application entry
   points, logical components and interfaces, contracts, data,
   security/latency/reliability mechanisms, deployment, recovery and verification.
-  Canonical SDS prose follows the same Vietnamese-prose/English-token policy.
+  All canonical SDS content is English.
   Repository roles, source paths, symbols, signatures, revisions and results are recorded by
   Implementation and UAT as conformance proof. See [Architecture SDS](architecture-sds.md).
 - UI specifies experiences, interactions, states, component grammar and coverage.
@@ -178,6 +177,11 @@ media; choose Git LFS or another explicit binary-storage policy for large videos
 Missing bytes are not silently treated as verified remote artifacts.
 
 ## Editing and compatibility
+
+Accepted, reviewed SRS/SDS leaves are authored as `done`; `todo` is reserved for genuinely unfinished
+drafts or unresolved design tasks. An implementation workflow must not fan out new SRS/SDS authoring
+solely because stale lifecycle metadata says `todo`; it uses current accepted specifications and opens
+the separately owned sidearm only when implementation facts prove a bounded gap.
 
 `done` is not an edit lock. Authorized changes may update specifications and assets;
 re-evaluate changed content and affected dependents. Do not force stale work green,

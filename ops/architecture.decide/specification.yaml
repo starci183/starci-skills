@@ -7,7 +7,7 @@ sourceTruth: Canonical Work intent and design decisions define the target. A con
   source/configuration/installed-API survey informs feasibility and migration; the overview then
   independently records retain, extend, correct, replace or add decisions with rationale and impact.
   Actual source observations and revisions remain Implementation or UAT proof, never SDS authority.
-proseLanguage: vi
+proseLanguage: en
 preserveEnglish:
   - yaml-schema-keys
   - stable-ids-and-refs
@@ -139,9 +139,9 @@ steps:
         effects. Do not reopen unrelated design or rewrite requirements to justify legacy code.
         Apply the component/interface/owner joins and admission-to-worker crash review in
         docs/architecture-sds.md; copied happy paths cannot settle cancellation or recovery.
-        Write all canonical SDS natural-language prose in Vietnamese. Keep YAML/schema keys, stable
-        IDs/refs, enum literals, protocol identifiers, API fields, variables, types, operation names
-        and source symbols in English even when embedded in Vietnamese prose. Schema validity alone
+        Write all canonical SDS content in English, including natural-language prose, YAML/schema
+        keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables, types,
+        operation names and source symbols. Schema validity alone
         is not review. SDS owns the source-independent design and planned verification;
         Implementation owns code effects and actual execution evidence. Done is never an edit lock."
 references:

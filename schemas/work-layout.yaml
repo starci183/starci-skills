@@ -114,9 +114,9 @@ rules:
     Flow leaves trace SRS paths through entry points, logical components, contracts, data, quality controls,
     deployment and verification. Logical responsibilities and interfaces are prescribed design
     targets. Implementation owns repository/path/symbol/revision mappings and UAT owns running proof.
-  - Natural-language prose in current canonical SRS and SDS is Vietnamese. YAML/schema keys, stable
-    IDs/refs, enum literals, protocol identifiers, API fields, variables, types, operation names and
-    source symbols remain English, including when embedded in Vietnamese prose.
+  - All current canonical SRS and SDS content is English, including natural-language prose,
+    YAML/schema keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables,
+    types, operation names and source symbols. Conversation locale never translates specifications.
 example:
   features/knowledge/:
     - index.yaml

@@ -6,10 +6,10 @@ are the upstream source of truth. SDS never contains repository roles, file path
 signatures, call graphs, source revisions or executed proof. Implementation owns the mapping from
 this logical design to actual code.
 
-Write all natural-language prose in current canonical SDS in Vietnamese. Keep YAML and schema keys,
-stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types, operation
-names and source symbols in English, including when they appear inside Vietnamese sentences. This
-language rule does not translate runtime contracts, knowledge topics or implementation identifiers.
+Write all current canonical SDS content in English, including natural-language prose, YAML and schema
+keys, stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types,
+operation names and source symbols. Conversation or presentation locale never translates canonical
+specifications.
 
 Architecture may inspect a small relevant source/configuration/API surface to check feasibility and
 migration impact. Those observations inform a design decision but never become SDS content or
@@ -123,5 +123,9 @@ shape and traceability. Review checks that significant SRS branches reach logica
 observable outcomes, contract/data ownership is unambiguous and material edge cases have selected
 mechanisms. Implementation separately maps actual source to these IDs and proves conformance.
 
-Changing accepted SRS invalidates dependent SDS review. Changing logical SDS invalidates affected
-Implementation and UAT. Preserve unrelated completed scopes and historical local run state.
+An accepted, reviewed SDS leaf is authored as `done` in the same change; `todo` is reserved for a
+genuinely unfinished draft or unresolved architecture task. An implementation workflow treats current
+accepted SDS as its input and opens a separate architecture sidearm only when concrete code or test
+facts prove a bounded contradiction or missing design decision. Changing accepted SRS invalidates
+dependent SDS review. Changing logical SDS invalidates affected Implementation and UAT. Preserve
+unrelated completed scopes and historical local run state.

@@ -6,10 +6,10 @@ their actual canonical nodes and dependencies before answering design questions
 or choosing implementation scope. A prior chat summary, draft outside the tree
 or raw stored `done` on changed inputs is not a replacement for the current Work.
 
-Natural-language prose in current canonical SRS and SDS is Vietnamese. Their YAML/schema keys,
-stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types, operation
-names and source symbols remain English even when embedded in Vietnamese prose. Runtime contracts,
-English-only knowledge and implementation identifiers are outside this translation rule.
+All current canonical SRS and SDS content is English, including natural-language prose, YAML/schema
+keys, stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types,
+operation names and source symbols. Conversation and presentation locale never translates canonical
+specifications, runtime contracts, knowledge, or implementation identifiers.
 
 Existing code is legacy implementation relative to that target, never the source
 of requirements or design authority. This remains true of newly written code and

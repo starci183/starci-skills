@@ -2,10 +2,10 @@
 
 Business defines observable product behavior. SRS is a source-of-truth contract derived from product intent, stakeholder authority, policy and customer outcomes. It is independent of source code. Architecture maps SRS behavior to a target technical design; Implementation later proves whether actual code conforms.
 
-Write all natural-language prose in current canonical SRS in Vietnamese. Keep YAML and schema keys,
-stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types, operation
-names and source symbols in English, including when they appear inside Vietnamese sentences. This
-language rule does not translate runtime contracts, knowledge topics or implementation identifiers.
+Write all current canonical SRS content in English, including natural-language prose, YAML and schema
+keys, stable IDs and refs, enum literals, protocol identifiers, API fields, variables, types,
+operation names and source symbols. Conversation or presentation locale never translates canonical
+specifications.
 
 One project has one backend-owned `.starciwork`. `features/index.yaml` is the product catalog and every actual capability owns `features/<feature>/`. Shared rules, data, NFRs, decisions and cross-feature journeys have one accountable feature owner; other features reference their stable IDs.
 
@@ -108,6 +108,6 @@ business/srs/
 
 Run `node bin/starci.mjs validate <work-root>`. The validator checks folder/schema matching, parent/leaf ownership, semantic ID uniqueness, FR flow/step/acceptance joins, typed references, journey coverage and data transitions. It does not prove stakeholder acceptance, complete reasoning, implementation or production behavior.
 
-Draft and blocked payloads cannot earn completed Work. Reorganizing folders changes semantic ancestry; preserve old proof and establish new review for changed content. Current accepted SRS remains the input to SDS, UI, implementation and UAT.
+Draft and blocked payloads cannot earn completed Work. An accepted, reviewed SRS leaf is authored as `done` in the same change; `todo` is reserved for a genuinely unfinished draft or unresolved business-design task. An implementation workflow must not reopen or rewrite accepted SRS solely because stale lifecycle metadata says `todo`. Reorganizing folders changes semantic ancestry; preserve old proof and establish new review for changed content. Current accepted SRS remains the input to SDS, UI, implementation and UAT.
 
 The compatibility reader also accepts the pre-upstream `starci/srs@3` leaf format for recovery and explicitly authorized migration. Do not use it for new authoring: new SRS content uses the section schemas published in `specifications/srs-sections.json`. Migration preserves stable IDs and useful evidence but requires a fresh scoped review; it never copies stale `done` state.

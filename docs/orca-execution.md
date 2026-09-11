@@ -104,7 +104,7 @@ paths. The code worker never edits SDS.
 
 The sidearm may not change product source, business behavior, SRS, ownership or accepted scope and
 may not create another secondary. Its successful result enters architecture review; the Coordinator
-integrates only validated Vietnamese-prose, source-independent SDS. The architecture Task becomes an
+integrates only validated English, source-independent SDS. The architecture Task becomes an
 explicit dependency of a fresh implementation attempt, which reruns affected checks. Independent
 branches keep running. A material change is `need-user`, not a sidearm.
 

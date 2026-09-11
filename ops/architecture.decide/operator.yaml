@@ -72,9 +72,9 @@ writes:
         data, quality, deployment, decisions and verification. Parent indexes carry only
         starci/sds-aggregate@1 metadata. Components prescribe logical responsibilities and
         interfaces without repository roles, paths, symbols, signatures, source status or revision
-        evidence. Write natural-language SDS prose in Vietnamese. Keep YAML/schema keys, stable
-        IDs/refs, enum literals, protocol identifiers, API fields, variables, types, operation names
-        and source symbols in English even inside Vietnamese prose. Preserve Business and shared
+        evidence. Write all canonical SDS content in English, including natural-language prose,
+        YAML/schema keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables,
+        types, operation names and source symbols. Preserve Business and shared
         design through stable IDs and exact owning Work refs.
   - id: matrixHandoff
     path: E/job-result.json
@@ -186,8 +186,8 @@ steps:
     action:
       en: Validate recursive layout and exact canonical SRS/shared-design references. Review full
         requirement/flow/acceptance coverage across the owning architecture scope. Resolve material
-        design blockers before pass. Confirm that natural-language SDS prose is Vietnamese and the
-        reserved machine/source token classes remain English; schema validity alone is not review.
+        design blockers before pass. Confirm that all canonical SDS content is English; schema
+        validity alone is not review.
         Implementation owns source mapping and test execution. Done means current reviewed design,
         never an edit lock.
 proofs:

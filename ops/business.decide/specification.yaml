@@ -4,7 +4,7 @@ payload: business/overview/index.yaml plus recursive business/srs/**/index.yaml 
   extensions.work3.srs section payloads; parent indexes carry only srs-aggregate metadata.
 sourceTruth: Current accepted Business/SRS in .starciwork and actual authorized intent define the
   target; all code is legacy observation, never requirement authority.
-proseLanguage: vi
+proseLanguage: en
 preserveEnglish:
   - yaml-schema-keys
   - stable-ids-and-refs
@@ -113,10 +113,10 @@ steps:
         non-functional-requirements, business-rules, policy-decisions, data and
         customer-journeys. Every item owns a folder/index.yaml; every intermediate index carries
         only starci/srs-aggregate@1 metadata. Keep each FR's flows, branch review,
-        postconditions and acceptance cohesive. Write all canonical SRS natural-language prose in
-        Vietnamese. Keep YAML/schema keys, stable IDs/refs, enum literals, protocol identifiers,
-        API fields, variables, types, operation names and source symbols in English even when they
-        appear inside Vietnamese prose. Link stable semantic IDs to exact owning Work refs.
+        postconditions and acceptance cohesive. Write all canonical SRS content in English,
+        including natural-language prose, YAML/schema keys, stable IDs/refs, enum literals,
+        protocol identifiers, API fields, variables, types, operation names and source symbols.
+        Link stable semantic IDs to exact owning Work refs.
   - reads:
       - target
       - repo

@@ -143,7 +143,7 @@ results; it is not an accepted product change or a passing test report.
 
 Auto identifies the initial ASAP chain and later checkpoint. It is not limited to two workflows, does not turn a waiting stage into completion and does not create a background scheduler. No mode permits inventing approvals, silently changing business policy or granting itself publication authority.
 
-User-facing language and execution preferences live in the installed `.claude/config.json`; defaults are Vietnamese (`vi`), inherited model and `medium` effort. Runtime contracts and knowledge remain English. Natural-language prose in current canonical SRS and SDS is Vietnamese, while structural keys and machine/source identifiers remain English. Installation does not change the current agent's model or enable auto.
+User-facing language and execution preferences live in the installed `.claude/config.json`; defaults are Vietnamese (`vi`), inherited model and `medium` effort. Runtime contracts, knowledge and all canonical SRS/SDS content remain English. The configured locale affects conversation and presentation only. Installation does not change the current agent's model or enable auto.
 
 ## CLI
 
