@@ -4,15 +4,27 @@ provider: qwencloud-token-plan
 source: user-configured-qwen-code-runtime
 modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch
 profiles:
-  qwen-flash:
+  qwen3.8-flash-worker:
     role: working
     model: qwen3.8-flash
     imageGeneration: false
-    roleDescription: Execute bounded implementation, content, repair or operation work through Qwen Code.
+    roleDescription: Execute fast bounded implementation, content, repair or operation work through Qwen Code.
     toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
-  qwen-reviewer:
+  qwen3.8-max-worker:
+    role: working
+    model: qwen3.8-max
+    imageGeneration: false
+    roleDescription: Execute complex bounded implementation or repair when the Flash worker is insufficient or unavailable.
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
+  qwen3.8-max-reviewer:
+    role: reasoning
+    model: qwen3.8-max
+    imageGeneration: false
+    roleDescription: Analyze architecture, business decisions and verification evidence without repairing the product being judged.
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
+  qwen3.8-flash-reviewer:
     role: reasoning
     model: qwen3.8-flash
     imageGeneration: false
-    roleDescription: Analyze and verify evidence without repairing the product being judged.
+    roleDescription: Provide a lower-cost reasoning fallback when the Max reviewer is unavailable.
     toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization

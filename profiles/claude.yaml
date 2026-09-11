@@ -17,5 +17,5 @@ profiles:
     legacyModelPreference: claude-fable-5-1
     model: null
     imageGeneration: false
-    roleDescription: Reason, plan and judge on the evidence under the same ownership boundary as sol-reviewer.
+    roleDescription: Reason, plan and judge on the evidence under the same ownership boundary as the Codex reasoning profile.
     toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization

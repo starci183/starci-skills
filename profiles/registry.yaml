@@ -16,28 +16,28 @@ orchestration:
     launches the first ready external agent in each cell's execution chain.
 defaults:
   codex:
-    working: sol-fresh
-    reasoning: sol-reviewer
+    working: gpt-5.6-sol
+    reasoning: gpt-5.6-sol-reviewer
   claude:
     working: opus
     reasoning: fable
   qwen:
-    working: qwen-flash
-    reasoning: qwen-reviewer
+    working: qwen3.8-flash-worker
+    reasoning: qwen3.8-max-reviewer
 reasoningOps:
   - business.decide
   - architecture.decide
   - review.verify
 targets:
-  codex-sol:
+  codex-gpt-5.6-sol:
     runtime: codex
-    profile: sol-fresh
+    profile: gpt-5.6-sol
     orcaLaunch:
       kind: managed-agent
       agent: codex
-  codex-sol-reviewer:
+  codex-gpt-5.6-sol-reviewer:
     runtime: codex
-    profile: sol-reviewer
+    profile: gpt-5.6-sol-reviewer
     orcaLaunch:
       kind: managed-agent
       agent: codex
@@ -53,74 +53,90 @@ targets:
     orcaLaunch:
       kind: managed-agent
       agent: claude
-  qwen-flash:
+  qwen-qwen3.8-flash-worker:
     runtime: qwen
-    profile: qwen-flash
+    profile: qwen3.8-flash-worker
     orcaLaunch:
       kind: command-terminal
-      command: qwen
+      command: qwen --model qwen3.8-flash --approval-mode auto
       dispatch: return-preamble-and-send
-  qwen-reviewer:
+  qwen-qwen3.8-max-worker:
     runtime: qwen
-    profile: qwen-reviewer
+    profile: qwen3.8-max-worker
     orcaLaunch:
       kind: command-terminal
-      command: qwen
+      command: qwen --model qwen3.8-max --approval-mode auto
+      dispatch: return-preamble-and-send
+  qwen-qwen3.8-max-reviewer:
+    runtime: qwen
+    profile: qwen3.8-max-reviewer
+    orcaLaunch:
+      kind: command-terminal
+      command: qwen --model qwen3.8-max --approval-mode auto
+      dispatch: return-preamble-and-send
+  qwen-qwen3.8-flash-reviewer:
+    runtime: qwen
+    profile: qwen3.8-flash-reviewer
+    orcaLaunch:
+      kind: command-terminal
+      command: qwen --model qwen3.8-flash --approval-mode auto
       dispatch: return-preamble-and-send
 skills:
   starci:
     chains:
       working:
-        - codex-sol
+        - codex-gpt-5.6-sol
         - claude-opus
-        - qwen-flash
+        - qwen-qwen3.8-max-worker
+        - qwen-qwen3.8-flash-worker
       reasoning:
-        - codex-sol-reviewer
+        - codex-gpt-5.6-sol-reviewer
         - claude-fable
-        - qwen-reviewer
+        - qwen-qwen3.8-max-reviewer
+        - qwen-qwen3.8-flash-reviewer
 operators:
   architecture.decide:
     skill: starci
-    chain: [codex-sol-reviewer, claude-fable, qwen-reviewer]
+    chain: [codex-gpt-5.6-sol-reviewer, claude-fable, qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]
   backend.implement:
     skill: starci
-    chain: [codex-sol, claude-opus, qwen-flash]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
   business.decide:
     skill: starci
-    chain: [codex-sol-reviewer, claude-fable, qwen-reviewer]
+    chain: [codex-gpt-5.6-sol-reviewer, claude-fable, qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]
   content.generate:
     skill: starci
-    chain: [qwen-flash, codex-sol, claude-opus]
+    chain: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker, codex-gpt-5.6-sol, claude-opus]
   interface.draw:
     skill: starci
-    chain: [qwen-flash, codex-sol, claude-opus]
+    chain: [codex-gpt-5.6-sol, qwen-qwen3.8-max-worker, claude-opus, qwen-qwen3.8-flash-worker]
   interface.implement:
     skill: starci
-    chain: [qwen-flash, codex-sol, claude-opus]
+    chain: [qwen-qwen3.8-flash-worker, qwen-qwen3.8-max-worker, codex-gpt-5.6-sol, claude-opus]
   knowledge.repair:
     skill: starci
-    chain: [codex-sol, claude-opus, qwen-flash]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
   release.deliver:
     skill: starci
-    chain: [codex-sol, claude-opus, qwen-flash]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
   review.verify:
     skill: starci
-    chain: [codex-sol-reviewer, claude-fable, qwen-reviewer]
+    chain: [codex-gpt-5.6-sol-reviewer, claude-fable, qwen-qwen3.8-max-reviewer, qwen-qwen3.8-flash-reviewer]
   runtime.operate:
     skill: starci
-    chain: [codex-sol, claude-opus, qwen-flash]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
   scope.retire:
     skill: starci
-    chain: [codex-sol, claude-opus, qwen-flash]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
   task.execute:
     skill: starci
-    chain: [codex-sol, claude-opus, qwen-flash]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
   uat.verify:
     skill: starci
-    chain: [codex-sol, claude-opus, qwen-flash]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
   workspace.manage:
     skill: starci
-    chain: [codex-sol, claude-opus, qwen-flash]
+    chain: [codex-gpt-5.6-sol, claude-opus, qwen-qwen3.8-max-worker, qwen-qwen3.8-flash-worker]
 fallback:
   allowedReasons:
     - unavailable
@@ -147,8 +163,8 @@ assetFallback: When image generation is unavailable, reuse verified assets first
 examples:
   codexFrontend:
     runtime: codex
-    profile: sol-fresh
-    model: null
+    profile: gpt-5.6-sol
+    model: gpt-5.6-sol
     imageGenerationAvailable: true
   claudeFrontend:
     runtime: claude

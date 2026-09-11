@@ -2,20 +2,18 @@ schema: starci/execution-profiles@1
 runtime: codex
 provider: openai
 source: legacy/resources/agents/profiles/openai.json
-modelPolicy: use-current-host-configuration; legacy model preferences are historical, never availability proof
+modelPolicy: use-profile-model-and-verify-observed-runtime-before-dispatch
 profiles:
-  sol-fresh:
+  gpt-5.6-sol:
     role: working
-    legacyModelPreference: gpt-5.6-sol
-    model: null
+    model: gpt-5.6-sol
     imageGeneration: true
     roleDescription: Execute the assigned implementation, content, repair or operation inside its frozen
       goal and write boundaries.
     toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
-  sol-reviewer:
+  gpt-5.6-sol-reviewer:
     role: reasoning
-    legacyModelPreference: gpt-5.6-sol
-    model: null
+    model: gpt-5.6-sol
     imageGeneration: false
     roleDescription: Plan, analyze and judge from source and independently observed evidence. Write the
       decision, plan or verification artifacts the operator owns; never repair the product being
