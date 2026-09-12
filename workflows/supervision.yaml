@@ -1,69 +1,66 @@
 schema: starci/orchestration-supervision@1
 purpose: |-
-  Define the Orca parent Coordinator control loop between workflow boundaries. This is
-  an orchestration protocol, not a product workflow, workflow child or operation.
+  Define the one control loop of StarCi 5.0: a workflow kernel, a pool of operation agents, and nothing
+  between them. The kernel owns the loop as code; an operation receives its whole contract at launch and
+  answers with exactly one report file; the kernel waits on the boundary tick and speaks to a live agent only
+  through notify. This is an execution protocol, not a product workflow and not an operation.
 ownership:
-  coordinator:
-    - workflow-dependency-resolution
-    - question-resolution
-    - escalation-resolution
-    - final-outcome-review
-    - conflict-workflow-dispatch
-  workflowWrapper:
+  kernel:
+    - goal-assessment-and-one-user-approval
     - operation-scheduling
+    - runtime-allocation
+    - machine-verified-acceptance
+    - commit-and-ledger-write
     - bounded-retry
-    - provider-fallback-with-no-effects
-    - operation-boundary-decision
-    - normalized-workflow-reporting
+    - gate-execution
+    - final-reporting
   operationAgent:
     - implementation-and-repair
     - test-and-verification-execution
     - operation-output-production
 routing:
-  operationToWorkflow:
-    recipient: workflow-manager
+  operationToKernel:
+    recipient: workflow-kernel
+    transport: one-report-file-per-dispatch
+    authority: report-file-then-signal
     events:
       - question
       - escalation
       - heartbeat
       - worker_done
       - worker_failed
-  workflowInternal:
-    execution: operation-agent-only
-    resolveWithoutCoordinator:
-      - operation-dependency
-      - safe-command-approval
-      - no-effect-provider-fallback
-      - bounded-retry
-      - module-owned-small-fix
-      - module-local-architecture-sidearm
-      - focused-test-failure
-    coordinatorNotification: none
-  workflowToCoordinator:
-    onlyWhen:
-      - cross-workflow-dependency
-      - shared-owner-change
-      - cross-workflow-conflict
-      - accepted-scope-or-authority-change
-      - human-product-decision
-      - workflow-manager-terminal-failure
-      - normalized-workflow-done
-    envelope: normalized-workflow-boundary
-  coordinatorToWorkflow:
-    recipient: workflow-manager
+  kernelToOperation:
+    recipient: own-operation-terminal
     transport: launcher-notify
-    eventType: escalation
-    reason: a-terminal-consumes-one-run-so-parent-run-mail-never-reaches-a-monitor-bound-to-its-nested-run
     statusEvent: forbidden-for-control-instruction
-    fileFirst: message-file-then-typed-pointer-verified-on-screen
-  coordinatorToOperation:
+    reason: an-operation-receives-its-whole-contract-at-launch-so-no-second-control-channel-exists
+    when:
+      - answer-a-question
+      - nudge-a-stalled-idle-operation
+  kernelLocal:
+    execution: operation-agent-only
+    userNotification: none
+    resolveWithoutUser:
+      - operation-dependency
+      - runtime-allocation-and-overflow
+      - no-effect-provider-failure
+      - bounded-retry
+      - review-finding-repair
+      - reported-design-gap
+  kernelToUser:
+    envelope: final-report-need-user
+    onlyWhen:
+      - goal-approval
+      - exhausted-retry-or-review-bound
+      - ledger-incomplete-or-refused-ledger-write
+      - no-runtime-accepted-an-operation
+      - human-product-decision
+      - gate-still-failing
+  operationToOperation:
     direct: forbidden
-    route: coordinator-to-workflow-manager-to-operation
-  managerRecovery:
-    onManagerFailure: coordinator-replaces-or-recovers-manager
-    bypassManager: forbidden
+    reason: operations-are-parallel-by-disjoint-allowlist-never-by-conversation
 waitHierarchy:
-  workflowManager:
+  kernel:
     waitsFor: operation-boundary
     accepts:
       - question
@@ -71,60 +68,49 @@ waitHierarchy:
       - heartbeat
       - worker_done
       - worker_failed
-    actsBy: decide-dispatch-retry-or-replace-operation
+    actsBy: verify-accept-commit-retry-or-reallocate
     directExecution: forbidden
-  coordinator:
-    waitsFor: normalized-workflow-boundary
-    accepts:
-      - cross-workflow-dependency
-      - shared-owner-change
-      - cross-workflow-conflict
-      - accepted-scope-or-authority-change
-      - human-product-decision
-      - workflow-manager-terminal-failure
-      - normalized-workflow-done
-    actsBy: decide-schedule-recover-or-replace-workflow-manager
-    workflowLocalExecution: forbidden
-    operationExecution: forbidden
+    loopOwner: code-never-a-model
+    modelCalls:
+      - assessGoal
+      - planOp
+      - decide
 workerLifecycle:
   displayNames:
-    coordinatorWorktree: "[Coordinator] <Plan>"
-    coordinator: "[Monitor] <Plan>"
     workflowWorktree: "[Workflow] <Workflow>"
-    workflowManager: "[Monitor] <Workflow>"
+    workflowKernel: "[Kernel] <Workflow>"
     operationAgent: "[Op] <operation> - <scope>"
     applyAgentNameWith: task-display-name-then-provider-attestation-then-terminal-canonicalization
-  coordinator:
-    lifetime: parent-run
-    host: orca-main-worktree
-    launch: persistent-native-agent
-    bootstrap: external-chat-creates-and-hands-off
-    authority: owns-plan-run-and-dag
-    release: after-final-run-settlement
-  workflowWrapper:
-    lifetime: workflow-attempt
-    host: workflow-child-worktree
-    launch: persistent-native-manager-agent
-    authority: owns-operation-dag-and-boundary-loop
-    reportsTo: parent-coordinator
-    worktree: one-isolated-child
-    release: after-reviewed-integration
+  kernel:
+    lifetime: one-workflow
+    host: workflow-worktree
+    launch: local-process-never-an-orca-worker
+    state: one-workflow-directory-with-an-append-only-event-log
+    authority: owns-the-loop-after-one-user-approval
+    release: after-the-final-report
   operationAgent:
     lifetime: operation-attempt
     launch: supervised-native-agent
     isolation: one-operation-one-agent
     release: after-accepted-worker_done
     reuse: forbidden
+    parallelism: disjoint-allowlist-under-one-worktree
     dispatchAdmission:
       required:
-        - expected-operation-from-active-dag-node
+        - expected-operation-from-the-approved-goal
         - exact-operation-contract
-        - resolved-provider-selection
+        - allocated-runtime-selection
         - canonical-display-name
       providerProof: worker-show-exact-effective-agent-model
       effectAcceptance: only-after-provider-proof
       onOperationMismatch: fence-reconcile-release-and-dispatch-expected-operation
-      onProviderMismatch: fence-reconcile-release-and-retry-resolved-target
+      onProviderMismatch: fence-reconcile-release-and-retry-allocated-runtime
+    acceptance:
+      authority: kernel-re-runs-every-declared-check-itself
+      changedFiles: computed-from-git-never-from-the-report
+      allowlist: every-changed-file-inside-the-operation-allowlist
+      commit: one-operation-one-commit
+      selfDeclaredDone: never-sufficient
     displayNameStability:
       identityAuthority: task-display-name-plus-worker-provider-receipt
       terminalTitle: mutable-native-ui-metadata
@@ -164,19 +150,13 @@ workerLifecycle:
       unsupervisedFallback: forbidden
       release: release-or-retain-from-worker-receipt
       duplicateSubmit: forbidden
+      onExhaustedRuntimes: release-the-slot-cool-the-pool-and-allocate-another-runtime
     deadTerminals:
-      owner: workflow-manager
+      owner: workflow-kernel
       when: after-every-settlement-and-before-workflow-completion
       command: sweep
       closes: settled-dispatch-terminals-and-residual-agent-terminals-in-the-workflow-worktree
-      never: live-worker-monitor-coordinator-or-user-terminal
-    managerReplacement:
-      owner: plan-coordinator
-      command: replace-monitor
-      precondition: worker-show-state-not-ready-or-running
-      settlement: worker-stop-then-worker-release-released-or-already_released
-      relaunch: worker-start-retry-of-with-supervisor-chain
-      liveManager: never-replaced
+      never: live-worker-kernel-or-user-terminal
 reports:
   schema: starci/op-report@1
   workflowSchema: starci/workflow-report@1
@@ -207,7 +187,7 @@ wait:
     action: wait-again
     inspectWorker: true
     notifyUser: false
-  endsTurnOnlyOn: [workflow-goal, blocked-escalation-to-parent]
+  endsTurnOnlyOn: [workflow-goal, blocked-need-user]
   onHealthyHeartbeat:
     action: none
     inspectWorker: false
@@ -247,31 +227,28 @@ transitions:
     next: wait
   worker_done:
     action: validate-review-release
-    next: unlock-dependent-workflows
+    next: unlock-dependent-operations
   worker_failed:
     action: reconcile-effects
     next: recover-or-escalate
 forbidden:
-  - external-bootstrap-retains-coordinator-loop
-  - shell-only-main-without-coordinator-agent
-  - workflow-child-without-manager-agent
-  - operation-agent-acts-as-workflow-manager
+  - model-owned-control-loop
+  - supervisor-layer-between-kernel-and-operation
+  - operation-agent-acts-as-the-kernel
   - operation-agent-creates-nested-agent
-  - operation-agent-messages-parent-coordinator-directly
-  - parent-coordinator-controls-operation-directly
-  - workflow-manager-implements-operation
-  - workflow-manager-runs-operation-tests
-  - coordinator-performs-workflow-local-work
-  - higher-manager-performs-lower-layer-work
+  - operation-agent-controls-another-operation
+  - kernel-implements-operation-scope
+  - kernel-runs-operation-work-instead-of-re-running-its-checks
+  - accept-self-declared-done-without-machine-verification
+  - commit-outside-the-operation-allowlist
   - periodic-terminal-poll
   - periodic-log-read
   - periodic-diff-read
   - progress-prompt
   - duplicate-test-run
-  - restart-healthy-workflow
-  - coordinator-implements-worker-scope
+  - restart-healthy-operation
   - user-report-on-unchanged-state
-  - dispatch-operation-not-selected-by-active-dag-node
+  - dispatch-operation-not-selected-by-the-approved-goal
   - accept-effect-before-provider-attestation
   - dispatch-operation-to-existing-terminal
   - infer-architecture-sidearm-from-review

@@ -248,7 +248,7 @@ export async function startOrcaExecution({request,parentRunId=null,parentWorktre
     const receipt=await adapterMethod(adapter,'createRun')({objective:`Coordinate StarCi workflow DAG containing ${plan.workflowId}`,controlPlane:'orca'});
     plan.runId=idOf(receipt,'runId','id');
   }
-  const managerName=formatOrcaDisplayName('workflow-manager',{workflow:plan.workflowId});
+  const managerName=formatOrcaDisplayName('workflow-kernel',{workflow:plan.workflowId});
   const worktreeDisplayName=formatOrcaDisplayName('workflow-worktree',{workflow:plan.workflowId});
   const taskReceipt=await adapterMethod(adapter,'createTask')({runId:plan.runId,kind:'workflow-wrapper',workflowId:plan.workflowId,title:managerName,spec:workflowPrompt(plan),deps:[]});
   const taskId=idOf(taskReceipt,'taskId','id'),worktree={kind:'new-child',name:workflowWorktreeName(plan.workflowId),displayName:worktreeDisplayName,isolated:true,parentWorktree:copy(parent)};

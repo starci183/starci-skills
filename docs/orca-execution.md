@@ -1,37 +1,33 @@
 # Orca execution adapter
 
-This is the Orca realization of the shared [five-layer agent model](execution-agent-model.md).
-The Orca parent owns the Plan workflow DAG. Each ready workflow wrapper runs in one isolated child
-worktree. Inside that child, each operation instance is the mandatory agent boundary and maps
-one-to-one to one concrete provider subagent; operations never create child worktrees.
+This is the Orca realization of the shared [execution agent model](execution-agent-model.md).
+In runtime 5.0 the topology is two layers, not five: **one workflow kernel** and **a pool of operation
+agents**. A workflow is one goal in one worktree; the kernel is an ordinary local process
+(`execution/workflow-kernel.mjs`) that owns the loop in that worktree, and each operation instance is the
+mandatory agent boundary and maps one-to-one to one concrete provider agent. Operations never create
+worktrees and never create nested agents.
 
-`execution/orca.mjs` is the child-workflow runtime boundary for supervised multi-agent execution. The
-outer Coordinator schedules related workflows from the accepted Plan and passes each ready
-`WorkflowRequest` to this adapter under the same parent Run. It accepts only orchestrated mode with
-control plane `orca`. A request for native teams, generic subagents, or an omitted control plane fails
-before the adapter creates a workflow child.
+There is no Plan Coordinator and no per-workflow Workflow Manager. A model is no longer asked to run a
+control loop: the loop is code, and a model is called only as a typed function for a decision a model is
+actually better at (`assessGoal`, `planOp`, `decide`). Orca supplies exactly two things - worktrees, and
+terminals in which an agent can be launched and attested - so the same kernel runs in a Codex or Claude host
+session with no Orca present. `supervise`, `coordinate`, `start-monitor`, `replace-monitor` and
+`start-coordinator` are gone with the layers they served; see [v5-plan.md](v5-plan.md) for why each 4.x
+failure mode traced back to putting a language model in charge of the loop.
 
-The module never invokes a shell or the Orca CLI. Callers inject an Orca adapter, which makes unit tests deterministic and lets the installed runtime translate calls to the version-matched `orca orchestration` commands.
+`execution/orca.mjs` remains the 4.x child-workflow runtime boundary and is still exercised by its tests; it
+accepts only orchestrated mode with control plane `orca`, and it never invokes a shell or the Orca CLI -
+callers inject an Orca adapter, which keeps unit tests deterministic and lets the installed runtime translate
+calls to the version-matched `orca orchestration` commands. New work runs through the kernel instead.
 
-The parent Coordinator is a persistent native agent running in the Orca main worktree for the
-lifetime of the Run. An external Codex or Claude chat may prepare the accepted Plan and bootstrap
-that agent, but it hands off the Run and leaves the event loop; it is not the active Coordinator.
-The main-worktree Coordinator owns the Run/DAG, cross-workflow boundary-event wait, decisions and
-integration. Every workflow wrapper is itself one persistent native Workflow Manager agent running
-in its isolated child worktree for one workflow attempt; a child worktree without that manager is
-not an executing workflow. The manager owns its operation DAG, provider resolution, operation-agent
-lifecycle and operation boundary events, and reports only normalized workflow boundaries to the
-parent Coordinator. Each operation is a fresh supervised native agent started inside that workflow
-child and released immediately after its exact
-`worker_done` is accepted. Operation agents are never reused. A Qwen operation is created only with
-`worker-start --agent qwen-code`; creating a `qwen` command terminal and attaching it by handle is
-forbidden. The Task preamble is delivered only by the supervised native start; an untracked
-returned-preamble, `dispatch --to <terminal>` or manual terminal-send fallback is forbidden. The workflow child is retained until reviewed
-integration settles, then it may be removed; unrelated workflows may instead run in solo mode.
-The Workflow Manager only decides, dispatches, retries, replaces and waits for operation boundaries;
-it never writes implementation code, repairs an operation or runs the operation's tests. Those effects
-belong exclusively to the operation agent. The Coordinator waits for normalized Workflow Manager
-boundaries and never performs workflow-local or operation work.
+Each operation is a fresh supervised agent started inside the workflow worktree and released immediately
+after its accepted report. Operation agents are never reused. A Qwen operation runs as one command terminal
+per attempt, created with the declared target command and fed by `dispatch --return-preamble` with a verified
+submission; a managed Codex or Claude operation is created only by `worker-start`, and attaching an
+operation to an existing terminal is forbidden either way. The kernel never writes implementation code,
+repairs an operation or runs an operation's tests on its behalf - it re-runs the operation's declared checks
+to decide whether to accept the slice, which is a different thing: the effects belong exclusively to the
+operation agent.
 
 ## Approval boundary
 
@@ -78,7 +74,8 @@ The adapter consumes the shared request contract with these orchestration fields
 }
 ```
 
-The workflow selection chooses the persistent native Workflow Manager hosted in the child worktree. Operations are ordered.
+In the legacy 4.x adapter the workflow selection chooses the persistent agent hosted in the child worktree.
+Operations are ordered.
 Dependencies may reference only earlier operations, and every operation carries its own resolved
 provider/model selection and nonempty file allowlist. An operation selection chooses its subagent; it
 does not change ownership, scope, criteria, authority or workflow worktree.
@@ -132,10 +129,8 @@ unsupervised terminal as a successful operation.
 
 The display contract is mandatory at creation time:
 
-- main worktree: `[Coordinator] <Plan>`;
-- persistent main agent (the Plan Coordinator): `[Monitor] <Plan>`;
-- child worktree: `[Workflow] <Workflow>`;
-- persistent child manager: `[Monitor] <Workflow>`;
+- workflow worktree: `[Workflow] <Workflow>`;
+- the kernel process that owns the loop in it: `[Kernel] <Workflow>`;
 - isolated operation agent: `[Op] <operation> - <scope>`.
 
 The executable call contract is `providers/orca/calls.yaml` (compiled to `calls.json`); `index.yaml`
@@ -146,51 +141,69 @@ replays an unknown mutation once with `--retry-request`, and returns every exit 
 (`committed`, `none`, `partial`, `unknown`). An Orca failure is a classified result; only a contract
 violation throws.
 
-A Workflow Monitor starts an operation only through `execution/orca-supervised-launch.mjs start-op`;
-it never assembles `task-create`, `worker-start`, provider fallback or terminal naming commands itself.
-Inside one invocation the launcher attests the nested Run, creates the canonical Task once, then walks
-the resolved chain: for each candidate it starts one fresh native worker, proves prompt delivery
+The kernel starts an operation only through `execution/orca-supervised-launch.mjs start-op`;
+it never assembles `task-create`, `worker-start`, candidate fallback or terminal naming commands itself.
+Inside one invocation the launcher attests the Run, creates the canonical Task once, then tries the one
+candidate the allocator supplied (`startOperation({candidates})`) or, when none was supplied, walks the
+resolved chain: for each candidate it starts one fresh native worker, proves prompt delivery
 (`worker.state` ready and `dispatch_input` accepted), attests the effective agent/model/worktree,
 canonicalizes the title, and accepts. A failed candidate is classified; when a Dispatch exists it is
 settled (`worker-stop`, `worker-release` must report `released` or `already_released`). Only a proven
 `effectState: none` admits the next candidate; `partial` or `unknown` stops with a typed reconciliation
-request, and an exhausted chain returns `ok:false, exhausted:true, attempts[]`. A Monitor that has verified, from receipts, that a chain target cannot start on this host passes
-`--skip <target:reason>` (reason from the registry's `fallback.allowedReasons`); the skip is recorded
-as a no-effect attempt and the chain starts at the next candidate. Companion commands are
-`start-monitor` (supervisor chain, no hardcoded provider), `replace-monitor` (settle a dead Monitor,
-relaunch with `--retry-of`; a live Monitor is never replaced), `settle --dispatch`, `sweep` (close dead terminals in the workflow worktree after settlement) and `verify`.
+request, and an exhausted chain returns `ok:false, exhausted:true, attempts[]`. A caller that has verified,
+from receipts, that a chain target cannot start on this host passes `--skip <target:reason>` (reason from the
+registry's `fallback.allowedReasons`); the skip is recorded as a no-effect attempt and the chain starts at the
+next candidate. The kernel never uses `--skip` for allocation: it names the candidate it wants, so a target
+that was never tried is never recorded as having failed. Companion commands are
+`settle --dispatch`, `sweep` (close dead terminals in the workflow worktree after settlement) and
+`verify`; the workflow control loop itself is the kernel's (`workflow-goal`, `workflow-approve`,
+`workflow-run`, `workflow-status`).
 `execution/orca-adapter.mjs` is the concrete adapter for `execution/orca.mjs` on the same runner,
 including `waitBoundary` (keepalive-filtered `check --wait` with `--ack`). A visible
 `Bash: ...` subtitle is only the native agent's current tool activity; identity comes from the native
 immutable Task display name and supervised worker/provider receipt. The terminal title is mutable UI
-metadata: native activity may change it while the agent works. The Workflow Monitor restores the
-canonical `[Op] ...` title without fencing the worker when the immutable identities still match, and
-restores it once more before release. Title drift alone never invalidates otherwise valid operation effects.
+metadata: native activity may change it while the agent works. The kernel restores the canonical
+`[Op] ...` title without fencing the worker when the immutable identities still match, and restores it once
+more before release. Title drift alone never invalidates otherwise valid operation effects.
 
-## Supervision protocol (4.1)
+## Workflow kernel (5.0)
 
-Three launcher commands own what agents used to improvise. `report` ends an operation or a workflow
-with exactly one typed outcome (`starci/op-report@1`, `starci/workflow-report@1`: `done | partial |
-failed | ask | blocked`, with the checks that were actually run, the files inside the allowlist, open
-items, a question or a blocker); the file under `.starciwork/_local/runtime/reports/<run>/<dispatch>.json`
-is the source of truth and the Orca message (`worker_done`, `worker_failed`, `question`, `escalation`)
-is only the wake-up. `done` needs a passing check and no open item; a second report for the same
-Dispatch is refused. `wait` is the one wait tick a supervisor runs in a loop: it blocks on the boundary
-events with the previous batch acknowledged, scans the report files, classifies every live worker from
-its screen (`working`, `reported`, `stalled-idle`, `stalled-prompt`, `stalled-silent`, `dead`), sweeps
-dead terminals and restores canonical titles; `event: timeout` means call `wait` again, and a
-supervisor turn ends only on the workflow goal or on a `blocked` escalation that needs the parent.
-`notify` carries every Coordinator -> Monitor and Monitor -> Op instruction: a terminal consumes only
-the Run it is bound to (`consumer_fenced`), so parent-Run mail never reaches a Monitor bound to its
-nested Run; `notify` writes the message file, types a pointer into the recipient's agent terminal and
-proves delivery from the screen (`queued | staged | submitted`), because a busy agent queues typed input
-while Orca answers `agent_prompt_stalled`. `start-coordinator` bootstraps the persistent Plan agent
-through a helper terminal that is closed afterwards (Run creation or binding, canonical Task, supervisor
-chain, provider attestation, hand-off of `coordinator_handle` to the agent terminal). A managed Claude
-whose delivered prompt stays staged in its input box is submitted once by the launcher before any
-fence. The Coordinator, Monitor and Op contracts are rendered from `docs/supervision-templates/`.
+The control loop above the launcher is code, not an agent. `workflow-goal` turns a job into a goal and prints it
+for exactly one user approval. In a repository that owns a Work tree (`<repo>/.starciwork/features`) the
+ledger **is** that tree: the kernel lists the eligible nodes in `--scope`, derives each operation from its
+node (goal from `description`, allowlist from `implementation.changes[].files`, checks from
+`extensions.work3.checks`, acceptance from `assertions`), names a node that declares no allowlist or checks
+as `ledger incomplete` instead of guessing one, and asks `assessGoal` only for the definition of done and
+the risks and questions. Without a Work tree, `assessGoal` assesses the whole ledger and the operation set
+itself. Either way the goal is frozen by the approval; `workflow-approve` records that approval and freezes the goal; `workflow-run` runs the loop;
+`workflow-status` reads one workflow's own directory. A workflow is one goal in one worktree with a pool
+of up to ten operation agents, parallel whenever their allowlists are disjoint, so there is no shared
+file to arbitrate. `execution/runtime-allocator.mjs` assigns each ready operation to the
+first runtime of that role's preference order that has a free slot, remaining budget and no cooldown
+(`prefer-then-overflow`, declared in `profiles/runtimes.yaml` and explained in
+`docs/runtime-allocation.md`); a launch failure or rate-limit releases the slot, parks that runtime for a
+classified cooldown and the operation overflows to the next preference, and a verify operation is allocated
+with the implementing runtime in `avoid`. The launcher is handed that one resolved candidate through
+`startOperation({candidates})`, so no chain is walked and no target is reported as skipped that was never
+tried. Acceptance is never
+self-declared: a report (`starci/op-report@1`, the file under the workflow's `reports/` directory, with
+the Orca message only as the wake-up) is evidence, and the kernel itself re-runs the operation's checks,
+computes the changed files from git rather than from the report, refuses anything outside the allowlist,
+then commits that one operation. On the Work ledger that commit carries a
+`Work: <node id>` trailer and the accepted slice is written back into its node - `state`, `completion` and an
+evidence manifest - through `execution/work-ledger.mjs`, which owns those fields and nothing else; a refused
+write restores the node's original bytes and becomes a `needUser` item rather than a green report over a
+ledger that does not agree. `report`, `wait` and `notify` remain the operation-side evidence and boundary
+commands. All runtime state lives in `.starciwork/_local/workflows/<id>/`, where
+`events.jsonl` is an append-only audit trail that can replay a run from seq 0 and `state.json` is a
+derived snapshot. Orca supplies worktrees and attested agent terminals only; the same kernel runs on a
+Codex or Claude host with no Orca present. The Op contract is rendered from
+`docs/supervision-templates/op.md`. See [v5-plan.md](v5-plan.md).
 
-## Normal execution
+## Normal execution (the legacy 4.x adapter)
+
+The remainder of this document describes `execution/orca.mjs`, the 4.x child-workflow boundary that is still
+shipped and tested. Its parent/child wording is that module's own model, not the 5.0 topology above.
 
 `startOrcaExecution({request, parentRunId, parentWorktree, adapter})` attaches one workflow child to an existing Orca
 parent Run; omitting `parentRunId` creates a compatibility parent Run. `parentWorktree` carries the exact main selector and id. It creates one wrapper Task/Dispatch/worktree, binds and attests the child lineage, and only then starts the first ready operation-subagent wave.

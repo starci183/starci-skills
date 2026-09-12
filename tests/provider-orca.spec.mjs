@@ -6,19 +6,21 @@ import {loadProviderContract,validateProviderContracts} from '../providers/valid
 test('Orca provider contract fixes hierarchy names and exact native API calls',()=>{
   const contract=readPublicJson('providers/orca/index.json');
   assert.equal(contract.schema,'starci/orca-provider@1');
-  assert.equal(contract.names.planCoordinatorWorktree,'[Coordinator] <Plan>');
-  assert.equal(contract.names.planCoordinator,'[Monitor] <Plan>');
+  assert.deepEqual(Object.keys(contract.names).sort(),['operationAgent','rule','workflowKernel','workflowWorktree']);
   assert.equal(contract.names.workflowWorktree,'[Workflow] <Workflow>');
-  assert.equal(contract.names.workflowMonitor,'[Monitor] <Workflow>');
+  assert.equal(contract.names.workflowKernel,'[Kernel] <Workflow>');
   assert.equal(contract.names.operationAgent,'[Op] <operation> - <scope>');
   assert.equal(contract.environmentBinding.currentRuntime,'omit---on');
   assert.equal(contract.environmentBinding.namedRuntimeAuthority,'live-runtime-inventory-only');
-  assert.match(contract.planCoordinator.calls.startAgent.cli,/orchestration worker-start .*--agent codex/);
-  assert.match(contract.workflowMonitor.calls.startChildAgent.cli,/--worktree new-child .*--agent codex/);
-  assert.match(contract.workflowMonitor.calls.bindParent.cli,/worktree set .*--parent-worktree/);
-  assert.match(contract.workflowMonitor.calls.attestParent.cli,/worktree show/);
-  assert.match(contract.workflowMonitor.calls.attestParent.acceptOnlyWhen,/parentWorktreeId/);
-  assert.match(contract.workflowMonitor.calls.nameAgent.cli,/\[Monitor\] <Workflow>/);
+  // The 4.x supervisor layers are gone from the provider canon, not renamed inside it.
+  assert.equal(contract.planCoordinator,undefined);
+  assert.equal(contract.workflowMonitor,undefined);
+  assert.equal(contract.workflowKernel.role,'one-local-process-per-workflow-in-the-workflow-worktree');
+  assert.match(contract.workflowKernel.calls.bindRun.cli,/orchestration run-create/);
+  assert.match(contract.workflowKernel.calls.nameSelf.cli,/terminal rename .*\[Kernel\] <Workflow>/);
+  assert.match(contract.workflowKernel.calls.attestWorktree.cli,/worktree show/);
+  assert.match(contract.workflowKernel.calls.waitOperationBoundary.cli,/orchestration check --wait/);
+  assert.match(contract.workflowKernel.calls.answerOperation.cli,/terminal send .*--enter/);
   assert.equal(contract.operationAgent.canonicalLauncher.module,'execution/orca-supervised-launch.mjs');
   assert.equal(contract.operationAgent.canonicalLauncher.command,'start-op');
   assert.equal(contract.operationAgent.canonicalLauncher.authority,'exclusive-effectful-construction-path');
@@ -26,7 +28,7 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.equal(contract.operationAgent.qwen38Flash.agent,'qwen');
   assert.equal(contract.operationAgent.qwen38Flash.model,'qwen3.8-flash');
   assert.equal(contract.operationAgent.qwen38Flash.nestedAgents,'forbidden');
-  assert.equal(contract.operationAgent.admission.expectedOperation,'active-dag-node');
+  assert.equal(contract.operationAgent.admission.expectedOperation,'approved-goal-operation');
   assert.equal(contract.operationAgent.admission.providerSelection,'profiles-registry-resolver-output');
   assert.equal(contract.operationAgent.admission.afterWorkerStart.api,'orchestration.worker-show');
   assert.equal(contract.operationAgent.admission.afterWorkerStart.beforeEffectAcceptance,'required');
@@ -40,17 +42,17 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.doesNotMatch(contract.operationAgent.qwen38Flash.calls.returnPreamble.cli,/--inject/);
   assert.match(contract.operationAgent.qwen38Flash.calls.submitPrompt.cli,/terminal send .*--enter/);
   assert.match(contract.operationAgent.qwen38Flash.calls.restoreName.cli,/terminal rename .*\[Op\] <operation> - <scope>/);
-  assert.equal(contract.routing.coordinatorToOperation,'forbidden');
-  assert.match(contract.routing.coordinatorToWorkflow.cli,/--type escalation/);
-  assert.equal(contract.routing.coordinatorToWorkflow.forbiddenType,'status');
+  assert.equal(contract.routing.operationToOperation,'forbidden');
+  assert.match(contract.routing.kernelToOperation.cli,/terminal send .*--enter/);
+  assert.equal(contract.routing.kernelToOperation.forbiddenType,'status');
+  assert.equal(contract.routing.kernelToOperation.proveDeliveryFrom,'terminal-screen-not-send-receipt');
+  assert.equal(contract.routing.operationToKernel.authority,'report-file-then-signal');
+  assert.equal(contract.routing.operationToKernel.onceOnly,true);
+  assert.deepEqual(Object.keys(contract.operationAgent.canonicalLauncher.companions).filter(name=>/monitor/i.test(name)),[]);
   assert.ok(contract.forbiddenCalls.includes('terminal-send-outside-canonical-launcher'));
   assert.ok(contract.forbiddenCalls.includes('orchestration.dispatch-to-reused-terminal-for-operation'));
   assert.ok(contract.forbiddenCalls.includes('operation-agent-tool-agent'));
-  for(const cli of [
-    contract.planCoordinator.calls.startAgent.cli,
-    contract.workflowMonitor.calls.startChildAgent.cli,
-    contract.operationAgent.managedFallback.calls.startAgent.cli
-  ])assert.doesNotMatch(cli,/--on\s+(?:windows|macos|linux)(?:\s|$)/i);
+  assert.doesNotMatch(contract.operationAgent.managedFallback.calls.startAgent.cli,/--on\s+(?:windows|macos|linux)(?:\s|$)/i);
 });
 
 test('Codex and Claude contracts expose solo operation APIs but forbid hosted orchestration',()=>{

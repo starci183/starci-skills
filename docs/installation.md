@@ -7,8 +7,8 @@ Use Node.js 20+ and npm. The runtime includes its YAML parser and does not requi
 This alpha is not published as `starci` yet. The commands below use the local release archive. Replace the archive path with your actual file; `--dir` always means the **host**, not automatically the backend or frontend.
 
 ```sh
-npx --yes --package=./starci-4.2.0.tgz starci init --dir /absolute/host
-npx --yes --package=./starci-4.2.0.tgz starci doctor --dir /absolute/host --quick
+npx --yes --package=./starci-5.0.0-alpha.1.tgz starci init --dir /absolute/host
+npx --yes --package=./starci-5.0.0-alpha.1.tgz starci doctor --dir /absolute/host --quick
 ```
 
 The installer copies its declared **source** payload to `/absolute/host/.claude`, builds and verifies local `.dist` from that tree, then records `.starci-skills.json` only if verification succeeds. It installs the managed entry in both `AGENTS.md` and `CLAUDE.md`, and creates local config only if absent. Installed `.claude/.gitignore` includes `/.dist/` and `/config.json`. It preserves custom instructions. Conflicting bootstrap protocols fail before runtime writes. `init` refuses an unmanaged `.claude` by default. It does not run Git commands, create project records, install global skills, or change FE sources. See [runtime distribution](runtime-distribution.md).
@@ -53,8 +53,8 @@ Open the coding agent at the host. If a task opens in FE or another repository, 
 ## Update
 
 ```sh
-npx --yes --package=./starci-4.2.0.tgz starci update --dir /absolute/host
-npx --yes --package=./starci-4.2.0.tgz starci doctor --dir /absolute/host
+npx --yes --package=./starci-5.0.0-alpha.1.tgz starci update --dir /absolute/host
+npx --yes --package=./starci-5.0.0-alpha.1.tgz starci doctor --dir /absolute/host
 ```
 
 Updates replace unchanged installer-owned runtime files, rebuild and verify `.dist` from the installed source, then record the new version only after a successful check. Locally changed or unowned content is preserved and reported. Inspect that report: a successful copy is not proof a mixed/custom installation is compatible. Major upgrades require `--upgrade-major`. Keep a backup or Git checkpoint of runtime and host instructions before upgrading. Existing business data, active plans, receipts, local settings and Git metadata are not migration targets.

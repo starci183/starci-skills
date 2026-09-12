@@ -34,14 +34,15 @@ export function validateProviderContracts(){
   catch(error){errors.push(error.message);return {ok:false,errors};}
 
   add(errors,orca.index?.schema==='starci/orca-provider@1','Missing Orca provider index');
-  add(errors,orca.index?.names?.planCoordinatorWorktree==='[Coordinator] <Plan>','Invalid Orca Plan Coordinator worktree name');
-  add(errors,orca.index?.names?.planCoordinator==='[Monitor] <Plan>','Invalid Orca Plan Coordinator agent name');
   add(errors,orca.index?.names?.workflowWorktree==='[Workflow] <Workflow>','Invalid Orca workflow worktree name');
-  add(errors,orca.index?.names?.workflowMonitor==='[Monitor] <Workflow>','Invalid Orca Workflow Monitor name');
+  add(errors,orca.index?.names?.workflowKernel==='[Kernel] <Workflow>','Invalid Orca workflow kernel name');
   add(errors,orca.index?.names?.operationAgent==='[Op] <operation> - <scope>','Invalid Orca operation name');
+  // 5.0 has a kernel and operation agents; a provider contract that still declares a supervisor layer is stale.
+  add(errors,!orca.index?.planCoordinator&&!orca.index?.workflowMonitor,'Orca provider index still declares a retired supervisor layer');
+  add(errors,plain(orca.index?.workflowKernel?.calls?.waitOperationBoundary)&&orca.index.workflowKernel.role==='one-local-process-per-workflow-in-the-workflow-worktree','Orca workflow kernel contract is invalid');
   add(errors,orca.index?.environmentBinding?.currentRuntime==='omit---on','Current Orca runtime must omit --on');
   add(errors,orca.index?.environmentBinding?.namedRuntimeAuthority==='live-runtime-inventory-only','Named Orca runtime must come from live inventory');
-  add(errors,orca.index?.operationAgent?.admission?.expectedOperation==='active-dag-node','Orca operation admission must bind the active DAG node');
+  add(errors,orca.index?.operationAgent?.admission?.expectedOperation==='approved-goal-operation','Orca operation admission must bind an operation of the approved goal');
   add(errors,orca.index?.operationAgent?.admission?.providerSelection==='profiles-registry-resolver-output','Orca operation admission must use the profile resolver');
   add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.api==='orchestration.worker-show','Orca provider attestation must use worker-show');
   add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.beforeEffectAcceptance==='required','Orca provider attestation must precede effect acceptance');
@@ -50,7 +51,9 @@ export function validateProviderContracts(){
   add(errors,orca.index?.operationAgent?.admission?.architectureSidearm?.onlyTrigger==='active implementation secondary_request','Architecture sidearm trigger is too broad');
   add(errors,orca.index?.operationAgent?.admission?.architectureSidearm?.exactReason==='sds-technical-gap','Architecture sidearm reason is invalid');
   add(errors,orca.index?.operationAgent?.canonicalLauncher?.module==='execution/orca-supervised-launch.mjs'&&orca.index?.operationAgent?.canonicalLauncher?.command==='start-op'&&orca.index?.operationAgent?.canonicalLauncher?.authority==='exclusive-effectful-construction-path','Orca operation launcher contract is invalid');
-  add(errors,/--type escalation/.test(orca.index?.routing?.coordinatorToWorkflow?.cli||'')&&orca.index?.routing?.coordinatorToWorkflow?.forbiddenType==='status','Coordinator-to-Workflow control must use escalation, not status');
+  add(errors,/terminal send/.test(orca.index?.routing?.kernelToOperation?.cli||'')&&orca.index?.routing?.kernelToOperation?.forbiddenType==='status'&&orca.index?.routing?.kernelToOperation?.proveDeliveryFrom==='terminal-screen-not-send-receipt','Kernel-to-operation control must be a proven terminal send, never a status message');
+  add(errors,orca.index?.routing?.operationToKernel?.authority==='report-file-then-signal'&&orca.index?.routing?.operationToKernel?.onceOnly===true,'An operation must answer exactly once, in its report file');
+  add(errors,orca.index?.routing?.operationToOperation==='forbidden','An operation must never control another operation');
   const commands=orca.api?.publicCommands;
   add(errors,Array.isArray(commands)&&commands.length===orca.api?.snapshot?.observedCommandCount,'Orca API inventory count mismatch');
   add(errors,Array.isArray(commands)&&new Set(commands).size===commands.length,'Orca API inventory contains duplicates');
@@ -87,8 +90,6 @@ export function validateProviderContracts(){
     if(target?.orcaLaunch?.kind==='command-terminal')add(errors,/--exclude-tools agent\b/.test(target.orcaLaunch.command||''),`Command terminal ${name} must exclude the provider agent tool`);
   }
   const workerStartTemplates=[
-    orca.index?.planCoordinator?.calls?.startAgent?.cli,
-    orca.index?.workflowMonitor?.calls?.startChildAgent?.cli,
     orca.index?.operationAgent?.managedFallback?.calls?.startAgent?.cli,
     codex.index?.orcaManagedForm?.start?.cli,
     claude.index?.orcaManagedForm?.start?.cli

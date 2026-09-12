@@ -2,17 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {getPath} from './orca-calls.mjs';
 import {buildReport,readReports,reportBody,reportPath,reportsDirectory,validateReport} from './reports.mjs';
-import {notifyTerminal,resolveSupervisorChain,settleDispatch,sweepWorktree} from './orca-supervised-launch.mjs';
+import {notifyTerminal,settleDispatch,sweepWorktree} from './orca-supervised-launch.mjs';
 
 /**
- * Supervision protocol 4.1 on top of the typed Orca runner: `report` (one typed outcome, file first,
- * signal second), `wait` (one owned wait tick that classifies every live worker) and `start-coordinator`
- * (the bootstrap of the persistent Plan agent). The helpers never improvise Orca calls: every call goes
- * through the contract runner and every result is classified.
+ * The operation-side protocol on top of the typed Orca runner: `report` (one typed outcome, file first,
+ * signal second) and `wait` (one owned boundary tick that classifies every live worker). 5.0 has no
+ * supervisor to bootstrap - the kernel is a local process - so `start-coordinator` is gone with the layer it
+ * served. The helpers never improvise Orca calls: every call goes through the contract runner and every
+ * result is classified.
  */
 export const REPORT_RESULT='starci/orca-report-result@1';
 export const WAIT_TICK='starci/orca-wait-tick@1';
-export const COORDINATOR_LAUNCH='starci/orca-supervised-coordinator-launch@1';
 export const BOUNDARY_TYPES='worker_done,worker_failed,question,escalation';
 const DEFAULT_STALLED_AFTER_MS=20*60*1000;
 export const DEFAULT_HEARTBEAT_GRACE_MS=10*60*1000;
@@ -28,9 +28,9 @@ function readJson(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf
 function writeJson(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`${JSON.stringify(value,null,2)}\n`);}
 
 /** One typed outcome: validate, write the file, send the matching Orca signal once, record the send. */
-export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome,summary,files=[],checksFile=null,checks=[],open=[],question=null,blocker=null,branch=null,head=null,gates=[],observations=[],reportsDir=null,capability=null,now=Date.now}){
+export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome,summary,files=[],checksFile=null,checks=[],open=[],question=null,blocker=null,branch=null,head=null,gates=[],observations=[],reportsDir=null,capability=null,fileKey=null,now=Date.now}){
   const directory=reportsDirectory(cwd,required(run,'run id'),reportsDir);
-  const file=reportPath(directory,required(dispatch,'dispatch id'));
+  const file=reportPath(directory,fileKey??required(dispatch,'dispatch id'));
   const existing=readJson(file,null);
   if(existing?.sent)return {schema:REPORT_RESULT,ok:false,file,reason:'already-reported',existing:{outcome:existing.outcome,sent:existing.sent}};
   const loadedChecks=checksFile?readJson(path.resolve(cwd,checksFile),null):checks;
@@ -154,70 +154,6 @@ function singleTick(orca,{cwd,run,from,timeoutMs,reportsDir,stalledAfterMs,heart
     next:event==='timeout'?'call wait again; a timeout is not a boundary':event==='report'?'process every message and report, then call wait again':event==='stalled-prompt'?'the agent is inside a confirmation dialog and cannot read a notify: settle it (--close true) and start-op again, then call wait again':'act on the stalled or dead worker (notify to report, or settle and retry), then call wait again'};
 }
 
-/** Bootstrap the persistent Plan Coordinator agent through a temporary helper terminal that is closed afterwards. */
-export function startCoordinator(orca,{cwd,plan,spec,run=null,objective=null,shell=process.platform==='win32'?'powershell -NoLogo':'bash',wait=sleepSync}){
-  const displayName=`[Monitor] ${required(plan,'plan name')}`;
-  const worktree=`path:${cwd}`;
-  const boot=orca.invoke('terminal-create',{worktree,title:`[Bootstrap] ${plan}`,command:shell},{cwd});
-  need(boot.outcome==='ok',`Bootstrap terminal failed: ${boot.reason}`);
-  const from=getPath(boot.receipt,'result.terminal.handle')??getPath(boot.receipt,'result.handle');
-  need(from,'Bootstrap terminal receipt is missing the handle');
-  const steps=[{name:'terminal-create',handle:from}];
-  const fail=(reason,extra={})=>({schema:COORDINATOR_LAUNCH,ok:false,reason,steps,...extra});
-  try{
-    let runId=run;
-    if(!runId){
-      const created=orca.invoke('run-create',{objective:required(objective,'run objective'),from},{cwd});
-      if(created.outcome!=='ok')return fail(`run-create: ${created.reason}`);
-      runId=getPath(created.receipt,'result.run.id')??getPath(created.receipt,'result.id');
-      steps.push({name:'run-create',run:runId});
-    }
-    const bound=orca.invoke('run-use',{id:runId,from},{cwd});
-    if(bound.outcome!=='ok')return fail(`run-use (bootstrap): ${bound.reason}`);
-    const task=orca.invoke('task-create',{run:runId,from,spec:required(spec,'coordinator spec'),'task-title':`Plan Coordinator - ${plan}`,'display-name':displayName},{cwd});
-    if(task.outcome!=='ok')return fail(`task-create: ${task.reason}`);
-    const taskId=getPath(task.receipt,'result.task.id');
-    steps.push({name:'task-create',task:taskId});
-    const attempts=[];
-    for(const candidate of resolveSupervisorChain('planCoordinator')){
-      const params={task:taskId,worktree,agent:candidate.orcaLaunch.agent,run:runId,from,'display-name':displayName,'timeout-ms':'180000'};
-      if(candidate.model)params.model=candidate.model;
-      if(candidate.effort)params.effort=candidate.effort;
-      const started=orca.invoke('worker-start',params,{cwd});
-      const dispatchId=getPath(started.receipt,'result.dispatchId')??getPath(started.receipt,'result.dispatch.id')??null;
-      const terminal=(getPath(started.receipt,'result.effects')??getPath(started.receipt,'result.residualResources')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
-      if(started.outcome!=='ok'){
-        const settlement=dispatchId?settleDispatch(orca,dispatchId,{cwd,reason:`coordinator worker-start ${started.outcome}`,terminalHandle:terminal,closeTerminal:true,wait}):null;
-        attempts.push({target:candidate.target,dispatchId,effectState:settlement?.effectState??started.effectState,reason:started.reason});
-        if(settlement&&settlement.effectState!=='none')return fail('partial-or-unknown-effects',{attempts});
-        const reissued=orca.invoke('task-update',{id:taskId,status:'ready',run:runId,from,result:JSON.stringify({reissuedAfter:dispatchId,reason:'candidate-fell-through'})},{cwd});
-        if(reissued.outcome!=='ok')return fail('task-not-reissuable',{attempts});
-        continue;
-      }
-      const shown=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});
-      const worker=resultOf(shown.receipt)?.worker,effective=worker?.startOptions?.launch?.effective;
-      if(shown.outcome!=='ok'||effective?.agent!==candidate.orcaLaunch.agent||(candidate.model&&effective?.model!==candidate.model)){
-        const settlement=settleDispatch(orca,dispatchId,{cwd,reason:'coordinator provider attestation failed',terminalHandle:terminal??worker?.agent_terminal_handle,closeTerminal:true,wait});
-        attempts.push({target:candidate.target,dispatchId,effectState:settlement.effectState,reason:`attestation: expected ${candidate.orcaLaunch.agent}/${candidate.model??'any'}, received ${effective?.agent??'unknown'}/${effective?.model??'unknown'}`});
-        if(settlement.effectState!=='none')return fail('partial-or-unknown-effects',{attempts});
-        continue;
-      }
-      const handle=worker.agent_terminal_handle;
-      const renamed=orca.invoke('terminal-rename',{terminal:handle,title:displayName},{cwd});
-      const handoff=orca.invoke('run-use',{id:runId,from:handle},{cwd});
-      if(handoff.outcome!=='ok')return fail(`run-use (coordinator): ${handoff.reason}`,{attempts,dispatchId,terminal:handle});
-      const runShow=orca.invoke('run-show',{id:runId},{cwd});
-      const coordinatorHandle=getPath(runShow.receipt,'result.run.coordinator_handle')??null;
-      return {schema:COORDINATOR_LAUNCH,ok:coordinatorHandle===handle,run:runId,task:taskId,dispatchId,terminal:handle,displayName,
-        attestation:{target:candidate.target,agent:effective.agent,model:effective.model??null,effort:effective.effort??null,coordinatorHandle,titleCanonical:renamed.outcome==='ok'},
-        attempts,steps,reason:coordinatorHandle===handle?null:`coordinator_handle is ${coordinatorHandle}, expected ${handle}`};
-    }
-    return fail('chain-exhausted',{attempts});
-  }finally{
-    const closed=orca.invoke('terminal-close',{terminal:from},{cwd});
-    steps.push({name:'terminal-close-bootstrap',outcome:closed.outcome});
-  }
-}
 
 export function protocolMain(command,options,{orca,cwd}){
   if(command==='report'){
@@ -229,7 +165,6 @@ export function protocolMain(command,options,{orca,cwd}){
       observations:options.observations?[options.observations]:[],reportsDir:options['reports-dir']??null,capability:options.capability??null});
   }
   if(command==='wait')return waitTick(orca,{cwd,run:required(options.run,'run id'),from:required(options.from,'own terminal handle'),timeoutMs:Number(options['timeout-ms']??900000),tickMs:Number(options['tick-ms']??DEFAULT_TICK_MS),reportsDir:options['reports-dir']??null,stalledAfterMs:Number(options['stalled-after-ms']??DEFAULT_STALLED_AFTER_MS),ack:options.ack??null,noAck:options['no-ack']==='true'});
-  if(command==='start-coordinator')return startCoordinator(orca,{cwd,plan:required(options.plan,'plan name'),spec:options.spec,run:options.run??null,objective:options.objective??null});
   throw Error(`Unsupported protocol command: ${command}`);
 }
 

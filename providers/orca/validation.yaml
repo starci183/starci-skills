@@ -61,12 +61,12 @@ receipts:
       - terminal-rename-to-canonical-op-name
       - record-ui-defect-if-terminal-is-no-longer-writable
 dispatchAssertions:
-  - Workflow Monitors invoke execution/orca-supervised-launch.mjs start-op; they never compose task-create, worker-start, provider fallback or terminal naming calls themselves.
-  - The launcher walks the resolved chain inside one invocation; a Monitor never re-invokes start-op for the same operation attempt to obtain a fallback.
-  - A dead Workflow Monitor is replaced only through replace-monitor, which proves the old Dispatch is settled before starting the linked --retry-of attempt.
-  - A workflow child is explicitly bound with worktree set --parent-worktree to the exact main Coordinator worktree and worktree show attests that parentWorktreeId before any operation Task is created.
-  - A null, stale or wrong workflow-child parentWorktreeId stops dispatch; orchestration Task membership alone never substitutes for Orca worktree lineage.
-  - Operation equals the expected active DAG node before Task creation.
+  - The workflow kernel invokes execution/orca-supervised-launch.mjs start-op; it never composes task-create, worker-start, candidate fallback or terminal naming calls itself.
+  - One start-op invocation owns the whole attempt: it tries the allocated candidate when the kernel supplies one, otherwise it walks the resolved chain, and the kernel never re-invokes start-op for the same attempt to obtain a fallback.
+  - A runtime that cannot launch is released, classified and cooled down by the runtime allocator, which then names another runtime; there is no supervisor to replace and no layer to recover.
+  - The workflow worktree is attested with worktree show to be the exact filesystem path the kernel runs in before any operation Task is created.
+  - A worktree whose resolved path is null, stale or different stops dispatch; orchestration Task membership alone never substitutes for Orca worktree identity.
+  - Operation equals an operation of the approved goal before Task creation.
   - architecture.decide is admitted only by an active implementation secondary_request with reason sds-technical-gap and an explicit bounded SDS allowlist.
   - Review findings, suggestions and open questions never create architecture.decide.
   - Provider selection is resolved before launch and attested from worker-show before any effect is accepted.
@@ -74,15 +74,15 @@ dispatchAssertions:
   - After provider attestation, terminal title is renamed and verified as [Op] <operation> - <scope> before effects are admitted.
   - A native activity-title drift during execution is mutable UI metadata; with exact Task, Dispatch, worker, agent and model identity it is recanonicalized rather than used to reject valid effects.
   - A managed operation is never dispatched to an existing terminal; only worker-start creates its supervised native agent. A command-terminal operation is dispatched only to the terminal the same attempt created.
+  - An operation's `done` is never accepted on its own word: the kernel re-runs every declared check itself, computes the changed files from git and refuses a report whose files fall outside the operation allowlist.
   - Current-runtime worker-start omits --on; a named --on value is used only after live runtime inventory returns that exact environment id.
   - Literal or guessed environment labels such as windows are rejected before worker-start.
 uiAssertions:
-  - Main worktree display name equals [Coordinator] <Plan>.
-  - Main agent terminal title equals [Monitor] <Plan>.
-  - Workflow child display name equals [Workflow] <Workflow>.
-  - Workflow Monitor title equals [Monitor] <Workflow>.
+  - Workflow worktree display name equals [Workflow] <Workflow>.
+  - The kernel's own terminal title equals [Kernel] <Workflow>.
   - Operation title is canonicalized to [Op] <operation> - <scope> after native readiness and again before release.
-  - Bash in the subtitle is accepted only as activity metadata beneath a native agent identity.
+  - Bash in the subtitle is accepted only as activity metadata beneath a native agent identity; the kernel terminal is a shell by design.
 messageAssertions:
-  - Coordinator-to-Workflow control instructions use type escalation.
+  - The kernel speaks to a live operation only by typing into that operation's own terminal, and delivery is proven from the screen rather than from the send receipt.
   - Status messages are informational only and never carry a control instruction.
+  - An operation answers exactly once, in its report file; the Orca signal that follows is a wake-up, not the answer.

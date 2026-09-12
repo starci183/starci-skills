@@ -23,49 +23,63 @@ const event=(eventType,overrides={})=>({
   dispatchId:'dispatch-workflow-1',attempt:2,eventType,emittedAt:1200,...overrides
 });
 
-test('supervision policy is a strict event-driven coordinator contract',()=>{
+test('the supervision policy is the 5.0 contract: one kernel owns the loop, operations report once',()=>{
   assert.equal(validateSupervisionPolicy(policy).ok,true);
   assert.equal(policy.wait.mode,'blocking-event-wait');
   assert.equal(policy.wait.onTimeout.inspectWorker,true);
   assert.equal(policy.wait.owner,'launcher-wait-tick');
-  assert.equal(policy.workerLifecycle.coordinator.lifetime,'parent-run');
-  assert.equal(policy.workerLifecycle.coordinator.host,'orca-main-worktree');
-  assert.equal(policy.workerLifecycle.coordinator.launch,'persistent-native-agent');
-  assert.equal(policy.workerLifecycle.coordinator.bootstrap,'external-chat-creates-and-hands-off');
-  assert.equal(policy.workerLifecycle.coordinator.authority,'owns-plan-run-and-dag');
-  assert.equal(policy.workerLifecycle.workflowWrapper.host,'workflow-child-worktree');
-  assert.equal(policy.workerLifecycle.workflowWrapper.launch,'persistent-native-manager-agent');
-  assert.equal(policy.workerLifecycle.workflowWrapper.authority,'owns-operation-dag-and-boundary-loop');
-  assert.equal(policy.workerLifecycle.workflowWrapper.reportsTo,'parent-coordinator');
-  assert.deepEqual(policy.ownership.workflowWrapper,[
-    'operation-scheduling','bounded-retry','provider-fallback-with-no-effects','operation-boundary-decision','normalized-workflow-reporting'
+  assert.deepEqual(policy.wait.endsTurnOnlyOn,['workflow-goal','blocked-need-user']);
+  // Two roles and no layer between them: the 4.x Coordinator and Workflow Manager are gone, not renamed.
+  assert.deepEqual(Object.keys(policy.ownership),['kernel','operationAgent']);
+  assert.deepEqual(policy.ownership.kernel,[
+    'goal-assessment-and-one-user-approval','operation-scheduling','runtime-allocation',
+    'machine-verified-acceptance','commit-and-ledger-write','bounded-retry','gate-execution','final-reporting'
   ]);
   assert.deepEqual(policy.ownership.operationAgent,[
     'implementation-and-repair','test-and-verification-execution','operation-output-production'
   ]);
-  assert.equal(policy.routing.operationToWorkflow.recipient,'workflow-manager');
-  assert.ok(policy.routing.workflowInternal.resolveWithoutCoordinator.includes('bounded-retry'));
-  assert.equal(policy.routing.workflowInternal.execution,'operation-agent-only');
-  assert.equal(policy.routing.workflowInternal.coordinatorNotification,'none');
-  assert.equal(policy.routing.workflowToCoordinator.envelope,'normalized-workflow-boundary');
-  assert.equal(policy.routing.coordinatorToWorkflow.recipient,'workflow-manager');
-  assert.equal(policy.routing.coordinatorToWorkflow.eventType,'escalation');
-  assert.equal(policy.routing.coordinatorToWorkflow.statusEvent,'forbidden-for-control-instruction');
-  assert.equal(policy.routing.coordinatorToOperation.direct,'forbidden');
-  assert.equal(policy.routing.managerRecovery.bypassManager,'forbidden');
-  assert.equal(policy.waitHierarchy.workflowManager.waitsFor,'operation-boundary');
-  assert.equal(policy.waitHierarchy.workflowManager.actsBy,'decide-dispatch-retry-or-replace-operation');
-  assert.equal(policy.waitHierarchy.workflowManager.directExecution,'forbidden');
-  assert.equal(policy.waitHierarchy.coordinator.waitsFor,'normalized-workflow-boundary');
-  assert.equal(policy.waitHierarchy.coordinator.actsBy,'decide-schedule-recover-or-replace-workflow-manager');
-  assert.equal(policy.waitHierarchy.coordinator.workflowLocalExecution,'forbidden');
-  assert.equal(policy.waitHierarchy.coordinator.operationExecution,'forbidden');
-  assert.equal(policy.workerLifecycle.displayNames.workflowManager,'[Monitor] <Workflow>');
+  assert.deepEqual(Object.keys(policy.workerLifecycle),['displayNames','kernel','operationAgent']);
+  assert.deepEqual(Object.keys(policy.waitHierarchy),['kernel']);
+  assert.equal(policy.workerLifecycle.kernel.lifetime,'one-workflow');
+  assert.equal(policy.workerLifecycle.kernel.host,'workflow-worktree');
+  assert.equal(policy.workerLifecycle.kernel.launch,'local-process-never-an-orca-worker');
+  assert.equal(policy.workerLifecycle.kernel.state,'one-workflow-directory-with-an-append-only-event-log');
+  assert.equal(policy.workerLifecycle.kernel.authority,'owns-the-loop-after-one-user-approval');
+  assert.equal(policy.workerLifecycle.kernel.release,'after-the-final-report');
+  assert.equal(policy.routing.operationToKernel.recipient,'workflow-kernel');
+  assert.equal(policy.routing.operationToKernel.transport,'one-report-file-per-dispatch');
+  assert.equal(policy.routing.operationToKernel.authority,'report-file-then-signal');
+  assert.equal(policy.routing.kernelToOperation.recipient,'own-operation-terminal');
+  assert.equal(policy.routing.kernelToOperation.transport,'launcher-notify');
+  assert.equal(policy.routing.kernelToOperation.statusEvent,'forbidden-for-control-instruction');
+  assert.deepEqual(policy.routing.kernelToOperation.when,['answer-a-question','nudge-a-stalled-idle-operation']);
+  assert.equal(policy.routing.operationToOperation.direct,'forbidden');
+  assert.ok(policy.routing.kernelLocal.resolveWithoutUser.includes('bounded-retry'));
+  assert.ok(policy.routing.kernelLocal.resolveWithoutUser.includes('runtime-allocation-and-overflow'));
+  assert.equal(policy.routing.kernelLocal.execution,'operation-agent-only');
+  assert.equal(policy.routing.kernelLocal.userNotification,'none');
+  assert.equal(policy.routing.kernelToUser.envelope,'final-report-need-user');
+  assert.equal(policy.waitHierarchy.kernel.waitsFor,'operation-boundary');
+  assert.equal(policy.waitHierarchy.kernel.actsBy,'verify-accept-commit-retry-or-reallocate');
+  assert.equal(policy.waitHierarchy.kernel.directExecution,'forbidden');
+  assert.equal(policy.waitHierarchy.kernel.loopOwner,'code-never-a-model');
+  assert.deepEqual(policy.waitHierarchy.kernel.modelCalls,['assessGoal','planOp','decide']);
+  assert.equal(policy.workerLifecycle.displayNames.workflowWorktree,'[Workflow] <Workflow>');
+  assert.equal(policy.workerLifecycle.displayNames.workflowKernel,'[Kernel] <Workflow>');
   assert.equal(policy.workerLifecycle.displayNames.operationAgent,'[Op] <operation> - <scope>');
   assert.equal(policy.workerLifecycle.displayNames.applyAgentNameWith,'task-display-name-then-provider-attestation-then-terminal-canonicalization');
   assert.equal(policy.workerLifecycle.operationAgent.launch,'supervised-native-agent');
   assert.equal(policy.workerLifecycle.operationAgent.release,'after-accepted-worker_done');
   assert.equal(policy.workerLifecycle.operationAgent.reuse,'forbidden');
+  assert.equal(policy.workerLifecycle.operationAgent.parallelism,'disjoint-allowlist-under-one-worktree');
+  // Acceptance is the kernel's, not the agent's claim.
+  assert.deepEqual(policy.workerLifecycle.operationAgent.acceptance,{
+    authority:'kernel-re-runs-every-declared-check-itself',
+    changedFiles:'computed-from-git-never-from-the-report',
+    allowlist:'every-changed-file-inside-the-operation-allowlist',
+    commit:'one-operation-one-commit',
+    selfDeclaredDone:'never-sufficient'
+  });
   assert.deepEqual(policy.workerLifecycle.operationAgent.displayNameStability,{
     identityAuthority:'task-display-name-plus-worker-provider-receipt',
     terminalTitle:'mutable-native-ui-metadata',
@@ -75,10 +89,11 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
     effectDecision:'never-reject-solely-for-runtime-terminal-title-drift'
   });
   assert.deepEqual(policy.workerLifecycle.operationAgent.dispatchAdmission.required,[
-    'expected-operation-from-active-dag-node','exact-operation-contract','resolved-provider-selection','canonical-display-name'
+    'expected-operation-from-the-approved-goal','exact-operation-contract','allocated-runtime-selection','canonical-display-name'
   ]);
   assert.equal(policy.workerLifecycle.operationAgent.dispatchAdmission.providerProof,'worker-show-exact-effective-agent-model');
   assert.equal(policy.workerLifecycle.operationAgent.dispatchAdmission.effectAcceptance,'only-after-provider-proof');
+  assert.equal(policy.workerLifecycle.operationAgent.deadTerminals.owner,'workflow-kernel');
   assert.equal(policy.workerLifecycle.operationAgent.architectureSidearm.onlyTrigger,'active-implementation-secondary_request');
   assert.equal(policy.workerLifecycle.operationAgent.architectureSidearm.requiredReason,'sds-technical-gap');
   assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.supervise,'dispatch-return-preamble');
@@ -89,27 +104,30 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.deepEqual(policy.workerLifecycle.operationAgent.nativeLaunchFailure.recognizedFailures,['agent_prompt_stalled','session_not_reported']);
   assert.equal(policy.workerLifecycle.operationAgent.nativeLaunchFailure.unsupervisedFallback,'forbidden');
   assert.equal(policy.workerLifecycle.operationAgent.nativeLaunchFailure.duplicateSubmit,'forbidden');
-  assert.ok(policy.forbidden.includes('external-bootstrap-retains-coordinator-loop'));
-  assert.ok(policy.forbidden.includes('shell-only-main-without-coordinator-agent'));
-  assert.ok(policy.forbidden.includes('workflow-child-without-manager-agent'));
-  assert.ok(policy.forbidden.includes('operation-agent-acts-as-workflow-manager'));
+  assert.equal(policy.workerLifecycle.operationAgent.nativeLaunchFailure.onExhaustedRuntimes,'release-the-slot-cool-the-pool-and-allocate-another-runtime');
+  assert.ok(policy.forbidden.includes('model-owned-control-loop'));
+  assert.ok(policy.forbidden.includes('supervisor-layer-between-kernel-and-operation'));
+  assert.ok(policy.forbidden.includes('operation-agent-acts-as-the-kernel'));
   assert.ok(policy.forbidden.includes('operation-agent-creates-nested-agent'));
-  assert.ok(policy.forbidden.includes('operation-agent-messages-parent-coordinator-directly'));
-  assert.ok(policy.forbidden.includes('parent-coordinator-controls-operation-directly'));
-  assert.ok(policy.forbidden.includes('workflow-manager-implements-operation'));
-  assert.ok(policy.forbidden.includes('workflow-manager-runs-operation-tests'));
-  assert.ok(policy.forbidden.includes('coordinator-performs-workflow-local-work'));
-  assert.ok(policy.forbidden.includes('higher-manager-performs-lower-layer-work'));
+  assert.ok(policy.forbidden.includes('operation-agent-controls-another-operation'));
+  assert.ok(policy.forbidden.includes('kernel-implements-operation-scope'));
+  assert.ok(policy.forbidden.includes('accept-self-declared-done-without-machine-verification'));
+  assert.ok(policy.forbidden.includes('commit-outside-the-operation-allowlist'));
   assert.ok(policy.forbidden.includes('periodic-terminal-poll'));
   assert.ok(policy.forbidden.includes('dispatch-operation-to-existing-terminal'));
+  // The retired layers cannot come back through the policy file.
+  const revived=structuredClone(policy);
+  revived.waitHierarchy.coordinator={waitsFor:'normalized-workflow-boundary'};
+  assert.equal(validateSupervisionPolicy(revived).ok,false);
+  assert.match(validateSupervisionPolicy(revived).errors.join('; '),/supervisor layer between the kernel and an operation/);
 });
 
-test('display names distinguish plan coordinator, workflow Monitor and operation roles',()=>{
-  assert.equal(formatOrcaDisplayName('coordinator-worktree',{plan:'AgentOS Backend'}),'[Coordinator] AgentOS Backend');
-  assert.equal(formatOrcaDisplayName('coordinator',{plan:'AgentOS Backend'}),'[Monitor] AgentOS Backend');
+test('display names distinguish the workflow worktree, its kernel and each operation',()=>{
   assert.equal(formatOrcaDisplayName('workflow-worktree',{workflow:'Chatbot'}),'[Workflow] Chatbot');
-  assert.equal(formatOrcaDisplayName('workflow-manager',{workflow:'Chatbot'}),'[Monitor] Chatbot');
+  assert.equal(formatOrcaDisplayName('workflow-kernel',{workflow:'Chatbot'}),'[Kernel] Chatbot');
   assert.equal(formatOrcaDisplayName('operation-agent',{operation:'review.verify',scope:'Chatbot'}),'[Op] review.verify - Chatbot');
+  for(const retired of ['coordinator','coordinator-worktree','workflow-manager'])
+    assert.throws(()=>formatOrcaDisplayName(retired,{plan:'AgentOS Backend',workflow:'Chatbot'}),/Unsupported Orca display-name kind/);
 });
 
 test('Qwen operation launch is one command terminal per attempt fed by dispatch --return-preamble',()=>{
@@ -162,14 +180,14 @@ test('worker provider attestation rejects Sol when the resolved operation target
   );
 });
 
-test('a management layer cannot claim operation execution work',()=>{
+test('the kernel cannot claim operation execution work',()=>{
   const invalid=structuredClone(policy);
-  invalid.ownership.workflowWrapper.push('implementation-and-repair');
+  invalid.ownership.kernel.push('implementation-and-repair');
   assert.equal(validateSupervisionPolicy(invalid).ok,false);
   assert.match(validateSupervisionPolicy(invalid).errors.join('; '),/crosses the operation boundary/);
 });
 
-test('wait timeout is a wait tick that inspects live workers, and a healthy heartbeat produces no coordinator action',()=>{
+test('wait timeout is a wait tick that inspects live workers, and a healthy heartbeat produces no kernel action',()=>{
   const timeout=observeSupervision(policy,state(),{type:'wait_timeout',cursor:'cursor-1'},{now:1100});
   assert.deepEqual({action:timeout.action,inspectWorker:timeout.inspectWorker,notifyUser:timeout.notifyUser},{action:'wait-again',inspectWorker:true,notifyUser:false});
   assert.equal(timeout.state.cursor,'cursor-1');

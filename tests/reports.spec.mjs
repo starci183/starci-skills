@@ -6,7 +6,7 @@ import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {createOrcaCalls} from '../execution/orca-calls.mjs';
 import {OUTCOMES,buildReport,reportBody,reportsDirectory,repositoryRoot,validateReport} from '../execution/reports.mjs';
-import {classifyWorker,reportOutcome,startCoordinator,waitTick} from '../execution/orca-protocol.mjs';
+import {classifyWorker,reportOutcome,waitTick} from '../execution/orca-protocol.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const base={run:'run_sales',task:'task_op',dispatch:'ctx_op',from:'term_op',summary:'Implemented the slice and ran the focused suite.'};
@@ -106,28 +106,7 @@ test('wait tick acknowledges the previous batch, reads report files, classifies 
   }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
 });
 
-test('start-coordinator bootstraps the Plan agent through a closed helper terminal and hands the Run to the agent terminal',()=>{
-  const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
-  const runUses=[];
-  const fake=fakeOrca({
-    'terminal-create':()=>json(0,{ok:true,result:{terminal:{handle:'term_boot'}}}),
-    'run-create':()=>json(0,{ok:true,result:{run:{id:'run_plan'}}}),
-    'run-use':(args)=>{runUses.push(args[args.indexOf('--from')+1]);return json(0,{ok:true,result:{run:{id:'run_plan'}}});},
-    'task-create':(args)=>{assert.ok(has(args,'--display-name','[Monitor] AgentOS Backend'));return json(0,{ok:true,result:{task:{id:'task_plan',display_name:'[Monitor] AgentOS Backend'}}});},
-    'worker-start':(args)=>{assert.ok(has(args,'--agent','claude')&&has(args,'--display-name','[Monitor] AgentOS Backend'));return json(0,{ok:true,result:{state:'ready',dispatchId:'ctx_plan',effects:[{kind:'terminal',role:'agent',id:'term_plan'}]}});},
-    'worker-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_plan',task_id:'task_plan'},worker:{state:'ready',agent_terminal_handle:'term_plan',startOptions:{launch:{effective:{agent:'claude',model:'opus',effort:'high'}}}},observation:{exactWorker:true},terminal:{title:'x'}}}),
-    'terminal-rename':()=>json(0,{ok:true,result:{}}),
-    'run-show':()=>json(0,{ok:true,result:{run:{id:'run_plan',coordinator_handle:'term_plan'}}}),
-    'terminal-close':(args)=>{assert.ok(has(args,'--terminal','term_boot'));return json(0,{ok:true,result:{}});}
-  });
-  const result=startCoordinator(fake.orca,{cwd,plan:'AgentOS Backend',spec:'Coordinate.',objective:'R15',wait:()=>{}});
-  assert.equal(result.ok,true);assert.equal(result.run,'run_plan');assert.equal(result.terminal,'term_plan');
-  assert.deepEqual(runUses,['term_boot','term_plan']);
-  assert.equal(result.attestation.coordinatorHandle,'term_plan');
-  assert.equal(result.steps.at(-1).name,'terminal-close-bootstrap');
-});
-
-test('report files of a linked worktree live in the main repository so op and Monitor scan the same directory',()=>{
+test('report files of a linked worktree live in the main repository so op and kernel scan the same directory',()=>{
   const root=repositoryRoot(process.cwd());
   assert.ok(fs.existsSync(path.join(root,'.git')));
   assert.equal(reportsDirectory(process.cwd(),'run_x'),path.join(root,'.starciwork','_local','runtime','reports','run_x'));

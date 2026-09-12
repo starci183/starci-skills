@@ -162,3 +162,42 @@ The following observations are now handled by the runtime itself; the regression
 - **OBS-31 a long Task spec leaves the managed Claude prompt staged.** `worker-start` returns `agent_prompt_stalled`
   while the whole preamble sits after `❯`; one Enter submits it. The launcher now recovers that case once before fencing,
   and Coordinator specs stay under 4 KB plus file pointers.
+
+## 5.0: the control loop stopped being an agent (2026-09-12)
+
+Every 4.x observation above that cost a run traced back to one decision, not to the operation work: a
+language model was put in charge of the control loop and then asked to be reliable. OBS-28 (a terminal
+consumes one Run, so downward instructions to a supervisor bound to a nested Run vanish), OBS-30 (a
+supervisor's own `worker_done` settles its Dispatch and fences every later send) and OBS-31 (a delivered
+prompt staged in an input box while the launcher believed the agent was working) are all failures of the
+channel between two supervisors - not failures of an operation agent doing its job. 5.0 removes the layer
+those failures lived in.
+
+**What changed.**
+
+- **The Plan Coordinator and the per-workflow Workflow Manager are gone**, with `supervise`, `coordinate`,
+  `start-monitor`, `replace-monitor` and `start-coordinator`. One workflow is one goal in one worktree, run
+  by one local process (`execution/workflow-kernel.mjs`). The only names left are `[Workflow] <Workflow>`,
+  `[Kernel] <Workflow>` and `[Op] <operation> - <scope>`.
+- **No supervisor mailbox.** The kernel reads and writes files. An operation receives its whole contract at
+  launch and answers with exactly one report file; the Orca signal is only the wake-up. That closes OBS-28
+  and OBS-30 by construction: there is no second supervisor to address and no Dispatch for the loop itself
+  to settle.
+- **Launch is the only place an agent is spoken to**, and it is already attested, so the only downward
+  channel afterwards is `notify` on the operation's own terminal, proven from the screen. OBS-31's recovery
+  stays in the launcher; the loop never types into a live agent to drive it.
+- **Acceptance is machine-verified.** A `done` is evidence, not a verdict: the kernel re-runs every declared
+  check itself, computes the changed files from git rather than from the report, refuses anything outside the
+  operation's allowlist, and only then commits that one operation.
+- **Runtime allocation replaced the provider chain.** Every runtime is a pool with roles, slots, a daily
+  budget and a classified cooldown, and each role has a preference order: work concentrates on the preferred
+  runtime until its slots are full and overflows only then (`prefer-then-overflow`). Ten parallel operations
+  no longer all start at the same provider and exhaust it together. The launcher is handed the one resolved
+  candidate, so a target that was never tried is never recorded as having failed.
+- **The product ledger is the TODO list.** In a repository with a Work tree the kernel derives its operations
+  from the eligible nodes instead of asking a model to invent a ledger, and writes each accepted slice back
+  into its node - `state`, `completion` and an evidence manifest - with a `Work: <node id>` commit trailer.
+- **Why the observations above are still here.** They are reproduced runtime behavior, and the OBS entries
+  remain the record of what Orca actually does. What changed is the architecture that has to survive them,
+  not the facts.
+

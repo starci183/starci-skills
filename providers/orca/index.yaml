@@ -28,61 +28,43 @@ ui:
     - native-agent-icon
     - terminal-title
     - supervised-worker-receipt
-  note: 'A sidebar subtitle such as "Bash: orca orchestration check" means the native agent is currently using Bash; it does not mean the terminal is a shell-only worker.'
+  note: 'A sidebar subtitle such as "Bash: orca orchestration check" means the native agent is currently using Bash; it does not mean the terminal is a shell-only worker. The kernel terminal is a shell by design: the loop is code, not an agent.'
 names:
-  planCoordinatorWorktree: "[Coordinator] <Plan>"
-  planCoordinator: "[Monitor] <Plan>"
-  rule: A worktree carries the scope role (Coordinator for the Plan main worktree, Workflow for a child); the persistent agent running inside a worktree is always its Monitor; operation agents are Op.
   workflowWorktree: "[Workflow] <Workflow>"
-  workflowMonitor: "[Monitor] <Workflow>"
+  workflowKernel: "[Kernel] <Workflow>"
   operationAgent: "[Op] <operation> - <scope>"
-planCoordinator:
-  role: persistent-native-agent
+  rule: A worktree carries its workflow name; the one kernel process that owns the loop inside that worktree is its Kernel; every operation agent is an Op. There is no supervisor layer between a Kernel and an Op.
+workflowKernel:
+  role: one-local-process-per-workflow-in-the-workflow-worktree
+  note: |-
+    The kernel is not an Orca worker. It is ordinary Node code (execution/workflow-kernel.mjs) running in a
+    worktree: it binds a Run, launches operation agents through the canonical launcher, reads their report
+    files and waits on the Run boundary. Orca supplies worktrees and attested terminals; everything above
+    them is the kernel's.
   calls:
-    createTask:
-      api: orchestration.task-create
-      cli: 'orca orchestration task-create --run <run-id> --spec "<plan-coordinator-contract>" --json'
-    startAgent:
-      api: orchestration.worker-start
-      cli: 'orca orchestration worker-start --task <task-id> --worktree current --agent codex --json'
+    bindRun:
+      api: orchestration.run-create
+      cli: 'orca orchestration run-create --objective "<workflow goal>" --from <own-terminal> --json'
+    useRun:
+      api: orchestration.run-use
+      cli: 'orca orchestration run-use --id <run-id> --from <own-terminal> --json'
     nameWorktree:
       api: worktree.set
-      cli: 'orca worktree set --worktree <exact-main-worktree-selector> --display-name "[Coordinator] <Plan>" --json'
-    nameAgent:
+      cli: 'orca worktree set --worktree <exact-workflow-worktree-selector> --display-name "[Workflow] <Workflow>" --json'
+    nameSelf:
       api: terminal.rename
-      cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Monitor] <Plan>" --json'
-    waitBoundary:
-      api: orchestration.check
-      cli: 'orca orchestration check --wait --types worker_done,worker_failed,escalation,question --timeout-ms 900000 --json'
-workflowMonitor:
-  role: persistent-native-agent-in-isolated-child-worktree
-  calls:
-    createTask:
-      api: orchestration.task-create
-      cli: 'orca orchestration task-create --run <run-id> --spec "<workflow-coordinator-contract>" --json'
-    startChildAgent:
-      api: orchestration.worker-start
-      cli: 'orca orchestration worker-start --task <task-id> --worktree new-child --repo <exact-repo-selector> --name <workflow-slug> --agent codex --setup run --json'
-    bindParent:
-      api: worktree.set
-      cli: 'orca worktree set --worktree <worker.worktree_id> --parent-worktree <exact-main-worktree-selector> --json'
-    attestParent:
+      cli: 'orca terminal rename --terminal <own-terminal> --title "[Kernel] <Workflow>" --json'
+    attestWorktree:
       api: worktree.show
-      cli: 'orca worktree show --worktree <worker.worktree_id> --json'
-      acceptOnlyWhen: 'result.worktree.parentWorktreeId equals the exact main Coordinator worktree id'
+      cli: 'orca worktree show --worktree <exact-workflow-worktree-selector> --json'
+      acceptOnlyWhen: 'result.worktree resolves to the exact filesystem path the kernel runs in'
       onMismatch: stop-before-operation-task-creation
-    nameWorktree:
-      api: worktree.set
-      cli: 'orca worktree set --worktree <worker.worktree_id> --display-name "[Workflow] <Workflow>" --json'
-    nameAgent:
-      api: terminal.rename
-      cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Monitor] <Workflow>" --json'
     waitOperationBoundary:
       api: orchestration.check
       cli: 'orca orchestration check --wait --types worker_done,worker_failed,escalation,question --timeout-ms 900000 --json'
-    reportParentBoundary:
-      api: orchestration.send
-      cli: 'orca orchestration send --type <worker_done|worker_failed|escalation|question> --subject "<normalized-subject>" --body "<normalized-workflow-envelope>" --task-id <workflow-task-id> --dispatch-id <workflow-dispatch-id> --json'
+    answerOperation:
+      api: terminal.send
+      cli: 'orca terminal send --terminal <operation-agent-terminal> --text "<answer or continue instruction>" --enter --json'
 operationAgent:
   role: one-supervised-native-agent-per-operation-attempt
   canonicalLauncher:
@@ -92,17 +74,22 @@ operationAgent:
     calls: calls.json
     runner: execution/orca-calls.mjs
     companions:
-      start-monitor: Plan Coordinator starts one Workflow Monitor from the supervisor chain.
-      replace-monitor: Plan Coordinator settles a dead Monitor and relaunches it with --retry-of.
-      settle: Any supervisor stops, releases and verifies one Dispatch; returns a typed settlement.
-      sweep: The Workflow Monitor closes dead terminals in its worktree after every settlement and before reporting workflow completion; live workers, Monitors, Coordinators and unknown terminals are kept.
+      settle: Stop, release and verify one Dispatch; returns a typed settlement.
+      sweep: The kernel closes dead terminals in its worktree after every settlement and before the final report; live workers, the kernel's own terminal and unknown terminals are kept.
+      notify: Type one message into a live operation agent's own terminal and prove delivery from the screen; the only way the kernel speaks to a working agent.
+      report: The typed operation report, written exactly once by the operation agent at its boundary.
+      wait: One owned boundary tick that classifies every live worker and scans the report files.
       verify: Read-only live agent-context check of every declared call before the first effect.
-    input: [nested-workflow-run, workflow-task, from, worktree, operation, scope, spec-file]
+      workflow-commands: workflow-goal, workflow-approve, workflow-run and workflow-status are the four kernel commands; the loop itself is code, not an agent.
+    input: [workflow-run, workflow-task, from, worktree, operation, scope, spec-file]
+    candidateAuthority: |-
+      The runtime allocator names one runtime per operation and startOperation({candidates}) hands the
+      launcher exactly that resolved selection; a chain is walked only when no candidate is given.
     guarantees:
       - verifies-declared-calls-against-live-agent-context-before-effects
-      - attests-from-is-nested-run-coordinator-handle
+      - attests-from-is-the-workflow-run-owner-handle
       - creates-canonical-operation-task-once-per-invocation
-      - walks-the-whole-resolved-operator-chain-in-order
+      - tries-only-the-allocated-candidate-or-walks-the-whole-resolved-chain-in-order
       - starts-fresh-native-agent-in-exact-workflow-worktree
       - omits-model-for-native-qwen-code
       - proves-prompt-delivery-before-attestation
@@ -113,7 +100,7 @@ operationAgent:
       - returns-exhausted-chain-as-typed-result-never-thrown-string
       - replays-unknown-mutations-once-with-retry-request
   admission:
-    expectedOperation: active-dag-node
+    expectedOperation: approved-goal-operation
     providerSelection: profiles-registry-resolver-output
     beforeTaskCreate:
       - assert-exact-operation
@@ -129,7 +116,7 @@ operationAgent:
         - worker.startOptions.launch.effective.model equals resolved model
         - worker.agent_terminal_handle is present
       beforeEffectAcceptance: required
-      mismatch: fence-reconcile-release-and-retry-resolved-target
+      mismatch: fence-reconcile-release-and-retry-allocated-runtime
       canonicalizeTitle:
         renameApi: terminal.rename
         renameCli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
@@ -164,7 +151,7 @@ operationAgent:
         cli: 'orca terminal read --terminal <terminal-handle> --screen --json'
       returnPreamble:
         api: orchestration.dispatch
-        cli: 'orca orchestration dispatch --task <operation-task-id> --to <terminal-handle> --from <monitor-terminal> --run <nested-run-id> --return-preamble --json'
+        cli: 'orca orchestration dispatch --task <operation-task-id> --to <terminal-handle> --from <kernel-terminal> --run <workflow-run-id> --return-preamble --json'
       submitPrompt:
         api: terminal.send
         cli: 'orca terminal send --terminal <terminal-handle> --text "<preamble>" --enter --json'
@@ -197,23 +184,31 @@ operationAgent:
       api: orchestration.check
       cli: 'orca orchestration check --ack <delivery-id> --json'
 routing:
-  coordinatorToWorkflow:
-    api: orchestration.send
-    cli: 'orca orchestration send --to dispatch:<workflow-dispatch-id> --type escalation --subject "<decision>" --body "<normalized-decision-envelope>" --json'
+  operationToKernel:
+    api: report-file
+    cli: 'node <launcher> report --run <workflow-run-id> --from <own-terminal> --task <operation-task-id> --dispatch <operation-dispatch-id> --reports-dir <workflow-reports-dir> --outcome <done|partial|failed|ask|blocked> --summary "<what happened>" --json'
+    authority: report-file-then-signal
+    onceOnly: true
+    reason: One report file per Dispatch is the source of truth; the Orca signal is only the wake-up.
+  kernelToOperation:
+    api: terminal.send
+    cli: 'orca terminal send --terminal <operation-agent-terminal> --text "<answer or continue instruction>" --enter --json'
     forbiddenType: status
-    reason: Workflow Monitors block on escalation but do not subscribe to status.
-  coordinatorToOperation: forbidden
-  operationToParentCoordinator: forbidden
+    proveDeliveryFrom: terminal-screen-not-send-receipt
+    reason: |-
+      An operation receives its whole contract at launch, so notify is the only downward channel and it is
+      proven from the screen; a status message never carries a control instruction.
+  operationToOperation: forbidden
 forbiddenCalls:
   - raw-operation-task-create-or-worker-start-outside-canonical-launcher
   - orchestration.dispatch-inject-for-operation
   - orchestration.dispatch-to-reused-terminal-for-operation
   - terminal-send-outside-canonical-launcher
-  - terminal-create-shell-only-coordinator
+  - terminal-create-shell-only-kernel
   - operation-agent-tool-agent
-  - orchestration-send-status-for-coordinator-instruction
-  - parent-coordinator-direct-operation-control
-  - task-create-for-non-dag-operation
+  - orchestration-send-status-for-control-instruction
+  - operation-agent-direct-control-of-another-operation
+  - task-create-for-an-operation-outside-the-approved-goal
   - operation-effect-without-provider-attestation
   - architecture-sidearm-inferred-from-review
   - literal-or-guessed-worker-start-environment
