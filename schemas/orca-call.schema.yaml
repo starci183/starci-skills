@@ -1,0 +1,130 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: starci://schemas/orca-call.schema.json
+title: StarCi Orca call contract
+type: object
+additionalProperties: false
+required: [schema, provider, api, purpose, liveSchema, envelope, defaults, idempotency, calls, forbiddenCalls, recoveries]
+properties:
+  schema: {const: starci/orca-calls@1}
+  provider: {const: orca}
+  api: {type: string, minLength: 1}
+  purpose: {type: string, minLength: 1}
+  liveSchema:
+    type: object
+    additionalProperties: false
+    required: [call, schemaVersion, compare, onMismatch]
+    properties:
+      call: {const: agent-context}
+      schemaVersion: {const: 1}
+      compare:
+        type: array
+        minItems: 1
+        items: {enum: [command, flags]}
+      onMismatch: {const: stop-before-effects-and-request-runtime-contract-upgrade}
+  envelope:
+    type: object
+    additionalProperties: false
+    required: [schema, outcomes, effectStates, rules]
+    properties:
+      schema: {const: starci/orca-call-result@1}
+      outcomes: {const: [ok, failed, unknown]}
+      effectStates: {const: [committed, none, partial, unknown]}
+      rules:
+        type: array
+        minItems: 1
+        items: {type: string, minLength: 1}
+  defaults:
+    type: object
+    additionalProperties: false
+    required: [timeoutMs, spawnGraceMs, jsonFlag]
+    properties:
+      timeoutMs: {type: integer, minimum: 1000}
+      spawnGraceMs: {type: integer, minimum: 0}
+      jsonFlag: {const: json}
+  idempotency:
+    type: object
+    additionalProperties: false
+    required: [flag, rule]
+    properties:
+      flag: {const: retry-request}
+      rule: {type: string, minLength: 1}
+  calls:
+    type: object
+    minProperties: 1
+    additionalProperties: {$ref: "#/$defs/call"}
+  forbiddenCalls:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items: {type: string, minLength: 1}
+  recoveries:
+    type: object
+    minProperties: 1
+    additionalProperties: {type: string, minLength: 1}
+$defs:
+  flag:
+    type: string
+    pattern: "^[a-z][a-z0-9-]*$"
+  call:
+    type: object
+    additionalProperties: false
+    required: [command, kind, flags, receipt]
+    properties:
+      command: {type: string, pattern: "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$"}
+      kind: {enum: [read, mutation]}
+      replay: {enum: [retry-request, none]}
+      timeoutMs: {type: integer, minimum: 1000}
+      flags:
+        type: array
+        uniqueItems: true
+        items: {$ref: "#/$defs/flag"}
+      required:
+        type: array
+        uniqueItems: true
+        items: {$ref: "#/$defs/flag"}
+      forbidden:
+        type: array
+        uniqueItems: true
+        items: {$ref: "#/$defs/flag"}
+      forbiddenValues:
+        type: object
+        additionalProperties:
+          type: array
+          minItems: 1
+          items: {type: string, minLength: 1}
+      receipt:
+        type: array
+        minItems: 1
+        items: {type: string, minLength: 1}
+      creates: {enum: [run, task, dispatch]}
+      note: {type: string, minLength: 1}
+      classify:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required: [when, outcome, effectState]
+          properties:
+            when:
+              type: object
+              additionalProperties: false
+              properties:
+                exitCode: {type: integer}
+                path: {type: string, minLength: 1}
+                in:
+                  type: array
+                  minItems: 1
+                  items: {type: string}
+                exists: {type: boolean}
+                nonEmpty: {type: boolean}
+            outcome: {enum: [ok, failed, unknown]}
+            effectState: {enum: [committed, none, partial, unknown]}
+            reason: {type: string, minLength: 1}
+      recovery:
+        type: object
+        additionalProperties: false
+        properties:
+          failed: {type: string, minLength: 1}
+          partial: {type: string, minLength: 1}
+          unknown: {type: string, minLength: 1}

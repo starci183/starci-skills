@@ -6,6 +6,7 @@ providers:
     index: orca/index.json
     capabilities: orca/capabilities.json
     api: orca/api.json
+    calls: orca/calls.json
     recipes: orca/recipes.json
     validation: orca/validation.json
     adapters:

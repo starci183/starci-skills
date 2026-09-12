@@ -4,6 +4,7 @@ executable: orca
 files:
   capabilities: capabilities.json
   api: api.json
+  calls: calls.json
   recipes: recipes.json
   validation: validation.json
   adapters:

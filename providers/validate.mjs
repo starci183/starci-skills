@@ -58,6 +58,19 @@ export function validateProviderContracts(){
     add(errors,Array.isArray(allowlist),`Invalid Orca ${role} allowlist`);
     for(const command of allowlist||[])add(errors,publicCommands.has(command),`Unknown Orca command in ${role} allowlist: ${command}`);
   }
+  const calls=orca.calls;
+  add(errors,calls?.schema==='starci/orca-calls@1','Missing Orca calls contract');
+  add(errors,calls?.envelope?.schema==='starci/orca-call-result@1','Orca calls contract must emit starci/orca-call-result@1');
+  add(errors,calls?.idempotency?.flag==='retry-request','Orca mutations must carry retry-request on unknown results');
+  const forbiddenCommands=new Set([...(calls?.forbiddenCalls||[]),...(orca.api?.forbiddenForStarciOrchestration||[])]);
+  for(const [name,call] of Object.entries(calls?.calls||{})){
+    add(errors,publicCommands.has(call?.command),`Orca call ${name} names an unknown command: ${call?.command}`);
+    add(errors,!forbiddenCommands.has(call?.command),`Orca call ${name} names a forbidden command: ${call?.command}`);
+    add(errors,['read','mutation'].includes(call?.kind),`Orca call ${name} has an invalid kind`);
+  }
+  for(const required of ['run-show','task-create','worker-start','worker-show','worker-stop','worker-release','worker-list','terminal-rename','check','send','worktree-set','worktree-show'])add(errors,plain(calls?.calls?.[required]),`Orca calls contract is missing ${required}`);
+  add(errors,(calls?.calls?.['worker-start']?.forbidden||[]).includes('terminal')&&(calls?.calls?.['worker-start']?.forbidden||[]).includes('on'),'worker-start must forbid --terminal and --on');
+  add(errors,Array.isArray(calls?.calls?.['worker-start']?.classify)&&calls.calls['worker-start'].classify.length>0,'worker-start must declare failure classification');
   const qwen=orca.adapters?.qwen;
   add(errors,qwen?.agent==='qwen-code','Missing native Orca Qwen adapter');
   add(errors,qwen?.kind==='direct-native-managed-agent','Qwen adapter must use direct native worker-start');

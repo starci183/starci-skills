@@ -1,0 +1,243 @@
+schema: starci/orca-calls@1
+provider: orca
+api: api.json
+purpose: |-
+  One typed contract per Orca call that StarCi may issue. The runner in execution/orca-calls.mjs
+  builds argv only from these entries, verifies each command and flag against the live
+  agent-context before the first effect, and converts every exit code and receipt into a typed
+  result envelope. An Orca failure is a classified result, never an untyped exception.
+liveSchema:
+  call: agent-context
+  schemaVersion: 1
+  compare: [command, flags]
+  onMismatch: stop-before-effects-and-request-runtime-contract-upgrade
+envelope:
+  schema: starci/orca-call-result@1
+  outcomes: [ok, failed, unknown]
+  effectStates: [committed, none, partial, unknown]
+  rules:
+    - outcome ok means the call completed and its receipt satisfied every required path.
+    - outcome failed with effectState none means the caller may retry the same candidate or fall through to the next candidate without reconciliation.
+    - effectState partial names live residual resources; the caller must settle them (worker-stop, worker-release) and prove none before fallback.
+    - outcome unknown or effectState unknown blocks fallback until a read-only reconciliation proves the actual state.
+defaults:
+  timeoutMs: 30000
+  spawnGraceMs: 15000
+  jsonFlag: json
+idempotency:
+  flag: retry-request
+  rule: |-
+    A mutation whose process timed out or returned non-JSON is re-issued once with the same
+    arguments plus --retry-request <deterministic id>; Orca returns the original result when it
+    exists. If the replay is still unknown, the runner returns outcome unknown and the caller
+    reconciles by reading task-list, worker-list or worker-show for the deterministic display name.
+calls:
+  agent-context:
+    command: agent-context
+    kind: read
+    timeoutMs: 15000
+    flags: []
+    receipt: [commands, commandCount, schemaVersion]
+  status:
+    command: status
+    kind: read
+    timeoutMs: 15000
+    flags: []
+    receipt: [result.runtime.state]
+  run-create:
+    command: orchestration run-create
+    kind: mutation
+    flags: [objective, from]
+    required: [objective]
+    receipt: [result.run.id]
+    creates: run
+  run-use:
+    command: orchestration run-use
+    kind: mutation
+    flags: [id, from]
+    required: [id]
+    receipt: [result.run.id]
+  run-show:
+    command: orchestration run-show
+    kind: read
+    flags: [id]
+    required: [id]
+    receipt: [result.run.id, result.run.coordinator_handle]
+  task-create:
+    command: orchestration task-create
+    kind: mutation
+    flags: [spec, task-title, display-name, deps, parent, run, from]
+    required: [spec, run, from]
+    receipt: [result.task.id, result.task.display_name]
+    creates: task
+  task-update:
+    command: orchestration task-update
+    kind: mutation
+    flags: [id, status, result, run, from]
+    required: [id, status]
+    receipt: [result.task.id]
+  task-list:
+    command: orchestration task-list
+    kind: read
+    flags: [run, status, ready, brief]
+    receipt: [result.tasks]
+  worker-start:
+    command: orchestration worker-start
+    kind: mutation
+    timeoutMs: 150000
+    flags: [task, worktree, agent, model, effort, name, repo, base-branch, display-name, setup, retry-of, timeout-ms, run, from]
+    required: [task, worktree, agent, run, from]
+    forbidden: [terminal, on]
+    forbiddenValues:
+      on: [windows, macos, linux]
+    receipt: [result.dispatch.id]
+    creates: dispatch
+    classify:
+      - when: {exitCode: 0, path: result.worker.state, in: [ready]}
+        outcome: ok
+        effectState: committed
+      - when: {exitCode: 0}
+        outcome: unknown
+        effectState: unknown
+        reason: worker-start exited 0 without a ready worker
+      - when: {path: result.worker.state, in: [outcome_unknown, unknown]}
+        outcome: unknown
+        effectState: unknown
+      - when: {path: result.residualResources, nonEmpty: true}
+        outcome: failed
+        effectState: partial
+      - when: {path: result.worker.residualResources, nonEmpty: true}
+        outcome: failed
+        effectState: partial
+      - when: {path: result.failedStage, exists: true}
+        outcome: failed
+        effectState: none
+      - when: {path: result.stage, exists: true}
+        outcome: failed
+        effectState: none
+      - when: {path: error.code, exists: true}
+        outcome: failed
+        effectState: none
+    recovery:
+      failed: worker-start-retry-of
+      partial: settle-dispatch
+      unknown: reconcile-then-stop-or-abandon
+  worker-show:
+    command: orchestration worker-show
+    kind: read
+    flags: [dispatch]
+    required: [dispatch]
+    receipt: [result.dispatch.id, result.worker.state]
+  worker-read:
+    command: orchestration worker-read
+    kind: read
+    flags: [dispatch, limit, cursor, source]
+    required: [dispatch]
+    receipt: [result]
+  worker-list:
+    command: orchestration worker-list
+    kind: read
+    flags: [run]
+    receipt: [result.workers]
+  worker-stop:
+    command: orchestration worker-stop
+    kind: mutation
+    timeoutMs: 60000
+    flags: [dispatch]
+    required: [dispatch]
+    receipt: [result]
+    classify:
+      - when: {exitCode: 0, path: result.verdict, in: [stopped, already_stopped, fenced]}
+        outcome: ok
+        effectState: committed
+      - when: {exitCode: 0}
+        outcome: ok
+        effectState: committed
+      - when: {path: result.verdict, in: [stop_unknown, unverifiable]}
+        outcome: unknown
+        effectState: unknown
+  worker-abandon:
+    command: orchestration worker-abandon
+    kind: mutation
+    flags: [dispatch]
+    required: [dispatch]
+    receipt: [result]
+  worker-release:
+    command: orchestration worker-release
+    kind: mutation
+    timeoutMs: 60000
+    flags: [dispatch]
+    required: [dispatch]
+    receipt: [result]
+    classify:
+      - when: {exitCode: 0, path: result.releaseState, in: [released, already_released]}
+        outcome: ok
+        effectState: committed
+      - when: {exitCode: 0, path: result.releaseState, in: [retained, release_pending]}
+        outcome: failed
+        effectState: partial
+      - when: {exitCode: 0}
+        outcome: ok
+        effectState: committed
+      - when: {path: result.releaseState, in: [release_unknown]}
+        outcome: unknown
+        effectState: unknown
+  check:
+    command: orchestration check
+    kind: read
+    timeoutMs: 960000
+    flags: [terminal, run, ack, unread, peek, all, types, wait, timeout-ms]
+    receipt: [result]
+    note: --ack acknowledges the prior Delivery; a wait timeout is outcome ok with an empty batch.
+  send:
+    command: orchestration send
+    kind: mutation
+    flags: [subject, to, run, from, body, type, priority, thread-id, payload, task-id, dispatch-id, outcome, files-modified, report-path, phase]
+    required: [subject]
+    receipt: [result]
+  reply:
+    command: orchestration reply
+    kind: mutation
+    flags: [id, body, run, from]
+    required: [id, body]
+    receipt: [result]
+  worktree-set:
+    command: worktree set
+    kind: mutation
+    replay: none
+    note: Metadata write without retry-request support; it is naturally idempotent, so an unknown result is re-read with worktree-show.
+    flags: [worktree, parent-worktree, display-name]
+    required: [worktree]
+    receipt: [result]
+  worktree-show:
+    command: worktree show
+    kind: read
+    flags: [worktree]
+    required: [worktree]
+    receipt: [result.worktree]
+  worktree-current:
+    command: worktree current
+    kind: read
+    flags: []
+    receipt: [result.worktree]
+  terminal-rename:
+    command: terminal rename
+    kind: mutation
+    replay: none
+    note: Title write without retry-request support; naturally idempotent and verified by worker-show.
+    flags: [terminal, title]
+    required: [terminal, title]
+    receipt: [result]
+forbiddenCalls:
+  - orchestration dispatch
+  - orchestration coordinator-start
+  - orchestration coordinator-stop
+  - orchestration reset
+  - terminal send
+  - terminal create
+  - terminal close
+  - terminal stop
+recoveries:
+  worker-start-retry-of: Start a replacement attempt with --retry-of <dispatch> after the failed Dispatch is proven settled; placement and agent are repeated explicitly.
+  settle-dispatch: worker-stop then worker-release the exact Dispatch; effectState becomes none only when release reports released or already_released.
+  reconcile-then-stop-or-abandon: Read worker-show; ready keeps the attempt, failed or stopped allows retry-of, outcome_unknown requires worker-stop and a second read or an explicit worker-abandon that keeps resources live.
