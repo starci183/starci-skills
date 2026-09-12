@@ -715,6 +715,8 @@ function launchOp(orca,store,state,op,allocated,ctx){
   op.status='running';op.runtime=allocated.runtime;op.target=allocated.target;
   if(!op.baseHead){const shown=ctx.git('git',['rev-parse','HEAD'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});op.baseHead=shown.status===0?(shown.stdout??'').trim():null;}
   op.task=launched.task.id;op.dispatch=launched.dispatchId;op.terminal=launched.terminal;op.nudged=false;
+  // A launch is an external effect: the state that names it is written before anything else can interrupt the kernel.
+  store.saveState(state);
   store.appendEvent({event:'launched',op:op.id,kind:op.kind,node:op.nodeId,attempt:op.attempt,runtime:op.runtime,target:op.target,
     dispatch:op.dispatch,terminal:op.terminal,allocation:launched.allocation??null});
   // Work v2 authors only uninvestigate, todo and done, so the launch is recorded in the node's kernel block.
