@@ -260,7 +260,8 @@ const ledgerErrorText=errors=>errors.slice(0,3).map(error=>typeof error==='strin
  */
 export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless}={}){
   need(!state.approved,`Workflow ${state.id} is already approved; run workflow-run`);
-  const repoRoot=state.repoRoot??repositoryRoot(state.worktree);
+  // The Work ledger is the branch content of the worktree; only the workflow history lives in the main repository.
+  const repoRoot=state.repoRoot??path.resolve(state.worktree);
   state.repoRoot=repoRoot;
   const loaded=ledgerApi.loadLedger({repoRoot,validate});
   const scope=state.scope.length?state.scope:null;
