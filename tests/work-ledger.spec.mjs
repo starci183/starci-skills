@@ -6,7 +6,7 @@ import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {
   DECISION_KINDS,EXECUTABLE_KINDS,decisionCandidates,disjoint,executableCandidates,layoutOf,layoutSide,ledgerSummary,nodeRepository,
-  buildSourceIdentity,checkAssertions,loadLedger,markDecided,markDone,markInProgress,markReopened,
+  brandReferences,buildSourceIdentity,checkAssertions,loadLedger,markDecided,markDone,markInProgress,markReopened,
   nodeFile,readNode,writeEvidence
 } from '../execution/work-ledger.mjs';
 
@@ -143,7 +143,7 @@ const bound={inputDigest:FRESH};
 test('the ledger is the Work tree: candidates split by kind and a node without a scope is not schedulable',()=>{
   const root=fakeRepo();
   try{
-    assert.deepEqual(DECISION_KINDS,['business','business-overview','architecture']);
+    assert.deepEqual(DECISION_KINDS,['business','business-overview','architecture','brand']);
     assert.deepEqual(EXECUTABLE_KINDS,['implementation','uat','e2e','operations','ui']);
     const ledger=open(root);
     assert.equal(ledger.ok,true);
@@ -418,5 +418,118 @@ test('a kind without a code profile binds no source at all: neither a source ide
     assert.equal(manifest.sourceIdentity,undefined);
     assert.equal(manifest.codeRefs,undefined);
     assert.equal(manifest.provenance.servedVersions[0].commit,HEAD,'provenance still names what ran');
+  }finally{cleanup(root);}
+});
+
+// --------------------------------------------------------------------------- the product brand
+// The brand is a decision the kernel reads, decides and attaches: one record at the tree root plus the
+// masters beside it. Synthetic fixture values only.
+const BRAND_NODE={id:'product.brand',path:'brand/index.yaml',kind:'brand',state:'todo',eligible:true,inputDigest:'1'.repeat(64),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null,brand:null};
+const BRAND=`schema: work/node@2
+id: product.brand
+kind: brand
+required: true
+state: todo
+assertions:
+  - brand-tokens-match-source
+assets:
+  - path: assets/mascot/rest.png
+    description: Mascot master at rest.
+brand:
+  rev: "2"
+  identity:
+    name: Example Product
+    family: starci
+    owner: Product owner
+  color:
+    tokens:
+      - token: --example-core-primary
+        value: "#c0203c"
+        role: primary
+    policy:
+      dangerMayMatchPrimary: true
+  typography:
+    family: Example Sans, system-ui, sans-serif
+  iconography:
+    set:
+      - "@example/icons"
+  imagery:
+    style:
+      - Warm studio light.
+  forbidden:
+    - Never recolour the mascot.
+  sources:
+    - repository: example-frontend
+      path: src/app/globals.css
+      kind: css
+`;
+
+function brandRepo(){
+  const root=fakeRepo();
+  const write=(relative,content)=>{
+    const file=path.join(root,'.starciwork',relative);
+    fs.mkdirSync(path.dirname(file),{recursive:true});
+    fs.writeFileSync(file,content);
+  };
+  write('brand/index.yaml',BRAND);
+  write('brand/assets/mascot/rest.png','synthetic-mascot-bytes');
+  write('brand/assets/logo/mark.svg','<svg role="img"></svg>');
+  return root;
+}
+const brandValidate=()=>({ok:true,errors:[],warnings:[],nodes:[...NODES,BRAND_NODE],resources:[],brand:{id:'product.brand',path:'brand/index.yaml',rev:'2',digest:'1'.repeat(64),state:'todo',effectiveState:'todo',boundNodes:['demo.billing.implementation.frontend.invoice']}});
+
+test('the brand is a decision the ledger exposes, lists and can attach as references',()=>{
+  const root=brandRepo();
+  try{
+    assert.ok(DECISION_KINDS.includes('brand'));
+    const ledger=loadLedger({repoRoot:root,validate:brandValidate});
+    assert.equal(ledger.brand.node.id,'product.brand');
+    assert.equal(ledger.brand.rev,'2');
+    assert.equal(ledger.brand.file,path.join(root,'.starciwork','brand','index.yaml'));
+    assert.equal(ledger.brand.spec.identity.family,'starci');
+    assert.equal(ledger.brand.spec.color.tokens[0].token,'--example-core-primary');
+
+    assert.deepEqual(brandReferences(ledger),[
+      path.join(root,'.starciwork','brand','index.yaml'),
+      path.join(root,'.starciwork','brand','assets','logo','mark.svg'),
+      path.join(root,'.starciwork','brand','assets','mascot','rest.png')
+    ]);
+
+    assert.deepEqual(decisionCandidates(ledger).map(node=>node.id),['demo.payments.business.overview','product.brand']);
+    assert.ok(ledgerSummary(ledger).decisionEligible.includes('product.brand'));
+    assert.deepEqual(decisionCandidates(ledger,{scope:'brand'}).map(node=>node.id),['product.brand']);
+  }finally{cleanup(root);}
+});
+
+test('markDecided settles the brand through a review that records the rev it decided',()=>{
+  const root=brandRepo();
+  try{
+    const file=nodeFile(root,BRAND_NODE);
+    markDecided(root,BRAND_NODE,{
+      rev:'2',
+      review:{reviewer:'Product owner',authority:'Synthetic fixture authority; no real review is claimed',
+        observations:[{id:'brand-tokens-match-source',observation:'Every declared token equals the value in the named source file.'}]},
+      inputDigest:FRESH
+    });
+    const parsed=parseYaml(fs.readFileSync(file,'utf8'));
+    assert.equal(parsed.state,'done');
+    assert.equal(parsed.completion.inputDigest,FRESH);
+    assert.equal(parsed.completion.review.schema,'starci/design-review@1');
+    assert.deepEqual(parsed.completion.review.observations,[{id:'brand-tokens-match-source',outcome:'pass',observation:'Every declared token equals the value in the named source file.'}]);
+    assert.equal(parsed.extensions.work3.kernel.rev,'2');
+    // Every authored line of the record survives the write.
+    assert.equal(parsed.brand.rev,'2');
+    assert.equal(parsed.brand.sources[0].path,'src/app/globals.css');
+    assert.throws(()=>markDecided(root,BRAND_NODE,{rev:'3',review:{reviewer:'x',authority:'y',observations:[{id:'invented',observation:'Not an authored assertion.'}]},inputDigest:FRESH}),/invented/);
+  }finally{cleanup(root);}
+});
+
+test('a tree with no brand record exposes none and offers no brand references',()=>{
+  const root=fakeRepo();
+  try{
+    const ledger=open(root);
+    assert.equal(ledger.brand,null);
+    assert.deepEqual(brandReferences(ledger),[]);
+    assert.ok(!ledgerSummary(ledger).decisionEligible.includes('product.brand'));
   }finally{cleanup(root);}
 });

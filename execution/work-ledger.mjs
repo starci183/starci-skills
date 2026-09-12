@@ -12,7 +12,7 @@ import {parseYaml} from '../core/yaml.mjs';
  * exactly four things — `state`, `completion`, `extensions.work3.kernel` and an evidence manifest.
  * Every other authored line of an index.yaml is preserved byte for byte.
  */
-export const DECISION_KINDS=['business','business-overview','architecture'];
+export const DECISION_KINDS=['business','business-overview','architecture','brand'];
 export const EXECUTABLE_KINDS=['implementation','uat','e2e','operations','ui'];
 export const KERNEL_EXTENSION=['extensions','work3','kernel'];
 export const EVIDENCE_SCHEMA='work/evidence@1';
@@ -20,6 +20,9 @@ export const REVIEW_SCHEMA='starci/design-review@1';
 export const HOST_BIN=new URL('../bin/starci.mjs',import.meta.url);
 /** The directory a repository keeps its Work tree in, when the tree is its own. */
 export const LEDGER_DIRECTORY='.starciwork';
+/** The product's one brand record and the directory holding its masters, both at the tree root. */
+export const BRAND_FILE='brand/index.yaml';
+export const BRAND_ASSETS='brand/assets';
 /** The two sides of a product an `implementation/<side>/**` layout names. */
 export const LAYOUT_SIDES=['frontend','backend'];
 
@@ -61,6 +64,23 @@ export function ledgerLocation(where){
   return {repoRoot:root,workRoot:path.join(root,LEDGER_DIRECTORY)};
 }
 
+/**
+ * The product's brand as the kernel reads it: `{node, rev, file, spec}`, or null when the tree authors
+ * none. The validator projection names the record; the authored file is where the spec itself lives.
+ */
+function readBrand(at,list,summary){
+  const node=list.find(item=>item.kind==='brand')??null;
+  if(!node)return null;
+  const file=nodeFile(at,node);
+  let spec=null;
+  try{
+    const raw=parseYaml(fs.readFileSync(file,'utf8'));
+    if(plain(raw)&&plain(raw.brand))spec=raw.brand;
+  }catch{/* an unreadable or malformed brand is a validator finding, not a crash in the reader */}
+  const revOf=value=>typeof value==='string'&&value.trim()?value.trim():null;
+  return {node,rev:revOf(spec?.rev)??revOf(summary?.rev),file,spec};
+}
+
 /** Load the Work tree. `validate` is injectable so the kernel and the tests share one shape. */
 export function loadLedger({repoRoot,workRoot=null,validate=null}={}){
   const at=ledgerLocation(repoRoot);
@@ -75,8 +95,32 @@ export function loadLedger({repoRoot,workRoot=null,validate=null}={}){
     warnings:Array.isArray(raw.warnings)?raw.warnings:[],
     repoRoot:root,workRoot:work,at:{repoRoot:root,workRoot:work},
     nodes:new Map(list.map(node=>[node.id,node])),list,
+    brand:readBrand({repoRoot:root,workRoot:work},list,plain(raw.brand)?raw.brand:null),
     resources:Array.isArray(raw.resources)?raw.resources:[]
   };
+}
+
+/**
+ * Everything an operation has to be handed when its work touches the brand: the record itself, then every
+ * master under `brand/assets/**`. Absolute paths, the record first, the masters sorted, symlinks skipped.
+ * A tree with no brand record returns nothing rather than an empty promise of one.
+ */
+export function brandReferences(ledger){
+  if(!plain(ledger?.brand))return [];
+  const {workRoot}=ledgerLocation({repoRoot:ledger.repoRoot,workRoot:ledger.workRoot});
+  const masters=[];
+  const walk=dir=>{
+    let entries;
+    try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch{return;}
+    for(const entry of [...entries].sort((a,b)=>a.name.localeCompare(b.name))){
+      const file=path.join(dir,entry.name);
+      if(entry.isSymbolicLink())continue;
+      if(entry.isDirectory())walk(file);
+      else if(entry.isFile())masters.push(file);
+    }
+  };
+  walk(path.join(workRoot,...BRAND_ASSETS.split('/')));
+  return [ledger.brand.file,...masters.sort((a,b)=>a.localeCompare(b))];
 }
 
 /** Absolute path of a node's index.yaml. A node may carry an explicit `file` for out-of-tree reads. */
