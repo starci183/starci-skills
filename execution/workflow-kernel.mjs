@@ -1063,7 +1063,7 @@ function workGoalMarkdown(state,loaded){
     const entry=state.lanes?.[op.nodeId??''];
     const walked=laneWalked(entry);
     const lane=walked.length?`${laneText(walked)} (this op: step ${walked.indexOf(op.kind)+1} of ${walked.length})`:op.kind;
-    lines.push(`| \`${op.id}\` | \`${op.nodeId}\` | ${item?.kind??'-'} | ${lane} | ${item?.module??'-'} | ${op.checks.length} | ${op.allowlist.map(entry=>`\`${entry}\``).join(', ')||'-'} |`);
+    lines.push(`| \`${op.id}\` | ${op.nodeId?`\`${op.nodeId}\``:op.intake?`intake of \`${op.intake.scope}\``:'-'} | ${item?.kind??'-'} | ${lane} | ${item?.module??'-'} | ${op.checks.length} | ${op.allowlist.map(entry=>`\`${entry}\``).join(', ')||'-'} |`);
   }
   if(state.decisions.length){
     lines.push(``,`## Decisions still open in scope`,``,`These are answered by a decision, not by an operation in a worktree.`,``);
@@ -1878,8 +1878,12 @@ function pruneAnsweredQuestions(store,state,loaded){
   if(!Array.isArray(state.needUser)||!loaded?.nodes)return;
   const kept=[];
   for(const item of state.needUser){
-    const node=item?.kind==='ledger'&&item.node?loaded.nodes.get(item.node):null;
-    if(node&&node.state==='done'){store.appendEvent({event:'need-user-answered',node:item.node,kind:item.kind,detail:String(item.detail??'').slice(0,160)});continue;}
+    if(item?.kind!=='ledger'){kept.push(item);continue;}
+    // Keyed by node, or by the op whose write was refused: the nodes that op closes (its own, or the set a review names).
+    const op=item.op?state.ops.find(candidate=>candidate.id===item.op):null;
+    const nodes=item.node?[item.node]:op?unique([...(op.nodeId?[op.nodeId]:[]),...(op.ledgerIds??[])]):[];
+    const answered=nodes.length>0&&nodes.every(id=>loaded.nodes.get(id)?.state==='done');
+    if(answered){store.appendEvent({event:'need-user-answered',node:item.node??null,op:item.op??null,nodes,detail:String(item.detail??'').slice(0,160)});continue;}
     kept.push(item);
   }
   state.needUser=kept;
