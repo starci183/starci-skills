@@ -1,5 +1,6 @@
 import {readDistJson} from '../core/runtime-root.mjs';
 import {resolveExecutionChain} from '../profiles/select.mjs';
+import {roleOf} from './kind-graph.mjs';
 
 /**
  * Runtime allocation: pools with slots and budgets instead of an ordered provider chain. The kernel asks
@@ -39,6 +40,8 @@ const orNull=value=>Number.isFinite(value)?value:null;
 const counters=value=>plain(value)?Object.fromEntries(Object.entries(value).filter(([,count])=>Number.isFinite(count))):{};
 
 export function loadRuntimes(){return readDistJson('profiles','runtimes.json');}
+/** The graph's role for an operation kind, or null when it knows none; never throws for an unknown kind. */
+const graphRole=kind=>{try{return roleOf(kind);}catch{return null;}};
 
 /** Classify why a launch or an operation failed; the kind selects the cooldown. */
 export function classifyFailure(reason){
@@ -106,7 +109,9 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const inFlight=()=>ids.reduce((total,id)=>total+load(id),0);
   /** Round-robin tie-break: the runtime right after the last allocated one wins an otherwise exact tie. */
   const rotation=id=>{const last=ids.indexOf(live.lastAllocated);return last<0?ids.indexOf(id):(ids.indexOf(id)-last-1+ids.length)%ids.length;};
-  const roleFor=kind=>runtimes.roleOfKind?.[kind]??'implement';
+  // The kind graph is the authority on what role a kind takes; the profile's own map stays the fallback for a
+  // kind the graph does not carry (a host profile's private kinds, and every 4.x operator id).
+  const roleFor=kind=>graphRole(kind)??runtimes.roleOfKind?.[kind]??'implement';
   /** The role's preference order, or null when the role declares none: then least-loaded ranks the pools. */
   const tiers=plain(allocation.tiers)?allocation.tiers:{};
   /** The order for one allocation: the difficulty tier when declared, else the role's preference, else least-loaded. */

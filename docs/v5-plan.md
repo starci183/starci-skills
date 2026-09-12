@@ -23,11 +23,13 @@ traced to that one decision, not to the operation work:
 Job (what the user wants, in their words)
   └─ goal            assessGoal() turns the job into a definition of done, a ledger of the
      │               things that must exist, and as many operations as the job needs
-     │               → presented once → one user approval → frozen
+     │               → presented once (with the lane of every node) → one approval → frozen
      └─ workflow      one kernel process + one worktree
         ├─ op pool    up to 10 operation agents at once, each with a disjoint allowlist
-        │  └─ op      one contract in, one report file out, one commit
-        ├─ verify     a verify op per accepted slice, allocated to a different runtime
+        │  └─ lane    one node = an ordered template of kinds; one step = one op
+        │     └─ op   one contract in, one report file out, one commit
+        ├─ verify     the lane's prove step (review.verify / uat.verify), on another runtime
+        ├─ routes     sds-gap, interface-gap, shared change, findings, red UAT → a kind + a bound
         ├─ gates      the workflow's own gates, run by the kernel
         └─ final report
 ```
@@ -37,6 +39,17 @@ definition of done, a ledger of the artifacts that must exist with their current
 operation set with, per operation, its kind, goal, ledger ids, allowlist, references, checks and
 acceptance. The user approves that goal exactly once. After approval the goal is frozen: the kernel
 may re-plan an operation inside it, never widen it.
+
+**A node is a lane, not an operation.** What must happen to a piece of work is a property of the work, not of
+the agent that picks it up: backend work is built and then independently reviewed; frontend work is drawn,
+then built against that drawing, then proved by a UAT run. 5.0 declares those templates in
+`profiles/kinds.yaml` (`execution/kind-graph.mjs`) and the kernel walks them: one lane step is one operation,
+a node yields its next step only when the previous one is accepted, and the Work ledger is told `done` only
+when the last step of the lane is. The same profile carries the **routes** - which kind answers an `sds-gap`
+(`architecture.revise`), an `interface-gap` (`interface.draw`), a shared change, a review finding or a red UAT
+run, with what origin and under what bound - so the policy table is data the user can read in `goal.md` before
+approving, and every application of it is a `routed` event. This is what F5 means for the work itself: not
+only the loop but the template it follows is code and profile, never an improvisation per job.
 
 **One workflow, one worktree.** A workflow is not a module and not a repository. It is one goal, one
 branch, one worktree, and a pool of up to ten concurrent operation agents inside it. Two operations may
@@ -49,9 +62,11 @@ a slice only when it has itself re-run the operation's checks, computed the chan
 acceptance statements satisfied. It then commits that operation's files. One op, one commit: a rejected
 operation leaves nothing behind to unwind.
 
-**Verify on a different runtime.** Every accepted slice gets a verify operation, and the allocator is
-told to avoid the runtime that implemented it. A model does not grade its own homework, and a provider
-outage does not take the grader with it.
+**Verify on a different runtime.** Every accepted slice gets the verify step its lane names - `review.verify`
+for backend and operations work, `uat.verify` for a frontend flow - and the allocator is told to avoid the
+runtime that implemented it. A model does not grade its own homework, and a provider outage does not take the
+grader with it. A red verify step is never a retry of the same code: the route repairs the lane's build step
+first and reopens the verification behind it.
 
 **Gates, then the final report.** The kernel runs the workflow's gates after the last slice and writes
 one final report: goal, ledger status, every operation with its runtime, commits, checks and verdict.

@@ -10,7 +10,8 @@ import {buildReport} from '../execution/reports.mjs';
 import {spawnSync} from 'node:child_process';
 import {validateGoalPlan} from '../execution/llm-functions.mjs';
 import {createStore} from '../execution/workflow-store.mjs';
-import {DYNAMIC_OPS_BUDGET,TRIAGE_AFTER,TRIAGE_OPTIONS,applyOpReport,approve,changedFiles,createWorkflowState,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,noteAnomaly,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,workModule,workOpId} from '../execution/workflow-kernel.mjs';
+import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
+import {DYNAMIC_OPS_BUDGET,TRIAGE_AFTER,TRIAGE_OPTIONS,applyOpReport,approve,changedFiles,createWorkflowState,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,launchOperator,noteAnomaly,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -126,9 +127,10 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
 }
 
 /** Pools instead of a chain: least-index-free runtime per role, honouring `avoid`. */
-function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','claude-opus','gpt-5.6-sol'],verify:['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol'],decide:['claude-fable-5.1','gpt-6-astra']}}={}){
+function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','claude-opus','gpt-5.6-sol'],verify:['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol'],decide:['claude-fable-5.1','gpt-6-astra'],write:['gpt-5.6-sol','claude-opus','qwen3.8-flash']}}={}){
   const busy=new Set(),requests=[];
-  const roleOf=kind=>kind==='review.verify'?'verify':['architecture.decide','business.decide'].includes(kind)?'decide':'implement';
+  // The kind graph is the role authority, exactly as the real allocator reads it; the rest is the 4.x guess.
+  const roleOf=kind=>graphRoleOf(kind)??(kind==='review.verify'?'verify':['architecture.decide','business.decide'].includes(kind)?'decide':'implement');
   return {
     maxParallelOps,requests,
     allocate(kind,{avoid=[]}={}){
@@ -511,6 +513,30 @@ implementation:
       files:
         - apps/agentos-controlplane/src/sales/receipt.tsx
 `;
+/** A frontend implementation node: the lane of this one is drawn, built and then proved by a UAT run. */
+const FRONTEND=`schema: work/node@2
+id: demo.sales.implementation.frontend.cart
+kind: implementation
+required: true
+state: todo
+description: Build the cart surface from the accepted design.
+assertions:
+  - cart-renders
+implementation:
+  status: mixed
+  changes:
+    - what: Render the cart.
+      why: The route is empty.
+      repository: demo-frontend
+      directory: .
+      files:
+        - apps/web/src/cart/index.tsx
+extensions:
+  work3:
+    checks:
+      - assertion: cart-renders
+        command: npx vitest run cart
+`;
 const OVERVIEW=`schema: work/node@2
 id: demo.payments.business.overview
 kind: business-overview
@@ -524,25 +550,29 @@ const WORK_NODES=[
   {id:'demo.sales.implementation.frontend.receipt',path:'features/sales/implementation/frontend/receipt/index.yaml',kind:'implementation',state:'todo',eligible:true,inputDigest:DIGEST('d'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null},
   {id:'demo.payments.business.overview',path:'features/payments/business/overview/index.yaml',kind:'business-overview',state:'todo',eligible:true,inputDigest:DIGEST('e'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null}
 ];
+const FRONTEND_NODE={id:'demo.sales.implementation.frontend.cart',path:'features/sales/implementation/frontend/cart/index.yaml',kind:'implementation',state:'todo',eligible:true,inputDigest:DIGEST('g'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null};
+const AUTHORED={'demo.sales.architecture.sds.intake':ARCHITECTURE,'demo.sales.implementation.backend.intake':BACKEND,
+  'demo.sales.implementation.frontend.receipt':UNCHECKED,'demo.payments.business.overview':OVERVIEW,
+  [FRONTEND_NODE.id]:FRONTEND};
+
 /** A Work tree on disk plus the validator projection of it, injected instead of spawning the real one. */
-function workRepo(){
+function workRepo(nodes=WORK_NODES){
   const repo=tmp();
   fs.writeFileSync(path.join(repo,'package.json'),JSON.stringify({name:'@demo/backend'}));
-  const authored={[WORK_NODES[0].path]:ARCHITECTURE,[WORK_NODES[1].path]:BACKEND,[WORK_NODES[2].path]:UNCHECKED,[WORK_NODES[3].path]:OVERVIEW};
-  for(const [relative,content] of Object.entries(authored)){
-    const file=path.join(repo,'.starciwork',relative);
+  for(const item of nodes){
+    const file=path.join(repo,'.starciwork',item.path);
     fs.mkdirSync(path.dirname(file),{recursive:true});
-    fs.writeFileSync(file,content);
+    fs.writeFileSync(file,AUTHORED[item.id]);
   }
   // The injected projection answers a fresh digest, the way the real validator does after a kernel write.
-  const validate=()=>({ok:true,errors:[],warnings:[],nodes:WORK_NODES.map(node=>({...node,inputDigest:DIGEST('f')})),resources:[]});
-  const node=id=>path.join(repo,'.starciwork',WORK_NODES.find(item=>item.id===id).path);
+  const validate=()=>({ok:true,errors:[],warnings:[],nodes:nodes.map(node=>({...node,inputDigest:DIGEST('f')})),resources:[]});
+  const node=id=>path.join(repo,'.starciwork',nodes.find(item=>item.id===id).path);
   const read=id=>parseYaml(fs.readFileSync(node(id),'utf8'));
   return {repo,validate,node,read};
 }
 
-function setupWork({scope=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal}={}){
-  const tree=workRepo();
+function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal}={}){
+  const tree=workRepo(nodes);
   const store=createStore({repoRoot:tree.repo,id:'20260912-110000-work-ledger'});
   const state=createWorkflowState({job:'Finish the sales slice',worktree:cwd,branch:'starci183/sales',
     gates,store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'work',scope,repoRoot:tree.repo});
@@ -590,8 +620,12 @@ test('on the Work ledger the goal is derived from the authored nodes, and a node
     assert.deepEqual(harness.goal.incomplete,['demo.sales.implementation.frontend.receipt']);
     // A decision in scope is listed, never launched into a worktree.
     assert.deepEqual(harness.state.decisions.map(item=>[item.id,item.operation]),[['demo.payments.business.overview','business.decide']]);
+    // The lane is part of what the user approves: the node's template, per node, in goal.md.
+    assert.deepEqual(harness.state.lanes['demo.sales.implementation.backend.intake'],
+      {lane:['backend.implement','review.verify'],done:[],checks:[],head:null});
     const markdown=fs.readFileSync(harness.store.paths.goal,'utf8');
     assert.match(markdown,/## Work nodes this workflow executes/);
+    assert.match(markdown,/backend\.implement.*review\.verify \(this op: step 1 of 2\)/);
     assert.match(markdown,/`demo\.sales\.implementation\.backend\.intake`/);
     assert.match(markdown,/## Decisions still open in scope/);
     assert.match(markdown,/## Needs you first/);
@@ -631,14 +665,15 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     const node=harness.read('demo.sales.implementation.backend.intake');
     assert.equal(node.state,'done');
     assert.equal(node.completion.inputDigest,DIGEST('f'));
-    assert.deepEqual(node.completion.evidence,['demo.sales.implementation.backend.intake-evidence']);
+    // The last step of the lane writes the completion, so the evidence record is named after the review.
+    assert.deepEqual(node.completion.evidence,['verify-1-evidence']);
     assert.equal(node.extensions.work3.kernel.verifiedBy,'starci-kernel');
     assert.deepEqual(node.extensions.work3.kernel.checks.map(check=>[check.assertion,check.exitCode]),[['unit-tests-pass',0]]);
     // The authored checks survive the write; the kernel owns only state, completion and its own block.
     assert.deepEqual(node.extensions.work3.checks.map(check=>check.command),['npx vitest run intake']);
     assert.equal(node.description,'Implement order intake against the accepted SDS.');
     const manifest=parseYaml(fs.readFileSync(path.join(path.dirname(harness.node('demo.sales.implementation.backend.intake')),
-      'evidence','demo.sales.implementation.backend.intake-evidence','manifest.yaml'),'utf8'));
+      'evidence','verify-1-evidence','manifest.yaml'),'utf8'));
     assert.equal(manifest.schema,'work/evidence@1');
     assert.equal(manifest.nodeId,'demo.sales.implementation.backend.intake');
     assert.equal(manifest.outcome,'pass');
@@ -647,7 +682,13 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     assert.match(harness.commits[0],/^feat\(demo\.sales\.implementation\.backend\.intake\): Implement order intake/);
     assert.match(harness.commits[0],/\nWork: demo\.sales\.implementation\.backend\.intake$/);
     const events=harness.store.readEvents();
-    assert.deepEqual(events.filter(event=>event.event==='ledger-write').map(event=>event.step),['in-progress','done']);
+    // The backend lane is build then review: the node is `in-progress` until the review is accepted.
+    assert.deepEqual(events.filter(event=>event.event==='ledger-write').map(event=>event.step),['in-progress','in-progress','done']);
+    assert.equal(events.find(event=>event.event==='ledger-write'&&event.step==='done').op,'verify-1');
+    assert.deepEqual(state.lanes['demo.sales.implementation.backend.intake'].lane,['backend.implement','review.verify']);
+    assert.deepEqual(state.lanes['demo.sales.implementation.backend.intake'].done,['backend.implement','review.verify']);
+    assert.deepEqual(events.filter(event=>event.event==='lane-step').map(event=>[event.kind,event.step,event.next]),
+      [['backend.implement','1/2','review.verify'],['review.verify','2/2',null]]);
     assert.equal(events.find(event=>event.event==='ledger-loaded').valid,true);
     // One review per module, on a runtime that did not implement it.
     const verify=state.ops.find(item=>item.kind==='review.verify');
@@ -665,7 +706,7 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
   }finally{harness.cleanup();}
 });
 
-test('a reported SDS gap reopens the architecture node and schedules the decision that settles it',()=>{
+test('a reported SDS gap routes to architecture.revise on the architecture node and reopens the requester',()=>{
   const file='apps/agentos-controlplane/src/sales/intake.ts';
   const design='.starciwork/features/sales/architecture/sds/intake/index.yaml';
   const harness=setupWork({dirty:[file,design],
@@ -684,15 +725,23 @@ test('a reported SDS gap reopens the architecture node and schedules the decisio
     assert.equal(gap.architecture,'demo.sales.architecture.sds.intake');
     assert.equal(gap.decide,'architecture-1');
     const decide=state.ops.find(item=>item.id==='architecture-1');
-    assert.equal(decide.kind,'architecture.decide');
+    // The route names the kind: a gap in an accepted design is revised, not decided from scratch.
+    assert.equal(decide.kind,'architecture.revise');
     assert.equal(decide.nodeId,'demo.sales.architecture.sds.intake');
-    assert.deepEqual(decide.allowlist,[design]);
+    assert.deepEqual(decide.allowlist,[design,'.starciwork/features/sales/architecture/sds/intake/**']);
     assert.equal(decide.status,'done');
+    // Every route application names itself in the log.
+    const route=harness.store.readEvents().find(event=>event.event==='routed'&&event.on==='sds-gap');
+    assert.deepEqual([route.op,route.to,route.origin,route.kind,route.then],
+      ['demo.sales.implementation.backend.intake','architecture-1','architecture','architecture.revise','reopen']);
     // The implementation waited for the decision before it ran again.
     const implement=state.ops.find(item=>item.id==='demo.sales.implementation.backend.intake');
     assert.ok(implement.dependsOn.includes('architecture-1'));
     assert.equal(implement.status,'done');
+    assert.ok(harness.store.readEvents().some(event=>event.event==='op-reopened'&&event.op===implement.id&&event.waitingFor==='architecture-1'));
     const architecture=harness.read('demo.sales.architecture.sds.intake');
+    // A revision bumps the rev of the design it rewrote.
+    assert.equal(architecture.extensions.work3.kernel.rev,1);
     // Reopened, then decided again by a collocated review: the kernel never fakes an execution receipt here.
     assert.equal(architecture.state,'done');
     assert.equal(architecture.extensions.work3.kernel.reopened.length,1);
@@ -701,7 +750,144 @@ test('a reported SDS gap reopens the architecture node and schedules the decisio
     assert.deepEqual(architecture.completion.review.observations.map(item=>item.id),['architecture-quality']);
     assert.equal(architecture.completion.inputDigest,DIGEST('f'));
     const steps=harness.store.readEvents().filter(event=>event.event==='ledger-write').map(event=>event.step);
-    assert.deepEqual(steps,['in-progress','reopened','in-progress','decided','in-progress','done']);
+    // The backend node stays in-progress through its build step; only the review step writes `done`.
+    assert.deepEqual(steps,['in-progress','reopened','in-progress','decided','in-progress','in-progress','done']);
+  }finally{harness.cleanup();}
+});
+
+/* ------------------------------------------------------------------ lanes and routes */
+
+const CART='demo.sales.implementation.frontend.cart';
+const cartFile='apps/web/src/cart/index.tsx';
+const cartDone=summary=>({outcome:'done',summary,files:[cartFile],checks:[passing('cart-renders','npx vitest run cart')]});
+const cartRed=summary=>({outcome:'failed',summary,files:[],
+  checks:[{name:'cart-renders',command:'npx vitest run cart',exitCode:1,evidence:'1 failed spec: the total is empty'}]});
+
+test('the kind graph is the lane and route authority: it validates, and the kernel reads the same answers from it',()=>{
+  assert.deepEqual(validateGraph(),[]);
+  assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'}),['interface.draw','frontend.implement','uat.verify']);
+  assert.deepEqual(laneFor({kind:'implementation',layout:null}),['backend.implement','review.verify']);
+  assert.deepEqual(laneFor({kind:'operations'}),['runtime.operate','review.verify']);
+  assert.equal(nextKind(laneFor({kind:'implementation',layout:'frontend'}),['interface.draw']),'frontend.implement');
+  assert.equal(nextKind(laneFor({kind:'implementation',layout:'frontend'}),['interface.draw','frontend.implement','uat.verify']),null);
+  assert.equal(describeLane(['interface.draw','frontend.implement']),'interface.draw -> frontend.implement');
+  assert.equal(routeFor({blocker:'sds-gap',kind:'backend.implement'}).kind,'architecture.revise');
+  assert.equal(routeFor({blocker:'shared-change',kind:'frontend.implement'}).kind,'frontend.implement','`same` is the requester own kind');
+  assert.equal(routeFor({verdict:'fail',kind:'review.verify'}).limit,3);
+  assert.equal(routeFor({outcome:'failed',kind:'uat.verify'}).then,'reopen');
+  assert.equal(validatorRejectLimit(),2,'the validator-reject route carries its own, lower bound');
+  assert.equal(routeFor({blocker:'environment',kind:'backend.implement'}).needUser,true);
+  assert.equal(routeFor({blocker:'weather',kind:'backend.implement'}),null);
+  // Two lane kinds are younger than the operator registry, so the launch seam resolves them to an operator id.
+  assert.equal(launchOperator('frontend.implement'),'interface.implement');
+  assert.equal(launchOperator('architecture.revise'),'architecture.decide');
+  assert.equal(launchOperator('backend.implement'),'backend.implement');
+});
+
+test('a frontend Work node travels its lane: interface.draw, then frontend.implement, then uat.verify, and the node is recorded done only after the UAT step',()=>{
+  const harness=setupWork({nodes:[FRONTEND_NODE],dirty:[cartFile],
+    scripts:{[CART]:[cartDone('The cart surface is drawn.')],
+      [`${CART}-implement`]:[cartDone('The cart is built from the accepted design.')],
+      [`${CART}-verify`]:[cartDone('The cart flow passes end to end.')]}});
+  try{
+    // The lane is in goal.md before anything launches: the user approves a template, not a pile of ops.
+    const markdown=fs.readFileSync(harness.store.paths.goal,'utf8');
+    assert.match(markdown,/interface\.draw.*frontend\.implement.*uat\.verify \(this op: step 1 of 3\)/);
+    assert.deepEqual(harness.state.lanes[CART].lane,['interface.draw','frontend.implement','uat.verify']);
+    assert.deepEqual(harness.state.ops.map(op=>[op.id,op.kind]),[[CART,'interface.draw']]);
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:20});
+    // One step at a time, each one its own operation on the node's own allowlist.
+    assert.deepEqual(state.ops.map(op=>[op.id,op.kind,op.status]),
+      [[CART,'interface.draw','done'],[`${CART}-implement`,'frontend.implement','done'],[`${CART}-verify`,'uat.verify','done']]);
+    assert.equal(state.ops.every(op=>op.nodeId===CART),true);
+    assert.deepEqual(state.lanes[CART].done,['interface.draw','frontend.implement','uat.verify']);
+    const log=events(harness.store);
+    assert.deepEqual(log.filter(event=>event.event==='lane-step').map(event=>[event.kind,event.step,event.next]),
+      [['interface.draw','1/3','frontend.implement'],['frontend.implement','2/3','uat.verify'],['uat.verify','3/3',null]]);
+    // The ledger hears `in-progress` for every step but the last, and `done` exactly once, from the UAT step.
+    const writes=log.filter(event=>event.event==='ledger-write');
+    assert.deepEqual(writes.map(event=>event.step),['in-progress','in-progress','in-progress','in-progress','in-progress','done']);
+    assert.equal(writes.filter(event=>event.step==='done').length,1);
+    assert.equal(writes.at(-1).op,`${CART}-verify`);
+    const node=harness.read(CART);
+    assert.equal(node.state,'done');
+    assert.deepEqual(node.completion.evidence,[`${CART}-verify-evidence`]);
+    assert.deepEqual(node.extensions.work3.kernel.checks.map(check=>[check.assertion,check.exitCode]),[['cart-renders',0]]);
+    // A frontend lane proves itself with its own UAT step: no kernel review is planned for it.
+    assert.equal(state.ops.some(op=>op.kind==='review.verify'),false);
+    assert.deepEqual(state.ledger.map(item=>[item.id,item.status]),[[CART,'verified']]);
+    assert.equal(state.finished.outcome,'done');
+    // Every contract says which lane it belongs to and which step it is.
+    assert.match(fs.readFileSync(harness.store.contractPath(`${CART}-implement`),'utf8'),
+      /Lane: interface\.draw -> frontend\.implement -> uat\.verify \(this op: step 2 of 3\)/);
+    assert.equal(laneLine(state,{nodeId:CART,kind:'uat.verify'}),'Lane: interface.draw -> frontend.implement -> uat.verify (this op: step 3 of 3)');
+    // The status command prints the lane per node.
+    const status=kernelMain('workflow-status',{id:harness.store.id},{orca:{invoke:()=>{throw Error('status makes no Orca call');}},cwd:harness.repo});
+    assert.deepEqual(status.lanes[CART],{lane:'interface.draw -> frontend.implement -> uat.verify',
+      done:['interface.draw','frontend.implement','uat.verify'],progress:'3/3'});
+    assert.deepEqual(status.workNodes.map(item=>[item.op,item.progress]),
+      [[CART,'3/3'],[`${CART}-implement`,'3/3'],[`${CART}-verify`,'3/3']]);
+  }finally{harness.cleanup();}
+});
+
+test('a red UAT run routes to a repair of the lane build step and reopens the run behind it, bounded by the review rounds',()=>{
+  const harness=setupWork({nodes:[FRONTEND_NODE],dirty:[cartFile],
+    scripts:{[CART]:[cartDone('Drawn.')],[`${CART}-implement`]:[cartDone('Built.')],
+      [`${CART}-verify`]:[cartRed('The cart total stays empty.'),cartDone('The flow passes now.')],
+      'repair-1':[cartDone('The total is summed.')]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:24});
+    const repair=state.ops.find(op=>op.origin==='repair');
+    assert.equal(repair.id,'repair-1');
+    assert.equal(repair.kind,'frontend.implement','the repair is the lane build step, not a backend op');
+    assert.equal(repair.nodeId,CART);
+    assert.deepEqual(repair.findings,['cart-renders failed (exit 1): 1 failed spec: the total is empty']);
+    const route=events(harness.store).find(event=>event.event==='routed'&&event.on==='uat-failed');
+    assert.deepEqual([route.op,route.to,route.origin,route.kind,route.limit,route.then],
+      [`${CART}-verify`,'repair-1','repair','frontend.implement',3,'reopen']);
+    // The UAT run itself waited for the repair instead of being retried against the code it failed on.
+    const uat=state.ops.find(op=>op.id===`${CART}-verify`);
+    assert.ok(uat.dependsOn.includes('repair-1'));
+    assert.equal(uat.attempt,2);
+    assert.equal(uat.status,'done');
+    assert.equal(state.verifyRounds[CART],1,'build-and-UAT shares the review-round counter');
+    assert.equal(harness.read(CART).state,'done');
+    assert.equal(state.finished.outcome,'done');
+  }finally{harness.cleanup();}
+});
+
+test('a frontend implementation that reports an interface gap routes to interface.draw and reopens the requester',()=>{
+  const gap={outcome:'blocked',summary:'The accepted design never drew the empty cart.',files:[],checks:[],
+    blocker:{kind:'interface-gap',detail:'the accepted design has no empty state for apps/web/src/cart/index.tsx'}};
+  const harness=setupWork({nodes:[FRONTEND_NODE],dirty:[cartFile],
+    scripts:{[CART]:[cartDone('Drawn.')],
+      [`${CART}-implement`]:[gap,cartDone('Built from the completed design.')],
+      'draw-1':[cartDone('The empty state is drawn.')],
+      [`${CART}-verify`]:[cartDone('The flow passes.')]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:24});
+    const draw=state.ops.find(op=>op.id==='draw-1');
+    assert.equal(draw.kind,'interface.draw');
+    assert.equal(draw.nodeId,CART);
+    assert.equal(draw.origin,'architecture');
+    assert.equal(draw.status,'done');
+    const route=events(harness.store).find(event=>event.event==='routed'&&event.on==='interface-gap');
+    assert.deepEqual([route.op,route.to,route.origin,route.kind,route.then],
+      [`${CART}-implement`,'draw-1','architecture','interface.draw','reopen']);
+    const build=state.ops.find(op=>op.id===`${CART}-implement`);
+    assert.ok(build.dependsOn.includes('draw-1'));
+    assert.equal(build.attempt,2);
+    assert.equal(build.status,'done');
+    assert.match(build.priorOpen.at(-1),/the interface gap is drawn by draw-1/);
+    assert.deepEqual(state.lanes[CART].done,['interface.draw','frontend.implement','uat.verify']);
+    assert.equal(harness.read(CART).state,'done');
+    assert.equal(state.finished.outcome,'done');
   }finally{harness.cleanup();}
 });
 

@@ -1,0 +1,80 @@
+schema: starci/kinds@1
+purpose: |-
+  The kind graph. Three things the workflow kernel must not hard-code: what an operation kind IS (its family,
+  the role that may run it, whether it may write), which ordered LANE of kinds a Work node travels before its
+  ledger entry may be called done, and which kind a reported outcome ROUTES to. A lane is the template the
+  user approves; a route is the rule that answers a blocker, a finding or a red run. Both are data here, so
+  adding "frontend work is drawn before it is coded, and proved by a UAT run" is a profile edit, not a patch
+  to the control loop.
+kinds:
+  business.decide: {family: business, role: decide}
+  architecture.decide: {family: architecture, role: decide}
+  # A revision fixes the SDS text of an accepted design and bumps its rev; it never re-opens the business case.
+  architecture.revise: {family: architecture, role: decide}
+  # The frontend design step: surfaces, states and the region-to-component map, before any code.
+  interface.draw: {family: interface, role: write}
+  frontend.implement: {family: implementation, role: implement}
+  backend.implement: {family: implementation, role: implement}
+  runtime.operate: {family: operations, role: implement}
+  uat.verify: {family: uat, role: verify, readOnly: true}
+  review.verify: {family: review, role: verify, readOnly: true}
+lanes:
+  implementation/backend: [backend.implement, review.verify]
+  implementation/frontend: [interface.draw, frontend.implement, uat.verify]
+  uat: [uat.verify]
+  operations: [runtime.operate, review.verify]
+  architecture: [architecture.decide]
+  business: [business.decide]
+# Work node kind -> lane family, and the layout that decides which lane of that family applies. A node path
+# under `implementation/frontend/**` carries its own layout; a node that names none takes `defaultLayout`.
+nodeKinds:
+  implementation: {lane: implementation, defaultLayout: backend}
+  ui: {lane: implementation, layout: frontend}
+  uat: {lane: uat}
+  operations: {lane: operations}
+  architecture: {lane: architecture}
+  business: {lane: business}
+  business-overview: {lane: business}
+# `kind: same` is the reporting op's own kind; `kind: lane-build` is the implement step of its lane, which only
+# the kernel can resolve. `then` says what happens to the reporter: pause (wait), reopen (run again after the
+# routed op), retry (the reporter is finished and the routed op carries the work).
+routes:
+  - on: sds-gap
+    when: {blocker: sds-gap}
+    kind: architecture.revise
+    origin: architecture
+    then: reopen
+  - on: interface-gap
+    when: {blocker: interface-gap}
+    kind: interface.draw
+    origin: architecture
+    then: reopen
+  - on: shared-change
+    when: {blocker: shared-change}
+    kind: same
+    origin: shared
+    then: pause
+  - on: environment
+    when: {blocker: environment}
+    then: pause
+    needUser: true
+  - on: authority
+    when: {blocker: authority}
+    then: pause
+    needUser: true
+  - on: review-findings
+    when: {verdict: fail, kind: review.verify}
+    kind: lane-build
+    origin: repair
+    then: retry
+    limit: 3
+  - on: uat-failed
+    when: {outcome: failed, kind: uat.verify}
+    kind: lane-build
+    origin: repair
+    then: reopen
+    limit: 3
+  - on: validator-reject
+    when: {verdict: reject}
+    then: retry
+    limit: 2

@@ -12,6 +12,7 @@ import {createAllocator,loadRuntimes} from './runtime-allocator.mjs';
 import {proofFinding,proofPlan,runAtBase} from './verify-proof.mjs';
 import * as work from './work-ledger.mjs';
 import * as llm from './llm-functions.mjs';
+import * as graph from './kind-graph.mjs';
 
 /**
  * The StarCi 5.0 workflow kernel: one process per job. It assesses the goal into a ledger and a dynamic
@@ -33,9 +34,22 @@ export const GOAL_RECORD='starci/workflow-goal@1';
  */
 export const LEDGER_MODES=['work','plan'];
 export const WORK_LEDGER='work';
-/** Work kind -> the operation kind that executes it; decision kinds are answered, never launched as work. */
+/**
+ * Work kind -> the operation kind that executes it. This is the fallback only: the lane of the node
+ * (`profiles/kinds.yaml` through `execution/kind-graph.mjs`) decides the kind of every step, and this map is
+ * what a tree whose kind graph cannot be read falls back to. Decision kinds are answered, never launched.
+ */
 export const WORK_OPERATION={implementation:'backend.implement',ui:'interface.implement',uat:'uat.verify',operations:'runtime.operate'};
 export const DECISION_OPERATION={architecture:'architecture.decide',business:'business.decide','business-overview':'business.decide'};
+/**
+ * Kinds the graph names that the operator registry still launches under their 4.x operator id. The graph is
+ * the kernel's vocabulary (roles, lanes, routes); `ops/registry.yaml` is the launchable operator set, and the
+ * two are allowed to differ - a lane step is resolved to a launchable operator here, once, at the launch seam.
+ */
+export const LAUNCH_OPERATOR={'frontend.implement':'interface.implement','architecture.revise':'architecture.decide'};
+export const launchOperator=kind=>LAUNCH_OPERATOR[kind]??kind;
+/** The graph's role for a kind; the runtimes profile keeps its own `roleOfKind` map as the fallback. */
+export const kindRole=kind=>{try{return graph.roleOf(kind);}catch{return null;}};
 const RESUME_LIMIT=5,RETRY_LIMIT=3,RESTART_LIMIT=3,VERIFY_ROUNDS=3,GATE_ROUNDS=3,LAUNCH_LIMIT=3,STALL_LIMIT=3;
 /** Run-time growth is bounded too: ops nobody approved, shared changes per iteration, inferred rate limits. */
 export const DYNAMIC_OPS_BUDGET=6;
@@ -145,6 +159,7 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     ledgerMode,scope:[...scope],repoRoot:repoRoot?path.resolve(repoRoot):null,
     run:null,from:null,workflowTask:null,phase:'goal',approved:false,
     definitionOfDone:[],risks:[],questions:[],ledger:[],ops:[],needUser:[],gateResults:[],verifyRounds:{},gateRounds:0,
+    lanes:{},
     decisions:[],ledgerSummary:null,
     dynamicOps:0,dynamicOpsBudget:DYNAMIC_OPS_BUDGET,sharedQueue:[],silences:{},preflight:null,
     head:null,iterations:0,counters:{},stalls:0,allocation:null,finished:null,createdAt:Date.now()};
@@ -164,6 +179,65 @@ const groupKey=(state,ledgerIds)=>{
   return componentKey(ledgerIds);
 };
 const implementsLedger=op=>op.kind!=='review.verify'&&(op.ledgerIds??[]).length>0;
+
+/* ------------------------------------------------------------------ lanes */
+
+/**
+ * A lane is the template a Work node travels: the ordered kinds that must each be accepted before the node's
+ * ledger entry may be called done. `state.lanes[nodeId] = {lane:[kind,...], done:[kind,...], checks, head}`
+ * is the whole bookkeeping - the graph owns the template, the kernel owns the progress.
+ *
+ * Backend work is built and then reviewed; frontend work is drawn, built and then proved by a UAT run. The
+ * node is one ledger item either way, so the user approves a template, not a pile of operations.
+ */
+export const LANE_LAYOUTS=['backend','frontend'];
+/** The layout a node path declares: `features/x/implementation/frontend/**` is frontend work. */
+export function nodeLayout(node){
+  const where=slash(node?.path??'');
+  for(const layout of LANE_LAYOUTS)if(new RegExp(`(^|/)implementation/${layout}(/|$)`).test(where))return layout;
+  return null;
+}
+/** Kinds the kernel plans itself (`planVerifyOps`), so a node never derives one as its own next step. */
+export const KERNEL_PLANNED_KINDS=['review.verify'];
+/** The lane record of one node, created the first time the node is seen and never re-templated after that. */
+export function laneOf(state,node){
+  state.lanes=plain(state.lanes)?state.lanes:{};
+  const id=String(node?.id??'');
+  const existing=state.lanes[id];
+  if(existing?.lane?.length)return existing;
+  const lane=(()=>{try{return graph.laneFor({kind:node?.kind??null,layout:nodeLayout(node),repositoryRole:node?.repository??null});}catch{return [];}})();
+  return state.lanes[id]={lane:[...lane],done:[...(existing?.done??[])],checks:[...(existing?.checks??[])],head:existing?.head??null};
+}
+/** Predicates an `optionalWhen` lane step reads. No step declares one yet; the seam is here, not in the graph. */
+const lanePredicates=()=>({});
+const laneNext=entry=>{
+  try{return graph.nextKind(entry?.lane??[],entry?.done??[],{predicates:lanePredicates()});}catch{return null;}
+};
+const laneText=lane=>{try{return graph.describeLane(lane??[]);}catch{return (lane??[]).join(' -> ');}};
+/** `2/3`: how much of a node's lane is accepted. What `workflow-status` prints per node. */
+const laneProgress=entry=>entry?.lane?.length?`${(entry.done??[]).filter(kind=>entry.lane.includes(kind)).length}/${entry.lane.length}`:null;
+/** The build step of a lane: its one implement-role kind, which is what a repair of that node must be. */
+const laneBuildKind=entry=>(entry?.lane??[]).find(kind=>kindRole(kind)==='implement')??null;
+/** The lane an operation belongs to: its own node, or - for a kernel review - the node set it judges. */
+const laneEntryOf=(state,op)=>state?.lanes?.[op?.nodeId??'']??state?.lanes?.[(op?.ledgerIds??[])[0]??'']??null;
+/** The id of one lane step: the node id for the first step, then the node id plus the step's action word. */
+const laneOpId=(nodeId,kind,first,taken)=>workOpId(first?nodeId:`${nodeId}-${String(kind).split('.').at(-1)}`,taken);
+/** Every route the kernel applies is logged the same way, so the log names the rule that moved an operation. */
+const routed=(store,op,on,to,origin=null,extra={})=>store.appendEvent({event:'routed',op:op.id,on,to,origin,...extra});
+/** The route for one situation, or null; a graph that knows no rule leaves the caller its own default. */
+const routeOf=query=>{try{return graph.routeFor(query);}catch{return null;}};
+/**
+ * A route may name the kind literally, the reporter's own kind (`same`, resolved by the graph) or the lane's
+ * build step (`lane-build`), which only the kernel can resolve. Anything else yields null and the caller
+ * keeps its own default, so an unknown sentinel never launches an operation of an invented kind.
+ */
+function routeKind(route,state,op){
+  const named=route?.kind??null;
+  if(!named)return null;
+  if(graph.KINDS.includes(named))return named;
+  if(/build|lane/.test(named))return laneBuildKind(laneEntryOf(state,op));
+  return null;
+}
 
 function toOp(raw,index){
   const id=typeof raw?.id==='string'&&raw.id.trim()?raw.id.trim():`op-${index+1}`;
@@ -316,9 +390,12 @@ export function validateWorkTree({repoRoot,workRoot=null}={}){
 /** One Work node -> one operation form; the goal phase and the run-time ledger sync both use it. */
 /** Checks the kernel runs itself as gates (whole-tree validator, end-to-end suites): never per operation, never in parallel. */
 export const KERNEL_CHECK=/^(work-valid|backend-e2e-pass|producer-e2e-pass|.*e2e.*)$/i;
-export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0}){
+export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,lane=null,done=[]}){
+  // Lane-aware: the kind of this operation is the node's next lane step, not a fixed map of the node kind.
+  const template=lane?.length?lane:(()=>{try{return graph.laneFor({kind:node.kind,layout:nodeLayout(node),repositoryRole:node.repository??null});}catch{return [];}})();
+  const step=(()=>{try{return graph.nextKind(template,done,{predicates:lanePredicates()});}catch{return null;}})();
   return toOp({id,nodeId:node.id,
-    kind:WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),
+    kind:step??WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),
     ledgerIds:[node.id],allowlist:node.allowlist,
     references:unique([node.path,...(node.refs??[])]),
     // The whole-tree validator is the kernel's own gate at acceptance: parallel operations must not fail on a sibling's in-progress ledger write.
@@ -342,7 +419,6 @@ export function syncLedgerOps(store,state,ctx){
   if(!loaded.ok)return [];
   ctx.work.loaded=loaded;
   const scope=state.scope.length?state.scope:null;
-  const known=new Set(state.ops.map(op=>op.nodeId).filter(Boolean));
   const taken=new Set(state.ops.map(op=>op.id));
   const opOfNode=new Map(state.ops.filter(op=>op.nodeId).map(op=>[op.nodeId,op.id]));
   const added=[];
@@ -362,19 +438,27 @@ export function syncLedgerOps(store,state,ctx){
     store.appendEvent({event:'op-out-of-repository',op:op.id,node:op.nodeId,repository:foreign,own:ctx.work.repository});
   }
   for(const node of ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.repository})){
-    if(known.has(node.id))continue;
     if(!node.schedulable){
       if(!state.needUser.some(item=>item.node===node.id))state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
       continue;
     }
-    const id=workOpId(node.id,taken);opOfNode.set(node.id,id);
-    const op=deriveWorkOp(ctx.work.api,ctx.work.repoRoot,node,{id,opOfNode,index:state.ops.length});
+    const entry=laneOf(state,node);
+    const mine=state.ops.filter(op=>op.nodeId===node.id);
+    // One step at a time: a node yields its next lane step only when nothing of it is still in flight.
+    if(mine.some(op=>op.status!=='done'))continue;
+    const next=laneNext(entry);
+    // No next step means the lane is walked; `review.verify` is the kernel's own (planVerifyOps), not the node's.
+    if(!next||KERNEL_PLANNED_KINDS.includes(next)||mine.some(op=>op.kind===next))continue;
+    const id=laneOpId(node.id,next,!mine.length,taken);opOfNode.set(node.id,id);
+    const op=deriveWorkOp(ctx.work.api,ctx.work.repoRoot,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done});
     op.difficulty=op.difficulty??'medium';
     op.createdIteration=state.iterations;
     state.ops.push(op);
-    state.ledger.push({id:node.id,title:describeNode(ctx.work.api,ctx.work.repoRoot,node),inputRef:node.path,kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[]});
+    if(!ledgerItem(state,node.id))
+      state.ledger.push({id:node.id,title:describeNode(ctx.work.api,ctx.work.repoRoot,node),inputRef:node.path,kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[],lane:[...entry.lane]});
     added.push(op.id);
-    store.appendEvent({event:'op-added',op:op.id,node:node.id,reason:'newly schedulable Work node'});
+    store.appendEvent({event:'op-added',op:op.id,node:node.id,kind:op.kind,
+      reason:mine.length?`lane step ${entry.done.length+1} of ${entry.lane.length} (${laneText(entry.lane)})`:'newly schedulable Work node'});
     gateDynamicOp(store,state,op);
   }
   return added;
@@ -429,11 +513,16 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
   for(const node of incomplete)state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
   need(ready.length||incomplete.length||state.decisions.length,
     `No eligible Work node in scope ${scope?scope.join(', '):'(the whole tree)'}: there is nothing for this workflow to do`);
+  // The lane is the template the user approves: every node gets its record here, before any op exists.
+  state.lanes={};
+  for(const node of ready)laneOf(state,node);
   state.ledger=ready.map(node=>({id:node.id,title:describeNode(ledgerApi,repoRoot,node),inputRef:node.path,
-    kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[]}));
+    kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[],
+    lane:[...(state.lanes[node.id]?.lane??[])]}));
   const taken=new Set(),opOfNode=new Map();
   for(const node of ready)opOfNode.set(node.id,workOpId(node.id,taken));
-  state.ops=ready.map((node,index)=>deriveWorkOp(ledgerApi,repoRoot,node,{id:opOfNode.get(node.id),opOfNode,index}));
+  state.ops=ready.map((node,index)=>deriveWorkOp(ledgerApi,repoRoot,node,
+    {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[]}));
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
   const assessed=typeof assessGoal==='function'?assessGoal({job:state.job,inputs:state.inputs,
     ledger:state.ledger.map(item=>({id:item.id,kind:item.kind,title:item.title,module:item.module})),
@@ -459,6 +548,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
     ledgerMode:state.ledgerMode,scope:state.scope,workRoot:slash(loaded.workRoot),ledgerValid:loaded.ok,
     definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,
     ledger:state.ledger,decisions:state.decisions,ledgerSummary:state.ledgerSummary,
+    lanes:Object.fromEntries(Object.entries(state.lanes??{}).map(([node,entry])=>[node,[...entry.lane]])),
     ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
       allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
     gates:state.gates,needUser:state.needUser,assessedBy:assessed?.provider??null});
@@ -483,10 +573,15 @@ function workGoalMarkdown(state,loaded){
     `Scope: ${state.scope.length?state.scope.map(item=>`\`${item}\``).join(', '):'the whole Work tree'}. `+
     `The Work tree ${loaded.ok?'validates':'does NOT validate'}; ${state.ledgerSummary?.eligible??0} of ${state.ledgerSummary?.total??0} nodes in scope are eligible.`,``,
     `## Definition of done`,``,...state.definitionOfDone.map((item,index)=>`${index+1}. ${item}`),``,
-    `## Work nodes this workflow executes`,``,`| op | node | kind | module | checks | allowlist |`,`| --- | --- | --- | --- | --- | --- |`];
+    `## Work nodes this workflow executes`,``,
+    `Each node travels its lane: every step is one operation, and the node is recorded done only when the last`,
+    `step is accepted. The lane is the template you approve here.`,``,
+    `| op | node | kind | lane | module | checks | allowlist |`,`| --- | --- | --- | --- | --- | --- | --- |`];
   for(const op of state.ops){
     const item=ledgerItem(state,op.ledgerIds[0]);
-    lines.push(`| \`${op.id}\` | \`${op.nodeId}\` | ${item?.kind??'-'} | ${item?.module??'-'} | ${op.checks.length} | ${op.allowlist.map(entry=>`\`${entry}\``).join(', ')||'-'} |`);
+    const entry=state.lanes?.[op.nodeId??''];
+    const lane=entry?.lane?.length?`${laneText(entry.lane)} (this op: step ${entry.lane.indexOf(op.kind)+1} of ${entry.lane.length})`:op.kind;
+    lines.push(`| \`${op.id}\` | \`${op.nodeId}\` | ${item?.kind??'-'} | ${lane} | ${item?.module??'-'} | ${op.checks.length} | ${op.allowlist.map(entry=>`\`${entry}\``).join(', ')||'-'} |`);
   }
   if(state.decisions.length){
     lines.push(``,`## Decisions still open in scope`,``,`These are answered by a decision, not by an operation in a worktree.`,``);
@@ -566,6 +661,17 @@ function jobRulings(store){
   return body?[`## Job rulings (apply to every operation)`,body,``]:[];
 }
 
+/**
+ * The lane line of a contract: the template this operation's node travels and which step this operation is.
+ * An operation that belongs to no lane (a plan-ledger op, a shared change, a gate repair) gets no line.
+ */
+export function laneLine(state,op){
+  const entry=laneEntryOf(state,op);
+  if(!entry?.lane?.length)return null;
+  const at=entry.lane.indexOf(op.kind);
+  return `Lane: ${laneText(entry.lane)} (this op: step ${at<0?(entry.done??[]).length+1:at+1} of ${entry.lane.length})`;
+}
+
 export function renderContract({template,op,state,store,launcher=state.launcher,run=state.run,
   guards=kernelGuards,protectedPaths=null}){
   const text=String(template??'');
@@ -582,6 +688,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
   const sections=[
     `# Operation contract - \`${op.kind}\` - op \`${op.id}\` - attempt ${op.attempt}`,``,
     `Runtime StarCi 5.0. One worktree \`${slash(state.worktree)}\` on branch \`${state.branch}\`. Other operations are running beside you in this same worktree: never touch a path outside your allowlist, never commit, never switch branches. Your Task id, Dispatch id and terminal handle are in the dispatch preamble.`,``,
+    ...(laneLine(state,op)?[laneLine(state,op),``]:[]),
     `## Goal`,op.goal,``,
     ...(op.nodeId?[`## Work node you close`,`- \`${op.nodeId}\` - the kernel writes its \`state\`, \`completion\` and evidence itself after it has reproduced your checks. Never edit a Work \`index.yaml\` unless it is in your allowlist.`,``]:[]),
     ...(items.length?[`## Goal items you close`,...items,``]:[]),
@@ -601,7 +708,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `Record every command with its exit code in \`${checksFile}\` as a JSON array \`[{"name","command","exitCode","evidence"}]\`.`,
     `The kernel re-runs these exact commands itself after your report and computes your changed files from git: a \`done\` the machine cannot reproduce is downgraded to \`failed\` and comes back to you.`,``,
     `## Report (exactly once, at the end)`,
-    `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" --files <comma-separated changed paths> --checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|sds-gap|environment|authority:<detail>]\``,
+    `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" --files <comma-separated changed paths> --checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|sds-gap|interface-gap|environment|authority:<detail>]\``,
     `- \`done\` needs every check exiting 0 and no open item; otherwise report \`partial\` (with \`--open\`) or \`failed\`.`,
     `- \`ask\` pauses you until the kernel answers in this terminal; then continue and report again.`,
     `- The command must print \`ok:true\`. Never report twice; never exit without reporting.`,``,
@@ -720,7 +827,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
   op.contractFile=store.contractPath(op.id);
   const relative=path.relative(process.cwd(),state.worktree)||'.';
   const launched=ctx.launch(orca,{cwd:state.worktree,run:state.run,workflowTask:state.workflowTask??state.id,from:state.from,
-    worktree:relative,operation:op.kind,scope:op.id,spec:contract,candidate:allocated.candidate,runtime:allocated.runtime,wait:ctx.wait});
+    worktree:relative,operation:launchOperator(op.kind),scope:op.id,spec:contract,candidate:allocated.candidate,runtime:allocated.runtime,wait:ctx.wait});
   op.launch={ok:Boolean(launched?.ok),target:launched?.selection?.target??allocated.target,
     task:launched?.task?.id??null,dispatch:launched?.dispatchId??null,stopReason:launched?.stopReason??null};
   if(!launched?.ok){
@@ -805,10 +912,12 @@ function scheduleOps(orca,store,state,ctx){
     const avoid=unique([...op.avoidRuntimes,...avoidForVerify(state,op)]);
     // Allocation stays inside the targets this operation can actually launch, so a runtime whose role has
     // no profile for this operation is never chosen and then rejected.
-    const allocated=ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,op.kind),difficulty:op.difficulty??null});
+    // The allocator is asked for the op's own kind (the graph knows its role); the launchable chain is the
+    // operator registry's, so a lane kind it does not carry is resolved to its operator id first.
+    const allocated=ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,launchOperator(op.kind)),difficulty:op.difficulty??null});
     if(!allocated?.ok){store.appendEvent({event:'allocation-deferred',op:op.id,reason:allocated?.reason??'no runtime',avoid});continue;}
     let candidate=null;
-    try{candidate=allocated.candidate??ctx.allocator.candidateFor(op.kind,allocated.target);}
+    try{candidate=allocated.candidate??ctx.allocator.candidateFor(launchOperator(op.kind),allocated.target);}
     catch(error){
       ctx.allocator.failed(allocated.runtime,{reason:'not launchable'});
       op.avoidRuntimes=unique([...op.avoidRuntimes,allocated.runtime]);
@@ -873,7 +982,8 @@ function markLedger(state,op,head){
     const item=ledgerItem(state,id);
     if(!item)continue;
     item.evidence=[...(item.evidence??[]),{opId:op.id,kind:op.kind,head:head??null}];
-    if(op.kind==='review.verify')item.status='verified';
+    // A verify-role step is what proves an item: `review.verify` for a backend lane, `uat.verify` for a frontend one.
+    if(op.kind==='review.verify'||kindRole(op.kind)==='verify')item.status='verified';
     else item.status='implemented';
   }
 }
@@ -885,21 +995,21 @@ function markLedger(state,op,head){
  * original bytes (work-ledger restores them itself), the refusal is an event, and the workflow carries it to
  * the user instead of reporting a green slice over a ledger that does not say so.
  */
-function ledgerWrite(store,state,op,ctx,step,action){
-  if(!ctx.work||!op.nodeId)return null;
-  const node=ctx.work.node(op.nodeId);
+function ledgerWrite(store,state,op,ctx,step,action,nodeId=op.nodeId){
+  if(!ctx.work||!nodeId)return null;
+  const node=ctx.work.node(nodeId);
   if(!node){
-    store.appendEvent({event:'ledger-node-missing',op:op.id,node:op.nodeId,step});
-    state.needUser.push({op:op.id,kind:'ledger',detail:`the Work node ${op.nodeId} is no longer in the validated tree, so ${step} could not be recorded`});
+    store.appendEvent({event:'ledger-node-missing',op:op.id,node:nodeId,step});
+    state.needUser.push({op:op.id,kind:'ledger',detail:`the Work node ${nodeId} is no longer in the validated tree, so ${step} could not be recorded`});
     return null;
   }
   try{
     const result=action(node);
-    store.appendEvent({event:'ledger-write',op:op.id,node:op.nodeId,step});
+    store.appendEvent({event:'ledger-write',op:op.id,node:nodeId,step});
     return result;
   }catch(error){
-    store.appendEvent({event:'ledger-write-failed',op:op.id,node:op.nodeId,step,reason:error.message});
-    state.needUser.push({op:op.id,kind:'ledger',detail:`the Work node ${op.nodeId} refused ${step}: ${error.message}`});
+    store.appendEvent({event:'ledger-write-failed',op:op.id,node:nodeId,step,reason:error.message});
+    state.needUser.push({op:op.id,kind:'ledger',detail:`the Work node ${nodeId} refused ${step}: ${error.message}`});
     return null;
   }
 }
@@ -907,30 +1017,85 @@ function ledgerWrite(store,state,op,ctx,step,action){
 /** The checks the kernel itself re-ran, carrying the assertion each one proves (the check name is that id). */
 const provenChecks=checks=>checks.map(check=>({name:check.name,command:check.command,exitCode:check.exitCode,assertion:check.name}));
 
-/** An accepted slice becomes `done` plus one evidence manifest on the node that asked for the work. */
-function recordDone(store,state,op,ctx,verified){
-  if(!ctx.work||!op.nodeId)return;
-  const decision=['architecture.decide','business.decide'].includes(op.kind);
+/**
+ * An accepted slice becomes `done` plus one evidence manifest on the node that asked for the work. On a lane
+ * this is the LAST step only: `nodeId`, `checks` and `head` are passed in, because the step that completes a
+ * lane may be a kernel review that names several nodes and proves them with the checks every step ran.
+ */
+function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op.head}={}){
+  if(!ctx.work||!nodeId)return;
+  const decision=['architecture.decide','architecture.revise','business.decide'].includes(op.kind)||kindRole(op.kind)==='decide';
   if(decision){
     ledgerWrite(store,state,op,ctx,'decided',node=>ctx.work.api.markDecided(ctx.work.repoRoot,node,{
       by:'starci-kernel',
+      // A revision of an accepted design bumps its rev, so a reopened decision is not read as the first one.
+      rev:op.kind==='architecture.revise'?nextRev(ctx,node):null,
       digest:ctx.work.digest,
       review:{reviewer:op.runtime??'starci-kernel',
         authority:`the kernel accepted ${op.id} after re-running its checks itself`,
         observations:decisionObservations(ctx,node,op),
-        limitations:['Only the operation allowlist was reviewed.']}}));
+        limitations:['Only the operation allowlist was reviewed.']}}),nodeId);
     return;
   }
   // A completion binds its source directly (starci/source-identity@1) so the tree needs no repository resource record;
   // the identity is scoped to the operation allowlist, which is exactly what the kernel verified.
-  const identity=ctx.work.origin&&/^[a-f0-9]{40,64}$/.test(String(op.head??''))&&typeof ctx.work.api.buildSourceIdentity==='function'
-    ?ctx.work.api.buildSourceIdentity({repository:ctx.work.repository??path.basename(ctx.work.repoRoot),origin:ctx.work.origin,commit:op.head,paths:op.allowlist??[],
+  const identity=ctx.work.origin&&/^[a-f0-9]{40,64}$/.test(String(head??''))&&typeof ctx.work.api.buildSourceIdentity==='function'
+    ?ctx.work.api.buildSourceIdentity({repository:ctx.work.repository??path.basename(ctx.work.repoRoot),origin:ctx.work.origin,commit:head,paths:op.allowlist??[],
       dependencyCoverage:'Dependencies were not re-verified by this operation.',limitations:['Only the operation allowlist was verified by the kernel.']})
     :null;
   ledgerWrite(store,state,op,ctx,'done',node=>ctx.work.api.markDone(ctx.work.repoRoot,node,{
-    opId:op.id,head:op.head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,...(identity?{sourceIdentity:identity}:{}),
+    opId:op.id,head:head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,...(identity?{sourceIdentity:identity}:{}),
     evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',
-      servedVersionEvidence:`Checks re-run by the StarCi kernel in workflow ${state.id} on branch ${state.branch}`}}));
+      servedVersionEvidence:`Checks re-run by the StarCi kernel in workflow ${state.id} on branch ${state.branch}`}}),nodeId);
+}
+
+/** The rev a revision writes: one past whatever the node's kernel block carries, and 1 when it carries none. */
+function nextRev(ctx,node){
+  try{
+    const raw=ctx.work.api.readNode(ctx.work.repoRoot,node);
+    const rev=Number(raw?.extensions?.work3?.kernel?.rev);
+    return Number.isFinite(rev)?rev+1:1;
+  }catch{return 1;}
+}
+
+/**
+ * One accepted operation is one lane step. The node keeps `todo` with the kernel's `in-progress` block until
+ * the LAST step of its lane is accepted; only then is `done` written, and with the checks every step of the
+ * lane proved - the implement step's checks are what cover the node's authored assertions, and the prove step
+ * (a kernel `review.verify`, or the lane's own `uat.verify`) is what allows the write at all.
+ */
+function laneNodesOf(state,op){
+  if(op.nodeId)return state?.lanes?.[op.nodeId]?.lane?.length?[op.nodeId]:[];
+  if(state.ledgerMode!==WORK_LEDGER)return [];
+  return (op.ledgerIds??[]).filter(id=>state?.lanes?.[id]?.lane?.length);
+}
+const mergeProven=checks=>{
+  const seen=new Map();
+  for(const check of checks)seen.set(`${check.name}|${check.command}`,check);
+  return [...seen.values()];
+};
+function advanceLanes(store,state,op,ctx,verified){
+  const nodes=laneNodesOf(state,op);
+  if(!nodes.length||!ctx.work)return {handled:false,completed:[]};
+  const completed=[];
+  for(const nodeId of nodes){
+    const entry=state.lanes[nodeId];
+    entry.done=unique([...(entry.done??[]),op.kind]);
+    entry.checks=mergeProven([...(entry.checks??[]),...provenChecks(verified.checks)]);
+    entry.head=op.head??entry.head??null;
+    const next=laneNext(entry);
+    store.appendEvent({event:'lane-step',op:op.id,node:nodeId,kind:op.kind,
+      step:laneProgress(entry),lane:entry.lane,next:next??null});
+    if(next){
+      // Not done yet: the node keeps the kernel block of the step that just landed, and waits for the next one.
+      ledgerWrite(store,state,op,ctx,'in-progress',node=>ctx.work.api.markInProgress(ctx.work.repoRoot,node,{opId:op.id,dispatch:op.dispatch}),nodeId);
+      continue;
+    }
+    recordDone(store,state,op,ctx,{checks:entry.checks},{nodeId,head:entry.head??op.head});
+    ctx.guards.gitQueue(()=>commitLedgerWrite(store,state,op,ctx,nodeId));
+    completed.push(nodeId);
+  }
+  return {handled:true,completed};
 }
 
 /**
@@ -938,9 +1103,9 @@ function recordDone(store,state,op,ctx,verified){
  * directory it belongs to and with the same `Work:` trailer - instead of being left dirty in the worktree.
  * It follows the operation's commit because a completion binds the head of the slice it proves.
  */
-function commitLedgerWrite(store,state,op,ctx){
-  if(!ctx.work||!op.nodeId)return null;
-  const node=ctx.work.node(op.nodeId);
+function commitLedgerWrite(store,state,op,ctx,nodeId=op.nodeId){
+  if(!ctx.work||!nodeId)return null;
+  const node=ctx.work.node(nodeId);
   if(!node)return null;
   const files=changedFiles(state,op,ctx,[`.starciwork/${slash(path.dirname(node.path))}`]);
   if(!files.length)return null;
@@ -948,13 +1113,13 @@ function commitLedgerWrite(store,state,op,ctx){
   // author of those digests, so it declares the scan skipped for exactly this commit.
   const run=args=>ctx.git('git',args,{cwd:state.worktree,encoding:'utf8',windowsHide:true,env:{...process.env,ALLOW_SECRET_SCAN:'1'}});
   run(['config','core.longpaths','true']);
-  if(run(['add','--',...files]).status!==0){store.appendEvent({event:'ledger-commit-failed',op:op.id,node:op.nodeId,reason:'git add'});return null;}
-  const committed=run(['commit','-q','-m',`work(${op.nodeId}): record ${op.id} in the Work ledger\n\nWork: ${op.nodeId}`]);
-  if(committed.status!==0){store.appendEvent({event:'ledger-commit-failed',op:op.id,node:op.nodeId,reason:tail(committed.stderr,200)});return null;}
+  if(run(['add','--',...files]).status!==0){store.appendEvent({event:'ledger-commit-failed',op:op.id,node:nodeId,reason:'git add'});return null;}
+  const committed=run(['commit','-q','-m',`work(${nodeId}): record ${op.id} in the Work ledger\n\nWork: ${nodeId}`]);
+  if(committed.status!==0){store.appendEvent({event:'ledger-commit-failed',op:op.id,node:nodeId,reason:tail(committed.stderr,200)});return null;}
   const shown=run(['rev-parse','HEAD']);
   const head=shown.status===0?(shown.stdout??'').trim():null;
   if(head)state.head=head;
-  store.appendEvent({event:'ledger-commit',op:op.id,node:op.nodeId,files,head});
+  store.appendEvent({event:'ledger-commit',op:op.id,node:nodeId,files,head});
   return head;
 }
 
@@ -967,8 +1132,8 @@ function decisionObservations(ctx,node,op){
 
 /**
  * A reported SDS gap reopens the design, it does not repair it in place: the architecture node the operation
- * names - or, failing that, the one in its own module - returns to `todo` and gets an `architecture.decide`
- * operation of its own, which the blocked operation then waits for.
+ * names - or, failing that, the one in its own module - returns to `todo` and gets the kind the `sds-gap`
+ * route names (`architecture.revise`: fix the SDS text, bump its rev), which the blocked operation waits for.
  */
 function architectureNodeFor(ctx,op,detail){
   const nodes=ctx.work.loaded.list.filter(node=>node.kind==='architecture');
@@ -983,30 +1148,64 @@ function architectureNodeFor(ctx,op,detail){
 /** The check a design change must survive: the Work tree still validates after the decision is written. */
 const workValidateCommand=ctx=>`node ${slash(path.join(skillRoot,'bin','starci.mjs'))} validate ${slash(path.join(ctx.work.repoRoot,'.starciwork'))}`;
 
+/** `then: reopen` - the reporter waits for the op the route created and runs again with the settled material. */
+function reopenRequester(store,state,op,open,created,note){
+  op.status='pending';op.attempt+=1;op.dependsOn=unique([...op.dependsOn,created.id]);
+  op.priorOpen=unique([...(open??[]),note]);
+  op.dispatch=null;op.terminal=null;op.nudged=false;
+  store.appendEvent({event:'op-reopened',op:op.id,waitingFor:created.id,note});
+}
+
 function reopenArchitecture(store,state,op,report,ctx,blocker){
   const architecture=architectureNodeFor(ctx,op,blocker.detail);
   if(!architecture)return null;
+  const route=routeOf({blocker:'sds-gap',kind:op.kind})??{kind:'architecture.revise',origin:'architecture',then:'reopen'};
   ledgerWrite(store,state,op,ctx,'reopened',()=>ctx.work.api.markReopened(ctx.work.repoRoot,architecture,
     {reason:`${op.id} reported an SDS gap: ${blocker.detail}`,by:'starci-kernel'}));
   const designFile=`.starciwork/${slash(architecture.path)}`;
-  const decide=addOp(store,state,{kind:'architecture.decide',nodeId:architecture.id,
-    goal:`Settle the design gap ${op.id} hit, in the architecture node ${architecture.id}: ${blocker.detail}`,
-    ledgerIds:op.ledgerIds,allowlist:[designFile],references:unique([architecture.path,...op.references]),
+  // The revision owns the node file and the SDS folder around it: a design fix is text, and its text is there.
+  const designFolder=`.starciwork/${slash(path.dirname(architecture.path))}/**`;
+  const decide=addOp(store,state,{kind:routeKind(route,state,op)??'architecture.revise',nodeId:architecture.id,
+    goal:`Revise the design ${op.id} found incomplete, in the architecture node ${architecture.id}: ${blocker.detail}. Fix the SDS text itself and bump its rev.`,
+    ledgerIds:op.ledgerIds,allowlist:unique([designFile,designFolder]),references:unique([architecture.path,...op.references]),
     checks:[{name:'work-tree-validates',command:workValidateCommand(ctx)}],
-    acceptance:[`${architecture.id} records the decision for: ${blocker.detail}`],origin:'architecture'},
+    acceptance:[`${architecture.id} records the decision for: ${blocker.detail}`],origin:route.origin??'architecture'},
     `sds-gap reported by ${op.id}`);
-  op.status='pending';op.attempt+=1;op.dependsOn=unique([...op.dependsOn,decide.id]);
-  op.priorOpen=unique([...(report.open??[]),`the design gap is settled by ${decide.id} in ${architecture.path}; read the updated design first`]);
-  op.dispatch=null;op.terminal=null;op.nudged=false;
+  reopenRequester(store,state,op,report.open,decide,`the design gap is settled by ${decide.id} in ${architecture.path}; read the updated design first`);
   store.appendEvent({event:'sds-gap',op:op.id,node:op.nodeId,architecture:architecture.id,decide:decide.id});
+  routed(store,op,'sds-gap',decide.id,decide.origin,{kind:decide.kind,node:architecture.id,then:route.then});
   return decide;
+}
+
+/**
+ * `interface-gap`: a frontend implementation found the accepted design silent about what it must build. The
+ * route puts the lane's draw step back in front of it instead of letting it invent a surface of its own.
+ */
+function reopenInterface(store,state,op,report,blocker){
+  const route=routeOf({blocker:'interface-gap',kind:op.kind})??{kind:'interface.draw',origin:'architecture',then:'reopen'};
+  const draw=addOp(store,state,{id:nextId(state,'draw'),kind:routeKind(route,state,op)??'interface.draw',nodeId:op.nodeId,
+    goal:`Draw the surface ${op.id} found missing in the accepted design: ${blocker.detail}`,
+    ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,checks:op.checks,
+    acceptance:[`the accepted design answers: ${blocker.detail}`],origin:route.origin??'architecture'},
+    `interface-gap reported by ${op.id}`);
+  reopenRequester(store,state,op,report.open,draw,`the interface gap is drawn by ${draw.id}; read the accepted design again first`);
+  routed(store,op,'interface-gap',draw.id,draw.origin,{kind:draw.kind,node:op.nodeId??null,then:route.then});
+  return draw;
 }
 
 /* ------------------------------------------------------------------ result policy */
 
+/**
+ * How many times one op may be retried. The `validator-reject` route carries its own, lower limit: the accept
+ * path that re-validates a written ledger (`validateAccepted`) reads it from here, so the bound lives in the
+ * graph with every other route bound and not in two places.
+ */
+export const validatorRejectLimit=()=>routeOf({verdict:'reject'})?.limit??RETRY_LIMIT;
+const retryLimitFor=reason=>reason==='validator-reject'?validatorRejectLimit():RETRY_LIMIT;
+
 function retryOp(store,state,op,findings,ctx,reason){
   op.repairs+=1;
-  if(op.repairs>RETRY_LIMIT){
+  if(op.repairs>retryLimitFor(reason)){
     const chosen=ctx.decide({situation:`${op.kind} ${op.id} is still failing after ${op.repairs-1} retries (${reason})`,
       options:['retry-other-runtime','split','escalate-to-user'],
       context:{goal:firstLine(op.goal),allowlist:op.allowlist,findings,runtime:op.runtime},cwd:ctx.cwd});
@@ -1028,7 +1227,7 @@ function retryOp(store,state,op,findings,ctx,reason){
       store.appendEvent({event:'split-refused',op:op.id,reason:'a single-path allowlist cannot be split'});
     }
     op.avoidRuntimes=unique([...op.avoidRuntimes,op.runtime].filter(Boolean));
-    op.repairs=RETRY_LIMIT;
+    op.repairs=retryLimitFor(reason);
   }
   op.status='ready';op.attempt+=1;op.findings=findings;op.priorOpen=[];op.dispatch=null;op.terminal=null;op.nudged=false;
   store.appendEvent({event:'retry',op:op.id,attempt:op.attempt,reason,findings:findings.slice(0,3)});
@@ -1095,10 +1294,16 @@ function pauseForShared(store,state,op,open,shared,note){
 
 const SHARED_DEPTH_LIMIT=2;
 function createSharedOp(store,state,op,detail,paths){
-  const created=addOp(store,state,{kind:'backend.implement',goal:`Apply the shared change ${op.id} cannot make: ${detail}`,
+  // The route decides what a shared change IS: the same build kind as the requester, created as `shared`.
+  const route=routeOf({blocker:'shared-change',kind:op.kind})??{kind:'same',origin:'shared',then:'pause'};
+  const created=addOp(store,state,{kind:routeKind(route,state,op)??op.kind,
+    goal:`Apply the shared change ${op.id} cannot make: ${detail}`,
     ledgerIds:op.ledgerIds,allowlist:paths,references:op.references,checks:op.checks,
-    acceptance:[detail],origin:'shared',requesters:[op.id]},`shared-change reported by ${op.id}`);
-  if(created)created.sharedDepth=(op.sharedDepth??0)+1;
+    acceptance:[detail],origin:route.origin??'shared',requesters:[op.id]},`shared-change reported by ${op.id}`);
+  if(created){
+    created.sharedDepth=(op.sharedDepth??0)+1;
+    routed(store,op,'shared-change',created.id,created.origin,{kind:created.kind,paths,then:route.then});
+  }
   return created;
 }
 
@@ -1186,6 +1391,11 @@ function handleBlocked(store,state,op,report,ctx){
     }
     return requestSharedChange(store,state,op,{paths,detail:blocker.detail,open:[...(report.open??[])]});
   }
+  // A frontend build that has no design to build from is drawn first, never guessed at.
+  if(blocker.kind==='interface-gap'){
+    reopenInterface(store,state,op,report,blocker);
+    return 'interface-gap';
+  }
   if(blocker.kind==='sds-gap'){
     if(ctx.work&&reopenArchitecture(store,state,op,report,ctx,blocker))return 'sds-gap';
     const design=unique([...state.inputs.filter(item=>item.kind==='sds').map(item=>item.ref),
@@ -1195,16 +1405,21 @@ function handleBlocked(store,state,op,report,ctx){
       state.needUser.push({op:op.id,kind:'sds-gap',detail:`${blocker.detail} (no design input to change)`});
       return 'escalate-to-user';
     }
-    const architecture=addOp(store,state,{kind:'architecture.decide',goal:`Settle the design gap ${op.id} hit: ${blocker.detail}`,
+    // The same route, on a plan ledger: the design inputs are the allowlist, and the op is re-planned after.
+    const route=routeOf({blocker:'sds-gap',kind:op.kind})??{kind:'architecture.revise',origin:'architecture',then:'reopen'};
+    const architecture=addOp(store,state,{kind:routeKind(route,state,op)??'architecture.revise',
+      goal:`Settle the design gap ${op.id} hit: ${blocker.detail}`,
       ledgerIds:op.ledgerIds,allowlist:design,references:op.references,checks:[],
-      acceptance:[`the design records the decision for: ${blocker.detail}`],origin:'architecture'},`sds-gap reported by ${op.id}`);
-    op.status='pending';op.attempt+=1;op.needsReplan=true;op.dependsOn=unique([...op.dependsOn,architecture.id]);
-    op.priorOpen=unique([...(report.open??[]),`the design gap is settled by ${architecture.id}; read the updated design first`]);
-    op.dispatch=null;op.terminal=null;
+      acceptance:[`the design records the decision for: ${blocker.detail}`],origin:route.origin??'architecture'},`sds-gap reported by ${op.id}`);
+    op.needsReplan=true;
+    reopenRequester(store,state,op,report.open,architecture,`the design gap is settled by ${architecture.id}; read the updated design first`);
+    routed(store,op,'sds-gap',architecture.id,architecture.origin,{kind:architecture.kind,then:route.then});
     return 'sds-gap';
   }
+  // `environment`, `authority` and anything the graph has no rule for: the user decides, the kernel does not guess.
   op.status='blocked';
   state.needUser.push({op:op.id,kind:blocker.kind,detail:blocker.detail});
+  routed(store,op,blocker.kind,'needUser',null,{then:routeOf({blocker:blocker.kind,kind:op.kind})?.then??null});
   return 'escalate-to-user';
 }
 
@@ -1265,8 +1480,12 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       if(findings.length)return repairFromVerify(store,state,op,findings,ctx);
       op.verdict='pass';
     }
-    recordDone(store,state,op,ctx,verified);
-    ctx.guards.gitQueue(()=>commitLedgerWrite(store,state,op,ctx));
+    // One accepted op is one lane step: the lane decides whether the node is told `in-progress` or `done`.
+    const lanes=advanceLanes(store,state,op,ctx,verified);
+    if(!lanes.handled){
+      recordDone(store,state,op,ctx,verified);
+      ctx.guards.gitQueue(()=>commitLedgerWrite(store,state,op,ctx));
+    }
     markLedger(state,op,op.head);
     store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
       checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
@@ -1281,6 +1500,8 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     if(op.kind==='review.verify'){op.status='done';op.verdict='fail';return repairFromVerify(store,state,op,reviewFindings(report),ctx);}
     const failing=(report.checks??[]).filter(check=>check.exitCode!==0)
       .map(check=>`${check.name} failed (exit ${check.exitCode}): ${check.evidence??''}`);
+    // A red UAT run is not retried against the same code: the lane's build step is repaired first.
+    if(kindRole(op.kind)==='verify')return repairFromUat(store,state,op,failing.length?failing:reviewFindings(report),ctx);
     return retryOp(store,state,op,failing.length?failing:[report.summary],ctx,'failed');
   }
   if(report.outcome==='ask')return answerOrEscalate(orca,store,state,op,report,ctx);
@@ -1292,13 +1513,18 @@ const reviewFindings=report=>{
   return findings.map(item=>typeof item==='string'?item:JSON.stringify(item));
 };
 
+/** The review rounds one reviewed node set may use: the `review-findings` route's bound. */
+const reviewRounds=()=>routeOf({verdict:'fail',kind:'review.verify'})?.limit??VERIFY_ROUNDS;
+
 /** A review that found something becomes one repair operation; the next review is created when it is done. */
 function repairFromVerify(store,state,op,findings,ctx){
   op.verdict='fail';
   const key=groupKey(state,op.ledgerIds);
+  const route=routeOf({verdict:'fail',kind:op.kind})??{kind:'lane-build',origin:'repair',then:'retry',limit:VERIFY_ROUNDS};
+  const rounds=Number.isFinite(route.limit)?route.limit:VERIFY_ROUNDS;
   for(const id of op.ledgerIds){const item=ledgerItem(state,id);if(item&&item.status==='verified')item.status='implemented';}
-  if((state.verifyRounds[key]??1)>=VERIFY_ROUNDS){
-    state.needUser.push({op:op.id,kind:'review',detail:`${key} still fails review after ${VERIFY_ROUNDS} rounds: ${findings[0]??'no finding text'}`});
+  if((state.verifyRounds[key]??1)>=rounds){
+    state.needUser.push({op:op.id,kind:'review',detail:`${key} still fails review after ${rounds} rounds: ${findings[0]??'no finding text'}`});
     store.appendEvent({event:'verify-limit',op:op.id,component:key,findings:findings.slice(0,3)});
     return 'verify-limit';
   }
@@ -1307,11 +1533,42 @@ function repairFromVerify(store,state,op,findings,ctx){
     return 'verify-without-findings';
   }
   const named=unique(findings.flatMap(pathsIn)).filter(file=>inside(file,op.allowlist));
-  addOp(store,state,{kind:'backend.implement',goal:`Resolve the review findings of ${op.id}`,ledgerIds:op.ledgerIds,
+  // The repair is the lane's build step, so a finding on frontend work comes back as frontend work.
+  const repair=addOp(store,state,{kind:routeKind(route,state,op)??'backend.implement',
+    goal:`Resolve the review findings of ${op.id}`,ledgerIds:op.ledgerIds,
     allowlist:named.length?named:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,
-    findings,origin:'repair'},`review findings of ${op.id}`);
+    findings,origin:route.origin??'repair'},`review findings of ${op.id}`);
   store.appendEvent({event:'verify-findings',op:op.id,component:key,findings:findings.length,allowlist:named});
+  routed(store,op,'review-findings',repair.id,repair.origin,{kind:repair.kind,limit:rounds,then:route.then});
   return 'repair-from-findings';
+}
+
+/**
+ * A UAT run that came back red: the route turns it into a repair of the lane's build step, and the run itself
+ * is reopened behind that repair instead of being retried against the code it already failed. It shares the
+ * review-round counter, so a flow cannot bounce between build and UAT forever.
+ */
+function repairFromUat(store,state,op,findings,ctx){
+  const key=groupKey(state,op.ledgerIds);
+  const route=routeOf({outcome:'failed',kind:op.kind})??{kind:'lane-build',origin:'repair',then:'reopen',limit:VERIFY_ROUNDS};
+  const rounds=Number.isFinite(route.limit)?route.limit:VERIFY_ROUNDS;
+  op.verdict='fail';
+  if((state.verifyRounds[key]??0)>=rounds){
+    op.status='blocked';
+    state.needUser.push({op:op.id,kind:'uat',detail:`${key} still fails UAT after ${rounds} rounds: ${findings[0]??'no finding text'}`});
+    store.appendEvent({event:'uat-limit',op:op.id,component:key,findings:findings.slice(0,3)});
+    return 'uat-limit';
+  }
+  state.verifyRounds[key]=(state.verifyRounds[key]??0)+1;
+  const named=unique(findings.flatMap(pathsIn)).filter(file=>inside(file,op.allowlist));
+  const repair=addOp(store,state,{kind:routeKind(route,state,op)??'frontend.implement',nodeId:op.nodeId,
+    goal:`Fix what the UAT run ${op.id} found red: ${firstLine(findings[0]??'the flow does not pass')}`,
+    ledgerIds:op.ledgerIds,allowlist:named.length?named:op.allowlist,references:op.references,
+    checks:op.checks,acceptance:op.acceptance,findings,origin:route.origin??'repair'},`uat findings of ${op.id}`);
+  reopenRequester(store,state,op,findings,repair,`the UAT repair ${repair.id} lands first; then run the flow again`);
+  store.appendEvent({event:'uat-findings',op:op.id,component:key,round:state.verifyRounds[key],findings:findings.length});
+  routed(store,op,'uat-failed',repair.id,repair.origin,{kind:repair.kind,limit:rounds,then:route.then});
+  return 'repair-from-uat';
 }
 
 /* ------------------------------------------------------------------ accept, verify, gates */
@@ -1367,9 +1624,21 @@ function verifyComponents(state,ready){
   return components;
 }
 
+/**
+ * A lane proves itself with `review.verify` only when its template names that step and it has not run yet. A
+ * frontend lane proves itself with its own `uat.verify` step instead, so no review is planned for it; an item
+ * with no lane (a plan-ledger goal item) keeps the 4.x rule that every implemented item is reviewed.
+ */
+const laneWantsReview=(state,id)=>{
+  const entry=state?.lanes?.[id];
+  if(!entry?.lane?.length)return true;
+  return entry.lane.includes('review.verify')&&!(entry.done??[]).includes('review.verify');
+};
+
 /** A ledger group whose implementing operations are all done gets one independent review. */
 function planVerifyOps(store,state,ctx){
   const ready=state.ledger.filter(item=>item.status==='implemented').map(item=>item.id)
+    .filter(id=>laneWantsReview(state,id))
     .filter(id=>{
       const ops=state.ops.filter(op=>op.ledgerIds.includes(id));
       return ops.some(implementsLedger)&&ops.filter(implementsLedger).every(op=>op.status==='done')
@@ -1381,9 +1650,9 @@ function planVerifyOps(store,state,ctx){
     const ledgerIds=[...component].sort();
     const key=groupKey(state,ledgerIds);
     // The review of one group is bounded: past the last round the group waits for the user, it is not reviewed again.
-    if((state.verifyRounds[key]??0)>=VERIFY_ROUNDS){
+    if((state.verifyRounds[key]??0)>=reviewRounds()){
       for(const id of ledgerIds){const item=ledgerItem(state,id);if(item)item.status='review-exhausted';}
-      state.needUser.push({kind:'review',detail:`${key} used its ${VERIFY_ROUNDS} review rounds and is implemented again; decide whether the last findings stand`});
+      state.needUser.push({kind:'review',detail:`${key} used its ${reviewRounds()} review rounds and is implemented again; decide whether the last findings stand`});
       store.appendEvent({event:'verify-exhausted',component:key,rounds:state.verifyRounds[key]});
       continue;
     }
@@ -1604,6 +1873,10 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   state.dynamicOpsBudget=dynamicBudget(state);
   state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
   state.silences=plain(state.silences)?state.silences:{};
+  state.lanes=plain(state.lanes)?state.lanes:{};
+  // A kind graph that cannot be read is not fatal - lanes simply do not apply - but it is never silent.
+  const graphProblems=(()=>{try{return graph.GRAPH.problem?[graph.GRAPH.problem]:graph.validateGraph();}catch(error){return [error.message];}})();
+  if(graphProblems.length)store.appendEvent({event:'kind-graph-problem',problems:graphProblems.slice(0,5)});
   // The worktree itself is a precondition: long paths, the hooks env for kernel commits, the autocrlf state.
   const checked=guards.preflight({worktree:state.worktree,git})??{};
   state.preflight={ok:Boolean(checked.ok),fixes:[...(checked.fixes??[])],problems:[...(checked.problems??[])]};
@@ -1763,6 +2036,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     state.ledgerMode=LEDGER_MODES.includes(state.ledgerMode)?state.ledgerMode:'plan';
     state.scope=Array.isArray(state.scope)?state.scope:[];
     state.decisions=Array.isArray(state.decisions)?state.decisions:[];
+    // A state written before lanes existed resumes with none: its nodes keep the single-step behaviour.
+    state.lanes=plain(state.lanes)?state.lanes:{};
     // Ledger root = the worktree (branch content); the store root above = the main repository (history).
     state.repoRoot=state.repoRoot??worktree;
     if(options.allocation)state.quota=parseQuota(options.allocation);
@@ -1798,7 +2073,11 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       dynamicOps:state.dynamicOps??0,dynamicOpsBudget:dynamicBudget(state),sharedQueue:state.sharedQueue??[],
       ledger:state.ledger.map(item=>({id:item.id,status:item.status,title:item.title,evidence:item.evidence})),
       ops:state.ops.map(op=>({id:op.id,kind:op.kind,status:op.status,runtime:op.runtime,attempt:op.attempt})),
-      workNodes:state.ops.filter(op=>op.nodeId).map(op=>({op:op.id,node:op.nodeId,status:op.status})),
+      // Per node: the lane it travels and how much of it is accepted - `lane: 2/3` is the line a user reads.
+      lanes:Object.fromEntries(Object.entries(state.lanes??{}).map(([node,entry])=>
+        [node,{lane:laneText(entry.lane),done:[...(entry.done??[])],progress:laneProgress(entry)}])),
+      workNodes:state.ops.filter(op=>op.nodeId).map(op=>({op:op.id,node:op.nodeId,status:op.status,kind:op.kind,
+        lane:laneText(state.lanes?.[op.nodeId]?.lane??[])||null,progress:laneProgress(state.lanes?.[op.nodeId])})),
       gates:state.gateResults,needUser:state.needUser,finished:state.finished,
       events:store.readEvents().slice(-20),final:readJson(store.paths.final,null)};
   }
