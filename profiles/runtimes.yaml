@@ -9,12 +9,16 @@ purpose: |-
 maxParallelOps: 10
 allocation:
   policy: prefer-then-overflow
+  tiers:
+    hard: [gpt-5.6-sol, claude-opus]
+    medium: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+    easy: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
   preference:
-    implement: [claude-opus, gpt-5.6-sol, qwen3.8-flash]
-    verify: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol, qwen3.8-flash]
+    implement: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+    verify: [gpt-5.6-sol, claude-fable-5.1, gpt-6-astra, claude-opus, qwen3.8-flash]
     decide: [claude-fable-5.1, gpt-6-astra, claude-opus]
     plan: [claude-opus, claude-fable-5.1]
-    write: [claude-opus, gpt-5.6-sol, qwen3.8-flash]
+    write: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin
@@ -25,12 +29,12 @@ runtimes:
   gpt-5.6-sol:
     target: gpt-5.6-sol
     roles: [implement, verify, write]
-    maxParallel: 3
+    maxParallel: 5
     budget: {opsPerDay: 60, tokensPerDay: 12000000}
   claude-opus:
     target: claude-opus
     roles: [implement, verify, write, plan]
-    maxParallel: 5
+    maxParallel: 3
     budget: {opsPerDay: 60, tokensPerDay: 20000000}
   claude-fable-5.1:
     target: claude-fable-5.1
@@ -45,7 +49,7 @@ runtimes:
   qwen3.8-flash:
     target: qwen3.8-flash
     roles: [implement, verify, write]
-    maxParallel: 4
+    maxParallel: 2
     budget: {opsPerDay: 120}
 roleOfKind:
   backend.implement: implement

@@ -62,7 +62,25 @@ function adoptState(state,day){
   };
 }
 
-export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null}={}){
+/** Apply a workflow's quota (`{order:[ids], slots:{id:n}}`) on top of the profile: slots become maxParallel, order becomes every role's preference. */
+export function applyQuota(runtimes,quota){
+  if(!plain(quota)||(!Array.isArray(quota.order)&&!plain(quota.slots)))return runtimes;
+  const copy=structuredClone(runtimes);
+  const order=Array.isArray(quota.order)?quota.order.filter(id=>copy.runtimes?.[id]):[];
+  for(const [id,n] of Object.entries(plain(quota.slots)?quota.slots:{}))if(copy.runtimes?.[id]&&Number.isFinite(Number(n)))copy.runtimes[id].maxParallel=Math.max(0,Number(n));
+  if(order.length){
+    copy.allocation=plain(copy.allocation)?copy.allocation:{};
+    copy.allocation.policy='prefer-then-overflow';
+    const roles=new Set(Object.values(copy.runtimes).flatMap(rt=>rt.roles??[]));
+    copy.allocation.preference={...(plain(copy.allocation.preference)?copy.allocation.preference:{})};
+    for(const role of roles)copy.allocation.preference[role]=[...order.filter(id=>(copy.runtimes[id].roles??[]).includes(role)),...((copy.allocation.preference[role]??[]).filter(id=>!order.includes(id)))];
+    copy.allocation.tiers=plain(copy.allocation.tiers)?Object.fromEntries(Object.entries(copy.allocation.tiers).map(([level,list])=>[level,list.filter(id=>order.includes(id)).concat(order.filter(id=>!list.includes(id)))])):copy.allocation.tiers;
+  }
+  return copy;
+}
+
+export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null}={}){
+  runtimes=applyQuota(runtimes,quota);
   need(plain(runtimes)&&plain(runtimes.runtimes),'Runtime allocation needs a runtimes profile with a runtimes map');
   const pools=runtimes.runtimes,ids=Object.keys(pools),allocation=plain(runtimes.allocation)?runtimes.allocation:{};
   need(ids.length,'Runtime allocation needs at least one runtime pool');
@@ -85,9 +103,12 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const rotation=id=>{const last=ids.indexOf(live.lastAllocated);return last<0?ids.indexOf(id):(ids.indexOf(id)-last-1+ids.length)%ids.length;};
   const roleFor=kind=>runtimes.roleOfKind?.[kind]??'implement';
   /** The role's preference order, or null when the role declares none: then least-loaded ranks the pools. */
-  const preferenceOf=role=>{
+  const tiers=plain(allocation.tiers)?allocation.tiers:{};
+  /** The order for one allocation: the difficulty tier when declared, else the role's preference, else least-loaded. */
+  const preferenceOf=(role,difficulty=null)=>{
     if(policy!==PREFER_THEN_OVERFLOW)return null;
-    const list=preference[role];
+    const tier=difficulty&&Array.isArray(tiers[difficulty])?tiers[difficulty].filter(id=>(pools[id]?.roles??[]).includes(role)):null;
+    const list=tier&&tier.length?tier:preference[role];
     return Array.isArray(list)&&list.length?list.filter(id=>typeof id==='string'):null;
   };
   /** Position in the preference order; an unlisted but eligible runtime sorts after every preferred one. */
@@ -96,9 +117,9 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const remainingOf=id=>({ops:orNull(opsLeft(id)),tokens:orNull(tokensLeft(id))});
 
   /** Rank every pool for one kind: ready candidates in allocation order plus why each other was skipped. */
-  const review=(kind,{avoid=[],restrictTo=null}={})=>{
+  const review=(kind,{avoid=[],restrictTo=null,difficulty=null}={})=>{
     rollDay();
-    const role=roleFor(kind),ready=[],blocked=[],order=preferenceOf(role);
+    const role=roleFor(kind),ready=[],blocked=[],order=preferenceOf(role,difficulty);
     for(const id of ids){
       const pool=pools[id],cool=cooling(id),free=slots(id)-load(id);
       const reason=!Array.isArray(pool?.roles)||!pool.roles.includes(role)?`no ${role} role`
@@ -127,8 +148,8 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     roleFor,
     review,
     /** Pick the runtime for one operation; `avoid` is absolute, `restrictTo` limits the pools to launchable targets. */
-    allocate(kind,{avoid=[],restrictTo=null}={}){
-      const {role,ready,blocked,preference:order}=review(kind,{avoid,restrictTo});
+    allocate(kind,{avoid=[],restrictTo=null,difficulty=null}={}){
+      const {role,ready,blocked,preference:order}=review(kind,{avoid,restrictTo,difficulty});
       if(inFlight()>=maxParallelOps)return {ok:false,kind,role,avoid,blocked,reason:`maxParallelOps ${maxParallelOps} is already in flight; release a slot before allocating ${kind}`};
       if(!ready.length)return {ok:false,kind,role,avoid,blocked,reason:`no runtime with the ${role} role, a free slot and budget for ${kind}: ${blocked.map(item=>`${item.runtime} (${item.reason})`).join(', ')||'no pool declares that role'}`};
       const chosen=ready[0];
@@ -140,9 +161,9 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
         policy,preference:order,overflowed:Boolean(order)&&chosen.preference>0};
     },
     /** Independent review: the implement runtime is excluded while `verifyAvoidsImplementRuntime` holds. */
-    allocateVerify(kind,{implementRuntime=null,avoid=[],restrictTo=null}={}){
+    allocateVerify(kind,{implementRuntime=null,avoid=[],restrictTo=null,difficulty=null}={}){
       const strict=allocation.verifyAvoidsImplementRuntime!==false;
-      return this.allocate(kind,{avoid:strict&&implementRuntime?[...avoid,implementRuntime]:avoid,restrictTo});
+      return this.allocate(kind,{avoid:strict&&implementRuntime?[...avoid,implementRuntime]:avoid,restrictTo,difficulty});
     },
     /** An operation that finished: free the slot, charge the tokens it used and clear the failure streak. */
     release(runtime,{tokens=0}={}){

@@ -99,7 +99,7 @@ export function createOrcaAdapter({orca=createOrcaCalls(),cwd=process.cwd(),from
       throw Error('integrateChange is coordinator-owned: perform the reviewed integration in the main worktree and record it explicitly; the adapter never merges');
     },
     /** One blocking boundary wait with optional acknowledgement; a timeout is an empty ok result. */
-    async waitBoundary({runId=null,types=['worker_done','worker_failed','escalation','question'],timeoutMs=900000,ack=null}={}){
+    async waitBoundary({runId=null,types=['worker_done','escalation','question'],timeoutMs=900000,ack=null}={}){
       const params={wait:true,types:types.join(','),'timeout-ms':timeoutMs};
       if(runId)params.run=runId;
       if(ack)params.ack=ack;

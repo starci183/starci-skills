@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {parseYaml} from '../core/yaml.mjs';
-import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,classifyFailure,createAllocator} from '../execution/runtime-allocator.mjs';
+import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,classifyFailure,createAllocator} from '../execution/runtime-allocator.mjs';
 
 const profile=parseYaml(fs.readFileSync(new URL('../profiles/runtimes.yaml',import.meta.url),'utf8'));
 const clock=start=>{const box={at:start};return {now:()=>box.at,advance:ms=>{box.at+=ms;}};};
@@ -21,8 +21,8 @@ test('prefer-then-overflow fills the preferred runtime before it offers the next
   assert.equal(allocator.maxParallelOps,10);
   assert.equal(allocator.policy,PREFER_THEN_OVERFLOW);
   assert.equal(profile.allocation.policy,PREFER_THEN_OVERFLOW);
-  assert.deepEqual(profile.allocation.preference.implement,['claude-opus','gpt-5.6-sol','qwen3.8-flash']);
-  assert.equal(profile.runtimes['claude-opus'].maxParallel,5);
+  assert.deepEqual(profile.allocation.preference.implement,['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
+  assert.equal(profile.runtimes['gpt-5.6-sol'].maxParallel,5);
   const picked=[];
   for(let index=0;index<6;index+=1){
     const result=allocator.allocate('backend.implement');
@@ -33,15 +33,15 @@ test('prefer-then-overflow fills the preferred runtime before it offers the next
     picked.push(result.runtime);
   }
   // Five slots of the preferred runtime first, and only the sixth operation overflows to the next one.
-  assert.deepEqual(picked,['claude-opus','claude-opus','claude-opus','claude-opus','claude-opus','gpt-5.6-sol']);
-  assert.deepEqual(tally(picked),{'claude-opus':5,'gpt-5.6-sol':1});
+  assert.deepEqual(picked,['gpt-5.6-sol','gpt-5.6-sol','gpt-5.6-sol','gpt-5.6-sol','gpt-5.6-sol','claude-opus']);
+  assert.deepEqual(tally(picked),{'gpt-5.6-sol':5,'claude-opus':1});
   // A freed preferred slot takes the next operation straight back from the overflow runtime.
-  allocator.release('claude-opus');
-  assert.equal(allocator.allocate('backend.implement').runtime,'claude-opus');
-  const counts=tally([...picked,'claude-opus']);
+  allocator.release('gpt-5.6-sol');
+  assert.equal(allocator.allocate('backend.implement').runtime,'gpt-5.6-sol');
+  const counts=tally([...picked,'gpt-5.6-sol']);
   const snapshot=allocator.snapshot();
   assert.equal(snapshot.policy,PREFER_THEN_OVERFLOW);
-  assert.deepEqual(snapshot.preference.verify,['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol','qwen3.8-flash']);
+  assert.deepEqual(snapshot.preference.verify,['gpt-5.6-sol','claude-fable-5.1','gpt-6-astra','claude-opus','qwen3.8-flash']);
   assert.equal(snapshot.inFlight,6);
   assert.equal(snapshot.runtimes['claude-opus'].remaining.ops,profile.runtimes['claude-opus'].budget.opsPerDay-counts['claude-opus']);
   assert.equal(snapshot.runtimes['qwen3.8-flash'].remaining.tokens,null);
@@ -57,27 +57,27 @@ test('a rate-limited preference overflows to the next runtime and is taken up ag
   const time=clock(Date.UTC(2026,8,12,9));
   const allocator=createAllocator({runtimes:profile,now:time.now});
   const first=allocator.allocate('backend.implement');
-  assert.equal(first.runtime,'claude-opus');
+  assert.equal(first.runtime,'gpt-5.6-sol');
   assert.equal(first.overflowed,false);
-  allocator.failed('claude-opus',{reason:'HTTP 429 Too Many Requests'});
+  allocator.failed('gpt-5.6-sol',{reason:'HTTP 429 Too Many Requests'});
   const overflow=[];
   for(let index=0;index<4;index+=1)overflow.push(allocator.allocate('backend.implement').runtime);
-  // Codex Sol has three slots, so the fourth operation overflows once more, to Qwen.
-  assert.deepEqual(overflow,['gpt-5.6-sol','gpt-5.6-sol','gpt-5.6-sol','qwen3.8-flash']);
+  // Opus has three slots, so the fourth operation overflows once more, to Qwen.
+  assert.deepEqual(overflow,['claude-opus','claude-opus','claude-opus','qwen3.8-flash']);
   const cooling=allocator.allocate('backend.implement');
   assert.equal(cooling.runtime,'qwen3.8-flash');
   assert.equal(cooling.overflowed,true);
-  assert.match(cooling.blocked.find(item=>item.runtime==='claude-opus').reason,/cooling after rate-limited/);
+  assert.match(cooling.blocked.find(item=>item.runtime==='gpt-5.6-sol').reason,/cooling after rate-limited/);
   time.advance(600001);
-  assert.equal(allocator.allocate('backend.implement').runtime,'claude-opus');
+  assert.equal(allocator.allocate('backend.implement').runtime,'gpt-5.6-sol');
   // The preference order is the allocation order; a role with no list falls back to least loaded.
   const fresh=createAllocator({runtimes:profile,now:time.now});
-  assert.deepEqual(fresh.review('backend.implement').ready.map(item=>item.runtime),['claude-opus','gpt-5.6-sol','qwen3.8-flash']);
+  assert.deepEqual(fresh.review('backend.implement').ready.map(item=>item.runtime),['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
   const unranked=createAllocator({runtimes:{...profile,allocation:{...profile.allocation,preference:{verify:profile.allocation.preference.verify}}},now:time.now});
   assert.equal(unranked.review('backend.implement').preference,null);
-  assert.deepEqual(unranked.review('backend.implement').ready.map(item=>item.runtime),['claude-opus','qwen3.8-flash','gpt-5.6-sol']);
+  assert.deepEqual(unranked.review('backend.implement').ready.map(item=>item.runtime),['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
   assert.equal(unranked.allocate('backend.implement').overflowed,false);
-  assert.equal(unranked.allocate('review.verify').runtime,'claude-fable-5.1');
+  assert.equal(unranked.allocate('review.verify').runtime,'gpt-5.6-sol');
 });
 
 test('an exact tie rotates to the runtime after the last allocated one',()=>{
@@ -239,4 +239,16 @@ test('the launch shape still comes from the operation chain and an unlisted targ
   const picked=allocator.allocate('review.verify',{restrictTo:targets});
   assert.ok(targets.includes(picked.runtime));
   assert.deepEqual(allocator.allocate('review.verify',{restrictTo:[]}).ok,false);
+});
+
+test('difficulty routes inside the quota: hard work to the strongest tier, easy work to the cheapest; a quota rewrites slots and order',()=>{
+  
+  const allocator=createAllocator({runtimes:profile,now:()=>0});
+  assert.equal(allocator.allocate('backend.implement',{difficulty:'easy'}).runtime,'qwen3.8-flash');
+  assert.equal(allocator.allocate('backend.implement',{difficulty:'hard'}).runtime,'gpt-5.6-sol');
+  const quota=applyQuota(profile,{order:['claude-opus','qwen3.8-flash','gpt-5.6-sol'],slots:{'claude-opus':2,'qwen3.8-flash':1,'gpt-5.6-sol':1}});
+  assert.equal(quota.runtimes['claude-opus'].maxParallel,2);
+  assert.deepEqual(quota.allocation.preference.implement,['claude-opus','qwen3.8-flash','gpt-5.6-sol']);
+  const quoted=createAllocator({runtimes:profile,quota:{order:['claude-opus','qwen3.8-flash','gpt-5.6-sol'],slots:{'claude-opus':2,'qwen3.8-flash':1,'gpt-5.6-sol':1}},now:()=>0});
+  assert.deepEqual([1,2,3,4].map(()=>quoted.allocate('backend.implement').runtime),['claude-opus','claude-opus','qwen3.8-flash','gpt-5.6-sol']);
 });

@@ -29,6 +29,6 @@ rules:
 signals:
   done: worker_done (--outcome succeeded)
   partial: worker_done (--outcome succeeded)
-  failed: worker_failed (--outcome failed)
+  failed: worker_done (--outcome failed)
   ask: question
   blocked: escalation

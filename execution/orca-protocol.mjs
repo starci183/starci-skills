@@ -13,7 +13,7 @@ import {notifyTerminal,settleDispatch,sweepWorktree} from './orca-supervised-lau
  */
 export const REPORT_RESULT='starci/orca-report-result@1';
 export const WAIT_TICK='starci/orca-wait-tick@1';
-export const BOUNDARY_TYPES='worker_done,worker_failed,question,escalation';
+export const BOUNDARY_TYPES='worker_done,question,escalation';
 const DEFAULT_STALLED_AFTER_MS=20*60*1000;
 export const DEFAULT_HEARTBEAT_GRACE_MS=10*60*1000;
 

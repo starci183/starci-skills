@@ -296,6 +296,9 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
       ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers,cwd,runHeadless}):null;
   if(assessed?.ok){
     state.definitionOfDone=[...(assessed.value.definitionOfDone??[])];
+    // Difficulty x model capability: the assessment rates every node; the allocator routes by tier inside the quota.
+    const rated=new Map((assessed.value.difficulty??[]).map(item=>[item.op,item.level]));
+    for(const op of state.ops){op.difficulty=rated.get(op.id)??rated.get(op.nodeId)??op.difficulty??'medium';}
     state.risks=[...(assessed.value.risks??[])];
     state.questions=[...(assessed.value.questions??[])];
   }else{
@@ -525,7 +528,7 @@ function scheduleOps(orca,store,state,ctx){
     const avoid=unique([...op.avoidRuntimes,...avoidForVerify(state,op)]);
     // Allocation stays inside the targets this operation can actually launch, so a runtime whose role has
     // no profile for this operation is never chosen and then rejected.
-    const allocated=ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,op.kind)});
+    const allocated=ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,op.kind),difficulty:op.difficulty??null});
     if(!allocated?.ok){store.appendEvent({event:'allocation-deferred',op:op.id,reason:allocated?.reason??'no runtime',avoid});continue;}
     let candidate=null;
     try{candidate=allocated.candidate??ctx.allocator.candidateFor(op.kind,allocated.target);}
@@ -1170,6 +1173,18 @@ const templateOf=host=>fs.readFileSync(path.join(host,'docs','supervision-templa
  * The four commands of the runtime, as the canonical launcher routes them. `functions` is the injection
  * seam for the model functions and the process helpers, so the command path is testable without a provider.
  */
+/** `--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2`: slots per runtime in priority order. */
+export function parseQuota(value){
+  if(!value)return null;
+  const order=[],slots={};
+  for(const entry of String(value).split(',').map(item=>item.trim()).filter(Boolean)){
+    const [id,n]=entry.split('=');
+    need(id&&Number.isFinite(Number(n)),`--allocation entries are <runtime>=<slots>: ${entry}`);
+    order.push(id.trim());slots[id.trim()]=Number(n);
+  }
+  return {order,slots,total:Object.values(slots).reduce((a,b)=>a+b,0)};
+}
+
 export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleepSync,functions={}}={}){
   const worktree=path.resolve(cwd);
   const repoRoot=repositoryRoot(worktree);
@@ -1183,6 +1198,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     state.decisions=Array.isArray(state.decisions)?state.decisions:[];
     // Ledger root = the worktree (branch content); the store root above = the main repository (history).
     state.repoRoot=state.repoRoot??worktree;
+    if(options.allocation)state.quota=parseQuota(options.allocation);
     return {store,state};
   };
   if(command==='workflow-goal'){
@@ -1192,6 +1208,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const ledgerMode=detectLedgerMode(worktree,options.ledger??null);
     const state=createWorkflowState({job,inputs:csv(options.inputs),worktree,branch:currentBranch(worktree),
       gates:csv(options.gates),store,host,launcher:launcherOf(host),ledgerMode,scope:csv(options.scope),repoRoot:worktree});
+    if(options.allocation)state.quota=parseQuota(options.allocation);
     store.appendEvent({event:'created',job,inputs:state.inputs,worktree:slash(worktree),branch:state.branch,
       ledgerMode,scope:state.scope});
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,...goalPhase(store,state,{cwd:worktree,...functions})};
@@ -1223,7 +1240,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     state.launcher=state.launcher??launcherOf(state.host);
     store.appendEvent({event:'run-bound',run:state.run,from:state.from});
     const finished=runLoop(orca,store,state,{cwd:worktree,wait,
-      allocator:createAllocator({state:state.allocation??undefined}),template:templateOf(state.host),
+      allocator:createAllocator({state:state.allocation??undefined,quota:state.quota??null}),template:templateOf(state.host),
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:finished.phase,ledgerMode:finished.ledgerMode,
       finished:finished.finished,ledger:finished.ledger.map(item=>`${item.id}=${item.status}`),

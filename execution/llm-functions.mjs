@@ -106,7 +106,7 @@ export const GOAL_FORM={
   ledger:{type:'object[]',minItems:1,each:{id:{type:'string'},title:{type:'string'},inputRef:{type:'string'},status:{type:'string',enum:['absent','partial','done','unknown']}}},
   ops:{type:'object[]',minItems:1,each:{id:{type:'string'},kind:{type:'string'},goal:{type:'string'},ledgerIds:{type:'string[]',minItems:1},
     allowlist:{type:'string[]',minItems:1},references:{type:'string[]'},checks:{type:'object[]',minItems:1,each:{name:{type:'string'},command:{type:'string'}}},
-    acceptance:{type:'string[]',minItems:1},dependsOn:{type:'string[]'}}},
+    acceptance:{type:'string[]',minItems:1},dependsOn:{type:'string[]'},difficulty:{type:'string',enum:['easy','medium','hard'],optional:true}}},
   risks:{type:'string[]',optional:true},questions:{type:'string[]',optional:true}
 };
 
@@ -229,15 +229,18 @@ const GOAL_RULES=[
 ];
 
 /** One job whose ledger already exists: only the definition of done and the risks around it are asked. */
+export const DIFFICULTY_LEVELS=['easy','medium','hard'];
 export const WORK_GOAL_FORM={
   definitionOfDone:{type:'string[]',minItems:1},
+  difficulty:{type:'object[]',optional:true,each:{op:{type:'string'},level:{type:'string',enum:DIFFICULTY_LEVELS},why:{type:'string',optional:true}}},
   risks:{type:'string[]',optional:true},questions:{type:'string[]',optional:true}
 };
 const WORK_GOAL_RULES=[
   'the ledger below is the authored Work tree: it is the TODO list, and you may neither add, drop nor rewrite a node',
   'the definition of done states what will be true of the product when those nodes are done, in the job\'s terms',
   'a risk is something that can make the listed work wrong or incomplete; a question is something only the user can settle',
-  'never plan operations, allowlists, checks or process steps: the kernel derives them from the nodes'
+  'never plan operations, allowlists, checks or process steps: the kernel derives them from the nodes',
+  'rate every ledger node in `difficulty` as easy (mechanical, one file family, no design judgement), medium (several files, existing patterns) or hard (cross-cutting, concurrency, persistence semantics, security, unclear SDS): the kernel routes hard work to the strongest runtimes and easy work to the cheapest'
 ];
 
 /**

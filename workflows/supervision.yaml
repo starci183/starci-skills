@@ -28,7 +28,6 @@ routing:
       - escalation
       - heartbeat
       - worker_done
-      - worker_failed
   kernelToOperation:
     recipient: own-operation-terminal
     transport: launcher-notify
@@ -67,7 +66,6 @@ waitHierarchy:
       - escalation
       - heartbeat
       - worker_done
-      - worker_failed
     actsBy: verify-accept-commit-retry-or-reallocate
     directExecution: forbidden
     loopOwner: code-never-a-model
@@ -161,7 +159,7 @@ reports:
   schema: starci/op-report@1
   workflowSchema: starci/workflow-report@1
   outcomes: [done, partial, failed, ask, blocked]
-  signals: {done: worker_done, partial: worker_done, failed: worker_failed, ask: question, blocked: escalation}
+  signals: {done: worker_done, partial: worker_done, failed: worker_done, ask: question, blocked: escalation}
   authority: report-file-then-signal
   command: report
   onceOnly: true
@@ -172,7 +170,6 @@ wait:
     - question
     - escalation
     - worker_done
-    - worker_failed
   tickMs: 120000
   heartbeatGraceMs: 600000
   ping: operation-heartbeat-every-5-minutes-peeked-per-tick

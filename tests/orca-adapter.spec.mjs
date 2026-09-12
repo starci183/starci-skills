@@ -82,7 +82,7 @@ test('boundary wait filters keepalive rows, reports a timeout as an empty ok bat
   const second=await adapter.waitBoundary({runId:'run_1',ack:'dlv_1'});
   assert.equal(second.timedOut,true);assert.deepEqual(second.messages,[]);
   const ackCall=fake.spawned.at(-1);
-  assert.ok(has(ackCall,'--ack','dlv_1')&&has(ackCall,'--wait')&&has(ackCall,'--types','worker_done,worker_failed,escalation,question'));
+  assert.ok(has(ackCall,'--ack','dlv_1')&&has(ackCall,'--wait')&&has(ackCall,'--types','worker_done,escalation,question'));
   assert.deepEqual(boundaryMessages({result:{messages:[{_heartbeat:true},{type:'question'}]}}).map(row=>row.type),['question']);
 });
 

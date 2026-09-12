@@ -14,7 +14,7 @@ export const BLOCKER_KINDS=['shared-change','sds-gap','environment','authority']
 export const SIGNALS={
   done:{type:'worker_done',orcaOutcome:'succeeded'},
   partial:{type:'worker_done',orcaOutcome:'succeeded'},
-  failed:{type:'worker_failed',orcaOutcome:'failed'},
+  failed:{type:'worker_done',orcaOutcome:'failed'},
   ask:{type:'question',orcaOutcome:null},
   blocked:{type:'escalation',orcaOutcome:null}
 };

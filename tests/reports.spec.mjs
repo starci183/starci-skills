@@ -94,7 +94,7 @@ test('wait tick acknowledges the previous batch, reads report files, classifies 
     });
     const first=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',reportsDir:dir,now:()=>5000,wait:()=>{}});
     assert.equal(first.event,'report');
-    assert.ok(!has(checks[0],'--ack'));assert.ok(has(checks[0],'--types','worker_done,worker_failed,question,escalation')&&has(checks[0],'--wait'));
+    assert.ok(!has(checks[0],'--ack'));assert.ok(has(checks[0],'--types','worker_done,question,escalation')&&has(checks[0],'--wait'));
     assert.equal(first.messages[0].payload.dispatchId,'ctx_q');
     assert.equal(first.reports.length,1);assert.equal(first.reports[0].validation.ok,true);
     assert.deepEqual(first.liveness.map(item=>[item.dispatch,item.liveness]),[['ctx_done','reported'],['ctx_idle','stalled-idle']]);

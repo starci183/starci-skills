@@ -465,13 +465,13 @@ function usage(){return `Usage:
   node orca-supervised-launch.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
   node orca-supervised-launch.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
   node orca-supervised-launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
-  node orca-supervised-launch.mjs workflow-goal --job <text> [--id <workflow-id>] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-goal --job <text> [--id <workflow-id>] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2] [--host <path-to-.claude>] [--worktree <relative-path>]
     turns the job into a goal and prints it for the one user approval. With a Work tree under
     <repo>/.starciwork/features the ledger is that tree (--ledger work, the default): the ops are derived
     from the eligible nodes in --scope and a node without an allowlist or checks is named as needing you.
     Without one the ledger is assessed by a model (--ledger plan).
   node orca-supervised-launch.mjs workflow-approve --id <workflow-id> [--worktree <relative-path>]
-  node orca-supervised-launch.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--max-iterations N] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--allocation <runtime=slots,...>] [--max-iterations N] [--host <path-to-.claude>] [--worktree <relative-path>]
     runs the kernel loop: up to 10 operation agents in one worktree, machine-verified acceptance, gates, final report.
     On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and
     committed with a "Work: <node id>" trailer.

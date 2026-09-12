@@ -61,7 +61,7 @@ workflowKernel:
       onMismatch: stop-before-operation-task-creation
     waitOperationBoundary:
       api: orchestration.check
-      cli: 'orca orchestration check --wait --types worker_done,worker_failed,escalation,question --timeout-ms 900000 --json'
+      cli: 'orca orchestration check --wait --types worker_done,escalation,question --timeout-ms 900000 --json'
     answerOperation:
       api: terminal.send
       cli: 'orca terminal send --terminal <operation-agent-terminal> --text "<answer or continue instruction>" --enter --json'
