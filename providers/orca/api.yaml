@@ -267,6 +267,7 @@ starciOrchestrationAllowlist:
     - orchestration gate-list
     - worktree set
     - terminal rename
+    - terminal close
   workflowMonitor:
     - orchestration task-create
     - orchestration task-list
@@ -284,6 +285,7 @@ starciOrchestrationAllowlist:
     - orchestration ask
     - orchestration reply
     - terminal rename
+    - terminal close
   operationAgent:
     - orchestration send
     - orchestration ask
@@ -294,5 +296,4 @@ forbiddenForStarciOrchestration:
   - orchestration reset
   - orchestration dispatch
   - terminal send
-  - terminal close
   - terminal stop

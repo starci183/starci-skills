@@ -30,7 +30,7 @@ function fakeOrca(handlers){
   const spawned=[];const counts={};
   const spawn=(executable,args)=>{
     spawned.push(args);
-    const key=args[0]==='terminal'?'terminal-rename':args[0]==='agent-context'?'agent-context':args[1];
+    const key=args[0]==='terminal'?`terminal-${args[1]}`:args[0]==='agent-context'?'agent-context':args[1];
     counts[key]=(counts[key]??0)+1;
     const handler=handlers[key];
     if(!handler)throw Error(`Unexpected fake call: ${args.join(' ')}`);
@@ -300,4 +300,28 @@ test('native activity title drift after the canonical rename is recorded, never 
   assert.equal(started2.ok,true);
   assert.equal(started2.titleDrift,true);
   assert.equal(started2.selection.target,'claude-opus');
+});
+
+test('an idle native TUI that Orca cannot stop is contained by closing exactly its own terminal, then the chain continues',()=>{
+  let closed=false;
+  const fake=fakeOrca({
+    'run-show':()=>json(0,runShow),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
+    'worker-start':(args)=>has(args,'--agent','qwen-code')
+      ?json(1,{ok:false,result:{dispatchId:'ctx_qwen',state:'failed',stage:'agent_readiness',failedStage:'agent_readiness',lastError:'timeout',effects:[{kind:'terminal',role:'agent',action:'created',id:'term_ctx_qwen'}],residualResources:[{kind:'terminal',role:'agent',action:'created',id:'term_ctx_qwen'}]}})
+      :json(0,started('ctx_claude','task_operation_sales')),
+    'worker-stop':(args)=>has(args,'--dispatch','ctx_qwen')?(closed?json(0,{ok:true,result:{dispatchId:'ctx_qwen',state:'failed',alreadySettled:true}}):json(1,{ok:false,result:{dispatchId:'ctx_qwen',state:'stop_unknown'}})):json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
+    'worker-show':(args)=>has(args,'--dispatch','ctx_qwen')?json(0,{ok:true,result:{dispatch:{id:'ctx_qwen',task_id:'task_operation_sales'},worker:{state:closed?'failed':'ready',agent_terminal_handle:'term_ctx_qwen'},observation:{status:closed?'exited':'live'}}}):json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'terminal-close':(args)=>{assert.ok(has(args,'--terminal','term_ctx_qwen'));closed=true;return json(0,{ok:true,result:{}});},
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_qwen',state:'released'}}),
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const result=startOperation(input,{orca:fake.orca});
+  assert.equal(result.ok,true);
+  assert.equal(result.selection.target,'claude-fable-5.1');
+  assert.equal(result.attempts.length,1);
+  assert.equal(result.attempts[0].effectState,'none');
+  assert.equal(result.attempts[0].settlement.closedTerminal.handle,'term_ctx_qwen');
+  assert.equal(result.attempts[0].settlement.reconciliation.afterClose,true);
+  assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='close').length,1);
 });

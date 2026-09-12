@@ -223,6 +223,14 @@ calls:
     kind: read
     flags: []
     receipt: [result.worktree]
+  terminal-close:
+    command: terminal close
+    kind: mutation
+    replay: none
+    flags: [terminal]
+    required: [terminal]
+    receipt: [result]
+    note: Containment only. The launcher closes the exact residual agent terminal that a fenced attempt itself created when worker-stop cannot confirm the stop; it never closes a Monitor, Coordinator, setup or user terminal.
   terminal-rename:
     command: terminal rename
     kind: mutation
@@ -238,9 +246,8 @@ forbiddenCalls:
   - orchestration reset
   - terminal send
   - terminal create
-  - terminal close
   - terminal stop
 recoveries:
   worker-start-retry-of: Start a replacement attempt with --retry-of <dispatch> after the failed Dispatch is proven settled; placement and agent are repeated explicitly.
-  settle-dispatch: worker-stop then worker-release the exact Dispatch; effectState becomes none only when release reports released or already_released.
+  settle-dispatch: worker-stop then worker-release the exact Dispatch; effectState becomes none only when release reports released or already_released, or when the worker process is proven gone and only an identity_unproven terminal remains. When stop stays unknown after bounded reconciliation, the exact residual agent terminal created by the fenced attempt is closed with terminal close, then stop and release are repeated.
   reconcile-then-stop-or-abandon: Read worker-show; ready keeps the attempt, failed or stopped allows retry-of, outcome_unknown requires worker-stop and a second read or an explicit worker-abandon that keeps resources live.

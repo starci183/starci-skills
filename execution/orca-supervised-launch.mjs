@@ -150,10 +150,22 @@ function reconcileUnknownStop(orca,dispatchId,{cwd,wait=sleepSync}){
   return {settled:false,observed};
 }
 
-export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt',wait}={}){
-  let stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd}),reconciliation=null;
+export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt',wait,terminalHandle=null}={}){
+  let stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd}),reconciliation=null,closedTerminal=null;
   if(stop.outcome==='unknown'){
     reconciliation=reconcileUnknownStop(orca,dispatchId,{cwd,wait});
+    if(!reconciliation.settled){
+      // The fenced attempt's own agent terminal is still alive and Orca will not stop it: contain it
+      // by closing exactly that handle, never any other terminal, then prove the stop again.
+      const show=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});
+      const owned=getPath(show.receipt,'result.worker.agent_terminal_handle')??null;
+      const handle=terminalHandle??owned;
+      if(handle&&(terminalHandle===null||owned===null||owned===terminalHandle)){
+        const closed=orca.invoke('terminal-close',{terminal:handle},{cwd});
+        closedTerminal={handle,outcome:closed.outcome,reason:closed.reason};
+        if(closed.outcome==='ok'){const again=reconcileUnknownStop(orca,dispatchId,{cwd,wait});reconciliation={...again,afterClose:true};}
+      }
+    }
     if(reconciliation.settled)stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd});
   }
   const release=stop.outcome==='unknown'?null:orca.invoke('worker-release',{dispatch:dispatchId},{cwd});
@@ -169,7 +181,7 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
     effectState='none';residualTerminal={state:releaseState,reason:releaseReason,processAction};
   }
   else if(release?.outcome==='failed'&&release.effectState==='partial')effectState='partial';
-  return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal,reconciliation,
+  return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal,reconciliation,closedTerminal,
     stop:{outcome:stop.outcome,effectState:stop.effectState,state:stopState,alreadySettled:getPath(stop.receipt,'result.alreadySettled')??null,reason:stop.reason},
     release:release?{outcome:release.outcome,effectState:release.effectState,state:releaseState,processAction,reason:releaseReason??release.reason}:{outcome:'skipped',reason:'worker-stop outcome unknown'}};
 }
@@ -181,13 +193,15 @@ function launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName,expec
   const started=orca.invoke('worker-start',params,{cwd});
   const dispatchId=dispatchIdFromReceipt(started.receipt);
   if(started.outcome!=='ok'){
-    const settlement=dispatchId&&started.effectState!=='none'?settleDispatch(orca,dispatchId,{cwd,reason:`worker-start ${started.outcome}`}):null;
+    const ownTerminal=(getPath(started.receipt,'result.residualResources')??getPath(started.receipt,'result.effects')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
+    const settlement=dispatchId&&started.effectState!=='none'?settleDispatch(orca,dispatchId,{cwd,reason:`worker-start ${started.outcome}`,terminalHandle:ownTerminal}):null;
     const effectState=settlement?settlement.effectState:started.effectState==='unknown'&&!dispatchId?'unknown':started.effectState;
     return {ok:false,dispatchId,effectState,reason:started.reason??`worker-start ${started.outcome}`,stage:started.stage,call:started,settlement};
   }
   need(dispatchId,'Orca worker-start receipt is missing the supervised Dispatch');
+  const ownTerminal=(getPath(started.receipt,'result.effects')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
   const fence=reason=>{
-    const settlement=settleDispatch(orca,dispatchId,{cwd,reason});
+    const settlement=settleDispatch(orca,dispatchId,{cwd,reason,terminalHandle:ownTerminal});
     return {ok:false,dispatchId,effectState:settlement.effectState,reason,call:started,settlement};
   };
   let show=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});
