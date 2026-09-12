@@ -10,9 +10,13 @@ test('local config initializes once, preserves preferences and rejects invalid d
  try {
  fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));
  const supervisor={runtimes:['claude-fable-5.1','gpt-6-astra']};
- assert.deepEqual(loadConfig(root,{initialize:true}),{language:'vi',model:null,effort:'medium',supervisor});
- assert.equal(fs.readFileSync(path.join(root,'config.json'),'utf8'),JSON.stringify({language:'vi',model:null,effort:'medium',supervisor},null,2)+'\n');
+ const validator={runtimes:['gpt-5.6-sol','claude-opus']};
+ assert.deepEqual(loadConfig(root,{initialize:true}),{language:'vi',model:null,effort:'medium',supervisor,validator});
+ assert.equal(fs.readFileSync(path.join(root,'config.json'),'utf8'),JSON.stringify({language:'vi',model:null,effort:'medium',supervisor,validator},null,2)+'\n');
  assert.throws(()=>validateConfig({language:'vi',model:null,effort:'medium',supervisor:{runtimes:[]}}),/supervisor/,'an empty supervisor list is rejected');
+ assert.throws(()=>validateConfig({language:'vi',model:null,effort:'medium',validator:{runtimes:[]}}),/validator/,'an empty validator list is rejected');
+ assert.throws(()=>validateConfig({language:'vi',model:null,effort:'medium',validator:{runtimes:['gpt-5.6-sol'],model:'x'}}),/validator/,'validator carries only runtimes');
+ assert.deepEqual(validateConfig({language:'vi',model:null,effort:'medium',validator:{runtimes:['claude-opus']}}).validator,{runtimes:['claude-opus']});
  const custom={language:'en',model:'test-host-model',effort:'medium'};
  fs.writeFileSync(path.join(root,'config.json'),JSON.stringify(custom));
  assert.deepEqual(loadConfig(root,{initialize:true}),custom);

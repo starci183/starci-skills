@@ -6,7 +6,7 @@ fills the form; the kernel decides what happens next. Everything procedural — 
 retries, how long to wait, who reports to whom, when to commit — is fixed by `execution/llm-functions.mjs`
 and the supervisor, and is not reachable from the prompt.
 
-There are three functions.
+There are four functions.
 
 **`assessGoal({job, inputs, material, constraints, providers, cwd, runHeadless})`** reads a job once, together
 with whatever it came with, and answers with one `starci/goal-plan@1`: a definition of done, a ledger of the
@@ -29,6 +29,15 @@ before it. The supervisor, not the model, then enforces that the allowlist stays
 **`decide({situation, options, context, ...})`** is the escape hatch for a crisis the policy table could not
 settle. The options are a closed set supplied by the kernel, and the form's `option` is enumerated over exactly
 that set, so the model can choose but cannot invent a move.
+
+**`validateOp({op, node, diff, checks, references, memory, providers, skip, ...})`** is the one validator of a
+workflow, called by the kernel per accepted op result after its own machine verification and before the
+commit. It answers `starci/op-validation@1`: `accept`, or `reject` with findings that each name a file of the
+diff; a finding elsewhere is dropped, a reject without a finding is an invalid form, and a reject made only of
+dropped findings is `unavailable`, as is garbage or a closed provider chain. The `memory` is the page the kernel
+maintains from earlier verdicts and the job rulings, so the same identity judges every op. Default providers
+are `gpt-5.6-sol` then `claude-opus`; `skip` names the ones the allocator has parked. What the kernel does with
+the verdict is in [workflow-kernel.md](workflow-kernel.md#validator).
 
 ## Providers
 

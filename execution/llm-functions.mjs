@@ -12,6 +12,7 @@ export const GOAL_PLAN='starci/goal-plan@1';
 export const WORK_GOAL='starci/work-goal@1';
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
+const unique=list=>[...new Set(list)];
 
 /** Headless provider commands. The prompt goes on stdin; the JSON answer is extracted from the provider's own envelope. */
 export const HEADLESS_PROVIDERS={
@@ -188,9 +189,10 @@ export const GOAL_FORM={
   risks:{type:'string[]',optional:true},questions:{type:'string[]',optional:true}
 };
 
-function frame(kind,payload,form){
+const PLANNING_ROLE='a planning function inside the StarCi supervisor';
+function frame(kind,payload,form,role=PLANNING_ROLE){
   return [
-    `You are a planning function inside the StarCi supervisor. Answer with ONE JSON object and nothing else.`,
+    `You are ${role}. Answer with ONE JSON object and nothing else.`,
     `Function: ${kind}. Required keys and types: ${JSON.stringify(Object.fromEntries(Object.entries(form).map(([k,v])=>[k,v.type+(v.enum?` in ${v.enum.join('|')}`:'')+(v.optional?' (optional)':'')])))}.`,
     `You decide only the content of the form. The process (provider, retries, waiting, reporting) is fixed by the runtime and is not yours to change.`,
     `Input:`,JSON.stringify(payload,null,2)
@@ -231,13 +233,13 @@ export function runHeadless(provider,prompt,options={}){return runHeadlessWithUs
  * cross-field rules. `usage` is the sum over every attempt the call paid for, including the invalid ones: the
  * kernel charges the whole call to the runtime that ran it, not only its last try.
  */
-export function callFunction({kind,payload,form,providers,cwd,runHeadless:run=runHeadlessWithUsage,retries=1,extra}){
+export function callFunction({kind,payload,form,providers,cwd,runHeadless:run=runHeadlessWithUsage,retries=1,extra,role}){
   const attempts=[];
   let usage=null;
   for(const provider of providers){
     for(let attempt=0;attempt<=retries;attempt+=1){
       let answered;
-      try{answered=run(provider,frame(kind,payload,form)+(attempt?`\nYour previous answer was invalid: ${attempts.at(-1).errors.join('; ')}. Answer again with the full JSON object.`:''),{cwd});}
+      try{answered=run(provider,frame(kind,payload,form,role)+(attempt?`\nYour previous answer was invalid: ${attempts.at(-1).errors.join('; ')}. Answer again with the full JSON object.`:''),{cwd});}
       catch(error){attempts.push({provider,attempt,errors:/^rate-limited:/.test(error.message)?['rate-limited']:[error.message]});break;}
       // A caller may inject a plain string-returning runner; then the call simply has no usage to charge.
       const answer=typeof answered==='string'?answered:answered?.text;
@@ -396,4 +398,66 @@ export function decide({situation,options,context={},providers=['claude-fable-5.
   const result=callFunction({kind:'decide',payload:{situation,options,context},form,providers,cwd,runHeadless:run});
   if(result.ok)result.value.schema=DECISION;
   return result;
+}
+
+/* ------------------------------------------------------------------ the validator */
+
+/**
+ * validateOp: the one validator of a workflow, as a headless call per accepted operation result. The kernel
+ * asks it after its own machine verification and proof, before the commit: does this diff satisfy the goal,
+ * the acceptance and the node's assertions? The verdict is closed - `accept`, or `reject` with findings that
+ * each name a file of the diff - and a finding outside the diff is dropped, because the validator has no
+ * authority over what the operation did not change. The memory the kernel maintains travels with every call,
+ * so one identity judges every op of the workflow consistently without living in a terminal.
+ */
+export const VALIDATION='starci/op-validation@1';
+export const VALIDATOR_VERDICTS=['accept','reject','unavailable'];
+/** Sol first, Opus as the fallback: the user's choice, overridable by `validator.runtimes` in config.json. */
+export const DEFAULT_VALIDATOR_RUNTIMES=['gpt-5.6-sol','claude-opus'];
+export const VALIDATION_FORM={
+  verdict:{type:'string',enum:['accept','reject']},summary:{type:'string'},
+  findings:{type:'object[]',optional:true,each:{file:{type:'string'},line:{optional:true},assertion:{type:'string',optional:true},detail:{type:'string'}}}
+};
+const VALIDATOR_ROLE='the acceptance validator of one StarCi workflow: you judge whether an operation result satisfies its goal, its acceptance statements and its Work assertions, from the diff and the machine check results alone';
+const VALIDATOR_RULES=[
+  'judge only what the diff shows against the goal, the acceptance statements and the assertions; never assume work the diff does not contain and never ask for work outside the goal',
+  'every finding must name a file of the diff (the `files` list); a finding on any other file is dropped by the kernel, so put the defect where the diff is',
+  'reject only for a concrete defect: an acceptance statement or assertion the diff does not satisfy, a check that proves nothing, a spec that cannot fail, code the goal did not ask for, a machine check whose evidence contradicts the claim; style and preference are never findings',
+  'stay consistent with the memory: the same kind of result gets the same verdict as before, and a job ruling in the memory is binding',
+  'the process (retry, commit, ledger) is the kernel\'s; you answer accept or reject and one line of summary'
+];
+const normalizeFile=value=>String(value??'').replaceAll('\\','/').replace(/^\.\//,'').replace(/^\/+/,'').trim();
+/** A reject must carry a finding, otherwise there is nothing for the operation to fix. */
+const validationRules=answer=>({errors:answer.verdict==='reject'&&!(Array.isArray(answer.findings)&&answer.findings.length)?['a reject must carry at least one finding']:[]});
+
+export function validateOp({op,node=null,diff,checks=[],references=[],memory='',providers=DEFAULT_VALIDATOR_RUNTIMES,skip=[],cwd,runHeadless:run}){
+  need(plain(op)&&typeof op.id==='string','validateOp needs the operation');
+  const files=unique((diff?.files??[]).map(normalizeFile).filter(Boolean));
+  // A provider the allocator reports as cooling is skipped, not tried: a rate limit parks it for every caller.
+  const chain=providers.filter(provider=>!skip.includes(provider));
+  if(!chain.length)return {ok:false,verdict:'unavailable',reason:`every validator provider is unavailable (${providers.join(', ')})`,attempts:[],usage:null,findings:[],dropped:[]};
+  const payload={
+    op:{id:op.id,kind:op.kind,goal:op.goal,attempt:op.attempt??1,acceptance:op.acceptance??[],allowlist:op.allowlist??[]},
+    ...(node?{node:{id:node.id??op.nodeId??null,description:node.description??null,assertions:node.assertions??[]}}:{}),
+    checks:checks.map(check=>({name:check.name,command:check.command,exitCode:check.exitCode,evidence:check.evidence??null})),
+    references,
+    diff:{files,truncated:Boolean(diff?.truncated),text:String(diff?.text??'')},
+    memory:String(memory??''),
+    rules:VALIDATOR_RULES
+  };
+  const result=callFunction({kind:'validateOp',payload,form:VALIDATION_FORM,providers:chain,cwd,runHeadless:run,extra:validationRules,role:VALIDATOR_ROLE});
+  if(!result.ok)return {ok:false,verdict:'unavailable',reason:result.reason??'no provider produced a valid verdict',attempts:result.attempts,usage:result.usage,findings:[],dropped:[]};
+  const answer=result.value;
+  const findings=[],dropped=[];
+  for(const finding of Array.isArray(answer.findings)?answer.findings:[]){
+    const file=normalizeFile(finding.file);
+    const item={file,line:Number.isInteger(Number(finding.line))&&finding.line!==null&&finding.line!==''?Number(finding.line):null,
+      assertion:typeof finding.assertion==='string'&&finding.assertion.trim()?finding.assertion.trim():null,detail:String(finding.detail??'').trim()};
+    (files.includes(file)?findings:dropped).push(item);
+  }
+  // A reject whose every finding pointed outside the diff is no verdict at all: nothing in it can be acted on.
+  const verdict=answer.verdict==='reject'&&!findings.length?'unavailable':answer.verdict;
+  return {ok:true,schema:VALIDATION,verdict,summary:String(answer.summary??'').trim(),findings,dropped,
+    provider:result.provider,attempt:result.attempt,attempts:result.attempts,usage:result.usage,
+    ...(verdict==='unavailable'?{reason:'every finding named a file outside the diff'}:{})};
 }

@@ -4,9 +4,10 @@ import {fileURLToPath} from 'node:url';
 import { skillRoot } from '../core/runtime-root.mjs';
 import { parseYaml } from '../core/yaml.mjs';
 export const configRoot = skillRoot;
+/** `supervisor` and `validator` share one shape: `{runtimes: [id, ...]}`, a nonempty list of runtime ids and nothing else. */
+const runtimesOk = section => section === undefined || (section && typeof section === 'object' && !Array.isArray(section) && Object.keys(section).every(key => key === 'runtimes') && Array.isArray(section.runtimes) && section.runtimes.length > 0 && section.runtimes.every(item => typeof item === 'string' && item.trim()));
 export function validateConfig(config) {
-  const supervisorOk = config?.supervisor === undefined || (config.supervisor && typeof config.supervisor === 'object' && !Array.isArray(config.supervisor) && Object.keys(config.supervisor).every(key => key === 'runtimes') && Array.isArray(config.supervisor.runtimes) && config.supervisor.runtimes.length > 0 && config.supervisor.runtimes.every(item => typeof item === 'string' && item.trim()));
-  if (!config || Array.isArray(config) || Object.keys(config).some(key => !['language','model','effort','supervisor'].includes(key)) || !supervisorOk || typeof config.language !== 'string' || !/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language) || !(config.model === null || typeof config.model === 'string' && config.model.trim()) || !['none','minimal','low','medium','high','xhigh','max','ultra'].includes(config.effort)) throw Error('Invalid config.json: expected language, model (null or host model name), effort, and optionally supervisor.runtimes (nonempty list of runtime ids).');
+  if (!config || Array.isArray(config) || Object.keys(config).some(key => !['language','model','effort','supervisor','validator'].includes(key)) || !runtimesOk(config.supervisor) || !runtimesOk(config.validator) || typeof config.language !== 'string' || !/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language) || !(config.model === null || typeof config.model === 'string' && config.model.trim()) || !['none','minimal','low','medium','high','xhigh','max','ultra'].includes(config.effort)) throw Error('Invalid config.json: expected language, model (null or host model name), effort, and optionally supervisor.runtimes / validator.runtimes (nonempty lists of runtime ids).');
   return config;
 }
 /** Resolve the authored/legacy example under a skill root. Prefer YAML; accept JSON; then built `.dist` JSON. */

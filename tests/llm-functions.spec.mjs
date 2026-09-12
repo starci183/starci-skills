@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {DECISION_FORM,GOAL_FORM,GOAL_PLAN,assessGoal,callFunction,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan} from '../execution/llm-functions.mjs';
+import {DECISION_FORM,GOAL_FORM,GOAL_PLAN,assessGoal,callFunction,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
   references:['.starciwork/features/sales/sds.md#3'],checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:[`${id} works`],dependsOn:[],...extra});
@@ -174,4 +174,49 @@ test('the goal-plan schema file documents the form the runtime validates',()=>{
   assert.equal(schema.module,'execution/llm-functions.mjs');
   for(const key of Object.keys(GOAL_FORM))assert.ok(key in schema.fields,`schemas/goal-plan.yaml does not document ${key}`);
   assert.ok(schema.rules.some(rule=>/disjoint/.test(rule)));
+});
+
+test('validateOp frames the op, the diff, the checks and the memory; drops a finding outside the diff; and is unavailable on garbage or a closed chain',()=>{
+  const prompts=[];
+  const op={id:'op-intake',kind:'backend.implement',goal:'Implement intake.',acceptance:['intake persists'],allowlist:['apps/be/src/intake.ts'],attempt:2};
+  const diff={files:['apps/be/src/intake.ts','apps/be/src/intake.spec.ts'],text:"diff --git a/apps/be/src/intake.ts b/apps/be/src/intake.ts\n+export const intake=1;\n",truncated:true};
+  const call=(answers,extra={})=>validateOp({op,node:{id:'demo.intake',description:'Persist an order.',assertions:['unit-tests-pass']},diff,
+    checks:[{name:'unit',command:'npx vitest run intake',exitCode:0,evidence:'1 passed'}],references:['sds.md#3'],memory:'- op-catalog | accept | catalog persisted',
+    providers:['gpt-5.6-sol','claude-opus'],runHeadless:(provider,prompt)=>{prompts.push([provider,prompt]);const next=answers.shift();if(next instanceof Error)throw next;return next;},...extra});
+  const accepted=call([JSON.stringify({verdict:'accept',summary:'The diff persists the order and the spec proves it.'})]);
+  assert.equal(accepted.ok,true);assert.equal(accepted.verdict,'accept');assert.equal(accepted.provider,'gpt-5.6-sol');
+  assert.equal(accepted.summary,'The diff persists the order and the spec proves it.');
+  assert.deepEqual(accepted.findings,[]);assert.deepEqual(accepted.dropped,[]);
+  const prompt=prompts[0][1];
+  assert.match(prompt,/^You are the acceptance validator of one StarCi workflow/);
+  assert.match(prompt,/Function: validateOp\. Required keys and types: .*"verdict":"string in accept\|reject"/);
+  for(const needle of ['- op-catalog | accept | catalog persisted','+export const intake=1;','"truncated": true','unit-tests-pass','Persist an order.','"exitCode": 0','1 passed','sds.md#3','intake persists','"attempt": 2','every finding must name a file of the diff'])
+    assert.ok(prompt.includes(needle),`the prompt carries ${needle}`);
+
+  // A reject keeps the finding inside the diff (path folded) and drops the one outside; the verdict stands.
+  const rejected=call([JSON.stringify({verdict:'reject',summary:'The spec proves nothing.',findings:[
+    {file:'./apps/be/src/intake.ts',line:'12',assertion:'unit-tests-pass',detail:'the spec asserts nothing'},{file:'apps/be/src/receipt.ts',detail:'the receipt is not in the diff'}]})]);
+  assert.equal(rejected.verdict,'reject');
+  assert.deepEqual(rejected.findings,[{file:'apps/be/src/intake.ts',line:12,assertion:'unit-tests-pass',detail:'the spec asserts nothing'}]);
+  assert.deepEqual(rejected.dropped,[{file:'apps/be/src/receipt.ts',line:null,assertion:null,detail:'the receipt is not in the diff'}]);
+  // A reject with no finding at all is an invalid form: the provider is asked once more, then the answer stands.
+  prompts.length=0;
+  const corrected=call([JSON.stringify({verdict:'reject',summary:'no'}),JSON.stringify({verdict:'accept',summary:'fine after all'})]);
+  assert.equal(corrected.verdict,'accept');assert.equal(corrected.attempt,1);
+  assert.match(prompts[1][1],/Your previous answer was invalid: a reject must carry at least one finding/);
+  // Every finding outside the diff: nothing actionable, so it is unavailable rather than a reject or an accept.
+  const outside=call([JSON.stringify({verdict:'reject',summary:'x',findings:[{file:'apps/be/src/receipt.ts',detail:'no'}]})]);
+  assert.equal(outside.ok,true);assert.equal(outside.verdict,'unavailable');assert.match(outside.reason,/outside the diff/);
+  assert.equal(outside.dropped.length,1);
+  // Garbage twice on the first provider, a crash on the second: unavailable, with the attempts on record.
+  const garbage=call(['nonsense','still nonsense',Error('claude-opus headless exited 1: boom')]);
+  assert.equal(garbage.ok,false);assert.equal(garbage.verdict,'unavailable');
+  assert.deepEqual(garbage.attempts.map(item=>[item.provider,item.attempt]),[['gpt-5.6-sol',0],['gpt-5.6-sol',1],['claude-opus',0]]);
+  // Cooling providers are skipped, not paid for; an empty chain is unavailable without a call.
+  prompts.length=0;
+  const fallback=call([JSON.stringify({verdict:'accept',summary:'ok'})],{skip:['gpt-5.6-sol']});
+  assert.equal(fallback.provider,'claude-opus');assert.deepEqual(prompts.map(item=>item[0]),['claude-opus']);
+  const closed=call([],{skip:['gpt-5.6-sol','claude-opus']});
+  assert.equal(closed.ok,false);assert.equal(closed.verdict,'unavailable');assert.match(closed.reason,/every validator provider is unavailable/);
+  assert.equal(prompts.length,1,'no provider was called for a closed chain');
 });
