@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {createOrcaCalls} from '../execution/orca-calls.mjs';
-import {OUTCOMES,buildReport,reportBody,validateReport} from '../execution/reports.mjs';
+import {OUTCOMES,buildReport,reportBody,reportsDirectory,repositoryRoot,validateReport} from '../execution/reports.mjs';
 import {classifyWorker,reportOutcome,startCoordinator,waitTick} from '../execution/orca-protocol.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
@@ -125,4 +125,11 @@ test('start-coordinator bootstraps the Plan agent through a closed helper termin
   assert.deepEqual(runUses,['term_boot','term_plan']);
   assert.equal(result.attestation.coordinatorHandle,'term_plan');
   assert.equal(result.steps.at(-1).name,'terminal-close-bootstrap');
+});
+
+test('report files of a linked worktree live in the main repository so op and Monitor scan the same directory',()=>{
+  const root=repositoryRoot(process.cwd());
+  assert.ok(fs.existsSync(path.join(root,'.git')));
+  assert.equal(reportsDirectory(process.cwd(),'run_x'),path.join(root,'.starciwork','_local','runtime','reports','run_x'));
+  assert.equal(reportsDirectory(process.cwd(),'run_x','C:/explicit'),path.resolve('C:/explicit'));
 });

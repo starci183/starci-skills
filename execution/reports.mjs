@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {spawnSync} from 'node:child_process';
 
 /**
  * Typed outcome envelopes for the supervision protocol (4.1). An operation or a workflow ends with
@@ -77,8 +78,16 @@ export function validateReport(report,{allowlist=null}={}){
   return {ok:errors.length===0,errors};
 }
 
+/** Linked worktrees share one report root: the main repository's .starciwork, resolved through the git common dir. */
+export function repositoryRoot(cwd){
+  const probe=spawnSync('git',['rev-parse','--git-common-dir'],{cwd,encoding:'utf8',windowsHide:true});
+  const common=probe.status===0?probe.stdout.trim():'';
+  if(!common)return cwd;
+  const resolved=path.resolve(cwd,common);
+  return path.basename(resolved)==='.git'?path.dirname(resolved):cwd;
+}
 export function reportsDirectory(cwd,run,explicit=null){
-  return explicit?path.resolve(cwd,explicit):path.join(cwd,'.starciwork','_local','runtime','reports',run);
+  return explicit?path.resolve(cwd,explicit):path.join(repositoryRoot(cwd),'.starciwork','_local','runtime','reports',run);
 }
 export function reportPath(directory,dispatch){return path.join(directory,`${dispatch}.json`);}
 
