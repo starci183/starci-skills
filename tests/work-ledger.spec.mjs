@@ -132,7 +132,7 @@ function fakeRepo(){
 }
 const validate=()=>({ok:true,errors:[],warnings:[],nodes:NODES,resources:[]});
 const open=root=>loadLedger({repoRoot:root,validate});
-const cleanup=root=>fs.rmSync(path.dirname(root),{recursive:true,force:true});
+const cleanup=root=>fs.rmSync(root,{recursive:true,force:true}); // only this run's root: the parent is shared with parallel runs
 const check={name:'unit',command:'npm run test:unit -- src/ledger',exitCode:0,assertion:'unit-tests-pass'};
 const types={name:'types',command:'npx tsc --noEmit',exitCode:0,assertion:'implementation-quality'};
 const FRESH='f'.repeat(64);
