@@ -81,7 +81,7 @@ test('every operator has an ordered external-agent chain and skill-level default
   // runtimes follow as the candidates the allocator actually prefers.
   assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.target),['gpt-5.6-sol','claude-opus']);
   assert.equal(resolveExecutionChain({op:'brand.decide'}).role,'working','it generates the placeholder mascot, so it runs on the working profiles where image generation is');
-  assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.profile),['gpt-5.6-sol','claude-opus']);
+  assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.profile),['gpt-5.6-sol','opus']);
   assert.deepEqual(registry.skills.starci.chains.working,['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
   assert.deepEqual(registry.skills.starci.chains.reasoning,['claude-fable-5.1','gpt-6-astra']);
   assert.equal(registry.supervisors.schema,'starci/supervisor-chains@1');

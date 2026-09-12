@@ -15,6 +15,9 @@ them, but cannot silently redefine them.
 ├── _local/
 │   ├── plans/
 │   └── drafts/
+├── brand/
+│   ├── index.yaml
+│   └── assets/**
 └── features/
     ├── index.yaml
     └── <feature>/
@@ -199,6 +202,11 @@ See [useful verification and dependency repair](work-verification.md) for the
 relationship between this folder tree, its dependency graph and layer-specific
 completion. Execution evidence may be useful; a separate evidence layer for every
 scope is not the model.
+
+`brand/` is the one exception to "everything lives under a feature": a product's brand
+is a single `kind: brand` record at the tree root with its masters in `brand/assets/**`,
+because no feature owns it and every frontend-facing node binds it. See
+[Brand: one record the design reads](work-ledger.md#brand-one-record-the-design-reads).
 
 The machine-readable layout is `schemas/work-layout.json`; node fields are defined
 in `schemas/work.schema.json` and enforced by the workspace validator.

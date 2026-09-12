@@ -1151,6 +1151,11 @@ $defs:
         $ref: "#/$defs/businessOverviewSpec"
         description: Overall product intent in customer language, owned by .starciwork/business/index.yaml
           before detailed module SRS records.
+      brand:
+        $ref: "#/$defs/brandSpec"
+        description: The product's single canonical brand record, owned by .starciwork/brand/index.yaml and
+          read by every design operation. It is a decided record, not a design deliverable, and its
+          rev is what invalidates frontend-facing completions.
     allOf:
       - if:
           properties:
@@ -1532,3 +1537,366 @@ $defs:
         $ref: "#/$defs/string"
         description: Unresolved customer questions or “None stated”; do not silently convert guesses into
           requirements.
+  brandAssetPath:
+    type: string
+    pattern: ^brand/assets/(?=[^\\:\x00-\x1f]*$)(?!(?:.*/)?\.{1,2}(?:/|$))[^/]+(?:/[^/]+)*$
+    description: Tree-relative brand payload path under brand/assets/, with arbitrary nested folders. No
+      absolute paths, traversal, empty segments, backslashes or control characters. The same file is
+      also declared in the brand node's own assets/ list so its current bytes bind the record.
+  brandAsset:
+    type: object
+    additionalProperties: false
+    required:
+      - path
+      - purpose
+    properties:
+      path:
+        $ref: "#/$defs/brandAssetPath"
+      purpose:
+        $ref: "#/$defs/string"
+        description: What this master is for; a file is not a permission to use it anywhere.
+      pose:
+        $ref: "#/$defs/string"
+        description: Named pose or variant of a mascot/logo master, for example waving or mono-dark.
+      sha256:
+        type: string
+        pattern: ^[a-f0-9]{64}$
+        description: Optional recorded digest of the master bytes; the validator hashes the file itself.
+  brandColorToken:
+    type: object
+    additionalProperties: false
+    required:
+      - token
+      - value
+      - role
+    properties:
+      token:
+        type: string
+        minLength: 3
+        description: Installed grammar token name, for example --starci-core-primary. A brand value is
+          always bound to the token it overrides, never to a loose colour name.
+      value:
+        $ref: "#/$defs/string"
+        description: Colour value as #rrggbb or oklch(...); no other notation is accepted.
+      foreground:
+        $ref: "#/$defs/string"
+        description: Readable foreground value paired with this token, in the same notation.
+      role:
+        enum:
+          - primary
+          - danger
+          - success
+          - warning
+          - info
+          - focus
+          - surface
+          - other
+        description: Semantic role the token plays in the product. Two tokens may share one value; a brand
+          may deliberately make danger the primary colour when its policy allows it.
+      note:
+        $ref: "#/$defs/string"
+        description: Why this value is the brand's answer for that role.
+  brandColorScale:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - steps
+    properties:
+      name:
+        $ref: "#/$defs/string"
+        description: Scale name, for example primary or neutral.
+      steps:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - step
+            - value
+          properties:
+            step:
+              $ref: "#/$defs/string"
+              description: Step label such as 50, 500 or 900.
+            value:
+              $ref: "#/$defs/string"
+              description: Colour value as #rrggbb or oklch(...).
+  brandColorSet:
+    type: object
+    additionalProperties: false
+    required:
+      - tokens
+    properties:
+      tokens:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/brandColorToken"
+      scales:
+        type: array
+        items:
+          $ref: "#/$defs/brandColorScale"
+    description: One complete colour answer, made of the grammar tokens the brand sets and the optional
+      scales behind them.
+  brandSpec:
+    description: The product's brand, as one decided record at .starciwork/brand/index.yaml. Every design
+      operation reads this record instead of restating colours, the mascot or imagery rules, and the
+      machine checks compare it against the real frontend token sources named in sources. At most one
+      brand record exists per Work tree; brand/assets/** beside it holds the masters.
+    type: object
+    additionalProperties: false
+    required:
+      - rev
+      - identity
+      - color
+      - typography
+      - iconography
+      - imagery
+      - forbidden
+      - sources
+    properties:
+      rev:
+        $ref: "#/$defs/string"
+        description: The brand revision every frontend-facing node binds. Bumping it invalidates their
+          completions, so it changes only with an owner decision.
+      identity:
+        type: object
+        additionalProperties: false
+        required:
+          - name
+          - family
+          - owner
+        properties:
+          name:
+            $ref: "#/$defs/string"
+            description: Product brand name as the customer sees it.
+          tagline:
+            $ref: "#/$defs/string"
+          family:
+            $ref: "#/$defs/string"
+            description: Installed grammar family id the brand dresses, for example starci.
+          owner:
+            $ref: "#/$defs/string"
+            description: Person or role who decides this brand; a reviewer is not an owner.
+      color:
+        type: object
+        additionalProperties: false
+        required:
+          - tokens
+          - policy
+        properties:
+          tokens:
+            type: array
+            minItems: 1
+            items:
+              $ref: "#/$defs/brandColorToken"
+          scales:
+            type: array
+            items:
+              $ref: "#/$defs/brandColorScale"
+          dark:
+            $ref: "#/$defs/brandColorSet"
+            description: The dark answer, in the same shape. Absent means the grammar's dark values stand.
+          policy:
+            type: object
+            additionalProperties: false
+            required:
+              - dangerMayMatchPrimary
+            properties:
+              dangerMayMatchPrimary:
+                type: boolean
+                description: Whether the brand is allowed to give danger the primary value. False makes an
+                  equal pair a BRAND_POLICY failure instead of a silent override of the grammar.
+              minContrast:
+                type: number
+                minimum: 1
+                description: Minimum foreground/background contrast the brand accepts; 4.5 when unstated.
+      typography:
+        type: object
+        additionalProperties: false
+        required:
+          - family
+        properties:
+          family:
+            $ref: "#/$defs/string"
+            description: Type family the brand installs, with its real fallback stack.
+          scale:
+            type: array
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - name
+                - value
+              properties:
+                name:
+                  $ref: "#/$defs/string"
+                value:
+                  $ref: "#/$defs/string"
+                usage:
+                  $ref: "#/$defs/string"
+          rules:
+            $ref: "#/$defs/stringList"
+      mascot:
+        type: object
+        additionalProperties: false
+        required:
+          - name
+          - assets
+          - allowedIn
+          - forbiddenIn
+          - rules
+        properties:
+          name:
+            $ref: "#/$defs/string"
+          component:
+            $ref: "#/$defs/string"
+            description: Grammar leaf component id that already renders the mascot; a design record uses it
+              instead of embedding the artwork again.
+          assets:
+            type: array
+            minItems: 1
+            items:
+              $ref: "#/$defs/brandAsset"
+          allowedIn:
+            $ref: "#/$defs/stringList"
+            description: Surfaces and slots the mascot may appear in.
+          forbiddenIn:
+            $ref: "#/$defs/stringList"
+            description: Surfaces and slots it may never appear in.
+          minSize:
+            $ref: "#/$defs/string"
+          rules:
+            $ref: "#/$defs/stringList"
+      logo:
+        type: object
+        additionalProperties: false
+        properties:
+          mark:
+            $ref: "#/$defs/brandAsset"
+          wordmark:
+            $ref: "#/$defs/brandAsset"
+          lockups:
+            type: array
+            items:
+              $ref: "#/$defs/brandAsset"
+          clearSpace:
+            $ref: "#/$defs/string"
+          minSize:
+            $ref: "#/$defs/string"
+          dark:
+            $ref: "#/$defs/brandAsset"
+      iconography:
+        type: object
+        additionalProperties: false
+        required:
+          - set
+        properties:
+          set:
+            type: array
+            minItems: 1
+            items:
+              $ref: "#/$defs/string"
+            description: The glyph packages the product is allowed to draw from.
+          custom:
+            $ref: "#/$defs/stringList"
+          forbidden:
+            $ref: "#/$defs/stringList"
+      imagery:
+        type: object
+        additionalProperties: false
+        required:
+          - style
+        properties:
+          style:
+            type: array
+            minItems: 1
+            items:
+              $ref: "#/$defs/string"
+          forbidden:
+            $ref: "#/$defs/stringList"
+          promptRules:
+            $ref: "#/$defs/stringList"
+            description: Rules every image-model prompt must state, so a generated image is brand-bound
+              before it is generated rather than judged afterwards.
+          references:
+            type: array
+            items:
+              $ref: "#/$defs/brandAssetPath"
+            description: Sample imagery under brand/assets/ that shows the style, also declared in the
+              brand node's assets.
+      voice:
+        type: object
+        additionalProperties: false
+        required:
+          - locales
+        properties:
+          locales:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - locale
+                - tone
+              properties:
+                locale:
+                  $ref: "#/$defs/string"
+                tone:
+                  $ref: "#/$defs/stringList"
+                vocabulary:
+                  type: object
+                  description: Preferred and refused wording for this locale.
+      motion:
+        type: object
+        additionalProperties: false
+        required:
+          - rules
+        properties:
+          rules:
+            $ref: "#/$defs/stringList"
+      forbidden:
+        $ref: "#/$defs/stringList"
+        description: Product-wide don'ts that hold whatever the surface is.
+      sources:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - repository
+            - path
+            - kind
+          properties:
+            repository:
+              $ref: "#/$defs/id"
+              description: Repository that actually holds the file, for example the frontend.
+            path:
+              type: string
+              minLength: 1
+              pattern: ^(?=.*\S)(?!/)(?!.*[\\:\x00-\x1f])(?!(?:.*/)?\.{1,2}(?:/|$))[^/]+(?:/[^/]+)*$
+              description: Normalized repository-relative path of the real token or component file the
+                checks compare this record against.
+            kind:
+              enum:
+                - css
+                - tokens
+                - component
+              description: What the file is, so a check knows how to read it.
+            note:
+              $ref: "#/$defs/string"
+        description: The real frontend files this record is proven against. A brand with no sources cannot
+          be checked and is refused.
+      artworkSlots:
+        type: object
+        additionalProperties: false
+        required:
+          - conventions
+        properties:
+          conventions:
+            $ref: "#/$defs/stringList"
+            description: How a design record declares an embedded artwork slot, so the mascot and sample
+              imagery arrive through a named slot instead of being pasted into a layout.

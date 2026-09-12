@@ -47,13 +47,18 @@ export function previewEvidence(root,{directory,nodeId,name}) {
 }
 function validate(root,completions=null,candidate=null,authoredTargets=null) {
   let authoredBinding,authoredAssets;
+  // The product's one brand record, resolved after node discovery. `result()` closes over it, so it
+  // is declared here rather than where it is computed: an early ROOT failure still returns a result.
+  let brandOwner=null;
   const errors = [], warnings = [], nodes = [], resources = [], evidence = [], jsonFiles = [], accountFiles = [], reservedDirectories = [], ids = new Map(), splitSrsEntries=[],splitSdsEntries=[];
   const issue = (code, p, message) => errors.push({code, path:p, message});
   const warn = (code, p, message) => warnings.push({code, path:p, message});
   let absolute;
   const rel = p => path.relative(absolute, p).split(path.sep).join('/') || '.';
   const within = (base, p) => { const r = path.relative(base,p); return r === '' || (!r.startsWith(`..${path.sep}`) && r !== '..' && !path.isAbsolute(r)); };
-  const result = () => ({ok:errors.length === 0, errors, warnings,...(authoredTargets?{authoredBinding,authoredAssets}:{}), nodes:nodes.map(n => ({id:n.meta.id, path:n.path, schema:n.meta.schema, kind:n.meta.kind, required:n.meta.required, state:n.meta.state ?? null, effectiveState:n.effectiveState ?? 'invalid', specDigest:n.specDigest, contextDigest:n.contextDigest??null, inputDigest:n.inputDigest ?? null, investigationDigest:n.meta.investigation?.contextDigest??null, completion:n.meta.completion?{inputDigest:n.meta.completion.inputDigest??null,...(Object.hasOwn(n.meta.completion,'review')?{review:structuredClone(n.meta.completion.review)}:{evidence:Array.isArray(n.meta.completion.evidence)?[...n.meta.completion.evidence]:[]})}:null, eligible:n.eligible ?? false, children:n.children.map(c => c.meta.id),dependsOn:(n.effectiveDeps??[]).map(d=>d.meta.id),refs:(n.effectiveRefs??[]).map(d=>d.meta.id),blockedBy:n.blockedBy??[],blockers:n.meta.blockers??[],suspensionReasons:n.suspensionReasons??[]})), resources:resources.map(r => ({id:r.meta.id,kind:r.meta.kind,revision:r.meta.revision,path:r.path,specDigest:r.specDigest}))});
+  /** The brand the whole tree reads, plus the nodes whose inputs it binds. Null when no brand is authored. */
+  const brandSummary = () => brandOwner ? {id:brandOwner.meta.id,path:brandOwner.path,rev:text(brandOwner.meta.brand?.rev)?brandOwner.meta.brand.rev:null,digest:brandOwner.specDigest,state:brandOwner.meta.state??null,effectiveState:brandOwner.effectiveState??'invalid',boundNodes:nodes.filter(n=>n.brandBinding).map(n=>n.meta.id).sort()} : null;
+  const result = () => ({ok:errors.length === 0, errors, warnings,...(authoredTargets?{authoredBinding,authoredAssets}:{}), nodes:nodes.map(n => ({id:n.meta.id, path:n.path, schema:n.meta.schema, kind:n.meta.kind, required:n.meta.required, state:n.meta.state ?? null, effectiveState:n.effectiveState ?? 'invalid', specDigest:n.specDigest, contextDigest:n.contextDigest??null, inputDigest:n.inputDigest ?? null, investigationDigest:n.meta.investigation?.contextDigest??null, completion:n.meta.completion?{inputDigest:n.meta.completion.inputDigest??null,...(Object.hasOwn(n.meta.completion,'review')?{review:structuredClone(n.meta.completion.review)}:{evidence:Array.isArray(n.meta.completion.evidence)?[...n.meta.completion.evidence]:[]})}:null, eligible:n.eligible ?? false, children:n.children.map(c => c.meta.id),dependsOn:(n.effectiveDeps??[]).map(d=>d.meta.id),refs:(n.effectiveRefs??[]).map(d=>d.meta.id),blockedBy:n.blockedBy??[],blockers:n.meta.blockers??[],suspensionReasons:n.suspensionReasons??[],brand:n.brandBinding??null})), brand:brandSummary(), resources:resources.map(r => ({id:r.meta.id,kind:r.meta.kind,revision:r.meta.revision,path:r.path,specDigest:r.specDigest}))});
   try {
     absolute = path.resolve(root);
     if (fs.lstatSync(absolute).isSymbolicLink() || !fs.statSync(absolute).isDirectory()) throw new Error('Root must be a real directory, not a symlink.');
@@ -183,6 +188,52 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     if (!target || !types.includes(target.type)) {issue('MISSING_REF',item.path,`Reference must resolve to ${types.join('/')} id.`);return null;}
     return target;
   };
+  // A brand value is readable by a machine or it is not a brand decision. Token names are grammar
+  // custom properties, colours are written one way only, and every master named here is a byte-bound
+  // file under brand/assets/ rather than an image somebody remembers seeing.
+  const BRAND_COLOR=/^(?:#[0-9a-f]{6}|oklch\(\s*[^()]+\))$/i;
+  const list = v => Array.isArray(v) ? v : [];
+  function checkBrandColors(set,p,label) {
+    const names=new Set();
+    const colour=(value,what)=>{if(!text(value)||!BRAND_COLOR.test(value.trim()))issue('BRAND_COLOR',p,`${what} must be written as #rrggbb or oklch(...); no other colour notation is accepted.`);};
+    for(const token of list(set?.tokens)) {
+      const name=token?.token;
+      if(!text(name)||!name.startsWith('--'))issue('BRAND_TOKEN',p,`${label} binds a grammar token name starting with --; a loose colour name is not a token.`);
+      else if(names.has(name))issue('BRAND_TOKEN',p,`${label} sets ${name} twice; one token carries one brand value.`);
+      else names.add(name);
+      colour(token?.value,`${label} value of ${text(name)?name:'an unnamed token'}`);
+      if(token?.foreground!==undefined)colour(token.foreground,`${label} foreground of ${text(name)?name:'an unnamed token'}`);
+    }
+    for(const scale of list(set?.scales))for(const step of list(scale?.steps))colour(step?.value,`${label} scale ${scale?.name??'(unnamed)'} step ${step?.step??'(unnamed)'}`);
+    return names;
+  }
+  function checkBrand(n) {
+    const spec=n.meta.brand,p=n.path;
+    if(!text(spec.rev))issue('BRAND_REV',p,'The brand record declares the rev every frontend-facing node binds; without it no completion can be invalidated by a brand change.');
+    if(!list(spec.sources).length)issue('BRAND_SOURCES',p,'A brand names the real frontend token or component files it is proven against; a record with no sources cannot be checked.');
+    checkBrandColors(spec.color,p,'color');
+    if(spec.color?.dark!==undefined)checkBrandColors(spec.color.dark,p,'color.dark');
+    const tokens=list(spec.color?.tokens).filter(object);
+    const valuesFor=role=>tokens.filter(token=>token.role===role).map(token=>String(token.value??'').trim().toLowerCase());
+    const primary=new Set(valuesFor('primary'));
+    if(spec.color?.policy?.dangerMayMatchPrimary===false&&valuesFor('danger').some(value=>primary.has(value)))
+      issue('BRAND_POLICY',p,'A danger token repeats the primary value while color.policy.dangerMayMatchPrimary is false; decide the override or give danger its own value.');
+    const declared=new Set(list(n.meta.assets).map(asset=>asset?.path));
+    const paths=[
+      ...list(spec.mascot?.assets).map(asset=>asset?.path),
+      ...['mark','wordmark','dark'].map(key=>spec.logo?.[key]?.path),
+      ...list(spec.logo?.lockups).map(lockup=>lockup?.path),
+      ...list(spec.imagery?.references)
+    ].filter(value=>value!==undefined&&value!==null);
+    for(const value of paths) {
+      const parts=typeof value==='string'?value.split('/'):[];
+      if(!text(value)||!value.startsWith('brand/assets/')||value.includes('\\')||value.includes(':')||parts.some(part=>!part||part==='.'||part==='..')) {
+        issue('BRAND_ASSET_PATH',p,'Every brand master is a normalized path under brand/assets/; a mascot, logo or sample image stored anywhere else is not owned by the brand record.');
+        continue;
+      }
+      if(!declared.has(parts.slice(1).join('/')))issue('BRAND_ASSET_BINDING',p,'Every brand master must also appear in the brand node assets as assets/<...> so its current bytes bind the record.');
+    }
+  }
   function checkSecrets(v,p) {
     if (!object(v) && !Array.isArray(v)) return;
     for (const [k,val] of Object.entries(v)) {
@@ -221,14 +272,21 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     n.parent=candidates[0]??null;if(n.parent)n.parent.children.push(n);
     if (!text(n.meta.kind)) issue('NODE_KIND',n.path,'kind is required.');
     if (typeof n.meta.required !== 'boolean') issue('REQUIRED',n.path,'required must be boolean.');
-    const structured=['businessOverview','business','architecture','ui','implementation','uat'].filter(key=>n.meta[key]!==undefined);
-    if(structured.length>1)issue('MODULE_SPEC',n.path,'A module node owns at most one business, architecture, UI, implementation or UAT specification.');
+    const structured=['businessOverview','business','architecture','ui','implementation','uat','brand'].filter(key=>n.meta[key]!==undefined);
+    if(structured.length>1)issue('MODULE_SPEC',n.path,'A module node owns at most one business, architecture, UI, implementation, UAT or brand specification.');
     if(n.meta.business!==undefined&&n.meta.kind!=='business')issue('MODULE_SPEC_OWNER',n.path,'business belongs to a business node.');
     if(n.meta.businessOverview!==undefined&&(n.meta.kind!=='business-overview'||!(n.path==='business/index.yaml'||/(?:^|\/)business\/overview\/index\.yaml$/.test(n.path))))issue('MODULE_SPEC_OWNER',n.path,'businessOverview belongs to business/overview/index.yaml or the legacy product business/index.yaml, with kind business-overview.');
     if(n.meta.architecture!==undefined&&n.meta.kind!=='architecture')issue('MODULE_SPEC_OWNER',n.path,'architecture belongs to an architecture node.');
     if(n.meta.ui!==undefined&&n.meta.kind!=='ui')issue('MODULE_SPEC_OWNER',n.path,'ui belongs to a UI node.');
     if(n.meta.implementation!==undefined&&n.meta.kind!=='implementation')issue('MODULE_SPEC_OWNER',n.path,'implementation belongs to an implementation node.');
     if(n.meta.uat!==undefined&&n.meta.kind!=='uat')issue('MODULE_SPEC_OWNER',n.path,'uat belongs to a uat node.');
+    if(n.meta.brand!==undefined&&n.meta.kind!=='brand')issue('MODULE_SPEC_OWNER',n.path,'brand belongs to the product brand node at brand/index.yaml.');
+    if(n.meta.kind==='brand'){
+      if(n.path!=='brand/index.yaml')issue('LAYOUT',n.path,'The product brand is one record at the tree root: brand/index.yaml beside features/, with its masters in brand/assets/**.');
+      else if(n.meta.schema!=='work/node@2')issue('BRAND_SCHEMA',n.path,'The brand record is canonical work/node@2.');
+      if(n.meta.brand===undefined)issue('BRAND_SPEC',n.path,'A brand node owns the product brand in its brand: key; there is nothing else for it to be.');
+      else if(object(n.meta.brand))checkBrand(n);
+    }
     if (!n.body && !structured.length) issue('EMPTY_SPEC',n.path,'Node must have concise description text or one structured module specification.');
     n.depIds=stringList(n.meta.dependsOn,n.path,'dependsOn'); n.refIds=stringList(n.meta.refs,n.path,'refs');
     if(n.meta.assertions !== undefined) stringList(n.meta.assertions,n.path,'assertions');
@@ -396,6 +454,23 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     if(spec.nodeType==='non-functional-requirement')for(const id of c.acceptanceRefs)if(!spec.refs.some(r=>r.type==='acceptance'&&r.itemId===id))issue('SRS_GRAPH',n.path,`NFR acceptance ${id} needs an explicit typed ref.`);
     if(spec.nodeType==='customer-journey'){for(const stage of c.stages){requireRefs([stage.functionalRequirementRef],'functional-requirement','Journey FR');requireRefs(stage.nfrRefs,'non-functional-requirement','Journey NFR');const frRef=spec.refs.find(r=>r.itemId===stage.functionalRequirementRef&&r.type==='functional-requirement'),flowRef=spec.refs.find(r=>r.itemId===stage.flowRef&&r.type==='flow');if(!flowRef)issue('SRS_GRAPH',n.path,`Journey flow ${stage.flowRef} needs an explicit typed flow ref.`);else if(frRef&&flowRef.nodeId!==frRef.nodeId)issue('SRS_JOURNEY_OWNER',n.path,`Journey flow ${stage.flowRef} must belong to functional requirement ${stage.functionalRequirementRef}.`);}for(const route of c.significantPaths)requireRefs([route.branchRef],'branch','Journey branch');}
   }
+  // One product, one brand. A second brand node cannot be the record every design operation reads, so
+  // neither of them is: both are named and the tree is invalid until one survives.
+  const brandNodes=nodes.filter(n=>n.meta.kind==='brand');
+  if(brandNodes.length>1)for(const n of brandNodes)issue('BRAND_SINGLETON',n.path,'A product has exactly one brand record at brand/index.yaml; a second brand node leaves no canonical answer for design to read.');
+  if(brandNodes.length===1&&brandNodes[0].path==='brand/index.yaml'&&object(brandNodes[0].meta.brand))brandOwner=brandNodes[0];
+  /**
+   * Frontend-facing nodes bind the brand implicitly. This is the one binding in the model that is not
+   * authored edge by edge: a UI node, a frontend implementation or UAT layout, or any node that names the
+   * brand in refs/dependsOn folds the brand's spec digest into its own inputDigest, so a rev bump or a
+   * changed colour suspends their completions instead of leaving stale screens certified.
+   */
+  const bindsBrand=n=>{
+    if(!brandOwner||n===brandOwner)return false;
+    if(n.meta.kind==='ui')return true;
+    if(['implementation','uat'].includes(n.meta.kind)&&n.path.split('/').slice(0,-1).includes('frontend'))return true;
+    return n.effectiveRefs.includes(brandOwner)||n.effectiveDeps.includes(brandOwner);
+  };
   const visiting=new Set();
   const workspaceDigest=workspace?digest(canonicalJSON(workspace.meta)):'';
   const semanticBase=(subject,specOf,digestNode)=>{
@@ -461,7 +536,9 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     // and all dependency edges still participate in normal cycle detection.
     const typedBase=target=>digest(canonicalJSON(semanticBase(target,x=>x.specDigest,input)));
     const specificationLinks=[],pending=[...specificationSeedRefs(n)];while(pending.length){const ref=pending.shift(),target=nodes.find(x=>x.meta.id===ref.nodeId);if(target&&!specificationLinks.some(x=>x.id===target.meta.id)){specificationLinks.push({id:target.meta.id,digest:typedBase(target)});pending.push(...specificationOwnerRefs(target));}}specificationLinks.sort((a,b)=>a.id.localeCompare(b.id));
-    const context={...semanticBase(n,x=>x.specDigest,input),...(specificationLinks.length?{specificationLinks}:{})};
+    const brand=bindsBrand(n)?{id:brandOwner.meta.id,rev:text(brandOwner.meta.brand.rev)?brandOwner.meta.brand.rev:null,digest:brandOwner.specDigest}:null;
+    n.brandBinding=brand;
+    const context={...semanticBase(n,x=>x.specDigest,input),...(specificationLinks.length?{specificationLinks}:{}),...(brand?{brand:{id:brand.id,digest:brand.digest}}:{})};
     n.contextDigest=digest(canonicalJSON(context));
     n.inputDigest=digest(canonicalJSON({...context,children:n.children.map(c=>({id:c.meta.id,digest:input(c)})).sort((a,b)=>a.id.localeCompare(b.id))}));
     visiting.delete(n);return n.inputDigest;
@@ -475,7 +552,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       if(cache.has(n))return cache.get(n);
       if(active.has(n))throw Error('Authored input graph has a cycle');active.add(n);
       const typedBase=target=>digest(canonicalJSON(semanticBase(target,spec,masked)));
-      const specificationLinks=[],pending=[...specificationSeedRefs(n)];while(pending.length){const ref=pending.shift(),target=nodes.find(x=>x.meta.id===ref.nodeId);if(target&&!specificationLinks.some(x=>x.id===target.meta.id)){specificationLinks.push({id:target.meta.id,digest:typedBase(target)});pending.push(...specificationOwnerRefs(target));}}specificationLinks.sort((a,b)=>a.id.localeCompare(b.id));const value=digest(canonicalJSON({...semanticBase(n,spec,masked),...(specificationLinks.length?{specificationLinks}:{}),children:n.children.map(c=>({id:c.meta.id,digest:masked(c)})).sort((a,b)=>a.id.localeCompare(b.id))}));
+      const specificationLinks=[],pending=[...specificationSeedRefs(n)];while(pending.length){const ref=pending.shift(),target=nodes.find(x=>x.meta.id===ref.nodeId);if(target&&!specificationLinks.some(x=>x.id===target.meta.id)){specificationLinks.push({id:target.meta.id,digest:typedBase(target)});pending.push(...specificationOwnerRefs(target));}}specificationLinks.sort((a,b)=>a.id.localeCompare(b.id));const value=digest(canonicalJSON({...semanticBase(n,spec,masked),...(specificationLinks.length?{specificationLinks}:{}),...(bindsBrand(n)?{brand:{id:brandOwner.meta.id,digest:spec(brandOwner)}}:{}),children:n.children.map(c=>({id:c.meta.id,digest:masked(c)})).sort((a,b)=>a.id.localeCompare(b.id))}));
       active.delete(n);cache.set(n,value);return value;
     }
     authoredAssets=authoredTargets.map(id=>{const n=nodes.find(n=>n.meta.id===id);return {id,assets:n?.ownedAssets??[]};});
@@ -566,13 +643,14 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       const splitSrs=n.meta.extensions?.work3?.srs,srsSection=splitSrs===undefined?null:classifySRSPath(n.path,false);
       const splitSds=n.meta.extensions?.work3?.sds,sdsSection=splitSds===undefined?null:classifySDSPath(n.path,false);
       const supported=n.meta.schema==='work/node@2'&&(
+        (n.meta.kind==='brand'&&object(n.meta.brand))||
         (n.meta.kind==='business-overview'&&object(n.meta.businessOverview))||
         (n.meta.kind==='business'&&spec?.schema==='starci/specification@2'&&spec.op==='business.decide')||
         (n.meta.kind==='architecture'&&spec?.schema===SDS_SCHEMA&&spec.op==='architecture.decide')||
         (n.meta.kind==='business'&&spec?.schema===SRS_V3_SCHEMA&&spec.op==='business.decide')||
         (n.meta.kind==='business'&&srsSection?.type&&splitSrs?.schema===srsSection.expectedSchema)||
         (n.meta.kind==='architecture'&&sdsSection?.type&&splitSds?.schema===sdsSection.expectedSchema));
-      if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to current structured Business overview, split source-independent SDS and their readable legacy formats; other profiles require their existing proof.');
+      if(!supported)issue('DESIGN_REVIEW_SCOPE',n.path,'Inline review is restricted to the brand record, current structured Business overview, split source-independent SDS and their readable legacy formats; other profiles require their existing proof.');
       if(Object.hasOwn(c,'evidence')||Object.hasOwn(c,'codeRefs')||Object.hasOwn(c,'sourceIdentity'))issue('DESIGN_REVIEW_MIXED',n.path,'Design review cannot be mixed with evidence or source completion bindings.');
       const review=c.review,seen=new Set();
       if(!object(review)||review.schema!=='starci/design-review@1'||!text(review.reviewer)||!text(review.authority)||!text(review.reviewedAt)||!/^\d{4}-\d{2}-\d{2}T/.test(review.reviewedAt)||!Number.isFinite(Date.parse(review.reviewedAt)))issue('DESIGN_REVIEW',n.path,'Review needs declared reviewer, actual authority provenance and an ISO review time; the validator does not authenticate them.');
@@ -585,6 +663,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       if(!Array.isArray(review?.limitations)||review.limitations.some(v=>!text(v)))issue('DESIGN_REVIEW_LIMITATIONS',n.path,'Review limitations must be an explicit list; known material blockers cannot be hidden here.');
       return true;
     }
+    if(n.meta.kind==='brand')issue('BRAND_DECISION',n.path,'A brand is settled by a collocated review of the rev it decided, never by an execution receipt.');
     const evidenceIds=stringList(c.evidence,n.path,'completion.evidence',true);
     const direct=Object.hasOwn(c,'sourceIdentity');
     if(direct){sourceIdentity(c.sourceIdentity,n,n);if(c.codeRefs!==undefined)issue('SOURCE_IDENTITY_MIXED',n.path,'Do not mix direct and legacy source proof.');}

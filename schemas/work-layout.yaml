@@ -4,6 +4,8 @@ node: index.yaml
 identity: stable metadata id; folder path is not identity
 shape:
   workspace: workspace.yaml
+  brand: brand/index.yaml
+  brandAssets: brand/assets/**/<file-in-original-format>
   businessTree: features/<feature>/**/index.yaml
   nodeAssets: <node>/assets/**/<file-in-original-format>
   uatFlow: features/<feature>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/}
@@ -28,6 +30,17 @@ rules:
     code. SRS owns required behavior and SDS owns target technical design. UI, implementation and
     UAT trace to them through stable IDs; current code may prove conformance or expose a gap, but
     never supplies or silently redefines either root.
+  - "A product's brand is one record: brand/index.yaml at the tree root, a sibling of features/, with
+    kind brand and its masters in brand/assets/**. At most one brand node exists per tree; a second
+    one, or a brand node anywhere else, is refused. It is a decision kind, done only through a
+    collocated completion.review that names the rev it settled, and its brand: key is the only place
+    colour tokens, typography, mascot, logo, iconography, imagery, voice, motion and the product-wide
+    don'ts are authored. Every design operation reads it instead of restating it, and the record names
+    the real frontend token or component files its machine checks compare against."
+  - "Frontend-facing nodes bind the brand implicitly: a ui node, an implementation or uat node with a
+    frontend layout, and any node that names the brand in refs or dependsOn fold the brand's spec
+    digest into their own inputDigest. A rev bump or a changed colour therefore suspends their
+    completions; no authored edge per screen is required, and backend-only work is untouched."
   - One project owns one canonical .starciwork in its bound source repository. Its product catalog
     is features/index.yaml; every actual feature owns
     features/<feature>/{business,architecture,ui,implementation,uat}/ as applicable.
@@ -118,6 +131,11 @@ rules:
     YAML/schema keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables,
     types, operation names and source symbols. Conversation locale never translates specifications.
 example:
+  brand/:
+    - index.yaml
+    - assets/mascot/rest.png
+    - assets/logo/mark.svg
+    - assets/imagery/reference-hero.webp
   features/knowledge/:
     - index.yaml
     - business/index.yaml

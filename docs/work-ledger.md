@@ -9,7 +9,7 @@ workflows that author it, and a kernel write preserves every one of those lines 
 
 ## Decision kinds and executable kinds
 
-`DECISION_KINDS` (`business`, `business-overview`, `architecture`) are answered, not executed. A
+`DECISION_KINDS` (`business`, `business-overview`, `architecture`, `brand`) are answered, not executed. A
 decision is settled by a collocated `completion.review`: a reviewer, actual authority provenance and
 one passing observation per authored assertion. Nothing is launched into a worktree and no agent
 writes code. `decisionCandidates(ledger,{scope})` returns the todo, eligible ones.
@@ -32,6 +32,162 @@ authored record is work, not a chore for the user, and inside that file `state`,
 `extensions.work3.kernel` stay the kernel's. The bound is one author op per node per workflow, and a
 record still incomplete after it was accepted is the question the user has to answer. See **Ledger
 incomplete → work.author** in [workflow-kernel.md](workflow-kernel.md).
+
+## Brand: one record the design reads
+
+A product's brand is not a paragraph repeated in every design record. It is one Work node —
+`.starciwork/brand/index.yaml`, schema `work/node@2`, `kind: brand` — whose `brand:` key is the whole
+answer, and its masters live beside it in `brand/assets/**` (logo, mascot poses, sample imagery),
+reserved the way `assets/` is reserved everywhere else. The rules that make it *the* record:
+
+- **One per tree.** `brand/index.yaml` at the tree root, a sibling of `features/`. A brand node at any
+  other path is a `LAYOUT` issue; two brand nodes are a `BRAND_SINGLETON` issue on both — when there
+  are two answers there is no canonical one, so neither is used. `brand:` on a node that is not a
+  brand node is `MODULE_SPEC_OWNER`, and a brand node with no `brand:` key is `BRAND_SPEC`.
+- **Decided, not executed.** `brand` is a `DECISION_KINDS` member: it reaches `done` only through a
+  collocated `completion.review` (`starci/design-review@1`) with one passing observation per authored
+  assertion, and `markDecided(…,{rev,review})` records the `rev` it settled in the kernel block. Its
+  profile is `brand: {assertions: true}` — the owner decides, and the assertions are what the machine
+  checks against the real frontend files the record names in `sources`.
+- **`rev` is mandatory.** It is the handle every frontend-facing node binds, so it moves only with an
+  owner decision (`BRAND_REV` when it is missing or blank).
+
+### The `brand:` record
+
+| Key | Shape | Required | What it settles |
+| --- | --- | --- | --- |
+| `rev` | string | yes | The revision frontend-facing nodes bind; bumping it invalidates their completions |
+| `identity` | `{name, tagline?, family, owner}` | yes | Brand name, the installed grammar family it dresses, and who decides it |
+| `color` | `{tokens[], scales?[], dark?, policy}` | yes | The grammar tokens the brand sets, their scales, the dark answer and the colour policy |
+| `color.tokens[]` | `{token, value, foreground?, role, note?}` | — | `token` starts with `--`; `role` is `primary\|danger\|success\|warning\|info\|focus\|surface\|other` |
+| `color.scales[]` | `{name, steps:[{step, value}]}` | — | Named ramps behind the tokens |
+| `color.dark` | `{tokens[], scales?[]}` | — | The same shape again for dark; absent means the grammar's dark values stand |
+| `color.policy` | `{dangerMayMatchPrimary, minContrast?}` | yes | Whether danger may carry the primary value; minimum contrast (4.5 when unstated) |
+| `typography` | `{family, scale?[], rules?[]}` | yes | Type family with its real fallback stack, named steps, rules |
+| `mascot` | `{name, component?, assets[], allowedIn[], forbiddenIn[], minSize?, rules[]}` | no | The mascot, the grammar leaf that already renders it, and where it may and may not appear |
+| `logo` | `{mark?, wordmark?, lockups?[], clearSpace?, minSize?, dark?}` | no | Logo masters and the space around them |
+| `iconography` | `{set[], custom?[], forbidden?[]}` | yes | The glyph packages the product may draw from, and the banned ones |
+| `imagery` | `{style[], forbidden?[], promptRules?[], references?[]}` | yes | Image direction; `promptRules` are what every image-model prompt must state |
+| `voice` | `{locales:[{locale, tone[], vocabulary?}]}` | no | Tone and wording per locale |
+| `motion` | `{rules[]}` | no | Movement rules |
+| `forbidden` | string list | yes | Product-wide don'ts that hold whatever the surface is |
+| `sources` | `[{repository, path, kind, note?}]` | yes, non-empty | The real files the checks compare against; `kind` is `css\|tokens\|component` |
+| `artworkSlots` | `{conventions[]}` | no | How a design record declares an embedded artwork slot |
+
+Values are validated, not merely typed. A colour is `#rrggbb` or `oklch(...)` and nothing else
+(`BRAND_COLOR`); a token name is a non-empty custom property starting with `--`, declared once
+(`BRAND_TOKEN`); every master path is a normalized path under `brand/assets/` (`BRAND_ASSET_PATH`) and
+also appears in the node's own `assets` as `assets/<…>` so its current bytes bind the record
+(`BRAND_ASSET_BINDING`); `sources` cannot be empty (`BRAND_SOURCES`). A brand may make danger the
+primary colour — that is a decision, and `color.policy.dangerMayMatchPrimary: true` is where it is
+taken; with `false`, an equal pair is a `BRAND_POLICY` failure rather than a silent override of the
+grammar.
+
+### The implicit binding: frontend-facing nodes bind the brand
+
+Every other edge in the Work model is authored. This one is not, because a screen that does not
+mention the brand is still wearing it. `validateWorkTree` folds the brand's **spec digest** into the
+`inputDigest` of every node that is frontend-facing:
+
+- `kind: ui`, at any depth;
+- `kind: implementation` or `kind: uat` whose layout names the frontend side — a `frontend` segment in
+  its path, which is exactly `implementation/frontend/**` and the frontend UAT layouts;
+- any node that names the brand in its own or an inherited `refs` / `dependsOn`.
+
+Those nodes carry `brand: {id, rev, digest}` in the validator's node projection, and the result carries
+a top-level `brand` summary — `{id, path, rev, digest, state, effectiveState, boundNodes}`. A `rev`
+bump, a changed colour or a replaced mascot master therefore changes their `inputDigest`, their stored
+`completion` no longer binds current inputs, and they come back as `STALE_COMPLETION` / effectively
+`uninvestigate`. Backend-only work is untouched, and a tree that authors no brand is hashed exactly as
+before.
+
+`loadLedger` exposes `ledger.brand` as `{node, rev, file, spec}` (or `null`), `decisionCandidates`
+returns a todo brand node like any other decision, and `brandReferences(ledger)` returns the record's
+absolute path followed by every `brand/assets/**` master — what the kernel attaches as references when
+an operation has to read the brand rather than guess it.
+
+### An example record
+
+```yaml
+schema: work/node@2
+id: product.brand
+kind: brand
+required: true
+state: done
+assertions:
+  - brand-tokens-match-source
+  - mascot-usage-is-bounded
+assets:
+  - path: assets/mascot/rest.png
+    description: Mascot master, resting pose.
+brand:
+  rev: "3"
+  identity:
+    name: Example Product
+    family: starci
+    owner: Product owner
+  color:
+    tokens:
+      - token: --example-core-primary
+        value: "#c0203c"
+        foreground: "#ffffff"
+        role: primary
+      - token: --example-core-danger
+        value: "#c0203c"
+        role: danger
+        note: The brand deliberately gives danger the primary value.
+    policy:
+      dangerMayMatchPrimary: true
+      minContrast: 4.5
+  typography:
+    family: Example Sans, system-ui, sans-serif
+  mascot:
+    name: Example Mascot
+    component: ExampleMascot
+    assets:
+      - path: brand/assets/mascot/rest.png
+        purpose: Default resting pose for empty states.
+        pose: rest
+    allowedIn:
+      - Empty states
+      - Onboarding
+    forbiddenIn:
+      - Destructive confirmations
+    rules:
+      - Render the grammar leaf; never redraw or recolour the artwork.
+  iconography:
+    set:
+      - "@example/icons"
+    forbidden:
+      - Inline one-off SVG glyphs
+  imagery:
+    style:
+      - Warm studio light on a plain ground.
+    promptRules:
+      - Every prompt states the brand primary and the forbidden list.
+  forbidden:
+    - Never place the mascot next to a destructive action.
+  sources:
+    - repository: example-frontend
+      path: src/app/globals.css
+      kind: css
+      note: The installed token values the checks read.
+completion:
+  inputDigest: <sha-256>
+  review:
+    schema: starci/design-review@1
+    reviewer: Product owner
+    authority: Owner decided the brand in session 12
+    reviewedAt: "2026-09-13T00:00:00.000Z"
+    observations:
+      - id: brand-tokens-match-source
+        outcome: pass
+        observation: Every token value equals the value in the named source file.
+      - id: mascot-usage-is-bounded
+        outcome: pass
+        observation: allowedIn and forbiddenIn cover every surface the design records use.
+    limitations: []
+```
 
 ## What the kernel may write
 

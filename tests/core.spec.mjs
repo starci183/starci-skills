@@ -242,3 +242,228 @@ test('authored suspension reason is operational, missing/blank reason fails, and
   f.node('imported',{...f.metas.get('imported'),suspensionReason:'   '});assert.ok(codes(f.run()).includes('SUSPENSION_REASON'));assert.equal(f.run().nodes[0].effectiveState,'invalid');
   f.node('imported',{...f.metas.get('imported'),state:'done'});assert.ok(codes(f.run()).includes('COMPLETION'));assert.equal(f.run().nodes[0].effectiveState,'invalid');
 });
+
+// --------------------------------------------------------------------------- the product brand
+// One record at the tree root, decided by its owner, that every frontend-facing node binds. Synthetic
+// names only: no product brand, no real token file and no claimed design review.
+const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4MsAAAAASUVORK5CYII=','base64');
+
+function brandRecord({rev='1',primary='"#c0203c"',danger='"#c0203c"',dangerMayMatchPrimary='true',mascot='brand/assets/mascot/rest.png',sources=true}={}) {
+  return `schema: work/node@2
+id: product.brand
+kind: brand
+required: true
+state: todo
+assertions:
+  - brand-tokens-match-source
+assets:
+  - path: assets/mascot/rest.png
+    description: Mascot master at rest.
+brand:
+  rev: "${rev}"
+  identity:
+    name: Example Product
+    family: starci
+    owner: Product owner
+  color:
+    tokens:
+      - token: --example-core-primary
+        value: ${primary}
+        foreground: "#ffffff"
+        role: primary
+      - token: --example-core-danger
+        value: ${danger}
+        role: danger
+        note: The brand decides whether danger carries the primary value.
+    policy:
+      dangerMayMatchPrimary: ${dangerMayMatchPrimary}
+  typography:
+    family: Example Sans, system-ui, sans-serif
+  mascot:
+    name: Example Mascot
+    component: ExampleMascot
+    assets:
+      - path: ${mascot}
+        purpose: Resting pose for empty states.
+    allowedIn:
+      - Empty states
+    forbiddenIn:
+      - Destructive confirmations
+    rules:
+      - Render the grammar leaf; never redraw the artwork.
+  iconography:
+    set:
+      - "@example/icons"
+  imagery:
+    style:
+      - Warm studio light on a plain ground.
+  forbidden:
+    - Never recolour the mascot.
+${sources?`  sources:
+    - repository: example-frontend
+      path: src/app/globals.css
+      kind: css
+`:'  sources: []\n'}`;
+}
+const uiNode=(state='todo',trailer='')=>`schema: work/node@2
+id: sales.ui
+kind: ui
+required: true
+state: ${state}
+assertions:
+  - ui-quality
+description: Sales surfaces and the states they reach.
+${trailer}`;
+const leaf=(id,kind)=>`schema: work/node@2
+id: ${id}
+kind: ${kind}
+required: true
+state: todo
+assertions:
+  - synthetic-check
+description: Synthetic ${kind} scope for the brand binding fixture.
+`;
+
+function brandFixture(t,record=brandRecord()) {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'work-brand-test-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const write=(p,value)=>{const file=path.join(root,p);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,value);};
+  write('workspace.yaml','schema: work/workspace@1\nid: brand-fixture\n');
+  write('brand/assets/mascot/rest.png',PNG);
+  write('brand/index.yaml',record);
+  write('features/index.yaml','schema: work/node@2\nid: features\nkind: business\nrequired: true\ndescription: Product catalog.\n');
+  write('features/sales/index.yaml','schema: work/node@2\nid: sales\nkind: business\nrequired: true\ndescription: Sales feature.\n');
+  write('features/sales/ui/index.yaml',uiNode());
+  write('features/sales/implementation/frontend/cart/index.yaml',leaf('sales.impl.fe.cart','implementation'));
+  write('features/sales/implementation/backend/cart/index.yaml',leaf('sales.impl.be.cart','implementation'));
+  return {root,write,run:()=>validateWorkspace(root),digestOf:id=>validateWorkspace(root).nodes.find(n=>n.id===id).inputDigest};
+}
+
+test('one brand record at the tree root is bound by every frontend-facing node and by nothing else',t=>{
+  const f=brandFixture(t);
+  const r=f.run();
+  assert.equal(r.ok,true,JSON.stringify(r.errors));
+  assert.equal(r.brand.id,'product.brand');
+  assert.equal(r.brand.path,'brand/index.yaml');
+  assert.equal(r.brand.rev,'1');
+  assert.match(r.brand.digest,/^[a-f0-9]{64}$/);
+  assert.deepEqual(r.brand.boundNodes,['sales.impl.fe.cart','sales.ui']);
+  const by=id=>r.nodes.find(n=>n.id===id);
+  assert.deepEqual(by('sales.ui').brand,{id:'product.brand',rev:'1',digest:r.brand.digest});
+  assert.deepEqual(by('sales.impl.fe.cart').brand,{id:'product.brand',rev:'1',digest:r.brand.digest});
+  assert.equal(by('sales.impl.be.cart').brand,null,'backend work does not wear the brand');
+  assert.equal(by('product.brand').brand,null,'the brand does not bind itself');
+});
+
+test('a node that names the brand in refs binds it even outside a frontend layout',t=>{
+  const f=brandFixture(t);
+  f.write('features/sales/implementation/backend/cart/index.yaml',`${leaf('sales.impl.be.cart','implementation')}refs:\n  - product.brand\n`);
+  const r=f.run();
+  assert.equal(r.ok,true,JSON.stringify(r.errors));
+  assert.equal(r.nodes.find(n=>n.id==='sales.impl.be.cart').brand.id,'product.brand');
+  assert.ok(r.brand.boundNodes.includes('sales.impl.be.cart'));
+});
+
+test('a brand whose colour, masters, sources or rev cannot be read by a machine is refused',t=>{
+  const f=brandFixture(t,brandRecord({rev:'',primary:'crimson',mascot:'assets/mascot/rest.png',sources:false}));
+  const c=codes(f.run());
+  for(const code of ['BRAND_REV','BRAND_COLOR','BRAND_ASSET_PATH','BRAND_SOURCES'])assert.ok(c.includes(code),`${code}: ${JSON.stringify(c)}`);
+  const g=brandFixture(t,brandRecord({dangerMayMatchPrimary:'false'}));
+  assert.ok(codes(g.run()).includes('BRAND_POLICY'),'an undecided danger/primary collision is not a silent grammar override');
+  const h=brandFixture(t,brandRecord({mascot:'brand/assets/mascot/absent.png'}));
+  assert.ok(codes(h.run()).includes('BRAND_ASSET_BINDING'),'a master outside the node assets binds no bytes');
+});
+
+test('a second brand and a brand outside the tree root leave no canonical record',t=>{
+  const f=brandFixture(t);
+  f.write('features/sales/brand/index.yaml',brandRecord().replace('id: product.brand','id: sales.brand'));
+  const two=f.run();
+  assert.equal(two.ok,false);
+  assert.equal(two.brand,null);
+  assert.equal(codes(two).filter(code=>code==='BRAND_SINGLETON').length,2,'both claimants are named');
+  assert.ok(two.errors.some(e=>e.code==='LAYOUT'&&e.path==='features/sales/brand/index.yaml'));
+  const g=brandFixture(t);
+  fs.rmSync(path.join(g.root,'brand/index.yaml'));
+  g.write('features/sales/brand/index.yaml',brandRecord());
+  const moved=g.run();
+  assert.equal(moved.ok,false);
+  assert.equal(moved.brand,null,'a brand under features is not the product brand');
+  assert.ok(moved.errors.some(e=>e.code==='LAYOUT'&&e.path==='features/sales/brand/index.yaml'));
+  const h=brandFixture(t);
+  h.write('features/sales/ui/index.yaml',`${uiNode()}brand:\n  rev: "1"\n`);
+  assert.ok(codes(h.run()).includes('MODULE_SPEC_OWNER'),'a ui node cannot author a brand of its own');
+});
+
+test('a brand rev or colour change suspends a completed UI node and leaves backend work alone',t=>{
+  const f=brandFixture(t);
+  f.write('features/sales/ui/evidence/current/capture.png',PNG);
+  const bound=f.digestOf('sales.ui');
+  f.write('features/sales/ui/evidence/current/manifest.yaml',`schema: work/evidence@1
+id: sales.ui.proof
+nodeId: sales.ui
+inputDigest: ${bound}
+outcome: pass
+assertions:
+  - id: ui-quality
+    outcome: pass
+    observation: Synthetic fixture observation from the unit harness, not product proof.
+assets:
+  - path: capture.png
+    sha256: ${sha256(PNG)}
+`);
+  f.write('features/sales/ui/index.yaml',uiNode('done',`completion:\n  inputDigest: ${bound}\n  evidence:\n    - sales.ui.proof\n`));
+  let r=f.run();
+  assert.equal(r.ok,true,JSON.stringify(r.errors));
+  assert.equal(r.nodes.find(n=>n.id==='sales.ui').effectiveState,'done');
+  const backend=r.nodes.find(n=>n.id==='sales.impl.be.cart').inputDigest;
+
+  f.write('brand/index.yaml',brandRecord({rev:'2'}));
+  r=f.run();
+  assert.ok(codes(r).includes('STALE_COMPLETION'));
+  const stale=r.nodes.find(n=>n.id==='sales.ui');
+  assert.notEqual(stale.inputDigest,bound);
+  assert.equal(stale.effectiveState,'uninvestigate','a v2 node whose inputs moved is no longer investigated');
+  assert.ok(stale.suspensionReasons.some(reason=>reason.code==='INPUT_CHANGED'));
+  assert.equal(stale.brand.rev,'2');
+  assert.equal(r.nodes.find(n=>n.id==='sales.impl.be.cart').inputDigest,backend,'backend work is untouched by a brand revision');
+
+  f.write('brand/index.yaml',brandRecord({primary:'"oklch(0.55 0.18 18)"'}));
+  const recoloured=f.run().nodes.find(n=>n.id==='sales.ui');
+  assert.notEqual(recoloured.inputDigest,bound,'a changed value invalidates even at the same rev');
+  assert.equal(recoloured.effectiveState,'uninvestigate');
+});
+
+test('a brand is decided by a review of its assertions, never by an execution receipt',t=>{
+  const f=brandFixture(t);
+  const bound=f.digestOf('product.brand');
+  const review=`completion:
+  inputDigest: ${bound}
+  review:
+    schema: starci/design-review@1
+    reviewer: Product owner
+    authority: Synthetic fixture authority; no real review is claimed
+    reviewedAt: "2026-09-13T00:00:00.000Z"
+    observations:
+      - id: brand-tokens-match-source
+        outcome: pass
+        observation: Every declared token equals the value in the named source file.
+    limitations: []
+`;
+  f.write('brand/index.yaml',`${brandRecord().replace('state: todo','state: done')}${review}`);
+  const decided=f.run();
+  assert.equal(decided.ok,true,JSON.stringify(decided.errors));
+  assert.equal(decided.nodes.find(n=>n.id==='product.brand').effectiveState,'done');
+  f.write('brand/index.yaml',`${brandRecord().replace('state: todo','state: done')}completion:\n  inputDigest: ${bound}\n  evidence:\n    - sales.ui.proof\n`);
+  assert.ok(codes(f.run()).includes('BRAND_DECISION'));
+});
+
+test('a tree with no brand record hashes exactly as it did before the brand existed',t=>{
+  const f=brandFixture(t);
+  const withBrand=f.digestOf('sales.impl.be.cart');
+  fs.rmSync(path.join(f.root,'brand'),{recursive:true,force:true});
+  const without=f.run();
+  assert.equal(without.ok,true,JSON.stringify(without.errors));
+  assert.equal(without.brand,null);
+  assert.equal(without.nodes.find(n=>n.id==='sales.impl.be.cart').inputDigest,withBrand,'an unbound node never saw the brand');
+  assert.equal(without.nodes.find(n=>n.id==='sales.ui').brand,null);
+});
