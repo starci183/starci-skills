@@ -10,8 +10,9 @@ import {buildReport} from '../execution/reports.mjs';
 import {spawnSync} from 'node:child_process';
 import {validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
 import {createStore} from '../execution/workflow-store.mjs';
+import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {DYNAMIC_OPS_BUDGET,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,changedFiles,createWorkflowState,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,launchOperator,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -130,7 +131,13 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
 function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','claude-opus','gpt-5.6-sol'],verify:['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol'],decide:['claude-fable-5.1','gpt-6-astra'],write:['gpt-5.6-sol','claude-opus','qwen3.8-flash'],plan:['claude-opus','claude-fable-5.1']}}={}){
   const busy=new Set(),requests=[];
   // The kind graph is the role authority, exactly as the real allocator reads it; the rest is the 4.x guess.
-  const roleOf=kind=>graphRoleOf(kind)??(kind==='review.verify'?'verify':['architecture.decide','business.decide'].includes(kind)?'decide':'implement');
+  // A kind the graph does not carry yet is not fatal for the allocator, exactly as in the real one: the role is
+  // guessed from the kind's own action word.
+  const roleOf=kind=>{
+    let fromGraph=null;
+    try{fromGraph=graphRoleOf(kind);}catch{fromGraph=null;}
+    return fromGraph??(kind==='review.verify'?'verify':/\.decide$/.test(kind)?'decide':'implement');
+  };
   return {
     maxParallelOps,requests,
     allocate(kind,{avoid=[]}={}){
@@ -595,14 +602,76 @@ function workRepo(nodes=WORK_NODES){
   for(const item of nodes){
     const file=path.join(repo,'.starciwork',item.path);
     fs.mkdirSync(path.dirname(file),{recursive:true});
-    fs.writeFileSync(file,AUTHORED[item.id]);
+    // A node may carry its own record text (`authored`), for a fixture that exists in two states of one id.
+    fs.writeFileSync(file,item.authored??AUTHORED[item.id]);
   }
   // The injected projection answers a fresh digest, the way the real validator does after a kernel write.
-  const validate=()=>({ok:true,errors:[],warnings:[],nodes:nodes.map(node=>({...node,inputDigest:DIGEST('f')})),resources:[]});
+  const validate=()=>({ok:true,errors:[],warnings:[],nodes:nodes.map(({authored,...node})=>({...node,inputDigest:DIGEST('f')})),resources:[]});
   const node=id=>path.join(repo,'.starciwork',nodes.find(item=>item.id===id).path);
   const read=id=>parseYaml(fs.readFileSync(node(id),'utf8'));
   return {repo,validate,node,read};
 }
+
+/* ------------------------------------------------------------------ the brand half of the ledger */
+
+/**
+ * The brand node, in the two states a tree can be in: one still to be decided (no record for a design op to
+ * read) and one a decision already settled, carrying the `rev` every surface built from it is bound to.
+ */
+const BRAND_RECORD=(state,rev=null)=>`schema: work/node@2
+id: demo.brand
+kind: brand
+required: true
+state: ${state}
+description: The brand of the product - identity, colour tokens, mascot.
+assertions:
+  - brand-tokens-declared
+${rev===null?'':`extensions:
+  work3:
+    kernel:
+      rev: ${rev}
+`}`;
+const brandNodeFixture=(state,rev=null)=>({id:'demo.brand',path:'brand/index.yaml',kind:'brand',state,
+  eligible:true,inputDigest:DIGEST('b'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null,
+  authored:BRAND_RECORD(state,rev)});
+const BRAND_TODO=brandNodeFixture('todo');
+const BRAND_DECIDED=brandNodeFixture('done',3);
+const MASCOT='brand/assets/mascot-front.png';
+const brandSpec=rev=>({name:'Aurora',family:'aurora',rev,
+  colorTokens:{'--brand-ink':{value:'oklch(0.21 0.01 275)',role:'text'},'--brand-accent':{value:'oklch(0.72 0.15 35)',role:'accent'}},
+  mascotAssets:[MASCOT],forbidden:['the bare word white inside a style tag'],
+  imageryPromptRules:['every imagery prompt names the mascot sheet and the accent token']});
+/**
+ * What `execution/work-ledger.mjs` will answer once the brand node kind lands: `loadLedger` carries
+ * `brand = {node, rev, file, spec} | null`, `brandReferences` names the record and every asset beside it, and a
+ * `brand` node is a decision candidate. The rev is read from the record on disk, so an accepted `brand.decide`
+ * moves it exactly as the real loader would.
+ */
+const brandLedger=tree=>({...work,
+  loadLedger:where=>{
+    const loaded=work.loadLedger(where);
+    let rev=null;
+    try{rev=Number(tree.read('demo.brand')?.extensions?.work3?.kernel?.rev);}catch{rev=null;}
+    const brand=Number.isFinite(rev)?{node:'demo.brand',rev,file:'brand/index.yaml',spec:brandSpec(rev)}:null;
+    return {...loaded,brand};
+  },
+  brandReferences:loaded=>loaded?.brand?[loaded.brand.file,...(loaded.brand.spec?.mascotAssets??[])]:[],
+  decisionCandidates:(loaded,options)=>[...work.decisionCandidates(loaded,options),
+    ...loaded.list.filter(node=>node.kind==='brand'&&node.state==='todo')]});
+/** A ledger that knows about brands and whose tree carries no brand node at all. */
+const brandlessLedger=()=>({...work,loadLedger:where=>({...work.loadLedger(where),brand:null}),brandReferences:()=>[]});
+const brandDone=summary=>({outcome:'done',summary,files:[],
+  checks:[passing('work-tree-validates','node starci.mjs validate .starciwork')]});
+/**
+ * `ops/registry.yaml` does not carry a brand operator yet - the kinds catalog is the sibling's to extend - so
+ * here the launchable chain of a brand decision is the architecture decision's, which has the same role.
+ */
+const brandAllocator=()=>{
+  const allocator=fakeAllocator();
+  return {...allocator,candidateFor:(kind,target)=>allocator.candidateFor(kind===BRAND_DECIDE?'architecture.decide':kind,target)};
+};
+/** And the same at the launch seam: the brand decision launches with the architecture decision's contract. */
+const brandLaunch=(orca,input)=>launchWithCandidate(orca,{...input,operation:input.operation===BRAND_DECIDE?'architecture.decide':input.operation});
 
 /**
  * The receipt node of WORK_NODES declares no check, so the kernel authors its record: this stands in for that
@@ -612,23 +681,26 @@ const receiptAuthor=()=>({'demo.sales.implementation.frontend.receipt-author':[{
   summary:'I described the receipt but could not settle which files render it.',
   files:[],checks:[passing('work-valid','node starci.mjs validate .starciwork')]}]});
 
-function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal}={}){
+function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal,
+  ledgerApi,validateOp=acceptAll}={}){
   const tree=workRepo(nodes);
   const store=createStore({repoRoot:tree.repo,id:'20260912-110000-work-ledger'});
   const state=createWorkflowState({job:'Finish the sales slice',worktree:cwd,branch:'starci183/sales',
     gates,store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'work',scope,repoRoot:tree.repo});
-  const goal=goalPhase(store,state,{validate:tree.validate,cwd,
+  const api=ledgerApi?ledgerApi(tree):undefined;
+  const goal=goalPhase(store,state,{validate:tree.validate,cwd,...(api?{ledgerApi:api}:{}),
     assessGoal:assessGoal??(({ledger})=>({ok:true,provider:'fake',value:{definitionOfDone:[`the ${ledger.length} listed nodes are done`],risks:[],questions:[]}}))});
   const fake=scriptedOrca({reportsDir:store.paths.reports,scripts});
   const git=fakeGit(dirty);
   const commits=[];
   const run=(options={})=>runLoop(fake.orca,store,state,{cwd,allocator,template,wait:noWait,validate:tree.validate,
+    ...(api?{ledgerApi:api}:{}),
     exec:exec??(command=>({status:0,stdout:`${command} ok`,stderr:''})),
     git:(executable,args)=>{if(args[0]==='commit')commits.push(args[args.indexOf('-m')+1]);return git.git(executable,args);},
     decide:()=>{throw Error('decide must not be called on a policy-covered path');},
-    validateOp:acceptAll,
+    validateOp,
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
-  return {...tree,store,state,goal,fake,git,run,commits,allocator,cleanup:()=>fs.rmSync(path.dirname(tree.repo),{recursive:true,force:true})};
+  return {...tree,api,store,state,goal,fake,git,run,commits,allocator,cleanup:()=>fs.rmSync(path.dirname(tree.repo),{recursive:true,force:true})};
 }
 
 test('on the Work ledger the goal is derived from the authored nodes, and a node without checks is named as needing the user',()=>{
@@ -933,6 +1005,206 @@ test('a red UAT run routes to a repair of the lane build step and reopens the ru
     assert.equal(state.verifyRounds[CART],1,'build-and-UAT shares the review-round counter');
     assert.equal(harness.read(CART).state,'done');
     assert.equal(state.finished.outcome,'done');
+  }finally{harness.cleanup();}
+});
+
+/**
+ * The brand is the second body of material a design operation may never invent. A tree that has a brand record
+ * hands it to every design-family op twice: as references (the record and every asset beside it) and as the
+ * short Brand block of the contract. The validator is given the same record as rules.
+ */
+test('a design operation carries the brand record and its assets, prints the Brand block in its contract, and the validator is given the brand as rules',()=>{
+  const judged=[];
+  const harness=setupWork({nodes:[FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile],ledgerApi:brandLedger,
+    validateOp:payload=>{judged.push(payload);return acceptAll();},
+    scripts:{[CART]:[cartDone('The cart surface is drawn.')],
+      [`${CART}-implement`]:[cartDone('The cart is built from the accepted design.')],
+      [`${CART}-verify`]:[cartDone('The cart flow passes end to end.')]}});
+  try{
+    // The brand of the tree is what the user approves, and it is on the state before any op is launched.
+    assert.deepEqual(harness.state.brand,{node:'demo.brand',file:'brand/index.yaml',name:'Aurora',family:'aurora',rev:3,mascotAssets:[MASCOT]});
+    assert.deepEqual(JSON.parse(fs.readFileSync(harness.store.paths.goalJson,'utf8')).brand,harness.state.brand);
+    // The first lane step is a design kind, so the record and its assets are references of the operation itself.
+    const op=harness.state.ops[0];
+    assert.equal(op.kind,'interface.draw');
+    assert.ok(op.references.includes('brand/index.yaml'),'the brand record is a reference of the drawing');
+    assert.ok(op.references.includes(MASCOT),'so is every asset beside it');
+    assert.ok(op.references.some(entry=>/knowledge\/grammars\//.test(entry)),'the installed grammar is still referenced');
+    // The Brand block sits under the references, so the operation cannot claim it did not know the brand.
+    const contract=renderContract({template,op,state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
+    assert.match(contract,/## Brand\n- name: Aurora - family: aurora - rev: 3\n- record: `brand\/index\.yaml`\n- mascot\/logo: `brand\/assets\/mascot-front\.png`/);
+    assert.match(contract,/## Brand[\s\S]*never invent one beside them\./);
+    assert.ok(contract.indexOf('## References')<contract.indexOf('## Brand'),'the block is under the references it summarises');
+    // A kind that draws nothing gets no brand block: the brand is the design family's material, not everyone's.
+    assert.doesNotMatch(renderContract({template,op:{...op,kind:'backend.implement'},state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'}),/## Brand/);
+    assert.deepEqual(DESIGN_KINDS,['interface.draw','interface.asset','frontend.implement','uat.verify']);
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:20});
+    assert.equal(state.finished.outcome,'done');
+    // Nothing was deferred and no decision was needed: the tree already had its brand.
+    assert.equal(events(harness.store).some(event=>event.event==='schedule-deferred'&&event.reason==='brand missing'),false);
+    assert.equal(state.ops.some(item=>item.kind===BRAND_DECIDE),false);
+    // The verdict on a design result is founded on the brand, trimmed to the fields a rule can be read from.
+    // Only the drawing leaves a diff here - the fake git's commit clears it - and a result with no diff is not judged.
+    assert.deepEqual(judged.map(payload=>payload.op.kind),['interface.draw']);
+    for(const payload of judged)
+      assert.deepEqual(Object.keys(payload.brand).sort(),[...BRAND_PAYLOAD].sort(),`${payload.op.kind} was judged against the brand`);
+    assert.equal(judged[0].brand.name,'Aurora');
+    assert.equal(judged[0].brand.rev,3);
+    assert.deepEqual(judged[0].brand.mascotAssets,[MASCOT]);
+    assert.deepEqual(judged[0].brand.colorTokens['--brand-accent'],{value:'oklch(0.72 0.15 35)',role:'accent'});
+    assert.deepEqual(judged[0].brand.forbidden,['the bare word white inside a style tag']);
+    // brandPayload is exactly that trim, and brandSummary is the identity the contract prints.
+    const loaded=harness.api.loadLedger({repoRoot:harness.repo,validate:harness.validate});
+    assert.deepEqual(brandPayload(loaded),judged[0].brand);
+    assert.deepEqual(brandSummary(loaded),harness.state.brand);
+    assert.equal(brandPayload({brand:null}),null);
+    assert.equal(brandSummary({}),null);
+  }finally{harness.cleanup();}
+});
+
+/**
+ * The same tree without the record: the design op is not launched with nothing to read. The kernel creates the
+ * `brand.decide` operation from the brand node the tree already carries and the design op waits behind it.
+ */
+test('a design operation on a tree with no brand record is deferred and waits for the brand.decide op the kernel creates from the todo brand node',()=>{
+  const harness=setupWork({nodes:[FRONTEND_NODE,BRAND_TODO],dirty:[cartFile],ledgerApi:brandLedger,allocator:brandAllocator(),
+    scripts:{'brand-1':[brandDone('The brand is decided: tokens, mascot, forbidden list.')],
+      [CART]:[cartDone('Drawn inside the decided brand.')],
+      [`${CART}-implement`]:[cartDone('Built from the drawing and the brand assets.')],
+      [`${CART}-verify`]:[cartDone('The flow passes end to end.')]}});
+  try{
+    // No record yet: the brand is a decision in the goal, the drawing op is the only operation, and it carries
+    // no brand reference because there is nothing to reference.
+    assert.equal(harness.state.brand,null);
+    assert.deepEqual(harness.state.decisions.map(item=>[item.id,item.kind,item.operation]),[['demo.brand','brand','brand.decide']]);
+    assert.deepEqual(harness.state.ops.map(op=>[op.id,op.kind]),[[CART,'interface.draw']]);
+    assert.equal(harness.state.ops[0].references.includes('brand/index.yaml'),false);
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:24,launch:brandLaunch});
+    const log=events(harness.store);
+    // The drawing was deferred for the brand, and told what it waits for.
+    const deferred=log.filter(event=>event.event==='schedule-deferred'&&event.reason==='brand missing');
+    assert.deepEqual(deferred.map(event=>[event.op,event.waitingFor]),[[CART,'brand-1']]);
+    // The decide op is the brand node's own record plus the folder its assets live in, and its only check is
+    // that the tree still validates.
+    const decide=state.ops.find(op=>op.kind===BRAND_DECIDE);
+    assert.equal(decide.id,'brand-1');
+    assert.equal(decide.nodeId,'demo.brand');
+    assert.equal(decide.origin,'ledger');
+    assert.deepEqual(decide.ledgerIds,[],'a decision is not a slice of the goal');
+    assert.deepEqual(decide.allowlist,['.starciwork/brand/index.yaml','.starciwork/brand/**']);
+    assert.deepEqual(decide.checks.map(check=>check.name),['work-tree-validates']);
+    assert.match(decide.goal,/Decide the brand in demo\.brand: the name, the design family, every colour token/);
+    assert.deepEqual(log.filter(event=>event.event==='brand-decide-created').map(event=>[event.op,event.node]),[['brand-1','demo.brand']]);
+    // The decision was settled as a decision: state done, a review on the node, and a bumped rev.
+    const record=harness.read('demo.brand');
+    assert.equal(record.state,'done');
+    assert.equal(record.extensions.work3.kernel.rev,1);
+    assert.deepEqual(record.completion.review.observations.map(item=>[item.id,item.outcome]),[['brand-tokens-declared','pass']]);
+    // A new rev is named once, after the kernel re-read the tree it had just written.
+    assert.deepEqual(log.filter(event=>event.event==='brand-revised').map(event=>[event.rev,event.node,event.op]),[[1,'demo.brand','brand-1']]);
+    assert.deepEqual(state.brand,{node:'demo.brand',file:'brand/index.yaml',name:'Aurora',family:'aurora',rev:1,mascotAssets:[MASCOT]});
+    // Only then did the drawing launch - and it launched with the brand it had to read.
+    const launchedDraw=log.findIndex(event=>event.event==='launched'&&event.op===CART);
+    const brandAccepted=log.findIndex(event=>event.event==='op-done'&&event.op==='brand-1');
+    assert.ok(brandAccepted>=0&&launchedDraw>brandAccepted,'the drawing launched after the brand was decided');
+    const draw=state.ops.find(op=>op.id===CART);
+    assert.ok(draw.dependsOn.includes('brand-1'));
+    assert.ok(draw.references.includes('brand/index.yaml')&&draw.references.includes(MASCOT));
+    assert.match(fs.readFileSync(harness.store.contractPath(CART),'utf8'),/## Brand\n- name: Aurora - family: aurora - rev: 1/);
+    // The node still walked its whole lane and is recorded done by its last step.
+    assert.deepEqual(state.ops.map(op=>[op.id,op.kind,op.status]),
+      [[CART,'interface.draw','done'],['brand-1',BRAND_DECIDE,'done'],
+        [`${CART}-implement`,'frontend.implement','done'],[`${CART}-verify`,'uat.verify','done']]);
+    assert.equal(harness.read(CART).state,'done');
+    assert.equal(state.finished.outcome,'done');
+  }finally{harness.cleanup();}
+});
+
+test('a tree that knows about brands and carries no brand node asks the user once and launches no design operation',()=>{
+  const harness=setupWork({nodes:[FRONTEND_NODE],dirty:[cartFile],ledgerApi:brandlessLedger,
+    scripts:{[CART]:[cartDone('This must never run.')]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:8});
+    const log=events(harness.store);
+    assert.equal(log.some(event=>event.event==='launched'),false,'no design op was launched without a brand');
+    assert.deepEqual(log.filter(event=>event.event==='brand-missing').map(event=>event.detail),
+      ['no brand record: author .starciwork/brand/index.yaml (a work.author or brand.decide op)']);
+    assert.deepEqual(state.needUser.filter(item=>item.kind==='brand'),
+      [{kind:'brand',detail:'no brand record: author .starciwork/brand/index.yaml (a work.author or brand.decide op)'}],
+      'the question is asked exactly once, however many iterations defer');
+    assert.equal(state.ops.some(op=>op.kind===BRAND_DECIDE),false,'there is no node to decide');
+    assert.equal(state.finished.outcome,'blocked');
+  }finally{harness.cleanup();}
+});
+
+/**
+ * `interface.asset` is optional, and what makes it optional is a fact of the node's own design record, never a
+ * judgement: the slots the drawing declared. The same record answers whether there is anything left to draw.
+ */
+test('the lane predicates read the node design record: declared artwork slots keep the asset step, a record with screens and no slots skips both',()=>{
+  const harness=setupWork({nodes:[FRONTEND_NODE,BRAND_DECIDED],ledgerApi:brandLedger});
+  try{
+    const access={api:work,at:{repoRoot:harness.repo}};
+    const design=text=>{
+      const folder=path.join(harness.repo,'.starciwork',path.dirname(FRONTEND_NODE.path),'design');
+      fs.mkdirSync(folder,{recursive:true});
+      fs.writeFileSync(path.join(folder,'index.yaml'),text);
+    };
+    // The lane of the frontend node, as the kinds profile will declare it once the asset step lands.
+    const lane=['interface.draw','interface.asset','frontend.implement','uat.verify'];
+    const profile={kinds:{},lanes:[{id:'implementation/frontend',match:[{kind:'implementation',role:'frontend'}],
+      steps:[{kind:'interface.draw',optionalWhen:'node.hasInterfaceDesign'},
+        {kind:'interface.asset',optionalWhen:'node.hasNoArtworkSlots'},{kind:'frontend.implement'},{kind:'uat.verify'}]}]};
+    const next=(done,predicates)=>nextKind(lane,done,{predicates,profile});
+    // No record at all: neither predicate holds, so the drawing runs and the artwork step after it is required.
+    assert.equal(designRecord(access,FRONTEND_NODE),null);
+    assert.deepEqual(lanePredicates(access,FRONTEND_NODE),{'node.hasInterfaceDesign':false,'node.hasNoArtworkSlots':false});
+    assert.equal(next([],lanePredicates(access,FRONTEND_NODE)),'interface.draw');
+    assert.equal(next(['interface.draw'],lanePredicates(access,FRONTEND_NODE)),'interface.asset');
+    // A record that declares slots: the artwork step stays, and the screens it declares retire the drawing.
+    design(`schema: starci/interface-design@1
+screens:
+  - id: cart
+    states: [resting, empty]
+artworkSlots:
+  - id: empty-cart-mascot
+    screen: cart
+    state: empty
+    region: hero
+    purpose: the empty cart says something
+    brief: the mascot holding an empty basket
+    size: 960x720
+    format: png
+    references: [${MASCOT}]
+    crop: none
+`);
+    const drawn=designRecord(access,FRONTEND_NODE);
+    assert.deepEqual(drawn.artworkSlots.map(slot=>[slot.id,slot.screen,slot.state]),[['empty-cart-mascot','cart','empty']]);
+    assert.deepEqual(lanePredicates(access,FRONTEND_NODE),{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':false});
+    assert.equal(next([],lanePredicates(access,FRONTEND_NODE)),'interface.asset','nothing left to draw, the artwork is next');
+    assert.equal(next(['interface.asset'],lanePredicates(access,FRONTEND_NODE)),'frontend.implement');
+    // The same record with no slot: the artwork step is skipped and the build follows the drawing directly.
+    design(`schema: starci/interface-design@1
+screens:
+  - id: cart
+    states: [resting]
+artworkSlots: []
+`);
+    assert.deepEqual(lanePredicates(access,FRONTEND_NODE),{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':true});
+    assert.equal(next([],lanePredicates(access,FRONTEND_NODE)),'frontend.implement');
+    assert.equal(next(['frontend.implement'],lanePredicates(access,FRONTEND_NODE)),'uat.verify');
+    // A record that is not a mapping, or a design folder with nothing in it, is no record: the steps stay.
+    design('- not a record\n');
+    assert.equal(designRecord(access,FRONTEND_NODE),null);
+    assert.deepEqual(lanePredicates(access,FRONTEND_NODE),{'node.hasInterfaceDesign':false,'node.hasNoArtworkSlots':false});
+    assert.equal(designRecord(access,null),null);
+    assert.equal(designRecord(null,FRONTEND_NODE),null);
   }finally{harness.cleanup();}
 });
 

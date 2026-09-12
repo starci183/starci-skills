@@ -96,12 +96,13 @@ is a profile edit, not a patch to the control loop.
 | lane | steps | who creates each step |
 | --- | --- | --- |
 | `implementation/backend` | `backend.implement` -> `review.verify` | the node, then the kernel's review planner |
-| `implementation/frontend` | `interface.draw` -> `frontend.implement` -> `uat.verify` | the node, all three |
+| `implementation/frontend` | `interface.draw` -> `interface.asset` (optional) -> `frontend.implement` -> `uat.verify` | the node, all four |
 | `operations` | `runtime.operate` -> `review.verify` | the node, then the review planner |
 | `uat` | `uat.verify` | the node |
-| `architecture` / `business` | `architecture.decide` / `business.decide` | answered as a decision, never launched |
+| `architecture` / `business` / `brand` | `architecture.decide` / `business.decide` / `brand.decide` | answered as a decision, never launched |
 
-The layout comes from the node path: a node under `implementation/frontend/**` takes the frontend lane, one
+The two optional steps of the frontend lane are decided by the node's own design record, not by a judgement:
+see [Brand and artwork](#brand-and-artwork). The layout comes from the node path: a node under `implementation/frontend/**` takes the frontend lane, one
 under `implementation/backend/**` (or any implementation node that names no layout) the backend lane. A `ui`
 node is frontend by kind. `state.lanes[nodeId] = {lane, done, checks, head}` is the whole bookkeeping.
 
@@ -200,6 +201,66 @@ The model is asked for forms only, never for control flow:
 
 Everything else - scheduling, allowlist arbitration, runtime choice, retries, commits, gates, the final
 report - is this code.
+
+## Brand and artwork
+
+Two bodies of material stand behind every surface this kernel builds. The **grammar** is the host's and is the
+same for every product (`knowledge/grammars/**`, `knowledge/patterns/fe/**`, `knowledge/ui/**`, listed by
+`grammarReferences()`). The **brand** is the product's own and lives in the Work tree: one `brand` node whose
+record carries the name, the design family, every colour token with the role it plays, the fonts, the mascot
+and logo assets, what is forbidden and the rules every imagery prompt must carry. `execution/work-ledger.mjs`
+answers it as `ledger.brand = {node, rev, file, spec} | null`, and `brandReferences(ledger)` names the record
+file plus every `brand/assets/**` path beside it.
+
+`DESIGN_KINDS` is the set of operations that read both: `interface.draw`, `interface.asset`,
+`frontend.implement`, `uat.verify`. They are what `brand.decide` exists for, so for each of them the kernel:
+
+- **references the brand.** `deriveWorkOp` adds the grammar canon and `brandReferences(loaded)` to the op's
+  references; an op derived before the brand existed picks the record up at launch, so its contract never
+  points at material that was not there yet.
+- **prints it in the contract.** A short `## Brand` block under the references - name, family, rev, the record
+  path and the mascot/logo assets - plus the one line it exists for: every colour, font, icon and illustration
+  comes from that record and the grammar, and none is invented beside them. No other kind gets the block.
+- **refuses to run without it.** A design op on a tree whose ledger knows about brands and carries no record is
+  not launched: `schedule-deferred` with reason `brand missing`, and the op waits behind the `brand.decide`
+  operation the kernel creates from the tree's own brand node (its `index.yaml` plus the folder its assets live
+  in, origin `ledger`, one check: the tree still validates). A tree that carries no brand node at all is the one
+  thing the kernel will not invent - a brand is the product's identity - so it asks once, as a `brand` needUser
+  item: *no brand record: author `.starciwork/brand/index.yaml` (a work.author or brand.decide op)*.
+
+A ledger build that does not answer the `brand` field at all leaves all of this off, so a tree that was never
+asked about brands behaves exactly as before.
+
+**The brand is a decision.** `brand` is a decision kind, so `decisionCandidates` lists it in goal.md,
+`DECISION_OPERATION.brand` is `brand.decide`, and an accepted `brand.decide` is settled by `markDecided` with a
+bumped `rev` - like `architecture.revise`, because every surface already built from the old brand was built from
+something that has now changed. The kernel then re-reads the tree and records `brand-revised {rev, node, op}`.
+That is all it does: the Work validator binds a completion to the digest of what it was built from, so the
+frontend-facing nodes that were built against the old brand are reopened in the tree itself, and `syncLedgerOps`
+picks them up on the next iteration like any other newly schedulable node.
+
+**Artwork slots and the optional step.** The interface design record under the node's own `design/` folder is
+the authority for the rest of the interface lane, and `lanePredicates` reads it from disk (`designRecord`):
+
+| predicate | true when | effect |
+| --- | --- | --- |
+| `node.hasInterfaceDesign` | the record exists and declares `screens` | `interface.draw` is skipped: there is nothing left to draw |
+| `node.hasNoArtworkSlots` | the record exists and declares no `artworkSlots` | `interface.asset` is skipped: there is no artwork to produce |
+
+A node with no record satisfies neither, so both steps run: the default is to do the work, and only the record
+may retire it. A slot is `{id, screen, state, region, purpose, brief, size, format, references, crop, file?,
+sha256?}`, which is what makes the asset step checkable - the files it produced, against the slots that were
+declared. The frontend lane is therefore `interface.draw -> interface.asset (optionalWhen
+node.hasNoArtworkSlots) -> frontend.implement -> uat.verify`, with both predicates evaluated every time the
+kernel asks `nextKind` - when the lane's next step is derived, when a step is accepted, and when the review
+planner asks whether a lane still owes a review.
+
+**The validator is given the brand too**, trimmed to the fields a verdict can be founded on (`brandPayload`:
+name, family, rev, colorTokens, mascotAssets, forbidden, imageryPromptRules) and with three rules that make it
+binding: a design candidate or a built surface using a colour, font or icon outside the brand tokens and the
+grammar is a defect; an `interface.asset` result whose slot files are missing, or whose artwork ignores the
+brand mascot and logo references, is a defect; and a `frontend.implement` result that substitutes its own image
+for a declared artwork slot, or omits one, is a defect.
 
 ## Validator
 
@@ -374,7 +435,8 @@ no profile for that operation is never chosen and then rejected.
 uat.verify (this op: step 2 of 3)`, so an operation knows what came before it and what will judge it), goal,
 goal items, allowlist, the kernel-owned paths the op may never touch, its resource locks, references, inherited
 open items, findings, acceptance, the exact check commands, the checks file, the report command with
-`--reports-dir`.
+`--reports-dir`. A design-family operation also gets the short `## Brand` block under its references (see
+[Brand and artwork](#brand-and-artwork)).
 Between the acceptance and the process prose it splices the kind-specific working order from
 `execution/contract-steps.mjs` (`stepsFor`): see [op-granularity.md](op-granularity.md), "Working order per kind".
 The process prose (`## Cook until done`, `## Ping (mandatory)`, `## Never`) is reused verbatim from
