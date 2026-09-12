@@ -229,6 +229,17 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
 
 function attemptRecord(candidate,extra){return {target:candidate.selection.target??candidate.selection.orcaLaunch.agent,agent:candidate.selection.orcaLaunch.agent,model:candidate.selection.model??null,...extra};}
 
+/** Long preambles crash Qwen's paste handling; hand them over as a short @file reference instead. */
+function deliveryText(adapter,{cwd,dispatchId,preamble}){
+  const delivery=adapter.delivery;
+  if(!delivery||preamble.length<=delivery.maxInlineChars)return preamble;
+  const directory=path.join(cwd,delivery.fileDirectory);
+  fs.mkdirSync(directory,{recursive:true});
+  const file=path.join(directory,delivery.fileName.replace('<dispatch>',dispatchId));
+  fs.writeFileSync(file,preamble.endsWith('\n')?preamble:`${preamble}\n`);
+  return delivery.prompt.replace('<file>',path.relative(cwd,file).replaceAll('\\','/'));
+}
+
 const screenText=receipt=>(getPath(receipt,'result.terminal.tail')??[]).join('\n');
 
 /** Command-terminal launch: one terminal per attempt, Task delivered by dispatch --return-preamble + terminal send. */
@@ -256,7 +267,8 @@ function launchCommandTerminalCandidate(orca,{cwd,candidate,taskId,displayName,w
   if(dispatched.outcome!=='ok')return fenceTerminal(`dispatch --return-preamble: ${dispatched.reason}`,dispatchIdFromReceipt(dispatched.receipt));
   const dispatchId=dispatchIdFromReceipt(dispatched.receipt),preamble=getPath(dispatched.receipt,'result.preamble');
   if(!dispatchId||typeof preamble!=='string'||!preamble.trim())return fenceTerminal('dispatch --return-preamble returned no Dispatch or preamble',dispatchId);
-  const sent=orca.invoke('terminal-send',{terminal:handle,text:preamble,enter:true},{cwd});
+  const text=deliveryText(adapter,{cwd,dispatchId,preamble});
+  const sent=orca.invoke('terminal-send',{terminal:handle,text,enter:true},{cwd});
   if(sent.outcome!=='ok')return fenceTerminal(`terminal send: ${sent.reason}`,dispatchId);
   const staged=new RegExp(adapter.submission.stagedPattern),activity=new RegExp(adapter.submission.activityPattern);
   let enters=1,submitted=false;
@@ -264,16 +276,17 @@ function launchCommandTerminalCandidate(orca,{cwd,candidate,taskId,displayName,w
     wait(adapter.submission.settleMs);
     const read=orca.invoke('terminal-read',{terminal:handle,screen:true},{cwd});
     screen=read.outcome==='ok'?screenText(read.receipt):'';
-    if(activity.test(screen)&&!staged.test(screen)){submitted=true;break;}
+    // Activity proves the turn started even when the transcript still shows the collapsed paste marker.
+    if(activity.test(screen)){submitted=true;break;}
     if(staged.test(screen)&&enters<adapter.submission.maxEnter){orca.invoke('terminal-send',{terminal:handle,enter:true},{cwd});enters+=1;}
   }
-  if(!submitted)return fenceTerminal('prompt was not consumed by the terminal agent',dispatchId);
+  if(!submitted)return fenceTerminal(`prompt was not consumed by the terminal agent; last frame: ${screen.split('\n').filter(l=>l.trim()).slice(-4).join(' | ').slice(0,300)}`,dispatchId);
   const shown=orca.invoke('dispatch-show',{task:taskId},{cwd});
   const dispatch=getPath(shown.receipt,'result.dispatch');
   if(shown.outcome!=='ok'||dispatch?.id!==dispatchId||dispatch?.assignee_handle!==handle)return fenceTerminal(`dispatch assignee attestation failed: expected ${handle} for ${dispatchId}`,dispatchId);
   const model=candidate.selection.model??candidate.selection.requestedModel??adapter.model;
   if(!screen.includes(adapter.modelMarker))return fenceTerminal(`rendered model attestation failed: ${adapter.modelMarker} not shown`,dispatchId);
-  const attestation={schema:'starci/orca-command-terminal-attestation@1',ok:true,supervision:'command-terminal',taskId,dispatchId,terminalHandle:handle,displayName,target:candidate.selection.target??null,agent:adapter.agent,model,submitEnters:enters,terminalTitle:{observed:displayName,canonical:true,mutableUiMetadata:true,action:'none'}};
+  const attestation={schema:'starci/orca-command-terminal-attestation@1',ok:true,supervision:'command-terminal',taskId,dispatchId,terminalHandle:handle,displayName,target:candidate.selection.target??null,agent:adapter.agent,model,submitEnters:enters,delivery:text.startsWith('@')?'file-reference':'inline',terminalTitle:{observed:displayName,canonical:true,mutableUiMetadata:true,action:'none'}};
   return {ok:true,dispatchId,terminal:handle,attestation,titleDrift:false,call:created,launch:'command-terminal'};
 }
 
@@ -334,13 +347,44 @@ export function promptDelivery(workerShow){
 
 function runChain(orca,{cwd,request,candidates,taskId,taskRecord,attest,expectedPath,wait}){
   const attempts=[];
-  for(const candidate of candidates){
+  for(const [index,candidate] of candidates.entries()){
     const result=launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName:request.displayName,expectedPath,attest:attest.bind(null,candidate.selection),wait});
     if(result.ok)return {ok:true,candidate,result,attempts};
     attempts.push(attemptRecord(candidate,{dispatchId:result.dispatchId,effectState:result.effectState,reason:result.reason,stage:result.stage??null,settlement:result.settlement}));
     if(result.effectState!=='none')return {ok:false,exhausted:false,stopReason:'partial-or-unknown-effects',attempts};
+    // A settled attempt leaves the Task blocked or failed; only a ready Task accepts the next candidate.
+    if(index<candidates.length-1&&result.dispatchId){
+      const reissued=orca.invoke('task-update',{id:taskId,status:'ready',run:request.runId,from:request.from,result:JSON.stringify({reissuedAfter:result.dispatchId,reason:'candidate-fell-through'})},{cwd});
+      if(reissued.outcome!=='ok'){attempts.at(-1).reissue={outcome:reissued.outcome,reason:reissued.reason};return {ok:false,exhausted:false,stopReason:'task-not-reissuable',attempts};}
+    }
   }
   return {ok:false,exhausted:true,stopReason:'chain-exhausted',attempts};
+}
+
+const SWEEP='starci/orca-supervised-sweep@1';
+const DEAD_TITLE=/npm view @qwen-code|^Report task outcome|^Terminal \d+$|^\s*$/i;
+/** Close dead terminals in this workflow worktree: settled-dispatch terminals and residual agent terminals; never a live worker, Monitor or Coordinator. */
+export function sweepWorktree(orca,{cwd,from,keep=[]}){
+  const listed=orca.invoke('terminal-list',{},{cwd});
+  need(listed.outcome==='ok',`terminal list failed: ${listed.reason}`);
+  const workers=orca.invoke('worker-list',{},{cwd});
+  const rows=getPath(workers.receipt,'result.workers')??[];
+  // A command-terminal operation shows as unsupervised with an active Dispatch: it is live.
+  const isLive=w=>['ready','running','starting'].includes(w.workerState)||(w.workerState==='unsupervised'&&['dispatched','pending','ready'].includes(w.dispatchStatus));
+  const live=new Set(rows.filter(isLive).map(w=>w.agentTerminalHandle));
+  const settled=new Set(rows.filter(w=>!isLive(w)&&['failed','abandoned','succeeded','stop_unknown','unsupervised'].includes(w.workerState)&&['failed','completed','abandoned'].includes(w.dispatchStatus??'failed')).map(w=>w.agentTerminalHandle));
+  const protect=new Set([from,...keep].filter(Boolean));
+  const normalize=value=>path.resolve(String(value??'')).replaceAll('\\','/').toLowerCase();
+  const closed=[],kept=[];
+  for(const terminal of getPath(listed.receipt,'result.terminals')??[]){
+    if(normalize(terminal.worktreePath)!==normalize(cwd))continue;
+    const handle=terminal.handle,title=terminal.title??'';
+    if(protect.has(handle)||live.has(handle)){kept.push({handle,title,reason:protect.has(handle)?'protected':'live-worker'});continue;}
+    if(!(settled.has(handle)||DEAD_TITLE.test(title))){kept.push({handle,title,reason:'unknown-ownership'});continue;}
+    const result=orca.invoke('terminal-close',{terminal:handle},{cwd});
+    closed.push({handle,title,outcome:result.outcome,reason:result.reason});
+  }
+  return {schema:SWEEP,worktree:cwd,closed,kept};
 }
 
 export function startOperation(input,{orca=createOrcaCalls(),wait}={}){
@@ -421,12 +465,14 @@ function usage(){return `Usage:
   node orca-supervised-launch.mjs start-monitor --run <run> --parent-task <task> --from <coordinator-terminal> --worktree <relative-path> --workflow <name> --spec-file <relative-file> [--dry-run]
   node orca-supervised-launch.mjs replace-monitor --run <run> --parent-task <task> --task <monitor-task> --dispatch <dead-dispatch> --from <coordinator-terminal> --worktree <relative-path> --workflow <name> --spec-file <relative-file>
   node orca-supervised-launch.mjs settle --dispatch <dispatch> [--worktree <relative-path>] [--terminal <own-agent-terminal>] [--close true]
+  node orca-supervised-launch.mjs sweep --worktree <relative-path> --from <monitor-terminal> [--keep <handle,handle>]
   node orca-supervised-launch.mjs verify`;}
 
 export function main(argv=process.argv.slice(2),{orca}={}){
   const {command,options}=parseArgs(argv);
-  need(['start-op','start-monitor','replace-monitor','settle','verify'].includes(command),usage());
+  need(['start-op','start-monitor','replace-monitor','settle','sweep','verify'].includes(command),usage());
   const runner=orca??createOrcaCalls();
+  if(command==='sweep')return sweepWorktree(runner,{cwd:exactWorktree(options.worktree).path,from:required(options.from,'monitor terminal handle'),keep:String(options.keep??'').split(',').filter(Boolean)});
   if(command==='verify'){const result=runner.verify();return {schema:'starci/orca-live-contract-verification@1',...result,result:undefined};}
   if(command==='settle')return settleDispatch(runner,required(options.dispatch,'dispatch'),{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),reason:'explicit-settle',terminalHandle:options.terminal??null,closeTerminal:options.close==='true'});
   const common={run:options.run,from:options.from,worktree:options.worktree,spec:specText(options['spec-file'])};

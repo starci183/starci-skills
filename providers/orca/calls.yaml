@@ -236,6 +236,11 @@ calls:
     required: [worktree, title, command]
     receipt: [result.terminal.handle]
     note: Command-terminal launch only; the command is the declared target command prefixed with the credential refresh. Never used to attach a shell to a managed agent.
+  terminal-list:
+    command: terminal list
+    kind: read
+    flags: ["worktree", "include-visual-layouts"]
+    receipt: [result.terminals]
   terminal-read:
     command: terminal read
     kind: read

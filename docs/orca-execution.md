@@ -158,7 +158,7 @@ request, and an exhausted chain returns `ok:false, exhausted:true, attempts[]`. 
 `--skip <target:reason>` (reason from the registry's `fallback.allowedReasons`); the skip is recorded
 as a no-effect attempt and the chain starts at the next candidate. Companion commands are
 `start-monitor` (supervisor chain, no hardcoded provider), `replace-monitor` (settle a dead Monitor,
-relaunch with `--retry-of`; a live Monitor is never replaced), `settle --dispatch` and `verify`.
+relaunch with `--retry-of`; a live Monitor is never replaced), `settle --dispatch`, `sweep` (close dead terminals in the workflow worktree after settlement) and `verify`.
 `execution/orca-adapter.mjs` is the concrete adapter for `execution/orca.mjs` on the same runner,
 including `waitBoundary` (keepalive-filtered `check --wait` with `--ack`). A visible
 `Bash: ...` subtitle is only the native agent's current tool activity; identity comes from the native

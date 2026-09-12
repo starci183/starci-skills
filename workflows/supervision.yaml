@@ -163,6 +163,12 @@ workerLifecycle:
       unsupervisedFallback: forbidden
       release: release-or-retain-from-worker-receipt
       duplicateSubmit: forbidden
+    deadTerminals:
+      owner: workflow-manager
+      when: after-every-settlement-and-before-workflow-completion
+      command: sweep
+      closes: settled-dispatch-terminals-and-residual-agent-terminals-in-the-workflow-worktree
+      never: live-worker-monitor-coordinator-or-user-terminal
     managerReplacement:
       owner: plan-coordinator
       command: replace-monitor

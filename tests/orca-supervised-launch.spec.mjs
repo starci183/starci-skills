@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {createOrcaCalls} from '../execution/orca-calls.mjs';
-import {buildMonitorLaunch,buildOperationLaunch,defaultOrcaExecutable,main,parseSkip,promptDelivery,qwenLaunchMode,replaceMonitor,resolveSupervisorChain,settleDispatch,startMonitor,startOperation} from '../execution/orca-supervised-launch.mjs';
+import {buildMonitorLaunch,buildOperationLaunch,defaultOrcaExecutable,main,parseSkip,promptDelivery,qwenLaunchMode,replaceMonitor,resolveSupervisorChain,settleDispatch,startMonitor,startOperation,sweepWorktree} from '../execution/orca-supervised-launch.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';
@@ -27,7 +27,7 @@ const stalled={ok:false,error:{code:'agent_prompt_stalled',message:'prompt was n
 const screen=lines=>({ok:true,result:{terminal:{handle:'term_qwen',status:'running',tail:lines,source:'screen'}}});
 const qwenReady=['>_ Qwen Code (v0.23.3)','Token Plan | qwen3.8-flash (Token Plan Singapore)','>   Type your message or @path/to/file','qwen3.8-flash (Token Plan Singapore)'];
 const qwenStaged=['>_ Qwen Code (v0.23.3)','A direct instruction from the user takes precedence [Pasted Content 715 chars]','qwen3.8-flash (Token Plan Singapore)'];
-const qwenThinking=['=== TASK ===','∵ Thinking… 1s','⠼ polishing (5s · ↑ 25 tokens · esc to cancel)','qwen3.8-flash (Token Plan Singapore)'];
+const qwenThinking=['[Pasted Content 6 200 chars]','∵ Thinking… 1s','⠼ polishing (5s · ↑ 25 tokens · esc to cancel)','qwen3.8-flash (Token Plan Singapore)'];
 function shown({dispatch='ctx_claude',task='task_operation_sales',agent='claude',model=null,title=reasonName,state='ready',effects=[{kind:'dispatch_input',state:'accepted'}],dispatchStatus='ready'}={}){
   return {ok:true,result:{dispatch:{id:dispatch,task_id:task,status:dispatchStatus},
     worker:{state,agent_terminal_handle:`term_${dispatch}`,effects,startOptions:{launch:{effective:{agent,model}}}},
@@ -63,9 +63,11 @@ function qwenHandlers({reads=[qwenReady,qwenStaged,qwenThinking],dispatchOk=true
     'dispatch-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_qwen',task_id:'task_operation_sales',assignee_handle:assignee,status:'dispatched'}}}),
     'terminal-close':()=>json(0,{ok:true,result:{}}),
     'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_qwen',state:'fenced'}}),
-    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_qwen',state:'retained',reason:'no_owned_resource',processAction:'none'}})
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_qwen',state:'retained',reason:'no_owned_resource',processAction:'none'}}),
+    'task-update':(args)=>{assert.ok(has(args,'--status','ready'));return json(0,{ok:true,result:{task:{id:'task_operation_sales',status:'ready'}}});}
   };
 }
+const reready={'task-update':(args)=>{assert.ok(has(args,'--status','ready'));return json(0,{ok:true,result:{task:{id:'task_operation_sales',status:'ready'}}});}};
 
 test('native Orca runner uses an executable instead of a Windows command shim',()=>{
   assert.equal(defaultOrcaExecutable,process.platform==='win32'?'orca.exe':'orca');
@@ -124,6 +126,7 @@ test('a Qwen operation runs in one command terminal: create, wait for the prompt
   const sends=fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='send');
   assert.equal(sends.length,2);
   assert.ok(has(sends[0],'--text')&&sends[0].includes('--enter')&&value(sends[0],'--text').startsWith('=== PREAMBLE ==='));
+  assert.equal(result.attestation.delivery,'inline');
   assert.equal(has(sends[1],'--text'),false);
   assert.equal(fake.spawned.filter(args=>args[1]==='worker-start').length,0);
 });
@@ -193,6 +196,7 @@ test('a managed candidate stall is classified as no-effect and the launcher fall
   assert.equal(result.attempts[0].target,'claude-fable-5.1');
   assert.equal(result.attempts[0].effectState,'none');
   assert.equal(result.attempts[0].settlement,null);
+  assert.equal(fake.spawned.filter(args=>args[1]==='task-update').length,0);
   assert.equal(fake.spawned.filter(args=>args[1]==='task-create').length,1);
   assert.deepEqual(fake.spawned.filter(args=>args[1]==='worker-start').map(args=>value(args,'--agent')),['claude','codex']);
   assert.ok(has(fake.spawned.filter(args=>args[1]==='worker-start')[1],'--model','gpt-6-astra'));
@@ -206,13 +210,16 @@ test('provider mismatch fences and settles the exact managed dispatch; a pending
     'worker-show':(args)=>has(args,'--dispatch','ctx_wrong')?json(0,shown({dispatch:'ctx_wrong',agent:'codex',model:'gpt-5.6-sol',title:'Working'})):json(0,shown({dispatch:'ctx_codex',agent:'codex',model:'gpt-6-astra',title:reasonName})),
     'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
     'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'released'}}),
-    'terminal-rename':()=>json(0,{ok:true,result:{}})
+    'terminal-rename':()=>json(0,{ok:true,result:{}}),
+    ...reready
   });
   const result=startOperation(reasonInput,{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,true);
   assert.equal(result.selection.target,'gpt-6-astra');
   assert.match(result.attempts[0].reason,/expected agent claude/);
   assert.equal(result.attempts[0].settlement.release.state,'released');
+  const reissue=fake.spawned.find(args=>args[1]==='task-update');
+  assert.ok(has(reissue,'--id','task_operation_sales')&&has(reissue,'--status','ready')&&has(reissue,'--from','term_monitor_sales'));
   const pending=fakeOrca({
     'run-show':()=>json(0,runShow),
     'task-create':()=>json(0,taskCreated('task_operation_sales',reasonName)),
@@ -402,4 +409,61 @@ test('a Dispatch Orca cannot move out of stop_unknown is abandoned only after it
   }).orca});
   assert.equal(cli.effectState,'none');
   assert.equal(cli.closedTerminal.handle,'term_9');
+});
+
+test('a Task that cannot be re-readied after a settled attempt stops the chain with a typed reason',()=>{
+  const fake=fakeOrca({
+    ...qwenHandlers({reads:[qwenReady,qwenStaged,qwenStaged,qwenStaged]}),
+    'task-update':()=>json(1,{ok:false,error:{code:'invalid_transition',message:'blocked tasks stay blocked'}})
+  });
+  const result=startOperation(input,{orca:fake.orca,wait:noWait});
+  assert.equal(result.ok,false);
+  assert.equal(result.stopReason,'task-not-reissuable');
+  assert.equal(result.attempts[0].reissue.outcome,'failed');
+  assert.equal(fake.spawned.filter(args=>args[1]==='worker-start').length,0);
+});
+
+test('sweep closes settled-dispatch and residual agent terminals in the workflow worktree only, never live workers or supervisors',()=>{
+  const here=path.resolve('.');
+  const fake=fakeOrca({
+    'terminal-list':()=>json(0,{ok:true,result:{terminals:[
+      {handle:'term_monitor',title:'◐ Monitor Sales',worktreePath:here},
+      {handle:'term_live',title:'◑ Sales backend implementation',worktreePath:here},
+      {handle:'term_dead_op',title:'◑ Old op',worktreePath:here},
+      {handle:'term_qwen_residual',title:'npm view @qwen-code/qwen-code dist-tags.latest',worktreePath:here},
+      {handle:'term_report',title:'Report task outcome | sales',worktreePath:here},
+      {handle:'term_user',title:'my shell',worktreePath:here},
+      {handle:'term_qwen_live',title:'◐ Qwen - sales',worktreePath:here},
+      {handle:'term_qwen_done',title:'◐ Qwen - sales',worktreePath:here},
+      {handle:'term_other_wt',title:'[Op] backend.implement - Core',worktreePath:path.resolve('..')}
+    ]}}),
+    'worker-list':()=>json(0,{ok:true,result:{workers:[
+      {dispatchId:'ctx_live',workerState:'ready',agentTerminalHandle:'term_live'},
+      {dispatchId:'ctx_dead',workerState:'abandoned',dispatchStatus:'failed',agentTerminalHandle:'term_dead_op'},
+      {dispatchId:'ctx_qwen_live',workerState:'unsupervised',dispatchStatus:'dispatched',agentTerminalHandle:'term_qwen_live'},
+      {dispatchId:'ctx_qwen_done',workerState:'unsupervised',dispatchStatus:'completed',agentTerminalHandle:'term_qwen_done'}
+    ]}}),
+    'terminal-close':()=>json(0,{ok:true,result:{}})
+  });
+  const swept=sweepWorktree(fake.orca,{cwd:here,from:'term_monitor'});
+  assert.equal(swept.schema,'starci/orca-supervised-sweep@1');
+  assert.deepEqual(swept.closed.map(item=>item.handle).sort(),['term_dead_op','term_qwen_done','term_qwen_residual','term_report']);
+  assert.deepEqual(swept.kept.map(item=>[item.handle,item.reason]),[['term_monitor','protected'],['term_live','live-worker'],['term_user','unknown-ownership'],['term_qwen_live','live-worker']]);
+  const cli=main(['sweep','--worktree','.','--from','term_monitor'],{orca:fake.orca});
+  assert.equal(cli.schema,'starci/orca-supervised-sweep@1');
+});
+
+test('a preamble above the inline limit is delivered as a short @file reference inside the worktree',()=>{
+  const long='=== PREAMBLE ===\n'+'x'.repeat(5000);
+  const fake=fakeOrca({...qwenHandlers(),'dispatch':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_qwen',task_id:'task_operation_sales'},preamble:long}})});
+  const result=startOperation(input,{orca:fake.orca,wait:noWait});
+  assert.equal(result.ok,true);
+  assert.equal(result.attestation.delivery,'file-reference');
+  const send=fake.spawned.find(args=>args[0]==='terminal'&&args[1]==='send'&&has(args,'--text'));
+  const text=value(send,'--text');
+  assert.match(text,/^@\.starciwork\/_local\/runtime\/orca-dispatch-ctx_qwen\.md /);
+  assert.ok(text.length<400);
+  const file=path.join(worktreePath,'.starciwork','_local','runtime','orca-dispatch-ctx_qwen.md');
+  assert.equal(fs.readFileSync(file,'utf8').startsWith('=== PREAMBLE ==='),true);
+  fs.rmSync(path.join(worktreePath,'.starciwork'),{recursive:true,force:true});
 });

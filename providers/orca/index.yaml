@@ -95,6 +95,7 @@ operationAgent:
       start-monitor: Plan Coordinator starts one Workflow Monitor from the supervisor chain.
       replace-monitor: Plan Coordinator settles a dead Monitor and relaunches it with --retry-of.
       settle: Any supervisor stops, releases and verifies one Dispatch; returns a typed settlement.
+      sweep: The Workflow Monitor closes dead terminals in its worktree after every settlement and before reporting workflow completion; live workers, Monitors, Coordinators and unknown terminals are kept.
       verify: Read-only live agent-context check of every declared call before the first effect.
     input: [nested-workflow-run, workflow-task, from, worktree, operation, scope, spec-file]
     guarantees:
