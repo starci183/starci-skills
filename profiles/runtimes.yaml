@@ -53,7 +53,9 @@ runtimes:
     budget: {opsPerDay: 120}
 roleOfKind:
   backend.implement: implement
+  frontend.implement: implement
   interface.implement: implement
+  architecture.revise: decide
   content.generate: write
   release.deliver: implement
   runtime.operate: implement

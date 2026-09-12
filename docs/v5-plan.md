@@ -56,6 +56,11 @@ outage does not take the grader with it.
 **Gates, then the final report.** The kernel runs the workflow's gates after the last slice and writes
 one final report: goal, ledger status, every operation with its runtime, commits, checks and verdict.
 
+**The process itself is data.** Which operation kinds exist, the mandatory lane a ledger node walks
+(`interface.draw -> frontend.implement -> uat.verify`, never a step skipped) and the bounded route an outcome
+may take live in `profiles/kinds.yaml`, read by the pure `execution/kind-graph.mjs`: see
+[kinds.md](kinds.md). The model fills an operation and picks among closed options; it never picks the process.
+
 ## 3. Runtime allocation instead of chains
 
 4.x resolved an ordered provider chain and walked it. Ten parallel operations cannot walk one ordered

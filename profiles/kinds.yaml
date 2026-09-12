@@ -1,0 +1,268 @@
+schema: starci/kinds@1
+purpose: |-
+  The process is data, not a judgement call. This catalog is the complete, closed list of operation kinds a
+  workflow may run, the mandatory lane (an ordered template) every ledger node walks, and the bounded routes
+  that an outcome may take. A model fills the content of one operation and picks among the closed options an
+  operation offers; it never decides which step comes next, which kind repairs what, or how many rounds a
+  repair may take. The kernel asks `execution/kind-graph.mjs`, and `execution/kind-graph.mjs` only reads this
+  file: changing the process means editing this profile, never prompting harder.
+vocabularies:
+  # What an operation is for. `design` settles intent, `build` changes the product, `prove` only inspects it,
+  # `repair` puts an authored record back in agreement with what was found.
+  families: [design, build, prove, repair]
+  # The allocator role of profiles/runtimes.yaml; `roleOfKind` there must agree with `role` here.
+  roles: [decide, plan, implement, verify, write]
+  # What a kind is allowed to change. `readOnly: true` means this list is empty.
+  mutates: [code, sds, srs, decision, design, runtime]
+  # Why an operation exists, as the kernel records it on the op.
+  origins: [ledger, shared, repair, gate, verify, architecture]
+  # The report outcomes of execution/reports.mjs.
+  outcomes: [done, partial, failed, ask, blocked]
+  # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
+  # walk that finds the interface design silent is not an SDS gap and must not be routed as one.
+  blockers: [shared-change, sds-gap, interface-gap, environment, authority]
+  # Verdicts the kernel computes about a report (never the reporter's own claim) and routes on.
+  verdicts: [pass, findings, rejected, gate-failed]
+  # What happens to the operation that produced the report:
+  #   retry    - no new operation; the same op runs again
+  #   reopen   - the op returns to pending and depends on the routed op
+  #   pause    - the op is parked until the routed op is done
+  #   settle   - the op is finished; only the routed op carries the work forward
+  #   needUser - nothing is routed automatically; the workflow stops for the user
+  then: [retry, reopen, pause, settle, needUser]
+predicates:
+  node.hasInterfaceDesign: |-
+    The node already binds an interface design that was reviewed - screens, contracts and states exist as a
+    design record the node references - so drawing it again would produce nothing.
+kinds:
+  business.decide:
+    family: design
+    role: decide
+    operator: business.decide
+    readOnly: false
+    mutates: [srs, decision]
+    purpose: Settle what the product must do, in the business record, before anything is designed against it.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [authority]
+  architecture.decide:
+    family: design
+    role: decide
+    operator: architecture.decide
+    readOnly: false
+    mutates: [sds, decision]
+    purpose: Settle how the product realises a requirement, as a new design decision in the design record.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, authority]
+  architecture.revise:
+    family: repair
+    role: decide
+    operator: architecture.decide
+    readOnly: false
+    mutates: [sds]
+    purpose: Repair a design record that a builder found silent or wrong - edit the text and bump its rev.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, authority]
+  interface.draw:
+    family: design
+    role: write
+    operator: interface.draw
+    readOnly: false
+    mutates: [design]
+    purpose: Draw the interface before any interface code exists - screens, contracts, states, empty and error.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [sds-gap, shared-change, authority]
+  frontend.implement:
+    family: build
+    role: implement
+    operator: interface.implement
+    readOnly: false
+    mutates: [code]
+    purpose: Build the interface the drawing settled, against that drawing and nothing invented beside it.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, sds-gap, interface-gap, environment, authority]
+  backend.implement:
+    family: build
+    role: implement
+    operator: backend.implement
+    readOnly: false
+    mutates: [code]
+    purpose: Build one slice of behind-the-interface behaviour under the node's own allowlist.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, sds-gap, environment, authority]
+  runtime.operate:
+    family: build
+    role: implement
+    operator: runtime.operate
+    readOnly: false
+    mutates: [runtime, code]
+    purpose: Operate the runtime the product needs - migrations, environment, deployment, infrastructure.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, sds-gap, environment, authority]
+  uat.verify:
+    family: prove
+    role: verify
+    operator: uat.verify
+    readOnly: false
+    mutates: [code]
+    purpose: Walk one end-to-end scenario on the running product and leave the scenario and its evidence.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, interface-gap, environment, authority]
+  review.verify:
+    family: prove
+    role: verify
+    operator: review.verify
+    readOnly: true
+    mutates: []
+    purpose: Read the delivered slice against its acceptance and report findings, repairing nothing.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [authority]
+# The mandatory sequence per ledger node. `match` is the node shape (`kind`, and `role` for the
+# backend/frontend side a node is delivered on, from its layout or its repository); the first lane whose
+# match fits wins, so the list runs from the most specific to the least. A step is mandatory unless it
+# carries `optionalWhen`, and `optionalWhen` names a predicate the kernel evaluates - never a judgement.
+lanes:
+  - id: implementation/frontend
+    match:
+      - {kind: implementation, role: frontend}
+      - {kind: ui}
+    purpose: Interface work is drawn before it is built and walked end to end before it is believed.
+    steps:
+      - kind: interface.draw
+        optionalWhen: node.hasInterfaceDesign
+      - kind: frontend.implement
+      - kind: uat.verify
+  - id: implementation/backend
+    match:
+      - {kind: implementation, role: backend}
+      - {kind: implementation}
+    purpose: A node that names no frontend side is behind-the-interface work, built then independently read.
+    steps:
+      - kind: backend.implement
+      - kind: review.verify
+  - id: uat
+    match:
+      - {kind: uat}
+    purpose: A UAT node is the walk itself; there is nothing to build first.
+    steps:
+      - kind: uat.verify
+  - id: operations
+    match:
+      - {kind: operations}
+    purpose: Runtime work is operated, then read back by someone who did not operate it.
+    steps:
+      - kind: runtime.operate
+      - kind: review.verify
+  - id: architecture
+    match:
+      - {kind: architecture}
+    purpose: A design node is settled once; builders depend on it, they do not re-decide it.
+    steps:
+      - kind: architecture.decide
+  - id: business
+    match:
+      - {kind: business}
+      - {kind: business-overview}
+    purpose: A business node is settled once, before any design is drawn against it.
+    steps:
+      - kind: business.decide
+# Bounded outcome routing. `on` is the report shape the kernel observed, `from` the kind that produced it
+# (`any` for every kind), `to` the operation the graph creates - `same` is the reporter's own kind and
+# `lane.build` the build step of the reporter's lane, so a frontend repair is never a backend op. `limit`
+# bounds how many times one route may fire for the same node group; past it the workflow asks the user.
+# Ordered: the first matching route wins, and a route with an explicit `from` stands before the `any` one.
+routes:
+  - id: uat-red-repairs-the-build
+    on: {outcome: failed}
+    from: uat.verify
+    to: {kind: lane.build, origin: repair}
+    limit: 3
+    then: settle
+    purpose: A red end-to-end scenario is a defect in the build it walked, not in the walk.
+  - id: review-findings-repair-the-build
+    on: {verdict: findings}
+    from: review.verify
+    to: {kind: lane.build, origin: repair}
+    limit: 3
+    then: settle
+    purpose: A read-only review never repairs; its findings become one repair of the kind that built the slice.
+  - id: rejected-report-retries
+    on: {verdict: rejected}
+    from: any
+    to: {kind: same}
+    limit: 2
+    then: retry
+    purpose: A report the kernel could not reproduce is the same operation again, with what it got told back.
+  - id: red-gate-repairs-the-build
+    on: {verdict: gate-failed}
+    from: any
+    to: {kind: lane.build, origin: gate}
+    limit: 3
+    then: settle
+    purpose: A failing workflow gate is one repair operation, never a relaxed gate.
+  - id: sds-gap-revises-the-design
+    on: {blocker: sds-gap}
+    from: any
+    to: {kind: architecture.revise, origin: architecture}
+    limit: 2
+    then: reopen
+    purpose: A builder that found the design silent waits for the design to be revised, then reads it again.
+  - id: interface-gap-redraws-the-interface
+    on: {blocker: interface-gap}
+    from: any
+    to: {kind: interface.draw, origin: architecture}
+    limit: 2
+    then: reopen
+    purpose: A missing screen, state or contract is drawn first; it is never improvised in the build.
+  - id: shared-change-is-a-scoped-build
+    on: {blocker: shared-change}
+    from: any
+    to: {kind: same, origin: shared}
+    limit: 3
+    then: pause
+    purpose: A path outside the allowlist becomes one scoped operation of the same kind; the requester waits.
+  - id: environment-needs-the-user
+    on: {blocker: environment}
+    from: any
+    to: {needUser: true}
+    limit: 1
+    then: needUser
+    purpose: A runtime that cannot start is not an operation's to fix; the workflow says so and stops.
+  - id: authority-needs-the-user
+    on: {blocker: authority}
+    from: any
+    to: {needUser: true}
+    limit: 1
+    then: needUser
+    purpose: A decision the goal does not authorise belongs to the user, not to a model.
+  - id: question-needs-the-user
+    on: {outcome: ask}
+    from: any
+    to: {needUser: true}
+    limit: 1
+    then: needUser
+    purpose: |-
+      A question the kernel cannot answer from the operation's own closed options reaches the user. The
+      kernel may answer it in place once, from those options; it never invents an answer it was not offered.
+  - id: partial-resumes-the-same-op
+    on: {outcome: partial}
+    from: any
+    to: {kind: same}
+    limit: 5
+    then: retry
+    purpose: Unfinished work is the same operation once more, carrying its own open items forward.
+  - id: failed-retries-the-same-op
+    on: {outcome: failed}
+    from: any
+    to: {kind: same}
+    limit: 3
+    then: retry
+    purpose: A failing check is retried with the failure named; past the limit the workflow asks the user.
