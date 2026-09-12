@@ -101,7 +101,7 @@ function fixture(t){
     work:{ownerRole:'be',pathFromRepository:'.starciwork'}},null,2)}\n`);
   return {root,source,host,owner,code,work,
     read:id=>parseYaml(fs.readFileSync(path.join(work,'features/sales/implementation',id===RECEIPT?'frontend/receipt':'backend/intake','index.yaml'),'utf8')),
-    evidence:id=>path.join(work,'features/sales/implementation',id===RECEIPT?'frontend/receipt':'backend/intake','evidence',`${id}-evidence`,'manifest.yaml')};
+    evidence:(id,opId=id)=>path.join(work,'features/sales/implementation',id===RECEIPT?'frontend/receipt':'backend/intake','evidence',`${opId}-evidence`,'manifest.yaml')};
 }
 
 /** The goal phase of a frontend workflow against the routed tree, stopping before any approval. */
@@ -127,7 +127,7 @@ test('a frontend workflow binds the Work tree its backend owns and takes only th
   assert.deepEqual(run.state.ledgerOwner,{repoRoot:run.owner,repository:'demo-backend',role:'be',project:'demo'});
   assert.equal(run.state.codeSide,'frontend');
   // The backend node names no repository and sits in implementation/backend/**: it is not this job's work.
-  assert.deepEqual(run.state.ops.map(op=>[op.id,op.nodeId,op.kind]),[[RECEIPT,RECEIPT,'backend.implement']]);
+  assert.deepEqual(run.state.ops.map(op=>[op.id,op.nodeId,op.kind]),[[RECEIPT,RECEIPT,'interface.draw']]);
   assert.deepEqual(run.state.ops[0].allowlist,[PAGE]);
   assert.deepEqual(run.state.ledger.map(item=>item.id),[RECEIPT]);
   assert.equal(run.state.needUser.length,0);
@@ -148,7 +148,12 @@ test('the accepted slice is recorded and committed in the owner, names the front
   approve(run.store,run.state);
   run.state.run='run_wf';run.state.from='term_kernel';
   const orca=scriptedOrca({reportsDir:run.store.paths.reports,worktree:run.code,
-    scripts:{[RECEIPT]:[{outcome:'done',summary:'The receipt page renders.',files:[PAGE],
+    // The frontend lane: the surface is drawn, then built, then walked; the node is done only after the walk.
+    scripts:{[RECEIPT]:[{outcome:'done',summary:'The receipt surface is drawn.',files:[],
+      checks:[passing('unit-tests-pass','npx vitest run receipt')]}],
+      [`${RECEIPT}-implement`]:[{outcome:'done',summary:'The receipt page renders.',files:[PAGE],
+      checks:[passing('unit-tests-pass','npx vitest run receipt')]}],
+      [`${RECEIPT}-verify`]:[{outcome:'done',summary:'The receipt flow passes on the surface.',files:[],
       checks:[passing('unit-tests-pass','npx vitest run receipt')]}]}});
   // The agent's work: the page is written in the frontend worktree and nowhere else.
   fs.writeFileSync(path.join(run.code,PAGE),'export default function Receipt(){return <main>Receipt</main>;}\n');
@@ -159,21 +164,23 @@ test('the accepted slice is recorded and committed in the owner, names the front
     // launch itself is stood in for and everything after it is the kernel's own path.
     launch:(_orca,{operation,scope})=>orca.register(scope??operation),
     decide:()=>{throw Error('decide must not be called on a policy-covered path');},
-    waitTimeoutMs:2000,tickMs:1000,maxIterations:1});
+    waitTimeoutMs:2000,tickMs:1000,maxIterations:10});
 
+  const built=state.ops.find(op=>op.kind==='frontend.implement'),last=state.ops.find(op=>op.kind==='uat.verify');
+  assert.deepEqual(state.ops.map(op=>op.kind),['interface.draw','frontend.implement','uat.verify']);
   const receipt=run.read(RECEIPT);
   assert.equal(receipt.state,'done');
   assert.equal(receipt.extensions.work3.kernel.verifiedBy,'starci-kernel');
-  assert.deepEqual(receipt.completion.evidence,[`${RECEIPT}-evidence`]);
+  assert.deepEqual(receipt.completion.evidence,[`${last.id}-evidence`],'the completion is named after the op that closed the lane');
   // Source identity names the repository the code is in - the frontend - never the owner of the ledger.
   assert.equal(receipt.completion.sourceIdentity.repositories[0].repository,'demo-frontend');
-  assert.equal(receipt.completion.sourceIdentity.repositories[0].commit,state.ops[0].head);
+  assert.equal(receipt.completion.sourceIdentity.repositories[0].commit,built.head,'the identity binds the head of the code, which the build step produced');
   assert.equal(receipt.completion.sourceIdentity.repositories[0].coverage.kind,'scoped');
-  const manifest=parseYaml(fs.readFileSync(run.evidence(RECEIPT),'utf8'));
+  const manifest=parseYaml(fs.readFileSync(run.evidence(RECEIPT,last.id),'utf8'));
   assert.equal(manifest.nodeId,RECEIPT);
   assert.equal(manifest.outcome,'pass');
   assert.equal(manifest.sourceIdentity.repositories[0].repository,'demo-frontend');
-  assert.deepEqual(manifest.provenance.servedVersions,[{repository:'demo-frontend',commit:state.ops[0].head,artifact:'worktree'}]);
+  assert.deepEqual(manifest.provenance.servedVersions,[{repository:'demo-frontend',commit:built.head,artifact:'worktree'}]);
   // The backend node was never touched: another workflow in another repository owns it.
   assert.equal(run.read(INTAKE).state,'todo');
 
@@ -182,13 +189,13 @@ test('the accepted slice is recorded and committed in the owner, names the front
   assert.equal(git(run.code,'status','--porcelain'),'');
   const ledgerCommit=git(run.owner,'rev-parse','HEAD');
   assert.notEqual(ledgerCommit,ownerHead,'the ledger write is committed in the repository that owns the tree');
-  assert.match(git(run.owner,'log','-1','--format=%B'),new RegExp(`^work\\(${RECEIPT.replaceAll('.','\\.')}\\): record ${RECEIPT.replaceAll('.','\\.')} in the Work ledger`));
+  assert.match(git(run.owner,'log','-1','--format=%B'),new RegExp(`^work\\(${RECEIPT.replaceAll('.','\\.')}\\): record ${last.id.replaceAll('.','\.')} in the Work ledger`));
   assert.match(git(run.owner,'log','-1','--format=%B'),new RegExp(`Work: ${RECEIPT.replaceAll('.','\\.')}`));
   assert.equal(git(run.owner,'status','--porcelain','--','.starciwork/features'),'','the write is committed, not left dirty in somebody else'+"'"+'s repository');
   assert.equal(git(run.owner,'status','--porcelain','--','.starciwork'),'?? .starciwork/_local/','only the kernel\'s own runtime directory stays untracked');
-  assert.equal(state.head,state.ops[0].head,'the workflow head stays the head of the code it produced');
+  assert.equal(state.head,built.head,'the workflow head stays the head of the code it produced');
   assert.notEqual(state.head,ledgerCommit);
-  assert.equal(state.ops[0].ledgerCommit,ledgerCommit);
+  assert.equal(last.ledgerCommit,ledgerCommit);
 
   const events=run.store.readEvents();
   const loaded=events.find(event=>event.event==='ledger-loaded');

@@ -140,7 +140,7 @@ test('every declared route resolves, carries a limit and says what happens to th
   assert.equal(routeFor({verdict:'findings',kind:'review.verify',lane:['runtime.operate','review.verify']},{profile}).kind,'runtime.operate');
   const red=routeFor({outcome:'failed',kind:'uat.verify',lane:lane('frontend')},{profile});
   assert.deepEqual({kind:red.kind,origin:red.origin,then:red.then,limit:red.limit},
-    {kind:'frontend.implement',origin:'repair',then:'settle',limit:3});
+    {kind:'frontend.implement',origin:'repair',then:'reopen',limit:3},'a red walk repairs the build and the walk runs again behind it');
   // A rejected report is the same operation again, bounded, with no new operation and no new origin.
   const rejected=routeFor({verdict:'rejected',kind:'backend.implement'},{profile});
   assert.deepEqual({kind:rejected.kind,origin:rejected.origin,then:rejected.then,limit:rejected.limit},

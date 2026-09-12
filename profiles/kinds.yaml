@@ -202,14 +202,14 @@ routes:
     from: uat.verify
     to: {kind: lane.build, origin: repair}
     limit: 3
-    then: settle
+    then: reopen
     purpose: A red end-to-end scenario is a defect in the build it walked, not in the walk.
   - id: e2e-red-repairs-the-build
     on: {outcome: failed}
     from: e2e.verify
     to: {kind: lane.build, origin: repair}
     limit: 3
-    then: settle
+    then: reopen
     purpose: A red API scenario is a defect in the slice it exercised, not in the scenario.
   - id: review-findings-repair-the-build
     on: {verdict: findings}

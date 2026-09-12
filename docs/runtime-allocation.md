@@ -9,6 +9,11 @@ cooldown — plus the role the worker will play. `maxParallelOps: 10` caps the
 whole workflow, so ten ready operations can be in flight across Codex, Claude
 and Qwen at the same time instead of queueing behind one provider.
 
+The role of an operation kind comes from the kind graph (`profiles/kinds.yaml`
+through `execution/kind-graph.mjs`), which is the one place a kind is defined;
+`roleOfKind` in `profiles/runtimes.yaml` stays the fallback for a kind the graph
+does not carry, which is every 4.x operator id the graph never adopted.
+
 ## The policy: prefer, then overflow
 
 The kernel does **not** spread work evenly. Each role has a preference order in

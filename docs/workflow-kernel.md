@@ -30,16 +30,69 @@ A workflow's ledger is either the product's own or one a model assessed, and `--
 | --- | --- | --- |
 | where the TODO list comes from | the authored Work tree, through the shipped validator | `assessGoal` invents it |
 | what the model is asked | the definition of done, risks and questions | the whole plan form |
-| what an op is | one eligible `todo` node in `--scope` | one op of the assessed plan |
+| what an op is | one step of the lane of one eligible `todo` node in `--scope` | one op of the assessed plan |
 | goal text / allowlist / checks / acceptance | `description` / `implementation.changes[].files` / `extensions.work3.checks` / `assertions` | the model's op form |
-| what an accepted slice writes | the node's `state`, `completion` and an evidence manifest, plus a `Work: <node id>` commit trailer | nothing outside the workflow directory |
-| review granularity | one `review.verify` per module | one per connected ledger component |
+| what an accepted slice writes | the node's `state`, `completion` and an evidence manifest - at the LAST lane step only - plus a `Work: <node id>` commit trailer | nothing outside the workflow directory |
+| review granularity | one `review.verify` per module, for lanes whose template names it | one per connected ledger component |
 
 A node that declares no allowlist or no checks is never guessed at: it is listed in `goal.md` under
 **Needs you first** as `ledger incomplete` and becomes a `needUser` item, because inventing a scope for
 authored work is exactly what the ledger exists to prevent. Decision nodes (`business`,
 `business-overview`, `architecture`) are listed too but never launched into a worktree - a decision is
 answered. The exception is a reported `sds-gap`: see the policy table.
+
+## Lanes and routes
+
+One Work node is not one operation. It is a **lane**: the ordered kinds it travels before its ledger entry may
+be called done. `profiles/kinds.yaml` declares the catalog and the lanes; `execution/kind-graph.mjs` reads it
+(`laneFor`, `nextKind`, `routeFor`, `roleOf`, `familyOf`, `isReadOnly`, `describeLane`, `validateGraph`), and the
+kernel only walks what it answers. Adding "frontend work is drawn before it is coded, and proved by a UAT run"
+is a profile edit, not a patch to the control loop.
+
+| lane | steps | who creates each step |
+| --- | --- | --- |
+| `implementation/backend` | `backend.implement` -> `review.verify` | the node, then the kernel's review planner |
+| `implementation/frontend` | `interface.draw` -> `frontend.implement` -> `uat.verify` | the node, all three |
+| `operations` | `runtime.operate` -> `review.verify` | the node, then the review planner |
+| `uat` | `uat.verify` | the node |
+| `architecture` / `business` | `architecture.decide` / `business.decide` | answered as a decision, never launched |
+
+The layout comes from the node path: a node under `implementation/frontend/**` takes the frontend lane, one
+under `implementation/backend/**` (or any implementation node that names no layout) the backend lane. A `ui`
+node is frontend by kind. `state.lanes[nodeId] = {lane, done, checks, head}` is the whole bookkeeping.
+
+Three rules follow, and they are the difference from 4.x:
+
+- **One step at a time.** A node yields its next operation only when the previous step is accepted and nothing
+  of that node is still in flight. The op id is the node id for the first step and `<node>-<action>` after it.
+- **The ledger hears `in-progress` until the last step.** Every accepted step writes `markInProgress` and a
+  `lane-step` event; `markDone` - with the checks every step of the lane proved and one evidence manifest - is
+  written only when `nextKind` answers null. So the node's completion is named after the step that completed
+  its lane (a backend node's evidence record is the review's), and a half-built node is never `done` in the tree.
+- **`review.verify` stays the kernel's.** The review planner creates it for a lane whose template names it; a
+  frontend lane is proved by its own `uat.verify` step, so no review is planned for one.
+
+A **route** is the same idea for a reported outcome: the graph says which kind answers it, under which origin,
+what happens to the reporter (`pause`, `reopen`, `retry`) and with which bound. Every application appends
+`routed {op, on, to, origin}`.
+
+| on | routes to | the reporter | bound |
+| --- | --- | --- | --- |
+| `blocked` `sds-gap` | `architecture.revise` on the architecture node (its `index.yaml` plus its SDS folder), origin `architecture`, whose own check is that the Work tree still validates; `markDecided` bumps the node's `rev` | reopened behind it | - |
+| `blocked` `interface-gap` | `interface.draw` on the same node, origin `architecture` | reopened behind it | - |
+| `blocked` `shared-change` | the reporter's own kind, origin `shared` | paused | 3 new shared ops per iteration |
+| review findings | the lane's build kind (so a finding on frontend work comes back as `frontend.implement`), origin `repair` | finished; the repair carries the work | 3 rounds per reviewed node set |
+| `uat.verify` reporting `failed` | the lane's build kind, origin `repair` | reopened behind the repair | the same 3 review rounds |
+| validator reject | retry of the same op | retried | 2 (`validatorRejectLimit()`) |
+| `blocked` `environment` / `authority` | nothing | blocked, `needUser` | - |
+
+Kinds younger than `ops/registry.yaml` are resolved to a launchable operator id once, at the launch seam:
+`frontend.implement` launches as `interface.implement` and `architecture.revise` as `architecture.decide`
+(`launchOperator`). The allocator is asked for the op's own kind, because `roleOf` from the graph is what
+decides its role - the runtimes profile's `roleOfKind` map is only the fallback for a kind the graph lacks.
+
+A profile that cannot be read is not fatal: the graph is empty, `WORK_OPERATION` maps the node kind as it did
+in 4.x, every route falls back to its built-in default, and one `kind-graph-problem` event says so.
 
 ## Phases
 
@@ -62,7 +115,8 @@ iteration:
 1. **answer** every op waiting for an answer (`notifyTerminal`), then
 2. **shared changes** - return every `paused` op whose shared op is `done` to `ready`, and create the shared
    ops a full earlier iteration had to queue, then
-3. **review** - create a `review.verify` op for each ledger group whose implementing ops are all done, then
+3. **lanes and review** - give every node whose previous lane step is accepted its next operation, and create a
+   `review.verify` op for each ledger group whose implementing ops are all done and whose lane names that step, then
 4. **schedule** - every op whose `dependsOn` are done, whose allowlist does not overlap a running op's
    allowlist and whose resource locks do not clash a running op's, up to `allocator.maxParallelOps`, gets a
    runtime from `allocator.allocate(kind,{avoid})`, a rendered contract, and a launch; then
@@ -165,9 +219,11 @@ the validator and writes `validator-skipped` once; tests inject a stub the same 
 | a report whose op wrote a kernel-owned path | `revertProtected`, report downgraded to `failed` with the finding `operation modified kernel-owned ledger paths: <paths>`, op retried | retry bound |
 | an op created at run time past `state.dynamicOpsBudget`, or whose whole allowlist is outside `state.scope` | the op is created `blocked` and becomes a `needUser` item; `workflow-approve --allow-dynamic N` reinstates it | 6 dynamic ops per workflow |
 | two `stalled-silent` settlements of one runtime within 30 minutes | `allocator.failed(runtime,{reason:'rate-limited (inferred from repeated silence)'})` and a `rate-limit-inferred` event | the window is cleared after it fires |
-| `blocked` `sds-gap` | on the Work ledger: `markReopened` the architecture node the report names (or the one in the op's module) and create an `architecture.decide` op on that node's `index.yaml`, whose own check is that the Work tree still validates; `markDecided` settles it when the op is accepted. On a plan ledger: an `architecture.decide` op on the design inputs, re-planned with `planOp` afterwards. Either way the blocked op depends on it and resumes afterwards | - |
+| `blocked` `sds-gap` | on the Work ledger: `markReopened` the architecture node the report names (or the one in the op's module) and create the route's `architecture.revise` op on that node's `index.yaml` and SDS folder, whose own check is that the Work tree still validates; `markDecided` settles it with a bumped `rev` when the op is accepted. On a plan ledger: an `architecture.decide` op on the design inputs, re-planned with `planOp` afterwards. Either way the blocked op depends on it and resumes afterwards | - |
+| `blocked` `interface-gap` | the route's `interface.draw` op on the same node; the reporter is reopened behind it | - |
 | `blocked` `environment` / `authority` | `needUser`, op blocked | - |
-| review with findings | one `backend.implement` repair op on the files the findings name inside the group's allowlists, then a fresh review | 3 rounds per ledger group |
+| review with findings | one repair op of the lane's build kind on the files the findings name inside the group's allowlists, then a fresh review | 3 rounds per ledger group |
+| a `uat.verify` op reporting `failed` | one repair op of the lane's build kind, and the UAT run itself reopened behind it | the same 3 rounds per node set |
 | failing gate | one repair op whose findings are the tail of the gate output, then the gates again | 3 rounds |
 | `stalled-prompt` / `stalled-silent` / `dead` from the tick | `settleDispatch(close)` and requeue on another runtime | 3 restarts |
 | nothing launchable and nothing running | `needUser`, stop `blocked` | 3 iterations |
@@ -218,7 +274,8 @@ authored line byte for byte. The kernel calls it at four points:
 | when | call | what it records |
 | --- | --- | --- |
 | an op launches | `markInProgress` | `opId` and `dispatch` in the kernel block; `state` stays `todo`, because Work v2 authors only `uninvestigate`, `todo` and `done` |
-| a `done` the kernel reproduced | `markDone` + its evidence manifest | the checks the kernel re-ran, the assertion each proves, the head, and a `completion` bound to the digest the validator reports after the kernel block was written |
+| a lane step is accepted and another follows | `markInProgress` again + a `lane-step` event | the step that just landed; the node is still `todo`, because its lane is not walked |
+| the LAST lane step is accepted | `markDone` + its evidence manifest | the checks every step of the lane proved, the assertion each one covers, the head, and a `completion` bound to the digest the validator reports after the kernel block was written |
 | a decision op is accepted | `markDecided` | a collocated `starci/design-review@1` with one observation per authored assertion - a decision is never settled by an execution receipt |
 | a reported `sds-gap` | `markReopened` | the node returns to `todo` with the reason, and its stored proof is kept as history |
 
@@ -267,9 +324,11 @@ no profile for that operation is never chosen and then rejected.
 
 ## The operation contract
 
-`renderContract` owns every concrete value - goal, goal items, allowlist, the kernel-owned paths the op may
-never touch, its resource locks, references, inherited open items, findings, acceptance, the exact check
-commands, the checks file, the report command with `--reports-dir`.
+`renderContract` owns every concrete value - the lane line (`Lane: interface.draw -> frontend.implement ->
+uat.verify (this op: step 2 of 3)`, so an operation knows what came before it and what will judge it), goal,
+goal items, allowlist, the kernel-owned paths the op may never touch, its resource locks, references, inherited
+open items, findings, acceptance, the exact check commands, the checks file, the report command with
+`--reports-dir`.
 Between the acceptance and the process prose it splices the kind-specific working order from
 `execution/contract-steps.mjs` (`stepsFor`): see [op-granularity.md](op-granularity.md), "Working order per kind".
 The process prose (`## Cook until done`, `## Ping (mandatory)`, `## Never`) is reused verbatim from
