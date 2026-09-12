@@ -1,6 +1,6 @@
 {
   "name": "starci",
-  "version": "4.0.0-alpha.1",
+  "version": "4.2.0",
   "description": "StarCi: one skill, bounded workflow matrices, complete operators and verified direct tasks.",
   "license": "MIT",
   "type": "module",

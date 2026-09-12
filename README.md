@@ -16,7 +16,7 @@ StarCi provides:
 
 StarCi is not a hosted agent service or an autonomous project runner. Your coding agent executes the work; the CLI supplies installation, inspection and validation. It does not call an LLM or need its own API key.
 
-**Status:** `4.0.0-alpha.1` · **Requirements:** Node.js 20+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release of this build. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
+**Status:** `4.2.0` · **Requirements:** Node.js 20+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release of this build. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
 
 [Quick start](#quick-start) · [First project](#first-project) · [Execution modes](#execution-modes) · [CLI](#cli) · [Documentation](#documentation)
 
@@ -46,11 +46,11 @@ Start with an empty test host. The installer writes **source** into `.claude`, b
 
 ### Install an archive with npx
 
-If you have a reviewed `starci-4.0.0-alpha.1.tgz`, run from the directory containing it:
+If you have a reviewed `starci-4.2.0.tgz`, run from the directory containing it:
 
 ```sh
-npx --yes --package=./starci-4.0.0-alpha.1.tgz starci init --dir /absolute/path/to/host
-npx --yes --package=./starci-4.0.0-alpha.1.tgz starci doctor --dir /absolute/path/to/host --quick
+npx --yes --package=./starci-4.2.0.tgz starci init --dir /absolute/path/to/host
+npx --yes --package=./starci-4.2.0.tgz starci doctor --dir /absolute/path/to/host --quick
 ```
 
 No global installation is required. `npx` executes package code: inspect the archive and choose the target deliberately. Maintainers can create an archive with `npm pack`; see [release verification](docs/releasing.md).
@@ -58,7 +58,7 @@ No global installation is required. `npx` executes package code: inspect the arc
 After this exact version is published, the equivalent registry command will be:
 
 ```sh
-npx starci@4.0.0-alpha.1 init --dir /absolute/path/to/host
+npx starci@4.2.0 init --dir /absolute/path/to/host
 ```
 
 That registry command is a future release instruction, **not the current quick start**. See [installation](docs/installation.md) for update, doctor and project binding.

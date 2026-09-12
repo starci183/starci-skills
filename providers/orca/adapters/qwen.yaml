@@ -33,12 +33,13 @@ submission:
 modelMarker: qwen3.8-flash
 approvalMode:
   working: yolo
-  reasoning: plan
+  reasoning: yolo
   reason: |-
-    A review operation has no write authority; Qwen's plan mode refuses file edits and shell mutations at the tool layer instead of trusting the prompt.
-    Working operations run unattended in an isolated child worktree under an allowlist, so they use yolo. The auto mode was
-    rejected live (OBS-27): it asks a remote classifier, and when that classifier is unavailable Qwen parks at an
-    interactive "Allow execution?" prompt that no supervisor can see; the heartbeat stays fresh while nothing runs.
+    Every Qwen operation runs unattended in an isolated child worktree under a contract allowlist, so both roles use
+    yolo. Plan mode was rejected live (4.2): it asks for confirmation on every shell command, including the heartbeat
+    send, so a review parked at "Allow execution of: 'orca'?" while its heartbeat stayed fresh. Auto mode was rejected
+    earlier (OBS-27) for the same reason with a remote classifier. Write authority for a review is enforced by the
+    contract allowlist and the Monitor's report validation, not by the provider's approval mode.
 start:
   - api: terminal.create
     binding: declared-target-command-with-credential-refresh
