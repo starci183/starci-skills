@@ -121,7 +121,7 @@ export function parseSkip(value,chain,registry=readDistJson('profiles','registry
  * allocator - not the chain - decides which runtime an operation gets, and the launcher must then try
  * exactly that one. A caller passes either `skip` or `candidates`, never both.
  */
-export function buildOperationLaunch({run,workflowTask,from,worktree,operation,scope,spec,skip,candidates:allocated=null}){
+export function buildOperationLaunch({run,workflowTask,from,worktree,operation,scope,spec,skip,candidates:allocated=null,kind=null}){
   const runId=required(run,'nested workflow Run ID'),workflow=required(workflowTask,'parent workflow Task ID');
   const monitor=required(from,'own supervising terminal handle');
   need(monitor.startsWith('term_'),'--from must be the exact supervising terminal handle');
@@ -137,7 +137,8 @@ export function buildOperationLaunch({run,workflowTask,from,worktree,operation,s
   const skipped=allocated?[]:parseSkip(skip,fullChain);
   const chain=fullChain.filter(candidate=>!skipped.some(item=>item.target===candidate.target));
   need(chain.length,'Every candidate of the operation chain was skipped');
-  const displayName=formatOrcaDisplayName('operation-agent',{operation:op,scope:opScope});
+  // The tab is named after the op's KIND: an `e2e.verify` op launched through the `uat.verify` operator contract must read as e2e.
+  const displayName=formatOrcaDisplayName('operation-agent',{operation:kind??op,scope:opScope});
   const candidates=chain.map(selection=>{
     const planned=planOperationAgentLaunch({taskId:'$operationTaskId',worktree:target.selector,selection,operation:op,scope:opScope});
     if(planned.mode==='command-terminal'){

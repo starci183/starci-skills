@@ -898,7 +898,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
   op.contractFile=store.contractPath(op.id);
   const relative=path.relative(process.cwd(),state.worktree)||'.';
   const launched=ctx.launch(orca,{cwd:state.worktree,run:state.run,workflowTask:state.workflowTask??state.id,from:state.from,
-    worktree:relative,operation:launchOperator(op.kind),scope:op.id,spec:contract,candidate:allocated.candidate,runtime:allocated.runtime,wait:ctx.wait});
+    worktree:relative,operation:launchOperator(op.kind),kind:op.kind,scope:op.id,spec:contract,candidate:allocated.candidate,runtime:allocated.runtime,wait:ctx.wait});
   op.launch={ok:Boolean(launched?.ok),target:launched?.selection?.target??allocated.target,
     task:launched?.task?.id??null,dispatch:launched?.dispatchId??null,stopReason:launched?.stopReason??null};
   if(!launched?.ok){
