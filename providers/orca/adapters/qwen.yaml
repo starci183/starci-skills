@@ -31,6 +31,10 @@ submission:
   timeoutMs: 45000
   maxEnter: 2
 modelMarker: qwen3.8-flash
+approvalMode:
+  working: auto
+  reasoning: plan
+  reason: A review operation has no write authority; Qwen's plan mode refuses file edits and shell mutations at the tool layer instead of trusting the prompt.
 start:
   - api: terminal.create
     binding: declared-target-command-with-credential-refresh

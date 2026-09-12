@@ -43,7 +43,11 @@ export function resolveExecutionChain({skill='starci',op}){
     const runtime=normalizeRuntime(route.runtime),profiles=runtimes[runtime]?.profiles,selected=profiles?.[profileId];
     if(!selected||selected.role!==role)throw Error('Execution target role mismatch');
     need(plain(route.orcaLaunch)&&launchAllowed(route.orcaLaunch),'Automatic Orca chains require a managed agent or a return-preamble command terminal');
-    return {priority,target,runtime,provider:runtimes[runtime].provider,profile:profileId,role,model:selected.model,orcaLaunch:structuredClone(route.orcaLaunch)};
+    const orcaLaunch=structuredClone(route.orcaLaunch);
+    // A reasoning role runs the analysis-only command when the target declares one (review must not repair).
+    if(orcaLaunch.kind==='command-terminal'&&role==='reasoning'&&orcaLaunch.reasoningCommand)orcaLaunch.command=orcaLaunch.reasoningCommand;
+    delete orcaLaunch.reasoningCommand;
+    return {priority,target,runtime,provider:runtimes[runtime].provider,profile:profileId,role,model:selected.model,orcaLaunch};
   });
   return {schema:'starci/execution-chain@1',skill,op,role,candidates};
 }

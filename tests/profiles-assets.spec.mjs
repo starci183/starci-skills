@@ -55,7 +55,7 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.equal(registry.orchestration.defaultOperationTarget,'qwen3.8-flash');
   assert.deepEqual(resolveExecutionChain({op:'backend.implement'}).candidates.map(x=>x.target),['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
   assert.deepEqual(resolveExecutionChain({op:'backend.implement'}).candidates[0].orcaLaunch,qwenLaunch);
-  assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates[0].orcaLaunch,qwenLaunch);
+  assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates[0].orcaLaunch,{...qwenLaunch,command:qwenLaunch.command.replace('--approval-mode auto','--approval-mode plan')});
   assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[0].profile,'qwen3.8-flash-reviewer');
   assert.equal(resolveExecutionChain({op:'backend.implement'}).candidates[0].profile,'qwen3.8-flash-worker');
   assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[2].profile,'gpt-5.6-sol-reviewer');

@@ -159,4 +159,5 @@ $defs:
             properties:
               kind: {const: command-terminal}
               command: {type: string, minLength: 1}
+              reasoningCommand: {type: string, minLength: 1}
               dispatch: {const: return-preamble-and-send}

@@ -114,6 +114,7 @@ targets:
     orcaLaunch:
       kind: command-terminal
       command: qwen --model qwen3.8-flash --approval-mode auto --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      reasoningCommand: qwen --model qwen3.8-flash --approval-mode plan --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
   qwen3.8-max:
     runtime: qwen

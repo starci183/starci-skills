@@ -59,7 +59,10 @@ export function flattenOperationCandidates({operation, registry}) {
       if (targetEnvironment !== environment) throw Error(`Execution target ${target} does not belong to environment ${environment}`);
       const profile = configured.profiles?.[role];
       if (!text(profile) || !(configured.requestedModel === null || text(configured.requestedModel))) throw Error(`Execution target ${target} has no ${role} profile or an invalid requestedModel`);
-      declaredTargets.set(target, {environmentPriority, profilePriority, environment, configured: {...configured, profile}});
+      const orcaLaunch = clone(configured.orcaLaunch);
+      if (orcaLaunch.kind === 'command-terminal' && role === 'reasoning' && orcaLaunch.reasoningCommand) orcaLaunch.command = orcaLaunch.reasoningCommand;
+      delete orcaLaunch.reasoningCommand;
+      declaredTargets.set(target, {environmentPriority, profilePriority, environment, configured: {...configured, profile, orcaLaunch}});
     }
   }
   if (route.chain.length !== declaredTargets.size || new Set(route.chain).size !== route.chain.length) throw Error(`Operation route chain must contain every declared target exactly once: ${operationName}`);
