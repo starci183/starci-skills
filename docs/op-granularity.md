@@ -38,7 +38,7 @@ carries a mandatory numbered section, `## Working order (mandatory, in this orde
 `execution/contract-steps.mjs` (`stepsFor`, `sequenceFor`) from the operation's own values - its
 allowlist, its `name: command` checks, its acceptance ids, references, resources, requesters and
 findings - never from generic wording. The sequence is chosen from the op kind and origin, then from
-the Work node kind it closes, then from its allowlist; an unknown kind falls back to `generic`.
+the Work node kind and layout it closes, then from its allowlist; an unknown kind falls back to `generic`.
 
 | Sequence | Chosen when | Order |
 | --- | --- | --- |
@@ -46,12 +46,32 @@ the Work node kind it closes, then from its allowlist; an unknown kind falls bac
 | `implement.shared` | origin `shared` | read the requester's paths -> minimal change, no refactor -> requester's checks -> report |
 | `implement.repair` | origin `repair` | map each finding -> confirm the check fails -> fix each -> re-run -> report with a finding -> fix map |
 | `implement.gate` | origin `gate` | read the failing gate -> re-run it -> fix exactly what it names -> re-run -> report |
+| `interface.draw` | kind `interface.draw` | read SRS/SDS + assertions -> enumerate every screen and every state -> draw inside the installed design grammar -> write the interface design record (blueprint, states, contract slots, copy) -> one rendered candidate per state where rendering is supported -> report; a missing business rule is `blocked` `sds-gap` |
+| `frontend.implement` | kind `frontend.implement`, or any implementing kind on an `implementation/frontend/**` node | read the interface design record first (a screen or state it lacks is `blocked` `interface-gap`) -> story/spec red per state -> implement with the typed components only -> update stories and skeletons -> lint/typecheck/unit -> report |
 | `review.verify` | kind `review.verify` | read-only: run every check yourself -> compare against assertions and SDS -> findings name file+line+assertion -> never fix -> `done` with findings (empty when clean) |
-| `uat` | `uat.verify` or a ledger `uat` node | read the flow folder (flow, seed, accounts) -> e2e spec at the allowlisted path -> run on the `resources` runtime -> report with the output; a runtime that cannot start is `failed`, never `done` |
+| `uat` | a ledger `uat` node without an explicit `uat.verify` kind | read the flow folder (flow, seed, accounts) -> e2e spec at the allowlisted path -> run on the `resources` runtime -> report with the output; a runtime that cannot start is `failed`, never `done` |
+| `uat.verify` | kind `uat.verify` | read the flow folder, seed and accounts -> start the named runtime -> walk the rendered surface as a person does, never the API -> a screenshot per step -> compare each step against the interface design record and the assertions -> write the run record under the flow folder -> `done` only on a complete passing walk |
 | `migration` | allowlist contains `migrations/` | new migration only -> apply on a real container -> roll back -> re-apply (idempotence) -> checks -> report |
 | `operations` | `runtime.operate` or a ledger `operations` node | apply on a real container -> roll back -> re-apply -> checks -> report |
-| `decide` | `architecture.decide` / `business.decide` | closed options only -> weigh -> write the decision with rationale into the node -> no code |
+| `architecture.revise` | kind `architecture.revise` | read the gap report -> edit only the named SDS section -> bump its `rev` and append one decision-log entry -> run the validator check -> report the rev and the sections; no code |
+| `decide` | `business.decide` (what the product must do) / `architecture.decide` (how the system satisfies it) | closed options only -> weigh against the requirement and the layer it must stay inside -> write the decision with rationale into the node -> no code, and no decision belonging to the other layer |
 | `generic` | anything else | read -> prove failing -> change -> checks -> self-audit -> report once |
+
+### The frontend lane
+A frontend node is not one operation. Its sequences run in order - `interface.draw` -> `frontend.implement`
+-> `uat.verify` - and each one says so in its definition of done ("the node is done only after
+`uat.verify`"), so no single operation of the lane can report the node finished:
+- `interface.draw` is design before code: it enumerates the screens and every state (loading, empty,
+  error, populated, permission-denied) and records the blueprint, contract slots and copy. A state nobody
+  enumerated is a state nobody builds, and an implementer that has to guess one is the cost.
+- `frontend.implement` may only build what that record describes. A screen or state the record lacks is
+  `blocked` with blocker `interface-gap`, which routes back to `interface.draw` - never an improvised
+  layout. Stories and skeletons move with every layout change, so each state stays renderable alone.
+- `uat.verify` walks the rendered surface with a screenshot per step and compares what is on screen to
+  the design record. A walk through the API proves the server, not the surface; a walk that stopped early
+  is `partial`/`failed`, never `done`.
+- A design (SDS) gap found anywhere in the lane is `blocked` with `sds-gap` and routes to
+  `architecture.revise`, which edits the named section, bumps its `rev` and writes no code.
 
 Why the order matters:
 - Spec red before code: a spec written after the code is green by construction and proves nothing; the
@@ -60,8 +80,11 @@ Why the order matters:
 - Smallest change inside the allowlist: other operations run in the same worktree; a path outside the
   allowlist is a `blocked` with `shared-change` and the exact paths, never an edit.
 - Report once, with the real vocabulary: `done|partial|failed|ask|blocked`, blockers `shared-change`,
-  `sds-gap`, `environment`, `authority`. A second report or a `done` on an unrun spec is a downgrade to
-  `failed`.
+  `sds-gap`, `interface-gap`, `environment`, `authority`. A second report, a `done` on an unrun spec or a
+  `done` on a partial walk is a downgrade to `failed`.
+- Design before code, in both directions: the red spec proves the behavior, the interface design record
+  proves the surface. An operation that invents the screen it implements leaves nothing for review to
+  compare against, which is why `interface-gap` routes back instead of being improvised.
 - Verify is read-only: a reviewer that fixes what it reviews leaves nothing for the repair operation and
   hides the finding from the ledger.
 
