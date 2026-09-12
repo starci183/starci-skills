@@ -125,6 +125,12 @@ export function nodeChecks(raw){
   }));
 }
 
+/** The repository a node says it is delivered in (`extensions.work3.scope.repository`), or null when it names none. */
+export function nodeRepository(raw){
+  const declared=raw?.extensions?.work3?.scope?.repository;
+  return typeof declared==='string'&&declared.trim()?sanitizeId(declared.trim()):null;
+}
+
 function enrich(ledger,node){
   const raw=readNode(ledger.repoRoot,node);
   const allowlist=nodeAllowlist(raw),checks=nodeChecks(raw);
@@ -132,7 +138,7 @@ function enrich(ledger,node){
   const missing=[];
   if(!allowlist.length)missing.push('implementation.changes[].files');
   if(!checks.length)missing.push('extensions.work3.checks');
-  return {...node,file:nodeFile(ledger.repoRoot,node),allowlist,checks,assertions,schedulable:missing.length===0,reason:missing.length?`Node ${node.id} declares no ${missing.join(' and no ')}; the kernel cannot launch it`:null};
+  return {...node,file:nodeFile(ledger.repoRoot,node),repository:nodeRepository(raw),allowlist,checks,assertions,schedulable:missing.length===0,reason:missing.length?`Node ${node.id} declares no ${missing.join(' and no ')}; the kernel cannot launch it`:null};
 }
 
 /**
@@ -140,11 +146,13 @@ function enrich(ledger,node){
  * the validator. A candidate without an allowlist or without checks is returned with
  * `schedulable:false` and a reason; the kernel must refuse to launch it rather than guess a scope.
  */
-export function executableCandidates(ledger,{scope=null}={}){
+export function executableCandidates(ledger,{scope=null,repository=null}={}){
   const scopes=scopeList(scope);
   return ledger.list
     .filter(node=>EXECUTABLE_KINDS.includes(node.kind)&&node.state==='todo'&&node.eligible===true&&inScope(node,scopes))
-    .map(node=>enrich(ledger,node));
+    .map(node=>enrich(ledger,node))
+    // A node delivered in another repository (a frontend leaf in a backend job) is never this kernel's work.
+    .filter(node=>!repository||!node.repository||node.repository===repository);
 }
 
 /** Decision work: a model or the user answers it; nothing is launched into a worktree. */

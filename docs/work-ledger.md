@@ -61,3 +61,7 @@ validator would reject is never the thing the kernel leaves behind.
 
 `ledgerSummary(ledger,{scope})` is the status view: counts per kind and state, what is eligible, and
 the ids a run could pick up.
+
+## Repository rule
+
+A node may say which repository delivers it: `extensions.work3.scope.repository`. `executableCandidates(ledger,{repository})` drops nodes whose declared repository differs from the one asked for (the kernel asks with its own `package.json` name), so a frontend leaf inside a backend job is never launched. A node naming no repository belongs to every job. An operation the kernel created for such a node before the rule existed is settled and blocked with refusal `out-of-repository` on the next ledger sync.

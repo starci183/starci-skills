@@ -339,7 +339,22 @@ export function syncLedgerOps(store,state,ctx){
   const taken=new Set(state.ops.map(op=>op.id));
   const opOfNode=new Map(state.ops.filter(op=>op.nodeId).map(op=>[op.nodeId,op.id]));
   const added=[];
-  for(const node of ctx.work.api.executableCandidates(loaded,{scope})){
+  // An operation created before the repository rule for a node another repository delivers is settled and blocked.
+  for(const op of state.ops){
+    if(!op.nodeId||op.refusal==='out-of-repository'||!ctx.work.repository||typeof ctx.work.api.nodeRepository!=='function')continue;
+    const node=loaded.nodes.get(op.nodeId);
+    if(!node)continue;
+    let foreign=null;try{foreign=ctx.work.api.nodeRepository(ctx.work.api.readNode(ctx.work.repoRoot,node));}catch{foreign=null;}
+    if(!foreign||foreign===ctx.work.repository)continue;
+    if(liveStatus.includes(op.status)&&op.dispatch&&ctx.orca){
+      settleDispatch(ctx.orca,op.dispatch,{cwd:state.worktree,reason:'out-of-repository',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+      if(op.runtime)ctx.allocator.release(op.runtime);
+    }
+    op.status='blocked';op.refusal='out-of-repository';op.dispatch=null;op.terminal=null;
+    for(const item of state.ledger)if(item.id===op.nodeId)item.status='out-of-repository';
+    store.appendEvent({event:'op-out-of-repository',op:op.id,node:op.nodeId,repository:foreign,own:ctx.work.repository});
+  }
+  for(const node of ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.repository})){
     if(known.has(node.id))continue;
     if(!node.schedulable){
       if(!state.needUser.some(item=>item.node===node.id))state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
@@ -1571,7 +1586,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   need(plain(allocator),'A runtime allocator is required');
   need(typeof template==='string'&&template.trim(),'The operation contract template is required');
   required(state.run,'Orca run id');required(state.from,'own terminal handle');
-  const ctx={cwd,allocator,planOp,decide,template,wait,exec,git,launch,now,guards,work:null,supervisor:supervisor??supervisorRuntimes(state.host??'')};
+  const ctx={cwd,allocator,planOp,decide,template,wait,exec,git,launch,now,guards,work:null,orca,supervisor:supervisor??supervisorRuntimes(state.host??'')};
   // A state written before these bounds existed resumes with them.
   state.dynamicOps=Number.isFinite(state.dynamicOps)?state.dynamicOps:0;
   state.dynamicOpsBudget=dynamicBudget(state);

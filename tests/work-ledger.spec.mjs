@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {
-  DECISION_KINDS,EXECUTABLE_KINDS,decisionCandidates,disjoint,executableCandidates,ledgerSummary,
+  DECISION_KINDS,EXECUTABLE_KINDS,decisionCandidates,disjoint,executableCandidates,ledgerSummary,nodeRepository,
   buildSourceIdentity,checkAssertions,loadLedger,markDecided,markDone,markInProgress,markReopened,
   nodeFile,readNode,writeEvidence
 } from '../execution/work-ledger.mjs';
@@ -363,5 +363,19 @@ test('markDone can write its evidence inside the same transaction, against the s
     assert.throws(()=>markDone(root,NODES[2],{...bound,opId:'op-10',head:HEAD,checks:[check,types],evidence:true,parse:source=>{const value=parseYaml(source);return value.completion?{...value,state:'todo'}:value;}}),/restored the original/);
     assert.equal(fs.existsSync(folder),false);
     assert.deepEqual(fs.readFileSync(file),before);
+  }finally{cleanup(root);}
+});
+
+test('a node another repository delivers is never a candidate for this repository, and stays one when no repository is asked',()=>{
+  const root=fakeRepo();
+  try{
+    const file=nodeFile(root,NODES[2]);
+    fs.writeFileSync(file,fs.readFileSync(file,'utf8')+'extensions:\n  work3:\n    scope:\n      repository: demo-frontend\n      note: delivered by the frontend workflow\n');
+    const ledger=open(root);
+    assert.equal(nodeRepository(readNode(root,NODES[2])),'demo-frontend');
+    assert.equal(nodeRepository(readNode(root,NODES[1])),null);
+    assert.deepEqual(executableCandidates(ledger).map(node=>[node.id,node.repository]),[['demo.billing.implementation.backend.ledger',null],['demo.billing.implementation.frontend.invoice','demo-frontend']]);
+    assert.deepEqual(executableCandidates(ledger,{repository:'demo-backend'}).map(node=>node.id),['demo.billing.implementation.backend.ledger']);
+    assert.deepEqual(executableCandidates(ledger,{repository:'demo-frontend'}).map(node=>node.id),['demo.billing.implementation.backend.ledger','demo.billing.implementation.frontend.invoice'],'a node naming no repository belongs to every job');
   }finally{cleanup(root);}
 });
