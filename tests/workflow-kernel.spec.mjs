@@ -1206,6 +1206,14 @@ test('a kernel that already has its run records run-resumed; only a real bind re
     const boundGoal=kernelMain('workflow-goal',{job:'Bind the sales slice',host},{orca,cwd:repo,functions});
     kernelMain('workflow-approve',{id:boundGoal.id},{orca,cwd:repo});
     kernelMain('workflow-run',{id:boundGoal.id,from:'term_kernel','max-iterations':'0'},{orca,cwd:repo,functions});
+    // Without a handle and without a launch file (the supervisor started it), the kernel opens its own terminal.
+    const ownGoal=kernelMain('workflow-goal',{job:'Own terminal for the sales slice',host},{orca,cwd:repo,functions});
+    kernelMain('workflow-approve',{id:ownGoal.id},{orca,cwd:repo});
+    kernelMain('workflow-run',{id:ownGoal.id,'max-iterations':'0'},{orca,cwd:repo,functions});
+    const ownEvents=createStore({repoRoot:repo,id:ownGoal.id}).readEvents();
+    const opened=ownEvents.find(event=>event.event==='kernel-terminal');
+    assert.match(opened.terminal,/^term_/);
+    assert.equal(ownEvents.find(event=>event.event==='run-bound').from,opened.terminal,'the kernel is the terminal it opened');
     const boundEvents=createStore({repoRoot:repo,id:boundGoal.id}).readEvents().map(event=>event.event);
     assert.ok(boundEvents.includes('run-bound'));
     assert.equal(boundEvents.includes('run-resumed'),false);

@@ -2429,7 +2429,16 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     need(state.approved,`Workflow ${state.id} is not approved yet; run workflow-approve --id ${state.id}`);
     const launchFile=options['launch-file']?path.resolve(worktree,options['launch-file']):store.paths.launch;
     let from=options.from??state.from,run=options.run??state.run;
-    if(!from){const launch=awaitLaunch(launchFile,{wait});from=launch.from;run=run??launch.run??null;state.workflowTask=launch.task??state.workflowTask;}
+    if(!from&&fs.existsSync(launchFile)){const launch=awaitLaunch(launchFile,{wait});from=launch.from;run=run??launch.run??null;state.workflowTask=launch.task??state.workflowTask;}
+    if(!from){
+      // No coordinator terminal handed this kernel a handle (the supervisor started it): the kernel opens its own
+      // Orca terminal in the worktree and is that terminal for the whole workflow.
+      const shell=process.platform==='win32'?'powershell -NoLogo':'bash';
+      const created=orca.invoke('terminal-create',{worktree:`path:${path.resolve(worktree)}`,title:`[Kernel] ${state.id}`,command:shell},{cwd:worktree});
+      from=getPath(created.receipt,'result.terminal.handle')??null;
+      need(from,`The kernel could not open its own Orca terminal: ${created.reason??'terminal-create failed'}; pass --from <own terminal>`);
+      store.appendEvent({event:'kernel-terminal',terminal:from});
+    }
     state.from=required(from,'own terminal handle');
     // `run-bound` is the one-time hand-off this kernel performed; joining a run it already has is `run-resumed`.
     const binding=!run;
