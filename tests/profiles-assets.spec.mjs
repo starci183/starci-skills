@@ -43,7 +43,9 @@ test('every operator has an ordered external-agent chain and skill-level default
   // An operator declares every runtime that carries its role, so runtime allocation always resolves a
   // launch shape: the decide ops gained Opus as the reasoning overflow, review.verify gained Opus and Astra.
   // interface.draw generates PNG candidates with the image model, which only the Codex runtime carries: one link, no overflow.
-  const expectedCounts={'business.decide':3,'architecture.decide':3,'review.verify':5,'interface.draw':1};
+  // brand.decide also generates a placeholder mascot, so it adds the Codex image-model target in front of the
+  // three decide-role runtimes: four candidates, one per runtime/profile it may actually launch on.
+  const expectedCounts={'business.decide':3,'architecture.decide':3,'brand.decide':4,'review.verify':5,'interface.draw':1};
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
     const expectedCount=expectedCounts[op]??3;
@@ -74,6 +76,12 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.target),['claude-opus','claude-fable-5.1','gpt-5.6-sol']);
   assert.equal(resolveExecutionChain({op:'work.author'}).role,'reasoning');
   assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.profile),['opus-reviewer','fable-5.1','gpt-5.6-sol-reviewer']);
+  // Settling an identity is reasoning, so the chain carries the reasoning profiles; the Codex target leads it
+  // because only that runtime carries an image generator for the placeholder mascot, and the decide-role
+  // runtimes follow as the candidates the allocator actually prefers.
+  assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.target),['gpt-5.6-sol','claude-fable-5.1','gpt-6-astra','claude-opus']);
+  assert.equal(resolveExecutionChain({op:'brand.decide'}).role,'reasoning');
+  assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.profile),['gpt-5.6-sol-reviewer','fable-5.1','gpt-6-astra','opus-reviewer']);
   assert.deepEqual(registry.skills.starci.chains.working,['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
   assert.deepEqual(registry.skills.starci.chains.reasoning,['claude-fable-5.1','gpt-6-astra']);
   assert.equal(registry.supervisors.schema,'starci/supervisor-chains@1');

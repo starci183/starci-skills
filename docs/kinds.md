@@ -24,8 +24,8 @@ that skipping it is not available.
 
 ## The catalog
 
-Eleven kinds, and the list is closed in both directions: `validateGraph` reports `catalog-drift` when the
-profile and the `KINDS` constant of `execution/kind-graph.mjs` disagree, so a twelfth kind cannot appear by
+Twelve kinds, and the list is closed in both directions: `validateGraph` reports `catalog-drift` when the
+profile and the `KINDS` constant of `execution/kind-graph.mjs` disagree, so a thirteenth kind cannot appear by
 accident. `family` says what an operation is for, `role` is the allocator role of
 [`profiles/runtimes.yaml`](runtime-allocation.md) (and must equal its `roleOfKind` entry), `mutates` is what it
 may change, and `operator` is the launchable operator contract in `ops/` that carries it.
@@ -35,6 +35,7 @@ may change, and `operator` is the launchable operator contract in `ops/` that ca
 | `business.decide` | design | decide | no | srs, decision | `business.decide` | Settle what the product must do, before anything is designed against it. |
 | `architecture.decide` | design | decide | no | sds, decision | `architecture.decide` | Settle how the product realises a requirement. |
 | `architecture.revise` | repair | decide | no | sds | `architecture.decide` | Repair a design record a builder found silent or wrong; bump its `rev`. |
+| `brand.decide` | design | decide | no | record, asset | `brand.decide` | Settle the visual identity - colour tokens traced to real source files, typography, mascot, logo, imagery rules - in the one brand record. |
 | `interface.draw` | design | write | no | design | `interface.draw` | Draw screens, contracts and states before any interface code exists. |
 | `frontend.implement` | build | implement | no | code | `interface.implement` | Build the interface the drawing settled. |
 | `backend.implement` | build | implement | no | code | `backend.implement` | Build one slice of behind-the-interface behaviour. |
@@ -47,6 +48,17 @@ may change, and `operator` is the launchable operator contract in `ops/` that ca
 Each kind also declares `reports`: the outcomes it may end with and the blocker kinds it may raise. That is
 what makes a route reachable or not - `review.verify` may not raise `shared-change`, because a kind that
 changes nothing cannot need a path it is not allowed to write.
+
+`brand.decide` is the identity of the product as data: one record per product, a `brand:` spec (identity and
+installed grammar family, colour tokens as *grammar token name -> value* with their roles and the policy that
+governs them, typography, mascot, logo, iconography, imagery with the prompt rules every later image prompt
+must state, voice, motion, the forbidden list, the `artworkSlots` conventions and `sources`), revised by
+bumping its `rev`. Two properties make it a kind of its own rather than an `architecture.decide`. Its values
+are not chosen: every token is read out of the real style and token files of the product's interface and
+`sources` names them, which is why an untraceable value is a question rather than a record entry. And it
+produces bytes - a placeholder mascot for a product that has none - so it is the only kind whose `mutates`
+carries `asset`. It is also, with `work.author`, one of the two kinds that write an authored `record`: there
+the record IS the decision, while `work.author` only completes the fields the kernel needs.
 
 `work.author` is the one kind that stands outside the lanes and the routes. A node whose record declares no
 write scope (`implementation.changes[].files` or `extensions.work3.allowlist`) and no check
@@ -74,6 +86,7 @@ list runs from the most specific to the least.
 | `operations` | `operations` | `runtime.operate` -> `review.verify` |
 | `architecture` | `architecture` | `architecture.decide` |
 | `business` | `business`, `business-overview` | `business.decide` |
+| `brand` | `brand` (the one identity record; completion profile `brand`: assertions only) | `brand.decide` |
 
 `nextKind(lane, doneKinds)` answers the one step that may run now. The order is mandatory in the strong
 sense: a step that is neither done nor a satisfied optional is returned *even when a later step already ran*,
@@ -106,6 +119,7 @@ walk repairs what that lane builds). Both need the reporter's context; an unreso
 | verdict `gate-failed` | any | `lane.build` | gate | 3 | settle |
 | blocker `sds-gap` | any | `architecture.revise` | architecture | 2 | reopen |
 | blocker `interface-gap` | any | `interface.draw` | architecture | 2 | reopen |
+| blocker `brand-gap` | any | `brand.decide` | architecture | 2 | reopen |
 | blocker `shared-change` | any | `same` | shared | 3 | pause |
 | blocker `environment` | any | *the user* | - | 1 | needUser |
 | blocker `authority` | any | *the user* | - | 1 | needUser |

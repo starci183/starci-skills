@@ -64,6 +64,7 @@ roleOfKind:
   uat.verify: verify
   architecture.decide: decide
   business.decide: decide
+  brand.decide: decide
   interface.draw: write
   work.author: plan
   task.execute: implement

@@ -136,6 +136,38 @@ test('the API end-to-end operator proves through the stack and the API only, and
   assert.deepEqual(codes.sort(),['ASSERTION_REQUEST_INCOMPLETE','CHECK_UNRUNNABLE','DECLARED_DEPENDENCY_UNMET','PROOF_SURFACE_UNAVAILABLE','SCOPE_OUTSIDE_ALLOWLIST','STACK_UNAVAILABLE']);
 });
 
+test('the brand operator traces every value to a real source file, writes one record plus its own assets, and refuses instead of choosing',()=>{
+  const document=fs.readFileSync(path.join(root,'brand.decide','operator.yaml'),'utf8');
+  const summary=catalogue.ops.find(op=>op.id==='brand.decide');
+  assert.ok(summary,'the identity operator is in the catalogue');
+  assert.deepEqual(summary.nodeKinds,['brand']);
+  assert.equal(summary.completionProfile,'brand');
+  // It produces bytes (a placeholder mascot), so the effect is declared rather than hidden in a decision op.
+  assert.ok(summary.sideEffects.length);
+  const contract=summary.contract;
+  // One record, its own assets, its own evidence: no product source write, so no repository write ceiling.
+  assert.deepEqual(contract.writes.map(write=>write.id),['node','brandAssets','evidence']);
+  assert.equal(contract.writes.some(write=>String(write.path).startsWith('repository:')),false);
+  assert.ok(contract.writes.find(write=>write.id==='node').fields.some(field=>field.startsWith('brand:')));
+  assert.ok(contract.writes.find(write=>write.id==='node').fields.includes('rev'));
+  // The real token files of the interface and the assets that already exist are inputs, not inventions.
+  for(const id of ['target','owner','grammar','sources','assets','knowledge','profile'])assert.ok(contract.reads.some(read=>read.id===id),id);
+  assert.match(contract.reads.find(read=>read.id==='sources').purpose.en,/source of truth/);
+  // The two refusals: an untraceable value asks, a missing source file is the user's environment.
+  const blockers=contract.blockers.map(blocker=>blocker.code);
+  assert.deepEqual(blockers.sort(),['BRAND_DECISION_UNRULED','BRAND_SOURCE_MISSING','BRAND_TOKEN_UNTRACEABLE','DECLARED_DEPENDENCY_UNMET']);
+  assert.match(contract.blockers.find(blocker=>blocker.code==='BRAND_SOURCE_MISSING').condition.en,/`blocked` with `environment`/);
+  assert.match(contract.blockers.find(blocker=>blocker.code==='BRAND_TOKEN_UNTRACEABLE').condition.en,/`ask`/);
+  for(const id of ['binding','token-traceability','brand-checks','asset-provenance'])assert.ok(contract.proofs.some(proof=>proof.id===id),id);
+  for(const text of [document,JSON.stringify(contract)]){
+    assert.match(text,/traceable/i,'a value is traceable to its source or it is not written');
+    assert.match(text,/placeholder/,'a generated mascot is a placeholder, never the accepted one');
+    assert.match(text,/never\s+described\s+as\s+generated/,'a missing file is never described as generated');
+    assert.match(text,/never\s+claim\s+a\s+file\s+exists/,'a deferred asset is a brief and an empty slot');
+  }
+  assert.deepEqual(validateCatalog(catalogue,{root,repositoryRoot:repository,documents:outputs()}).errors,[]);
+});
+
 test('all generated authority/catalogue bytes are reproducible without writes in check mode',()=>{
   const before=outputs();
   assert.deepEqual(outputs(),before);

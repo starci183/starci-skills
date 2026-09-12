@@ -57,6 +57,7 @@ the Work node kind and layout it closes, then from its allowlist; an unknown kin
 | `operations` | `runtime.operate` or a ledger `operations` node | apply on a real container -> roll back -> re-apply -> checks -> report |
 | `architecture.revise` | kind `architecture.revise` | read the gap report -> edit only the named SDS section -> bump its `rev` and append one decision-log entry -> run the validator check -> report the rev and the sections; no code |
 | `decide` | `business.decide` (what the product must do) / `architecture.decide` (how the system satisfies it) | closed options only -> weigh against the requirement and the layer it must stay inside -> write the decision with rationale into the node -> no code, and no decision belonging to the other layer |
+| `brand.decide` | kind `brand.decide`, or a ledger `brand` node | read the accepted scope and the owner's rulings -> read every colour value out of the real style/token files and record the token name, the value and the file it came from -> give each token its role, the danger-may-match-primary policy and the contrast floor, and measure the pairs -> settle typography, the one icon set, mascot and logo, reusing existing assets and generating at most one placeholder mascot with the image model -> write the record (identity, tokens, mascot/logo rules, imagery prompt rules, artwork slots, voice, motion, forbidden, `sources`) -> run the brand checks and bump `rev` -> report the rev; an untraceable value is `ask`, a missing source file is `blocked` `environment` |
 | `generic` | anything else | read -> prove failing -> change -> checks -> self-audit -> report once |
 
 ### Before the lane: completing the record
@@ -82,6 +83,9 @@ A frontend node is not one operation. Its sequences run in order - `interface.dr
   is `partial`/`failed`, never `done`.
 - A design (SDS) gap found anywhere in the lane is `blocked` with `sds-gap` and routes to
   `architecture.revise`, which edits the named section, bumps its `rev` and writes no code.
+- An identity gap - no colour token, no typeface, no mascot rule to draw inside - is `blocked` with
+  `brand-gap` and routes to `brand.decide`, which settles the one brand record out of the product's real
+  style and token files and bumps its `rev`. A drawing never invents a colour to get itself unblocked.
 
 Why the order matters:
 - Spec red before code: a spec written after the code is green by construction and proves nothing; the
@@ -90,8 +94,8 @@ Why the order matters:
 - Smallest change inside the allowlist: other operations run in the same worktree; a path outside the
   allowlist is a `blocked` with `shared-change` and the exact paths, never an edit.
 - Report once, with the real vocabulary: `done|partial|failed|ask|blocked`, blockers `shared-change`,
-  `sds-gap`, `interface-gap`, `environment`, `authority`. A second report, a `done` on an unrun spec or a
-  `done` on a partial walk is a downgrade to `failed`.
+  `sds-gap`, `interface-gap`, `brand-gap`, `environment`, `authority`. A second report, a `done` on an unrun
+  spec or a `done` on a partial walk is a downgrade to `failed`.
 - Design before code, in both directions: the red spec proves the behavior, the interface design record
   proves the surface. An operation that invents the screen it implements leaves nothing for review to
   compare against, which is why `interface-gap` routes back instead of being improvised.

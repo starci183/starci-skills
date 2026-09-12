@@ -31,3 +31,7 @@ ui:
   image: true
 business-overview:
   assertions: true
+# The one identity record of a product: a decision proven by its own checks (token-to-source match, contrast,
+# mascot assets present), not by a capture - a brand without a mascot is still a complete brand.
+brand:
+  assertions: true
