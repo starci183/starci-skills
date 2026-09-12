@@ -75,7 +75,8 @@ test('precedence: an explicit --ledger-root outranks the route registry, which o
     assert.equal(option.ownerRepoRoot,other);
     assert.equal(option.ownerRepository,'demo-other');
     assert.equal(option.sharedLedger,true);
-    assert.equal(option.side,null,'an option names a tree, not a role, so it constrains no layout');
+    assert.equal(option.side,'frontend','an option names a tree; the registry still knows this repository is the frontend, so backend-layout nodes stay out');
+    assert.equal(option.role,'fe');
   }
   // Without a host there is no registry, so the repository's own tree is the answer.
   const local=resolveLedgerRoot({repoRoot:fixture.backend,git:noRemote});

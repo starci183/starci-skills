@@ -131,6 +131,11 @@ function fromOption(named){
   return {source:'option',ledgerRoot,ownerRepoRoot:ownerOf(ledgerRoot),project:null,role:null,ownerRole:null,binding:null};
 }
 
+function enrich(option,{code,host,git}){
+  let routed=null;try{routed=fromWorkspace({code,host,git});}catch{routed=null;}
+  if(!routed)return option;
+  return {...option,project:routed.project??null,role:routed.role??null,ownerRole:routed.ownerRole??null,binding:routed.binding??null};
+}
 function fromWorkspace({code,host,git}){
   const projects=registryRoot(host);
   if(!projects)return null;
@@ -165,7 +170,9 @@ function fromWorkspace({code,host,git}){
 export function resolveLedgerRoot({repoRoot,host=null,options={},git=spawnSync}={}){
   const code=path.resolve(required(repoRoot,'repository root'));
   const named=options['ledger-root']??options.ledgerRoot??null;
-  const resolved=named?fromOption(named):fromWorkspace({code,host,git});
+  // An option names the tree; the registry still knows which side of the product this repository is, and that
+  // side is what keeps a frontend job from taking backend nodes that declare no repository of their own.
+  const resolved=named?enrich(fromOption(named),{code,host,git}):fromWorkspace({code,host,git});
   if(!resolved){
     const ledgerRoot=path.join(code,LEDGER_DIRECTORY);
     return settle({source:'local',ledgerRoot,ownerRepoRoot:code,project:null,role:null,ownerRole:null,binding:null},code,hasFeatures(ledgerRoot));
