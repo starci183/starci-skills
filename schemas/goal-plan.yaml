@@ -1,0 +1,34 @@
+schema: starci/goal-plan-schema@1
+describes: starci/goal-plan@1
+module: execution/llm-functions.mjs
+purpose: |-
+  The answer of assessGoal: one job, read together with its inputs, turned into a definition of done,
+  a ledger of the things that must exist, and as many operations as the job needs. The user approves the
+  rendered one-pager (renderGoalMarkdown); the kernel then runs the ops, up to ten at a time on one worktree.
+fields:
+  definitionOfDone: at least one statement of what must be true when the job is finished
+  ledger: "the things the job needs, each {id, title, inputRef, status}"
+  ledger.status: one of absent, partial, done, unknown
+  ledger.inputRef: the input the item was read from (an SRS/SDS section, a bug report, a UAT step, a design, a dataset, existing code)
+  ops: "the operations, each {id, kind, goal, ledgerIds, allowlist, references, checks, acceptance, dependsOn}"
+  ops.kind: the operation kind the runtime dispatches (implement, verify, architecture and the rest of the op catalog)
+  ops.ledgerIds: "at least one ledger id this op builds or verifies"
+  ops.allowlist: "at least one repository-relative path or glob the op may write"
+  ops.references: material the op must read before writing
+  ops.checks: "real commands, each {name, command}, runnable from the worktree"
+  ops.acceptance: at least one statement a verify op checks one by one
+  ops.dependsOn: op ids that must finish first; empty means the op can start immediately
+  risks: optional notes the user should see before approving
+  questions: optional questions that must be answered before the plan is trustworthy
+rules:
+  - Inputs are plural: SRS/SDS is one input kind among bug reports, UAT flows, designs, datasets and existing code.
+  - "The ledger is derived from the definition of done, never from the file structure of the repository."
+  - Op ids are unique; dependsOn may only name op ids of the same plan, and the dependency graph must be acyclic.
+  - Every ledger item is referenced by at least one op, unless its status is already done.
+  - "Independent ops (no dependency either way) must have disjoint allowlists as path prefixes: the kernel runs up to 10 ops at once on one worktree, so an overlap is a re-plan, not a risk note."
+  - Each op must be small enough for one session to finish; the number of ops is dynamic.
+  - "Process steps are never planned: ping, report and retry are fixed by the runtime."
+validation: |-
+  validateGoalPlan(plan) = validateForm(plan, GOAL_FORM) then goalPlanRules(plan). assessGoal passes
+  goalPlanRules to callFunction as the extra check, so a plan that breaks a rule is returned to the model
+  with the rule named (overlapping allowlists name both ops) and the model re-plans.
