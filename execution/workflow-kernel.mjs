@@ -1172,16 +1172,17 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     state.ledgerMode=LEDGER_MODES.includes(state.ledgerMode)?state.ledgerMode:'plan';
     state.scope=Array.isArray(state.scope)?state.scope:[];
     state.decisions=Array.isArray(state.decisions)?state.decisions:[];
-    state.repoRoot=state.repoRoot??repoRoot;
+    // Ledger root = the worktree (branch content); the store root above = the main repository (history).
+    state.repoRoot=state.repoRoot??worktree;
     return {store,state};
   };
   if(command==='workflow-goal'){
     const job=required(options.job,'job');
     const host=hostOf(options,repoRoot);
     const store=createStore({repoRoot,id:options.id??newWorkflowId(job)});
-    const ledgerMode=detectLedgerMode(repoRoot,options.ledger??null);
+    const ledgerMode=detectLedgerMode(worktree,options.ledger??null);
     const state=createWorkflowState({job,inputs:csv(options.inputs),worktree,branch:currentBranch(worktree),
-      gates:csv(options.gates),store,host,launcher:launcherOf(host),ledgerMode,scope:csv(options.scope),repoRoot});
+      gates:csv(options.gates),store,host,launcher:launcherOf(host),ledgerMode,scope:csv(options.scope),repoRoot:worktree});
     store.appendEvent({event:'created',job,inputs:state.inputs,worktree:slash(worktree),branch:state.branch,
       ledgerMode,scope:state.scope});
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,...goalPhase(store,state,{cwd:worktree,...functions})};
