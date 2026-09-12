@@ -307,13 +307,15 @@ export function validateWorkTree({repoRoot,workRoot=null}={}){
 
 /** An operation id that is also a safe file name: the Work id with every other character folded to `-`. */
 /** One Work node -> one operation form; the goal phase and the run-time ledger sync both use it. */
+/** Checks the kernel runs itself as gates (whole-tree validator, end-to-end suites): never per operation, never in parallel. */
+export const KERNEL_CHECK=/^(work-valid|backend-e2e-pass|producer-e2e-pass|.*e2e.*)$/i;
 export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0}){
   return toOp({id,nodeId:node.id,
     kind:WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),
     ledgerIds:[node.id],allowlist:node.allowlist,
     references:unique([node.path,...(node.refs??[])]),
     // The whole-tree validator is the kernel's own gate at acceptance: parallel operations must not fail on a sibling's in-progress ledger write.
-    checks:node.checks.filter(check=>check.assertion!=='work-valid').map(check=>({name:check.assertion??check.command,command:check.command})),
+    checks:node.checks.filter(check=>!KERNEL_CHECK.test(check.assertion??'')).map(check=>({name:check.assertion??check.command,command:check.command})),
     acceptance:node.assertions.length?node.assertions:[`${node.id} satisfies the Work contract it authored`],
     resources:[...(node.resources??[])],
     // An eligible node has no unsettled dependency, so a dependency inside this set is already done; the
@@ -783,7 +785,7 @@ function avoidForVerify(state,op){
 export function machineVerify(state,op,{exec,cwd=state.worktree}={}){
   const checks=[];
   // The whole-tree validator is the kernel's own gate at acceptance, never an operation check.
-  for(const check of (op.checks??[]).filter(check=>!/^work-valid$/i.test(check.name??''))){
+  for(const check of (op.checks??[]).filter(check=>!KERNEL_CHECK.test(check.name??''))){
     const result=exec(check.command,{cwd,timeoutMs:op.timeoutMs??CHECK_TIMEOUT_MS});
     const exitCode=Number.isInteger(result?.status)?result.status:1;
     checks.push({name:check.name,command:check.command,exitCode,evidence:tail(`${result?.stdout??''}${result?.stderr??''}`)});
@@ -1480,6 +1482,8 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     ctx.work={api:ledgerApi,loaded,repoRoot,validate,digest,node:id=>loaded.nodes.get(id)??null};
     store.appendEvent({event:'ledger-loaded',workRoot:slash(loaded.workRoot),valid:loaded.ok,nodes:loaded.list.length,scope:state.scope});
   }
+  // Operations created before a rule change carry their old check lists: the kernel-owned checks are stripped on load.
+  for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
     if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});store.saveState(state);return state;}
     state.iterations+=1;
