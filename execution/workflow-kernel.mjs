@@ -626,6 +626,32 @@ export function protectedFingerprint(root,paths=[]){
  * Before any machine verification: revert what the operation wrote into the kernel's own ledger paths and
  * report it. A report that touched them is never accepted - it is downgraded to `failed` and comes back.
  */
+/**
+ * After an accepted done, files the operation left dirty outside every live allowlist are stray: they belong
+ * to no running or paused operation, so they are reverted (tracked) or removed (untracked) and recorded as a
+ * finding for the module review. Kernel-owned ledger paths are handled by guardKernelPaths, never here.
+ */
+function cleanStrayFiles(store,state,op,ctx){
+  if(typeof ctx.git!=='function')return [];
+  const shown=ctx.git('git',['status','--porcelain'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
+  if(shown.status!==0)return [];
+  const live=state.ops.filter(item=>['running','paused','answering','ready'].includes(item.status)&&item.id!==op.id).flatMap(item=>item.allowlist??[]);
+  const ledger=/^\.starciwork\//;
+  const entries=(shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
+    .map(line=>({code:line.slice(0,2),file:normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))}))
+    .filter(entry=>!inside(entry.file,live)&&!inside(entry.file,op.kernelOwned??[])&&!ledger.test(entry.file)&&!entry.file.startsWith('.gitmounts/'));
+  if(!entries.length)return [];
+  const tracked=entries.filter(entry=>!entry.code.startsWith('??')).map(entry=>entry.file);
+  const untracked=entries.filter(entry=>entry.code.startsWith('??')).map(entry=>entry.file);
+  if(tracked.length)ctx.git('git',['checkout','--',...tracked],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
+  for(const file of untracked){try{fs.rmSync(path.join(state.worktree,file),{recursive:true,force:true});}catch{}}
+  const finding=`operation ${op.id} left changes outside every live allowlist; the kernel reverted ${tracked.length} tracked and removed ${untracked.length} untracked path(s): ${[...tracked,...untracked].slice(0,12).join(', ')}`;
+  op.strayFiles=[...tracked,...untracked];
+  state.reviewFindings=[...(state.reviewFindings??[]),{op:op.id,finding}];
+  store.appendEvent({event:'stray-files-reverted',op:op.id,tracked,untracked});
+  return op.strayFiles;
+}
+
 function guardKernelPaths(store,state,op,ctx){
   const paths=op.kernelOwned??[];
   if(!paths.length)return [];
@@ -1037,14 +1063,24 @@ function pauseForShared(store,state,op,open,shared,note){
   store.appendEvent({event:'op-paused',op:op.id,waitingFor:op.waitingFor,note});
 }
 
+const SHARED_DEPTH_LIMIT=2;
 function createSharedOp(store,state,op,detail,paths){
-  return addOp(store,state,{kind:'backend.implement',goal:`Apply the shared change ${op.id} cannot make: ${detail}`,
+  const created=addOp(store,state,{kind:'backend.implement',goal:`Apply the shared change ${op.id} cannot make: ${detail}`,
     ledgerIds:op.ledgerIds,allowlist:paths,references:op.references,checks:op.checks,
     acceptance:[detail],origin:'shared',requesters:[op.id]},`shared-change reported by ${op.id}`);
+  if(created)created.sharedDepth=(op.sharedDepth??0)+1;
+  return created;
 }
 
 /** One shared request: merge into an existing shared op, create one, or queue it for the next iteration. */
 function requestSharedChange(store,state,op,{paths,detail,open=[]}){
+  // A shared op that itself needs a shared change is a design problem, not a scheduling one: two levels deep it stops.
+  if((op.sharedDepth??0)>=SHARED_DEPTH_LIMIT){
+    op.status='blocked';
+    state.needUser.push({op:op.id,kind:'shared-depth',detail:`${op.id} is a shared change ${op.sharedDepth} levels deep and still needs ${paths.join(', ')}: ${detail}`});
+    store.appendEvent({event:'shared-change-depth',op:op.id,depth:op.sharedDepth,paths});
+    return 'shared-change-depth';
+  }
   const existing=state.ops.find(item=>sharedAlive(item)&&pathSetsOverlap(item.allowlist,paths));
   if(existing){
     existing.requesters=unique([...(existing.requesters??[]),op.id]);
@@ -1204,6 +1240,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     markLedger(state,op,op.head);
     store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
       checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
+    ctx.guards.gitQueue(()=>cleanStrayFiles(store,state,op,ctx));
     return 'done';
   }
   if(report.outcome==='partial'){
