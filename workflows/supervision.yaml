@@ -51,10 +51,11 @@ routing:
     envelope: normalized-workflow-boundary
   coordinatorToWorkflow:
     recipient: workflow-manager
-    transport: orchestration-send
+    transport: launcher-notify
     eventType: escalation
-    reason: escalation-is-in-the-workflow-manager-blocking-subscription
+    reason: a-terminal-consumes-one-run-so-parent-run-mail-never-reaches-a-monitor-bound-to-its-nested-run
     statusEvent: forbidden-for-control-instruction
+    fileFirst: message-file-then-typed-pointer-verified-on-screen
   coordinatorToOperation:
     direct: forbidden
     route: coordinator-to-workflow-manager-to-operation
@@ -176,17 +177,34 @@ workerLifecycle:
       settlement: worker-stop-then-worker-release-released-or-already_released
       relaunch: worker-start-retry-of-with-supervisor-chain
       liveManager: never-replaced
+reports:
+  schema: starci/op-report@1
+  workflowSchema: starci/workflow-report@1
+  outcomes: [done, partial, failed, ask, blocked]
+  signals: {done: worker_done, partial: worker_done, failed: worker_failed, ask: question, blocked: escalation}
+  authority: report-file-then-signal
+  command: report
+  onceOnly: true
 wait:
   mode: blocking-event-wait
+  owner: launcher-wait-tick
   subscribe:
     - question
     - escalation
     - worker_done
     - worker_failed
+  tick:
+    - check-wait-with-previous-batch-acknowledged
+    - scan-report-files
+    - classify-every-live-worker
+    - sweep-dead-terminals
+    - recanonicalize-titles
+  events: [report, stalled-idle, stalled-silent, stalled-prompt, dead, timeout]
   onTimeout:
-    action: rearm
-    inspectWorker: false
+    action: wait-again
+    inspectWorker: true
     notifyUser: false
+  endsTurnOnlyOn: [workflow-goal, blocked-escalation-to-parent]
   onHealthyHeartbeat:
     action: none
     inspectWorker: false

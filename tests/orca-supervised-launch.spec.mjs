@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {createOrcaCalls} from '../execution/orca-calls.mjs';
-import {buildMonitorLaunch,buildOperationLaunch,defaultOrcaExecutable,main,parseSkip,promptDelivery,qwenLaunchMode,replaceMonitor,resolveSupervisorChain,settleDispatch,startMonitor,startOperation,sweepWorktree} from '../execution/orca-supervised-launch.mjs';
+import {buildMonitorLaunch,buildOperationLaunch,defaultOrcaExecutable,main,notifyTerminal,parseSkip,promptDelivery,qwenLaunchMode,replaceMonitor,resolveSupervisorChain,settleDispatch,startMonitor,startOperation,sweepWorktree} from '../execution/orca-supervised-launch.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';
@@ -466,4 +466,49 @@ test('a preamble above the inline limit is delivered as a short @file reference 
   const file=path.join(worktreePath,'.starciwork','_local','runtime','orca-dispatch-ctx_qwen.md');
   assert.equal(fs.readFileSync(file,'utf8').startsWith('=== PREAMBLE ==='),true);
   fs.rmSync(path.join(worktreePath,'.starciwork'),{recursive:true,force:true});
+});
+
+test('notify proves Coordinator -> Monitor delivery from the screen, not from the send receipt',()=>{
+  const file=path.join(worktreePath,'.starciwork','_local','runtime','r14-v4','coordinator-addendum.md');
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  fs.writeFileSync(file,'COORDINATOR ADDENDUM: the --skip qwen authorization is withdrawn.\n');
+  try{
+    const busy=fakeOrca({
+      'terminal-send':()=>json(1,{ok:false,error:{code:'agent_prompt_stalled',message:'prompt was not consumed'}}),
+      'terminal-read':()=>json(0,screen(['  ...withdrawn.','❯ Press up to edit queued messages','  ⏵⏵ bypass permissions on']))
+    });
+    const queued=notifyTerminal(busy.orca,{cwd:worktreePath,terminal:'term_monitor_sales',file:'.starciwork/_local/runtime/r14-v4/coordinator-addendum.md',wait:noWait});
+    assert.equal(queued.ok,true);
+    assert.equal(queued.delivered,'queued');
+    assert.equal(queued.effectState,'committed');
+    assert.equal(queued.send.outcome,'failed');
+    const sendArgs=busy.spawned.find(args=>args[1]==='send');
+    assert.ok(sendArgs.join(' ').includes('coordinator-addendum.md'));
+    const lost=fakeOrca({
+      'terminal-send':()=>json(1,{ok:false,error:{code:'agent_prompt_stalled',message:'prompt was not consumed'}}),
+      'terminal-read':()=>json(0,screen(['❯','  ⏵⏵ bypass permissions on']))
+    });
+    const missing=main(['notify','--terminal','term_monitor_sales','--text','resend me','--worktree',worktree],{orca:lost.orca});
+    assert.equal(missing.ok,false);
+    assert.equal(missing.effectState,'none');
+    assert.match(missing.reason,/not visible/);
+  }finally{fs.rmSync(path.dirname(file),{recursive:true,force:true});}
+});
+
+test('a managed agent whose prompt is staged in its input box is submitted once instead of fenced',()=>{
+  let shows=0,model=null;const sends=[];
+  const fake=fakeOrca({
+    'run-show':()=>json(0,runShow),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',reasonName)),
+    'worker-start':(args)=>{model=args.includes('--model')?value(args,'--model'):null;return json(1,{ok:false,error:{code:'agent_prompt_stalled',message:'prompt was not consumed'},result:{state:'failed',failedStage:'dispatch_input',dispatchId:'ctx_claude',residualResources:[{kind:'terminal',role:'agent',id:'term_ctx_claude'}]}});},
+    'terminal-read':()=>json(0,screen(['You are working inside Orca, a multi-agent IDE.','❯ You are working inside Orca, a multi-agent IDE. You are a dispatched worker.','  ⏵⏵ bypass permissions on'])),
+    'terminal-send':(args)=>{sends.push(args);return json(0,{ok:true,result:{}});},
+    'worker-show':()=>{shows+=1;return json(0,shown({model,title:shows>1?reasonName:'worker-task_operation_sales'}));},
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const result=startOperation(reasonInput,{orca:fake.orca,wait:noWait});
+  assert.equal(result.ok,true);
+  assert.equal(result.dispatchId,'ctx_claude');
+  assert.equal(sends.length,1);assert.ok(has(sends[0],'--enter')&&has(sends[0],'--terminal','term_ctx_claude'));
+  assert.equal(fake.spawned.filter(args=>args[1]==='worker-stop').length,0);
 });

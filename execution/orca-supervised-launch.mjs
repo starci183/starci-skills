@@ -6,6 +6,7 @@ import {readDistJson} from '../core/runtime-root.mjs';
 import {resolveExecutionChain} from '../profiles/select.mjs';
 import {createOrcaCalls,defaultOrcaExecutable,getPath} from './orca-calls.mjs';
 import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} from './supervision.mjs';
+import {protocolMain} from './orca-protocol.mjs';
 
 /**
  * Canonical supervised launcher for Orca operation agents and Workflow Monitors.
@@ -242,6 +243,30 @@ function deliveryText(adapter,{cwd,dispatchId,preamble}){
 
 const screenText=receipt=>(getPath(receipt,'result.terminal.tail')??[]).join('\n');
 
+/**
+ * Coordinator -> Monitor delivery that bypasses the Run mailbox. Orca fences a terminal to the one Run it
+ * consumes (a Monitor bound to its nested Run never reads parent-Run mail: consumer_fenced), so the message
+ * is typed into the Monitor's own agent terminal. A busy Claude queues typed input and reads it when its turn
+ * ends; Orca then reports agent_prompt_stalled although the text is staged, so delivery is proven from the
+ * screen, never from the send receipt.
+ */
+export function notifyTerminal(orca,{cwd,terminal,file,text,wait=sleepSync}){
+  need(text||file,'notify needs --text or --file');
+  const body=file?fs.readFileSync(path.resolve(cwd,file),'utf8').trim():text;
+  const pointer=file?`Read ${path.resolve(cwd,file).replaceAll('\\','/')} completely and apply it now; it supersedes the corresponding clauses of your contract. Summary: ${body.split('\n').find(line=>line.trim())?.slice(0,300)??''}`:body;
+  const sent=orca.invoke('terminal-send',{terminal,text:pointer,enter:true},{cwd});
+  wait(1500);
+  const read=orca.invoke('terminal-read',{terminal,screen:true},{cwd});
+  const screen=read.outcome==='ok'?screenText(read.receipt):'';
+  const marker=pointer.slice(-40).replace(/\s+/g,' ');
+  const flat=screen.replace(/\s+/g,' ');
+  const delivered=/queued messages/i.test(flat)?'queued':flat.includes(marker)?'staged':sent.outcome==='ok'?'submitted':null;
+  return {schema:'starci/orca-notify-result@1',ok:Boolean(delivered),terminal,file:file??null,delivered,
+    effectState:delivered?'committed':sent.outcome==='ok'?'unknown':'none',
+    send:{outcome:sent.outcome,effectState:sent.effectState,reason:sent.reason},
+    reason:delivered?null:`message not visible on the terminal screen (${sent.reason??sent.outcome})`};
+}
+
 /** Command-terminal launch: one terminal per attempt, Task delivered by dispatch --return-preamble + terminal send. */
 function launchCommandTerminalCandidate(orca,{cwd,candidate,taskId,displayName,wait=sleepSync}){
   const adapter=readDistJson('providers','orca','adapters','qwen.json');
@@ -293,8 +318,13 @@ function launchCommandTerminalCandidate(orca,{cwd,candidate,taskId,displayName,w
 function launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName,expectedPath,attest,wait}){
   if(candidate.launch==='command-terminal')return launchCommandTerminalCandidate(orca,{cwd,candidate,taskId,displayName,wait});
   const params={...candidate.workerParams,task:taskId};
-  const started=orca.invoke('worker-start',params,{cwd});
+  let started=orca.invoke('worker-start',params,{cwd});
   const dispatchId=dispatchIdFromReceipt(started.receipt);
+  let recovery=null;
+  if(started.outcome!=='ok'&&dispatchId&&/agent_prompt_stalled/.test(`${started.reason??''} ${getPath(started.receipt,'error.code')??''}`)){
+    recovery=recoverStagedPrompt(orca,{cwd,started,dispatchId,wait});
+    if(recovery.ok)started=recovery.started;
+  }
   if(started.outcome!=='ok'){
     const ownTerminal=(getPath(started.receipt,'result.residualResources')??getPath(started.receipt,'result.effects')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
     const settlement=dispatchId&&started.effectState!=='none'?settleDispatch(orca,dispatchId,{cwd,reason:`worker-start ${started.outcome}`,terminalHandle:ownTerminal}):null;
@@ -302,7 +332,7 @@ function launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName,expec
     return {ok:false,dispatchId,effectState,reason:started.reason??`worker-start ${started.outcome}`,stage:started.stage,call:started,settlement};
   }
   need(dispatchId,'Orca worker-start receipt is missing the supervised Dispatch');
-  const ownTerminal=(getPath(started.receipt,'result.effects')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
+  const ownTerminal=(getPath(started.receipt,'result.effects')??getPath(started.receipt,'result.residualResources')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
   const fence=reason=>{
     const settlement=settleDispatch(orca,dispatchId,{cwd,reason,terminalHandle:ownTerminal});
     return {ok:false,dispatchId,effectState:settlement.effectState,reason,call:started,settlement};
@@ -331,7 +361,27 @@ function launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName,expec
   }
   const canonical=observedTitle===displayName;
   attestation={...attestation,terminalTitle:{observed:observedTitle,canonical,mutableUiMetadata:true,action:canonical?'none':'recanonicalize-without-fencing'}};
-  return {ok:true,dispatchId,terminal:attestation.terminalHandle,attestation,titleDrift:!canonical,call:started,taskRecord};
+  return {ok:true,dispatchId,terminal:attestation.terminalHandle,attestation,titleDrift:!canonical,call:started,taskRecord,recovery};
+}
+
+const STAGED_PROMPT=/(^|\n)\s*❯\s*\S|Pasted Content|Press up to edit queued messages/;
+/**
+ * A managed Claude sometimes leaves the delivered prompt staged in its input box (long specs): Orca reports
+ * agent_prompt_stalled although the agent is alive. One verified Enter submits it; anything else is fenced.
+ */
+function recoverStagedPrompt(orca,{cwd,started,dispatchId,wait=sleepSync}){
+  const terminal=(getPath(started.receipt,'result.residualResources')??getPath(started.receipt,'result.effects')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
+  if(!terminal)return {ok:false,reason:'no agent terminal in the stalled receipt'};
+  const read=orca.invoke('terminal-read',{terminal,screen:true},{cwd});
+  const screen=read.outcome==='ok'?screenText(read.receipt):'';
+  if(!STAGED_PROMPT.test(screen))return {ok:false,reason:'prompt is not staged on the screen',terminal};
+  const submitted=orca.invoke('terminal-send',{terminal,enter:true},{cwd});
+  wait(4000);
+  const show=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});
+  const state=resultOf(show.receipt)?.worker?.state??null;
+  if(show.outcome!=='ok'||!['ready','running'].includes(state))return {ok:false,reason:`worker is ${state??'unknown'} after submitting the staged prompt`,terminal,submitted:submitted.outcome};
+  const receipt={...started.receipt,ok:true,result:{...(started.receipt?.result??{}),state,dispatchId,effects:[{kind:'terminal',role:'agent',id:terminal},{kind:'dispatch_input',state:'accepted'}]}};
+  return {ok:true,terminal,action:'submitted-staged-prompt',started:{...started,outcome:'ok',effectState:'committed',reason:null,receipt}};
 }
 
 /** The native agent must have consumed its Task input: state ready and no dispatch_input failure. */
@@ -466,13 +516,22 @@ function usage(){return `Usage:
   node orca-supervised-launch.mjs replace-monitor --run <run> --parent-task <task> --task <monitor-task> --dispatch <dead-dispatch> --from <coordinator-terminal> --worktree <relative-path> --workflow <name> --spec-file <relative-file>
   node orca-supervised-launch.mjs settle --dispatch <dispatch> [--worktree <relative-path>] [--terminal <own-agent-terminal>] [--close true]
   node orca-supervised-launch.mjs sweep --worktree <relative-path> --from <monitor-terminal> [--keep <handle,handle>]
+  node orca-supervised-launch.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
+  node orca-supervised-launch.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
+  node orca-supervised-launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
+  node orca-supervised-launch.mjs start-coordinator --plan <name> --spec-file <file> (--run <run> | --objective <text>) [--worktree <relative-path>]
   node orca-supervised-launch.mjs verify`;}
 
 export function main(argv=process.argv.slice(2),{orca}={}){
   const {command,options}=parseArgs(argv);
-  need(['start-op','start-monitor','replace-monitor','settle','sweep','verify'].includes(command),usage());
+  need(['start-op','start-monitor','replace-monitor','settle','sweep','verify','notify','report','wait','start-coordinator'].includes(command),usage());
   const runner=orca??createOrcaCalls();
+  if(['report','wait','start-coordinator'].includes(command)){
+    const cwd=options.worktree?exactWorktree(options.worktree).path:process.cwd();
+    return protocolMain(command,{...options,spec:options['spec-file']?specText(options['spec-file']):options.spec},{orca:runner,cwd});
+  }
   if(command==='sweep')return sweepWorktree(runner,{cwd:exactWorktree(options.worktree).path,from:required(options.from,'monitor terminal handle'),keep:String(options.keep??'').split(',').filter(Boolean)});
+  if(command==='notify')return notifyTerminal(runner,{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),terminal:required(options.terminal,'monitor terminal handle'),file:options.file??null,text:options.text??null});
   if(command==='verify'){const result=runner.verify();return {schema:'starci/orca-live-contract-verification@1',...result,result:undefined};}
   if(command==='settle')return settleDispatch(runner,required(options.dispatch,'dispatch'),{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),reason:'explicit-settle',terminalHandle:options.terminal??null,closeTerminal:options.close==='true'});
   const common={run:options.run,from:options.from,worktree:options.worktree,spec:specText(options['spec-file'])};

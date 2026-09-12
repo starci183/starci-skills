@@ -1,0 +1,34 @@
+schema: starci/op-report-schema@1
+describes: starci/op-report@1
+module: execution/reports.mjs
+purpose: |-
+  The single typed outcome of one operation attempt. The file under
+  .starciwork/_local/runtime/reports/<run>/<dispatch>.json is the source of truth; the Orca message
+  the launcher sends with it is only the wake-up signal for the Workflow Monitor.
+fields:
+  outcome: one of done, partial, failed, ask, blocked
+  run: nested workflow Run id the operation belongs to
+  task: operation Task id
+  dispatch: operation Dispatch id (also the report file name)
+  from: reporting agent terminal handle
+  summary: one paragraph, at most 600 characters
+  files: repository-relative paths the operation changed; every path must be inside the contract allowlist
+  checks: "checks that were actually run, each {name, command, exitCode, evidence}"
+  open: items the next operation must pick up (required for partial)
+  question: "{text, options[]} (required for ask)"
+  blocker: "{kind: shared-change | sds-gap | environment | authority, detail} (required for blocked)"
+  observations: reproducible Orca or runtime behavior worth recording
+  signal: "{type, orcaOutcome} derived from the outcome, never chosen by the agent"
+  sent: "null before the signal is sent, then {messageId, sentAt}"
+rules:
+  - done requires at least one check, no failing check and no open item; anything less is partial or failed.
+  - partial requires open items.
+  - ask requires a question; the operation waits for the Monitor's reply and reports again afterwards.
+  - blocked requires a blocker; the Monitor forwards shared-change and sds-gap blockers to the Coordinator as one normalized escalation.
+  - A report is written once; a second report for the same dispatch is refused by the launcher.
+signals:
+  done: worker_done (--outcome succeeded)
+  partial: worker_done (--outcome succeeded)
+  failed: worker_failed (--outcome failed)
+  ask: question
+  blocked: escalation

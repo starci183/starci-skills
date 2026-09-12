@@ -26,7 +26,8 @@ const event=(eventType,overrides={})=>({
 test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.equal(validateSupervisionPolicy(policy).ok,true);
   assert.equal(policy.wait.mode,'blocking-event-wait');
-  assert.equal(policy.wait.onTimeout.inspectWorker,false);
+  assert.equal(policy.wait.onTimeout.inspectWorker,true);
+  assert.equal(policy.wait.owner,'launcher-wait-tick');
   assert.equal(policy.workerLifecycle.coordinator.lifetime,'parent-run');
   assert.equal(policy.workerLifecycle.coordinator.host,'orca-main-worktree');
   assert.equal(policy.workerLifecycle.coordinator.launch,'persistent-native-agent');
@@ -168,9 +169,9 @@ test('a management layer cannot claim operation execution work',()=>{
   assert.match(validateSupervisionPolicy(invalid).errors.join('; '),/crosses the operation boundary/);
 });
 
-test('wait timeout only rearms and a healthy heartbeat produces no coordinator action',()=>{
+test('wait timeout is a wait tick that inspects live workers, and a healthy heartbeat produces no coordinator action',()=>{
   const timeout=observeSupervision(policy,state(),{type:'wait_timeout',cursor:'cursor-1'},{now:1100});
-  assert.deepEqual({action:timeout.action,inspectWorker:timeout.inspectWorker,notifyUser:timeout.notifyUser},{action:'rearm',inspectWorker:false,notifyUser:false});
+  assert.deepEqual({action:timeout.action,inspectWorker:timeout.inspectWorker,notifyUser:timeout.notifyUser},{action:'wait-again',inspectWorker:true,notifyUser:false});
   assert.equal(timeout.state.cursor,'cursor-1');
   const heartbeat=observeSupervision(policy,timeout.state,{type:'event',event:event('heartbeat'),cursor:'cursor-2'},{now:1200});
   assert.equal(heartbeat.action,'none');assert.equal(heartbeat.inspectWorker,false);assert.equal(heartbeat.notifyUser,false);

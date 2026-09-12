@@ -142,3 +142,23 @@ The following observations are now handled by the runtime itself; the regression
 - Keep credentials and user data out of this document.
 - Do not change `.claude` automatically from a product worker. The Coordinator may propose an upgrade; implementation requires the separately authorized runtime-maintenance workflow.
 - Add a regression test with any accepted runtime fix.
+
+## 4.1 observations (2026-09-12, R14 day one)
+
+- **OBS-27 Qwen `--approval-mode auto` parks on a remote classifier.** When the classifier is unavailable Qwen shows
+  `Allow execution of: 'cmd'?` and waits; the terminal keeps a fresh `lastOutputAt`, so a heartbeat-only supervisor sees
+  a healthy worker. Working operations now run `yolo` (isolated child worktree, allowlist); reviews stay `plan`. The
+  `wait` tick classifies that screen as `stalled-prompt`.
+- **OBS-28 a terminal consumes one Run.** `check --run <parent> --terminal <monitor>` answers
+  `consumer_fenced: This coordinator terminal is bound to run_<nested>`; every Coordinator `send --to dispatch:<monitor>`
+  was recorded as `Sent` and never read. Downward instructions now go through `notify` (message file plus typed pointer
+  verified on the screen; a busy Claude queues it as `Press up to edit queued messages`).
+- **OBS-29 `terminal close` can leave the pty alive.** Closing a Qwen terminal parked on a confirmation returned
+  `ptyKilled:false, ptyStopVerdict: unverifiable` and the process survived; `taskkill /T` was needed. The sweep records
+  `ptyKilled:false` as a residual and the process is killed by the user-side helper, never assumed dead.
+- **OBS-30 `worker_done` from the Coordinator settles its own Dispatch.** Every later `send` fails with
+  `sender_not_assignee`; `--retry-of` a completed Dispatch is refused (`task_not_startable`). The Coordinator now reports
+  `partial` at checkpoints and `done` only after the integration gate.
+- **OBS-31 a long Task spec leaves the managed Claude prompt staged.** `worker-start` returns `agent_prompt_stalled`
+  while the whole preamble sits after `❯`; one Enter submits it. The launcher now recovers that case once before fencing,
+  and Coordinator specs stay under 4 KB plus file pointers.

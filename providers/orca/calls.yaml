@@ -200,7 +200,7 @@ calls:
   send:
     command: orchestration send
     kind: mutation
-    flags: [subject, to, run, from, body, type, priority, thread-id, payload, task-id, dispatch-id, outcome, files-modified, report-path, phase]
+    flags: [subject, to, run, from, body, type, priority, thread-id, payload, task-id, dispatch-id, outcome, files-modified, report-path, phase, dispatch-capability]
     required: [subject]
     receipt: [result]
   reply:
@@ -254,7 +254,11 @@ calls:
     flags: [terminal, text, enter, interrupt]
     required: [terminal]
     receipt: [result]
-    note: Canonical launcher only, to submit a dispatch --return-preamble Task to the terminal the same attempt created.
+    note: |-
+      Canonical launcher only: submits a dispatch --return-preamble Task to the terminal the same attempt created, and
+      carries Coordinator -> Monitor notices (launcher `notify`). Orca fences a terminal to the one Run it consumes
+      (consumer_fenced), so parent-Run mail never reaches a Monitor bound to its nested Run; typed input does. A busy
+      agent queues the text and Orca answers agent_prompt_stalled, so delivery is proven from the screen, not this receipt.
   dispatch:
     command: orchestration dispatch
     kind: mutation

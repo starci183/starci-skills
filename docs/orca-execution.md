@@ -167,10 +167,28 @@ metadata: native activity may change it while the agent works. The Workflow Moni
 canonical `[Op] ...` title without fencing the worker when the immutable identities still match, and
 restores it once more before release. Title drift alone never invalidates otherwise valid operation effects.
 
-Send a parent Coordinator control instruction to a Workflow Monitor with
-`orchestration send --type escalation`. Workflow Monitors block on escalation plus operation
-question/outcome events; `status` is informational and cannot carry control because it does not wake
-that subscription.
+## Supervision protocol (4.1)
+
+Three launcher commands own what agents used to improvise. `report` ends an operation or a workflow
+with exactly one typed outcome (`starci/op-report@1`, `starci/workflow-report@1`: `done | partial |
+failed | ask | blocked`, with the checks that were actually run, the files inside the allowlist, open
+items, a question or a blocker); the file under `.starciwork/_local/runtime/reports/<run>/<dispatch>.json`
+is the source of truth and the Orca message (`worker_done`, `worker_failed`, `question`, `escalation`)
+is only the wake-up. `done` needs a passing check and no open item; a second report for the same
+Dispatch is refused. `wait` is the one wait tick a supervisor runs in a loop: it blocks on the boundary
+events with the previous batch acknowledged, scans the report files, classifies every live worker from
+its screen (`working`, `reported`, `stalled-idle`, `stalled-prompt`, `stalled-silent`, `dead`), sweeps
+dead terminals and restores canonical titles; `event: timeout` means call `wait` again, and a
+supervisor turn ends only on the workflow goal or on a `blocked` escalation that needs the parent.
+`notify` carries every Coordinator -> Monitor and Monitor -> Op instruction: a terminal consumes only
+the Run it is bound to (`consumer_fenced`), so parent-Run mail never reaches a Monitor bound to its
+nested Run; `notify` writes the message file, types a pointer into the recipient's agent terminal and
+proves delivery from the screen (`queued | staged | submitted`), because a busy agent queues typed input
+while Orca answers `agent_prompt_stalled`. `start-coordinator` bootstraps the persistent Plan agent
+through a helper terminal that is closed afterwards (Run creation or binding, canonical Task, supervisor
+chain, provider attestation, hand-off of `coordinator_handle` to the agent terminal). A managed Claude
+whose delivered prompt stays staged in its input box is submitted once by the launcher before any
+fence. The Coordinator, Monitor and Op contracts are rendered from `docs/supervision-templates/`.
 
 ## Normal execution
 

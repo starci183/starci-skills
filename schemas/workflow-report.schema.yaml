@@ -1,0 +1,23 @@
+schema: starci/workflow-report-schema@1
+describes: starci/workflow-report@1
+module: execution/reports.mjs
+purpose: |-
+  The normalized boundary a Workflow Monitor reports to the Plan Coordinator. Same outcomes and
+  signals as starci/op-report@1, plus the branch state the Coordinator integrates.
+fields:
+  outcome: one of done, partial, failed, ask, blocked
+  run: parent Run id
+  task: workflow Monitor Task id
+  dispatch: workflow Monitor Dispatch id
+  branch: the child branch carrying the accepted work (required for done and partial)
+  head: the commit the report describes (required for done and partial)
+  gates: "[{name, status}] the checks the workflow passed before reporting"
+  files: accepted files (union of the accepted operation reports)
+  open: items the Coordinator must schedule or decide (required for partial)
+  question: "{text, options[]} (required for ask)"
+  blocker: "{kind, detail} (required for blocked)"
+  observations: Orca observations for docs/orca-runtime-upgrades.md
+rules:
+  - A Monitor reports done only after review.verify passed and the child branch is committed.
+  - A Monitor reports partial at a checkpoint the Coordinator asked for, never as a substitute for done.
+  - The file lives in the Coordinator worktree's reports directory for the parent Run so the Coordinator's wait tick can read it even when the Orca delivery is lost.

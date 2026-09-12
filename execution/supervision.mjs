@@ -139,7 +139,7 @@ export function validateSupervisionPolicy(policy){
   if(routing?.operationToWorkflow?.recipient!=='workflow-manager'||!uniqueStrings(routing?.operationToWorkflow?.events)||!['question','escalation','heartbeat','worker_done','worker_failed'].every(event=>routing.operationToWorkflow.events.includes(event)))errors.push('Operation events must route to the Workflow Manager');
   if(routing?.workflowInternal?.execution!=='operation-agent-only'||!uniqueStrings(routing?.workflowInternal?.resolveWithoutCoordinator)||routing?.workflowInternal?.coordinatorNotification!=='none')errors.push('Workflow-local resolution is invalid');
   if(!uniqueStrings(routing?.workflowToCoordinator?.onlyWhen)||routing?.workflowToCoordinator?.envelope!=='normalized-workflow-boundary')errors.push('Workflow-to-Coordinator routing is invalid');
-  if(routing?.coordinatorToWorkflow?.recipient!=='workflow-manager'||routing?.coordinatorToWorkflow?.transport!=='orchestration-send'||routing?.coordinatorToWorkflow?.eventType!=='escalation'||routing?.coordinatorToWorkflow?.statusEvent!=='forbidden-for-control-instruction')errors.push('Coordinator instructions must wake the Workflow Manager through escalation');
+  if(routing?.coordinatorToWorkflow?.recipient!=='workflow-manager'||routing?.coordinatorToWorkflow?.transport!=='launcher-notify'||routing?.coordinatorToWorkflow?.eventType!=='escalation'||routing?.coordinatorToWorkflow?.statusEvent!=='forbidden-for-control-instruction')errors.push('Coordinator instructions must wake the Workflow Manager through escalation');
   if(routing?.coordinatorToOperation?.direct!=='forbidden'||routing?.coordinatorToOperation?.route!=='coordinator-to-workflow-manager-to-operation')errors.push('Coordinator must route through the Workflow Manager');
   if(routing?.managerRecovery?.onManagerFailure!=='coordinator-replaces-or-recovers-manager'||routing?.managerRecovery?.bypassManager!=='forbidden')errors.push('Workflow Manager recovery is invalid');
   const waitHierarchy=policy?.waitHierarchy;
@@ -147,7 +147,11 @@ export function validateSupervisionPolicy(policy){
   if(waitHierarchy?.coordinator?.waitsFor!=='normalized-workflow-boundary'||!uniqueStrings(waitHierarchy?.coordinator?.accepts)||!['cross-workflow-dependency','shared-owner-change','cross-workflow-conflict','accepted-scope-or-authority-change','human-product-decision','workflow-manager-terminal-failure','normalized-workflow-done'].every(event=>waitHierarchy.coordinator.accepts.includes(event))||waitHierarchy?.coordinator?.actsBy!=='decide-schedule-recover-or-replace-workflow-manager'||waitHierarchy?.coordinator?.workflowLocalExecution!=='forbidden'||waitHierarchy?.coordinator?.operationExecution!=='forbidden')errors.push('Coordinator wait hierarchy is invalid');
   if(policy?.wait?.mode!=='blocking-event-wait')errors.push('Coordinator wait must be event-driven');
   if(!uniqueStrings(policy?.wait?.subscribe)||![...BOUNDARY_EVENTS].every(event=>policy.wait.subscribe.includes(event)))errors.push('Boundary event subscriptions are incomplete');
-  if(policy?.wait?.onTimeout?.action!=='rearm'||policy?.wait?.onTimeout?.inspectWorker!==false||policy?.wait?.onTimeout?.notifyUser!==false)errors.push('Wait timeout must only rearm');
+  if(policy?.wait?.owner!=='launcher-wait-tick'||policy?.wait?.onTimeout?.action!=='wait-again'||policy?.wait?.onTimeout?.inspectWorker!==true||policy?.wait?.onTimeout?.notifyUser!==false)errors.push('Wait timeout must inspect live workers through the launcher wait tick and wait again');
+  if(!uniqueStrings(policy?.wait?.endsTurnOnlyOn)||!['workflow-goal','blocked-escalation-to-parent'].every(item=>policy.wait.endsTurnOnlyOn.includes(item)))errors.push('A supervisor turn ends only on the workflow goal or a blocked escalation');
+  const reports=policy?.reports;
+  if(reports?.schema!=='starci/op-report@1'||reports?.workflowSchema!=='starci/workflow-report@1'||!uniqueStrings(reports?.outcomes)||!['done','partial','failed','ask','blocked'].every(item=>reports.outcomes.includes(item))||reports?.authority!=='report-file-then-signal'||reports?.command!=='report'||reports?.onceOnly!==true)errors.push('Typed report policy is invalid');
+  if(!plain(reports?.signals)||reports.signals.done!=='worker_done'||reports.signals.partial!=='worker_done'||reports.signals.failed!=='worker_failed'||reports.signals.ask!=='question'||reports.signals.blocked!=='escalation')errors.push('Report signal mapping is invalid');
   if(policy?.wait?.onHealthyHeartbeat?.action!=='none'||policy?.wait?.onHealthyHeartbeat?.inspectWorker!==false||policy?.wait?.onHealthyHeartbeat?.notifyUser!==false)errors.push('Healthy heartbeat must be non-actionable');
   if(!uniqueStrings(policy?.liveness?.checkWhen)||!['heartbeat-grace-expired','workflow-deadline-expired','terminal-closed','terminal-crashed'].every(trigger=>policy.liveness.checkWhen.includes(trigger)))errors.push('Liveness triggers are incomplete');
   if(!uniqueStrings(policy?.liveness?.inspectionOrder)||policy.liveness.inspectionOrder.at(-1)!=='bounded-terminal-tail'||policy?.liveness?.maxTerminalTailReads!==1)errors.push('Liveness inspection must end with one bounded terminal tail');
@@ -212,7 +216,8 @@ export function observeSupervision(policy,inputState,observation,{now=Date.now()
   if(observation.type==='wait_timeout'){
     if(observation.cursor!==undefined)state.cursor=observation.cursor;
     state.status='waiting';
-    return {state,action:'rearm',inspectWorker:false,notifyUser:false,ackRequired:false};
+    // 4.1: a timeout is a wait tick, not silence; the launcher `wait` classifies every live worker before waiting again.
+    return {state,action:'wait-again',inspectWorker:true,notifyUser:false,ackRequired:false};
   }
   if(observation.type==='terminal_state'){
     const terminalState=text(observation.terminalState,'terminal state');
