@@ -938,7 +938,9 @@ function launchOp(orca,store,state,op,allocated,ctx){
     op.launchFailures+=1;
     ctx.allocator.failed(allocated.runtime,{reason:launched?.stopReason??'launch failed'});
     op.avoidRuntimes=unique([...op.avoidRuntimes,allocated.runtime]);
-    store.appendEvent({event:'launch-failed',op:op.id,runtime:allocated.runtime,stopReason:launched?.stopReason??null,attempts:launched?.attempts?.length??0});
+    // The attempts travel with the event: a launch that failed is only diagnosable from what Orca said at each step.
+    store.appendEvent({event:'launch-failed',op:op.id,runtime:allocated.runtime,stopReason:launched?.stopReason??null,attempts:launched?.attempts?.length??0,
+      detail:(launched?.attempts??[]).slice(0,4).map(attempt=>({target:attempt.target??null,stage:attempt.stage??null,effectState:attempt.effectState??null,reason:String(attempt.reason??'').slice(0,240)}))});
     if(op.launchFailures>=LAUNCH_LIMIT){
       op.status='blocked';
       state.needUser.push({op:op.id,kind:'environment',detail:`no runtime could launch ${op.id} (${op.launchFailures} attempts, last ${launched?.stopReason??'unknown'})`});
