@@ -22,8 +22,8 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.equal(contract.operationAgent.canonicalLauncher.module,'execution/orca-supervised-launch.mjs');
   assert.equal(contract.operationAgent.canonicalLauncher.command,'start-op');
   assert.equal(contract.operationAgent.canonicalLauncher.authority,'exclusive-effectful-construction-path');
-  assert.equal(contract.operationAgent.qwen38Flash.launch,'direct-native-worker-start');
-  assert.equal(contract.operationAgent.qwen38Flash.agent,'qwen-code');
+  assert.equal(contract.operationAgent.qwen38Flash.launch,'command-terminal');
+  assert.equal(contract.operationAgent.qwen38Flash.agent,'qwen');
   assert.equal(contract.operationAgent.qwen38Flash.model,'qwen3.8-flash');
   assert.equal(contract.operationAgent.qwen38Flash.nestedAgents,'forbidden');
   assert.equal(contract.operationAgent.admission.expectedOperation,'active-dag-node');
@@ -35,19 +35,20 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.equal(contract.operationAgent.admission.afterWorkerStart.runtimeTitleDrift.whenImmutableIdentityRemainsExact,'recanonicalize-without-fencing');
   assert.equal(contract.operationAgent.admission.architectureSidearm.onlyTrigger,'active implementation secondary_request');
   assert.equal(contract.operationAgent.admission.architectureSidearm.exactReason,'sds-technical-gap');
-  assert.match(contract.operationAgent.qwen38Flash.calls.startAgent.cli,/worker-start .*--agent qwen-code/);
-  assert.doesNotMatch(contract.operationAgent.qwen38Flash.calls.startAgent.cli,/--terminal|--model/);
+  assert.match(contract.operationAgent.qwen38Flash.calls.createTerminal.cli,/terminal create .*--command/);
+  assert.match(contract.operationAgent.qwen38Flash.calls.returnPreamble.cli,/orchestration dispatch .*--return-preamble/);
+  assert.doesNotMatch(contract.operationAgent.qwen38Flash.calls.returnPreamble.cli,/--inject/);
+  assert.match(contract.operationAgent.qwen38Flash.calls.submitPrompt.cli,/terminal send .*--enter/);
   assert.match(contract.operationAgent.qwen38Flash.calls.restoreName.cli,/terminal rename .*\[Op\] <operation> - <scope>/);
   assert.equal(contract.routing.coordinatorToOperation,'forbidden');
   assert.match(contract.routing.coordinatorToWorkflow.cli,/--type escalation/);
   assert.equal(contract.routing.coordinatorToWorkflow.forbiddenType,'status');
-  assert.ok(contract.forbiddenCalls.includes('terminal-send-operation-prompt'));
-  assert.ok(contract.forbiddenCalls.includes('orchestration.dispatch-to-existing-terminal-for-operation'));
+  assert.ok(contract.forbiddenCalls.includes('terminal-send-outside-canonical-launcher'));
+  assert.ok(contract.forbiddenCalls.includes('orchestration.dispatch-to-reused-terminal-for-operation'));
   assert.ok(contract.forbiddenCalls.includes('operation-agent-tool-agent'));
   for(const cli of [
     contract.planCoordinator.calls.startAgent.cli,
     contract.workflowMonitor.calls.startChildAgent.cli,
-    contract.operationAgent.qwen38Flash.calls.startAgent.cli,
     contract.operationAgent.managedFallback.calls.startAgent.cli
   ])assert.doesNotMatch(cli,/--on\s+(?:windows|macos|linux)(?:\s|$)/i);
 });
@@ -106,13 +107,14 @@ test('provider catalog exposes explicit API and validation contracts',()=>{
   assert.equal(claudeApi.unavailableAssumptions.AgentOutput,false);
   assert.equal(validateProviderContracts().ok,true);
   const qwen=loadProviderContract('orca').adapters.qwen;
-  assert.equal(qwen.kind,'direct-native-managed-agent');
-  assert.equal(qwen.start[0].api,'orchestration.worker-start');
-  assert.equal(qwen.start[0].binding,'agent-qwen-code');
-  assert.equal(qwen.start[1].api,'orchestration.worker-show');
-  assert.equal(qwen.start[1].phase,'provider-identity');
-  assert.equal(qwen.start[2].api,'terminal.rename');
-  assert.equal(qwen.start[3].api,'orchestration.worker-show');
-  assert.equal(qwen.start[3].phase,'canonical-title');
-  assert.ok(qwen.forbidden.includes('terminal-create-qwen-command'));
+  assert.equal(qwen.kind,'command-terminal-agent');
+  assert.equal(qwen.start[0].api,'terminal.create');
+  assert.equal(qwen.start[2].api,'orchestration.dispatch');
+  assert.equal(qwen.start[2].binding,'return-preamble');
+  assert.equal(qwen.start[3].api,'terminal.send');
+  assert.equal(qwen.start[5].api,'orchestration.dispatch-show');
+  assert.equal(qwen.credentialRefresh.envKey,'BAILIAN_TOKEN_PLAN_API_KEY');
+  assert.doesNotMatch(qwen.credentialRefresh.win32+qwen.credentialRefresh.posix,/sk-/);
+  assert.ok(qwen.forbidden.includes('dispatch-inject'));
+  assert.ok(qwen.forbidden.includes('qwen-agent-tool'));
 });

@@ -223,6 +223,42 @@ calls:
     kind: read
     flags: []
     receipt: [result.worktree]
+  terminal-create:
+    command: terminal create
+    kind: mutation
+    replay: none
+    flags: [worktree, title, command]
+    required: [worktree, title, command]
+    receipt: [result.terminal.handle]
+    note: Command-terminal launch only; the command is the declared target command prefixed with the credential refresh. Never used to attach a shell to a managed agent.
+  terminal-read:
+    command: terminal read
+    kind: read
+    flags: [terminal, cursor, limit, screen]
+    required: [terminal]
+    receipt: [result.terminal]
+  terminal-send:
+    command: terminal send
+    kind: mutation
+    replay: none
+    flags: [terminal, text, enter, interrupt]
+    required: [terminal]
+    receipt: [result]
+    note: Canonical launcher only, to submit a dispatch --return-preamble Task to the terminal the same attempt created.
+  dispatch:
+    command: orchestration dispatch
+    kind: mutation
+    flags: [task, to, from, run, return-preamble]
+    required: [task, to, return-preamble]
+    forbidden: [inject, dry-run]
+    receipt: [result.dispatch.id, result.preamble]
+    creates: dispatch
+  dispatch-show:
+    command: orchestration dispatch-show
+    kind: read
+    flags: [task, preamble, from]
+    required: [task]
+    receipt: [result.dispatch.id, result.dispatch.assignee_handle]
   terminal-close:
     command: terminal close
     kind: mutation
@@ -240,12 +276,9 @@ calls:
     required: [terminal, title]
     receipt: [result]
 forbiddenCalls:
-  - orchestration dispatch
   - orchestration coordinator-start
   - orchestration coordinator-stop
   - orchestration reset
-  - terminal send
-  - terminal create
   - terminal stop
 recoveries:
   worker-start-retry-of: Start a replacement attempt with --retry-of <dispatch> after the failed Dispatch is proven settled; placement and agent are repeated explicitly.

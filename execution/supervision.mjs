@@ -30,14 +30,29 @@ export function planOperationAgentLaunch({taskId,worktree,selection,operation,sc
   const task=text(taskId,'operation Task ID'),target=text(worktree,'workflow worktree selector');
   need(plain(selection?.orcaLaunch),'Missing Orca launch selection');
   const displayName=formatOrcaDisplayName('operation-agent',{operation,scope});
-  need(selection.orcaLaunch.kind==='managed-agent','Operation launch must use a supervised managed agent');
+  if(selection.orcaLaunch.kind==='command-terminal'){
+    need(selection.orcaLaunch.dispatch==='return-preamble-and-send','Command-terminal launch must deliver the Task with dispatch --return-preamble');
+    const command=text(selection.orcaLaunch.command,'command-terminal command');
+    need(/--exclude-tools agent\b/.test(command),'Command-terminal launch must exclude the provider agent tool');
+    return {
+      schema:'starci/orca-operation-launch@1',mode:'command-terminal',displayName,
+      steps:[
+        {command:'terminal-create',args:{worktree:target,title:displayName,command}},
+        {command:'terminal-read',phase:'readiness',args:{terminal:'$terminalHandle',screen:true}},
+        {command:'dispatch',args:{task,to:'$terminalHandle','return-preamble':true}},
+        {command:'terminal-send',args:{terminal:'$terminalHandle',text:'$preamble',enter:true}},
+        {command:'terminal-read',phase:'submission',args:{terminal:'$terminalHandle',screen:true}},
+        {command:'dispatch-show',phase:'assignee-attestation',args:{task}}
+      ],
+      forbidden:['dispatch-inject','provider-native-subagent','reuse-existing-terminal','unsupervised-retain-as-success']
+    };
+  }
+  need(selection.orcaLaunch.kind==='managed-agent','Operation launch must use a supervised managed agent or a command terminal');
   const workerArgs={task,worktree:target,agent:text(selection.orcaLaunch.agent,'Orca agent ID')};
   const qwen=workerArgs.agent==='qwen-code';
-  if(qwen){
-    need(selection.model==='qwen3.8-flash','Native qwen-code must resolve to Qwen 3.8 Flash');
-    need(selection.orcaLaunch.startup==='direct-native-worker-start','Qwen must use direct native worker-start');
-  }else if(selection.model!==null&&selection.model!==undefined)workerArgs.model=text(selection.model,'resolved provider model');
-  if(!qwen&&selection.effort!==null&&selection.effort!==undefined){
+  need(!qwen,'Native qwen-code managed launch is retired: Qwen runs as a command terminal');
+  if(selection.model!==null&&selection.model!==undefined)workerArgs.model=text(selection.model,'resolved provider model');
+  if(selection.effort!==null&&selection.effort!==undefined){
     need(workerArgs.model,'Orca effort requires an explicit provider model');
     workerArgs.effort=text(selection.effort,'resolved provider effort');
   }
@@ -116,7 +131,7 @@ export function validateSupervisionPolicy(policy){
   if(sidearm?.onlyTrigger!=='active-implementation-secondary_request'||sidearm?.requiredReason!=='sds-technical-gap'||sidearm?.requiredSecondaryOp!=='architecture.decide'||sidearm?.requiredAuthority!=='explicit-bounded-sds-allowlist'||!uniqueStrings(sidearm?.forbiddenTriggers)||!['review-finding','review-suggestion','unanswered-design-question','inferred-sds-gap'].every(rule=>sidearm.forbiddenTriggers.includes(rule)))errors.push('Architecture sidearm admission is invalid');
   const titleStability=operationAgent?.displayNameStability;
   if(titleStability?.identityAuthority!=='task-display-name-plus-worker-provider-receipt'||titleStability?.terminalTitle!=='mutable-native-ui-metadata'||titleStability?.launch!=='provider-attest-then-rename-and-verify'||titleStability?.runtimeDrift!=='recanonicalize-without-fencing-when-immutable-identity-is-exact'||titleStability?.settlement!=='recanonicalize-before-release'||titleStability?.effectDecision!=='never-reject-solely-for-runtime-terminal-title-drift')errors.push('Operation display-name stability policy is invalid');
-  if(qwenLaunch?.agent!=='qwen-code'||qwenLaunch?.model!=='qwen3.8-flash'||qwenLaunch?.modelAuthority!=='verified-qwen-runtime-configuration'||qwenLaunch?.create!=='direct-native-worker-start'||qwenLaunch?.readiness!=='supervised-worker-receipt'||qwenLaunch?.supervise!=='worker-start-by-agent-id'||qwenLaunch?.promptDelivery!=='supervised-worker-start-only'||qwenLaunch?.terminalCommand!=='forbidden'||qwenLaunch?.nestedAgents!=='forbidden')errors.push('Qwen supervised launch is invalid');
+  if(qwenLaunch?.agent!=='qwen'||qwenLaunch?.model!=='qwen3.8-flash'||qwenLaunch?.modelAuthority!=='rendered-terminal-footer'||qwenLaunch?.create!=='command-terminal-per-attempt'||qwenLaunch?.readiness!=='rendered-input-prompt'||qwenLaunch?.supervise!=='dispatch-return-preamble'||qwenLaunch?.promptDelivery!=='terminal-send-with-submit-verification'||qwenLaunch?.credentialRefresh!=='unset-stale-process-env-then-qwen-env-file'||qwenLaunch?.terminalCommand!=='declared-target-command-only'||qwenLaunch?.nestedAgents!=='forbidden')errors.push('Qwen command-terminal launch is invalid');
   if(!uniqueStrings(nativeFailure?.recognizedFailures)||!['agent_prompt_stalled','session_not_reported'].every(reason=>nativeFailure.recognizedFailures.includes(reason))||nativeFailure?.action!=='fence-and-reconcile-exact-attempt'||nativeFailure?.nextCandidate!=='only-after-verified-no-effects'||nativeFailure?.unsupervisedFallback!=='forbidden'||nativeFailure?.release!=='release-or-retain-from-worker-receipt'||nativeFailure?.duplicateSubmit!=='forbidden')errors.push('Native operation failure policy is invalid');
   const routing=policy?.routing;
   if(routing?.operationToWorkflow?.recipient!=='workflow-manager'||!uniqueStrings(routing?.operationToWorkflow?.events)||!['question','escalation','heartbeat','worker_done','worker_failed'].every(event=>routing.operationToWorkflow.events.includes(event)))errors.push('Operation events must route to the Workflow Manager');

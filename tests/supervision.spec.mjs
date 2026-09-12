@@ -80,10 +80,10 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.equal(policy.workerLifecycle.operationAgent.dispatchAdmission.effectAcceptance,'only-after-provider-proof');
   assert.equal(policy.workerLifecycle.operationAgent.architectureSidearm.onlyTrigger,'active-implementation-secondary_request');
   assert.equal(policy.workerLifecycle.operationAgent.architectureSidearm.requiredReason,'sds-technical-gap');
-  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.supervise,'worker-start-by-agent-id');
-  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.promptDelivery,'supervised-worker-start-only');
-  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.create,'direct-native-worker-start');
-  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.terminalCommand,'forbidden');
+  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.supervise,'dispatch-return-preamble');
+  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.promptDelivery,'terminal-send-with-submit-verification');
+  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.create,'command-terminal-per-attempt');
+  assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.terminalCommand,'declared-target-command-only');
   assert.equal(policy.workerLifecycle.operationAgent.qwenLaunch.nestedAgents,'forbidden');
   assert.deepEqual(policy.workerLifecycle.operationAgent.nativeLaunchFailure.recognizedFailures,['agent_prompt_stalled','session_not_reported']);
   assert.equal(policy.workerLifecycle.operationAgent.nativeLaunchFailure.unsupervisedFallback,'forbidden');
@@ -111,21 +111,21 @@ test('display names distinguish plan coordinator, workflow Monitor and operation
   assert.equal(formatOrcaDisplayName('operation-agent',{operation:'review.verify',scope:'Chatbot'}),'[Op] review.verify - Chatbot');
 });
 
-test('Qwen operation launch uses one direct native worker and restores the canonical title',()=>{
+test('Qwen operation launch is one command terminal per attempt fed by dispatch --return-preamble',()=>{
+  const command='qwen --model qwen3.8-flash --approval-mode auto --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false';
   const launch=planOperationAgentLaunch({
     taskId:'task-1',worktree:'path:C:/work/chatbot',operation:'backend.implement',scope:'Chatbot',
-    selection:{model:'qwen3.8-flash',orcaLaunch:{kind:'managed-agent',agent:'qwen-code',startup:'direct-native-worker-start'}}
+    selection:{model:'qwen3.8-flash',orcaLaunch:{kind:'command-terminal',command,dispatch:'return-preamble-and-send'}}
   });
-  assert.equal(launch.mode,'native-worker-start');
+  assert.equal(launch.mode,'command-terminal');
   assert.equal(launch.displayName,'[Op] backend.implement - Chatbot');
-  assert.deepEqual(launch.steps.map(step=>step.command),['worker-start','worker-show','terminal-rename','worker-show']);
-  assert.deepEqual(launch.steps[0].args,{task:'task-1',worktree:'path:C:/work/chatbot',agent:'qwen-code'});
-  assert.deepEqual(launch.steps[1],{command:'worker-show',phase:'provider-identity',args:{dispatch:'$workerDispatchId'}});
-  assert.deepEqual(launch.steps[2].args,{terminal:'$workerTerminalHandle',title:'[Op] backend.implement - Chatbot'});
-  assert.deepEqual(launch.steps[3],{command:'worker-show',phase:'canonical-title',args:{dispatch:'$workerDispatchId'}});
-  assert.ok(launch.forbidden.includes('terminal-create-provider-command'));
-  assert.ok(launch.forbidden.includes('worker-start-by-terminal-handle'));
-  assert.ok(launch.forbidden.includes('unsupervised-retain'));
+  assert.deepEqual(launch.steps.map(step=>step.command),['terminal-create','terminal-read','dispatch','terminal-send','terminal-read','dispatch-show']);
+  assert.deepEqual(launch.steps[0].args,{worktree:'path:C:/work/chatbot',title:'[Op] backend.implement - Chatbot',command});
+  assert.deepEqual(launch.steps[2].args,{task:'task-1',to:'$terminalHandle','return-preamble':true});
+  assert.ok(launch.forbidden.includes('dispatch-inject'));
+  assert.ok(launch.forbidden.includes('reuse-existing-terminal'));
+  assert.throws(()=>planOperationAgentLaunch({taskId:'task-1',worktree:'path:C:/work/chatbot',operation:'backend.implement',scope:'Chatbot',selection:{model:'qwen3.8-flash',orcaLaunch:{kind:'command-terminal',command:'qwen --approval-mode auto',dispatch:'return-preamble-and-send'}}}),/exclude the provider agent tool/);
+  assert.throws(()=>planOperationAgentLaunch({taskId:'task-1',worktree:'path:C:/work/chatbot',operation:'backend.implement',scope:'Chatbot',selection:{model:'qwen3.8-flash',orcaLaunch:{kind:'managed-agent',agent:'qwen-code'}}}),/retired/);
 });
 
 test('managed operation launch carries the exact resolved model and effort',()=>{
@@ -140,7 +140,7 @@ test('managed operation launch carries the exact resolved model and effort',()=>
 
 test('worker provider attestation rejects Sol when the resolved operation target is Qwen',()=>{
   const operation='backend.implement',scope='Accounting',displayName='[Op] backend.implement - Accounting';
-  const selection={target:'qwen-qwen3.8-flash-worker',model:'qwen3.8-flash',orcaLaunch:{kind:'managed-agent',agent:'qwen-code',startup:'direct-native-worker-start'}};
+  const selection={target:'qwen-qwen3.8-flash-worker',model:'qwen3.8-flash',orcaLaunch:{kind:'managed-agent',agent:'qwen-code'}};
   const taskRecord={id:'task-1',display_name:displayName};
   const receipt=(agent='qwen-code',model='qwen3.8-flash')=>({result:{
     dispatch:{id:'ctx-1',task_id:'task-1'},

@@ -112,11 +112,9 @@ targets:
     profile: qwen3.8-flash-worker
     requestedModel: qwen3.8-flash
     orcaLaunch:
-      kind: managed-agent
-      agent: qwen-code
-      startup: direct-native-worker-start
-      modelAuthority: verified-qwen-runtime-configuration
-      supervision: worker-start-agent
+      kind: command-terminal
+      command: qwen --model qwen3.8-flash --approval-mode auto --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      dispatch: return-preamble-and-send
   qwen-qwen3.8-max-worker:
     runtime: qwen
     profile: qwen3.8-max-worker
@@ -154,11 +152,9 @@ targets:
     profile: qwen3.8-flash-reviewer
     requestedModel: qwen3.8-flash
     orcaLaunch:
-      kind: managed-agent
-      agent: qwen-code
-      startup: direct-native-worker-start
-      modelAuthority: verified-qwen-runtime-configuration
-      supervision: worker-start-agent
+      kind: command-terminal
+      command: qwen --model qwen3.8-flash --approval-mode auto --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      dispatch: return-preamble-and-send
 skills:
   starci:
     chains:
@@ -290,15 +286,18 @@ fallback:
     - business-ambiguity
     - safety-block
     - partial-or-unknown-effects
-selection: Orca supplies the observed external-agent inventory. Resolve the selected skill and
+selection: |-
+  Orca supplies the observed external-agent inventory. Resolve the selected skill and
   operator chain from top to bottom, choosing the first ready runtime/profile. Fall through only
   after an allowed failure with verified no-effect state. This policy never installs an agent,
-  authenticates a provider, grants tools or expands the workflow authority. Use managed-agent
-  launch when Orca recognizes the provider. This Orca build recognizes Qwen through native agent
-  id qwen-code; Qwen 3.8 Flash therefore uses supervised worker-start and inherits its exact model
-  from the verified Qwen runtime configuration. Launch it directly with `worker-start --agent qwen-code`;
-  never create or attach a terminal by running the `qwen` command. Use a declared command-terminal only when an exact
-  per-operation model override is required and the native adapter cannot carry that model.
+  authenticates a provider, grants tools or expands the workflow authority. Claude and Codex use
+  managed-agent launch (worker-start). Qwen 3.8 Flash uses the command-terminal launch declared on
+  its target: the canonical launcher creates one terminal per attempt running the declared `qwen`
+  command, waits for the rendered input prompt, obtains the Task preamble with `dispatch
+  --return-preamble`, submits it with `terminal send` and verifies the submission, then attests the
+  Dispatch assignee and the rendered model; Orca 1.4.188's native qwen-code adapter cannot deliver a
+  prompt to Qwen Code 0.23.3. Qwen 3.8 Max and DeepSeek command terminals stay out of automatic
+  chains; every command excludes the Qwen `agent` tool.
 costPolicy: |-
   Execution operations (backend, frontend, UAT, content, release, runtime, retire, task, workspace)
   run Qwen 3.8 Flash first, Claude Opus second and Codex gpt-5.6-sol third. Deep reasoning

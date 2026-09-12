@@ -31,17 +31,18 @@ recipes:
     beforeOperationTaskCreate: parent-lineage-attested
   start-qwen-operation:
     mode: orchestrated
-    actor: workflow-monitor
+    actor: canonical-launcher
     sequence:
       - assert-expected-active-dag-operation
       - resolve-operation-provider-chain
       - orchestration.task-create
       - assert-canonical-task-display-name
-      - orchestration.worker-start-current-worktree-agent-qwen-code
-      - orchestration.worker-show-and-attest-provider-identity
-      - terminal.rename
-      - assert-canonical-terminal-title
-      - orchestration.worker-show-and-verify-canonical-title
+      - terminal.create-declared-qwen-command-with-credential-refresh
+      - terminal.read-screen-until-input-prompt
+      - orchestration.dispatch-return-preamble
+      - terminal.send-preamble-with-enter
+      - terminal.read-screen-verify-submission-or-one-more-enter
+      - orchestration.dispatch-show-attest-assignee-and-rendered-model
     terminalName: "[Op] <operation> - <scope>"
     taskCardinality: one
     dispatchCardinality: one
@@ -120,8 +121,8 @@ forbiddenSequences:
   - plan-coordinator-calls-operation
   - workflow-coordinator-implements-op
   - qwen-op-uses-agent-tool
-  - terminal-send-operation-prompt
-  - dispatch-to-existing-terminal-operation
+  - terminal-send-outside-canonical-launcher
+  - dispatch-to-reused-terminal-operation
   - dispatch-inject-operation
   - unsupervised-operation-retain-as-success
   - infer-architecture-sidearm-from-review

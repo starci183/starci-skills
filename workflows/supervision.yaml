@@ -142,14 +142,15 @@ workerLifecycle:
         - unanswered-design-question
         - inferred-sds-gap
     qwenLaunch:
-      agent: qwen-code
+      agent: qwen
       model: qwen3.8-flash
-      modelAuthority: verified-qwen-runtime-configuration
-      create: direct-native-worker-start
-      readiness: supervised-worker-receipt
-      supervise: worker-start-by-agent-id
-      promptDelivery: supervised-worker-start-only
-      terminalCommand: forbidden
+      modelAuthority: rendered-terminal-footer
+      create: command-terminal-per-attempt
+      readiness: rendered-input-prompt
+      supervise: dispatch-return-preamble
+      promptDelivery: terminal-send-with-submit-verification
+      credentialRefresh: unset-stale-process-env-then-qwen-env-file
+      terminalCommand: declared-target-command-only
       nestedAgents: forbidden
     nativeLaunchFailure:
       recognizedFailures:

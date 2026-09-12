@@ -4,7 +4,7 @@ import {resolveExecutionChain,selectExecutionTarget,selectProfile} from '../prof
 import {readPublicJson} from './helpers/read-public.mjs';
 import {validateAssets} from '../contracts/assets.mjs';
 
-const qwenLaunch={kind:'managed-agent',agent:'qwen-code',startup:'direct-native-worker-start',modelAuthority:'verified-qwen-runtime-configuration',supervision:'worker-start-agent'};
+const qwenLaunch={kind:'command-terminal',command:'qwen --model qwen3.8-flash --approval-mode auto --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false',dispatch:'return-preamble-and-send'};
 
 test('active roles select Codex, Claude or Qwen without reviving retired profiles or granting tools',()=>{
   const codex=selectProfile({runtime:'codex',op:'interface.implement',imageGenerationAvailable:true});
@@ -46,7 +46,7 @@ test('every operator has an ordered external-agent chain and skill-level default
     const expectedCount=reasoningOps.has(op)?2:3;
     assert.equal(route.candidates.length,expectedCount,op);
     assert.equal(new Set(route.candidates.map(x=>x.target)).size,expectedCount);
-    assert.ok(route.candidates.every(candidate=>candidate.orcaLaunch.kind==='managed-agent'),op);
+    assert.ok(route.candidates.every(candidate=>candidate.orcaLaunch.kind==='managed-agent'||(candidate.orcaLaunch.kind==='command-terminal'&&candidate.orcaLaunch.dispatch==='return-preamble-and-send')),op);
   }
   assert.deepEqual(resolveExecutionChain({op:'interface.draw'}).candidates.map(x=>x.target),['codex-gpt-5.6-sol','claude-opus','qwen-qwen3.8-flash-worker']);
   assert.equal(resolveExecutionChain({op:'interface.draw'}).candidates[0].model,'gpt-5.6-sol');
@@ -104,7 +104,8 @@ test('Qwen Flash executes then Opus then Sol, Sol draws, Fable then Astra reason
   for(const op of ops){
     const chain=resolveExecutionChain({op}).candidates;
     assert.ok(!chain.some(candidate=>['qwen3.8-max','deepseek-v4-pro'].includes(candidate.model)),op);
-    assert.ok(chain.every(candidate=>candidate.orcaLaunch.kind==='managed-agent'),op);
+    assert.ok(chain.every(candidate=>candidate.orcaLaunch.kind==='managed-agent'||candidate.orcaLaunch.dispatch==='return-preamble-and-send'),op);
+    assert.ok(chain.filter(candidate=>candidate.orcaLaunch.kind==='command-terminal').every(candidate=>/--exclude-tools agent\b/.test(candidate.orcaLaunch.command)),op);
   }
 });
 const pending=()=>({reviewedDrawIds:['draw-1'],items:[{id:'hero',drawIds:['draw-1'],usage:'Decorative hero artwork',requiredForFlow:false,status:'deferred',sourcePath:null,artifact:null,provenance:'Claude profile has no image generator; inspected existing repository assets first.',brief:{prompt:'Create the approved abstract hero illustration',width:1200,height:800,format:'webp',placement:'Hero right column',placeholder:'blank-reserved-slot'}}]});

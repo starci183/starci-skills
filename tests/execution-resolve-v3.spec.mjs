@@ -32,11 +32,13 @@ test('resolver preserves each exact operator chain and its environment metadata'
   assert.deepEqual(reasoning.map(value => value.target), ['claude-fable-5.1', 'codex-gpt-6-astra']);
 });
 
-test('automatic Orca chains reject command-terminal targets', () => {
+test('automatic Orca chains accept return-preamble command terminals and reject any other terminal form', () => {
+  const candidates = flattenOperationCandidates({operation: 'backend.implement', registry});
+  assert.equal(candidates[0].orcaLaunch.kind, 'command-terminal');
+  assert.equal(candidates[0].orcaLaunch.dispatch, 'return-preamble-and-send');
   const invalid = structuredClone(registry);
-  invalid.operators['review.verify'].chain[1] = 'qwen-deepseek-v4-pro-reviewer';
-  invalid.operators['review.verify'].environments = [{environment:'qwen',profiles:['qwen-qwen3.8-flash-reviewer','qwen-deepseek-v4-pro-reviewer']}];
-  assert.throws(() => flattenOperationCandidates({operation:'review.verify',registry:invalid}), /supervised managed agent/);
+  invalid.targets['qwen-qwen3.8-flash-reviewer'].orcaLaunch = {kind: 'command-terminal', command: 'qwen', dispatch: 'inject'};
+  assert.throws(() => flattenOperationCandidates({operation:'review.verify',registry:invalid}), /managed agent or a return-preamble command terminal/);
 });
 
 test('resolver selects deterministically and preserves unavailable observations', () => {

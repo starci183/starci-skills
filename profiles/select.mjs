@@ -4,6 +4,9 @@ const registry=readDistJson('profiles','registry.json');
 const runtimes=Object.fromEntries(registry.runtimes.map(name=>[name,readDistJson('profiles',`${name}.json`)]));
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const normalizeRuntime=runtime=>registry.aliases[runtime]??runtime;
+const need=(condition,message)=>{if(!condition)throw Error(message);};
+/** Automatic chains may carry native managed agents and command terminals that deliver the Task via return-preamble. */
+export const launchAllowed=launch=>plain(launch)&&(launch.kind==='managed-agent'||(launch.kind==='command-terminal'&&launch.dispatch==='return-preamble-and-send'&&typeof launch.command==='string'&&launch.command.trim().length>0));
 /** Select policy only; never switch models, dispatch workers or grant tools. */
 export function selectProfile({runtime,op,profile,config=loadConfig(),model=config.model,effort=config.effort,language=config.language,imageGenerationAvailable=false}) {
   validateConfig({language,model,effort});
@@ -35,7 +38,7 @@ export function resolveExecutionChain({skill='starci',op}){
     if(!plain(route))throw Error('Unknown execution target');
     const runtime=normalizeRuntime(route.runtime),profiles=runtimes[runtime]?.profiles,selected=profiles?.[route.profile];
     if(!selected||selected.role!==role)throw Error('Execution target role mismatch');
-    if(!plain(route.orcaLaunch)||route.orcaLaunch.kind!=='managed-agent')throw Error('Automatic Orca chains require supervised managed agents');
+    need(plain(route.orcaLaunch)&&launchAllowed(route.orcaLaunch),'Automatic Orca chains require a managed agent or a return-preamble command terminal');
     return {priority,target,runtime,provider:runtimes[runtime].provider,profile:route.profile,role,model:selected.model,orcaLaunch:structuredClone(route.orcaLaunch)};
   });
   return {schema:'starci/execution-chain@1',skill,op,role,candidates};

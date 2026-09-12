@@ -73,18 +73,22 @@ export function validateProviderContracts(){
   add(errors,(calls?.calls?.['worker-start']?.forbidden||[]).includes('terminal')&&(calls?.calls?.['worker-start']?.forbidden||[]).includes('on'),'worker-start must forbid --terminal and --on');
   add(errors,Array.isArray(calls?.calls?.['worker-start']?.classify)&&calls.calls['worker-start'].classify.length>0,'worker-start must declare failure classification');
   const qwen=orca.adapters?.qwen;
-  add(errors,qwen?.agent==='qwen-code','Missing native Orca Qwen adapter');
-  add(errors,qwen?.kind==='direct-native-managed-agent','Qwen adapter must use direct native worker-start');
-  add(errors,qwen?.requiredModel==='qwen3.8-flash','Qwen adapter must attest Qwen 3.8 Flash');
-  add(errors,qwen?.start?.length===4&&qwen.start[0]?.api==='orchestration.worker-start'&&qwen.start[0]?.binding==='agent-qwen-code'&&qwen.start[1]?.api==='orchestration.worker-show'&&qwen.start[1]?.phase==='provider-identity'&&qwen.start[2]?.api==='terminal.rename'&&qwen.start[3]?.api==='orchestration.worker-show'&&qwen.start[3]?.phase==='canonical-title','Qwen adapter start sequence is invalid');
-  add(errors,qwen?.forbidden?.includes('qwen-agent-tool'),'Qwen adapter does not forbid its agent tool');
-  add(errors,qwen?.forbidden?.includes('terminal-create-qwen-command')&&qwen?.forbidden?.includes('worker-start-by-terminal-handle'),'Qwen adapter does not forbid command-terminal attachment');
-  add(errors,orca.index?.operationAgent?.qwen38Flash?.launch==='direct-native-worker-start','Orca index must launch Qwen natively');
-  add(errors,orca.index?.operationAgent?.qwen38Flash?.agent===qwen?.agent&&orca.index?.operationAgent?.qwen38Flash?.model===qwen?.requiredModel,'Orca index and Qwen adapter identities disagree');
+  add(errors,qwen?.agent==='qwen','Missing Orca Qwen adapter');
+  add(errors,qwen?.kind==='command-terminal-agent','Qwen adapter must launch a command terminal');
+  add(errors,qwen?.model==='qwen3.8-flash'&&qwen?.modelMarker==='qwen3.8-flash','Qwen adapter must attest Qwen 3.8 Flash from the rendered footer');
+  add(errors,typeof qwen?.credentialRefresh?.envKey==='string'&&/^[A-Z0-9_]+$/.test(qwen.credentialRefresh.envKey)&&typeof qwen?.credentialRefresh?.win32==='string'&&typeof qwen?.credentialRefresh?.posix==='string'&&!/sk-|Bearer|=\S{20,}/.test(qwen.credentialRefresh.win32+qwen.credentialRefresh.posix),'Qwen credential refresh must name only the variable and never carry a value');
+  add(errors,typeof qwen?.readiness?.screenPattern==='string'&&qwen?.readiness?.timeoutMs>=30000,'Qwen readiness contract is invalid');
+  add(errors,typeof qwen?.submission?.stagedPattern==='string'&&typeof qwen?.submission?.activityPattern==='string'&&qwen?.submission?.maxEnter===2,'Qwen submission contract is invalid');
+  add(errors,qwen?.start?.length===6&&qwen.start[0]?.api==='terminal.create'&&qwen.start[1]?.api==='terminal.read'&&qwen.start[2]?.api==='orchestration.dispatch'&&qwen.start[2]?.binding==='return-preamble'&&qwen.start[3]?.api==='terminal.send'&&qwen.start[4]?.api==='terminal.read'&&qwen.start[5]?.api==='orchestration.dispatch-show','Qwen adapter start sequence is invalid');
+  add(errors,qwen?.forbidden?.includes('qwen-agent-tool')&&qwen?.forbidden?.includes('dispatch-inject')&&qwen?.forbidden?.includes('reuse-existing-terminal'),'Qwen adapter does not forbid nested agents, inject or terminal reuse');
+  add(errors,orca.index?.operationAgent?.qwen38Flash?.launch==='command-terminal','Orca index must launch Qwen as a command terminal');
+  add(errors,orca.index?.operationAgent?.qwen38Flash?.agent===qwen?.agent&&orca.index?.operationAgent?.qwen38Flash?.model===qwen?.model,'Orca index and Qwen adapter identities disagree');
+  for(const [name,target] of Object.entries(readDistJson('profiles','registry.json').targets||{})){
+    if(target?.orcaLaunch?.kind==='command-terminal')add(errors,/--exclude-tools agent\b/.test(target.orcaLaunch.command||''),`Command terminal ${name} must exclude the provider agent tool`);
+  }
   const workerStartTemplates=[
     orca.index?.planCoordinator?.calls?.startAgent?.cli,
     orca.index?.workflowMonitor?.calls?.startChildAgent?.cli,
-    orca.index?.operationAgent?.qwen38Flash?.calls?.startAgent?.cli,
     orca.index?.operationAgent?.managedFallback?.calls?.startAgent?.cli,
     codex.index?.orcaManagedForm?.start?.cli,
     claude.index?.orcaManagedForm?.start?.cli

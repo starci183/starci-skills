@@ -1,29 +1,49 @@
 schema: starci/orca-agent-adapter@1
-agent: qwen-code
-kind: direct-native-managed-agent
-modelAuthority: qwen-runtime-configuration
-requiredModel: qwen3.8-flash
-start:
-  - api: orchestration.worker-start
-    binding: agent-qwen-code
-  - api: orchestration.worker-show
-    phase: provider-identity
-  - api: terminal.rename
-  - api: orchestration.worker-show
-    phase: canonical-title
+agent: qwen
+kind: command-terminal-agent
+model: qwen3.8-flash
+modelAuthority: rendered-terminal-footer
+why: |-
+  Orca 1.4.188's native qwen-code adapter cannot deliver a Task prompt to Qwen Code 0.23.3
+  (agent_prompt_stalled, agent_readiness timeout). A terminal created with the declared qwen command
+  renders an input prompt within seconds, accepts the Task preamble through terminal send, and
+  reports worker_done through the Dispatch context created by dispatch --return-preamble.
+credentialRefresh:
+  envKey: BAILIAN_TOKEN_PLAN_API_KEY
+  reason: A running Orca process keeps the environment it started with; a stale copy of the key overrides the current value in the Qwen env file and yields HTTP 401. The terminal command unsets only that variable name so Qwen reads its own env file. No value is ever placed in a command, receipt or log.
+  win32: 'Remove-Item Env:BAILIAN_TOKEN_PLAN_API_KEY -ErrorAction SilentlyContinue; '
+  posix: 'unset BAILIAN_TOKEN_PLAN_API_KEY; '
 readiness:
-  - supervised-worker-receipt
-  - effective-agent-qwen-code
-  - effective-model-qwen3.8-flash
+  screenPattern: 'Type your message'
+  timeoutMs: 120000
+  intervalMs: 5000
+submission:
+  stagedPattern: 'Pasted Content'
+  activityPattern: 'Thinking|esc to cancel|tokens'
+  settleMs: 3000
+  timeoutMs: 45000
+  maxEnter: 2
+modelMarker: qwen3.8-flash
+start:
+  - api: terminal.create
+    binding: declared-target-command-with-credential-refresh
+  - api: terminal.read
+    phase: readiness
+  - api: orchestration.dispatch
+    binding: return-preamble
+  - api: terminal.send
+    phase: submit
+  - api: terminal.read
+    phase: submission
+  - api: orchestration.dispatch-show
+    phase: assignee-attestation
 release:
-  api: orchestration.worker-release
+  api: orchestration.worker-stop
+  then: terminal.close
 forbidden:
   - qwen-agent-tool
   - provider-native-subagent
-  - terminal-create-qwen-command
-  - worker-start-by-terminal-handle
-  - manual-prompt-send
-  - dispatch-to-existing-terminal
+  - worker-start-agent-qwen-code
   - dispatch-inject
-  - return-preamble
+  - reuse-existing-terminal
   - unsupervised-retain-as-success

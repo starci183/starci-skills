@@ -286,6 +286,11 @@ starciOrchestrationAllowlist:
     - orchestration reply
     - terminal rename
     - terminal close
+    - terminal create
+    - terminal read
+    - terminal send
+    - orchestration dispatch
+    - orchestration dispatch-show
   operationAgent:
     - orchestration send
     - orchestration ask
@@ -294,6 +299,4 @@ forbiddenForStarciOrchestration:
   - orchestration coordinator-start
   - orchestration coordinator-stop
   - orchestration reset
-  - orchestration dispatch
-  - terminal send
   - terminal stop

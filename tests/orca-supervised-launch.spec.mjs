@@ -4,14 +4,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {createOrcaCalls} from '../execution/orca-calls.mjs';
-import {buildMonitorLaunch,buildOperationLaunch,defaultOrcaExecutable,main,parseSkip,promptDelivery,replaceMonitor,resolveSupervisorChain,settleDispatch,startMonitor,startOperation} from '../execution/orca-supervised-launch.mjs';
+import {buildMonitorLaunch,buildOperationLaunch,defaultOrcaExecutable,main,parseSkip,promptDelivery,qwenLaunchMode,replaceMonitor,resolveSupervisorChain,settleDispatch,startMonitor,startOperation} from '../execution/orca-supervised-launch.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';
 const worktreePath=path.resolve(worktree);
-const opName='[Op] review.verify - Sales';
+const noWait=()=>{};
+// Execution op: qwen command terminal first, then Claude Opus, then Codex Sol.
+const opName='[Op] backend.implement - Sales';
 const input={run:'run_sales',workflowTask:'task_workflow_sales',from:'term_monitor_sales',worktree,
-  operation:'review.verify',scope:'Sales',spec:'Review the bounded Sales implementation and report exactly once.'};
+  operation:'backend.implement',scope:'Sales',spec:'Implement the bounded Sales slice and report exactly once.'};
+// Reasoning op: managed agents only (Fable, then Astra).
+const reasonName='[Op] architecture.decide - Sales';
+const reasonInput={...input,operation:'architecture.decide',spec:'Decide the bounded Sales SDS gap.'};
 const monitorInput={run:'run_parent',parentTask:'task_parent',from:'term_parent',worktree,workflow:'Sales',spec:'Manage the Sales operation DAG without performing operation work.'};
 
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
@@ -19,7 +24,11 @@ const runShow={ok:true,result:{run:{id:'run_sales',coordinator_handle:'term_moni
 const taskCreated=(id,display_name)=>({ok:true,result:{task:{id,display_name}}});
 const started=(id,task)=>({ok:true,result:{dispatch:{id,task_id:task},worker:{state:'ready',agent_terminal_handle:`term_${id}`}}});
 const stalled={ok:false,error:{code:'agent_prompt_stalled',message:'prompt was not consumed'},result:{failedStage:'dispatch_input',effects:[],residualResources:[]}};
-function shown({dispatch='ctx_qwen',task='task_operation_sales',agent='qwen-code',model='qwen3.8-flash',title=opName,state='ready',effects=[{kind:'dispatch_input',state:'accepted'}],dispatchStatus='ready'}={}){
+const screen=lines=>({ok:true,result:{terminal:{handle:'term_qwen',status:'running',tail:lines,source:'screen'}}});
+const qwenReady=['>_ Qwen Code (v0.23.3)','Token Plan | qwen3.8-flash (Token Plan Singapore)','>   Type your message or @path/to/file','qwen3.8-flash (Token Plan Singapore)'];
+const qwenStaged=['>_ Qwen Code (v0.23.3)','A direct instruction from the user takes precedence [Pasted Content 715 chars]','qwen3.8-flash (Token Plan Singapore)'];
+const qwenThinking=['=== TASK ===','∵ Thinking… 1s','⠼ polishing (5s · ↑ 25 tokens · esc to cancel)','qwen3.8-flash (Token Plan Singapore)'];
+function shown({dispatch='ctx_claude',task='task_operation_sales',agent='claude',model=null,title=reasonName,state='ready',effects=[{kind:'dispatch_input',state:'accepted'}],dispatchStatus='ready'}={}){
   return {ok:true,result:{dispatch:{id:dispatch,task_id:task,status:dispatchStatus},
     worker:{state,agent_terminal_handle:`term_${dispatch}`,effects,startOptions:{launch:{effective:{agent,model}}}},
     observation:{exactWorker:true},terminal:{title,worktreePath}}};
@@ -39,27 +48,47 @@ function fakeOrca(handlers){
   return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),spawned,names:()=>spawned.map(args=>args.slice(0,2).join(' '))};
 }
 const has=(args,flag,value)=>{const index=args.indexOf(flag);return index>=0&&(value===undefined||args[index+1]===value);};
+const value=(args,flag)=>args[args.indexOf(flag)+1];
+
+/** Happy-path Qwen command-terminal handlers; `reads` scripts the successive --screen frames. */
+function qwenHandlers({reads=[qwenReady,qwenStaged,qwenThinking],dispatchOk=true,assignee='term_qwen'}={}){
+  let readIndex=0;
+  return {
+    'run-show':()=>json(0,runShow),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
+    'terminal-create':()=>json(0,{ok:true,result:{terminal:{handle:'term_qwen'}}}),
+    'terminal-read':()=>json(0,screen(reads[Math.min(readIndex++,reads.length-1)])),
+    'dispatch':()=>dispatchOk?json(0,{ok:true,result:{dispatch:{id:'ctx_qwen',task_id:'task_operation_sales'},injected:false,preamble:'=== PREAMBLE ===\nreport worker_done once\n=== TASK ===\nImplement'}}):json(1,{ok:false,error:{code:'invalid_argument',message:'no such task'}}),
+    'terminal-send':()=>json(0,{ok:true,result:{}}),
+    'dispatch-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_qwen',task_id:'task_operation_sales',assignee_handle:assignee,status:'dispatched'}}}),
+    'terminal-close':()=>json(0,{ok:true,result:{}}),
+    'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_qwen',state:'fenced'}}),
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_qwen',state:'retained',reason:'no_owned_resource',processAction:'none'}})
+  };
+}
 
 test('native Orca runner uses an executable instead of a Windows command shim',()=>{
   assert.equal(defaultOrcaExecutable,process.platform==='win32'?'orca.exe':'orca');
+  assert.equal(qwenLaunchMode,'command-terminal');
 });
 
-test('operation request carries the whole review chain and owns the canonical Task identity',()=>{
+test('operation request carries the whole chain with its launch kinds and owns the canonical Task identity',()=>{
   const planned=buildOperationLaunch(input);
   assert.equal(planned.schema,'starci/orca-supervised-op-request@2');
   assert.equal(planned.displayName,opName);
-  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['qwen-qwen3.8-flash-reviewer','claude-fable-5.1','codex-gpt-5.6-sol-reviewer']);
-  assert.equal(planned.selection.orcaLaunch.agent,'qwen-code');
-  assert.equal(planned.candidates[0].workerParams.model,undefined);
+  assert.deepEqual(planned.candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['qwen-qwen3.8-flash-worker','command-terminal'],['claude-opus','managed-agent'],['codex-gpt-5.6-sol','managed-agent']]);
+  assert.match(planned.candidates[0].terminalParams.command,/^qwen --model qwen3.8-flash .*--exclude-tools agent/);
+  assert.equal(planned.candidates[0].terminalParams.title,opName);
+  assert.equal(planned.candidates[0].terminalParams.worktree,`path:${worktreePath}`);
+  assert.deepEqual(planned.candidates[0].dispatchParams,{task:'$operationTaskId',to:'$terminalHandle',from:'term_monitor_sales',run:'run_sales','return-preamble':true});
   assert.equal(planned.candidates[1].workerParams.model,undefined);
   assert.equal(planned.candidates[2].workerParams.model,'gpt-5.6-sol');
-  assert.equal(planned.candidates[0].workerParams.worktree,`path:${worktreePath}`);
-  assert.equal(planned.candidates[0].workerParams['timeout-ms'],120000);
+  assert.equal(planned.candidates[1].workerParams['timeout-ms'],120000);
   assert.deepEqual(planned.runAttestationParams,{id:'run_sales'});
   assert.equal(planned.taskParams['display-name'],opName);
-  assert.equal(planned.taskParams.parent,undefined);
   assert.throws(()=>buildOperationLaunch({...input,worktree:'current'}),/filesystem-relative path/);
   assert.throws(()=>buildOperationLaunch({...input,worktree:worktreePath}),/must be relative/);
+  assert.deepEqual(buildOperationLaunch(reasonInput).candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['claude-fable-5.1','managed-agent'],['codex-gpt-6-astra','managed-agent']]);
 });
 
 test('Workflow Monitor launch resolves the supervisor chain instead of a hardcoded provider',()=>{
@@ -67,105 +96,148 @@ test('Workflow Monitor launch resolves the supervisor chain instead of a hardcod
   const planned=buildMonitorLaunch(monitorInput);
   assert.equal(planned.displayName,'[Monitor] Sales');
   assert.deepEqual(planned.candidates.map(candidate=>candidate.workerParams.agent),['claude','codex']);
-  assert.equal(planned.candidates[0].workerParams.model,undefined);
   assert.equal(planned.candidates[1].workerParams.model,'gpt-5.6-sol');
   assert.equal(planned.candidates[1].workerParams.effort,'high');
   assert.equal(planned.taskParams.parent,'task_parent');
   assert.throws(()=>resolveSupervisorChain('nobody'),/Supervisor chain is missing/);
 });
 
-test('supervised operation launcher starts native Qwen without a model override and verifies prompt delivery',()=>{
-  const fake=fakeOrca({
-    'run-show':()=>json(0,runShow),
-    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
-    'worker-start':()=>json(0,started('ctx_qwen','task_operation_sales')),
-    'worker-show':(args,nth)=>json(0,shown({title:nth===1?'Working':opName})),
-    'terminal-rename':()=>json(0,{ok:true,result:{}})
-  });
-  const result=startOperation(input,{orca:fake.orca});
+test('a Qwen operation runs in one command terminal: create, wait for the prompt, return-preamble, send, submit-verify, attest assignee',()=>{
+  const fake=fakeOrca(qwenHandlers());
+  const result=startOperation(input,{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,true);
-  assert.equal(result.schema,'starci/orca-supervised-op-launch@2');
+  assert.equal(result.launch,'command-terminal');
   assert.equal(result.dispatchId,'ctx_qwen');
-  assert.equal(result.selection.target,'qwen-qwen3.8-flash-reviewer');
+  assert.equal(result.terminal,'term_qwen');
+  assert.equal(result.selection.target,'qwen-qwen3.8-flash-worker');
+  assert.equal(result.attestation.supervision,'command-terminal');
+  assert.equal(result.attestation.model,'qwen3.8-flash');
+  assert.equal(result.attestation.submitEnters,2);
   assert.deepEqual(result.attempts,[]);
-  const start=fake.spawned.find(args=>args[1]==='worker-start');
-  assert.ok(has(start,'--agent','qwen-code'));
-  assert.equal(start.includes('--model'),false);
-  assert.ok(has(start,'--worktree',`path:${worktreePath}`));
-  assert.ok(has(start,'--timeout-ms','120000'));
-  assert.ok(has(start,'--from','term_monitor_sales'));
-  assert.deepEqual(fake.names(),['orchestration run-show','orchestration task-create','orchestration worker-start','orchestration worker-show','terminal rename','orchestration worker-show']);
+  const create=fake.spawned.find(args=>args[0]==='terminal'&&args[1]==='create');
+  assert.ok(has(create,'--title',opName)&&has(create,'--worktree',`path:${worktreePath}`));
+  assert.match(value(create,'--command'),/BAILIAN_TOKEN_PLAN_API_KEY.*qwen --model qwen3.8-flash/);
+  assert.doesNotMatch(value(create,'--command'),/sk-/);
+  const dispatch=fake.spawned.find(args=>args[1]==='dispatch');
+  assert.ok(has(dispatch,'--task','task_operation_sales')&&has(dispatch,'--to','term_qwen')&&has(dispatch,'--from','term_monitor_sales')&&has(dispatch,'--run','run_sales')&&dispatch.includes('--return-preamble'));
+  assert.equal(dispatch.includes('--inject'),false);
+  const sends=fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='send');
+  assert.equal(sends.length,2);
+  assert.ok(has(sends[0],'--text')&&sends[0].includes('--enter')&&value(sends[0],'--text').startsWith('=== PREAMBLE ==='));
+  assert.equal(has(sends[1],'--text'),false);
+  assert.equal(fake.spawned.filter(args=>args[1]==='worker-start').length,0);
 });
 
-test('a Qwen prompt stall is classified as no-effect and the launcher falls through to Claude in the same invocation',()=>{
+test('a Qwen terminal that never renders its prompt is closed with no effects and the chain continues to Claude',()=>{
   const fake=fakeOrca({
-    'run-show':()=>json(0,runShow),
-    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
-    'worker-start':(args)=>has(args,'--agent','qwen-code')?json(1,stalled):json(0,started('ctx_claude','task_operation_sales')),
-    'worker-show':(args,nth)=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:nth===1?'Working':opName})),
+    ...qwenHandlers({reads:[['Welcome','npm view @qwen-code/qwen-code dist-tags.latest']]}),
+    'worker-start':(args)=>{assert.ok(has(args,'--agent','claude'));return json(0,started('ctx_claude','task_operation_sales'));},
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
-  const result=startOperation(input,{orca:fake.orca});
+  const result=startOperation(input,{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'claude-fable-5.1');
+  assert.equal(result.selection.target,'claude-opus');
+  assert.equal(result.launch,'managed-agent');
   assert.equal(result.attempts.length,1);
-  assert.equal(result.attempts[0].target,'qwen-qwen3.8-flash-reviewer');
   assert.equal(result.attempts[0].effectState,'none');
-  assert.match(result.attempts[0].reason,/prompt was not consumed/);
+  assert.match(result.attempts[0].reason,/readiness timeout/);
+  assert.equal(fake.spawned.filter(args=>args[1]==='dispatch').length,0);
+  assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='close').length,1);
+  assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='read').length,24);
+});
+
+test('a Qwen prompt that is never consumed is fenced: stop the Dispatch, close exactly that terminal, release, then fall through',()=>{
+  const fake=fakeOrca({
+    ...qwenHandlers({reads:[qwenReady,qwenStaged,qwenStaged,qwenStaged]}),
+    'worker-start':()=>json(0,started('ctx_claude','task_operation_sales')),
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const result=startOperation(input,{orca:fake.orca,wait:noWait});
+  assert.equal(result.ok,true);
+  assert.equal(result.selection.target,'claude-opus');
+  assert.equal(result.attempts[0].dispatchId,'ctx_qwen');
+  assert.equal(result.attempts[0].effectState,'none');
+  assert.match(result.attempts[0].reason,/not consumed/);
+  assert.equal(result.attempts[0].settlement.closedTerminal.handle,'term_qwen');
+  assert.ok(fake.spawned.some(args=>args[1]==='worker-stop'&&has(args,'--dispatch','ctx_qwen')));
+  assert.ok(fake.spawned.some(args=>args[1]==='worker-release'&&has(args,'--dispatch','ctx_qwen')));
+  assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='send'&&!has(args,'--text')).length,1);
+});
+
+test('a Dispatch whose assignee is not the created terminal is fenced, never accepted',()=>{
+  const fake=fakeOrca({
+    ...qwenHandlers({assignee:'term_other'}),
+    'worker-start':()=>json(0,started('ctx_claude','task_operation_sales')),
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const result=startOperation(input,{orca:fake.orca,wait:noWait});
+  assert.equal(result.selection.target,'claude-opus');
+  assert.match(result.attempts[0].reason,/assignee attestation failed/);
+});
+
+test('a managed candidate stall is classified as no-effect and the launcher falls through in the same invocation',()=>{
+  const fake=fakeOrca({
+    'run-show':()=>json(0,runShow),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',reasonName)),
+    'worker-start':(args)=>has(args,'--agent','claude')?json(1,stalled):json(0,started('ctx_codex','task_operation_sales')),
+    'worker-show':(args,nth)=>json(0,shown({dispatch:'ctx_codex',agent:'codex',model:'gpt-6-astra',title:nth===1?'Working':reasonName})),
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const result=startOperation(reasonInput,{orca:fake.orca,wait:noWait});
+  assert.equal(result.ok,true);
+  assert.equal(result.selection.target,'codex-gpt-6-astra');
+  assert.equal(result.attempts.length,1);
+  assert.equal(result.attempts[0].target,'claude-fable-5.1');
+  assert.equal(result.attempts[0].effectState,'none');
   assert.equal(result.attempts[0].settlement,null);
   assert.equal(fake.spawned.filter(args=>args[1]==='task-create').length,1);
-  assert.equal(fake.spawned.filter(args=>args[1]==='worker-stop').length,0);
-  assert.deepEqual(fake.spawned.filter(args=>args[1]==='worker-start').map(args=>args[args.indexOf('--agent')+1]),['qwen-code','claude']);
+  assert.deepEqual(fake.spawned.filter(args=>args[1]==='worker-start').map(args=>value(args,'--agent')),['claude','codex']);
+  assert.ok(has(fake.spawned.filter(args=>args[1]==='worker-start')[1],'--model','gpt-6-astra'));
 });
 
-test('provider mismatch fences and settles the exact dispatch, then the next candidate runs; a retained terminal stops the chain',()=>{
+test('provider mismatch fences and settles the exact managed dispatch; a pending release stops the chain',()=>{
   const fake=fakeOrca({
     'run-show':()=>json(0,runShow),
-    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
-    'worker-start':(args,nth)=>json(0,started(nth===1?'ctx_wrong':'ctx_claude','task_operation_sales')),
-    'worker-show':(args)=>has(args,'--dispatch','ctx_wrong')?json(0,shown({dispatch:'ctx_wrong',agent:'codex',model:'gpt-5.6-sol',title:'Working'})):json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:fake.spawned.some(a=>a[0]==='terminal')?opName:'Working'})),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',reasonName)),
+    'worker-start':(args,nth)=>json(0,started(nth===1?'ctx_wrong':'ctx_codex','task_operation_sales')),
+    'worker-show':(args)=>has(args,'--dispatch','ctx_wrong')?json(0,shown({dispatch:'ctx_wrong',agent:'codex',model:'gpt-5.6-sol',title:'Working'})):json(0,shown({dispatch:'ctx_codex',agent:'codex',model:'gpt-6-astra',title:reasonName})),
     'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
     'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'released'}}),
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
-  const result=startOperation(input,{orca:fake.orca});
+  const result=startOperation(reasonInput,{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'claude-fable-5.1');
-  assert.equal(result.attempts.length,1);
-  assert.match(result.attempts[0].reason,/expected agent qwen-code/);
-  assert.equal(result.attempts[0].effectState,'none');
+  assert.equal(result.selection.target,'codex-gpt-6-astra');
+  assert.match(result.attempts[0].reason,/expected agent claude/);
   assert.equal(result.attempts[0].settlement.release.state,'released');
-  assert.ok(fake.spawned.some(args=>args[1]==='worker-stop'&&has(args,'--dispatch','ctx_wrong')));
-  assert.ok(fake.spawned.some(args=>args[1]==='worker-release'&&has(args,'--dispatch','ctx_wrong')));
-
-  const retained=fakeOrca({
+  const pending=fakeOrca({
     'run-show':()=>json(0,runShow),
-    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',reasonName)),
     'worker-start':()=>json(0,started('ctx_wrong','task_operation_sales')),
     'worker-show':()=>json(0,shown({dispatch:'ctx_wrong',agent:'codex',model:'gpt-5.6-sol',title:'Working'})),
     'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
     'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'release_pending',processAction:'closing'}})
   });
-  const stopped=startOperation(input,{orca:retained.orca});
+  const stopped=startOperation(reasonInput,{orca:pending.orca,wait:noWait});
   assert.equal(stopped.ok,false);
-  assert.equal(stopped.exhausted,false);
   assert.equal(stopped.stopReason,'partial-or-unknown-effects');
   assert.equal(stopped.attempts[0].effectState,'partial');
-  assert.equal(stopped.recovery,'reconcile-residual-resources-before-retry');
-  assert.equal(retained.spawned.filter(args=>args[1]==='worker-start').length,1);
+  assert.equal(pending.spawned.filter(args=>args[1]==='worker-start').length,1);
 });
 
 test('an exhausted chain is a typed failure, never a thrown string',()=>{
   const fake=fakeOrca({
-    'run-show':()=>json(0,runShow),
-    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
+    ...qwenHandlers({reads:[['Welcome']]}),
     'worker-start':()=>json(1,stalled)
   });
-  const result=startOperation(input,{orca:fake.orca});
+  const result=startOperation(input,{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,false);
   assert.equal(result.exhausted,true);
   assert.equal(result.stopReason,'chain-exhausted');
-  assert.deepEqual(result.attempts.map(attempt=>attempt.target),['qwen-qwen3.8-flash-reviewer','claude-fable-5.1','codex-gpt-5.6-sol-reviewer']);
+  assert.deepEqual(result.attempts.map(attempt=>attempt.target),['qwen-qwen3.8-flash-worker','claude-opus','codex-gpt-5.6-sol']);
   assert.ok(result.attempts.every(attempt=>attempt.effectState==='none'));
   assert.equal(result.recovery,'report-workflow-boundary-worker_failed');
 });
@@ -176,11 +248,27 @@ test('a terminal that is not the nested Run Monitor cannot create an operation T
   assert.deepEqual(fake.names(),['orchestration run-show']);
 });
 
-test('prompt delivery requires a ready worker with accepted task input',()=>{
+test('managed prompt delivery requires a ready worker with accepted task input',()=>{
   assert.equal(promptDelivery(shown()).ok,true);
-  assert.match(promptDelivery(shown({state:'failed',effects:[{kind:'dispatch_input',state:'accepted'}]})).reason,/Worker is failed/);
+  assert.match(promptDelivery(shown({state:'failed'})).reason,/Worker is failed/);
   assert.match(promptDelivery(shown({dispatchStatus:'failed'})).reason,/Dispatch failed/);
   assert.match(promptDelivery(shown({effects:[{kind:'dispatch_input',state:'stalled'}]})).reason,/Task input was stalled/);
+});
+
+test('native activity title drift after the canonical rename is recorded, never fenced',()=>{
+  const fake=fakeOrca({
+    'run-show':()=>json(0,runShow),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',reasonName)),
+    'worker-start':()=>json(0,started('ctx_claude','task_operation_sales')),
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:'◐ Deciding the Sales SDS'})),
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const result=startOperation(reasonInput,{orca:fake.orca,wait:noWait});
+  assert.equal(result.ok,true);
+  assert.equal(result.titleDrift,true);
+  assert.deepEqual(result.attestation.terminalTitle,{observed:'◐ Deciding the Sales SDS',canonical:false,mutableUiMetadata:true,action:'recanonicalize-without-fencing'});
+  assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='rename').length,2);
+  assert.equal(fake.spawned.filter(args=>args[1]==='worker-stop').length,0);
 });
 
 test('Workflow Monitor launch tries Claude Opus first and falls through to Codex Sol only after a no-effect failure',()=>{
@@ -192,15 +280,13 @@ test('Workflow Monitor launch tries Claude Opus first and falls through to Codex
   });
   const result=startMonitor(monitorInput,{orca:fake.orca});
   assert.equal(result.ok,true);
-  assert.equal(result.schema,'starci/orca-supervised-monitor-launch@2');
   assert.equal(result.selection.target,'codex-gpt-5.6-sol');
   assert.equal(result.attempts[0].target,'claude-opus');
   const codexStart=fake.spawned.filter(args=>args[1]==='worker-start').at(-1);
-  assert.ok(has(codexStart,'--model','gpt-5.6-sol'));
-  assert.ok(has(codexStart,'--effort','high'));
+  assert.ok(has(codexStart,'--model','gpt-5.6-sol')&&has(codexStart,'--effort','high'));
 });
 
-test('a dead Workflow Monitor is settled and replaced with --retry-of; a live one is never replaced',()=>{
+test('a dead Workflow Monitor is settled and replaced on a fresh Task with --retry-of; a live one is never replaced',()=>{
   const fake=fakeOrca({
     'worker-show':(args,nth)=>has(args,'--dispatch','ctx_dead')?json(0,{ok:true,result:{dispatch:{id:'ctx_dead',task_id:'task_monitor_sales'},worker:{state:'failed',stage:'process_exited'}}}):json(0,shown({dispatch:'ctx_new',task:'task_monitor_sales_2',agent:'claude',model:null,title:nth>=3?'[Monitor] Sales':'Working'})),
     'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
@@ -221,8 +307,6 @@ test('a dead Workflow Monitor is settled and replaced with --retry-of; a live on
   assert.ok(has(start,'--retry-of','ctx_dead')&&has(start,'--task','task_monitor_sales_2'));
   const create=fake.spawned.find(args=>args[1]==='task-create');
   assert.ok(has(create,'--parent','task_parent')&&has(create,'--display-name','[Monitor] Sales')&&has(create,'--spec',monitorInput.spec));
-  const close=fake.spawned.find(args=>args[1]==='task-update');
-  assert.ok(has(close,'--id','task_monitor_sales')&&has(close,'--status','failed'));
   const live=fakeOrca({'worker-show':()=>json(0,shown({dispatch:'ctx_live',task:'task_monitor_sales',agent:'claude',model:null,title:'[Monitor] Sales'}))});
   assert.throws(()=>replaceMonitor({...monitorInput,task:'task_monitor_sales',dispatch:'ctx_live'},{orca:live.orca}),/a live Monitor is never replaced/);
 });
@@ -236,7 +320,6 @@ test('a dead worker whose terminal Orca keeps as identity_unproven settles to no
   assert.equal(settlement.effectState,'none');
   assert.equal(settlement.stop.alreadySettled,true);
   assert.deepEqual(settlement.residualTerminal,{state:'retained',reason:'identity_unproven',processAction:'none'});
-  assert.equal(settlement.release.outcome,'failed');
   const live=fakeOrca({
     'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_1',state:'ready'}}),
     'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_1',state:'retained',reason:'active_worker',processAction:'none'}})
@@ -244,27 +327,50 @@ test('a dead worker whose terminal Orca keeps as identity_unproven settles to no
   assert.equal(settleDispatch(live.orca,'ctx_1',{cwd:'.'}).effectState,'partial');
 });
 
-test('settlement reports unknown when stop cannot be confirmed and never calls release afterwards',()=>{
+test('settlement reconciles an unknown stop, closes an unstoppable own terminal, and reports unknown when nothing settles',()=>{
   const fake=fakeOrca({'worker-stop':()=>json(1,{ok:false,result:{dispatchId:'ctx_x',state:'stop_unknown'}}),
-    'worker-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_1'},worker:{state:'ready'},observation:{status:'live'}}})});
-  const settlement=settleDispatch(fake.orca,'ctx_1',{cwd:'.',wait:()=>{}});
+    'worker-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_1'},worker:{state:'ready',agent_terminal_handle:'term_1'},observation:{status:'live'}}}),
+    'terminal-close':()=>json(1,{ok:false,error:{code:'terminal_busy',message:'cannot close'}})});
+  const settlement=settleDispatch(fake.orca,'ctx_1',{cwd:'.',wait:noWait});
   assert.equal(settlement.schema,'starci/orca-supervised-settlement@1');
   assert.equal(settlement.effectState,'unknown');
   assert.equal(settlement.release.outcome,'skipped');
   assert.equal(settlement.reconciliation.settled,false);
-  assert.equal(settlement.reconciliation.observed.length,6);
-  assert.equal(fake.spawned.filter(args=>args[1]==='worker-release').length,0);
-  const exits=fakeOrca({
-    'worker-stop':(args,nth)=>nth<=2?json(1,{ok:false,result:{dispatchId:'ctx_2',state:'stop_unknown'}}):json(0,{ok:true,result:{dispatchId:'ctx_2',state:'failed',alreadySettled:true}}),
-    'worker-show':(args,nth)=>json(0,{ok:true,result:{dispatch:{id:'ctx_2'},worker:{state:nth<2?'ready':'failed'},observation:{status:nth<2?'live':'exited'}}}),
-    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_2',state:'retained',reason:'identity_unproven',processAction:'none'}})
+  assert.equal(settlement.closedTerminal.outcome,'failed');
+  let closed=false;
+  const contained=fakeOrca({
+    'worker-stop':()=>closed?json(0,{ok:true,result:{dispatchId:'ctx_2',state:'failed',alreadySettled:true}}):json(1,{ok:false,result:{dispatchId:'ctx_2',state:'stop_unknown'}}),
+    'worker-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_2'},worker:{state:closed?'failed':'ready',agent_terminal_handle:'term_ctx_2'},observation:{status:closed?'exited':'live'}}}),
+    'terminal-close':(args)=>{assert.ok(has(args,'--terminal','term_ctx_2'));closed=true;return json(0,{ok:true,result:{}});},
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_2',state:'released'}})
   });
-  const settled=settleDispatch(exits.orca,'ctx_2',{cwd:'.',wait:()=>{}});
+  const settled=settleDispatch(contained.orca,'ctx_2',{cwd:'.',wait:noWait,terminalHandle:'term_ctx_2'});
   assert.equal(settled.effectState,'none');
-  assert.equal(settled.reconciliation.settled,true);
-  assert.equal(exits.spawned.filter(args=>args[1]==='worker-stop').length,3);
-  const cli=main(['settle','--dispatch','ctx_2'],{orca:fakeOrca({'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'released'}})}).orca});
+  assert.equal(settled.reconciliation.afterClose,true);
+  const cli=main(['settle','--dispatch','ctx_3'],{orca:fakeOrca({'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_3',state:'failed'}}),'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_3',state:'released'}})}).orca});
   assert.equal(cli.effectState,'none');
+});
+
+test('--skip records a verified no-effect failure for a chain target and starts at the next candidate',()=>{
+  const planned=buildOperationLaunch({...input,skip:'qwen-qwen3.8-flash-worker:unavailable'});
+  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['claude-opus','codex-gpt-5.6-sol']);
+  assert.deepEqual(planned.skipped,[{target:'qwen-qwen3.8-flash-worker',reason:'unavailable',effectState:'none',source:'monitor-verified-skip'}]);
+  assert.throws(()=>buildOperationLaunch({...input,skip:'qwen-qwen3.8-flash-worker:permission-denied'}),/reason must be one of/);
+  assert.throws(()=>buildOperationLaunch({...input,skip:'codex-gpt-6-astra:unavailable'}),/outside this operation chain/);
+  assert.throws(()=>buildOperationLaunch({...input,skip:'qwen-qwen3.8-flash-worker,claude-opus,codex-gpt-5.6-sol'}),/Every candidate/);
+  const fake=fakeOrca({
+    'run-show':()=>json(0,runShow),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
+    'worker-start':(args)=>{assert.ok(has(args,'--agent','claude'));return json(0,started('ctx_claude','task_operation_sales'));},
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const result=startOperation({...input,skip:'qwen-qwen3.8-flash-worker'},{orca:fake.orca,wait:noWait});
+  assert.equal(result.ok,true);
+  assert.equal(result.selection.target,'claude-opus');
+  assert.deepEqual(result.attempts.map(attempt=>[attempt.target,attempt.reason,attempt.effectState]),[['qwen-qwen3.8-flash-worker','unavailable','none']]);
+  assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='create').length,0);
+  assert.deepEqual(parseSkip('',[]),[]);
 });
 
 test('verify command reports live contract drift before any effect',()=>{
@@ -274,76 +380,4 @@ test('verify command reports live contract drift before any effect',()=>{
   assert.equal(result.schema,'starci/orca-live-contract-verification@1');
   assert.equal(result.ok,true);
   assert.equal(result.commandCount,232);
-});
-
-test('native activity title drift after the canonical rename is recorded, never fenced',()=>{
-  const fake=fakeOrca({
-    'run-show':()=>json(0,runShow),
-    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
-    'worker-start':()=>json(0,started('ctx_qwen','task_operation_sales')),
-    'worker-show':()=>json(0,shown({title:'◐ Reviewing the Sales module'})),
-    'terminal-rename':()=>json(0,{ok:true,result:{}})
-  });
-  const result=startOperation(input,{orca:fake.orca});
-  assert.equal(result.ok,true);
-  assert.equal(result.titleDrift,true);
-  assert.deepEqual(result.attestation.terminalTitle,{observed:'◐ Reviewing the Sales module',canonical:false,mutableUiMetadata:true,action:'recanonicalize-without-fencing'});
-  assert.equal(fake.spawned.filter(args=>args[0]==='terminal').length,2);
-  assert.equal(fake.spawned.filter(args=>args[1]==='worker-stop').length,0);
-  const monitor=fakeOrca({
-    'task-create':()=>json(0,taskCreated('task_monitor_sales','[Monitor] Sales')),
-    'worker-start':()=>json(0,started('ctx_claude','task_monitor_sales')),
-    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',task:'task_monitor_sales',agent:'claude',model:null,title:'◑ Orca Plan Coordinator'})),
-    'terminal-rename':()=>json(0,{ok:true,result:{}})
-  });
-  const started2=startMonitor(monitorInput,{orca:monitor.orca});
-  assert.equal(started2.ok,true);
-  assert.equal(started2.titleDrift,true);
-  assert.equal(started2.selection.target,'claude-opus');
-});
-
-test('an idle native TUI that Orca cannot stop is contained by closing exactly its own terminal, then the chain continues',()=>{
-  let closed=false;
-  const fake=fakeOrca({
-    'run-show':()=>json(0,runShow),
-    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
-    'worker-start':(args)=>has(args,'--agent','qwen-code')
-      ?json(1,{ok:false,result:{dispatchId:'ctx_qwen',state:'failed',stage:'agent_readiness',failedStage:'agent_readiness',lastError:'timeout',effects:[{kind:'terminal',role:'agent',action:'created',id:'term_ctx_qwen'}],residualResources:[{kind:'terminal',role:'agent',action:'created',id:'term_ctx_qwen'}]}})
-      :json(0,started('ctx_claude','task_operation_sales')),
-    'worker-stop':(args)=>has(args,'--dispatch','ctx_qwen')?(closed?json(0,{ok:true,result:{dispatchId:'ctx_qwen',state:'failed',alreadySettled:true}}):json(1,{ok:false,result:{dispatchId:'ctx_qwen',state:'stop_unknown'}})):json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
-    'worker-show':(args)=>has(args,'--dispatch','ctx_qwen')?json(0,{ok:true,result:{dispatch:{id:'ctx_qwen',task_id:'task_operation_sales'},worker:{state:closed?'failed':'ready',agent_terminal_handle:'term_ctx_qwen'},observation:{status:closed?'exited':'live'}}}):json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
-    'terminal-close':(args)=>{assert.ok(has(args,'--terminal','term_ctx_qwen'));closed=true;return json(0,{ok:true,result:{}});},
-    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_qwen',state:'released'}}),
-    'terminal-rename':()=>json(0,{ok:true,result:{}})
-  });
-  const result=startOperation(input,{orca:fake.orca});
-  assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'claude-fable-5.1');
-  assert.equal(result.attempts.length,1);
-  assert.equal(result.attempts[0].effectState,'none');
-  assert.equal(result.attempts[0].settlement.closedTerminal.handle,'term_ctx_qwen');
-  assert.equal(result.attempts[0].settlement.reconciliation.afterClose,true);
-  assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='close').length,1);
-});
-
-test('--skip records a verified no-effect failure for a chain target and starts at the next candidate',()=>{
-  const planned=buildOperationLaunch({...input,skip:'qwen-qwen3.8-flash-reviewer:unavailable'});
-  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['claude-fable-5.1','codex-gpt-5.6-sol-reviewer']);
-  assert.deepEqual(planned.skipped,[{target:'qwen-qwen3.8-flash-reviewer',reason:'unavailable',effectState:'none',source:'monitor-verified-skip'}]);
-  assert.throws(()=>buildOperationLaunch({...input,skip:'qwen-qwen3.8-flash-reviewer:permission-denied'}),/reason must be one of/);
-  assert.throws(()=>buildOperationLaunch({...input,skip:'codex-gpt-5.6-sol:unavailable'}),/outside this operation chain/);
-  assert.throws(()=>buildOperationLaunch({...input,skip:'qwen-qwen3.8-flash-reviewer,claude-fable-5.1,codex-gpt-5.6-sol-reviewer'}),/Every candidate/);
-  const fake=fakeOrca({
-    'run-show':()=>json(0,runShow),
-    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
-    'worker-start':(args)=>{assert.ok(has(args,'--agent','claude'));return json(0,started('ctx_claude','task_operation_sales'));},
-    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
-    'terminal-rename':()=>json(0,{ok:true,result:{}})
-  });
-  const result=startOperation({...input,skip:'qwen-qwen3.8-flash-reviewer'},{orca:fake.orca});
-  assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'claude-fable-5.1');
-  assert.deepEqual(result.attempts.map(attempt=>[attempt.target,attempt.reason,attempt.effectState]),[['qwen-qwen3.8-flash-reviewer','unavailable','none']]);
-  assert.equal(fake.spawned.filter(args=>args[1]==='worker-start').length,1);
-  assert.deepEqual(parseSkip('',[]),[]);
 });

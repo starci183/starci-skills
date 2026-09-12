@@ -149,18 +149,30 @@ operationAgent:
     api: orchestration.task-create
     cli: 'orca orchestration task-create --run <run-id> --task-title "<concise-operation-title>" --display-name "[Op] <operation> - <scope>" --spec "<one-operation-contract>" --json'
   qwen38Flash:
-    agent: qwen-code
+    agent: qwen
     model: qwen3.8-flash
-    modelAuthority: verified-qwen-runtime-configuration
-    launch: direct-native-worker-start
+    modelAuthority: rendered-terminal-footer
+    launch: command-terminal
     nestedAgents: forbidden
     calls:
-      startAgent:
-        api: orchestration.worker-start
-        cli: 'orca orchestration worker-start --task <operation-task-id> --worktree current --agent qwen-code --json'
+      createTerminal:
+        api: terminal.create
+        cli: 'orca terminal create --worktree <exact-workflow-worktree-selector> --title "[Op] <operation> - <scope>" --command "<credential-refresh><declared-qwen-command>" --json'
+      awaitPrompt:
+        api: terminal.read
+        cli: 'orca terminal read --terminal <terminal-handle> --screen --json'
+      returnPreamble:
+        api: orchestration.dispatch
+        cli: 'orca orchestration dispatch --task <operation-task-id> --to <terminal-handle> --from <monitor-terminal> --run <nested-run-id> --return-preamble --json'
+      submitPrompt:
+        api: terminal.send
+        cli: 'orca terminal send --terminal <terminal-handle> --text "<preamble>" --enter --json'
+      attestAssignee:
+        api: orchestration.dispatch-show
+        cli: 'orca orchestration dispatch-show --task <operation-task-id> --json'
       restoreName:
         api: terminal.rename
-        cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation> - <scope>" --json'
+        cli: 'orca terminal rename --terminal <terminal-handle> --title "[Op] <operation> - <scope>" --json'
   managedFallback:
     calls:
       startAgent:
@@ -194,9 +206,8 @@ routing:
 forbiddenCalls:
   - raw-operation-task-create-or-worker-start-outside-canonical-launcher
   - orchestration.dispatch-inject-for-operation
-  - orchestration.dispatch-return-preamble-for-operation
-  - orchestration.dispatch-to-existing-terminal-for-operation
-  - terminal-send-operation-prompt
+  - orchestration.dispatch-to-reused-terminal-for-operation
+  - terminal-send-outside-canonical-launcher
   - terminal-create-shell-only-coordinator
   - operation-agent-tool-agent
   - orchestration-send-status-for-coordinator-instruction
