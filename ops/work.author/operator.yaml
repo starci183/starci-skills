@@ -1,0 +1,158 @@
+id: work.author
+goal:
+  en: Complete the authored fields of one canonical Work node - its write scope, its testable assertions and
+    one runnable check per assertion - so the node becomes launchable without anyone inventing its scope.
+nodeKinds:
+  - implementation
+  - uat
+  - ui
+  - operations
+completionProfile: operations
+sideEffects: []
+graphPolicy:
+  mode: selected-scope-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the selected node exactly as authored: its description, kind, refs, dependencies, assertions,
+        required flag, state and whatever write scope or checks it already declares. The authored intent
+        governs; an absent field is the gap to complete, never a licence to restate the node's purpose."
+  - id: neighbours
+    path: parent and sibling node index.yaml files of the selected scope
+    purpose:
+      en: Read the ancestor scope and the sibling nodes so the completed scope neither duplicates nor
+        contradicts work another node already owns. An overlap belongs to the owning node, not to this one.
+  - id: specification
+    path: accepted requirement and design records the node declares in refs or dependsOn
+    purpose:
+      en: Read the accepted requirement and design sections the node references, so every assertion restates
+        an accepted outcome. A behaviour the accepted records do not state is a reported gap, not an invention.
+  - id: source
+    path: selected repositories and the modules the referenced design names
+    purpose:
+      en: Inspect the actual code an implementation of this node would change, so the declared write scope
+        names files that exist in the shape the design prescribes. Never write a path that was not inspected.
+  - id: scripts
+    path: repository package manifests, task runners and existing check commands
+    purpose:
+      en: Read the commands this repository already exposes, so every declared check is a command that can be
+        run verbatim and that actually exercises the assertion it claims. Never invent a runner or a script name.
+  - id: profile
+    path: profiles/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
+        profiles. Use current host model configuration; historical model names are not availability proof.
+        Capabilities are the intersection of actual tools, selected profile policy, op permissions and existing
+        task authority.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - assertions
+      - implementation.changes
+      - extensions.work3.allowlist
+      - extensions.work3.checks
+      - extensions.work3.resources
+    content:
+      en: "Author only the fields that make the node launchable: its testable assertions, the write scope as
+        real inspected files, one check per assertion with a verbatim runnable command, and the exclusive
+        runtime resources those checks need. Preserve every other authored line, including the node's
+        description, refs, dependsOn, required flag and state. Never write completion, never write the kernel's
+        own extension block, never write anything under the node's evidence folder, and never edit another node."
+  - id: evidence
+    path: E/manifest.yaml + E/result.json
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - provenance
+      - extensions
+    content:
+      en: Record which records and which source modules were inspected, the assertion-to-check mapping that was
+        authored, and every scope question that stayed open. Record an honest not-run or failed validator result.
+steps:
+  - reads:
+      - target
+      - neighbours
+      - specification
+      - profile
+    writes:
+      - evidence
+    action:
+      en: Read the selected node, its ancestor and sibling records and the accepted requirement and design
+        sections it references. Restate what this node must deliver and where its boundary against its siblings
+        runs. Do not restate the node's purpose as a new requirement and do not widen its scope.
+  - reads:
+      - target
+      - specification
+      - source
+    writes:
+      - node
+    action:
+      en: Inspect the actual modules the referenced design names and record the exact files an implementation of
+        this node would change as the node's write scope. Every path is a file or directory that was opened;
+        a path that cannot be resolved from the design and the source is an open question, never a guess.
+  - reads:
+      - target
+      - specification
+    writes:
+      - node
+    action:
+      en: Write the node's assertions as testable claims, one per observable outcome the accepted records state.
+        An assertion nobody can run is not an assertion; a claim the accepted records do not support is removed
+        rather than softened.
+  - reads:
+      - scripts
+      - source
+    writes:
+      - node
+    action:
+      en: Write one check per assertion, each a command this repository already exposes, each actually
+        exercising the assertion it declares, and each naming the exclusive runtime resources it needs. A
+        missing runner is a reported blocker, never a command written in the hope that it exists.
+  - reads:
+      - target
+      - scripts
+    writes:
+      - node
+      - evidence
+    action:
+      en: Run the workspace validator over the edited tree and confirm the record still validates and now
+        declares both a write scope and checks. Record the assertion-to-check mapping and any open question.
+        Build nothing and change no product source; the kernel launches the node's own work afterwards.
+proofs:
+  - id: launchable
+    requirement:
+      en: The node declares a non-empty write scope and at least one check, every authored assertion is named
+        by a check that proves it, and the workspace validator passes over the edited tree. An honest not-run
+        or failing validator cannot earn done.
+  - id: inspected-scope
+    requirement:
+      en: Every path in the write scope was inspected in the actual source and is consistent with the
+        referenced design; every check command exists in the repository and was run or explicitly reported as
+        unrunnable. A fabricated path or command is a failure, not a draft.
+  - id: preserved-record
+    requirement:
+      en: The node's description, refs, dependsOn, required flag and state are byte-identical to what was
+        authored, no completion or kernel extension block was written, nothing under the evidence folder of
+        the record was edited, and no other node changed.
+blockers:
+  - code: SCOPE_UNDETERMINED
+    condition:
+      en: The accepted requirement and design records and the actual source do not determine which files this
+        node would change, so any write scope would be invented. Report the exact question instead.
+  - code: CHECK_RUNNER_MISSING
+    condition:
+      en: An assertion has no command in this repository that could prove it, so declaring a check would
+        declare a command that does not run.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A referenced requirement or design record is missing or not effectively done, so the assertions would
+        rest on material that was never accepted. Report the node/resource IDs; never weaken refs or dependsOn
+        and never author the missing record here.

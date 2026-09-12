@@ -12,8 +12,9 @@ vocabularies:
   families: [design, build, prove, repair]
   # The allocator role of profiles/runtimes.yaml; `roleOfKind` there must agree with `role` here.
   roles: [decide, plan, implement, verify, write]
-  # What a kind is allowed to change. `readOnly: true` means this list is empty.
-  mutates: [code, sds, srs, decision, design, runtime]
+  # What a kind is allowed to change. `readOnly: true` means this list is empty. `record` is the authored Work
+  # record itself - the fields a node must declare before the kernel can launch it - and only `work.author` has it.
+  mutates: [code, sds, srs, decision, design, runtime, record]
   # Why an operation exists, as the kernel records it on the op.
   origins: [ledger, shared, repair, gate, verify, architecture]
   # The report outcomes of execution/reports.mjs.
@@ -135,6 +136,19 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [authority]
+  # The one kind that runs BEFORE a lane rather than inside one: a node whose record declares no write scope or
+  # no check cannot be launched, and completing that record is work, not a question for the user. It is the only
+  # kind allowed to write its own node's `index.yaml`, and the kernel creates it itself - once per node - when
+  # the ledger reports the node incomplete, so no route and no lane names it.
+  work.author:
+    family: design
+    role: plan
+    operator: work.author
+    readOnly: false
+    mutates: [record]
+    purpose: Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it.
+    reports:
+      outcomes: [done, partial, failed, ask]
 # The mandatory sequence per ledger node. `match` is the node shape (`kind`, and `role` for the
 # backend/frontend side a node is delivered on, from its layout or its repository); the first lane whose
 # match fits wins, so the list runs from the most specific to the least. A step is mandatory unless it

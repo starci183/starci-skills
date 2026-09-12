@@ -26,8 +26,12 @@ two things an operation contract cannot be written without:
 
 A candidate missing either arrives with `schedulable:false` and a `reason`. The kernel must refuse to
 launch it rather than invent a scope or a check — that refusal is the point, not a gap to route
-around. Today's authored trees are mostly decisions for exactly this reason: goal assessment has to
-author an allowlist and checks before any operation is launchable.
+around. What it does instead is create one `work.author` operation for that node, whose single write
+scope is the node's own `index.yaml` and whose single check is the whole-tree validator: completing an
+authored record is work, not a chore for the user, and inside that file `state`, `completion` and
+`extensions.work3.kernel` stay the kernel's. The bound is one author op per node per workflow, and a
+record still incomplete after it was accepted is the question the user has to answer. See **Ledger
+incomplete → work.author** in [workflow-kernel.md](workflow-kernel.md).
 
 ## What the kernel may write
 

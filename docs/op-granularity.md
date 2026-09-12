@@ -42,6 +42,7 @@ the Work node kind and layout it closes, then from its allowlist; an unknown kin
 
 | Sequence | Chosen when | Order |
 | --- | --- | --- |
+| `work.author` | kind `work.author`: the node's record declares no write scope or no check, so nothing of its lane may start | read the record, its parent and sibling records and the requirement/design it references -> open the actual code an implementation would change and list those files -> state the claims as testable assertions -> write the write scope and one runnable check per assertion into the record -> leave `completion`, the kernel block, the evidence folder, `required`, `state` and `dependsOn` untouched -> run the validator -> report the assertions and checks added; an undeterminable scope is `ask`, never a guessed path |
 | `implement.ledger` | `backend.implement` / `interface.implement` from a ledger `implementation` or `ui` node | read SDS/SRS + assertions -> spec red -> smallest change -> checks -> self-audit -> report once |
 | `implement.shared` | origin `shared` | read the requester's paths -> minimal change, no refactor -> requester's checks -> report |
 | `implement.repair` | origin `repair` | map each finding -> confirm the check fails -> fix each -> re-run -> report with a finding -> fix map |
@@ -57,6 +58,14 @@ the Work node kind and layout it closes, then from its allowlist; an unknown kin
 | `architecture.revise` | kind `architecture.revise` | read the gap report -> edit only the named SDS section -> bump its `rev` and append one decision-log entry -> run the validator check -> report the rev and the sections; no code |
 | `decide` | `business.decide` (what the product must do) / `architecture.decide` (how the system satisfies it) | closed options only -> weigh against the requirement and the layer it must stay inside -> write the decision with rationale into the node -> no code, and no decision belonging to the other layer |
 | `generic` | anything else | read -> prove failing -> change -> checks -> self-audit -> report once |
+
+### Before the lane: completing the record
+An operation is cut by acceptance (§1), which presumes the node says what its acceptance is and what proves it.
+A node whose record declares neither cannot be cut at all, and the kernel will not invent a scope for authored
+work. `work.author` is that gap closed as work rather than as a question: one operation, whose whole write scope
+is the node's own `index.yaml`, whose whole check is the Work validator, and which builds nothing. It precedes
+the node's lane, it is bounded at one per node per workflow, and a record still incomplete after it was accepted
+is the one case that does go back to the user.
 
 ### The frontend lane
 A frontend node is not one operation. Its sequences run in order - `interface.draw` -> `frontend.implement`

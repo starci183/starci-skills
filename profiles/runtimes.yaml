@@ -65,4 +65,5 @@ roleOfKind:
   architecture.decide: decide
   business.decide: decide
   interface.draw: write
+  work.author: plan
   task.execute: implement

@@ -35,11 +35,55 @@ A workflow's ledger is either the product's own or one a model assessed, and `--
 | what an accepted slice writes | the node's `state`, `completion` and an evidence manifest - at the LAST lane step only - plus a `Work: <node id>` commit trailer | nothing outside the workflow directory |
 | review granularity | one `review.verify` per module, for lanes whose template names it | one per connected ledger component |
 
-A node that declares no allowlist or no checks is never guessed at: it is listed in `goal.md` under
-**Needs you first** as `ledger incomplete` and becomes a `needUser` item, because inventing a scope for
-authored work is exactly what the ledger exists to prevent. Decision nodes (`business`,
-`business-overview`, `architecture`) are listed too but never launched into a worktree - a decision is
-answered. The exception is a reported `sds-gap`: see the policy table.
+A node that declares no allowlist or no checks is never guessed at - and it is not the user's chore either:
+it is listed in `goal.md` under **Needs you first** as `ledger incomplete`, and the first ledger sync turns it
+into one `work.author` operation whose write scope is that node's own `index.yaml`. See **Ledger incomplete ->
+work.author** below. Decision nodes (`business`, `business-overview`, `architecture`) are listed too but never
+launched into a worktree - a decision is answered. The exception is a reported `sds-gap`: see the policy table.
+
+### Ledger incomplete -> work.author
+
+`enrich` in `execution/work-ledger.mjs` marks a candidate `schedulable:false` with a `reason` when its record
+declares no write scope (`implementation.changes[].files` or `extensions.work3.allowlist`) or no check
+(`extensions.work3.checks`). Nothing of that node's lane may start, because the kernel would have to invent the
+two things it refuses to invent. Completing the record, though, is work - reading the node, its neighbours and
+the requirement and design it references, then naming real files and real commands - so `syncLedgerOps` creates
+an operation for it instead of an item in `needUser[]`:
+
+| | |
+| --- | --- |
+| kind / origin | `work.author` / `ledger` (so it counts against no dynamic budget) |
+| id | `<node>-author`, recorded as `state.lanes[<node>].authored` |
+| goal | `Complete the Work record of <node> so the kernel can launch it: <reason>` |
+| allowlist | exactly one path: the node's own `index.yaml`, as `protectedPaths` names it |
+| checks | one: `work-valid`, the kernel's own whole-tree validator |
+| acceptance | the node declares an allowlist and checks that name its assertions; the tree validates |
+| ledger items | none - the node enters `state.ledger` when its own lane starts, not when its record is written |
+
+It is the one kind allowed to write its own node's `index.yaml`, which `kernelOwnedPaths` already permits for a
+path an allowlist names exactly, so the contract's **Never touch (kernel-owned)** lists only that node's
+`evidence/**`. What stays the kernel's *inside* the file is guarded by comparison instead of by path:
+`launchOp` snapshots `state`, `completion` and `extensions.work3.kernel` right after its own `markInProgress`
+write, and `guardRecordBlocks` reads them back before anything is verified. A moved block is reverted with the
+rest of the file and the report is downgraded to `failed` and retried, exactly as a written kernel path is for
+any other op. No proof by contrast applies (the op changes no spec), and the validator (the LLM one) sees the
+record diff like any other op's diff.
+
+On acceptance the kernel asks the tree, never the report: the ledger is reloaded and `executableCandidates`
+re-enriches the node.
+
+- **Schedulable now** - event `record-authored {node, op, allowlist, checks}`, and the node's lane creates its
+  first step on the next iteration, with the node's own id, because the author op preceded the lane rather
+  than walking a step of it.
+- **Still not schedulable** - event `record-still-incomplete` and one `ledger` item in `needUser[]`. There is
+  no second author op: one per node per workflow is the bound, and the record is now the user's to settle.
+
+Either way the node keeps `state: todo` with nothing but the kernel's `in-progress` receipt. Authoring a record
+is not completing work, so there is no `markDone`, no `completion` and no evidence manifest.
+
+Two cases keep the 5.0 behaviour of a bare `needUser` item, because no operation here could hold the write
+scope: a Work tree another repository owns (the record is not in this worktree at all, the same reason
+`requestSharedChange` refuses ledger paths), and a node whose `index.yaml` the guard cannot name.
 
 ## Lanes and routes
 
@@ -217,6 +261,8 @@ the validator and writes `validator-skipped` once; tests inject a stub the same 
 | `blocked` `shared-change` with paths | one shared op per distinct path set (a path-prefix overlap merges into the pending or running shared op and appends the requester); the requester is `paused` and returns to `ready` only when that op is `done`, carrying `priorOpen: ["shared change <op> done at <head>"]` | 3 new shared ops per iteration, the rest queued |
 | `blocked` `shared-change` naming no path | treated as an `ask` to the kernel: the op is answered in its terminal with "name the exact paths" and reports again | - |
 | a report whose op wrote a kernel-owned path | `revertProtected`, report downgraded to `failed` with the finding `operation modified kernel-owned ledger paths: <paths>`, op retried | retry bound |
+| a Work node the ledger reports incomplete (no write scope, or no check) | one `work.author` op on that node's own `index.yaml`, origin `ledger`, checked by the whole-tree validator; on acceptance the tree is re-read - `record-authored` and the node's lane starts, or `record-still-incomplete` and one `needUser` item | one author op per node per workflow |
+| an author op that moved `state`, `completion` or `extensions.work3.kernel` inside the record it authors | the file is reverted, the report downgraded to `failed` with the finding `operation modified kernel-owned fields (...)`, op retried | retry bound |
 | an op created at run time past `state.dynamicOpsBudget`, or whose whole allowlist is outside `state.scope` | the op is created `blocked` and becomes a `needUser` item; `workflow-approve --allow-dynamic N` reinstates it | 6 dynamic ops per workflow |
 | two `stalled-silent` settlements of one runtime within 30 minutes | `allocator.failed(runtime,{reason:'rate-limited (inferred from repeated silence)'})` and a `rate-limit-inferred` event | the window is cleared after it fires |
 | `blocked` `sds-gap` | on the Work ledger: `markReopened` the architecture node the report names (or the one in the op's module) and create the route's `architecture.revise` op on that node's `index.yaml` and SDS folder, whose own check is that the Work tree still validates; `markDecided` settles it with a bumped `rev` when the op is accepted. On a plan ledger: an `architecture.decide` op on the design inputs, re-planned with `planOp` afterwards. Either way the blocked op depends on it and resumes afterwards | - |
@@ -240,7 +286,7 @@ tree shipped without the module falls back to a minimal implementation of the sa
 
 | guard | what the kernel does with it |
 | --- | --- |
-| `protectedPaths(node, repoRoot)` | the node's `index.yaml` (where `state`, `completion` and `extensions.work3.kernel` live) and its `evidence/**`. Every contract of that node lists them under **Never touch (kernel-owned)**; `changedFiles` excludes them, so no operation commit can ever carry one. An op is granted one only when its own allowlist names that exact file - how an `architecture.decide` op authors the design body of its node - never through a directory glob |
+| `protectedPaths(node, repoRoot)` | the node's `index.yaml` (where `state`, `completion` and `extensions.work3.kernel` live) and its `evidence/**`. Every contract of that node lists them under **Never touch (kernel-owned)**; `changedFiles` excludes them, so no operation commit can ever carry one. An op is granted one only when its own allowlist names that exact file - how an `architecture.decide` op authors the design body of its node, and how a `work.author` op authors the record of its own - never through a directory glob. Inside a record an author op holds, `state`, `completion` and `extensions.work3.kernel` are still the kernel's, guarded by `guardRecordBlocks` comparing them before and after |
 | `revertProtected(git, {cwd, paths})` | run before any machine verification. The kernel fingerprints those paths right after its own `markInProgress` write, so only the operation's edits are caught; a changed fingerprint is reverted and the report is downgraded to `failed` with the finding `operation modified kernel-owned ledger paths: <paths>`. A completion an agent writes itself is a claim, not a record |
 | `resourceLocks(op)` / `resourcesClash(a, b)` | the declared `op.resources` plus what the op's kind and check commands prove it reaches for (`postgres`, `e2e-runtime`, `docker`, `cluster`). The scheduler treats a clash exactly like an overlapping allowlist, and the contract renders them under **Resources** |
 | `gitQueue(fn)` | every git mutation the kernel makes - the op commit, the ledger commit, a protected-path revert - runs alone through this queue, because one worktree has one index |
