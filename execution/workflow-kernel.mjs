@@ -200,7 +200,9 @@ export const dynamicBudget=state=>Number.isFinite(state?.dynamicOpsBudget)?state
 function gateDynamicOp(store,state,op){
   state.dynamicOps=(state.dynamicOps??0)+1;
   const budget=dynamicBudget(state);
-  const outside=op.nodeId||!state.scope?.length?[]:op.allowlist.filter(entry=>!inScopePath(entry,state.scope));
+  // In Work-ledger mode the scope names features (ledger ids), not file paths: the ledger itself bounds the
+  // work, so only the budget gates a dynamic op there.
+  const outside=op.nodeId||state.ledgerMode==='work'||!state.scope?.length?[]:op.allowlist.filter(entry=>!inScopePath(entry,state.scope));
   const reason=state.dynamicOps>budget?`beyond the dynamic-op budget of ${budget} for this workflow`
     :outside.length===op.allowlist.length&&outside.length?`outside the approved scope ${state.scope.join(', ')}: ${outside.join(', ')}`:null;
   if(!reason)return true;
@@ -780,7 +782,8 @@ function avoidForVerify(state,op){
 /** Re-run the operation's own checks. A `done` the kernel cannot reproduce is not a `done`. */
 export function machineVerify(state,op,{exec,cwd=state.worktree}={}){
   const checks=[];
-  for(const check of op.checks??[]){
+  // The whole-tree validator is the kernel's own gate at acceptance, never an operation check.
+  for(const check of (op.checks??[]).filter(check=>!/^work-valid$/i.test(check.name??''))){
     const result=exec(check.command,{cwd,timeoutMs:op.timeoutMs??CHECK_TIMEOUT_MS});
     const exitCode=Number.isInteger(result?.status)?result.status:1;
     checks.push({name:check.name,command:check.command,exitCode,evidence:tail(`${result?.stdout??''}${result?.stderr??''}`)});
