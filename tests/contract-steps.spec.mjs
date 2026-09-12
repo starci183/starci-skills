@@ -102,7 +102,7 @@ test('interface.draw enumerates every screen state and writes the design record 
   assert.match(drawn[0],/features\/sales\/business\/srs\/intake\/index\.yaml/);
   assert.match(drawn[1],/enumerate every state it can be in before you draw anything/);
   for(const state of ['loading','empty','error','populated','permission-denied'])assert.ok(drawn[1].includes(state),`the state ${state} is enumerated`);
-  assert.match(text,/installed design grammar/);assert.match(text,/invent no component family/);
+  assert.match(text,/installed design grammar/);assert.match(text,/invent no component, token, colour or icon of your own/);assert.match(text,/design binding/);
   assert.match(text,/interface design record at the path the allowlist names \(`features\/sales\/ui\/intake\/index\.yaml`\)/);
   assert.match(text,/blueprint \(the regions in order\)/);assert.match(text,/contract slots/);assert.match(text,/the exact copy/);
   assert.match(text,/one candidate PNG per screen state and viewport WITH THE IMAGE MODEL.*is NOT a candidate/);assert.match(text,/never a capture of a working feature/);

@@ -457,15 +457,11 @@ export const KERNEL_CHECK=/^work-valid$/i;
  */
 export const DESIGN_KINDS=['interface.draw','frontend.implement','uat.verify'];
 export function grammarReferences(root=skillRoot){
+  // The whole canon, not a shortlist: every grammar family file, every frontend pattern, every UI rule the host carries.
   const found=[];
-  try{
-    const grammars=path.join(root,'knowledge','grammars');
-    for(const family of fs.readdirSync(grammars,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name))
-      for(const file of ['DNA.yaml','family.yaml','idioms.yaml']){const candidate=path.join(grammars,family,file);if(fs.existsSync(candidate))found.push(slash(candidate));}
-    const composition=path.join(root,'knowledge','ui','composition','state.yaml');
-    if(fs.existsSync(composition))found.push(slash(composition));
-  }catch{}
-  return found;
+  const walk=dir=>{try{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())walk(file);else if(/\.ya?ml$/i.test(entry.name))found.push(slash(file));}}catch{}};
+  for(const relative of [['knowledge','grammars'],['knowledge','patterns','fe'],['knowledge','ui']])walk(path.join(root,...relative));
+  return unique(found).sort();
 }
 export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,lane=null,done=[]}){
   // Lane-aware: the kind of this operation is the node's next lane step, not a fixed map of the node kind.
