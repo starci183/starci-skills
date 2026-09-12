@@ -468,23 +468,32 @@ function usage(){return `Usage:
   node orca-supervised-launch.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
   node orca-supervised-launch.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
   node orca-supervised-launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
-  node orca-supervised-launch.mjs workflow-goal --job <text> [--id <workflow-id>] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-goal --job <text> [--id <workflow-id>] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--ledger-root <path>] [--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2] [--host <path-to-.claude>] [--worktree <relative-path>]
     turns the job into a goal and prints it for the one user approval. With a Work tree under
     <repo>/.starciwork/features the ledger is that tree (--ledger work, the default): the ops are derived
     from the eligible nodes in --scope and a node without an allowlist or checks is named as needing you.
     Without one the ledger is assessed by a model (--ledger plan).
-  node orca-supervised-launch.mjs workflow-approve --id <workflow-id> [--worktree <relative-path>]
-  node orca-supervised-launch.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--allocation <runtime=slots,...>] [--max-iterations N] [--host <path-to-.claude>] [--worktree <relative-path>]
+    A repository that shares another repository's tree (a frontend working its backend's Work) is routed by
+    the host registry <host>/../.workspaces/projects/*/work.json, so --host is what makes a frontend job
+    resolvable; --ledger-root names the tree outright instead. The workflow directory and every Work commit
+    then live in the owner repository, while code, checks and code commits stay in this worktree. A node that
+    names no repository belongs to the side its layout sits in, so implementation/frontend/** is never a
+    backend job's work and implementation/backend/** is never a frontend's.
+  node orca-supervised-launch.mjs workflow-approve --id <workflow-id> [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--allocation <runtime=slots,...>] [--max-iterations N] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     runs the kernel loop: up to 10 operation agents in one worktree, machine-verified acceptance, gates, final report.
     On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and
-    committed with a "Work: <node id>" trailer.
-  node orca-supervised-launch.mjs workflow-status --id <workflow-id> [--json true] [--worktree <relative-path>]
+    committed with a "Work: <node id>" trailer - in the repository that owns the tree, which is this one
+    unless the product routes the Work elsewhere.
+  node orca-supervised-launch.mjs workflow-status --id <workflow-id> [--json true] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     prints one status view of the workflow, derived from its own files: kernel liveness, runtimes, running
     and blocked operations, the ledger by feature, reviews, the validator, what needs you, the rate and the
     last events. --json true prints the machine shape (the kernel's own status fields plus view).
   node orca-supervised-launch.mjs workflow-list [--json true] [--worktree <relative-path>]
     one line per workflow of this repository: phase, operations done, kernel liveness, last event age
-  node orca-supervised-launch.mjs workflow-stop --id <workflow-id> [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-stop --id <workflow-id> [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+    approve, status and stop find the workflow directory where the goal put it, so a job whose ledger is
+    owned by another repository is reached with the same --host (or --ledger-root) the goal was given.
   node orca-supervised-launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000] [--worktree <repo>]
   node orca-supervised-launch.mjs verify`;}
 

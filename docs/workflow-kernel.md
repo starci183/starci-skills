@@ -232,6 +232,28 @@ its own `work(<node id>): ...` commit scoped to that node's directory, so the tr
 commits go through `gitQueue`, and the node's `index.yaml` and `evidence/**` are kernel-owned for the whole
 life of the op: see the guards above.
 
+### When the ledger belongs to another repository
+
+The tree a job works is resolved once, before the store exists, by `execution/ledger-routing.mjs`:
+`--ledger-root`, else the host route registry, else `<repoRoot>/.starciwork`. A frontend job therefore works
+the Work tree its backend owns — see **Shared ledger across repositories** in
+[work-ledger.md](work-ledger.md) for the resolution rules and what a shared tree changes.
+
+Inside the kernel this splits `ctx.work` in two: `ctx.work.code` is `{repoRoot,origin,repository}` of the
+worktree this kernel commits code in, and `ctx.work.ledger` is `{repoRoot,workRoot,repository}` of the tree
+it records Work in (`ctx.work.at` is the `{repoRoot,workRoot}` pair every `work-ledger` call takes, and
+`ctx.work.shared` says whether they differ). Candidate filtering asks with `ctx.work.code.repository` and
+`ctx.work.side`, so a frontend workflow picks only the nodes its repository delivers; source identity and
+evidence name `ctx.work.code`; the ledger write and its commit happen in `ctx.work.ledger`. `state.ledgerRoot`
+and `state.ledgerOwner` are written at goal time and reused on every resume, `workflow-status` reports both,
+and `workflow-goal|run|status` all accept `--ledger-root`. The workflow directory itself follows the ledger:
+a repository that shares another's tree keeps no `.starciwork` of its own, so
+`.starciwork/_local/workflows/<id>` lives in the owner.
+
+A shared-ledger run records `ledger-shared {owner,root}` on its `ledger-loaded` event and refuses to start at
+all when the owner's tree carries pending changes the kernel does not own (`ledger-shared-dirty`, then
+`blocked` with a `needUser` item naming the files).
+
 ## The single-candidate launch
 
 5.0 allocates one runtime per op, so the launcher must try exactly one candidate.

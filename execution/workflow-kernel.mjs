@@ -7,7 +7,8 @@ import {getPath} from './orca-calls.mjs';
 import {waitTick} from './orca-protocol.mjs';
 import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from './orca-supervised-launch.mjs';
 import {validateReport} from './reports.mjs';
-import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot} from './workflow-store.mjs';
+import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} from './workflow-store.mjs';
+import {resolveLedgerRoot,sharedLedgerStatus} from './ledger-routing.mjs';
 import {createAllocator,loadRuntimes} from './runtime-allocator.mjs';
 import {proofFinding,proofPlan,runAtBase} from './verify-proof.mjs';
 import {stepsFor} from './contract-steps.mjs';
@@ -132,21 +133,51 @@ export function currentBranch(cwd,git=spawnSync){
   return shown.status===0?(shown.stdout??'').trim():'unknown';
 }
 
-/** `<repo>/.starciwork/features` decides the mode: a repository that owns a Work tree is driven by it. */
-export function detectLedgerMode(repoRoot,requested=null){
+/**
+ * A resolved Work tree decides the mode: a repository driven by one, whether it owns that tree or shares the
+ * tree another repository of the same product owns (`ledgerRoot`), is driven by it.
+ */
+export function detectLedgerMode(repoRoot,requested=null,ledgerRoot=null){
   if(requested){need(LEDGER_MODES.includes(requested),`Unsupported ledger mode ${requested}; use ${LEDGER_MODES.join(' or ')}`);return requested;}
-  return fs.existsSync(path.join(String(repoRoot??''),'.starciwork','features'))?WORK_LEDGER:'plan';
+  const root=ledgerRoot?String(ledgerRoot):path.join(String(repoRoot??''),'.starciwork');
+  return fs.existsSync(path.join(root,'features'))?WORK_LEDGER:'plan';
+}
+
+/**
+ * The ledger this workflow works, resolved once and then a fact of the workflow: `state.ledgerRoot` and
+ * `state.ledgerOwner` are written at goal time and reused on every resume, so a long job can never drift onto
+ * another tree because a route file changed underneath it. An explicit `--ledger-root` always re-resolves.
+ */
+export function ledgerBinding(state,{repoRoot,host=null,ledgerRoot=null,git=spawnSync,resolve=resolveLedgerRoot}={}){
+  if(!ledgerRoot&&state.ledgerRoot&&plain(state.ledgerOwner)&&state.ledgerOwner.repoRoot)
+    return {source:state.ledgerSource??'state',ledgerRoot:state.ledgerRoot,ownerRepoRoot:state.ledgerOwner.repoRoot,
+      ownerRepository:state.ledgerOwner.repository??null,ownerRole:state.ledgerOwner.role??null,
+      project:state.ledgerOwner.project??null,role:state.codeRole??null,side:state.codeSide??null,
+      sharedLedger:Boolean(state.ledgerShared),exists:true};
+  const resolved=resolve({repoRoot,host,options:ledgerRoot?{'ledger-root':ledgerRoot}:{},git});
+  state.ledgerRoot=resolved.ledgerRoot;
+  state.ledgerOwner={repoRoot:resolved.ownerRepoRoot,repository:resolved.ownerRepository,role:resolved.ownerRole,project:resolved.project};
+  state.ledgerSource=resolved.source;
+  state.ledgerShared=Boolean(resolved.sharedLedger);
+  state.codeRole=resolved.role??null;
+  state.codeSide=resolved.side??null;
+  return resolved;
 }
 
 /** The whole mutable state of one workflow. `schema` is the store's, so state.json is written atomically by it. */
 export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],store,host=null,launcher=null,
-  ledgerMode='plan',scope=[],repoRoot=null}){
+  ledgerMode='plan',scope=[],repoRoot=null,ledgerRoot=null,ledgerOwner=null,ledgerSource=null,ledgerShared=false,
+  codeRole=null,codeSide=null}){
   need(plain(store)&&typeof store.id==='string','A workflow store is required');
   need(LEDGER_MODES.includes(ledgerMode),`Unsupported ledger mode ${ledgerMode}; use ${LEDGER_MODES.join(' or ')}`);
   return {schema:WORKFLOW_STATE,kernel:WORKFLOW_KERNEL,id:store.id,dir:store.dir,
     job:required(job,'job'),inputs:inputs.map(parseRef),worktree:path.resolve(required(worktree,'worktree')),
     branch:required(branch,'branch'),gates:gates.map(parseGate),host,launcher,
     ledgerMode,scope:[...scope],repoRoot:repoRoot?path.resolve(repoRoot):null,
+    // The code root is the worktree above; these name the tree the Work itself lives in, which may belong to
+    // another repository of the same product.
+    ledgerRoot:ledgerRoot?path.resolve(ledgerRoot):null,ledgerOwner:plain(ledgerOwner)?{...ledgerOwner}:null,
+    ledgerSource,ledgerShared:Boolean(ledgerShared),codeRole,codeSide,
     run:null,from:null,workflowTask:null,phase:'goal',approved:false,
     definitionOfDone:[],risks:[],questions:[],ledger:[],ops:[],needUser:[],gateResults:[],verifyRounds:{},gateRounds:0,
     decisions:[],ledgerSummary:null,
@@ -344,7 +375,7 @@ export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0}){
 export function syncLedgerOps(store,state,ctx){
   if(!ctx.work)return [];
   let loaded;
-  try{loaded=ctx.work.api.loadLedger({repoRoot:ctx.work.repoRoot,validate:ctx.work.validate});}
+  try{loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});}
   catch(error){store.appendEvent({event:'ledger-sync-failed',reason:error.message});return [];}
   if(!loaded.ok)return [];
   ctx.work.loaded=loaded;
@@ -355,31 +386,31 @@ export function syncLedgerOps(store,state,ctx){
   const added=[];
   // An operation created before the repository rule for a node another repository delivers is settled and blocked.
   for(const op of state.ops){
-    if(!op.nodeId||op.refusal==='out-of-repository'||!ctx.work.repository||typeof ctx.work.api.nodeRepository!=='function')continue;
+    if(!op.nodeId||op.refusal==='out-of-repository'||!ctx.work.code.repository||typeof ctx.work.api.nodeRepository!=='function')continue;
     const node=loaded.nodes.get(op.nodeId);
     if(!node)continue;
-    let foreign=null;try{foreign=ctx.work.api.nodeRepository(ctx.work.api.readNode(ctx.work.repoRoot,node));}catch{foreign=null;}
-    if(!foreign||foreign===ctx.work.repository)continue;
+    let foreign=null;try{foreign=ctx.work.api.nodeRepository(ctx.work.api.readNode(ctx.work.at,node));}catch{foreign=null;}
+    if(!foreign||foreign===ctx.work.code.repository)continue;
     if(liveStatus.includes(op.status)&&op.dispatch&&ctx.orca){
       settleDispatch(ctx.orca,op.dispatch,{cwd:state.worktree,reason:'out-of-repository',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
       if(op.runtime)ctx.allocator.release(op.runtime);
     }
     op.status='blocked';op.refusal='out-of-repository';op.dispatch=null;op.terminal=null;
     for(const item of state.ledger)if(item.id===op.nodeId)item.status='out-of-repository';
-    store.appendEvent({event:'op-out-of-repository',op:op.id,node:op.nodeId,repository:foreign,own:ctx.work.repository});
+    store.appendEvent({event:'op-out-of-repository',op:op.id,node:op.nodeId,repository:foreign,own:ctx.work.code.repository});
   }
-  for(const node of ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.repository})){
+  for(const node of ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.code.repository,side:ctx.work.side})){
     if(known.has(node.id))continue;
     if(!node.schedulable){
       if(!state.needUser.some(item=>item.node===node.id))state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
       continue;
     }
     const id=workOpId(node.id,taken);opOfNode.set(node.id,id);
-    const op=deriveWorkOp(ctx.work.api,ctx.work.repoRoot,node,{id,opOfNode,index:state.ops.length});
+    const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length});
     op.difficulty=op.difficulty??'medium';
     op.createdIteration=state.iterations;
     state.ops.push(op);
-    state.ledger.push({id:node.id,title:describeNode(ctx.work.api,ctx.work.repoRoot,node),inputRef:node.path,kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[]});
+    state.ledger.push({id:node.id,title:describeNode(ctx.work.api,ctx.work.at,node),inputRef:node.path,kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[]});
     added.push(op.id);
     store.appendEvent({event:'op-added',op:op.id,node:node.id,reason:'newly schedulable Work node'});
     gateDynamicOp(store,state,op);
@@ -420,32 +451,38 @@ const ledgerErrorText=errors=>errors.slice(0,3).map(error=>typeof error==='strin
  * "ledger incomplete" in goal.md, because guessing a scope for authored work is not the kernel's to do.
  * The model is asked for one thing only: the definition of done and the risks and questions around it.
  */
-export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless}={}){
+export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless,
+  ledgerRoot=null,git=spawnSync,resolveLedger=resolveLedgerRoot}={}){
   need(!state.approved,`Workflow ${state.id} is already approved; run workflow-run`);
   // The Work ledger is the branch content of the worktree; only the workflow history lives in the main repository.
   const repoRoot=state.repoRoot??path.resolve(state.worktree);
   state.repoRoot=repoRoot;
-  const loaded=ledgerApi.loadLedger({repoRoot,validate});
+  // ... unless another repository of the same product owns the tree: then the code is here and the Work is there.
+  const binding=ledgerBinding(state,{repoRoot,host:state.host,ledgerRoot,git,resolve:resolveLedger});
+  const at={repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot};
+  const repository=ledgerApi.repositoryName?.(repoRoot)??null;
+  const loaded=ledgerApi.loadLedger({...at,validate});
   const scope=state.scope.length?state.scope:null;
-  const executables=ledgerApi.executableCandidates(loaded,{scope});
+  const executables=ledgerApi.executableCandidates(loaded,{scope,repository,side:binding.side});
   const ready=executables.filter(node=>node.schedulable),incomplete=executables.filter(node=>!node.schedulable);
   state.decisions=ledgerApi.decisionCandidates(loaded,{scope}).map(node=>({id:node.id,kind:node.kind,path:node.path,
-    operation:DECISION_OPERATION[node.kind]??'business.decide',title:describeNode(ledgerApi,repoRoot,node)}));
+    operation:DECISION_OPERATION[node.kind]??'business.decide',title:describeNode(ledgerApi,at,node)}));
   state.ledgerSummary=ledgerApi.ledgerSummary(loaded,{scope});
   if(!loaded.ok)state.needUser.push({kind:'ledger',detail:`the Work tree does not validate, so no node in it is a trustworthy TODO: ${ledgerErrorText(loaded.errors)}`});
   for(const node of incomplete)state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
   need(ready.length||incomplete.length||state.decisions.length,
     `No eligible Work node in scope ${scope?scope.join(', '):'(the whole tree)'}: there is nothing for this workflow to do`);
-  state.ledger=ready.map(node=>({id:node.id,title:describeNode(ledgerApi,repoRoot,node),inputRef:node.path,
+  state.ledger=ready.map(node=>({id:node.id,title:describeNode(ledgerApi,at,node),inputRef:node.path,
     kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[]}));
   const taken=new Set(),opOfNode=new Map();
   for(const node of ready)opOfNode.set(node.id,workOpId(node.id,taken));
-  state.ops=ready.map((node,index)=>deriveWorkOp(ledgerApi,repoRoot,node,{id:opOfNode.get(node.id),opOfNode,index}));
+  state.ops=ready.map((node,index)=>deriveWorkOp(ledgerApi,at,node,{id:opOfNode.get(node.id),opOfNode,index}));
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
   const assessed=typeof assessGoal==='function'?assessGoal({job:state.job,inputs:state.inputs,
     ledger:state.ledger.map(item=>({id:item.id,kind:item.kind,title:item.title,module:item.module})),
     constraints:[
-      `the ledger is the authored Work tree under ${slash(repoRoot)}/.starciwork and is not yours to change`,
+      `the ledger is the authored Work tree under ${slash(binding.ledgerRoot)} and is not yours to change`,
+      ...(binding.sharedLedger?[`that tree is owned by ${binding.ownerRepository??slash(binding.ownerRepoRoot)}, not by this repository: the code is written here and the Work is recorded there`]:[]),
       `every op runs in the one worktree ${slash(state.worktree)} on branch ${state.branch} under the node's own allowlist`,
       ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers,cwd,runHeadless}):null;
   if(assessed?.ok){
@@ -464,6 +501,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
   }
   writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,job:state.job,inputs:state.inputs,
     ledgerMode:state.ledgerMode,scope:state.scope,workRoot:slash(loaded.workRoot),ledgerValid:loaded.ok,
+    ledgerSource:binding.source,ledgerShared:binding.sharedLedger,ledgerOwner:state.ledgerOwner,codeRepository:repository,codeSide:binding.side??null,
     definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,
     ledger:state.ledger,decisions:state.decisions,ledgerSummary:state.ledgerSummary,
     ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
@@ -477,6 +515,8 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
   return {ok:true,id:state.id,ledgerMode:state.ledgerMode,goal:store.paths.goal,goalJson:store.paths.goalJson,
     ops:state.ops.length,ledger:state.ledger.length,decisions:state.decisions.length,
     incomplete:incomplete.map(node=>node.id),needUser:state.needUser,gates:state.gates.length,
+    ledgerRoot:slash(binding.ledgerRoot),ledgerSource:binding.source,ledgerShared:binding.sharedLedger,
+    ledgerOwner:binding.sharedLedger?(binding.ownerRepository??slash(binding.ownerRepoRoot)):null,
     next:`review ${slash(store.paths.goal)} and approve with workflow-approve --id ${state.id}`};
 }
 
@@ -487,6 +527,7 @@ function workGoalMarkdown(state,loaded){
     if(!work.disjoint(op.allowlist,other.allowlist))overlaps.push(`\`${op.id}\` and \`${other.id}\` share paths, so they never run at the same time`);
   const lines=[`# ${state.job}`,``,
     `Workflow \`${state.id}\` - branch \`${state.branch}\` - ledger \`work\` (${slash(loaded.workRoot)})`,
+    ...(state.ledgerShared?[``,`The Work tree is owned by \`${state.ledgerOwner?.repository??slash(state.ledgerOwner?.repoRoot??'')}\`, not by this repository: code is written and committed in \`${slash(state.worktree)}\`, and every Work record is written and committed in the owner.`]:[]),
     `Scope: ${state.scope.length?state.scope.map(item=>`\`${item}\``).join(', '):'the whole Work tree'}. `+
     `The Work tree ${loaded.ok?'validates':'does NOT validate'}; ${state.ledgerSummary?.eligible??0} of ${state.ledgerSummary?.total??0} nodes in scope are eligible.`,``,
     `## Definition of done`,``,...state.definitionOfDone.map((item,index)=>`${index+1}. ${item}`),``,
@@ -633,10 +674,13 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
  */
 export function kernelOwnedPaths(state,op,ctx){
   if(!ctx?.work||!op.nodeId)return [];
+  // A ledger another repository owns is not in this worktree at all: an operation cannot write it here, so
+  // there is no path here to protect and no fingerprint to take.
+  if(ctx.work.shared)return [];
   const node=ctx.work.node(op.nodeId);
   if(!node)return [];
   const granted=(op.allowlist??[]).map(normalize);
-  return unique(((ctx.guards??kernelGuards).protectedPaths(node,ctx.work.repoRoot)??[]).map(normalize))
+  return unique(((ctx.guards??kernelGuards).protectedPaths(node,ctx.work.ledger?.repoRoot??ctx.work.repoRoot)??[]).map(normalize))
     .filter(file=>!granted.includes(file));
 }
 
@@ -688,7 +732,7 @@ function cleanStrayFiles(store,state,op,ctx){
 function guardKernelPaths(store,state,op,ctx){
   const paths=op.kernelOwned??[];
   if(!paths.length)return [];
-  const root=ctx.work?.repoRoot??state.worktree;
+  const root=ctx.work?.ledger?.repoRoot??ctx.work?.repoRoot??state.worktree;
   if(protectedFingerprint(root,paths)===(op.kernelOwnedAt??''))return [];
   const result=ctx.guards.gitQueue(()=>ctx.guards.revertProtected(ctx.git,{cwd:state.worktree,paths}))??{};
   const reverted=unique([...(result.reverted??[]),...(result.removed??[])]).map(normalize);
@@ -753,9 +797,9 @@ function launchOp(orca,store,state,op,allocated,ctx){
   store.appendEvent({event:'launched',op:op.id,kind:op.kind,node:op.nodeId,attempt:op.attempt,runtime:op.runtime,target:op.target,
     dispatch:op.dispatch,terminal:op.terminal,allocation:launched.allocation??null});
   // Work v2 authors only uninvestigate, todo and done, so the launch is recorded in the node's kernel block.
-  ledgerWrite(store,state,op,ctx,'in-progress',node=>ctx.work.api.markInProgress(ctx.work.repoRoot,node,{opId:op.id,dispatch:op.dispatch}));
+  ledgerWrite(store,state,op,ctx,'in-progress',node=>ctx.work.api.markInProgress(ctx.work.at,node,{opId:op.id,dispatch:op.dispatch}));
   // The baseline is taken after the kernel's own in-progress write, so only the operation's edits are caught.
-  op.kernelOwnedAt=op.kernelOwned.length?protectedFingerprint(ctx.work?.repoRoot??state.worktree,op.kernelOwned):null;
+  op.kernelOwnedAt=op.kernelOwned.length?protectedFingerprint(ctx.work?.ledger?.repoRoot??ctx.work?.repoRoot??state.worktree,op.kernelOwned):null;
   return {ok:true};
 }
 
@@ -923,7 +967,7 @@ function recordDone(store,state,op,ctx,verified){
   if(!ctx.work||!op.nodeId)return;
   const decision=['architecture.decide','business.decide'].includes(op.kind);
   if(decision){
-    ledgerWrite(store,state,op,ctx,'decided',node=>ctx.work.api.markDecided(ctx.work.repoRoot,node,{
+    ledgerWrite(store,state,op,ctx,'decided',node=>ctx.work.api.markDecided(ctx.work.at,node,{
       by:'starci-kernel',
       digest:ctx.work.digest,
       review:{reviewer:op.runtime??'starci-kernel',
@@ -934,12 +978,15 @@ function recordDone(store,state,op,ctx,verified){
   }
   // A completion binds its source directly (starci/source-identity@1) so the tree needs no repository resource record;
   // the identity is scoped to the operation allowlist, which is exactly what the kernel verified.
-  const identity=ctx.work.origin&&/^[a-f0-9]{40,64}$/.test(String(op.head??''))&&typeof ctx.work.api.buildSourceIdentity==='function'
-    ?ctx.work.api.buildSourceIdentity({repository:ctx.work.repository??path.basename(ctx.work.repoRoot),origin:ctx.work.origin,commit:op.head,paths:op.allowlist??[],
+  // Source identity names the repository the slice is IN, which is the worktree this kernel commits in - never
+  // the repository that happens to own the ledger the record is written to.
+  const repository=ctx.work.code.repository??path.basename(ctx.work.code.repoRoot);
+  const identity=ctx.work.code.origin&&/^[a-f0-9]{40,64}$/.test(String(op.head??''))&&typeof ctx.work.api.buildSourceIdentity==='function'
+    ?ctx.work.api.buildSourceIdentity({repository,origin:ctx.work.code.origin,commit:op.head,paths:op.allowlist??[],
       dependencyCoverage:'Dependencies were not re-verified by this operation.',limitations:['Only the operation allowlist was verified by the kernel.']})
     :null;
-  ledgerWrite(store,state,op,ctx,'done',node=>ctx.work.api.markDone(ctx.work.repoRoot,node,{
-    opId:op.id,head:op.head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,...(identity?{sourceIdentity:identity}:{}),
+  ledgerWrite(store,state,op,ctx,'done',node=>ctx.work.api.markDone(ctx.work.at,node,{
+    opId:op.id,head:op.head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,repository,...(identity?{sourceIdentity:identity}:{}),
     evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',
       servedVersionEvidence:`Checks re-run by the StarCi kernel in workflow ${state.id} on branch ${state.branch}`}}));
 }
@@ -953,25 +1000,41 @@ function commitLedgerWrite(store,state,op,ctx){
   if(!ctx.work||!op.nodeId)return null;
   const node=ctx.work.node(op.nodeId);
   if(!node)return null;
-  const files=changedFiles(state,op,ctx,[`.starciwork/${slash(path.dirname(node.path))}`]);
-  if(!files.length)return null;
+  // The write happens where the tree is, so the commit happens there too: in the owner repository, on whatever
+  // branch it is on, with the same `Work:` trailer. A shared ledger is the only case where that is not here.
+  const cwd=ctx.work.ledger?.repoRoot??state.worktree;
+  const scope=normalize(path.join(path.relative(cwd,ctx.work.ledger?.workRoot??path.join(cwd,'.starciwork')),path.dirname(node.path)));
   // Ledger writes carry 64-hex digests that a repository secrets guard mistakes for keys; the kernel is the
   // author of those digests, so it declares the scan skipped for exactly this commit.
-  const run=args=>ctx.git('git',args,{cwd:state.worktree,encoding:'utf8',windowsHide:true,env:{...process.env,ALLOW_SECRET_SCAN:'1'}});
+  const run=args=>ctx.git('git',args,{cwd,encoding:'utf8',windowsHide:true,env:{...process.env,ALLOW_SECRET_SCAN:'1'}});
+  const files=ledgerChanges(run,scope);
+  if(!files.length)return null;
   run(['config','core.longpaths','true']);
   if(run(['add','--',...files]).status!==0){store.appendEvent({event:'ledger-commit-failed',op:op.id,node:op.nodeId,reason:'git add'});return null;}
   const committed=run(['commit','-q','-m',`work(${op.nodeId}): record ${op.id} in the Work ledger\n\nWork: ${op.nodeId}`]);
   if(committed.status!==0){store.appendEvent({event:'ledger-commit-failed',op:op.id,node:op.nodeId,reason:tail(committed.stderr,200)});return null;}
   const shown=run(['rev-parse','HEAD']);
   const head=shown.status===0?(shown.stdout??'').trim():null;
-  if(head)state.head=head;
-  store.appendEvent({event:'ledger-commit',op:op.id,node:op.nodeId,files,head});
+  // `state.head` is the head of the code this workflow produced; a commit in another repository is never that.
+  if(head&&!ctx.work.shared)state.head=head;
+  if(head)op.ledgerCommit=head;
+  store.appendEvent({event:'ledger-commit',op:op.id,node:op.nodeId,files,head,ledgerCommit:head,
+    ...(ctx.work.shared?{repository:ctx.work.ledger.repository,shared:true}:{})});
   return head;
+}
+
+/** Pending ledger paths under one node directory, read where the tree lives rather than in this worktree. */
+function ledgerChanges(run,scope){
+  const shown=run(['status','--porcelain','--',scope]);
+  if(shown.status!==0)return [];
+  return unique((shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
+    .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))))
+    .filter(file=>inside(file,[scope]));
 }
 
 /** A decision is settled by observations, one per authored assertion; with none authored, one for the node. */
 function decisionObservations(ctx,node,op){
-  const authored=(()=>{try{const raw=ctx.work.api.readNode(ctx.work.repoRoot,node);return Array.isArray(raw.assertions)?raw.assertions.map(String):[];}catch{return [];}})();
+  const authored=(()=>{try{const raw=ctx.work.api.readNode(ctx.work.at,node);return Array.isArray(raw.assertions)?raw.assertions.map(String):[];}catch{return [];}})();
   const observation=firstLine(op.reports.at(-1)?.summary)||`${op.id} settled this decision`;
   return (authored.length?authored:[String(node.id)]).map(id=>({id,outcome:'pass',observation}));
 }
@@ -992,12 +1055,12 @@ function architectureNodeFor(ctx,op,detail){
 }
 
 /** The check a design change must survive: the Work tree still validates after the decision is written. */
-const workValidateCommand=ctx=>`node ${slash(path.join(skillRoot,'bin','starci.mjs'))} validate ${slash(path.join(ctx.work.repoRoot,'.starciwork'))}`;
+const workValidateCommand=ctx=>`node ${slash(path.join(skillRoot,'bin','starci.mjs'))} validate ${slash(ctx.work.ledger?.workRoot??path.join(ctx.work.repoRoot,'.starciwork'))}`;
 
 function reopenArchitecture(store,state,op,report,ctx,blocker){
   const architecture=architectureNodeFor(ctx,op,blocker.detail);
   if(!architecture)return null;
-  ledgerWrite(store,state,op,ctx,'reopened',()=>ctx.work.api.markReopened(ctx.work.repoRoot,architecture,
+  ledgerWrite(store,state,op,ctx,'reopened',()=>ctx.work.api.markReopened(ctx.work.at,architecture,
     {reason:`${op.id} reported an SDS gap: ${blocker.detail}`,by:'starci-kernel'}));
   const designFile=`.starciwork/${slash(architecture.path)}`;
   const decide=addOp(store,state,{kind:'architecture.decide',nodeId:architecture.id,
@@ -1567,7 +1630,7 @@ export function runGates(store,state,ctx){
 function refreshLedgerSummary(state,ctx){
   if(!ctx?.work)return state.ledgerSummary;
   try{
-    const loaded=ctx.work.api.loadLedger({repoRoot:ctx.work.repoRoot,validate:ctx.work.validate});
+    const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});
     state.ledgerSummary=ctx.work.api.ledgerSummary(loaded,{scope:state.scope.length?state.scope:null});
   }catch{/* a tree that cannot be re-read leaves the approved summary in place */}
   return state.ledgerSummary;
@@ -1576,13 +1639,14 @@ function refreshLedgerSummary(state,ctx){
 function finish(store,state,outcome,reason=null,ctx=null){
   const final={schema:FINAL_REPORT,id:state.id,job:state.job,outcome,reason,branch:state.branch,head:state.head,
     ledgerMode:state.ledgerMode,scope:state.scope,ledgerSummary:refreshLedgerSummary(state,ctx),decisions:state.decisions,
+    ledgerRoot:state.ledgerRoot?slash(state.ledgerRoot):null,ledgerShared:Boolean(state.ledgerShared),ledgerOwner:state.ledgerOwner??null,
     definitionOfDone:state.definitionOfDone,
     ledger:state.ledger.map(item=>({...item})),
     acceptedAsPreexisting:state.ledger.filter(item=>item.status==='preexisting').map(item=>item.id),
     gates:state.gateResults.map(result=>({name:result.name,command:result.command,status:result.status,exitCode:result.exitCode})),
     needUser:state.needUser,
     ops:state.ops.map(op=>({id:op.id,kind:op.kind,node:op.nodeId,origin:op.origin,status:op.status,runtime:op.runtime,attempt:op.attempt,
-      allowlist:op.allowlist,ledgerIds:op.ledgerIds,head:op.head,verdict:op.verdict,validation:op.validation??null,files:op.files})),
+      allowlist:op.allowlist,ledgerIds:op.ledgerIds,head:op.head,ledgerCommit:op.ledgerCommit??null,verdict:op.verdict,validation:op.validation??null,files:op.files})),
     iterations:state.iterations,finishedAt:Date.now()};
   writeJson(store.paths.final,final);
   state.finished={outcome,reason,report:store.paths.final};
@@ -1736,7 +1800,8 @@ export function triageAnomaly(store,state,signature,ctx){
 
 export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,validateOp=llm.validateOp,template,supervisor=null,validator=null,
   wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
-  ledgerApi=work,validate=validateWorkTree,waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now}={}){
+  ledgerApi=work,validate=validateWorkTree,ledgerRoot=null,resolveLedger=resolveLedgerRoot,
+  waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   need(plain(allocator),'A runtime allocator is required');
   need(typeof template==='string'&&template.trim(),'The operation contract template is required');
@@ -1760,18 +1825,45 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     // The Work tree is read once per run: every write below goes back into the node the operation closes.
     const repoRoot=state.repoRoot??repositoryRoot(state.worktree);
     state.repoRoot=repoRoot;
-    const loaded=ledgerApi.loadLedger({repoRoot,validate});
+    // Two repositories, two jobs: the code is written, checked and committed here, and the Work is read and
+    // recorded in the repository that owns the tree - which is this one unless the product routes it elsewhere.
+    const binding=ledgerBinding(state,{repoRoot,host:state.host,ledgerRoot,git:ctx.git,resolve:resolveLedger});
+    const at={repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot};
+    const loaded=ledgerApi.loadLedger({...at,validate});
     // The kernel block is part of a node's semantic digest, so a completion must bind the digest the
     // validator reports AFTER that block is written: every transition resolves it through this reader.
     const digest=({node})=>{
-      const fresh=ledgerApi.loadLedger({repoRoot,validate}).nodes.get(node.id)?.inputDigest;
+      const fresh=ledgerApi.loadLedger({...at,validate}).nodes.get(node.id)?.inputDigest;
       need(/^[a-f0-9]{64}$/.test(String(fresh??'')),`The Work validator reports no inputDigest for ${node.id}`);
       return fresh;
     };
     const remote=ctx.git('git',['remote','get-url','origin'],{cwd:repoRoot,encoding:'utf8',windowsHide:true});
     const origin=remote.status===0?ledgerApi.normalizeOrigin?.((remote.stdout??'').trim())??null:null;
-    ctx.work={api:ledgerApi,loaded,repoRoot,validate,digest,origin,repository:ledgerApi.repositoryName?.(repoRoot)??null,node:id=>loaded.nodes.get(id)??null};
-    store.appendEvent({event:'ledger-loaded',workRoot:slash(loaded.workRoot),valid:loaded.ok,nodes:loaded.list.length,scope:state.scope});
+    // `code` identifies the slice every receipt names; `ledger` is where the record is written. They are the
+    // same repository in a single-repository job, and `repoRoot`/`origin`/`repository` keep the old meaning:
+    // the ledger is read at `repoRoot`, the code is named by `repository` at `origin`.
+    const code={repoRoot,origin,repository:ledgerApi.repositoryName?.(repoRoot)??null};
+    const ledger={repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot,
+      repository:binding.ownerRepository??ledgerApi.repositoryName?.(binding.ownerRepoRoot)??null};
+    const shared=binding.sharedLedger?{owner:ledger.repository??slash(ledger.repoRoot),root:slash(ledger.workRoot)}:null;
+    ctx.work={api:ledgerApi,loaded,validate,digest,node:id=>loaded.nodes.get(id)??null,
+      code,ledger,at,shared:Boolean(shared),side:binding.side??null,source:binding.source,
+      repoRoot:ledger.repoRoot,workRoot:ledger.workRoot,origin:code.origin,repository:code.repository};
+    store.appendEvent({event:'ledger-loaded',workRoot:slash(loaded.workRoot),valid:loaded.ok,nodes:loaded.list.length,
+      scope:state.scope,source:binding.source,code:code.repository,...(shared?{'ledger-shared':shared}:{})});
+    // A shared tree is somebody else's working copy: the kernel commits into it, so it refuses to start over
+    // a pending change it does not own rather than sweep that change into a `work(...)` commit.
+    if(shared){
+      const status=sharedLedgerStatus({ownerRepoRoot:ledger.repoRoot,ledgerRoot:ledger.workRoot,git:ctx.git});
+      if(!status.ok){
+        const detail=`the Work ledger ${shared.root} is owned by ${shared.owner} and carries uncommitted changes the kernel does not own: ${status.foreign.slice(0,12).join(', ')}`;
+        if(!state.needUser.some(item=>item.kind==='ledger'&&item.detail===detail))state.needUser.push({kind:'ledger',detail});
+        store.appendEvent({event:'ledger-shared-dirty',owner:shared.owner,root:shared.root,foreign:status.foreign});
+        finish(store,state,'blocked','the shared Work ledger carries uncommitted changes the kernel does not own',ctx);
+        store.saveState(state);
+        return state;
+      }
+    }
   }
   // Operations created before a rule change carry their old check lists: the kernel-owned checks are stripped on load.
   for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
@@ -1900,8 +1992,18 @@ export function stopRequested(store){return fs.existsSync(path.join(store.dir,'s
 export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleepSync,functions={}}={}){
   const worktree=path.resolve(cwd);
   const repoRoot=repositoryRoot(worktree);
+  // The ledger a job works decides where its own runtime state lives too: a repository that shares another
+  // repository's Work tree keeps no `.starciwork` of its own, so the workflow directory belongs to the owner.
+  const routed=()=>{try{return resolveLedgerRoot({repoRoot:worktree,host:hostOf(options,repoRoot),options});}catch{return null;}};
+  const storeRootFor=id=>{
+    if(fs.existsSync(path.join(workflowsRoot(repoRoot),id,'state.json')))return repoRoot;
+    const resolved=routed();
+    return resolved?.sharedLedger&&fs.existsSync(path.join(workflowsRoot(resolved.ownerRepoRoot),id,'state.json'))
+      ?resolved.ownerRepoRoot:repoRoot;
+  };
   const open=id=>{
-    const store=createStore({repoRoot,id:required(id,'workflow id')});
+    const workflowId=required(id,'workflow id');
+    const store=createStore({repoRoot:storeRootFor(workflowId),id:workflowId});
     const state=store.loadState();
     need(plain(state)&&state.kernel===WORKFLOW_KERNEL,`No workflow kernel state in ${slash(store.dir)}`);
     // A state written before the ledger mode existed resumes as a plan-ledger workflow.
@@ -1916,14 +2018,21 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   if(command==='workflow-goal'){
     const job=required(options.job,'job');
     const host=hostOf(options,repoRoot);
-    const store=createStore({repoRoot,id:options.id??newWorkflowId(job)});
-    const ledgerMode=detectLedgerMode(worktree,options.ledger??null);
+    // Resolved before the store exists, because a shared ledger moves the workflow directory into its owner.
+    const ledger=resolveLedgerRoot({repoRoot:worktree,host,options});
+    const store=createStore({repoRoot:ledger.sharedLedger?ledger.ownerRepoRoot:repoRoot,id:options.id??newWorkflowId(job)});
+    const ledgerMode=detectLedgerMode(worktree,options.ledger??null,ledger.exists?ledger.ledgerRoot:null);
     const state=createWorkflowState({job,inputs:csv(options.inputs),worktree,branch:currentBranch(worktree),
-      gates:csv(options.gates),store,host,launcher:launcherOf(host),ledgerMode,scope:csv(options.scope),repoRoot:worktree});
+      gates:csv(options.gates),store,host,launcher:launcherOf(host),ledgerMode,scope:csv(options.scope),repoRoot:worktree,
+      ledgerRoot:ledger.exists?ledger.ledgerRoot:null,ledgerShared:ledger.sharedLedger,ledgerSource:ledger.source,
+      codeRole:ledger.role,codeSide:ledger.side,
+      ledgerOwner:ledger.exists?{repoRoot:ledger.ownerRepoRoot,repository:ledger.ownerRepository,role:ledger.ownerRole,project:ledger.project}:null});
     if(options.allocation)state.quota=parseQuota(options.allocation);
     store.appendEvent({event:'created',job,inputs:state.inputs,worktree:slash(worktree),branch:state.branch,
-      ledgerMode,scope:state.scope});
-    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,...goalPhase(store,state,{cwd:worktree,...functions})};
+      ledgerMode,scope:state.scope,ledgerRoot:slash(ledger.ledgerRoot),ledgerSource:ledger.source,
+      ...(ledger.sharedLedger?{'ledger-shared':{owner:ledger.ownerRepository??slash(ledger.ownerRepoRoot),root:slash(ledger.ledgerRoot)}}:{})});
+    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,
+      ...goalPhase(store,state,{cwd:worktree,ledgerRoot:options['ledger-root']??null,...functions})};
   }
   if(command==='workflow-stop'){
     const {store}=open(options.id);
@@ -1939,6 +2048,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const {store,state}=open(options.id);
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:state.phase,approved:state.approved,
       iterations:state.iterations,head:state.head,ledgerMode:state.ledgerMode,scope:state.scope,
+      ledgerRoot:state.ledgerRoot?slash(state.ledgerRoot):null,ledgerSource:state.ledgerSource??null,
+      ledgerShared:Boolean(state.ledgerShared),ledgerOwner:state.ledgerOwner??null,codeSide:state.codeSide??null,
       ledgerSummary:state.ledgerSummary,decisions:state.decisions,preflight:state.preflight??null,
       dynamicOps:state.dynamicOps??0,dynamicOpsBudget:dynamicBudget(state),sharedQueue:state.sharedQueue??[],
       ledger:state.ledger.map(item=>({id:item.id,status:item.status,title:item.title,evidence:item.evidence})),
@@ -1964,10 +2075,13 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       // Slots are derived from the operations that are actually running; saved loads may belong to a dead kernel.
       supervisor:supervisorRuntimes(state.host),validator:validatorRuntimes(state.host),
       allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null}),template:templateOf(state.host),
+      ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:finished.phase,ledgerMode:finished.ledgerMode,
       finished:finished.finished,ledger:finished.ledger.map(item=>`${item.id}=${item.status}`),
-      ledgerSummary:finished.ledgerSummary,needUser:finished.needUser,head:finished.head,iterations:finished.iterations};
+      ledgerSummary:finished.ledgerSummary,needUser:finished.needUser,head:finished.head,iterations:finished.iterations,
+      ledgerRoot:finished.ledgerRoot?slash(finished.ledgerRoot):null,ledgerShared:Boolean(finished.ledgerShared),
+      ledgerOwner:finished.ledgerShared?(finished.ledgerOwner?.repository??slash(finished.ledgerOwner?.repoRoot??'')):null};
   }
   throw Error(`Unsupported workflow kernel command: ${command}`);
 }
