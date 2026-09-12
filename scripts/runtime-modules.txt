@@ -30,6 +30,7 @@ execution/reports.mjs
 execution/llm-functions.mjs
 execution/workflow-store.mjs
 execution/workflow-kernel.mjs
+execution/contract-steps.mjs
 execution/kernel-guards.mjs
 execution/kernel-supervisor.mjs
 execution/verify-proof.mjs

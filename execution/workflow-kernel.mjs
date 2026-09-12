@@ -10,6 +10,7 @@ import {validateReport} from './reports.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot} from './workflow-store.mjs';
 import {createAllocator,loadRuntimes} from './runtime-allocator.mjs';
 import {proofFinding,proofPlan,runAtBase} from './verify-proof.mjs';
+import {stepsFor} from './contract-steps.mjs';
 import * as work from './work-ledger.mjs';
 import * as llm from './llm-functions.mjs';
 
@@ -595,6 +596,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     ...(op.priorOpen.length?[`## Open items you inherit`,...op.priorOpen.map(item=>`- ${item}`),``]:[]),
     ...(op.findings.length?[`## Findings you must resolve`,...op.findings.map(item=>`- ${typeof item==='string'?item:JSON.stringify(item)}`),``]:[]),
     `## Acceptance`,...(op.acceptance.length?op.acceptance.map((item,index)=>`${index+1}. ${item}`):['1. the goal above holds']),``,
+    stepsFor(op,{node:op.nodeId?state.ledger.find(item=>item.nodeId===op.nodeId)??null:null}),``,
     ...jobRulings(store),
     cook,``,
     `## Checks to run`,...(op.checks.length?op.checks.map(check=>`- ${check.name}: \`${check.command}\``):['- none were declared: run the checks this code already has and record them']),

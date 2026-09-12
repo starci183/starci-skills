@@ -200,6 +200,8 @@ no profile for that operation is never chosen and then rejected.
 `renderContract` owns every concrete value - goal, goal items, allowlist, the kernel-owned paths the op may
 never touch, its resource locks, references, inherited open items, findings, acceptance, the exact check
 commands, the checks file, the report command with `--reports-dir`.
+Between the acceptance and the process prose it splices the kind-specific working order from
+`execution/contract-steps.mjs` (`stepsFor`): see [op-granularity.md](op-granularity.md), "Working order per kind".
 The process prose (`## Cook until done`, `## Ping (mandatory)`, `## Never`) is reused verbatim from
 `docs/supervision-templates/op.md`, so one template serves every operation kind and no placeholder survives
 into a rendered contract.

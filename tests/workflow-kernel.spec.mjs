@@ -239,6 +239,9 @@ test('the goal phase writes goal.md and goal.json and stops: nothing is launched
     const contract=renderContract({template,op:state.ops[0],state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
     assert.match(contract,/## Cook until done/);assert.match(contract,/## Ping \(mandatory\)/);
     assert.match(contract,/## Acceptance/);assert.match(contract,/## Never/);
+    // A plan-mode backend.implement op without a Work node still gets the implement.ledger working order.
+    assert.match(contract,/## Working order \(mandatory, in this order\)\nSequence `implement\.ledger`\./);
+    assert.match(contract,/## Definition of done for this kind/);
     assert.match(contract,/node L\.mjs report --run run_wf/);
     assert.match(contract,/- `apps\/agentos-controlplane\/src\/sales\/intake\.ts`/);
     assert.doesNotMatch(contract,/<launcher>|<nested run>|<runtime dir>|<reports dir>/);
@@ -576,6 +579,16 @@ test('on the Work ledger the goal is derived from the authored nodes, and a node
     assert.deepEqual(op.acceptance,['unit-tests-pass']);
     assert.deepEqual(op.references,['features/sales/implementation/backend/intake/index.yaml']);
     assert.equal(op.origin,'ledger');
+    // The contract of a ledger implementation op carries the implement.ledger working order, interpolated
+    // from the node's own check command and assertion id, between the acceptance and the process prose.
+    const contract=renderContract({template,op,state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
+    assert.match(contract,/## Working order \(mandatory, in this order\)\nSequence `implement\.ledger`\./);
+    assert.match(contract,/1\. Read `features\/sales\/implementation\/backend\/intake\/index\.yaml` and the node assertions \(`unit-tests-pass`\)/);
+    assert.match(contract,/2\. Write or extend the spec\(s\)[^\n]*they MUST fail now/);
+    assert.match(contract,/4\. Run every listed check verbatim: unit-tests-pass: `npx vitest run intake`\./);
+    assert.match(contract,/## Definition of done for this kind\n- every assertion \(`unit-tests-pass`\)/);
+    assert.ok(contract.indexOf('## Acceptance')<contract.indexOf('## Working order')&&contract.indexOf('## Working order')<contract.indexOf('## Cook until done'));
+    assert.doesNotMatch(contract,/Implement, run every check, read the failures/,'the template no longer repeats the working order');
     // The model was asked for the definition of done only: it never saw an operation form to fill.
     assert.equal(asked.length,1);
     assert.ok(Array.isArray(asked[0].ledger)&&asked[0].ledger.length===1);
