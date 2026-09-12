@@ -67,6 +67,8 @@ function taskFromReceipt(receipt){
 }
 
 function dispatchIdFromReceipt(receipt){
+  const direct=getPath(receipt,'result.dispatchId')??getPath(receipt,'result.dispatch_id');
+  if(typeof direct==='string'&&direct.startsWith('ctx_'))return direct;
   const dispatch=findObject(receipt,value=>plain(value)&&typeof value.id==='string'&&value.id.startsWith('ctx_')&&(typeof value.task_id==='string'||typeof value.dispatch_id==='string'));
   return dispatch?.id??null;
 }

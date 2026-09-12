@@ -87,13 +87,16 @@ calls:
     timeoutMs: 150000
     flags: [task, worktree, agent, model, effort, name, repo, base-branch, display-name, setup, retry-of, timeout-ms, run, from]
     required: [task, worktree, agent, run]
-    note: --from is resolved by Orca from the calling terminal when omitted; the canonical launcher always passes the exact Monitor or Coordinator handle.
     forbidden: [terminal, on]
     forbiddenValues:
       on: [windows, macos, linux]
-    receipt: [result.dispatch.id]
+    receipt: [result.dispatchId]
     creates: dispatch
+    note: "--from is resolved by Orca from the calling terminal when omitted; the canonical launcher always passes the exact Monitor or Coordinator handle. Observed 1.4.188 receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1."
     classify:
+      - when: {exitCode: 0, path: result.state, in: [ready]}
+        outcome: ok
+        effectState: committed
       - when: {exitCode: 0, path: result.worker.state, in: [ready]}
         outcome: ok
         effectState: committed
@@ -101,6 +104,9 @@ calls:
         outcome: unknown
         effectState: unknown
         reason: worker-start exited 0 without a ready worker
+      - when: {path: result.state, in: [outcome_unknown, unknown]}
+        outcome: unknown
+        effectState: unknown
       - when: {path: result.worker.state, in: [outcome_unknown, unknown]}
         outcome: unknown
         effectState: unknown

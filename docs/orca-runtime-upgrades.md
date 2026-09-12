@@ -119,6 +119,14 @@ While the Orca parent coordinates the Core/shared, Accounting, Chatbot, and Sale
 - Immediate containment: keep V4.1 Flash out of automatic Token Plan chains. For canonical SRS/SDS-bound implementation, prefer Qwen 3.8 Flash on the current Token Plan; use DeepSeek V4 Pro for hard fallback and independent review, with Qwen 3.8 Max excluded from automatic backend/review routing.
 - Upgrade candidate: add a first-class DeepSeek provider profile for `deepseek-flash`, run a bounded representative coding benchmark against Qwen 3.8 Flash, verify the returned model ID and billing source, then promote it only after an explicit routing decision.
 
+### A native Claude launch stalls at dispatch_input when the CLI has no login session
+
+- Expected: `worker-start --agent claude --model opus` creates a branded Claude Code agent that consumes its Task input.
+- Observed (2026-09-12, Orca 1.4.188, Claude Code 2.1.269): the start exited 1 with `state: failed`, `failedStage: dispatch_input`, `lastError: agent_prompt_stalled`, a residual visible terminal, `launch.effective` correct. `terminal read --screen` showed the Claude Code login selector ("Select login method"), so the prompt was typed into a login dialog. The stream read showed only "Welcome to Claude Code", which is not enough to diagnose a TUI.
+- Impact: identical signature to the Qwen prompt stall; without the rendered screen a Coordinator would fence, settle and fall through to the next provider while the real cause is an unauthenticated CLI on the host.
+- Resolution in StarCi: the typed runner classified the receipt as `failed`/`partial`, `settle` released the terminal (`processAction: closed_agent_terminal`), and the flat `worker-start` receipt shape (`result.state`, `result.dispatchId`, `result.residualResources`) is now the contract. Pre-accepting the folder trust dialog (`hasTrustDialogAccepted`) is necessary but not sufficient.
+- Upgrade candidate: before the first launch of a provider on a host, run a read-only readiness probe that reads the rendered screen (`terminal read --screen`) and recognizes login, trust and permission dialogs as `provider-unauthenticated`, reported to the user instead of consumed as a fallback reason.
+
 ## Resolved in runtime 4.0
 
 The following observations are now handled by the runtime itself; the regression test names are the proof to rerun.
