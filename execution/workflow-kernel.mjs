@@ -2089,11 +2089,15 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   // A state written before these bounds existed resumes with them.
   state.dynamicOps=state.ops.filter(item=>countsAgainstBudget(item)).length;
   state.dynamicOpsBudget=dynamicBudget(state);
+  // The budget counts only shared and repair ops; a kernel-origin op an older build refused under it is superseded,
+  // never reinstated by --allow-dynamic, and its needUser item goes with it.
+  state.dynamicOps=state.ops.filter(item=>countsAgainstBudget(item)).length;
+  for(const op of state.ops)if(!countsAgainstBudget(op)&&op.refusal==='dynamic-op'){op.refusal='superseded';state.needUser=state.needUser.filter(item=>item.op!==op.id||item.kind!=='dynamic-op');}
   state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
   state.silences=plain(state.silences)?state.silences:{};
   state.lanes=plain(state.lanes)?state.lanes:{};
   // A kind graph that cannot be read is not fatal - lanes simply do not apply - but it is never silent.
-  const graphProblems=(()=>{try{return graph.GRAPH.problem?[graph.GRAPH.problem]:graph.validateGraph();}catch(error){return [error.message];}})();
+  const graphProblems=(()=>{try{return graph.validateGraph().map(item=>typeof item==='string'?item:`${item.code??'graph'}: ${item.message??JSON.stringify(item)}`);}catch(error){return [error.message];}})();
   if(graphProblems.length)store.appendEvent({event:'kind-graph-problem',problems:graphProblems.slice(0,5)});
   // The worktree itself is a precondition: long paths, the hooks env for kernel commits, the autocrlf state.
   const checked=guards.preflight({worktree:state.worktree,git})??{};
