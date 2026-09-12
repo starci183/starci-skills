@@ -1,6 +1,6 @@
 # StarCi 4.0 plan: orchestration that cannot silently fail
 
-Status: proposal, not accepted. Written 2026-09-12 against runtime `3.0.0-alpha.3`
+Status: accepted 2026-09-12 and in progress on branch `v4/orchestration`. Written against runtime `3.0.0-alpha.3`
 (`.claude` branch `codex/host-bootstrap-routing`, head `c45997b8`, 738/738 tests green)
 and Orca app `1.4.188` (`agent-context` schema 1, 232 commands).
 

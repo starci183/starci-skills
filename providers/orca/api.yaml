@@ -283,8 +283,6 @@ starciOrchestrationAllowlist:
     - orchestration check
     - orchestration ask
     - orchestration reply
-    - terminal create
-    - terminal wait
     - terminal rename
   operationAgent:
     - orchestration send

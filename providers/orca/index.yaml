@@ -84,16 +84,28 @@ operationAgent:
     module: execution/orca-supervised-launch.mjs
     command: start-op
     authority: exclusive-effectful-construction-path
+    calls: calls.json
+    runner: execution/orca-calls.mjs
+    companions:
+      start-monitor: Plan Coordinator starts one Workflow Monitor from the supervisor chain.
+      replace-monitor: Plan Coordinator settles a dead Monitor and relaunches it with --retry-of.
+      settle: Any supervisor stops, releases and verifies one Dispatch; returns a typed settlement.
+      verify: Read-only live agent-context check of every declared call before the first effect.
     input: [nested-workflow-run, workflow-task, from, worktree, operation, scope, spec-file]
     guarantees:
-      - resolves-first-operator-chain-candidate
+      - verifies-declared-calls-against-live-agent-context-before-effects
       - attests-from-is-nested-run-coordinator-handle
-      - creates-canonical-operation-task
+      - creates-canonical-operation-task-once-per-invocation
+      - walks-the-whole-resolved-operator-chain-in-order
       - starts-fresh-native-agent-in-exact-workflow-worktree
       - omits-model-for-native-qwen-code
+      - proves-prompt-delivery-before-attestation
       - attests-effective-agent-model-and-worktree
       - canonicalizes-and-verifies-terminal-title
-      - fences-provider-or-worktree-mismatch
+      - fences-settles-and-proves-no-effects-before-next-candidate
+      - stops-with-typed-reconciliation-on-partial-or-unknown-effects
+      - returns-exhausted-chain-as-typed-result-never-thrown-string
+      - replays-unknown-mutations-once-with-retry-request
   admission:
     expectedOperation: active-dag-node
     providerSelection: profiles-registry-resolver-output

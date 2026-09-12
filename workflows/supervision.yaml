@@ -156,9 +156,18 @@ workerLifecycle:
         - session_not_reported
       action: fence-and-reconcile-exact-attempt
       nextCandidate: only-after-verified-no-effects
+      fallthroughOwner: canonical-launcher-within-one-start-op-invocation
+      classification: typed-call-result-outcome-and-effect-state
       unsupervisedFallback: forbidden
       release: release-or-retain-from-worker-receipt
       duplicateSubmit: forbidden
+    managerReplacement:
+      owner: plan-coordinator
+      command: replace-monitor
+      precondition: worker-show-state-not-ready-or-running
+      settlement: worker-stop-then-worker-release-released-or-already_released
+      relaunch: worker-start-retry-of-with-supervisor-chain
+      liveManager: never-replaced
 wait:
   mode: blocking-event-wait
   subscribe:

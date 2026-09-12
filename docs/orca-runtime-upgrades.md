@@ -119,6 +119,15 @@ While the Orca parent coordinates the Core/shared, Accounting, Chatbot, and Sale
 - Immediate containment: keep V4.1 Flash out of automatic Token Plan chains. For canonical SRS/SDS-bound implementation, prefer Qwen 3.8 Flash on the current Token Plan; use DeepSeek V4 Pro for hard fallback and independent review, with Qwen 3.8 Max excluded from automatic backend/review routing.
 - Upgrade candidate: add a first-class DeepSeek provider profile for `deepseek-flash`, run a bounded representative coding benchmark against Qwen 3.8 Flash, verify the returned model ID and billing source, then promote it only after an explicit routing decision.
 
+## Resolved in runtime 4.0
+
+The following observations are now handled by the runtime itself; the regression test names are the proof to rerun.
+
+- **Native Qwen branding can succeed while supervised prompt delivery fails** and **Dispatch injection cannot adopt an agent that is already working**: `start-op` proves prompt delivery from the `worker-show` receipt, classifies a stall as `effectState: none`, settles the attempt and falls through to the next managed candidate inside the same invocation (`tests/orca-supervised-launch.spec.mjs`: "a Qwen prompt stall is classified as no-effect and the launcher falls through to Claude in the same invocation"; `tests/orca-calls.spec.mjs`: "worker-start receipts classify into ok, failed-none, failed-partial and unknown"). The Orca-side prompt-injection defect remains an Orca upgrade candidate.
+- **Terminal stop and reset need observable settlement**: `settle` reports `none` only when `worker-release` returns `released` or `already_released`; `stop_unknown` and `release_unknown` stay `unknown` and block fallback (`tests/orca-supervised-launch.spec.mjs`: "settlement reports unknown when stop cannot be confirmed").
+- **Workflow Monitors ending in `process_exited` with retained `identity_unproven` terminals** (observed on `run_4f84cba16322`): `replace-monitor` proves the Monitor is not live, settles it and relaunches with `--retry-of` from the supervisor chain (`tests/orca-supervised-launch.spec.mjs`: "a dead Workflow Monitor is settled and replaced"). Monitor and Coordinator providers now come from `profiles/registry.yaml` `supervisors`, not from a hardcoded Codex launch.
+- **Untyped Orca failures**: every call is declared in `providers/orca/calls.yaml`, verified against the live `agent-context` (`verify`), replayed once with `--retry-request` on an unknown mutation result, and returned as `starci/orca-call-result@1` (`tests/orca-calls.spec.mjs`).
+
 ## Recording rules
 
 - Record only reproduced runtime behavior; do not infer a defect from a slow or still-running operation.

@@ -8,6 +8,14 @@ exceptions:
       License metadata for the bundled yaml runtime in core/yaml.mjs;
       scripts/compile-declarative.mjs keeps it source-side and excludes it from
       YAML→.dist projection.
+  - path: docs/examples/v4-live-proof/settle-chatbot-monitor.json
+    reason: Verbatim Orca 1.4.188 settlement receipt captured as runtime 4.0 live proof.
+  - path: docs/examples/v4-live-proof/settle-core-monitor.json
+    reason: Verbatim Orca 1.4.188 settlement receipt captured as runtime 4.0 live proof.
+  - path: docs/examples/v4-live-proof/settle-sales-monitor.json
+    reason: Verbatim Orca 1.4.188 settlement receipt captured as runtime 4.0 live proof.
+  - path: docs/examples/v4-live-proof/verify.json
+    reason: Verbatim Orca 1.4.188 receipt captured as runtime 4.0 live proof; JSON is the receipt format.
   - path: knowledge/ui/proof/calibration/calibration.json
     reason: >
       Explicit calibration dataset exception enforced by

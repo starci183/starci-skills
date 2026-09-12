@@ -77,13 +77,15 @@ test('worker-start receipts classify into ok, failed-none, failed-partial and un
 });
 
 test('release and stop verdicts classify without ever throwing, and missing receipt paths are not accepted as ok',()=>{
-  const release=state=>classifyReceipt(calls,'worker-release',{exitCode:state==='release_unknown'?1:0,receipt:{ok:state!=='release_unknown',result:{releaseState:state}}});
+  const release=state=>classifyReceipt(calls,'worker-release',{exitCode:state==='release_unknown'?1:0,receipt:{ok:state!=='release_unknown',result:{dispatchId:'ctx_1',state}}});
   assert.deepEqual(pick(release('released')),{outcome:'ok',effectState:'committed'});
   assert.deepEqual(pick(release('already_released')),{outcome:'ok',effectState:'committed'});
   assert.deepEqual(pick(release('retained')),{outcome:'failed',effectState:'partial'});
   assert.deepEqual(pick(release('release_pending')),{outcome:'failed',effectState:'partial'});
   assert.deepEqual(pick(release('release_unknown')),{outcome:'unknown',effectState:'unknown'});
-  assert.deepEqual(pick(classifyReceipt(calls,'worker-stop',{exitCode:1,receipt:{ok:false,result:{verdict:'stop_unknown'}}})),{outcome:'unknown',effectState:'unknown'});
+  assert.deepEqual(pick(classifyReceipt(calls,'worker-release',{exitCode:0,receipt:fixture('worker-release-retained-identity-unproven.json')})),{outcome:'failed',effectState:'partial'});
+  assert.deepEqual(pick(classifyReceipt(calls,'worker-stop',{exitCode:0,receipt:fixture('worker-stop-already-settled.json')})),{outcome:'ok',effectState:'committed'});
+  assert.deepEqual(pick(classifyReceipt(calls,'worker-stop',{exitCode:1,receipt:{ok:false,result:{dispatchId:'ctx_1',state:'stop_unknown'}}})),{outcome:'unknown',effectState:'unknown'});
   assert.deepEqual(pick(classifyReceipt(calls,'task-create',{exitCode:0,receipt:{ok:true,result:{task:{id:'task_1'}}}})),{outcome:'unknown',effectState:'unknown'});
   assert.deepEqual(pick(classifyReceipt(calls,'task-create',{exitCode:1,receipt:{ok:false,error:{code:'invalid_argument',message:'bad spec'}}})),{outcome:'failed',effectState:'none'});
   assert.deepEqual(pick(classifyReceipt(calls,'run-show',{exitCode:0,receipt:{ok:true,result:{run:{id:'run_1',coordinator_handle:'term_1'}}}})),{outcome:'ok',effectState:'none'});

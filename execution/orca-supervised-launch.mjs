@@ -135,12 +135,21 @@ export function buildMonitorLaunch({run,parentTask,from,worktree,workflow,spec})
 export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt'}={}){
   const stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd});
   const release=stop.outcome==='unknown'?null:orca.invoke('worker-release',{dispatch:dispatchId},{cwd});
-  const releaseState=getPath(release?.receipt,'result.releaseState')??null;
-  let effectState='unknown';
+  const stopState=getPath(stop.receipt,'result.state')??null;
+  const releaseState=getPath(release?.receipt,'result.state')??null;
+  const releaseReason=getPath(release?.receipt,'result.reason')??null;
+  const processAction=getPath(release?.receipt,'result.processAction')??null;
+  let effectState='unknown',residualTerminal=null;
   if(stop.outcome!=='unknown'&&release?.outcome==='ok')effectState='none';
+  else if(releaseState==='retained'&&processAction==='none'&&['failed','stopped','abandoned'].includes(stopState)){
+    // Orca will not close a terminal whose identity it cannot prove, but the worker process is gone:
+    // no live effect remains, only a UI terminal the operator may close by hand.
+    effectState='none';residualTerminal={state:releaseState,reason:releaseReason,processAction};
+  }
   else if(release?.outcome==='failed'&&release.effectState==='partial')effectState='partial';
-  return {schema:SETTLEMENT,dispatchId,reason,effectState,stop:{outcome:stop.outcome,effectState:stop.effectState,reason:stop.reason},
-    release:release?{outcome:release.outcome,effectState:release.effectState,releaseState,reason:release.reason}:{outcome:'skipped',reason:'worker-stop outcome unknown'}};
+  return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal,
+    stop:{outcome:stop.outcome,effectState:stop.effectState,state:stopState,alreadySettled:getPath(stop.receipt,'result.alreadySettled')??null,reason:stop.reason},
+    release:release?{outcome:release.outcome,effectState:release.effectState,state:releaseState,processAction,reason:releaseReason??release.reason}:{outcome:'skipped',reason:'worker-stop outcome unknown'}};
 }
 
 function attemptRecord(candidate,extra){return {target:candidate.selection.target??candidate.selection.orcaLaunch.agent,agent:candidate.selection.orcaLaunch.agent,model:candidate.selection.model??null,...extra};}

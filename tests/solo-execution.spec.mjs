@@ -168,6 +168,25 @@ test('a failed operation blocks only its dependent branch while an unrelated op 
   assert.equal(receipt.operations.find(row => row.id === 'unrelated').state, 'completed');
 });
 
+test('a failed solo operation records the same effectState vocabulary as an Orca attempt', async () => {
+  const stalled = adapters({run: ({operation}) => operation.id === 'inspect'
+    ? {status: 'failed', reason: 'agent stalled before any write', effectState: 'none'}
+    : {status: 'completed'}});
+  const clean = await runSoloWorkflow({host: 'claude', workflow: workflow(), adapters: stalled.value});
+  const inspect = clean.operations.find(row => row.id === 'inspect');
+  assert.equal(inspect.state, 'failed');
+  assert.equal(inspect.effectState, 'none');
+  assert.equal(inspect.retryable, true);
+  const opaque = adapters({run: ({operation}) => operation.id === 'inspect' ? {status: 'failed', reason: 'crashed mid-write'} : {status: 'completed'}});
+  const dirty = await runSoloWorkflow({host: 'claude', workflow: workflow(), adapters: opaque.value});
+  assert.equal(dirty.operations.find(row => row.id === 'inspect').effectState, 'unknown');
+  assert.equal(dirty.operations.find(row => row.id === 'inspect').retryable, false);
+  const noAgent = adapters({openAgent: () => {throw new Error('provider unavailable');}});
+  const unopened = await runSoloWorkflow({host: 'claude', workflow: workflow(), adapters: noAgent.value});
+  assert.equal(unopened.operations.find(row => row.id === 'inspect').effectState, 'none');
+  assert.equal(unopened.operations.find(row => row.id === 'inspect').retryable, true);
+});
+
 test('invalid graphs, changed receipts, unsafe agent reuse and session drift fail closed', async () => {
   const injected = adapters();
   await assert.rejects(() => runSoloWorkflow({

@@ -67,7 +67,7 @@ calls:
     command: orchestration task-create
     kind: mutation
     flags: [spec, task-title, display-name, deps, parent, run, from]
-    required: [spec, run, from]
+    required: [spec, run]
     receipt: [result.task.id, result.task.display_name]
     creates: task
   task-update:
@@ -86,7 +86,8 @@ calls:
     kind: mutation
     timeoutMs: 150000
     flags: [task, worktree, agent, model, effort, name, repo, base-branch, display-name, setup, retry-of, timeout-ms, run, from]
-    required: [task, worktree, agent, run, from]
+    required: [task, worktree, agent, run]
+    note: --from is resolved by Orca from the calling terminal when omitted; the canonical launcher always passes the exact Monitor or Coordinator handle.
     forbidden: [terminal, on]
     forbiddenValues:
       on: [windows, macos, linux]
@@ -145,17 +146,15 @@ calls:
     timeoutMs: 60000
     flags: [dispatch]
     required: [dispatch]
-    receipt: [result]
+    receipt: [result.dispatchId, result.state]
+    note: Observed 1.4.188 receipt has result.state (worker state after the stop), result.alreadySettled, result.processAction and result.mutation.requestId.
     classify:
-      - when: {exitCode: 0, path: result.verdict, in: [stopped, already_stopped, fenced]}
-        outcome: ok
-        effectState: committed
-      - when: {exitCode: 0}
-        outcome: ok
-        effectState: committed
-      - when: {path: result.verdict, in: [stop_unknown, unverifiable]}
+      - when: {path: result.state, in: [stop_unknown, unverifiable, outcome_unknown]}
         outcome: unknown
         effectState: unknown
+      - when: {exitCode: 0, path: result.state, exists: true}
+        outcome: ok
+        effectState: committed
   worker-abandon:
     command: orchestration worker-abandon
     kind: mutation
@@ -168,18 +167,16 @@ calls:
     timeoutMs: 60000
     flags: [dispatch]
     required: [dispatch]
-    receipt: [result]
+    receipt: [result.dispatchId, result.state]
+    note: Observed 1.4.188 receipt has result.state (released, already_released, retained, release_pending, release_unknown), result.reason and result.processAction.
     classify:
-      - when: {exitCode: 0, path: result.releaseState, in: [released, already_released]}
+      - when: {exitCode: 0, path: result.state, in: [released, already_released]}
         outcome: ok
         effectState: committed
-      - when: {exitCode: 0, path: result.releaseState, in: [retained, release_pending]}
+      - when: {path: result.state, in: [retained, release_pending]}
         outcome: failed
         effectState: partial
-      - when: {exitCode: 0}
-        outcome: ok
-        effectState: committed
-      - when: {path: result.releaseState, in: [release_unknown]}
+      - when: {path: result.state, in: [release_unknown]}
         outcome: unknown
         effectState: unknown
   check:

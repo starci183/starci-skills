@@ -29,8 +29,8 @@ Create that output directory first, outside the runtime and product trees. `prep
 Test the **archive**, not only the source checkout:
 
 ```sh
-npx --yes --package=/absolute/release-output/starci-3.0.0-alpha.3.tgz starci --help
-npx --yes --package=/absolute/release-output/starci-3.0.0-alpha.3.tgz starci init --dir /absolute/isolated-host
+npx --yes --package=/absolute/release-output/starci-4.0.0-alpha.1.tgz starci --help
+npx --yes --package=/absolute/release-output/starci-4.0.0-alpha.1.tgz starci init --dir /absolute/isolated-host
 node /absolute/isolated-host/.claude/bin/starci.mjs doctor --dir /absolute/isolated-host --quick
 ```
 
@@ -38,6 +38,6 @@ Also verify new workspace initialization/validation, an update preserving custom
 
 ## Publication is a separate approval
 
-The intended package is `starci`, prerelease `3.0.0-alpha.3`. A registry lookup returning not-found is not proof of namespace ownership. Before any publish, the maintainer must confirm authenticated npm account rights, name/version availability, archive contents, license ownership and intended prerelease dist-tag. Require explicit publication authority, then publish the exact reviewed archive. Do not expose tokens in logs or source. Update README release status only after registry verification succeeds.
+The intended package is `starci`, prerelease `4.0.0-alpha.1`. A registry lookup returning not-found is not proof of namespace ownership. Before any publish, the maintainer must confirm authenticated npm account rights, name/version availability, archive contents, license ownership and intended prerelease dist-tag. Require explicit publication authority, then publish the exact reviewed archive. Do not expose tokens in logs or source. Update README release status only after registry verification succeeds.
 
 Never publish unrelated dirty changes, silently retag a stable release as an alpha, or assume the previous `@starci/skills` package redirects users. Announce the naming transition and migration limits in the release notes.

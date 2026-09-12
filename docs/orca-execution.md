@@ -137,10 +137,27 @@ The display contract is mandatory at creation time:
 - persistent child manager: `[Monitor] <Workflow>`;
 - isolated operation agent: `[Op] <operation> - <scope>`.
 
-The executable call contract is `providers/orca/index.yaml`. A Workflow Monitor starts an operation only
-through `execution/orca-supervised-launch.mjs start-op`; it never assembles `task-create`, `worker-start`,
-provider fallback or terminal naming commands itself. The launcher records and enforces the exact `orca`
-API/CLI calls for creating, attaching, naming and attesting the operation agent. A visible
+The executable call contract is `providers/orca/calls.yaml` (compiled to `calls.json`); `index.yaml`
+documents the same calls per role. `execution/orca-calls.mjs` builds every argv from that contract,
+verifies each declared command and flag against the live `orca agent-context` before the first effect,
+replays an unknown mutation once with `--retry-request`, and returns every exit code as a
+`starci/orca-call-result@1` envelope with `outcome` (`ok`, `failed`, `unknown`) and `effectState`
+(`committed`, `none`, `partial`, `unknown`). An Orca failure is a classified result; only a contract
+violation throws.
+
+A Workflow Monitor starts an operation only through `execution/orca-supervised-launch.mjs start-op`;
+it never assembles `task-create`, `worker-start`, provider fallback or terminal naming commands itself.
+Inside one invocation the launcher attests the nested Run, creates the canonical Task once, then walks
+the resolved chain: for each candidate it starts one fresh native worker, proves prompt delivery
+(`worker.state` ready and `dispatch_input` accepted), attests the effective agent/model/worktree,
+canonicalizes the title, and accepts. A failed candidate is classified; when a Dispatch exists it is
+settled (`worker-stop`, `worker-release` must report `released` or `already_released`). Only a proven
+`effectState: none` admits the next candidate; `partial` or `unknown` stops with a typed reconciliation
+request, and an exhausted chain returns `ok:false, exhausted:true, attempts[]`. Companion commands are
+`start-monitor` (supervisor chain, no hardcoded provider), `replace-monitor` (settle a dead Monitor,
+relaunch with `--retry-of`; a live Monitor is never replaced), `settle --dispatch` and `verify`.
+`execution/orca-adapter.mjs` is the concrete adapter for `execution/orca.mjs` on the same runner,
+including `waitBoundary` (keepalive-filtered `check --wait` with `--ack`). A visible
 `Bash: ...` subtitle is only the native agent's current tool activity; identity comes from the native
 immutable Task display name and supervised worker/provider receipt. The terminal title is mutable UI
 metadata: native activity may change it while the agent works. The Workflow Monitor restores the

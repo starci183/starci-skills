@@ -59,6 +59,29 @@ recipes:
       - assert-canonical-terminal-title
       - orchestration.worker-show-and-verify-canonical-title
     terminalName: "[Op] <operation> - <scope>"
+  operation-candidate-fallthrough:
+    mode: orchestrated
+    actor: canonical-launcher
+    sequence:
+      - classify-worker-start-or-attestation-failure
+      - orchestration.worker-stop-when-a-dispatch-exists
+      - orchestration.worker-release-and-require-released-or-already_released
+      - record-attempt-with-effect-state
+      - start-next-candidate-only-when-effect-state-is-none
+      - return-typed-exhausted-or-reconciliation-result
+    forbiddenAfter: [partial-effects, unknown-effects]
+  replace-workflow-monitor:
+    mode: orchestrated
+    actor: plan-coordinator
+    sequence:
+      - orchestration.worker-show-and-require-not-ready-or-running
+      - orchestration.worker-stop
+      - orchestration.worker-release-and-require-released-or-already_released
+      - orchestration.worker-start-retry-of-with-supervisor-chain
+      - orchestration.worker-show-and-attest-provider-identity
+      - terminal.rename
+      - orchestration.worker-show-and-verify-canonical-title
+    terminalName: "[Monitor] <Workflow>"
   coordinator-instruction:
     actor: plan-coordinator
     recipient: workflow-coordinator

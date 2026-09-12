@@ -124,8 +124,8 @@ test('provider mismatch fences and settles the exact dispatch, then the next can
     'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
     'worker-start':(args,nth)=>json(0,started(nth===1?'ctx_wrong':'ctx_claude','task_operation_sales')),
     'worker-show':(args)=>has(args,'--dispatch','ctx_wrong')?json(0,shown({dispatch:'ctx_wrong',agent:'codex',model:'gpt-5.6-sol',title:'Working'})):json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:fake.spawned.some(a=>a[0]==='terminal')?opName:'Working'})),
-    'worker-stop':()=>json(0,{ok:true,result:{verdict:'stopped'}}),
-    'worker-release':()=>json(0,{ok:true,result:{releaseState:'released'}}),
+    'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'released'}}),
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
   const result=startOperation(input,{orca:fake.orca});
@@ -134,7 +134,7 @@ test('provider mismatch fences and settles the exact dispatch, then the next can
   assert.equal(result.attempts.length,1);
   assert.match(result.attempts[0].reason,/expected agent qwen-code/);
   assert.equal(result.attempts[0].effectState,'none');
-  assert.equal(result.attempts[0].settlement.release.releaseState,'released');
+  assert.equal(result.attempts[0].settlement.release.state,'released');
   assert.ok(fake.spawned.some(args=>args[1]==='worker-stop'&&has(args,'--dispatch','ctx_wrong')));
   assert.ok(fake.spawned.some(args=>args[1]==='worker-release'&&has(args,'--dispatch','ctx_wrong')));
 
@@ -143,8 +143,8 @@ test('provider mismatch fences and settles the exact dispatch, then the next can
     'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
     'worker-start':()=>json(0,started('ctx_wrong','task_operation_sales')),
     'worker-show':()=>json(0,shown({dispatch:'ctx_wrong',agent:'codex',model:'gpt-5.6-sol',title:'Working'})),
-    'worker-stop':()=>json(0,{ok:true,result:{verdict:'stopped'}}),
-    'worker-release':()=>json(0,{ok:true,result:{releaseState:'retained',retainedReason:'identity_unproven'}})
+    'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'release_pending',processAction:'closing'}})
   });
   const stopped=startOperation(input,{orca:retained.orca});
   assert.equal(stopped.ok,false);
@@ -203,8 +203,8 @@ test('Workflow Monitor launch tries Claude Opus first and falls through to Codex
 test('a dead Workflow Monitor is settled and replaced with --retry-of; a live one is never replaced',()=>{
   const fake=fakeOrca({
     'worker-show':(args,nth)=>has(args,'--dispatch','ctx_dead')?json(0,{ok:true,result:{dispatch:{id:'ctx_dead',task_id:'task_monitor_sales'},worker:{state:'failed',stage:'process_exited'}}}):json(0,shown({dispatch:'ctx_new',task:'task_monitor_sales',agent:'claude',model:null,title:nth>=3?'[Monitor] Sales':'Working'})),
-    'worker-stop':()=>json(0,{ok:true,result:{verdict:'stopped'}}),
-    'worker-release':()=>json(0,{ok:true,result:{releaseState:'already_released'}}),
+    'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'already_released'}}),
     'worker-start':()=>json(0,started('ctx_new','task_monitor_sales')),
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
@@ -220,14 +220,31 @@ test('a dead Workflow Monitor is settled and replaced with --retry-of; a live on
   assert.throws(()=>replaceMonitor({...monitorInput,task:'task_monitor_sales',dispatch:'ctx_live'},{orca:live.orca}),/a live Monitor is never replaced/);
 });
 
+test('a dead worker whose terminal Orca keeps as identity_unproven settles to none with the residual terminal recorded',()=>{
+  const fake=fakeOrca({
+    'worker-stop':()=>json(0,JSON.parse(fs.readFileSync(new URL('./fixtures/orca/live-1.4.188/worker-stop-already-settled.json',import.meta.url),'utf8'))),
+    'worker-release':()=>json(0,JSON.parse(fs.readFileSync(new URL('./fixtures/orca/live-1.4.188/worker-release-retained-identity-unproven.json',import.meta.url),'utf8')))
+  });
+  const settlement=settleDispatch(fake.orca,'ctx_aabf230fb48b',{cwd:'.'});
+  assert.equal(settlement.effectState,'none');
+  assert.equal(settlement.stop.alreadySettled,true);
+  assert.deepEqual(settlement.residualTerminal,{state:'retained',reason:'identity_unproven',processAction:'none'});
+  assert.equal(settlement.release.outcome,'failed');
+  const live=fakeOrca({
+    'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_1',state:'ready'}}),
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_1',state:'retained',reason:'active_worker',processAction:'none'}})
+  });
+  assert.equal(settleDispatch(live.orca,'ctx_1',{cwd:'.'}).effectState,'partial');
+});
+
 test('settlement reports unknown when stop cannot be confirmed and never calls release afterwards',()=>{
-  const fake=fakeOrca({'worker-stop':()=>json(1,{ok:false,result:{verdict:'stop_unknown'}})});
+  const fake=fakeOrca({'worker-stop':()=>json(1,{ok:false,result:{dispatchId:'ctx_x',state:'stop_unknown'}})});
   const settlement=settleDispatch(fake.orca,'ctx_1',{cwd:'.'});
   assert.equal(settlement.schema,'starci/orca-supervised-settlement@1');
   assert.equal(settlement.effectState,'unknown');
   assert.equal(settlement.release.outcome,'skipped');
   assert.equal(fake.spawned.filter(args=>args[1]==='worker-release').length,0);
-  const cli=main(['settle','--dispatch','ctx_2'],{orca:fakeOrca({'worker-stop':()=>json(0,{ok:true,result:{verdict:'stopped'}}),'worker-release':()=>json(0,{ok:true,result:{releaseState:'released'}})}).orca});
+  const cli=main(['settle','--dispatch','ctx_2'],{orca:fakeOrca({'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'released'}})}).orca});
   assert.equal(cli.effectState,'none');
 });
 

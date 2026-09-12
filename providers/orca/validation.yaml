@@ -12,8 +12,18 @@ liveDiscovery:
 preflight:
   - orca status --json
   - orca agent-context --json
+  - node .dist/execution/orca-supervised-launch.mjs verify
   - orca skills get orca-cli --json
   - orca skills get orchestration --json
+callContract:
+  file: calls.json
+  runner: execution/orca-calls.mjs
+  envelope: starci/orca-call-result@1
+  rules:
+    - Every argv StarCi issues is built from calls.json; prose templates in index.json are documentation of the same calls, never a second construction path.
+    - An Orca exit code 1 is a classified result with outcome and effectState; only a contract violation throws.
+    - A mutation whose result is unknown is replayed once with --retry-request; a still-unknown result blocks fallback until a read-only reconciliation proves state.
+    - Fallback to the next candidate requires effectState none, proven by settlement (worker-stop, worker-release released or already_released) when the failed attempt created a Dispatch.
 receipts:
   required:
     - run-id
@@ -50,6 +60,8 @@ receipts:
       - record-ui-defect-if-terminal-is-no-longer-writable
 dispatchAssertions:
   - Workflow Monitors invoke execution/orca-supervised-launch.mjs start-op; they never compose task-create, worker-start, provider fallback or terminal naming calls themselves.
+  - The launcher walks the resolved chain inside one invocation; a Monitor never re-invokes start-op for the same operation attempt to obtain a fallback.
+  - A dead Workflow Monitor is replaced only through replace-monitor, which proves the old Dispatch is settled before starting the linked --retry-of attempt.
   - A workflow child is explicitly bound with worktree set --parent-worktree to the exact main Coordinator worktree and worktree show attests that parentWorktreeId before any operation Task is created.
   - A null, stale or wrong workflow-child parentWorktreeId stops dispatch; orchestration Task membership alone never substitutes for Orca worktree lineage.
   - Operation equals the expected active DAG node before Task creation.

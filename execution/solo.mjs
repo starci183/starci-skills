@@ -272,6 +272,8 @@ async function executeOperation({host, workflow, operation, state, receipt, adap
   } catch (error) {
     state.state = 'failed';
     state.failure = failure(error);
+    state.effectState = 'none';
+    state.retryable = true;
     state.gate.state = 'skipped';
     return;
   }
@@ -303,6 +305,8 @@ async function executeOperation({host, workflow, operation, state, receipt, adap
   if (result.status === 'failed') {
     state.state = 'failed';
     state.failure = isText(result.reason) ? result.reason : 'Operation failed';
+    state.effectState = ['none', 'partial', 'unknown'].includes(result.effectState) ? result.effectState : 'unknown';
+    state.retryable = state.effectState === 'none';
     state.gate.state = 'skipped';
     const closeFailure = await closeAgent(adapters, {host, session: clone(receipt.session), agent: clone(agent), operationId: operation.id, outcome: 'failed'});
     if (closeFailure) state.failure = `${state.failure}; close failed: ${closeFailure}`;

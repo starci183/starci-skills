@@ -1,0 +1,17 @@
+{
+  "id": "3a1895c9-d8a8-44e7-a11d-ba0309b7dd0c",
+  "ok": true,
+  "result": {
+    "dispatchId": "ctx_aabf230fb48b",
+    "state": "failed",
+    "alreadySettled": true,
+    "processAction": "none",
+    "mutation": {
+      "requestId": "457e56ec-e48e-4d2e-b753-b509ba252e55",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "a014f786-0897-4403-befc-ca6d9896a272"
+  }
+}
