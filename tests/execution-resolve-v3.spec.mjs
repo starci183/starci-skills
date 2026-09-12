@@ -17,19 +17,19 @@ const request = (operation = 'interface.implement') => ({
 test('resolver preserves each exact operator chain and its environment metadata', () => {
   const candidates = flattenOperationCandidates({operation: 'interface.implement', registry});
   assert.deepEqual(candidates.map(value => value.target), [
-    'qwen-qwen3.8-flash-worker', 'claude-opus', 'codex-gpt-5.6-sol'
+    'qwen3.8-flash', 'claude-opus', 'gpt-5.6-sol'
   ]);
   assert.deepEqual(candidates.map(value => [value.environmentPriority, value.profilePriority]), [[0, 0], [1, 0], [2, 0]]);
   const backend = flattenOperationCandidates({operation: 'backend.implement', registry});
   assert.deepEqual(backend.map(value => value.target), [
-    'qwen-qwen3.8-flash-worker', 'claude-opus', 'codex-gpt-5.6-sol'
+    'qwen3.8-flash', 'claude-opus', 'gpt-5.6-sol'
   ]);
   const review = flattenOperationCandidates({operation: 'review.verify', registry});
   assert.deepEqual(review.map(value => value.target), [
-    'qwen-qwen3.8-flash-reviewer', 'claude-fable-5.1', 'codex-gpt-5.6-sol-reviewer'
+    'qwen3.8-flash', 'claude-fable-5.1', 'gpt-5.6-sol'
   ]);
   const reasoning = flattenOperationCandidates({operation: 'architecture.decide', registry});
-  assert.deepEqual(reasoning.map(value => value.target), ['claude-fable-5.1', 'codex-gpt-6-astra']);
+  assert.deepEqual(reasoning.map(value => value.target), ['claude-fable-5.1', 'gpt-6-astra']);
 });
 
 test('automatic Orca chains accept return-preamble command terminals and reject any other terminal form', () => {
@@ -37,7 +37,9 @@ test('automatic Orca chains accept return-preamble command terminals and reject 
   assert.equal(candidates[0].orcaLaunch.kind, 'command-terminal');
   assert.equal(candidates[0].orcaLaunch.dispatch, 'return-preamble-and-send');
   const invalid = structuredClone(registry);
-  invalid.targets['qwen-qwen3.8-flash-reviewer'].orcaLaunch = {kind: 'command-terminal', command: 'qwen', dispatch: 'inject'};
+  invalid.targets['qwen3.8-flash'].orcaLaunch = {kind: 'command-terminal', command: 'qwen', dispatch: 'inject'};
+  const noRole = structuredClone(registry); delete noRole.targets['qwen3.8-flash'].profiles.reasoning;
+  assert.throws(() => flattenOperationCandidates({operation:'review.verify',registry:noRole}), /no reasoning profile/);
   assert.throws(() => flattenOperationCandidates({operation:'review.verify',registry:invalid}), /managed agent or a return-preamble command terminal/);
 });
 
@@ -53,10 +55,10 @@ test('resolver selects deterministically and preserves unavailable observations'
       ]}
     ]
   });
-  assert.equal(result.selected.target, 'codex-gpt-5.6-sol');
+  assert.equal(result.selected.target, 'gpt-5.6-sol');
   assert.equal(result.selected.requestedModel, 'gpt-5.6-sol');
   assert.equal(result.selected.observedModel, 'gpt-5.6-sol');
-  assert.equal(result.observations.find(value => value.target === 'codex-gpt-5.6-sol').reason, null);
+  assert.equal(result.observations.find(value => value.target === 'gpt-5.6-sol').reason, null);
   assert.equal(result.observations[0].status, 'unavailable');
   assert.equal(result.observations[0].observation.environment, 'qwen');
   assert.equal(result.observations[1].target, 'claude-opus');
@@ -71,11 +73,11 @@ test('unknown observations are unavailable and unsafe fallback never advances th
   assert.equal(unknown.selected, null);
   assert.throws(() => resolveOperationExecution({
     workflowRequest: request(), operationId: 'work', registry, inventory: ['qwen', 'codex'],
-    attempts: [{target: 'qwen-qwen3.8-flash-worker', reason: 'rate-limited', effectState: 'unknown'}]
+    attempts: [{target: 'qwen3.8-flash', reason: 'rate-limited', effectState: 'unknown'}]
   }), /effectState must be none/);
   assert.throws(() => resolveOperationExecution({
     workflowRequest: request(), operationId: 'work', registry, inventory: ['qwen', 'codex'],
-    attempts: [{target: 'qwen-qwen3.8-flash-worker', reason: 'permission-denied', effectState: 'none'}]
+    attempts: [{target: 'qwen3.8-flash', reason: 'permission-denied', effectState: 'none'}]
   }), /requires reconciliation/);
 });
 

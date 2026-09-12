@@ -15,7 +15,7 @@ which is why `worker-stop` and `worker-release` receipts were captured into
 (`released`, `already_released`, `retained`, `release_pending`, `release_unknown`).
 
 A dry run of `start-op --dry-run` for `backend.implement` in the Core child resolved the chain
-`qwen-qwen3.8-flash-worker` (no `--model`) → `claude-opus` (no `--model`) → `codex-gpt-5.6-sol`
+`qwen3.8-flash` (no `--model`) → `claude-opus` (no `--model`) → `gpt-5.6-sol`
 (`--model gpt-5.6-sol`), each with `--timeout-ms 120000`.
 
 Not proven here: an actual `start-op` fall-through on the live run. That requires the exact

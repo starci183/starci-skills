@@ -84,19 +84,19 @@ Decided per op family (user decision 2026-09-12; per-op placement is the maintai
 
 | Family | Ops | Chain |
 | --- | --- | --- |
-| Deep reasoning | `business.decide`, `architecture.decide` | `claude-fable-5.1` → `codex-gpt-6-astra` |
-| Independent review | `review.verify` | `qwen-qwen3.8-flash-reviewer` → `claude-fable-5.1` → `codex-gpt-5.6-sol-reviewer` |
-| Execution | `backend.implement`, `interface.implement`, `uat.verify`, `content.generate`, `release.deliver`, `runtime.operate`, `scope.retire`, `task.execute`, `workspace.manage` | `qwen-qwen3.8-flash-worker` → `claude-opus` → `codex-gpt-5.6-sol` |
-| Runtime maintenance | `knowledge.repair` | `claude-opus` → `codex-gpt-5.6-sol` → `qwen-qwen3.8-flash-worker` |
-| Draw | `interface.draw` | `codex-gpt-5.6-sol` → `claude-opus` → `qwen-qwen3.8-flash-worker` |
-| Workflow Monitor (new) | — | `claude-opus` → `codex-gpt-5.6-sol` |
-| Plan Coordinator (new) | — | `claude-opus` → `codex-gpt-5.6-sol` |
+| Deep reasoning | `business.decide`, `architecture.decide` | `claude-fable-5.1` → `gpt-6-astra` |
+| Independent review | `review.verify` | `qwen3.8-flash` → `claude-fable-5.1` → `gpt-5.6-sol` |
+| Execution | `backend.implement`, `interface.implement`, `uat.verify`, `content.generate`, `release.deliver`, `runtime.operate`, `scope.retire`, `task.execute`, `workspace.manage` | `qwen3.8-flash` → `claude-opus` → `gpt-5.6-sol` |
+| Runtime maintenance | `knowledge.repair` | `claude-opus` → `gpt-5.6-sol` → `qwen3.8-flash` |
+| Draw | `interface.draw` | `gpt-5.6-sol` → `claude-opus` → `qwen3.8-flash` |
+| Workflow Monitor (new) | — | `claude-opus` → `gpt-5.6-sol` |
+| Plan Coordinator (new) | — | `claude-opus` → `gpt-5.6-sol` |
 
 Constraint to state honestly: Orca `worker-start --model` accepts Claude/Codex/Cursor ids only, and
 `qwen-code` inherits the model from the Qwen runtime configuration. Qwen candidates therefore never
 carry a model override; Qwen 3.8 Max and DeepSeek stay outside automatic chains as command-terminal
 exception targets. Target names drop the `-reviewer` suffix where the profile has no working twin
-(`codex-gpt-6-astra`); `codex-gpt-5.6-sol-reviewer` and `qwen-qwen3.8-flash-reviewer` keep it because
+(`gpt-6-astra`); `gpt-5.6-sol` and `qwen3.8-flash` keep it because
 the same model also exists as a working target.
 
 ## 4. Phases
@@ -126,8 +126,8 @@ Total ≈ 22–24 h of work, sequential (phases 2→3→4 depend on each other; 
 
 ## 6. Decisions (user, 2026-09-12)
 
-1. **Qwen Max is dropped** from every automatic chain. Deep reasoning is `claude-fable-5.1` → `codex-gpt-6-astra`. `qwen-qwen3.8-max-*` targets stay installed as explicit user-approved exceptions only.
-2. **Monitor and Coordinator** use `claude-opus` → `codex-gpt-5.6-sol`. Rationale: the supervisor only decides, dispatches and waits, so model quality matters less than session stability; the Codex monitors are the ones observed dying, and 4.0 adds `replace-monitor` regardless of provider.
+1. **Qwen Max is dropped** from every automatic chain. Deep reasoning is `claude-fable-5.1` → `gpt-6-astra`. `qwen-qwen3.8-max-*` targets stay installed as explicit user-approved exceptions only.
+2. **Monitor and Coordinator** use `claude-opus` → `gpt-5.6-sol`. Rationale: the supervisor only decides, dispatches and waits, so model quality matters less than session stability; the Codex monitors are the ones observed dying, and 4.0 adds `replace-monitor` regardless of provider.
 3. **Branch**: `main` is fast-forwarded to `codex/host-bootstrap-routing`; 4.0 work happens on `v4/orchestration` branched from that head and is merged back to `main` when the exit criteria pass.
 4. **Solo parity stays in 4.0** (phase 6): solo is the simpler special case (one workflow, current worktree) of the same control loop and must consume the same result envelope.
 5. **Live proof and completion**: phase 8 runs on the real `run_4f84cba16322` (`nivo-backend` AgentOS R14). After 4.0 passes its gates the orchestration must run stably until the R14 backend implementation and its E2E evidence are complete, and the `.claude` repository is pushed to its remote. Push is therefore an explicitly named allowed action for this delivery; product-side publish/deploy remain outside it.

@@ -158,6 +158,10 @@ calls:
       - when: {path: result.state, in: [stop_unknown, unverifiable, outcome_unknown]}
         outcome: unknown
         effectState: unknown
+      - when: {path: error.code, in: [dispatch_inactive]}
+        outcome: unknown
+        effectState: unknown
+        reason: Orca refuses to stop a Dispatch that is already stop_unknown; reconcile, then abandon after the own terminal is closed
       - when: {exitCode: 0, path: result.state, exists: true}
         outcome: ok
         effectState: committed
@@ -167,6 +171,7 @@ calls:
     flags: [dispatch]
     required: [dispatch]
     receipt: [result]
+    note: Fences a stop_unknown Dispatch without any process action. The launcher uses it only after the attempt's own terminal is proven closed, so no live effect can remain.
   worker-release:
     command: orchestration worker-release
     kind: mutation

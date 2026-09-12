@@ -140,7 +140,7 @@ test('managed operation launch carries the exact resolved model and effort',()=>
 
 test('worker provider attestation rejects Sol when the resolved operation target is Qwen',()=>{
   const operation='backend.implement',scope='Accounting',displayName='[Op] backend.implement - Accounting';
-  const selection={target:'qwen-qwen3.8-flash-worker',model:'qwen3.8-flash',orcaLaunch:{kind:'managed-agent',agent:'qwen-code'}};
+  const selection={target:'qwen3.8-flash',model:'qwen3.8-flash',orcaLaunch:{kind:'managed-agent',agent:'qwen-code'}};
   const taskRecord={id:'task-1',display_name:displayName};
   const receipt=(agent='qwen-code',model='qwen3.8-flash')=>({result:{
     dispatch:{id:'ctx-1',task_id:'task-1'},
@@ -149,7 +149,7 @@ test('worker provider attestation rejects Sol when the resolved operation target
   }});
   assert.deepEqual(attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord,workerShow:receipt()}),{
     schema:'starci/orca-operation-provider-attestation@1',ok:true,taskId:'task-1',dispatchId:'ctx-1',terminalHandle:'term-1',
-    displayName,target:'qwen-qwen3.8-flash-worker',agent:'qwen-code',model:'qwen3.8-flash',
+    displayName,target:'qwen3.8-flash',agent:'qwen-code',model:'qwen3.8-flash',
     terminalTitle:{observed:displayName,canonical:true,mutableUiMetadata:true,action:'none'}
   });
   assert.throws(()=>attestOperationWorker({taskId:'task-1',operation,scope,selection,taskRecord,workerShow:receipt('codex','gpt-5.6-sol')}),/Provider mismatch/);

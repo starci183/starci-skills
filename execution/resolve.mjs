@@ -40,6 +40,7 @@ export function flattenOperationCandidates({operation, registry}) {
   const operationName = typeof operation === 'string' ? operation : operation?.operation;
   if (!text(operationName)) throw Error('Operation name is required');
   const route = registry.operators[operationName];
+  const role = (registry.reasoningOps ?? []).includes(operationName) ? 'reasoning' : 'working';
   if (!plain(route) || !Array.isArray(route.environments) || !route.environments.length) throw Error(`Unknown operation route: ${operationName}`);
   if (!Array.isArray(route.chain) || !route.chain.length) throw Error(`Operation route needs an exact target chain: ${operationName}`);
   const seenEnvironments = new Set(), seenTargets = new Set(), declaredTargets = new Map();
@@ -56,8 +57,9 @@ export function flattenOperationCandidates({operation, registry}) {
       if (!(configured.orcaLaunch?.kind === 'managed-agent' || (configured.orcaLaunch?.kind === 'command-terminal' && configured.orcaLaunch?.dispatch === 'return-preamble-and-send' && text(configured.orcaLaunch?.command)))) throw Error(`Automatic operation target must be a managed agent or a return-preamble command terminal: ${target}`);
       const targetEnvironment = canonicalEnvironment(registry, configured.runtime);
       if (targetEnvironment !== environment) throw Error(`Execution target ${target} does not belong to environment ${environment}`);
-      if (!text(configured.profile) || !(configured.requestedModel === null || text(configured.requestedModel))) throw Error(`Execution target ${target} has invalid profile or requestedModel`);
-      declaredTargets.set(target, {environmentPriority, profilePriority, environment, configured});
+      const profile = configured.profiles?.[role];
+      if (!text(profile) || !(configured.requestedModel === null || text(configured.requestedModel))) throw Error(`Execution target ${target} has no ${role} profile or an invalid requestedModel`);
+      declaredTargets.set(target, {environmentPriority, profilePriority, environment, configured: {...configured, profile}});
     }
   }
   if (route.chain.length !== declaredTargets.size || new Set(route.chain).size !== route.chain.length) throw Error(`Operation route chain must contain every declared target exactly once: ${operationName}`);
@@ -104,10 +106,12 @@ function profileObservation(environmentObservation, candidate) {
   return typeof match === 'string' ? {profile: candidate.profile, status: 'ready', observedModel: environmentObservation.observedModel ?? null} : match;
 }
 
+let registryAliases = new Map();
 function attemptsByTarget(attempts, candidates, fallback) {
   if (!Array.isArray(attempts)) throw Error('Execution attempts must be an array');
   const known = new Set(candidates.map(candidate => candidate.target)), result = new Map();
-  for (const attempt of attempts) {
+  for (const raw of attempts) {
+    const attempt = plain(raw) && text(raw.target) ? {...raw, target: registryAliases.get(raw.target) ?? raw.target} : raw;
     if (!plain(attempt) || !text(attempt.target) || result.has(attempt.target) || !known.has(attempt.target)) throw Error('Execution attempt must identify one unique candidate target');
     if (attempt.effectState !== fallback.requiredEffectState) throw Error(`Unsafe fallback for ${attempt.target}: effectState must be none`);
     if (!fallback.allowedReasons.includes(attempt.reason)) throw Error(`Fallback reason requires reconciliation for ${attempt.target}: ${attempt.reason}`);
@@ -130,15 +134,16 @@ export function resolveOperation({workflowRequest, operationId, registry, invent
     if (!candidates.length) {
       const role = (registry.reasoningOps ?? []).includes(operation.operation) ? 'reasoning' : 'working';
       const profile = registry.defaults?.[soloHost]?.[role];
-      const match = Object.entries(registry.targets).find(([, target]) => canonicalEnvironment(registry, target.runtime) === soloHost && target.profile === profile);
+      const match = Object.entries(registry.targets).find(([, target]) => canonicalEnvironment(registry, target.runtime) === soloHost && target.profiles?.[role] === profile);
       if (match) {
         const [target, configured] = match;
-        candidates = [{priority:0,environmentPriority:0,profilePriority:0,target,environment:soloHost,runtime:soloHost,profile:configured.profile,requestedModel:configured.requestedModel,orcaLaunch:clone(configured.orcaLaunch)}];
+        candidates = [{priority:0,environmentPriority:0,profilePriority:0,target,environment:soloHost,runtime:soloHost,profile,requestedModel:configured.requestedModel,orcaLaunch:clone(configured.orcaLaunch)}];
       }
     }
   }
   if (!candidates.length) throw Error(`No execution candidates for operation ${operationId} in requested mode`);
   const observed = inventoryByEnvironment(inventory, registry);
+  registryAliases = new Map(Object.entries(registry.targetAliases ?? {}));
   const attempted = attemptsByTarget(attempts, candidates, registry.fallback);
   const observations = candidates.map(candidate => {
     const environmentObservation = observed.get(candidate.environment);

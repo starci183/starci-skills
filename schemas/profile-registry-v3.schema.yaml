@@ -75,6 +75,9 @@ properties:
     minProperties: 1
     additionalProperties: {$ref: "#/$defs/target"}
   skills: {type: object}
+  targetAliases:
+    type: object
+    additionalProperties: {type: string, minLength: 1}
   operators:
     type: object
     additionalProperties:
@@ -125,10 +128,16 @@ $defs:
   target:
     type: object
     additionalProperties: false
-    required: [runtime, profile, requestedModel, orcaLaunch]
+    required: [runtime, profiles, requestedModel, orcaLaunch]
     properties:
       runtime: {type: string, minLength: 1}
-      profile: {type: string, minLength: 1}
+      profiles:
+        type: object
+        additionalProperties: false
+        minProperties: 1
+        properties:
+          working: {type: string, minLength: 1}
+          reasoning: {type: string, minLength: 1}
       requestedModel: {$ref: "#/$defs/model"}
       orcaLaunch:
         oneOf:

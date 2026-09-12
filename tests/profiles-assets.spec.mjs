@@ -48,45 +48,50 @@ test('every operator has an ordered external-agent chain and skill-level default
     assert.equal(new Set(route.candidates.map(x=>x.target)).size,expectedCount);
     assert.ok(route.candidates.every(candidate=>candidate.orcaLaunch.kind==='managed-agent'||(candidate.orcaLaunch.kind==='command-terminal'&&candidate.orcaLaunch.dispatch==='return-preamble-and-send')),op);
   }
-  assert.deepEqual(resolveExecutionChain({op:'interface.draw'}).candidates.map(x=>x.target),['codex-gpt-5.6-sol','claude-opus','qwen-qwen3.8-flash-worker']);
+  assert.deepEqual(resolveExecutionChain({op:'interface.draw'}).candidates.map(x=>x.target),['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
   assert.equal(resolveExecutionChain({op:'interface.draw'}).candidates[0].model,'gpt-5.6-sol');
-  assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates.map(x=>x.target),['qwen-qwen3.8-flash-worker','claude-opus','codex-gpt-5.6-sol']);
+  assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates.map(x=>x.target),['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
   assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates[0].orcaLaunch,qwenLaunch);
-  assert.equal(registry.orchestration.defaultOperationTarget,'qwen-qwen3.8-flash-worker');
-  assert.deepEqual(resolveExecutionChain({op:'backend.implement'}).candidates.map(x=>x.target),['qwen-qwen3.8-flash-worker','claude-opus','codex-gpt-5.6-sol']);
+  assert.equal(registry.orchestration.defaultOperationTarget,'qwen3.8-flash');
+  assert.deepEqual(resolveExecutionChain({op:'backend.implement'}).candidates.map(x=>x.target),['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
   assert.deepEqual(resolveExecutionChain({op:'backend.implement'}).candidates[0].orcaLaunch,qwenLaunch);
   assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates[0].orcaLaunch,qwenLaunch);
-  assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates.map(x=>x.target),['qwen-qwen3.8-flash-reviewer','claude-fable-5.1','codex-gpt-5.6-sol-reviewer']);
-  assert.deepEqual(resolveExecutionChain({op:'knowledge.repair'}).candidates.map(x=>x.target),['claude-opus','codex-gpt-5.6-sol','qwen-qwen3.8-flash-worker']);
-  assert.deepEqual(registry.skills.starci.chains.working,['qwen-qwen3.8-flash-worker','claude-opus','codex-gpt-5.6-sol']);
-  assert.deepEqual(registry.skills.starci.chains.reasoning,['claude-fable-5.1','codex-gpt-6-astra']);
+  assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[0].profile,'qwen3.8-flash-reviewer');
+  assert.equal(resolveExecutionChain({op:'backend.implement'}).candidates[0].profile,'qwen3.8-flash-worker');
+  assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[2].profile,'gpt-5.6-sol-reviewer');
+  assert.equal(registry.targetAliases['qwen-qwen3.8-flash-worker'],'qwen3.8-flash');
+  assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates.map(x=>x.target),['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol']);
+  assert.deepEqual(resolveExecutionChain({op:'knowledge.repair'}).candidates.map(x=>x.target),['claude-opus','gpt-5.6-sol','qwen3.8-flash']);
+  assert.deepEqual(registry.skills.starci.chains.working,['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
+  assert.deepEqual(registry.skills.starci.chains.reasoning,['claude-fable-5.1','gpt-6-astra']);
   assert.equal(registry.supervisors.schema,'starci/supervisor-chains@1');
   for(const role of ['planCoordinator','workflowMonitor']){
-    assert.deepEqual(registry.supervisors[role].chain,['claude-opus','codex-gpt-5.6-sol']);
+    assert.deepEqual(registry.supervisors[role].chain,['claude-opus','gpt-5.6-sol']);
     for(const target of registry.supervisors[role].chain)assert.equal(registry.targets[target].orcaLaunch.kind,'managed-agent');
   }
 });
 test('Orca selects the first ready candidate and only falls through after verified no-effect failures',()=>{
   const backend=selectExecutionTarget({op:'backend.implement',inventory:['codex','claude','qwen']});
-  assert.equal(backend.selected.target,'qwen-qwen3.8-flash-worker');
+  assert.equal(backend.selected.target,'qwen3.8-flash');
   assert.deepEqual(backend.selected.orcaLaunch,qwenLaunch);
   let selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen']});
-  assert.equal(selected.selected.target,'qwen-qwen3.8-flash-worker');
+  assert.equal(selected.selected.target,'qwen3.8-flash');
   assert.deepEqual(selected.selected.orcaLaunch,qwenLaunch);
   selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude']});
   assert.equal(selected.selected.target,'claude-opus');
   selected=selectExecutionTarget({op:'interface.implement',inventory:['codex']});
-  assert.equal(selected.selected.target,'codex-gpt-5.6-sol');
-  assert.deepEqual(selected.skipped.map(x=>x.target),['qwen-qwen3.8-flash-worker','claude-opus']);
-  selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen-qwen3.8-flash-worker',reason:'rate-limited',effectState:'none'}]});
+  assert.equal(selected.selected.target,'gpt-5.6-sol');
+  assert.deepEqual(selected.skipped.map(x=>x.target),['qwen3.8-flash','claude-opus']);
+  selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen3.8-flash',reason:'rate-limited',effectState:'none'}]});
   assert.equal(selected.selected.target,'claude-opus');
+  assert.equal(selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen-qwen3.8-flash-worker',reason:'rate-limited',effectState:'none'}]}).selected.target,'claude-opus');
   selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[
-    {target:'qwen-qwen3.8-flash-worker',reason:'rate-limited',effectState:'none'},
+    {target:'qwen3.8-flash',reason:'rate-limited',effectState:'none'},
     {target:'claude-opus',reason:'startup-failure',effectState:'none'}
   ]});
-  assert.equal(selected.selected.target,'codex-gpt-5.6-sol');
-  assert.throws(()=>selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen-qwen3.8-flash-worker',reason:'rate-limited',effectState:'unknown'}]}),/Unsafe fallback/);
-  assert.throws(()=>selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen-qwen3.8-flash-worker',reason:'permission-denied',effectState:'none'}]}),/reconciliation/);
+  assert.equal(selected.selected.target,'gpt-5.6-sol');
+  assert.throws(()=>selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen3.8-flash',reason:'rate-limited',effectState:'unknown'}]}),/Unsafe fallback/);
+  assert.throws(()=>selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen3.8-flash',reason:'permission-denied',effectState:'none'}]}),/reconciliation/);
 });
 test('Qwen Flash executes then Opus then Sol, Sol draws, Fable then Astra reason, Max and DeepSeek stay out',()=>{
   const backend=resolveExecutionChain({op:'backend.implement'}).candidates;
@@ -94,12 +99,12 @@ test('Qwen Flash executes then Opus then Sol, Sol draws, Fable then Astra reason
   const uat=resolveExecutionChain({op:'uat.verify'}).candidates;
   const review=resolveExecutionChain({op:'review.verify'}).candidates;
   for(const chain of [backend,frontend,uat]){
-    assert.deepEqual(chain.map(candidate=>candidate.target),['qwen-qwen3.8-flash-worker','claude-opus','codex-gpt-5.6-sol']);
+    assert.deepEqual(chain.map(candidate=>candidate.target),['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
     assert.deepEqual(chain[0].orcaLaunch,qwenLaunch);
   }
-  assert.equal(review[0].target,'qwen-qwen3.8-flash-reviewer');
-  assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','codex-gpt-6-astra']);
-  assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','codex-gpt-6-astra']);
+  assert.equal(review[0].target,'qwen3.8-flash');
+  assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra']);
+  assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra']);
   const ops=Object.keys(readPublicJson('profiles/registry.json').operators);
   for(const op of ops){
     const chain=resolveExecutionChain({op}).candidates;

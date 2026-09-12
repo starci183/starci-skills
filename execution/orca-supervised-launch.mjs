@@ -90,9 +90,10 @@ export function resolveSupervisorChain(role,registry=readDistJson('profiles','re
     const route=registry.targets?.[target];
     need(plain(route)&&route.orcaLaunch?.kind==='managed-agent',`Supervisor target must be a managed agent: ${target}`);
     const runtime=registry.aliases?.[route.runtime]??route.runtime;
-    const profile=readDistJson('profiles',`${runtime}.json`).profiles?.[route.profile];
+    const profileId=route.profiles?.working??route.profiles?.reasoning;
+    const profile=readDistJson('profiles',`${runtime}.json`).profiles?.[profileId];
     need(plain(profile),`Unknown supervisor profile: ${target}`);
-    return {priority,target,runtime,profile:route.profile,model:profile.model??route.requestedModel??null,effort:profile.model||route.requestedModel?effort:null,orcaLaunch:structuredClone(route.orcaLaunch)};
+    return {priority,target,runtime,profile:profileId,model:profile.model??route.requestedModel??null,effort:profile.model||route.requestedModel?effort:null,orcaLaunch:structuredClone(route.orcaLaunch)};
   });
 }
 
@@ -101,7 +102,8 @@ export function parseSkip(value,chain,registry=readDistJson('profiles','registry
   if(value===undefined||value===null||value==='')return [];
   const allowed=registry.fallback.allowedReasons;
   return String(value).split(',').filter(Boolean).map(entry=>{
-    const [target,reason='unavailable']=entry.split(':');
+    const [named,reason='unavailable']=entry.split(':');
+    const target=registry.targetAliases?.[named]??named;
     need(chain.some(candidate=>candidate.target===target),`--skip names a target outside this operation chain: ${target}`);
     need(allowed.includes(reason),`--skip reason must be one of ${allowed.join(', ')}: ${reason}`);
     return {target,reason,effectState:'none',source:'monitor-verified-skip'};
@@ -196,6 +198,16 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
       }
     }
     if(reconciliation.settled)stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd});
+    if(stop.outcome==='unknown'&&closedTerminal?.outcome==='ok'){
+      // Orca cannot move a stop_unknown Dispatch, but the attempt's only process lived in the terminal we
+      // just closed: abandon records the fence honestly and no live effect remains.
+      const abandoned=orca.invoke('worker-abandon',{dispatch:dispatchId},{cwd});
+      if(abandoned.outcome==='ok'){
+        return {schema:SETTLEMENT,dispatchId,reason,effectState:'none',residualTerminal:null,reconciliation,closedTerminal,abandoned:true,
+          stop:{outcome:stop.outcome,effectState:stop.effectState,state:getPath(stop.receipt,'result.state')??null,alreadySettled:null,reason:stop.reason},
+          release:{outcome:'skipped',reason:'dispatch abandoned after its own terminal was closed'}};
+      }
+    }
   }
   const release=stop.outcome==='unknown'?null:orca.invoke('worker-release',{dispatch:dispatchId},{cwd});
   const stopState=getPath(stop.receipt,'result.state')??null;
@@ -408,7 +420,7 @@ function usage(){return `Usage:
     --skip records a Monitor-verified no-effect failure for a chain target (reason from registry fallback.allowedReasons) so the chain starts at the next candidate
   node orca-supervised-launch.mjs start-monitor --run <run> --parent-task <task> --from <coordinator-terminal> --worktree <relative-path> --workflow <name> --spec-file <relative-file> [--dry-run]
   node orca-supervised-launch.mjs replace-monitor --run <run> --parent-task <task> --task <monitor-task> --dispatch <dead-dispatch> --from <coordinator-terminal> --worktree <relative-path> --workflow <name> --spec-file <relative-file>
-  node orca-supervised-launch.mjs settle --dispatch <dispatch> [--worktree <relative-path>]
+  node orca-supervised-launch.mjs settle --dispatch <dispatch> [--worktree <relative-path>] [--terminal <own-agent-terminal>] [--close true]
   node orca-supervised-launch.mjs verify`;}
 
 export function main(argv=process.argv.slice(2),{orca}={}){
@@ -416,7 +428,7 @@ export function main(argv=process.argv.slice(2),{orca}={}){
   need(['start-op','start-monitor','replace-monitor','settle','verify'].includes(command),usage());
   const runner=orca??createOrcaCalls();
   if(command==='verify'){const result=runner.verify();return {schema:'starci/orca-live-contract-verification@1',...result,result:undefined};}
-  if(command==='settle')return settleDispatch(runner,required(options.dispatch,'dispatch'),{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),reason:'explicit-settle'});
+  if(command==='settle')return settleDispatch(runner,required(options.dispatch,'dispatch'),{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),reason:'explicit-settle',terminalHandle:options.terminal??null,closeTerminal:options.close==='true'});
   const common={run:options.run,from:options.from,worktree:options.worktree,spec:specText(options['spec-file'])};
   if(command==='start-op'){
     const input={...common,workflowTask:options['workflow-task'],operation:options.operation,scope:options.scope,skip:options.skip};
