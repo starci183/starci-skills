@@ -1145,7 +1145,19 @@ function scheduleOps(orca,store,state,ctx){
     // The allocator is asked for the op's own kind (the graph knows its role); the launchable chain is the
     // operator registry's, so a lane kind it does not carry is resolved to its operator id first.
     const allocated=ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,launchOperator(op.kind)),difficulty:op.difficulty??null});
-    if(!allocated?.ok){store.appendEvent({event:'allocation-deferred',op:op.id,reason:allocated?.reason??'no runtime',avoid});continue;}
+    if(!allocated?.ok){
+      // Every runtime that could carry the op is on its own avoid list: the list has served its purpose (one restart
+      // per runtime) and now only starves the op. It is cleared and the op gets one more round on any runtime;
+      // past the restart limit that round is the user's call instead.
+      const reason=String(allocated?.reason??'no runtime');
+      const starved=op.avoidRuntimes.length&&/\(avoided\)/.test(reason)&&!/\(no free slot\)|\(cooling|\(budget|\(rate/.test(reason);
+      if(starved){
+        if(op.restarts>RESTART_LIMIT){op.status='blocked';state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} failed on every runtime that can run it (${op.avoidRuntimes.join(', ')}) after ${op.restarts} restarts`});store.appendEvent({event:'avoid-exhausted',op:op.id,avoid:op.avoidRuntimes});continue;}
+        store.appendEvent({event:'avoid-reset',op:op.id,avoid:op.avoidRuntimes,restarts:op.restarts});
+        op.avoidRuntimes=[];
+      }
+      store.appendEvent({event:'allocation-deferred',op:op.id,reason,avoid});continue;
+    }
     let candidate=null;
     try{candidate=allocated.candidate??ctx.allocator.candidateFor(launchOperator(op.kind),allocated.target);}
     catch(error){
