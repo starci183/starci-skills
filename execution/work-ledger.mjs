@@ -174,7 +174,9 @@ function enrich(ledger,node){
   const missing=[];
   if(!allowlist.length)missing.push('implementation.changes[].files');
   if(!checks.length)missing.push('extensions.work3.checks');
-  return {...node,file:nodeFile(ledger.at??ledger.repoRoot,node),repository:nodeRepository(raw),layout:layoutOf(node),side:layoutSide(node),
+  const declaredResources=raw?.extensions?.work3?.resources;
+  const resources=Array.isArray(declaredResources)?declaredResources.filter(item=>typeof item==='string'&&item.trim()).map(item=>item.trim()):[];
+  return {...node,file:nodeFile(ledger.at??ledger.repoRoot,node),repository:nodeRepository(raw),layout:layoutOf(node),side:layoutSide(node),resources,
     allowlist,checks,assertions,schedulable:missing.length===0,reason:missing.length?`Node ${node.id} declares no ${missing.join(' and no ')}; the kernel cannot launch it`:null};
 }
 

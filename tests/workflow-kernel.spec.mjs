@@ -489,6 +489,7 @@ dependsOn:
 description: Implement order intake against the accepted SDS.
 assertions:
   - unit-tests-pass
+  - work-valid
 implementation:
   status: mixed
   changes:
@@ -503,6 +504,8 @@ extensions:
     checks:
       - assertion: unit-tests-pass
         command: npx vitest run intake
+      - assertion: work-valid
+        command: node starci.mjs validate .starciwork
 `;
 const UNCHECKED=`schema: work/node@2
 id: demo.sales.implementation.frontend.receipt
@@ -611,17 +614,17 @@ test('on the Work ledger the goal is derived from the authored nodes, and a node
     assert.equal(op.goal,'Implement order intake against the accepted SDS.');
     assert.deepEqual(op.allowlist,['apps/agentos-controlplane/src/sales/intake.ts']);
     assert.deepEqual(op.checks,[{name:'unit-tests-pass',command:'npx vitest run intake'}]);
-    assert.deepEqual(op.acceptance,['unit-tests-pass']);
+    assert.deepEqual(op.acceptance,['unit-tests-pass','work-valid']);
     assert.deepEqual(op.references,['features/sales/implementation/backend/intake/index.yaml']);
     assert.equal(op.origin,'ledger');
     // The contract of a ledger implementation op carries the implement.ledger working order, interpolated
     // from the node's own check command and assertion id, between the acceptance and the process prose.
     const contract=renderContract({template,op,state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
     assert.match(contract,/## Working order \(mandatory, in this order\)\nSequence `implement\.ledger`\./);
-    assert.match(contract,/1\. Read `features\/sales\/implementation\/backend\/intake\/index\.yaml` and the node assertions \(`unit-tests-pass`\)/);
+    assert.match(contract,/1\. Read `features\/sales\/implementation\/backend\/intake\/index\.yaml` and the node assertions \(`unit-tests-pass`, `work-valid`\)/);
     assert.match(contract,/2\. Write or extend the spec\(s\)[^\n]*they MUST fail now/);
     assert.match(contract,/4\. Run every listed check verbatim: unit-tests-pass: `npx vitest run intake`\./);
-    assert.match(contract,/## Definition of done for this kind\n- every assertion \(`unit-tests-pass`\)/);
+    assert.match(contract,/## Definition of done for this kind\n- every assertion \(`unit-tests-pass`, `work-valid`\)/);
     assert.ok(contract.indexOf('## Acceptance')<contract.indexOf('## Working order')&&contract.indexOf('## Working order')<contract.indexOf('## Cook until done'));
     assert.doesNotMatch(contract,/Implement, run every check, read the failures/,'the template no longer repeats the working order');
     // The model was asked for the definition of done only: it never saw an operation form to fill.
@@ -686,10 +689,13 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     assert.equal(node.completion.inputDigest,DIGEST('f'));
     // The last step of the lane writes the completion, so the evidence record is named after the review.
     assert.deepEqual(node.completion.evidence,['verify-1-evidence']);
+    // The kernel-owned assertion is stripped from every op and proven by the kernel itself when it records the node.
+    assert.deepEqual(node.extensions.work3.kernel.checks.filter(check=>check.assertion==='work-valid').map(check=>check.exitCode),[0],'the kernel proved work-valid by validating the tree');
+    assert.ok(!state.ops.some(op=>(op.checks??[]).some(check=>/work-valid/.test(check.name??''))),'no op ever carried the kernel-owned check');
     assert.equal(node.extensions.work3.kernel.verifiedBy,'starci-kernel');
-    assert.deepEqual(node.extensions.work3.kernel.checks.map(check=>[check.assertion,check.exitCode]),[['unit-tests-pass',0]]);
+    assert.deepEqual(node.extensions.work3.kernel.checks.map(check=>[check.assertion,check.exitCode]),[['unit-tests-pass',0],['work-valid',0]]);
     // The authored checks survive the write; the kernel owns only state, completion and its own block.
-    assert.deepEqual(node.extensions.work3.checks.map(check=>check.command),['npx vitest run intake']);
+    assert.deepEqual(node.extensions.work3.checks.map(check=>check.command),['npx vitest run intake','node starci.mjs validate .starciwork']);
     assert.equal(node.description,'Implement order intake against the accepted SDS.');
     const manifest=parseYaml(fs.readFileSync(path.join(path.dirname(harness.node('demo.sales.implementation.backend.intake')),
       'evidence','verify-1-evidence','manifest.yaml'),'utf8'));

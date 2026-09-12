@@ -502,6 +502,17 @@ export function syncLedgerOps(store,state,ctx){
     if(mine.some(op=>op.status!=='done'))continue;
     const next=laneNext(entry);
     // No next step means the lane is walked; `review.verify` is the kernel's own (planVerifyOps), not the node's.
+    const onDisk=(()=>{try{return ctx.work.api.readNode(ctx.work.at,node)?.state??node.state;}catch{return node.state;}})();
+    if(!next&&mine.length&&onDisk==='todo'&&!entry.recordedAttempt){
+      // The lane is walked but the tree still says todo: an earlier done write was refused (a rule since fixed).
+      // Record it once more from the lane's merged checks; a second refusal stays in needUser.
+      const last=[...mine].reverse().find(op=>op.status==='done')??mine.at(-1);
+      entry.recordedAttempt=state.iterations;
+      store.appendEvent({event:'lane-record-retry',node:node.id,op:last.id});
+      recordDone(store,state,last,ctx,{checks:entry.checks??[]},{nodeId:node.id,head:entry.head??last.head});
+      ctx.guards.gitQueue(()=>commitLedgerWrite(store,state,last,ctx,node.id));
+      continue;
+    }
     if(!next||KERNEL_PLANNED_KINDS.includes(next)||mine.some(op=>op.kind===next))continue;
     const id=laneOpId(node.id,next,!mine.length,taken);opOfNode.set(node.id,id);
     const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done});
@@ -1095,8 +1106,26 @@ const provenChecks=checks=>checks.map(check=>({name:check.name,command:check.com
  * this is the LAST step only: `nodeId`, `checks` and `head` are passed in, because the step that completes a
  * lane may be a kernel review that names several nodes and proves them with the checks every step ran.
  */
+/**
+ * The checks the kernel owns (`work-valid`: the whole-tree validator) are stripped from every op, so the kernel
+ * proves them itself when it records a node done: it validates the tree now and adds one passing check per
+ * kernel-owned assertion the node declares. A tree that does not validate proves nothing and the write is refused.
+ */
+function kernelProof(ctx,nodeId){
+  if(!ctx.work||typeof ctx.work.api.readNode!=='function')return [];
+  const node=ctx.work.node(nodeId);
+  if(!node)return [];
+  let owned=[];
+  try{owned=ctx.work.api.nodeChecks(ctx.work.api.readNode(ctx.work.at,node)).filter(check=>KERNEL_CHECK.test(check.assertion??''));}catch{owned=[];}
+  if(!owned.length)return [];
+  let ok=false;
+  try{ok=Boolean(ctx.work.validate({repoRoot:ctx.work.ledger?.repoRoot??ctx.work.repoRoot,workRoot:ctx.work.ledger?.workRoot??null}).ok);}catch{ok=false;}
+  return owned.map(check=>({name:check.assertion,command:workValidateCommand(ctx),exitCode:ok?0:1,assertion:check.assertion}));
+}
+
 function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op.head}={}){
   if(!ctx.work||!nodeId)return;
+  verified={...verified,checks:[...(verified?.checks??[]),...kernelProof(ctx,nodeId)]};
   const decision=['architecture.decide','architecture.revise','business.decide'].includes(op.kind)||kindRole(op.kind)==='decide';
   if(decision){
     ledgerWrite(store,state,op,ctx,'decided',node=>ctx.work.api.markDecided(ctx.work.at,node,{
@@ -1856,10 +1885,12 @@ function verifyComponents(state,ready){
  * frontend lane proves itself with its own `uat.verify` step instead, so no review is planned for it; an item
  * with no lane (a plan-ledger goal item) keeps the 4.x rule that every implemented item is reviewed.
  */
+// A review is the LAST prove step of a lane: it is planned only when every step before it is accepted, so a
+// backend node is reviewed after its e2e scenarios are green, never in parallel with them.
 const laneWantsReview=(state,id)=>{
   const entry=state?.lanes?.[id];
   if(!entry?.lane?.length)return true;
-  return entry.lane.includes('review.verify')&&!(entry.done??[]).includes('review.verify');
+  return entry.lane.includes('review.verify')&&laneNext(entry)==='review.verify';
 };
 
 /** A ledger group whose implementing operations are all done gets one independent review. */
