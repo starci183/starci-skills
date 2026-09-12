@@ -11,6 +11,9 @@ const done=text=>text.split(DONE_HEADING)[1].split('\n').filter(line=>line.start
 
 test('every sequence renders a numbered working order and a definition of done, and the key is named in the section',()=>{
   const samples={
+    'work.author':[op({kind:'work.author',origin:'ledger',nodeId:'demo.sales.implementation.backend.intake',
+      allowlist:['work/features/sales/implementation/backend/intake/index.yaml'],
+      acceptance:['the node declares an allowlist and checks that name its assertions','the tree validates']}),{kind:'implementation'}],
     'implement.ledger':[op(),{kind:'implementation'}],
     'implement.shared':[op({origin:'shared',requesters:['op-catalog']}),null],
     'implement.repair':[op({origin:'repair',findings:['intake.ts:12 breaks unit-tests-pass']}),null],
@@ -238,6 +241,40 @@ test('the module carries no product path or repository name',async()=>{
   const fs=await import('node:fs');
   const source=fs.readFileSync(new URL('../execution/contract-steps.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(source,/starci-academy|agentos|nivo|apps\/|\.starciwork/i);
+});
+
+test('work.author completes the record from real material, keeps the kernel fields, builds nothing, and asks instead of guessing a scope',()=>{
+  const record='work/features/sales/implementation/backend/intake/index.yaml';
+  const author=op({kind:'work.author',origin:'ledger',nodeId:'demo.sales.implementation.backend.intake',
+    allowlist:[record],references:['features/sales/implementation/backend/intake/index.yaml','features/sales/architecture/sds/intake/index.yaml'],
+    acceptance:['the node declares an allowlist and checks that name its assertions','the tree validates'],
+    checks:[{name:'work-valid',command:'node bin/starci.mjs validate .'}]});
+  const text=stepsFor(author,{node:{kind:'implementation',inputRef:'features/sales/implementation/backend/intake/index.yaml'}});
+  const authored=steps(text);
+  assert.equal(sequenceFor(author,{node:{kind:'implementation'}}),'work.author');
+  assert.match(text,/Sequence `work\.author`/);
+  assert.match(authored[0],/features\/sales\/architecture\/sds\/intake\/index\.yaml/);
+  assert.match(authored[0],/parent and sibling records/);
+  // The scope is read out of the code, never invented, and an undetermined scope is a question.
+  assert.match(authored[1],/Open the actual code/);
+  assert.match(authored[1],/a path you have not opened is not a path you may write/);
+  assert.match(authored[2],/testable assertions, one per observable outcome/);
+  assert.match(authored[3],/one check per assertion into the record the allowlist names \(`work\/features\/sales\/implementation\/backend\/intake\/index\.yaml`\)/);
+  assert.match(authored[3],/runnable verbatim/);
+  // What stays the kernel's inside the one record this op may write.
+  assert.match(authored[4],/never write `completion`/);
+  assert.match(authored[4],/never write the kernel's own extension block/);
+  assert.match(authored[4],/never write anything under the record's own evidence folder/);
+  assert.match(authored[4],/keep the description, the references, `required`, `state` and `dependsOn` byte for byte/);
+  assert.match(authored[5],/work-valid: `node bin\/starci\.mjs validate \.`/);
+  assert.match(authored[6],/`ask` with the exact question/);
+  assert.match(authored[6],/never an invented path or a command written in the hope that it exists/);
+  // It precedes the lane: nothing is built here and no red-spec rule applies.
+  assert.doesNotMatch(text,/MUST fail now/);
+  assert.match(text,/no product code changed: this operation precedes the node's lane/);
+  // A frontend node, a repair origin or a migration-looking allowlist never reroutes it.
+  assert.equal(sequenceFor(op({kind:'work.author',origin:'repair',findings:['a']}),{node:{kind:'ui'}}),'work.author');
+  assert.equal(sequenceFor(op({kind:'work.author',allowlist:['db/migrations/1.sql']}),{node:{kind:'uat'}}),'work.author');
 });
 
 test('e2e.verify proves a backend slice through the API on the real stack, never a screen, and a backend uat node resolves to it while a frontend one walks the surface',()=>{

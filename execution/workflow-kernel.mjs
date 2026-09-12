@@ -53,6 +53,14 @@ export const LAUNCH_OPERATOR={'frontend.implement':'interface.implement','archit
 export const launchOperator=kind=>{let fromGraph=null;try{fromGraph=graph.operatorOf(kind);}catch{fromGraph=null;}return (fromGraph&&fromGraph!==kind?fromGraph:null)??LAUNCH_OPERATOR[kind]??kind;};
 /** The graph's role for a kind; the runtimes profile keeps its own `roleOfKind` map as the fallback. */
 export const kindRole=kind=>{try{return graph.roleOf(kind);}catch{return null;}};
+/**
+ * The one kind that authors a Work record instead of working from one, and the only kind whose write scope is
+ * its own node's `index.yaml`. It runs before the node's lane, never inside it: no lane names it, no route
+ * creates it, and the kernel creates exactly one per node when the ledger reports that node incomplete.
+ */
+export const AUTHOR_KIND='work.author';
+/** What stays the kernel's inside a record an author op may otherwise write. Compared before and after, never reverted field by field. */
+export const RECORD_OWNED=['state','completion','extensions.work3.kernel'];
 const RESUME_LIMIT=5,RETRY_LIMIT=3,RESTART_LIMIT=3,VERIFY_ROUNDS=3,GATE_ROUNDS=3,LAUNCH_LIMIT=3,STALL_LIMIT=3;
 /** Run-time growth is bounded too: ops nobody approved, shared changes per iteration, inferred rate limits. */
 export const DYNAMIC_OPS_BUDGET=6;
@@ -245,8 +253,12 @@ export function laneOf(state,node){
   if(existing?.lane?.length)return existing;
   const lane=(()=>{try{return graph.laneFor({kind:node?.kind??null,layout:nodeLayout(node),repositoryRole:node?.repository??null});}catch{return [];}})();
   // A node that already has accepted ops (a state from before lanes existed) starts its lane where those ops left it.
-  const accepted=state.ops.filter(op=>op.nodeId===id&&op.status==='done').map(op=>op.kind);
-  return state.lanes[id]={lane:[...lane],done:unique([...(existing?.done??[]),...accepted]),checks:[...(existing?.checks??[])],head:existing?.head??state.ops.find(op=>op.nodeId===id&&op.status==='done'&&op.head)?.head??null};
+  // An accepted author op is not one of them: it completed the record the lane is templated from, it walked no step.
+  const accepted=state.ops.filter(op=>op.nodeId===id&&op.status==='done'&&op.kind!==AUTHOR_KIND).map(op=>op.kind);
+  return state.lanes[id]={lane:[...lane],done:unique([...(existing?.done??[]),...accepted]),checks:[...(existing?.checks??[])],
+    // `authored` is the bound on record authoring, not lane progress: it survives a re-template of the lane.
+    ...(existing?.authored?{authored:existing.authored}:{}),
+    head:existing?.head??state.ops.find(op=>op.nodeId===id&&op.status==='done'&&op.head&&op.kind!==AUTHOR_KIND)?.head??null};
 }
 /** Predicates an `optionalWhen` lane step reads. No step declares one yet; the seam is here, not in the graph. */
 const lanePredicates=()=>({});
@@ -493,20 +505,24 @@ export function syncLedgerOps(store,state,ctx){
   state.needUser=state.needUser.filter(item=>item.kind!=='ledger'||(item.node?incomplete.has(item.node):!doneNow.has(state.ops.find(op=>op.id===item.op)?.nodeId??'')));
   for(const node of candidates){
     if(!node.schedulable){
-      if(!state.needUser.some(item=>item.node===node.id))state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
+      const authored=authorRecordOp(store,state,ctx,node,taken);
+      if(authored)added.push(authored.id);
       continue;
     }
     const entry=laneOf(state,node);
     const mine=state.ops.filter(op=>op.nodeId===node.id);
+    // The op that completed this node's record is not a step of its lane: it precedes the lane, so the lane's
+    // first step is still the first step and still carries the node's own id.
+    const laneOps=mine.filter(op=>op.kind!==AUTHOR_KIND);
     // One step at a time: a node yields its next lane step only when nothing of it is still in flight.
     if(mine.some(op=>op.status!=='done'))continue;
     const next=laneNext(entry);
     // No next step means the lane is walked; `review.verify` is the kernel's own (planVerifyOps), not the node's.
     const onDisk=(()=>{try{return ctx.work.api.readNode(ctx.work.at,node)?.state??node.state;}catch{return node.state;}})();
-    if(!next&&mine.length&&onDisk==='todo'&&!entry.recordedAttempt){
+    if(!next&&laneOps.length&&onDisk==='todo'&&!entry.recordedAttempt){
       // The lane is walked but the tree still says todo: an earlier done write was refused (a rule since fixed).
       // Record it once more from the lane's merged checks; a second refusal stays in needUser.
-      const last=[...mine].reverse().find(op=>op.status==='done')??mine.at(-1);
+      const last=[...laneOps].reverse().find(op=>op.status==='done')??laneOps.at(-1);
       entry.recordedAttempt=state.iterations;
       store.appendEvent({event:'lane-record-retry',node:node.id,op:last.id});
       recordDone(store,state,last,ctx,{checks:entry.checks??[]},{nodeId:node.id,head:entry.head??last.head});
@@ -514,7 +530,7 @@ export function syncLedgerOps(store,state,ctx){
       continue;
     }
     if(!next||KERNEL_PLANNED_KINDS.includes(next)||mine.some(op=>op.kind===next))continue;
-    const id=laneOpId(node.id,next,!mine.length,taken);opOfNode.set(node.id,id);
+    const id=laneOpId(node.id,next,!laneOps.length,taken);opOfNode.set(node.id,id);
     const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done});
     op.difficulty=op.difficulty??'medium';
     op.createdIteration=state.iterations;
@@ -523,10 +539,62 @@ export function syncLedgerOps(store,state,ctx){
       state.ledger.push({id:node.id,title:describeNode(ctx.work.api,ctx.work.at,node),inputRef:node.path,kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[],lane:[...entry.lane]});
     added.push(op.id);
     store.appendEvent({event:'op-added',op:op.id,node:node.id,kind:op.kind,
-      reason:mine.length?`lane step ${entry.done.length+1} of ${entry.lane.length} (${laneText(entry.lane)})`:'newly schedulable Work node'});
+      reason:laneOps.length?`lane step ${entry.done.length+1} of ${entry.lane.length} (${laneText(entry.lane)})`:'newly schedulable Work node'});
     gateDynamicOp(store,state,op);
   }
   return added;
+}
+
+/** The one path an operation may be given inside the ledger: the node's own `index.yaml`, exactly as the guard names it. */
+function recordPath(state,ctx,node){
+  const root=ctx.work.ledger?.repoRoot??ctx.work.repoRoot??state.worktree;
+  const owned=(ctx.guards??kernelGuards).protectedPaths(node,root)??[];
+  return owned.find(entry=>/index\.ya?ml$/.test(entry))??null;
+}
+
+/**
+ * An incomplete record is an operation's job, not the user's. A candidate the ledger reports `schedulable:false`
+ * (it declares no write scope, or no check) gets exactly one `work.author` op whose allowlist is that node's own
+ * `index.yaml` and whose only check is the kernel's own whole-tree validator. The bound is the point: one author
+ * op per node per workflow, and a record that is still incomplete after that op was accepted is the question the
+ * user has to answer - `settleAuthoredRecord` raises it and no second author op is ever created.
+ *
+ * Two cases keep today's behaviour instead. A tree another repository owns is not in this worktree, so no
+ * operation here can be given a path inside it; and a node whose `index.yaml` the guard cannot name has no
+ * write scope to grant. Both stay a `needUser` item, because inventing one is exactly what the ledger prevents.
+ */
+function authorRecordOp(store,state,ctx,node,taken){
+  const lane=laneOf(state,node);
+  const record=ctx.work.shared?null:recordPath(state,ctx,node);
+  const stop=detail=>{
+    if(!state.needUser.some(item=>item.node===node.id&&item.kind==='ledger'))state.needUser.push({node:node.id,kind:'ledger',detail});
+    return null;
+  };
+  if(lane.authored){
+    const op=byId(state,lane.authored);
+    // Still in flight: the record is being completed and there is nothing to tell the user yet. Finished any
+    // other way - accepted, refused, blocked - the node is the user's, because its one author op is spent.
+    if(op&&liveStatus.includes(op.status))return null;
+    return stop(`ledger incomplete: ${node.reason}`);
+  }
+  if(!record)return stop(`ledger incomplete: ${node.reason}`);
+  const id=workOpId(`${node.id}-author`,taken);
+  const op=toOp({id,nodeId:node.id,kind:AUTHOR_KIND,
+    goal:`Complete the Work record of ${node.id} so the kernel can launch it: ${node.reason}`,
+    // No ledger item: the node enters the workflow's ledger when its own lane starts, not when its record is written.
+    ledgerIds:[],allowlist:[record],references:unique([node.path,...(node.refs??[])]),
+    checks:[{name:'work-valid',command:workValidateCommand(ctx)}],
+    acceptance:['the node declares an allowlist and checks that name its assertions','the tree validates'],
+    origin:'ledger'},state.ops.length);
+  op.difficulty='hard';
+  op.createdIteration=state.iterations;
+  lane.authored=op.id;
+  state.ops.push(op);
+  // The record is being completed now, so it is no longer a question for the user.
+  state.needUser=state.needUser.filter(item=>!(item.kind==='ledger'&&item.node===node.id));
+  store.appendEvent({event:'op-added',op:op.id,node:node.id,kind:op.kind,reason:`ledger incomplete: ${node.reason}`});
+  gateDynamicOp(store,state,op);
+  return op;
 }
 
 export function workOpId(nodeId,taken=new Set()){
@@ -664,7 +732,11 @@ function workGoalMarkdown(state,loaded){
   }
   const incomplete=state.needUser.filter(item=>item.kind==='ledger');
   if(incomplete.length){
-    lines.push(``,`## Needs you first`,``);
+    lines.push(``,`## Needs you first`,``,
+      `A node whose record declares no write scope or no check cannot be launched. The kernel creates one`,
+      `\`work.author\` operation per such node - whose only write scope is that node's own \`index.yaml\` - and`,
+      `comes back to you only if the record is still incomplete after that operation was accepted. Anything`,
+      `listed here without a node id is yours from the start.`,``);
     for(const item of incomplete)lines.push(`- ${item.node?`\`${item.node}\` `:''}${item.detail}`);
   }
   if(overlaps.length)lines.push(``,`## Serialized by a shared allowlist`,``,...overlaps.map(item=>`- ${item}`));
@@ -712,10 +784,14 @@ export function approve(store,state,{allocation=null,allowDynamic=null}={}){
   }
   // The user sets the runtime allocation at approval; without --allocation the proposal from goal.md is used and recorded.
   if(!state.quota){const proposal=state.quotaProposal??proposeQuota(state);state.quota=parseQuota(proposal.text);state.quotaSource='proposal';}else state.quotaSource=allocation?'user':state.quotaSource??'user';
-  need(state.ops.length,`Workflow ${state.id} has no plan to approve; run workflow-goal first`);
+  // On the Work ledger a plan may legitimately start with no operation: every candidate in scope declares an
+  // incomplete record, and the first ledger sync turns each of those into one `work.author` op. Anything else
+  // with no operation is an empty plan and stays unapprovable.
+  const toAuthor=state.ledgerMode===WORK_LEDGER?state.needUser.filter(item=>item.kind==='ledger'&&item.node).length:0;
+  need(state.ops.length||toAuthor,`Workflow ${state.id} has no plan to approve; run workflow-goal first`);
   state.approved=true;
   if(state.phase!=='finished')state.phase='run';
-  store.appendEvent({event:'approved',ops:state.ops.length,quota:state.quota,dynamicOpsBudget:dynamicBudget(state)});
+  store.appendEvent({event:'approved',ops:state.ops.length,toAuthor,quota:state.quota,dynamicOpsBudget:dynamicBudget(state)});
   store.saveState(state);
   return {ok:true,id:state.id,phase:state.phase,approved:true,ops:state.ops.length,ledger:state.ledger.length,
     quota:state.quota,dynamicOpsBudget:dynamicBudget(state)};
@@ -746,6 +822,8 @@ function jobRulings(store){
 export function laneLine(state,op){
   const entry=laneEntryOf(state,op);
   if(!entry?.lane?.length)return null;
+  // An author op is no step of the lane: it is what makes the lane launchable, so it is named as preceding it.
+  if(op?.kind===AUTHOR_KIND)return `Lane: this op precedes ${laneText(entry.lane)}, which the kernel launches itself once this record is complete`;
   const at=entry.lane.indexOf(op.kind);
   return `Lane: ${laneText(entry.lane)} (this op: step ${at<0?(entry.done??[]).length+1:at+1} of ${entry.lane.length})`;
 }
@@ -768,7 +846,9 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `Runtime StarCi 5.0. One worktree \`${slash(state.worktree)}\` on branch \`${state.branch}\`. Other operations are running beside you in this same worktree: never touch a path outside your allowlist, never commit, never switch branches. Your Task id, Dispatch id and terminal handle are in the dispatch preamble.`,``,
     ...(laneLine(state,op)?[laneLine(state,op),``]:[]),
     `## Goal`,op.goal,``,
-    ...(op.nodeId?[`## Work node you close`,`- \`${op.nodeId}\` - the kernel writes its \`state\`, \`completion\` and evidence itself after it has reproduced your checks. Never edit a Work \`index.yaml\` unless it is in your allowlist.`,``]:[]),
+    ...(op.nodeId?(op.kind===AUTHOR_KIND
+      ?[`## Work node you author`,`- \`${op.nodeId}\` - you complete this record so the kernel can launch the node's own work; you do not do that work. Its \`index.yaml\` is in your allowlist, and inside that file \`${RECORD_OWNED.join('`, `')}\` stay the kernel's: it reads them back, reverts the file if they moved and downgrades your report to \`failed\`. Never edit another node's \`index.yaml\`.`,``]
+      :[`## Work node you close`,`- \`${op.nodeId}\` - the kernel writes its \`state\`, \`completion\` and evidence itself after it has reproduced your checks. Never edit a Work \`index.yaml\` unless it is in your allowlist.`,``]):[]),
     ...(items.length?[`## Goal items you close`,...items,``]:[]),
     `## Allowlist`,...op.allowlist.map(entry=>`- \`${entry}\``),
     `Anything else is out of scope. Name the exact paths you need in \`open[]\`, or report \`blocked\` with \`shared-change\` and the exact repository paths in the detail - a \`shared-change\` that names no path is sent straight back to you.`,``,
@@ -876,6 +956,39 @@ function guardKernelPaths(store,state,op,ctx){
   return touched;
 }
 
+/** The kernel-owned blocks of one node's record, as one comparable string; `null` when the record cannot be read. */
+function recordBlocks(ctx,nodeId){
+  if(!ctx?.work||!nodeId||typeof ctx.work.api.readNode!=='function')return null;
+  const node=ctx.work.node(nodeId);
+  if(!node)return null;
+  try{
+    const raw=ctx.work.api.readNode(ctx.work.at,node);
+    return JSON.stringify({state:raw?.state??null,completion:raw?.completion??null,
+      kernel:raw?.extensions?.work3?.kernel??null});
+  }catch{return null;}
+}
+
+/**
+ * `work.author` is the one kind whose allowlist names its own node's `index.yaml`, so that file cannot be
+ * protected as a whole - the op exists to write it. What stays the kernel's is protected inside it instead:
+ * `state`, `completion` and `extensions.work3.kernel` are read back and compared with the snapshot taken at
+ * launch. A changed block is reverted with the rest of the file and the report is not accepted, exactly as a
+ * written kernel path is for any other op: a completion an agent writes itself is a claim, not a record.
+ */
+function guardRecordBlocks(store,state,op,ctx){
+  if(op.kind!==AUTHOR_KIND||typeof op.recordBlocks!=='string')return [];
+  const now=recordBlocks(ctx,op.nodeId);
+  if(now===null||now===op.recordBlocks)return [];
+  const paths=op.allowlist??[];
+  const cwd=ctx.work?.ledger?.repoRoot??ctx.work?.repoRoot??state.worktree;
+  const result=ctx.guards.gitQueue(()=>ctx.guards.revertProtected(ctx.git,{cwd,paths}))??{};
+  op.recordBlocks=recordBlocks(ctx,op.nodeId)??op.recordBlocks;
+  const reverted=unique([...(result.reverted??[]),...(result.removed??[])]).map(normalize);
+  const touched=reverted.length?reverted:paths;
+  store.appendEvent({event:'record-blocks-modified',op:op.id,node:op.nodeId,blocks:RECORD_OWNED,paths:touched,reverted});
+  return touched;
+}
+
 /* ------------------------------------------------------------------ launch */
 
 /**
@@ -934,6 +1047,9 @@ function launchOp(orca,store,state,op,allocated,ctx){
   ledgerWrite(store,state,op,ctx,'in-progress',node=>ctx.work.api.markInProgress(ctx.work.at,node,{opId:op.id,dispatch:op.dispatch}));
   // The baseline is taken after the kernel's own in-progress write, so only the operation's edits are caught.
   op.kernelOwnedAt=op.kernelOwned.length?protectedFingerprint(ctx.work?.ledger?.repoRoot??ctx.work?.repoRoot??state.worktree,op.kernelOwned):null;
+  // An author op holds the whole record, so the file cannot be fingerprinted as a unit: the blocks inside it
+  // that stay the kernel's are snapshotted instead, after the same in-progress write.
+  if(op.kind===AUTHOR_KIND)op.recordBlocks=recordBlocks(ctx,op.nodeId);
   return {ok:true};
 }
 
@@ -1204,6 +1320,41 @@ function advanceLanes(store,state,op,ctx,verified){
     completed.push(nodeId);
   }
   return {handled:true,completed};
+}
+
+/**
+ * An accepted `work.author` op is measured against the tree, never against its own report: the ledger is
+ * reloaded and the candidate enriched again, so the answer comes from `executableCandidates` exactly as the
+ * next iteration will read it. A node that is schedulable now is logged `record-authored` and its own lane
+ * creates its first step on the next iteration. A node that is still not schedulable is the one thing the
+ * kernel cannot do for the user: the incompleteness is raised once, and `authorRecordOp` never creates a
+ * second author op for it.
+ *
+ * The node keeps `state: todo` throughout, because authoring a record is not completing work: no `markDone`,
+ * no completion, no evidence manifest - only the kernel's own `in-progress` receipt from the launch.
+ */
+function settleAuthoredRecord(store,state,op,ctx){
+  const nodeId=op.nodeId;
+  let candidate=null;
+  try{
+    const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});
+    if(loaded.ok){
+      ctx.work.loaded=loaded;
+      candidate=ctx.work.api.executableCandidates(loaded,{scope:state.scope.length?state.scope:null,
+        repository:ctx.work.code.repository,side:ctx.work.side}).find(item=>item.id===nodeId)??null;
+    }
+  }catch(error){store.appendEvent({event:'ledger-sync-failed',op:op.id,reason:error.message});}
+  if(candidate?.schedulable){
+    state.needUser=state.needUser.filter(item=>!(item.kind==='ledger'&&item.node===nodeId));
+    store.appendEvent({event:'record-authored',node:nodeId,op:op.id,allowlist:candidate.allowlist,
+      checks:candidate.checks.map(check=>check.assertion??check.command),
+      lane:[...(state.lanes?.[nodeId]?.lane??[])]});
+    return 'record-authored';
+  }
+  const detail=`ledger incomplete: ${candidate?.reason??`${nodeId} is still not launchable after ${op.id} completed its record`}`;
+  if(!state.needUser.some(item=>item.kind==='ledger'&&item.node===nodeId))state.needUser.push({node:nodeId,kind:'ledger',detail});
+  store.appendEvent({event:'record-still-incomplete',node:nodeId,op:op.id,detail});
+  return 'record-still-incomplete';
 }
 
 /**
@@ -1685,8 +1836,27 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     op.reports.at(-1).downgradedTo='failed';
     return retryOp(store,state,op,[`operation modified kernel-owned ledger paths: ${touched.join(', ')}`],ctx,'kernel-paths-modified');
   }
+  // The record-authoring op holds its own node's index.yaml, so the blocks inside it the kernel owns are guarded
+  // by comparison rather than by path. A changed block is the same refusal as a written kernel path.
+  const blocks=guardRecordBlocks(store,state,op,ctx);
+  if(blocks.length){
+    op.reports.at(-1).downgradedTo='failed';
+    return retryOp(store,state,op,[`operation modified kernel-owned fields (${RECORD_OWNED.join(', ')}) of the Work record it authors: ${blocks.join(', ')}`],ctx,'record-blocks-modified');
+  }
   if(report.outcome==='done'){
     const verified=machineVerify(state,op,ctx);
+    // `work-valid` is the kernel's own check and is stripped from every operation's list, so an op that edits the
+    // tree is held to it here: the record it wrote must leave a tree that still validates, before anything is committed.
+    if(op.kind===AUTHOR_KIND){
+      const command=workValidateCommand(ctx);
+      const tree=(()=>{try{return {ok:Boolean(ctx.work.validate({repoRoot:ctx.work.ledger?.repoRoot??ctx.work.repoRoot,workRoot:ctx.work.ledger?.workRoot??null}).ok),reason:null};}
+        catch(error){return {ok:false,reason:error.message};}})();
+      verified.checks.push({name:'work-valid',command,exitCode:tree.ok?0:1,evidence:tree.reason??''});
+      if(!tree.ok){
+        verified.ok=false;
+        verified.failed=[...verified.failed,verified.checks.at(-1)];
+      }
+    }
     writeJson(store.checksPath(`${op.id}-kernel`),{schema:'starci/workflow-kernel-checks@1',op:op.id,attempt:op.attempt,
       runtime:op.runtime,checks:verified.checks,verifiedAt:Date.now()});
     if(!verified.ok){
@@ -1731,6 +1901,14 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     }
     if(commit.head)state.head=commit.head;
     op.status='done';op.files=files;op.head=commit.head??state.head;op.verifiedChecks=verified.checks;
+    // An author op closes no node: it completed a record, so what follows is the ledger's answer, not a completion.
+    if(op.kind===AUTHOR_KIND){
+      const settled=settleAuthoredRecord(store,state,op,ctx);
+      store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
+        checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
+      ctx.guards.gitQueue(()=>cleanStrayFiles(store,state,op,ctx));
+      return settled;
+    }
     if(op.kind==='review.verify'){
       const findings=reviewFindings(report);
       if(findings.length)return repairFromVerify(store,state,op,findings,ctx);

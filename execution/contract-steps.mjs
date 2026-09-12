@@ -14,12 +14,17 @@
  * record describes, and `uat.verify` walks the rendered surface. Each of those sequences says so in its
  * definition of done, so no operation of the lane can report the node finished on its own.
  *
+ * `work.author` is the one sequence that runs BEFORE a lane: a node whose record declares no write scope or no
+ * check cannot be launched, and its sequence is read the material, name files you actually opened, turn the
+ * node's claims into runnable checks, build nothing. Its own write scope is the record it completes, which is
+ * why its steps spell out what inside that record still belongs to the kernel.
+ *
  * The module is product-agnostic: no repository name, no product path, only what the operation carries.
  */
 
 export const STEPS_HEADING='## Working order (mandatory, in this order)';
 export const DONE_HEADING='## Definition of done for this kind';
-export const SEQUENCES=['implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','frontend.implement','review.verify','e2e.verify','uat','uat.verify','operations','migration','architecture.revise','decide','generic'];
+export const SEQUENCES=['work.author','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','frontend.implement','review.verify','e2e.verify','uat','uat.verify','operations','migration','architecture.revise','decide','generic'];
 
 const IMPLEMENT_KINDS=['backend.implement','interface.implement','frontend.implement'];
 const IMPLEMENT_NODES=['implementation','ui'];
@@ -47,6 +52,9 @@ const count=(n,one,many=`${one}s`)=>`${n} ${n===1?one:many}`;
 /** The sequence key of an operation: its kind and origin first, then the Work node kind and layout it closes, then its allowlist. */
 export function sequenceFor(op,{node=null}={}){
   const kind=text(op?.kind),origin=text(op?.origin),nodeKind=text(node?.kind),allowlist=list(op?.allowlist);
+  // Authoring a record comes before the node's lane and owns the record itself, so neither the node kind nor
+  // the origin may route it anywhere else.
+  if(kind==='work.author')return 'work.author';
   if(kind==='review.verify')return 'review.verify';
   if(kind==='interface.draw')return 'interface.draw';
   if(kind==='architecture.revise')return 'architecture.revise';
@@ -90,6 +98,27 @@ function values(op,node){
 }
 
 const SEQUENCE_STEPS={
+  // Before a node can travel its lane its record must say what may be written and what proves it. That is this
+  // operation's whole job: read the material, name real files, turn the node's claims into runnable checks, and
+  // build nothing. It is the one operation whose write scope is the record it completes.
+  'work.author':v=>({
+    steps:[
+      `Read the record this operation completes and everything it already names (${v.references}): its parent and sibling records and the accepted requirement and design sections it refers to; restate in three lines what this node must deliver and where its boundary against its siblings runs.`,
+      `Open the actual code an implementation of this node would change - follow the referenced design to the owning modules and read them - and list the exact files it would touch; a path you have not opened is not a path you may write, and a scope the material does not determine is a question, never a guess.`,
+      `State the node's claims as testable assertions, one per observable outcome the accepted records state; an assertion nobody can run is not an assertion, and a claim the accepted records do not support is dropped rather than softened.`,
+      `Write those files as the node's own write scope and one check per assertion into the record the allowlist names (${v.allowlist}); every check is a command this repository already exposes, runnable verbatim, that actually exercises the assertion it declares, and it names the exclusive runtime it needs.`,
+      `Leave every other authored line exactly as it is: keep the description, the references, \`required\`, \`state\` and \`dependsOn\` byte for byte, never write \`completion\`, never write the kernel's own extension block, never write anything under the record's own evidence folder, and never edit another node.`,
+      `Run the listed validator check verbatim: ${v.declared}; the record must still validate and must now declare both a write scope and checks.`,
+      `Report \`done\` exactly once, listing the assertions and the checks you added and the files each one covers. A node whose scope the material does not determine, or an assertion with no command in this repository that could prove it, is \`ask\` with the exact question - which behaviour, which file, which command - never an invented path or a command written in the hope that it exists.`
+    ],
+    done:[
+      `the record at ${v.allowlist} declares a write scope of files you opened and one runnable check per assertion`,
+      `every assertion is a claim a named check actually proves, and every check command exists in this repository`,
+      `\`completion\`, the kernel's own extension block and the record's evidence folder are untouched, and \`required\`, \`state\` and \`dependsOn\` are exactly as authored`,
+      `the validator check exits 0: ${v.declared}`,
+      `no product code changed: this operation precedes the node's lane, and the kernel launches that lane itself once the record is complete`
+    ]
+  }),
   'implement.ledger':v=>({
     steps:[
       `Read ${v.references} and the node assertions (${v.acceptance}); restate in three lines what must be true when you are done.`,

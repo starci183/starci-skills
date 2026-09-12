@@ -65,6 +65,10 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates.map(x=>x.target),['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol','claude-opus','gpt-6-astra']);
   assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[3].profile,'opus-reviewer');
   assert.deepEqual(resolveExecutionChain({op:'knowledge.repair'}).candidates.map(x=>x.target),['claude-opus','gpt-5.6-sol','qwen3.8-flash']);
+  // Completing a Work record is reading work, so it runs on the plan-role runtimes with the reasoning profiles.
+  assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.target),['claude-opus','claude-fable-5.1','gpt-5.6-sol']);
+  assert.equal(resolveExecutionChain({op:'work.author'}).role,'reasoning');
+  assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.profile),['opus-reviewer','fable-5.1','gpt-5.6-sol-reviewer']);
   assert.deepEqual(registry.skills.starci.chains.working,['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
   assert.deepEqual(registry.skills.starci.chains.reasoning,['claude-fable-5.1','gpt-6-astra']);
   assert.equal(registry.supervisors.schema,'starci/supervisor-chains@1');

@@ -14,10 +14,12 @@ import {readWorkflow} from './helpers/read-public.mjs';
 const matrices=readWorkflow('jobs.json');
 const contract=id=>catalogue.ops.find(o=>o.id===id).contract;
 
-test('fourteen complete jobs replace the old catalogue; twenty-two extras have explicit ownership',()=>{
-  assert.equal(catalogue.ops.length,14);
+test('the complete jobs replace the old catalogue, each is classified once, and twenty-two extras have explicit ownership',()=>{
+  // The catalogue IS the registry: a new operator appears in both or in neither, and it is basic or supporting,
+  // never both and never neither. Counted from the registry so adding one operator is one edit, not three.
+  assert.deepEqual(catalogue.ops.map(op=>op.id).sort(),[...registry.ops].sort());
   assert.equal(registry.consolidation.basic.length,6);
-  assert.equal(registry.consolidation.supporting.length,8);
+  assert.deepEqual([...registry.consolidation.basic,...registry.consolidation.supporting].sort(),[...registry.ops].sort());
   assert.equal(registry.consolidation.mappings.length+registry.consolidation.unchanged.length,22);
   for(const mapping of registry.consolidation.mappings){
     assert.equal(catalogue.ops.some(op=>op.id===mapping.from),false);

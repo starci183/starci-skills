@@ -127,7 +127,7 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
 }
 
 /** Pools instead of a chain: least-index-free runtime per role, honouring `avoid`. */
-function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','claude-opus','gpt-5.6-sol'],verify:['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol'],decide:['claude-fable-5.1','gpt-6-astra'],write:['gpt-5.6-sol','claude-opus','qwen3.8-flash']}}={}){
+function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','claude-opus','gpt-5.6-sol'],verify:['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol'],decide:['claude-fable-5.1','gpt-6-astra'],write:['gpt-5.6-sol','claude-opus','qwen3.8-flash'],plan:['claude-opus','claude-fable-5.1']}}={}){
   const busy=new Set(),requests=[];
   // The kind graph is the role authority, exactly as the real allocator reads it; the rest is the 4.x guess.
   const roleOf=kind=>graphRoleOf(kind)??(kind==='review.verify'?'verify':['architecture.decide','business.decide'].includes(kind)?'decide':'implement');
@@ -523,6 +523,28 @@ implementation:
       files:
         - apps/agentos-controlplane/src/sales/receipt.tsx
 `;
+/** A node whose record says nothing a kernel could launch: no write scope and no check. Its job is `work.author`. */
+const UNAUTHORED=`schema: work/node@2
+id: demo.sales.implementation.backend.refund
+kind: implementation
+required: true
+state: todo
+description: Refund a paid order.
+`;
+/**
+ * What an accepted `work.author` op leaves behind, merged into the record as it stands: the kernel's own
+ * in-progress receipt already created `extensions.work3`, so the checks go inside it instead of beside it.
+ */
+function authorRecord(file){
+  const text=fs.readFileSync(file,'utf8');
+  const checks='    checks:\n      - assertion: refund-restores-balance\n        command: npx vitest run refund\n';
+  const scope='assertions:\n  - refund-restores-balance\nimplementation:\n  status: mixed\n  changes:\n'
+    +'    - what: Refund the order.\n      why: The endpoint does not exist.\n      repository: demo-backend\n'
+    +'      directory: .\n      files:\n        - apps/agentos-controlplane/src/sales/refund.ts\n';
+  const merged=text.includes('\n  work3:\n')?text.replace('\n  work3:\n',`\n  work3:\n${checks}`)
+    :`${text}extensions:\n  work3:\n${checks}`;
+  fs.writeFileSync(file,`${scope}${merged}`);
+}
 /** A frontend implementation node: the lane of this one is drawn, built and then proved by a UAT run. */
 const FRONTEND=`schema: work/node@2
 id: demo.sales.implementation.frontend.cart
@@ -561,9 +583,10 @@ const WORK_NODES=[
   {id:'demo.payments.business.overview',path:'features/payments/business/overview/index.yaml',kind:'business-overview',state:'todo',eligible:true,inputDigest:DIGEST('e'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null}
 ];
 const FRONTEND_NODE={id:'demo.sales.implementation.frontend.cart',path:'features/sales/implementation/frontend/cart/index.yaml',kind:'implementation',state:'todo',eligible:true,inputDigest:DIGEST('g'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null};
+const UNAUTHORED_NODE={id:'demo.sales.implementation.backend.refund',path:'features/sales/implementation/backend/refund/index.yaml',kind:'implementation',state:'todo',eligible:true,inputDigest:DIGEST('h'),dependsOn:[],refs:['features/sales/architecture/sds/intake/index.yaml'],blockedBy:[],children:[],completion:null};
 const AUTHORED={'demo.sales.architecture.sds.intake':ARCHITECTURE,'demo.sales.implementation.backend.intake':BACKEND,
   'demo.sales.implementation.frontend.receipt':UNCHECKED,'demo.payments.business.overview':OVERVIEW,
-  [FRONTEND_NODE.id]:FRONTEND};
+  [FRONTEND_NODE.id]:FRONTEND,[UNAUTHORED_NODE.id]:UNAUTHORED};
 
 /** A Work tree on disk plus the validator projection of it, injected instead of spawning the real one. */
 function workRepo(nodes=WORK_NODES){
@@ -580,6 +603,14 @@ function workRepo(nodes=WORK_NODES){
   const read=id=>parseYaml(fs.readFileSync(node(id),'utf8'));
   return {repo,validate,node,read};
 }
+
+/**
+ * The receipt node of WORK_NODES declares no check, so the kernel authors its record: this stands in for that
+ * op in every test that is not about authoring. A fresh object per call - the scripted Orca shifts the queue.
+ */
+const receiptAuthor=()=>({'demo.sales.implementation.frontend.receipt-author':[{outcome:'done',
+  summary:'I described the receipt but could not settle which files render it.',
+  files:[],checks:[passing('work-valid','node starci.mjs validate .starciwork')]}]});
 
 function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal}={}){
   const tree=workRepo(nodes);
@@ -679,7 +710,8 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     scripts:{'demo.sales.implementation.backend.intake':[{outcome:'done',summary:'Intake implemented.',files:[file],
       checks:[passing('unit-tests-pass','npx vitest run intake')]}],
       [`${'demo.sales.implementation.backend.intake'}-verify`]:[{outcome:'done',summary:'The intake scenarios pass through the API on the real stack.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
-      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}]}});
+      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      ...receiptAuthor()}});
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
@@ -691,7 +723,9 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     assert.deepEqual(node.completion.evidence,['verify-1-evidence']);
     // The kernel-owned assertion is stripped from every op and proven by the kernel itself when it records the node.
     assert.deepEqual(node.extensions.work3.kernel.checks.filter(check=>check.assertion==='work-valid').map(check=>check.exitCode),[0],'the kernel proved work-valid by validating the tree');
-    assert.ok(!state.ops.some(op=>(op.checks??[]).some(check=>/work-valid/.test(check.name??''))),'no op ever carried the kernel-owned check');
+    // No lane op ever carries the kernel-owned check. The one exception is the record-authoring op, whose
+    // whole check IS the whole-tree validator - and the kernel runs that one itself before it accepts the record.
+    assert.deepEqual(state.ops.filter(op=>(op.checks??[]).some(check=>/work-valid/.test(check.name??''))).map(op=>op.kind),['work.author']);
     assert.equal(node.extensions.work3.kernel.verifiedBy,'starci-kernel');
     assert.deepEqual(node.extensions.work3.kernel.checks.map(check=>[check.assertion,check.exitCode]),[['unit-tests-pass',0],['work-valid',0]]);
     // The authored checks survive the write; the kernel owns only state, completion and its own block.
@@ -708,7 +742,8 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     assert.match(harness.commits[0],/\nWork: demo\.sales\.implementation\.backend\.intake$/);
     const events=harness.store.readEvents();
     // The backend lane is build then review: the node is `in-progress` until the review is accepted.
-    assert.deepEqual(events.filter(event=>event.event==='ledger-write').map(event=>event.step),['in-progress','in-progress','in-progress','in-progress','done']);
+    // Five launches write `in-progress`: three lane steps of the intake node, and the author op of the receipt node.
+    assert.deepEqual(events.filter(event=>event.event==='ledger-write').map(event=>event.step),['in-progress','in-progress','in-progress','in-progress','in-progress','done']);
     assert.equal(events.find(event=>event.event==='ledger-write'&&event.step==='done').op,'verify-1');
     assert.deepEqual(state.lanes['demo.sales.implementation.backend.intake'].lane,['backend.implement','e2e.verify','review.verify']);
     assert.deepEqual(state.lanes['demo.sales.implementation.backend.intake'].done,['backend.implement','e2e.verify','review.verify']);
@@ -722,12 +757,18 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     assert.notEqual(verify.runtime,state.ops[0].runtime);
     assert.equal(state.verifyRounds['demo.sales.implementation.backend.intake'],1,'rounds are counted per reviewed node set, not per feature');
     assert.deepEqual(state.ledger.map(item=>[item.module,item.status]),[['features/sales','verified']]);
-    assert.equal(state.finished.outcome,'blocked','the frontend node is still ledger-incomplete');
+    assert.equal(state.finished.outcome,'blocked','the frontend node has not finished authoring its record');
+    // The ledger-incomplete frontend node became one `work.author` op on its own record, and nothing else of it.
+    const author=state.ops.find(item=>item.kind==='work.author');
+    assert.equal(author.id,'demo.sales.implementation.frontend.receipt-author');
+    assert.deepEqual(author.allowlist,['.starciwork/features/sales/implementation/frontend/receipt/index.yaml']);
+    assert.deepEqual(author.ledgerIds,[],'the node enters the workflow ledger when its own lane starts, not when its record is written');
+    assert.equal(harness.read('demo.sales.implementation.frontend.receipt').state,'todo','authoring a record never completes the node');
     const final=JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8'));
     assert.equal(final.ledgerMode,'work');
     assert.equal(final.ledgerSummary.total,4);
     assert.deepEqual(final.decisions.map(item=>item.id),['demo.payments.business.overview']);
-    assert.deepEqual(final.ops.map(op=>[op.id,op.node]),[['demo.sales.implementation.backend.intake','demo.sales.implementation.backend.intake'],['demo.sales.implementation.backend.intake-verify','demo.sales.implementation.backend.intake'],['verify-1',null]]);
+    assert.deepEqual(final.ops.map(op=>[op.id,op.node]),[['demo.sales.implementation.backend.intake','demo.sales.implementation.backend.intake'],['demo.sales.implementation.frontend.receipt-author','demo.sales.implementation.frontend.receipt'],['demo.sales.implementation.backend.intake-verify','demo.sales.implementation.backend.intake'],['verify-1',null]]);
   }finally{harness.cleanup();}
 });
 
@@ -742,7 +783,8 @@ test('a reported SDS gap routes to architecture.revise on the architecture node 
       'architecture-1':[{outcome:'done',summary:'The partial-order case is now mapped.',files:[design],
         checks:[passing('work-tree-validates','starci validate')]}],
       [`${'demo.sales.implementation.backend.intake'}-verify`]:[{outcome:'done',summary:'The intake scenarios pass through the API on the real stack.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
-      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}]}});
+      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      ...receiptAuthor()}});
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
@@ -777,7 +819,7 @@ test('a reported SDS gap routes to architecture.revise on the architecture node 
     assert.equal(architecture.completion.inputDigest,DIGEST('f'));
     const steps=harness.store.readEvents().filter(event=>event.event==='ledger-write').map(event=>event.step);
     // The backend node stays in-progress through its build step; only the review step writes `done`.
-    assert.deepEqual(steps,['in-progress','reopened','in-progress','decided','in-progress','in-progress','in-progress','in-progress','done']);
+    assert.deepEqual(steps,['in-progress','in-progress','reopened','in-progress','decided','in-progress','in-progress','in-progress','in-progress','done']);
   }finally{harness.cleanup();}
 });
 
@@ -926,7 +968,8 @@ test('the kernel-owned ledger paths are protected: the contract forbids them, ch
   const harness=setupWork({dirty:[file],
     scripts:{[nodeId]:[done('Intake implemented, and the node marked done.'),done('Intake implemented.')],
       [`${'demo.sales.implementation.backend.intake'}-verify`]:[{outcome:'done',summary:'The intake scenarios pass through the API on the real stack.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
-      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}]}});
+      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      ...receiptAuthor()}});
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
@@ -973,6 +1016,153 @@ test('the kernel-owned ledger paths are protected: the contract forbids them, ch
     assert.equal(op.status,'done');assert.equal(op.attempt,2);
     assert.equal(harness.read(nodeId).state,'done');
     assert.equal(harness.read(nodeId).extensions.work3.kernel.verifiedBy,'starci-kernel');
+  }finally{harness.cleanup();}
+});
+
+/* ------------------------------------------------------------------ an incomplete record is an op's job */
+
+const REFUND='demo.sales.implementation.backend.refund';
+const REFUND_RECORD='.starciwork/features/sales/implementation/backend/refund/index.yaml';
+const REFUND_AUTHOR=`${REFUND}-author`;
+const authorReport=summary=>({outcome:'done',summary,files:[REFUND_RECORD],
+  checks:[passing('work-valid','node starci.mjs validate .starciwork')]});
+/** Run one workflow over the unauthored node, letting the test decide what the operation does while it runs. */
+function runAuthoring({scripts,whileRunning=()=>{},guards=null,maxIterations=12}){
+  const harness=setupWork({nodes:[UNAUTHORED_NODE],dirty:[REFUND_RECORD],scripts});
+  approve(harness.store,harness.state);
+  harness.state.run='run_wf';harness.state.from='term_kernel';
+  const nodeFile=harness.node(REFUND);
+  const orca={...harness.fake.orca,invoke:(name,params,options)=>{
+    const result=harness.fake.orca.invoke(name,params,options);
+    // The operation edits the record while it runs; the wait tick is the moment it has done so.
+    if(name==='check')whileRunning(nodeFile);
+    return result;
+  }};
+  const commits=[];
+  const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:noWait,
+    validateOp:acceptAll,validate:harness.validate,...(guards?{guards:guards(nodeFile)}:{}),
+    exec:command=>({status:0,stdout:`${command} ok`,stderr:''}),
+    git:(executable,args)=>{if(args[0]==='commit')commits.push(args[args.indexOf('-m')+1]);return harness.git.git(executable,args);},
+    waitTimeoutMs:2000,tickMs:1000,maxIterations});
+  return {harness,state,commits,nodeFile,log:events(harness.store)};
+}
+
+test('a ledger-incomplete node becomes exactly one work.author op on its own record, and the completed record starts the node lane',()=>{
+  // Two iterations are the whole story: the author op completes the record, and the lane's first step is created.
+  const {harness,state,commits,log}=runAuthoring({maxIterations:2,
+    scripts:{[REFUND_AUTHOR]:[authorReport('The record now declares its write scope and one check per assertion.')]},
+    whileRunning:file=>{if(!fs.readFileSync(file,'utf8').includes('refund-restores-balance'))authorRecord(file);}});
+  try{
+    // At approval the node is still the ledger's own question: no op was derived from a record that says nothing.
+    assert.deepEqual(harness.goal.incomplete,[REFUND]);
+    // One author op, and its write scope is exactly the node's own index.yaml - nothing else in the tree.
+    const authors=state.ops.filter(op=>op.kind==='work.author');
+    assert.deepEqual(authors.map(op=>op.id),[REFUND_AUTHOR]);
+    const author=authors[0];
+    assert.deepEqual(author.allowlist,[REFUND_RECORD]);
+    assert.equal(author.origin,'ledger');
+    assert.equal(author.nodeId,REFUND);
+    assert.deepEqual(author.ledgerIds,[]);
+    assert.match(author.goal,/^Complete the Work record of demo\.sales\.implementation\.backend\.refund so the kernel can launch it: Node .* declares no implementation\.changes\[\]\.files and no extensions\.work3\.checks/);
+    assert.deepEqual(author.checks.map(check=>check.name),['work-valid']);
+    assert.match(author.checks[0].command,/bin\/starci\.mjs validate .*\.starciwork$/);
+    assert.deepEqual(author.acceptance,['the node declares an allowlist and checks that name its assertions','the tree validates']);
+    assert.equal(author.status,'done');
+    assert.equal(state.lanes[REFUND].authored,REFUND_AUTHOR);
+    // Its contract grants the record and still forbids what stays the kernel's inside it.
+    const contract=fs.readFileSync(harness.store.contractPath(REFUND_AUTHOR),'utf8');
+    assert.match(contract,/# Operation contract - `work\.author`/);
+    assert.match(contract,/## Work node you author/);
+    assert.match(contract,/`state`, `completion`, `extensions\.work3\.kernel` stay the kernel's/);
+    assert.match(contract,/## Never touch \(kernel-owned\)\n- `\.starciwork\/features\/sales\/implementation\/backend\/refund\/evidence\/\*\*`/);
+    assert.doesNotMatch(contract,/## Never touch \(kernel-owned\)\n- `\.starciwork\/features\/sales\/implementation\/backend\/refund\/index\.yaml`/);
+    assert.match(contract,/Lane: this op precedes backend\.implement -> e2e\.verify -> review\.verify, which the kernel launches itself once this record is complete/);
+    assert.match(contract,/Sequence `work\.author`/);
+    // The record it wrote is committed, and the kernel measured the result against the tree, not against the report.
+    assert.match(commits[0],/^feat\(demo\.sales\.implementation\.backend\.refund-author\): Complete the Work record/);
+    const recorded=log.find(event=>event.event==='record-authored');
+    assert.equal(recorded.node,REFUND);
+    assert.equal(recorded.op,REFUND_AUTHOR);
+    assert.deepEqual(recorded.allowlist,['apps/agentos-controlplane/src/sales/refund.ts']);
+    assert.deepEqual(recorded.checks,['refund-restores-balance']);
+    // The node is schedulable now, so its lane created its first step - with the node's own id, because the
+    // author op preceded the lane rather than walking a step of it.
+    const first=state.ops.find(op=>op.nodeId===REFUND&&op.kind==='backend.implement');
+    assert.equal(first.id,REFUND);
+    assert.deepEqual(first.allowlist,['apps/agentos-controlplane/src/sales/refund.ts']);
+    assert.deepEqual(first.checks,[{name:'refund-restores-balance',command:'npx vitest run refund'}]);
+    assert.deepEqual(state.lanes[REFUND].lane,['backend.implement','e2e.verify','review.verify']);
+    assert.deepEqual(state.lanes[REFUND].done,[],'authoring the record walked no step of the lane');
+    assert.deepEqual(state.ledger.map(item=>item.id),[REFUND]);
+    // Authoring is not completion: the node keeps todo and has no proof of anything.
+    const node=harness.read(REFUND);
+    assert.equal(node.state,'todo');
+    assert.equal(node.completion,undefined);
+    assert.equal(node.extensions.work3.kernel.opId,REFUND);
+    assert.deepEqual(node.assertions,['refund-restores-balance']);
+    assert.equal(state.needUser.some(item=>item.kind==='ledger'&&item.node===REFUND),false,
+      'a record the kernel completed is no longer a question for the user');
+  }finally{harness.cleanup();}
+});
+
+test('an author op that moved what the kernel owns inside the record is reverted and never accepted',()=>{
+  const forgery=`completion:\n  inputDigest: ${DIGEST('f')}\n`;
+  let forged=false;
+  // The stub stands in for `git checkout --`: the forged completion is what a revert takes back out.
+  const guards=nodeFile=>stubGuards({revertProtected:(git,{paths})=>{
+    const before=fs.readFileSync(nodeFile,'utf8');
+    if(!before.includes(forgery))return {reverted:[],removed:[]};
+    fs.writeFileSync(nodeFile,before.replaceAll(forgery,''));
+    return {reverted:[paths[0]],removed:[]};
+  }});
+  // Three iterations: the forged attempt, the attempt that authors the record, and the lane's first step.
+  const {harness,state,log}=runAuthoring({guards,maxIterations:3,
+    scripts:{[REFUND_AUTHOR]:[authorReport('The record is complete and the node is done.'),
+      authorReport('The record declares its write scope and one check per assertion.')]},
+    whileRunning:file=>{
+      const text=fs.readFileSync(file,'utf8');
+      // Already authored, or forged and waiting for the kernel to read the record back: nothing to do here.
+      if(text.includes('refund-restores-balance')||text.includes('completion:'))return;
+      if(!forged){forged=true;fs.appendFileSync(file,forgery);return;}
+      authorRecord(file);
+    }});
+  try{
+    const author=state.ops.find(op=>op.id===REFUND_AUTHOR);
+    const moved=log.find(event=>event.event==='record-blocks-modified');
+    assert.ok(moved,'the write into the kernel-owned fields of the record was caught');
+    assert.deepEqual(moved.blocks,['state','completion','extensions.work3.kernel']);
+    assert.deepEqual(moved.reverted,[REFUND_RECORD]);
+    assert.equal(author.reports[0].outcome,'done');
+    assert.equal(author.reports[0].downgradedTo,'failed');
+    const retried=log.find(event=>event.event==='retry'&&event.op===REFUND_AUTHOR);
+    assert.match(retried.findings[0],/^operation modified kernel-owned fields \(state, completion, extensions\.work3\.kernel\) of the Work record it authors: \.starciwork\/features\/sales/);
+    assert.ok(log.findIndex(event=>event.event==='record-blocks-modified')<log.findIndex(event=>event.event==='op-done'),
+      'the revert happened before anything was accepted');
+    // The refusal is not a dead end: the second attempt authors the record and is accepted.
+    assert.equal(author.attempt,2);
+    assert.equal(author.status,'done');
+    assert.ok(log.some(event=>event.event==='record-authored'&&event.node===REFUND));
+    assert.equal(harness.read(REFUND).completion,undefined,'no completion an operation wrote itself survived');
+  }finally{harness.cleanup();}
+});
+
+test('a record that is still incomplete after its author op asks the user once and never gets a second author op',()=>{
+  const {harness,state,log}=runAuthoring({
+    scripts:{[REFUND_AUTHOR]:[authorReport('I described the work but left the scope open.')]}});
+  try{
+    assert.deepEqual(state.ops.filter(op=>op.kind==='work.author').map(op=>op.id),[REFUND_AUTHOR],
+      'one author op per node per workflow, whatever it left behind');
+    assert.equal(state.ops.find(op=>op.id===REFUND_AUTHOR).status,'done');
+    const still=log.find(event=>event.event==='record-still-incomplete');
+    assert.equal(still.node,REFUND);
+    assert.match(still.detail,/^ledger incomplete: Node demo\.sales\.implementation\.backend\.refund declares no implementation\.changes\[\]\.files and no extensions\.work3\.checks/);
+    assert.equal(log.some(event=>event.event==='record-authored'),false);
+    // Exactly one question for the user, and no lane was ever started for the node.
+    assert.deepEqual(state.needUser.filter(item=>item.kind==='ledger'&&item.node===REFUND).length,1);
+    assert.equal(state.ops.some(op=>op.nodeId===REFUND&&op.kind!=='work.author'),false);
+    assert.deepEqual(state.ledger,[]);
+    assert.equal(harness.read(REFUND).state,'todo');
+    assert.equal(state.finished.outcome,'blocked');
   }finally{harness.cleanup();}
 });
 

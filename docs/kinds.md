@@ -24,8 +24,8 @@ that skipping it is not available.
 
 ## The catalog
 
-Nine kinds, and the list is closed in both directions: `validateGraph` reports `catalog-drift` when the
-profile and the `KINDS` constant of `execution/kind-graph.mjs` disagree, so a tenth kind cannot appear by
+Eleven kinds, and the list is closed in both directions: `validateGraph` reports `catalog-drift` when the
+profile and the `KINDS` constant of `execution/kind-graph.mjs` disagree, so a twelfth kind cannot appear by
 accident. `family` says what an operation is for, `role` is the allocator role of
 [`profiles/runtimes.yaml`](runtime-allocation.md) (and must equal its `roleOfKind` entry), `mutates` is what it
 may change, and `operator` is the launchable operator contract in `ops/` that carries it.
@@ -42,10 +42,21 @@ may change, and `operator` is the launchable operator contract in `ops/` that ca
 | `e2e.verify` | prove | verify | no | code | `uat.verify` | Prove one delivered slice through its public API on the real stack, never a screen, and leave the scenario spec with its run output. |
 | `uat.verify` | prove | verify | no | code | `uat.verify` | Walk one end-to-end scenario on the rendered surface and leave it with its evidence. |
 | `review.verify` | prove | verify | **yes** | - | `review.verify` | Read the slice against its acceptance and report findings, repairing nothing. |
+| `work.author` | design | plan | no | record | `work.author` | Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it. |
 
 Each kind also declares `reports`: the outcomes it may end with and the blocker kinds it may raise. That is
 what makes a route reachable or not - `review.verify` may not raise `shared-change`, because a kind that
 changes nothing cannot need a path it is not allowed to write.
+
+`work.author` is the one kind that stands outside the lanes and the routes. A node whose record declares no
+write scope (`implementation.changes[].files` or `extensions.work3.allowlist`) and no check
+(`extensions.work3.checks`) cannot be launched at all, so nothing of its lane may start; completing that
+record is the `work.author` operation, and it therefore **precedes** the node's lane rather than being a step
+of it. No lane names it and no route creates it: the kernel creates exactly one per node, itself, the moment
+the Work ledger reports that node incomplete - see **Ledger incomplete -> work.author** in
+[workflow-kernel.md](workflow-kernel.md). It is also the only kind whose `mutates` is `record`, and the only
+one permitted to write its own node's `index.yaml`; `state`, `completion` and `extensions.work3.kernel` stay
+the kernel's inside that file.
 
 ## The lanes
 

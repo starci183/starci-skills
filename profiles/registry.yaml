@@ -71,6 +71,7 @@ reasoningOps:
   - business.decide
   - architecture.decide
   - review.verify
+  - work.author
 targets:
   gpt-5.6-sol:
     runtime: codex
@@ -258,6 +259,12 @@ operators:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol]}
+  work.author:
+    skill: starci
+    chain: [claude-opus, claude-fable-5.1, gpt-5.6-sol]
+    environments:
+      - {environment: claude, profiles: [claude-opus, claude-fable-5.1]}
+      - {environment: codex, profiles: [gpt-5.6-sol]}
   workspace.manage:
     skill: starci
     chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
@@ -296,7 +303,10 @@ costPolicy: |-
   run Qwen 3.8 Flash first, Claude Opus second and Codex gpt-5.6-sol third. Deep reasoning
   (business.decide, architecture.decide) runs Claude Fable 5.1 first and Codex gpt-6-astra second.
   Independent review runs the Qwen 3.8 Flash reviewer first, Claude Fable 5.1 second and the Codex
-  Sol reviewer third. interface.draw keeps Codex gpt-5.6-sol first for image generation, then Claude
+  Sol reviewer third. work.author reads a Work record, its neighbours and the code an implementation would
+  touch, so it carries the `plan` role and leads with Claude Opus, then Claude Fable 5.1; Codex gpt-5.6-sol
+  stays in its chain as the launchable fallback even though the allocator prefers the plan-role runtimes.
+  interface.draw keeps Codex gpt-5.6-sol first for image generation, then Claude
   Opus with deferred artwork, then Qwen 3.8 Flash. knowledge.repair edits this runtime and therefore
   leads with Claude Opus. Plan Coordinator and Workflow Monitor supervisors lead with Claude Opus and
   fall back to Codex Sol. Every automatic chain contains only native managed-agent candidates and

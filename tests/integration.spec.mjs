@@ -400,7 +400,10 @@ test('source and relocated payload contain only current runtime, presets and dom
   assert.equal(Object.hasOwn(installed.scripts, 'test:legacy'), false);
   assert.equal(fs.existsSync(path.join(root,'.claude/skills/catalog.json')),false);
   assert.match(read(root,'.claude/SKILL.md'),/^name: starci$/m);
-  assert.equal(JSON.parse(read(root, '.claude/.dist/ops/catalog.json')).ops.length, 14);
+  // The install carries exactly the operators the source publishes - counted from the source, so adding one
+  // operator is one edit in ops/registry.yaml and not a number repeated across the suite.
+  assert.deepEqual(JSON.parse(read(root, '.claude/.dist/ops/catalog.json')).ops.map(op => op.id).sort(),
+    JSON.parse(fs.readFileSync(path.join(packageRoot, '.dist/ops/catalog.json'), 'utf8')).ops.map(op => op.id).sort());
 });
 
 test('a 300-piece multi-repository tree accepts a new unfinished domain without restructuring', t => {

@@ -40,6 +40,16 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.equal(familyOf('architecture.revise',{profile}),'repair');
   assert.equal(operatorOf('frontend.implement',{profile}),'interface.implement');
   assert.equal(roleOf('architecture.revise',{profile}),'decide');
+  // The record-authoring kind is the only one that changes an authored Work record, and the only one no lane walks.
+  assert.deepEqual(mutationsOf('work.author',{profile}),['record']);
+  assert.equal(familyOf('work.author',{profile}),'design');
+  assert.equal(roleOf('work.author',{profile}),'plan');
+  assert.equal(operatorOf('work.author',{profile}),'work.author');
+  assert.deepEqual(reportsOf('work.author',{profile}),{outcomes:['done','partial','failed','ask'],blockers:[]});
+  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('record')),['work.author']);
+  for(const entry of profile.lanes)assert.equal(entry.steps.some(step=>step.kind==='work.author'),false,entry.id);
+  // And no route creates it: the kernel starts it itself when the ledger reports a node incomplete.
+  for(const route of profile.routes)assert.notEqual(route.to?.kind,'work.author');
 });
 
 test('every lane is a sequence of catalogued kinds, and every declared node shape reaches one',()=>{

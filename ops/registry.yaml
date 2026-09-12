@@ -13,6 +13,7 @@ ops:
   - scope.retire
   - task.execute
   - uat.verify
+  - work.author
   - workspace.manage
 consolidation:
   schema: starci/op-consolidation@1
@@ -25,6 +26,7 @@ consolidation:
     - backend.implement
     - uat.verify
   supporting:
+    - work.author
     - workspace.manage
     - runtime.operate
     - release.deliver
