@@ -13,7 +13,7 @@ import {parseYaml} from '../core/yaml.mjs';
  * Every other authored line of an index.yaml is preserved byte for byte.
  */
 export const DECISION_KINDS=['business','business-overview','architecture'];
-export const EXECUTABLE_KINDS=['implementation','uat','operations','ui'];
+export const EXECUTABLE_KINDS=['implementation','uat','e2e','operations','ui'];
 export const KERNEL_EXTENSION=['extensions','work3','kernel'];
 export const EVIDENCE_SCHEMA='work/evidence@1';
 export const REVIEW_SCHEMA='starci/design-review@1';

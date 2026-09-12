@@ -250,5 +250,6 @@ test('e2e.verify proves a backend slice through the API on the real stack, never
   assert.match(rendered,/never `done` on an unrun or partial spec/);
   assert.match(rendered,/prove step of `backend.implement` -> `e2e.verify` -> `review.verify`/);
   assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'uat',path:'features/sales/uat/checkout/index.yaml'}}),'uat');
+  assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'e2e',path:'features/sales/e2e/checkout/index.yaml'}}),'e2e.verify');
   assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'uat',path:'features/sales/implementation/frontend/checkout/index.yaml'}}),'uat.verify');
 });

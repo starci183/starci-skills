@@ -165,6 +165,12 @@ lanes:
     purpose: A frontend UAT node is the walk itself; there is nothing to build first.
     steps:
       - kind: uat.verify
+  - id: e2e
+    match:
+      - {kind: e2e}
+    purpose: An API scenario node is proven through the public API on the real stack; there is nothing to build first.
+    steps:
+      - kind: e2e.verify
   - id: uat
     match:
       - {kind: uat}

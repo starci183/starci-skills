@@ -23,6 +23,9 @@ release:
   code: true
 operations:
   assertions: true
+# An API-level end-to-end scenario node: proven by a run on the real stack, no capture, no UAT provenance.
+e2e:
+  assertions: true
 ui:
   assertions: true
   image: true

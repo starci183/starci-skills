@@ -57,6 +57,7 @@ list runs from the most specific to the least.
 | --- | --- | --- |
 | `implementation/frontend` | `implementation` + frontend side, or `ui` | `interface.draw` (optional when `node.hasInterfaceDesign`) -> `frontend.implement` -> `uat.verify` |
 | `implementation/backend` | `implementation` + backend side, or no side named | `backend.implement` -> `e2e.verify` -> `review.verify` |
+| `e2e` | `e2e` (API scenario node; completion profile `e2e`: assertions only) | `e2e.verify` |
 | `uat/frontend` | `uat` + frontend side | `uat.verify` |
 | `uat` | `uat` | `e2e.verify` |
 | `operations` | `operations` | `runtime.operate` -> `review.verify` |

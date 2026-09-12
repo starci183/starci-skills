@@ -55,6 +55,7 @@ export function sequenceFor(op,{node=null}={}){
   // End-to-end proof of a backend slice goes through the API on a real stack, never a screen: `e2e.verify` is the
   // backend lane's prove step, and a ledger `uat` node outside the frontend layout is such a scenario.
   if(kind==='e2e.verify')return 'e2e.verify';
+  if(nodeKind==='e2e')return 'e2e.verify';
   if(nodeKind==='uat')return frontendNode(node)?'uat.verify':'uat';
   const implement=IMPLEMENT_KINDS.includes(kind)||IMPLEMENT_NODES.includes(nodeKind);
   if(implement&&origin==='shared')return 'implement.shared';

@@ -58,6 +58,7 @@ test('every lane is a sequence of catalogued kinds, and every declared node shap
   assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'},{profile}),['interface.draw','frontend.implement','uat.verify']);
   assert.deepEqual(laneFor({kind:'uat',layout:null},{profile}),['e2e.verify'],'a scenario node outside the frontend is an API scenario');
   assert.deepEqual(laneFor({kind:'uat',layout:'frontend'},{profile}),['uat.verify'],'a frontend scenario node walks the surface');
+  assert.deepEqual(laneFor({kind:'e2e',layout:null},{profile}),['e2e.verify'],'an e2e node is proven through the API');
   assert.deepEqual(laneFor({kind:'operations',layout:null},{profile}),['runtime.operate','review.verify']);
   assert.deepEqual(laneFor({kind:'architecture',layout:null},{profile}),['architecture.decide']);
   assert.deepEqual(laneFor({kind:'business',layout:null},{profile}),['business.decide']);

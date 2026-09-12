@@ -41,7 +41,7 @@ export const WORK_LEDGER='work';
  * (`profiles/kinds.yaml` through `execution/kind-graph.mjs`) decides the kind of every step, and this map is
  * what a tree whose kind graph cannot be read falls back to. Decision kinds are answered, never launched.
  */
-export const WORK_OPERATION={implementation:'backend.implement',ui:'interface.implement',uat:'uat.verify',operations:'runtime.operate'};
+export const WORK_OPERATION={implementation:'backend.implement',ui:'interface.implement',uat:'uat.verify',e2e:'e2e.verify',operations:'runtime.operate'};
 export const DECISION_OPERATION={architecture:'architecture.decide',business:'business.decide','business-overview':'business.decide'};
 /**
  * Kinds the graph names that the operator registry still launches under their 4.x operator id. The graph is
