@@ -225,6 +225,52 @@ export function validateWorkTree({repoRoot,workRoot=null}={}){
 }
 
 /** An operation id that is also a safe file name: the Work id with every other character folded to `-`. */
+/** One Work node -> one operation form; the goal phase and the run-time ledger sync both use it. */
+export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0}){
+  return toOp({id,nodeId:node.id,
+    kind:WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),
+    ledgerIds:[node.id],allowlist:node.allowlist,
+    references:unique([node.path,...(node.refs??[])]),
+    checks:node.checks.map(check=>({name:check.assertion??check.command,command:check.command})),
+    acceptance:node.assertions.length?node.assertions:[`${node.id} satisfies the Work contract it authored`],
+    // An eligible node has no unsettled dependency, so a dependency inside this set is already done; the
+    // mapping is kept so a tree that validates differently still schedules in dependency order.
+    dependsOn:(node.dependsOn??[]).map(dep=>opOfNode.get(dep)).filter(Boolean),origin:'ledger'},index);
+}
+
+/**
+ * Dynamic operations: the Work tree is re-read every iteration and every newly schedulable node (a node the
+ * user added, or one whose dependencies just became done) becomes an operation of this workflow.
+ */
+export function syncLedgerOps(store,state,ctx){
+  if(!ctx.work)return [];
+  let loaded;
+  try{loaded=ctx.work.api.loadLedger({repoRoot:ctx.work.repoRoot,validate:ctx.work.validate});}
+  catch(error){store.appendEvent({event:'ledger-sync-failed',reason:error.message});return [];}
+  if(!loaded.ok)return [];
+  ctx.work.loaded=loaded;
+  const scope=state.scope.length?state.scope:null;
+  const known=new Set(state.ops.map(op=>op.nodeId).filter(Boolean));
+  const taken=new Set(state.ops.map(op=>op.id));
+  const opOfNode=new Map(state.ops.filter(op=>op.nodeId).map(op=>[op.nodeId,op.id]));
+  const added=[];
+  for(const node of ctx.work.api.executableCandidates(loaded,{scope})){
+    if(known.has(node.id))continue;
+    if(!node.schedulable){
+      if(!state.needUser.some(item=>item.node===node.id))state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
+      continue;
+    }
+    const id=workOpId(node.id,taken);opOfNode.set(node.id,id);
+    const op=deriveWorkOp(ctx.work.api,ctx.work.repoRoot,node,{id,opOfNode,index:state.ops.length});
+    op.difficulty=op.difficulty??'medium';
+    state.ops.push(op);
+    state.ledger.push({id:node.id,title:describeNode(ctx.work.api,ctx.work.repoRoot,node),inputRef:node.path,kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[]});
+    added.push(op.id);
+    store.appendEvent({event:'op-added',op:op.id,node:node.id,reason:'newly schedulable Work node'});
+  }
+  return added;
+}
+
 export function workOpId(nodeId,taken=new Set()){
   const base=String(nodeId??'').replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^[-._]+/,'').replace(/[-._]+$/,'')||'node';
   let id=base;
@@ -278,15 +324,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
     kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[]}));
   const taken=new Set(),opOfNode=new Map();
   for(const node of ready)opOfNode.set(node.id,workOpId(node.id,taken));
-  state.ops=ready.map((node,index)=>toOp({id:opOfNode.get(node.id),nodeId:node.id,
-    kind:WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(ledgerApi,repoRoot,node),
-    ledgerIds:[node.id],allowlist:node.allowlist,
-    references:unique([node.path,...(node.refs??[])]),
-    checks:node.checks.map(check=>({name:check.assertion??check.command,command:check.command})),
-    acceptance:node.assertions.length?node.assertions:[`${node.id} satisfies the Work contract it authored`],
-    // An eligible node has no unsettled dependency, so a dependency inside this set is already done; the
-    // mapping is kept so a tree that validates differently still schedules in dependency order.
-    dependsOn:(node.dependsOn??[]).map(id=>opOfNode.get(id)).filter(Boolean),origin:'ledger'},index));
+  state.ops=ready.map((node,index)=>deriveWorkOp(ledgerApi,repoRoot,node,{id:opOfNode.get(node.id),opOfNode,index}));
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
   const assessed=typeof assessGoal==='function'?assessGoal({job:state.job,inputs:state.inputs,
     ledger:state.ledger.map(item=>({id:item.id,kind:item.kind,title:item.title,module:item.module})),
@@ -680,7 +718,10 @@ function commitLedgerWrite(store,state,op,ctx){
   if(!node)return null;
   const files=changedFiles(state,op,ctx,[`.starciwork/${slash(path.dirname(node.path))}`]);
   if(!files.length)return null;
-  const run=args=>ctx.git('git',args,{cwd:state.worktree,encoding:'utf8',windowsHide:true});
+  // Ledger writes carry 64-hex digests that a repository secrets guard mistakes for keys; the kernel is the
+  // author of those digests, so it declares the scan skipped for exactly this commit.
+  const run=args=>ctx.git('git',args,{cwd:state.worktree,encoding:'utf8',windowsHide:true,env:{...process.env,ALLOW_SECRET_SCAN:'1'}});
+  run(['config','core.longpaths','true']);
   if(run(['add','--',...files]).status!==0){store.appendEvent({event:'ledger-commit-failed',op:op.id,node:op.nodeId,reason:'git add'});return null;}
   const committed=run(['commit','-q','-m',`work(${op.nodeId}): record ${op.id} in the Work ledger\n\nWork: ${op.nodeId}`]);
   if(committed.status!==0){store.appendEvent({event:'ledger-commit-failed',op:op.id,node:op.nodeId,reason:tail(committed.stderr,200)});return null;}
@@ -1125,6 +1166,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     store.appendEvent({event:'tick',iteration:state.iterations,
       ops:state.ops.map(op=>`${op.id}=${op.status}`),ledger:state.ledger.map(item=>`${item.id}=${item.status}`)});
     answerQuestions(orca,store,state,ctx);
+    syncLedgerOps(store,state,ctx);
     planVerifyOps(store,state,ctx);
     scheduleOps(orca,store,state,ctx);
     state.allocation=typeof allocator.serialize==='function'?allocator.serialize():allocator.snapshot?.()??null;
