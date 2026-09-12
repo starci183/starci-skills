@@ -252,3 +252,12 @@ test('difficulty routes inside the quota: hard work to the strongest tier, easy 
   const quoted=createAllocator({runtimes:profile,quota:{order:['claude-opus','qwen3.8-flash','gpt-5.6-sol'],slots:{'claude-opus':2,'qwen3.8-flash':1,'gpt-5.6-sol':1}},now:()=>0});
   assert.deepEqual([1,2,3,4].map(()=>quoted.allocate('backend.implement').runtime),['claude-opus','claude-opus','qwen3.8-flash','gpt-5.6-sol']);
 });
+
+test('a tagged quota fills a difficulty tier by ratio (4:1) and sends easy work to the cheap runtime',()=>{
+  const quota={order:['gpt-5.6-sol','claude-opus','qwen3.8-flash'],slots:{'gpt-5.6-sol':4,'claude-opus':1,'qwen3.8-flash':2},tags:{'gpt-5.6-sol':['hard','medium'],'claude-opus':['hard','medium'],'qwen3.8-flash':['easy','medium']}};
+  const allocator=createAllocator({runtimes:profile,quota,now:()=>0});
+  const hard=[1,2,3,4,5].map(()=>allocator.allocate('backend.implement',{difficulty:'hard'}).runtime);
+  assert.deepEqual(tally(hard),{'gpt-5.6-sol':4,'claude-opus':1});
+  assert.equal(allocator.allocate('backend.implement',{difficulty:'easy'}).runtime,'qwen3.8-flash');
+  assert.equal(allocator.allocate('backend.implement',{difficulty:'hard'}).ok,false);
+});

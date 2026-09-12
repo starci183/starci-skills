@@ -7,7 +7,7 @@ import {waitTick} from './orca-protocol.mjs';
 import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from './orca-supervised-launch.mjs';
 import {validateReport} from './reports.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot} from './workflow-store.mjs';
-import {createAllocator} from './runtime-allocator.mjs';
+import {createAllocator,loadRuntimes} from './runtime-allocator.mjs';
 import * as work from './work-ledger.mjs';
 import * as llm from './llm-functions.mjs';
 
@@ -351,6 +351,8 @@ function workGoalMarkdown(state,loaded){
     for(const item of incomplete)lines.push(`- ${item.node?`\`${item.node}\` `:''}${item.detail}`);
   }
   if(overlaps.length)lines.push(``,`## Serialized by a shared allowlist`,``,...overlaps.map(item=>`- ${item}`));
+  const proposal=state.quotaProposal??proposeQuota(state);
+  lines.push(``,`## Runtime allocation (the user sets this at approval)`,``,`Proposed from the difficulty of the operations (${proposal.summary}). Approve with \`workflow-approve --id ${state.id} --allocation ${proposal.text}\` or pass your own order and slots.`,``,`| runtime | slots (ratio) | difficulty | why |`,`| --- | --- | --- | --- |`,...proposal.rows.map(row=>`| \`${row.runtime}\` | ${row.slots} | ${row.tags} | ${row.why} |`),``,`Slots are both the parallel cap and the fill ratio inside a difficulty tier (4:1 means four operations on the first runtime for one on the second); a runtime without a tag takes every difficulty.`);
   if(state.gates.length)lines.push(``,`## Job gates`,``,...state.gates.map(gate=>`- ${gate.name}: \`${gate.command}\``));
   for(const [heading,items] of [['Risks',state.risks],['Questions',state.questions]]){
     if(!items.length)continue;
@@ -360,13 +362,34 @@ function workGoalMarkdown(state,loaded){
 }
 
 /** The one human gate of the runtime: nothing is launched until the plan is approved. */
-export function approve(store,state){
+/** A quota proposal from the difficulty mix: hard/medium operations lean on the strongest runtimes, easy ones on the cheapest. The user always sets the final numbers. */
+export function proposeQuota(state,{runtimes=null}={}){
+  const profile=runtimes??(()=>{try{return loadRuntimes();}catch{return null;}})();
+  const ops=state.ops.filter(op=>op.status!=='done');
+  const hard=ops.filter(op=>op.difficulty==='hard').length,easy=ops.filter(op=>op.difficulty==='easy').length,medium=ops.length-hard-easy;
+  const total=Math.min(ops.length||1,profile?.maxParallelOps??10);
+  const order=(profile?.allocation?.preference?.implement??['gpt-5.6-sol','claude-opus','qwen3.8-flash']).filter(id=>profile?.runtimes?.[id]);
+  const weights=order.map((id,index)=>index===0?hard+medium*0.6+easy*0.2:index===1?hard*0.4+medium*0.4+easy*0.3:medium*0.2+easy*0.8);
+  const sum=weights.reduce((a,b)=>a+b,0)||1;
+  let rows=order.map((id,index)=>({runtime:id,slots:Math.max(index===0?1:0,Math.round(total*weights[index]/sum)),tags:index===0?'hard+medium':index===1?'hard+medium':'easy+medium',why:index===0?'strongest tier: hard and most medium operations':index===1?'second tier: medium operations and overflow':'cheapest tier: easy operations and overflow'}));
+  const cap=id=>profile?.runtimes?.[id]?.maxParallel;
+  rows=rows.map(row=>({...row,slots:Number.isFinite(cap(row.runtime))&&cap(row.runtime)>0?Math.min(row.slots,cap(row.runtime)):row.slots}));
+  const text=rows.map(row=>`${row.runtime}=${row.slots}:${row.tags}`).join(',');
+  const proposal={rows,text,summary:`${hard} hard, ${medium} medium, ${easy} easy of ${ops.length} operations; up to ${total} in parallel`};
+  state.quotaProposal=proposal;
+  return proposal;
+}
+
+export function approve(store,state,{allocation=null}={}){
+  if(allocation)state.quota=parseQuota(allocation);
+  // The user sets the runtime allocation at approval; without --allocation the proposal from goal.md is used and recorded.
+  if(!state.quota){const proposal=state.quotaProposal??proposeQuota(state);state.quota=parseQuota(proposal.text);state.quotaSource='proposal';}else state.quotaSource=allocation?'user':state.quotaSource??'user';
   need(state.ops.length,`Workflow ${state.id} has no plan to approve; run workflow-goal first`);
   state.approved=true;
   if(state.phase!=='finished')state.phase='run';
-  store.appendEvent({event:'approved',ops:state.ops.length});
+  store.appendEvent({event:'approved',ops:state.ops.length,quota:state.quota});
   store.saveState(state);
-  return {ok:true,id:state.id,phase:state.phase,approved:true,ops:state.ops.length,ledger:state.ledger.length};
+  return {ok:true,id:state.id,phase:state.phase,approved:true,ops:state.ops.length,ledger:state.ledger.length,quota:state.quota};
 }
 
 /* ------------------------------------------------------------------ contract */
@@ -1176,13 +1199,18 @@ const templateOf=host=>fs.readFileSync(path.join(host,'docs','supervision-templa
 /** `--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2`: slots per runtime in priority order. */
 export function parseQuota(value){
   if(!value)return null;
-  const order=[],slots={};
+  const order=[],slots={},tags={};
   for(const entry of String(value).split(',').map(item=>item.trim()).filter(Boolean)){
-    const [id,n]=entry.split('=');
-    need(id&&Number.isFinite(Number(n)),`--allocation entries are <runtime>=<slots>: ${entry}`);
-    order.push(id.trim());slots[id.trim()]=Number(n);
+    const [id,rest]=entry.split('=');
+    const [n,tagText]=String(rest??'').split(':');
+    need(id&&Number.isFinite(Number(n)),`--allocation entries are <runtime>=<slots>[:<easy+medium+hard>]: ${entry}`);
+    const runtime=id.trim();
+    order.push(runtime);slots[runtime]=Number(n);
+    const levels=String(tagText??'').split('+').map(level=>level.trim()).filter(Boolean);
+    for(const level of levels)need(['easy','medium','hard'].includes(level),`--allocation difficulty tags are easy|medium|hard: ${entry}`);
+    if(levels.length)tags[runtime]=levels;
   }
-  return {order,slots,total:Object.values(slots).reduce((a,b)=>a+b,0)};
+  return {order,slots,tags,total:Object.values(slots).reduce((a,b)=>a+b,0)};
 }
 
 export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleepSync,functions={}}={}){
@@ -1215,7 +1243,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   }
   if(command==='workflow-approve'){
     const {store,state}=open(options.id);
-    return {schema:WORKFLOW_KERNEL,command,dir:store.dir,...approve(store,state)};
+    return {schema:WORKFLOW_KERNEL,command,dir:store.dir,...approve(store,state,{allocation:options.allocation??null})};
   }
   if(command==='workflow-status'){
     const {store,state}=open(options.id);

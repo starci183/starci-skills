@@ -74,7 +74,12 @@ export function applyQuota(runtimes,quota){
     const roles=new Set(Object.values(copy.runtimes).flatMap(rt=>rt.roles??[]));
     copy.allocation.preference={...(plain(copy.allocation.preference)?copy.allocation.preference:{})};
     for(const role of roles)copy.allocation.preference[role]=[...order.filter(id=>(copy.runtimes[id].roles??[]).includes(role)),...((copy.allocation.preference[role]??[]).filter(id=>!order.includes(id)))];
-    copy.allocation.tiers=plain(copy.allocation.tiers)?Object.fromEntries(Object.entries(copy.allocation.tiers).map(([level,list])=>[level,list.filter(id=>order.includes(id)).concat(order.filter(id=>!list.includes(id)))])):copy.allocation.tiers;
+    const tags=plain(quota.tags)?quota.tags:{};
+    if(Object.keys(tags).length){
+      // Tags name the difficulty levels a runtime accepts; an untagged runtime in the order accepts every level.
+      copy.allocation.tiers=Object.fromEntries(['easy','medium','hard'].map(level=>[level,order.filter(id=>!tags[id]||tags[id].includes(level))]));
+      copy.allocation.tierFill='ratio';
+    }else copy.allocation.tiers=plain(copy.allocation.tiers)?Object.fromEntries(Object.entries(copy.allocation.tiers).map(([level,list])=>[level,list.filter(id=>order.includes(id)).concat(order.filter(id=>!list.includes(id)))])):copy.allocation.tiers;
   }
   return copy;
 }
@@ -122,7 +127,9 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     const role=roleFor(kind),ready=[],blocked=[],order=preferenceOf(role,difficulty);
     for(const id of ids){
       const pool=pools[id],cool=cooling(id),free=slots(id)-load(id);
+      const tier=difficulty&&Array.isArray(tiers[difficulty])?tiers[difficulty]:null;
       const reason=!Array.isArray(pool?.roles)||!pool.roles.includes(role)?`no ${role} role`
+        :tier&&tier.length&&!tier.includes(id)?`outside the ${difficulty} tier`
         :avoid.includes(id)?'avoided'
         :Array.isArray(restrictTo)&&!restrictTo.includes(id)?'not launchable for this operation'
         :cool?`cooling after ${cool.kind} until ${new Date(cool.until).toISOString()}`
@@ -135,7 +142,11 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     }
     // prefer-then-overflow: the first eligible runtime of the role's order wins, so a saturated or cooling
     // preference simply is not in `ready` and the next one takes the operation without any special case.
-    if(order)ready.sort((a,b)=>cmp(a.preference,b.preference)||cmp(a.ratio,b.ratio)||cmp(b.free,a.free)||cmp(a.rotation,b.rotation));
+    // A difficulty tier with ratio fill spreads its operations in proportion to the slots (4:1), then keeps the order;
+    // otherwise the order itself is the fill (prefer, then overflow).
+    const tierRatio=difficulty&&allocation.tierFill==='ratio'&&Array.isArray(tiers[difficulty]);
+    if(order&&tierRatio)ready.sort((a,b)=>cmp(a.ratio,b.ratio)||cmp(a.preference,b.preference)||cmp(b.free,a.free)||cmp(a.rotation,b.rotation));
+    else if(order)ready.sort((a,b)=>cmp(a.preference,b.preference)||cmp(a.ratio,b.ratio)||cmp(b.free,a.free)||cmp(a.rotation,b.rotation));
     else ready.sort((a,b)=>cmp(a.ratio,b.ratio)||cmp(b.free,a.free)||cmp(b.opsLeft,a.opsLeft)||cmp(a.rotation,b.rotation));
     return {kind,role,ready,blocked,preference:order};
   };
