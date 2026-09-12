@@ -212,7 +212,7 @@ test('markDone writes state, completion and the kernel block and nothing else ch
     const after=fs.readFileSync(file,'utf8');
     const done=parseYaml(after);
     assert.equal(done.state,'done');
-    assert.deepEqual(done.completion,{inputDigest:FRESH,evidence:['op-ledger-1'],codeRefs:[{repository:'demo-backend',commit:HEAD}]});
+    assert.deepEqual(done.completion,{inputDigest:FRESH,evidence:['op-ledger-1-evidence'],codeRefs:[{repository:'demo-backend',commit:HEAD}]});
     assert.deepEqual(done.extensions.work3.kernel,{opId:'op-ledger-1',dispatch:'ctx_7',head:HEAD,checks:[{...check},{...types}],verifiedBy:'kernel@run-1',at:'2026-09-12T10:30:00.000Z'});
 
     // Every authored line outside state / completion / extensions is unchanged, byte for byte.
@@ -266,7 +266,7 @@ test('a node with no completion and no extensions gains both blocks, and a decis
     assert.equal(rewritten.match(/^extensions:/gm).length,1);
     const rebound=parseYaml(rewritten);
     assert.equal(rebound.completion.review,undefined);
-    assert.deepEqual(rebound.completion.evidence,['op-arch']);
+    assert.deepEqual(rebound.completion.evidence,['op-arch-evidence']);
     assert.equal(rebound.extensions.work3.sds.id,'SDS-LEDGER','the authored sds payload survives beside the kernel block');
     assert.equal(rebound.description,parseYaml(ARCHITECTURE).description);
     assert.deepEqual(rebound.refs,['demo.billing.business.srs.fr.invoice']);
@@ -300,10 +300,10 @@ test('the evidence manifest is a work/evidence@1 record under the node it proves
       ...bound,opId:'op-ledger-1',head:HEAD,checks:[check,types],
       capturedAt:'2026-09-12T10:30:00.000Z',environment:'worktree-local'
     });
-    assert.equal(written,path.join(path.dirname(nodeFile(root,NODES[1])),'evidence','op-ledger-1','manifest.yaml'));
+    assert.equal(written,path.join(path.dirname(nodeFile(root,NODES[1])),'evidence','op-ledger-1-evidence','manifest.yaml'));
     const manifest=parseYaml(fs.readFileSync(written,'utf8'));
     assert.equal(manifest.schema,'work/evidence@1');
-    assert.equal(manifest.id,'op-ledger-1');
+    assert.equal(manifest.id,'op-ledger-1-evidence');
     assert.equal(manifest.nodeId,'demo.billing.implementation.backend.ledger');
     assert.equal(manifest.inputDigest,FRESH);
     assert.equal(manifest.bindings,undefined,'nodeId plus inputDigest already bind the primary node; repeating it is a duplicate binding');
@@ -325,7 +325,7 @@ test('the evidence manifest is a work/evidence@1 record under the node it proves
 
     const failing=writeEvidence(root,NODES[2],{...bound,opId:'op frontend/1',checks:[{name:'unit',command:'npm test',exitCode:1}]});
     const second=parseYaml(fs.readFileSync(failing,'utf8'));
-    assert.equal(second.id,'op-frontend-1','an operation id is sanitized into a valid Work id');
+    assert.equal(second.id,'op-frontend-1-evidence','an operation id is sanitized into a valid Work id');
     assert.equal(second.outcome,'fail');
     assert.deepEqual(second.codeRefs,undefined);
     assert.equal(second.provenance.servedVersions[0].commit,'0'.repeat(40));

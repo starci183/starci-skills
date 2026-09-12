@@ -89,10 +89,28 @@ const inScope=(node,scopes)=>{
   });
 };
 
-/** Files a node is allowed to touch: the union of implementation.changes[].files it authored. */
+/**
+ * Files a node is allowed to touch: the union of implementation.changes[].files it authored and of
+ * extensions.work3.allowlist (a list, or `{files:[...]}`), which is the only legal place for kinds that may
+ * not carry an implementation payload (uat, operations, ui).
+ */
 export function nodeAllowlist(raw){
   const changes=Array.isArray(raw?.implementation?.changes)?raw.implementation.changes:[];
-  return unique(changes.flatMap(change=>Array.isArray(change?.files)?change.files:[]).filter(file=>typeof file==='string'&&file.trim()).map(file=>slash(file.trim())));
+  const declared=raw?.extensions?.work3?.allowlist;
+  const extra=Array.isArray(declared)?declared:Array.isArray(declared?.files)?declared.files:[];
+  return unique([...changes.flatMap(change=>Array.isArray(change?.files)?change.files:[]),...extra].filter(file=>typeof file==='string'&&file.trim()).map(file=>slash(file.trim())));
+}
+
+/** The evidence record id for an operation: never the node id itself, which would be a duplicate stable id. */
+export function evidenceIdFor(opId){return `${sanitizeId(text(opId,'operation id'))}-evidence`;}
+
+/** A git remote as the validator wants an origin: a normalized credential-free https or ssh URL. */
+export function normalizeOrigin(remote){
+  const raw=String(remote??'').trim();
+  if(!raw)return null;
+  const scp=raw.match(/^([\w.-]+)@([\w.-]+):(.+)$/);
+  const candidate=scp?`ssh://${scp[1]}@${scp[2]}/${scp[3]}`:raw;
+  try{const url=new URL(candidate);if(!['https:','ssh:'].includes(url.protocol)||url.password||url.search||url.hash)return null;url.username=url.protocol==='ssh:'?url.username:'';return url.href;}catch{return null;}
 }
 
 /** Checks the kernel must re-run itself: extensions.work3.checks entries. */
@@ -394,7 +412,7 @@ export function markInProgress(repoRoot,node,{opId,dispatch=null,startedAt=null,
  * names what proved it.
  */
 export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,parse=parseYaml}={}){
-  const id=text(opId,'operation id'),evidenceId=sanitizeId(id);
+  const id=text(opId,'operation id'),evidenceId=evidenceIdFor(id);
   return transact(repoRoot,node,register=>{
     const {raw,kernel}=existingKernel(repoRoot,node);
     const verified=checkList(checks);
@@ -455,7 +473,7 @@ export function markDecided(repoRoot,node,{rev=null,review,by='starci-kernel',at
 
 // ---------------------------------------------------------------------------- evidence
 
-function repositoryName(repoRoot){
+export function repositoryName(repoRoot){
   const manifest=path.join(path.resolve(repoRoot),'package.json');
   if(fs.existsSync(manifest)){
     try{
@@ -467,12 +485,12 @@ function repositoryName(repoRoot){
 }
 
 /**
- * Write `<node dir>/evidence/<opId>/manifest.yaml` as a work/evidence@1 record. The id is the
- * sanitized operation id, which is also what markDone lists in `completion.evidence`, and the
+ * Write `<node dir>/evidence/<opId>-evidence/manifest.yaml` as a work/evidence@1 record. The id is the
+ * sanitized operation id plus `-evidence` (an op named after its node must not duplicate the node id), which is also what markDone lists in `completion.evidence`, and the
  * record binds the node by digest so stale proof cannot be reused.
  */
 export function writeEvidence(repoRoot,node,evidence={}){
-  const id=sanitizeId(text(evidence.opId,'operation id'));
+  const id=evidenceIdFor(evidence.opId);
   const raw=readNode(repoRoot,node);
   const repository=evidence.repository?sanitizeId(evidence.repository):repositoryName(repoRoot);
   const head=evidence.head??null;

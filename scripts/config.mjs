@@ -5,7 +5,8 @@ import { skillRoot } from '../core/runtime-root.mjs';
 import { parseYaml } from '../core/yaml.mjs';
 export const configRoot = skillRoot;
 export function validateConfig(config) {
-  if (!config || Array.isArray(config) || Object.keys(config).some(key => !['language','model','effort'].includes(key)) || typeof config.language !== 'string' || !/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language) || !(config.model === null || typeof config.model === 'string' && config.model.trim()) || !['none','minimal','low','medium','high','xhigh','max','ultra'].includes(config.effort)) throw Error('Invalid config.json: expected language, model (null or host model name), and effort.');
+  const supervisorOk = config?.supervisor === undefined || (config.supervisor && typeof config.supervisor === 'object' && !Array.isArray(config.supervisor) && Object.keys(config.supervisor).every(key => key === 'runtimes') && Array.isArray(config.supervisor.runtimes) && config.supervisor.runtimes.length > 0 && config.supervisor.runtimes.every(item => typeof item === 'string' && item.trim()));
+  if (!config || Array.isArray(config) || Object.keys(config).some(key => !['language','model','effort','supervisor'].includes(key)) || !supervisorOk || typeof config.language !== 'string' || !/^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(config.language) || !(config.model === null || typeof config.model === 'string' && config.model.trim()) || !['none','minimal','low','medium','high','xhigh','max','ultra'].includes(config.effort)) throw Error('Invalid config.json: expected language, model (null or host model name), effort, and optionally supervisor.runtimes (nonempty list of runtime ids).');
   return config;
 }
 /** Resolve the authored/legacy example under a skill root. Prefer YAML; accept JSON; then built `.dist` JSON. */

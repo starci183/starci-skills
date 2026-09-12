@@ -1,3 +1,6 @@
 language: vi
 model: null
 effort: medium
+# Models the workflow kernel uses for triage and decide operations, strongest first; lower it to save budget.
+supervisor:
+  runtimes: [claude-fable-5.1, gpt-6-astra]

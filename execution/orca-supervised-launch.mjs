@@ -8,6 +8,7 @@ import {createOrcaCalls,defaultOrcaExecutable,getPath} from './orca-calls.mjs';
 import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} from './supervision.mjs';
 import {protocolMain} from './orca-protocol.mjs';
 import {kernelMain} from './workflow-kernel.mjs';
+import {supervisorMain} from './kernel-supervisor.mjs';
 
 /**
  * Canonical supervised launcher for Orca operation agents, plus the CLI surface of the 5.0 workflow
@@ -477,9 +478,10 @@ function usage(){return `Usage:
     committed with a "Work: <node id>" trailer.
   node orca-supervised-launch.mjs workflow-status --id <workflow-id> [--worktree <relative-path>]
   node orca-supervised-launch.mjs workflow-stop --id <workflow-id> [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000] [--worktree <repo>]
   node orca-supervised-launch.mjs verify`;}
 
-const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-run','workflow-status','workflow-stop'];
+const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-run','workflow-status','workflow-stop','workflow-supervise'];
 
 export function main(argv=process.argv.slice(2),{orca,wait}={}){
   const {command,options}=parseArgs(argv);
@@ -487,6 +489,7 @@ export function main(argv=process.argv.slice(2),{orca,wait}={}){
   const runner=orca??createOrcaCalls();
   if(KERNEL_COMMANDS.includes(command)){
     const cwd=options.worktree?exactWorktree(options.worktree).path:process.cwd();
+  if(command==='workflow-supervise')return supervisorMain(options,{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd()});
     return kernelMain(command,options,{orca:runner,cwd,wait});
   }
   if(['report','wait'].includes(command)){

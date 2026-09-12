@@ -899,8 +899,14 @@ function recordDone(store,state,op,ctx,verified){
         limitations:['Only the operation allowlist was reviewed.']}}));
     return;
   }
+  // A completion binds its source directly (starci/source-identity@1) so the tree needs no repository resource record;
+  // the identity is scoped to the operation allowlist, which is exactly what the kernel verified.
+  const identity=ctx.work.origin&&/^[a-f0-9]{40,64}$/.test(String(op.head??''))&&typeof ctx.work.api.buildSourceIdentity==='function'
+    ?ctx.work.api.buildSourceIdentity({repository:ctx.work.repository??path.basename(ctx.work.repoRoot),origin:ctx.work.origin,commit:op.head,paths:op.allowlist??[],
+      dependencyCoverage:'Dependencies were not re-verified by this operation.',limitations:['Only the operation allowlist was verified by the kernel.']})
+    :null;
   ledgerWrite(store,state,op,ctx,'done',node=>ctx.work.api.markDone(ctx.work.repoRoot,node,{
-    opId:op.id,head:op.head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,
+    opId:op.id,head:op.head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,...(identity?{sourceIdentity:identity}:{}),
     evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',
       servedVersionEvidence:`Checks re-run by the StarCi kernel in workflow ${state.id} on branch ${state.branch}`}}));
 }
@@ -1461,6 +1467,8 @@ export function settleStalled(orca,store,state,ctx,tick){
     if(observed.liveness==='stalled-silent'&&noteSilence(store,state,op,ctx))op.avoidRuntimes=unique([...op.avoidRuntimes,op.runtime].filter(Boolean));
     op.restarts+=1;
     store.appendEvent({event:'settled',op:op.id,liveness:observed.liveness,restarts:op.restarts});
+    noteAnomaly(store,state,`settled:${op.id}:${observed.liveness}`,{op:op.id,runtime:op.runtime,liveness:observed.liveness});
+    triageAnomaly(store,state,`settled:${op.id}:${observed.liveness}`,{...ctx,orca});
     if(op.restarts>RESTART_LIMIT){
       op.status='blocked';
       state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} was restarted ${op.restarts} times (${observed.liveness})`});
@@ -1486,14 +1494,84 @@ function answerQuestions(orca,store,state,ctx){
  * reviews and repairs the results imply, and - when nothing is left to run - run the job gates and finish.
  * Every iteration appends a `tick` event and saves state, so re-running `workflow-run` continues.
  */
-export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,template,
+/**
+ * Reconcile the kernel's picture with Orca's: a live Dispatch of this Run that no operation names is an orphan
+ * (a launch the kernel lost) and is settled; the check is cheap and runs at start and every RECONCILE_EVERY ticks.
+ */
+export const RECONCILE_EVERY=10;
+export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync}={}){
+  const listed=orca.invoke('worker-list',{run:state.run},{cwd});
+  if(listed.outcome!=='ok')return {orphans:[],reason:listed.reason};
+  const live=(getPath(listed.receipt,'result.workers')??[]).filter(w=>['ready','running','starting'].includes(w.workerState)||(w.workerState==='unsupervised'&&['dispatched','pending','ready'].includes(w.dispatchStatus)));
+  const known=new Set(state.ops.map(op=>op.dispatch).filter(Boolean));
+  const orphans=[];
+  for(const worker of live){
+    if(known.has(worker.dispatchId))continue;
+    const settlement=settleDispatch(orca,worker.dispatchId,{cwd,reason:'orphan dispatch not named by any operation',terminalHandle:worker.agentTerminalHandle??null,closeTerminal:true,wait});
+    orphans.push({dispatch:worker.dispatchId,terminal:worker.agentTerminalHandle??null,effectState:settlement.effectState});
+  }
+  if(orphans.length)store.appendEvent({event:'reconciled-orphans',orphans});
+  return {orphans};
+}
+
+/**
+ * Triage: the one place a model reads an anomaly the policy table could not classify. It is called only when
+ * the same anomaly signature repeats, it may only pick from a closed option set, and every pick is recorded so
+ * the next occurrence becomes a rule instead of another call.
+ */
+/** The decide role's preference starts with the supervisor runtimes that exist in the profile. */
+const plainObject=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+export function withSupervisorPreference(profile,runtimes){
+  if(!profile||!plainObject(profile.runtimes))return profile;
+  const known=runtimes.filter(id=>profile.runtimes[id]);
+  if(!known.length)return profile;
+  const copy=structuredClone(profile);
+  copy.allocation=copy.allocation??{};copy.allocation.preference=copy.allocation.preference??{};
+  copy.allocation.preference.decide=[...known,...((copy.allocation.preference.decide??[]).filter(id=>!known.includes(id)))];
+  return copy;
+}
+export const DEFAULT_SUPERVISOR_RUNTIMES=['claude-fable-5.1','gpt-6-astra'];
+/** `<host>/config.json` may set `supervisor.runtimes`: the models triage and decide operations prefer, strongest first. */
+export function supervisorRuntimes(host){
+  try{
+    const config=JSON.parse(fs.readFileSync(path.join(host,'config.json'),'utf8'));
+    const listed=Array.isArray(config?.supervisor?.runtimes)?config.supervisor.runtimes:typeof config?.supervisor==='string'?[config.supervisor]:null;
+    const runtimes=(listed??[]).filter(item=>typeof item==='string'&&item.trim()).map(item=>item.trim());
+    return runtimes.length?runtimes:DEFAULT_SUPERVISOR_RUNTIMES;
+  }catch{return DEFAULT_SUPERVISOR_RUNTIMES;}
+}
+export const TRIAGE_AFTER=3;
+export const TRIAGE_OPTIONS=['resume-ops','park-runtime','settle-op','restart-kernel','needUser'];
+export function noteAnomaly(store,state,signature,detail){
+  state.anomalies=state.anomalies??{};
+  const entry=state.anomalies[signature]=state.anomalies[signature]??{count:0,detail,firstAt:Date.now(),triaged:null};
+  entry.count+=1;entry.lastAt=Date.now();
+  return entry;
+}
+export function triageAnomaly(store,state,signature,ctx){
+  const entry=state.anomalies?.[signature];
+  if(!entry||entry.count<TRIAGE_AFTER||entry.triaged||typeof ctx.decide!=='function')return null;
+  const chosen=ctx.decide({situation:`Anomaly repeated ${entry.count} times: ${signature}`,options:TRIAGE_OPTIONS,providers:ctx.supervisor??DEFAULT_SUPERVISOR_RUNTIMES,
+    context:{detail:entry.detail,recentEvents:store.readEvents({since:Math.max(0,(store.readEvents().at(-1)?.seq??0)-40)}).map(e=>`${e.event}${e.op?` ${e.op}`:''}${e.reason?` ${String(e.reason).slice(0,80)}`:''}`),ops:state.ops.map(op=>`${op.id}=${op.status}`)},cwd:state.worktree});
+  const option=chosen?.ok&&TRIAGE_OPTIONS.includes(chosen.value.option)?chosen.value.option:'needUser';
+  entry.triaged={option,rationale:chosen?.ok?chosen.value.rationale:null,at:Date.now()};
+  store.appendEvent({event:'triage',signature,option,rationale:entry.triaged.rationale,count:entry.count});
+  if(option==='resume-ops'){for(const op of state.ops)if(op.status==='blocked'&&op.refusal!=='dynamic-op'){op.status='ready';op.dispatch=null;op.terminal=null;}}
+  else if(option==='park-runtime'){const runtime=entry.detail?.runtime;if(runtime)ctx.allocator.failed(runtime,{reason:`triage: ${signature}`});}
+  else if(option==='settle-op'){const op=state.ops.find(item=>item.id===entry.detail?.op&&item.status==='running');if(op){settleDispatch(ctx.orca,op.dispatch,{cwd:state.worktree,reason:'triage',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});op.status='ready';op.dispatch=null;op.terminal=null;}}
+  else if(option==='restart-kernel'){fs.writeFileSync(path.join(store.dir,'stop.flag'),'triage restart');}
+  else state.needUser.push({kind:'triage',detail:`${signature}: ${JSON.stringify(entry.detail).slice(0,300)}`});
+  return option;
+}
+
+export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,template,supervisor=null,
   wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
   ledgerApi=work,validate=validateWorkTree,waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   need(plain(allocator),'A runtime allocator is required');
   need(typeof template==='string'&&template.trim(),'The operation contract template is required');
   required(state.run,'Orca run id');required(state.from,'own terminal handle');
-  const ctx={cwd,allocator,planOp,decide,template,wait,exec,git,launch,now,guards,work:null};
+  const ctx={cwd,allocator,planOp,decide,template,wait,exec,git,launch,now,guards,work:null,supervisor:supervisor??supervisorRuntimes(state.host??'')};
   // A state written before these bounds existed resumes with them.
   state.dynamicOps=Number.isFinite(state.dynamicOps)?state.dynamicOps:0;
   state.dynamicOpsBudget=dynamicBudget(state);
@@ -1518,12 +1596,16 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
       need(/^[a-f0-9]{64}$/.test(String(fresh??'')),`The Work validator reports no inputDigest for ${node.id}`);
       return fresh;
     };
-    ctx.work={api:ledgerApi,loaded,repoRoot,validate,digest,node:id=>loaded.nodes.get(id)??null};
+    const remote=ctx.git('git',['remote','get-url','origin'],{cwd:repoRoot,encoding:'utf8',windowsHide:true});
+    const origin=remote.status===0?ledgerApi.normalizeOrigin?.((remote.stdout??'').trim())??null:null;
+    ctx.work={api:ledgerApi,loaded,repoRoot,validate,digest,origin,repository:ledgerApi.repositoryName?.(repoRoot)??null,node:id=>loaded.nodes.get(id)??null};
     store.appendEvent({event:'ledger-loaded',workRoot:slash(loaded.workRoot),valid:loaded.ok,nodes:loaded.list.length,scope:state.scope});
   }
   // Operations created before a rule change carry their old check lists: the kernel-owned checks are stripped on load.
   for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
+  reconcileWithOrca(orca,store,state,{cwd,wait});
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
+    if(iteration>0&&iteration%RECONCILE_EVERY===0)reconcileWithOrca(orca,store,state,{cwd,wait});
     if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});store.saveState(state);return state;}
     state.iterations+=1;
     store.appendEvent({event:'tick',iteration:state.iterations,
@@ -1542,7 +1624,8 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     if(running.length){
       const tick=waitTick(orca,{cwd:state.worktree,run:state.run,from:state.from,timeoutMs:waitTimeoutMs,tickMs,
         reportsDir:store.paths.reports,now,wait});
-      store.appendEvent({event:'wait',result:tick.event,ticks:tick.ticks,
+      if(tick.event==='check-failed'){noteAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{reason:tick.check?.reason??null});triageAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{...ctx,orca});}
+    store.appendEvent({event:'wait',result:tick.event,ticks:tick.ticks,
         liveness:(tick.liveness??[]).map(item=>`${item.dispatch}:${item.liveness}`)});
       acceptReports(orca,store,state,ctx);
       settleStalled(orca,store,state,ctx,tick);
@@ -1707,7 +1790,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     store.appendEvent({event:binding?'run-bound':'run-resumed',run:state.run,from:state.from,iterations:state.iterations});
     const finished=(()=>{const release=acquireKernelLock(store);try{fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});return runLoop(orca,store,state,{cwd:worktree,wait,
       // Slots are derived from the operations that are actually running; saved loads may belong to a dead kernel.
-      allocator:createAllocator({state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null}),template:templateOf(state.host),
+      supervisor:supervisorRuntimes(state.host),
+      allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null}),template:templateOf(state.host),
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:finished.phase,ledgerMode:finished.ledgerMode,
       finished:finished.finished,ledger:finished.ledger.map(item=>`${item.id}=${item.status}`),

@@ -10,7 +10,7 @@ import {buildReport} from '../execution/reports.mjs';
 import {spawnSync} from 'node:child_process';
 import {validateGoalPlan} from '../execution/llm-functions.mjs';
 import {createStore} from '../execution/workflow-store.mjs';
-import {DYNAMIC_OPS_BUDGET,applyOpReport,approve,changedFiles,createWorkflowState,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,renderContract,resumePaused,runLoop,settleStalled,workModule,workOpId} from '../execution/workflow-kernel.mjs';
+import {DYNAMIC_OPS_BUDGET,TRIAGE_AFTER,TRIAGE_OPTIONS,applyOpReport,approve,changedFiles,createWorkflowState,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,noteAnomaly,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,workModule,workOpId} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -631,14 +631,14 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     const node=harness.read('demo.sales.implementation.backend.intake');
     assert.equal(node.state,'done');
     assert.equal(node.completion.inputDigest,DIGEST('f'));
-    assert.deepEqual(node.completion.evidence,['demo.sales.implementation.backend.intake']);
+    assert.deepEqual(node.completion.evidence,['demo.sales.implementation.backend.intake-evidence']);
     assert.equal(node.extensions.work3.kernel.verifiedBy,'starci-kernel');
     assert.deepEqual(node.extensions.work3.kernel.checks.map(check=>[check.assertion,check.exitCode]),[['unit-tests-pass',0]]);
     // The authored checks survive the write; the kernel owns only state, completion and its own block.
     assert.deepEqual(node.extensions.work3.checks.map(check=>check.command),['npx vitest run intake']);
     assert.equal(node.description,'Implement order intake against the accepted SDS.');
     const manifest=parseYaml(fs.readFileSync(path.join(path.dirname(harness.node('demo.sales.implementation.backend.intake')),
-      'evidence','demo.sales.implementation.backend.intake','manifest.yaml'),'utf8'));
+      'evidence','demo.sales.implementation.backend.intake-evidence','manifest.yaml'),'utf8'));
     assert.equal(manifest.schema,'work/evidence@1');
     assert.equal(manifest.nodeId,'demo.sales.implementation.backend.intake');
     assert.equal(manifest.outcome,'pass');
@@ -1023,4 +1023,37 @@ test('the kernel defaults to the real guard module when it is on disk',()=>{
   assert.deepEqual(kernelGuards.resourceLocks({kind:'backend.implement',resources:['postgres'],checks:[]}),['postgres']);
   assert.equal(kernelGuards.resourcesClash({resources:['docker']},{resources:['docker']}),true);
   assert.equal(kernelGuards.resourcesClash({resources:['docker']},{resources:['postgres']}),false);
+});
+
+test('reconcile settles a live dispatch no operation names, and a repeated anomaly is triaged once through a closed option set',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    running(harness.state,'op-intake','ctx_known');
+    harness.fake.live.set('ctx_known',{id:'ctx_known',task:'task_k',handle:'term_k'});
+    harness.fake.live.set('ctx_orphan',{id:'ctx_orphan',task:'task_o',handle:'term_o'});
+    const reconciled=reconcileWithOrca(harness.fake.orca,harness.store,harness.state,{cwd,wait:noWait});
+    assert.deepEqual(reconciled.orphans.map(item=>item.dispatch),['ctx_orphan']);
+    assert.ok(harness.fake.live.has('ctx_known'),'the dispatch an operation names is left alone');
+    assert.ok(!harness.fake.live.has('ctx_orphan'),'the orphan is released');
+    assert.equal(events(harness.store).at(-1).event,'reconciled-orphans');
+
+    const asked=[];
+    const decide=({situation,options})=>{asked.push({situation,options});return {ok:true,value:{option:'park-runtime',rationale:'the runtime keeps dying'}};};
+    const parked=[];
+    const ctx={cwd,allocator:{...harness.allocator,failed:(runtime,info)=>parked.push([runtime,info.reason])},guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>0,work:null,decide,orca:harness.fake.orca};
+    for(let count=1;count<=TRIAGE_AFTER;count+=1){
+      noteAnomaly(harness.store,harness.state,'settled:op-intake:dead',{op:'op-intake',runtime:'qwen3.8-flash',liveness:'dead'});
+      assert.equal(triageAnomaly(harness.store,harness.state,'settled:op-intake:dead',ctx),count<TRIAGE_AFTER?null:'park-runtime');
+    }
+    assert.equal(asked.length,1,'the model is asked exactly once per signature');
+    assert.deepEqual(asked[0].options,TRIAGE_OPTIONS);
+    assert.deepEqual(parked,[['qwen3.8-flash','triage: settled:op-intake:dead']]);
+    noteAnomaly(harness.store,harness.state,'settled:op-intake:dead',{});
+    assert.equal(triageAnomaly(harness.store,harness.state,'settled:op-intake:dead',ctx),null,'a triaged signature is a rule now, not another call');
+    const triaged=events(harness.store).find(event=>event.event==='triage');
+    assert.equal(triaged.option,'park-runtime');
+    assert.equal(triageAnomaly(harness.store,harness.state,'missing',{}),null,'no decider or no entry is a no-op');
+  }finally{harness.cleanup();}
 });
