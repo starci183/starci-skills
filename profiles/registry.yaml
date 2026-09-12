@@ -205,11 +205,10 @@ operators:
       - {environment: qwen, profiles: [qwen3.8-flash]}
   interface.draw:
     skill: starci
-    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+    # Drawing generates PNG candidates with the image model; only the Codex runtime carries one ($imagegen).
+    chain: [gpt-5.6-sol]
     environments:
       - {environment: codex, profiles: [gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen3.8-flash]}
   interface.implement:
     skill: starci
     chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
