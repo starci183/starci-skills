@@ -12,6 +12,7 @@ import {resolveLedgerRoot,sharedLedgerStatus} from './ledger-routing.mjs';
 import {createAllocator,loadRuntimes} from './runtime-allocator.mjs';
 import {proofFinding,proofPlan,runAtBase} from './verify-proof.mjs';
 import {stepsFor} from './contract-steps.mjs';
+import {parseYaml} from '../core/yaml.mjs';
 import * as work from './work-ledger.mjs';
 import * as llm from './llm-functions.mjs';
 import * as graph from './kind-graph.mjs';
@@ -42,7 +43,14 @@ export const WORK_LEDGER='work';
  * what a tree whose kind graph cannot be read falls back to. Decision kinds are answered, never launched.
  */
 export const WORK_OPERATION={implementation:'backend.implement',ui:'interface.implement',uat:'uat.verify',e2e:'e2e.verify',operations:'runtime.operate'};
-export const DECISION_OPERATION={architecture:'architecture.decide',business:'business.decide','business-overview':'business.decide'};
+export const DECISION_OPERATION={architecture:'architecture.decide',business:'business.decide','business-overview':'business.decide',brand:'brand.decide'};
+/**
+ * The brand is a decision like any other, and the one every design-family operation reads: the node kind
+ * `brand` is answered by `brand.decide`, which authors the brand record (name, family, colour tokens and their
+ * roles, the mascot and logo assets, what is forbidden, the imagery prompt rules) and bumps its `rev`.
+ */
+export const BRAND_KIND='brand';
+export const BRAND_DECIDE='brand.decide';
 /**
  * Kinds the graph names that the operator registry still launches under their 4.x operator id. The graph is
  * the kernel's vocabulary (roles, lanes, routes); `ops/registry.yaml` is the launchable operator set, and the
@@ -206,7 +214,7 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     run:null,from:null,workflowTask:null,phase:'goal',approved:false,
     definitionOfDone:[],risks:[],questions:[],ledger:[],ops:[],needUser:[],gateResults:[],verifyRounds:{},gateRounds:0,
     lanes:{},
-    decisions:[],ledgerSummary:null,
+    decisions:[],ledgerSummary:null,brand:null,
     dynamicOps:0,dynamicOpsBudget:DYNAMIC_OPS_BUDGET,sharedQueue:[],silences:{},preflight:null,
     head:null,iterations:0,counters:{},stalls:0,allocation:null,finished:null,createdAt:Date.now()};
 }
@@ -260,10 +268,62 @@ export function laneOf(state,node){
     ...(existing?.authored?{authored:existing.authored}:{}),
     head:existing?.head??state.ops.find(op=>op.nodeId===id&&op.status==='done'&&op.head&&op.kind!==AUTHOR_KIND)?.head??null};
 }
-/** Predicates an `optionalWhen` lane step reads. No step declares one yet; the seam is here, not in the graph. */
-const lanePredicates=()=>({});
-const laneNext=entry=>{
-  try{return graph.nextKind(entry?.lane??[],entry?.done??[],{predicates:lanePredicates()});}catch{return null;}
+/**
+ * How the kernel reads a Work tree from anywhere that is not the run context: `deriveWorkOp` has the api and
+ * the location, the run loop has `ctx.work`. Both answer the same three things, so one reader serves both.
+ */
+const ledgerAccess=ctx=>{
+  if(!plain(ctx))return null;
+  if(plain(ctx.work))return {api:ctx.work.api??null,at:ctx.work.at??{repoRoot:ctx.work.repoRoot,workRoot:ctx.work.workRoot},loaded:ctx.work.loaded??null};
+  if(ctx.api)return {api:ctx.api,at:ctx.at??null,loaded:ctx.loaded??null};
+  return null;
+};
+const workRootOf=at=>typeof at==='string'?path.join(at,'.starciwork')
+  :plain(at)?(at.workRoot?String(at.workRoot):at.repoRoot?path.join(String(at.repoRoot),'.starciwork'):null):null;
+/**
+ * The interface design record of a node: the one design file the node's own `design/` folder names (`index.yaml`
+ * first, then the only file there). It is the authority for what the interface lane still has to do - which
+ * screens were drawn and which artwork slots the drawing declared - so it is read from disk, never inferred.
+ * A node whose design was never drawn has no record, and then every drawing step of its lane stays mandatory.
+ */
+export function designRecord(ctx,node){
+  const access=ledgerAccess(ctx);
+  if(!access?.api||!plain(node))return null;
+  let directory=null;
+  try{directory=typeof access.api.nodeDirectory==='function'?access.api.nodeDirectory(access.at??'',node):null;}catch{directory=null;}
+  if(!directory){
+    const root=workRootOf(access.at);
+    directory=root&&node.path?path.join(root,path.dirname(String(node.path))):null;
+  }
+  if(!directory)return null;
+  const folder=path.join(directory,'design');
+  let names=[];
+  try{names=fs.readdirSync(folder,{withFileTypes:true}).filter(entry=>entry.isFile()&&/\.(ya?ml|json)$/i.test(entry.name)).map(entry=>entry.name).sort();}catch{return null;}
+  const file=names.find(name=>/^index\.(ya?ml|json)$/i.test(name))??names[0];
+  if(!file)return null;
+  try{
+    const text=fs.readFileSync(path.join(folder,file),'utf8');
+    const parsed=/\.json$/i.test(file)?JSON.parse(text):parseYaml(text);
+    if(!plain(parsed))return null;
+    return plain(parsed.design)?{...parsed,...parsed.design,file:slash(path.join(folder,file))}:{...parsed,file:slash(path.join(folder,file))};
+  }catch{return null;}
+}
+const declared=value=>Array.isArray(value)?value.length>0:plain(value)?Object.keys(value).length>0:false;
+/**
+ * Predicates an `optionalWhen` lane step reads. Both are facts of the node's design record, never a judgement:
+ * `node.hasInterfaceDesign` is true when that record exists and declares screens (so there is nothing left to
+ * draw), and `node.hasNoArtworkSlots` is true when it exists and declares no artwork slot (so there is no
+ * artwork to produce). A node with no record satisfies neither: the step runs until the record says otherwise.
+ */
+export function lanePredicates(ctx=null,node=null){
+  const record=designRecord(ctx,node);
+  return {
+    'node.hasInterfaceDesign':Boolean(record)&&declared(record.screens),
+    'node.hasNoArtworkSlots':Boolean(record)&&!declared(record.artworkSlots)
+  };
+}
+const laneNext=(entry,predicates=null)=>{
+  try{return graph.nextKind(entry?.lane??[],entry?.done??[],{predicates:predicates??{}});}catch{return null;}
 };
 const laneText=lane=>(lane??[]).join(' -> ');
 /** `2/3`: how much of a node's lane is accepted. What `workflow-status` prints per node. */
@@ -454,8 +514,12 @@ export const KERNEL_CHECK=/^work-valid$/i;
  * The design grammar the host installs (knowledge/grammars/<family>/{DNA,family,idioms}.yaml and the UI composition
  * state canon) is a reference of every design-family operation: a drawing, a frontend build or a walk without it
  * invents its own look. Product-agnostic: every grammar family the host carries is listed.
+ *
+ * The brand record is the second half of that material and it is the product's own: these four kinds are what
+ * `brand.decide` exists for, so each of them references the brand file and every asset beside it, and each of
+ * them refuses to run on a tree that has no brand record at all.
  */
-export const DESIGN_KINDS=['interface.draw','frontend.implement','uat.verify'];
+export const DESIGN_KINDS=['interface.draw','interface.asset','frontend.implement','uat.verify'];
 /** The repository a node is delivered in when it is not this kernel's own; null when it is ours or unknown. */
 function foreignNodeOf(ctx,op){
   if(!ctx?.work||!op?.nodeId||!ctx.work.code?.repository||typeof ctx.work.api?.nodeRepository!=='function')return null;
@@ -470,14 +534,68 @@ export function grammarReferences(root=skillRoot){
   for(const relative of [['knowledge','grammars'],['knowledge','patterns','fe'],['knowledge','ui']])walk(path.join(root,...relative));
   return unique(found).sort();
 }
-export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,lane=null,done=[]}){
+/**
+ * The brand record as the Work ledger answers it. A ledger build that knows about brands always carries the
+ * field - `{node, rev, file, spec}` or `null` - and one that does not carries none, which is the only way the
+ * kernel tells "this product has no brand yet" from "this tree was never asked about brands".
+ */
+const brandAware=ctx=>{const access=ledgerAccess(ctx);return Boolean(access?.loaded)&&Object.hasOwn(access.loaded,'brand');};
+const brandOf=ctx=>ledgerAccess(ctx)?.loaded?.brand??null;
+/** The brand file and every asset beside it, as the ledger names them; a ledger that names none adds nothing. */
+const brandReferencesOf=(api,loaded)=>{
+  if(typeof api?.brandReferences!=='function'||!loaded?.brand)return [];
+  try{return unique((api.brandReferences(loaded)??[]).map(entry=>slash(String(entry??''))).filter(Boolean));}catch{return [];}
+};
+/** What a contract prints and the status records: the brand's identity and its artwork, never the whole spec. */
+export function brandSummary(loaded){
+  const brand=loaded?.brand;
+  if(!plain(brand))return null;
+  const spec=plain(brand.spec)?brand.spec:{};
+  const rev=brand.rev??spec.rev??null;
+  return {node:brand.node??null,file:brand.file?slash(String(brand.file)):null,
+    name:spec.name??brand.name??null,family:spec.family??brand.family??null,rev:rev===undefined?null:rev,
+    mascotAssets:unique((Array.isArray(spec.mascotAssets)?spec.mascotAssets:[]).map(entry=>slash(String(entry??''))).filter(Boolean))};
+}
+/** What the validator is given: the brand as rules, trimmed to the fields a verdict may be founded on. */
+export const BRAND_PAYLOAD=['name','family','rev','colorTokens','mascotAssets','forbidden','imageryPromptRules'];
+export function brandPayload(loaded){
+  const brand=loaded?.brand;
+  if(!plain(brand))return null;
+  const spec=plain(brand.spec)?brand.spec:{};
+  const value={};
+  for(const field of BRAND_PAYLOAD){
+    const given=spec[field]??(field==='rev'?brand.rev:undefined);
+    if(given!==undefined&&given!==null)value[field]=given;
+  }
+  return Object.keys(value).length?value:null;
+}
+/**
+ * The brand summary on the state, and the one event a changed `rev` owes every operation that already read it.
+ * A new rev is not the kernel's to act on beyond this: the Work validator binds a completion to the digest of
+ * what it was built from, so a frontend-facing node whose brand moved is reopened in the tree itself and
+ * `syncLedgerOps` picks it up on the next iteration like any other newly schedulable node.
+ */
+function noteBrand(store,state,loaded,{op=null,silent=false}={}){
+  if(!loaded||!Object.hasOwn(loaded,'brand'))return state.brand??null;
+  const summary=brandSummary(loaded);
+  const changed=String(state.brand?.rev??'')!==String(summary?.rev??'');
+  state.brand=summary;
+  if(changed&&!silent&&summary?.rev!==null&&summary?.rev!==undefined)
+    store.appendEvent({event:'brand-revised',rev:summary.rev,node:summary.node??null,...(op?{op:op.id}:{})});
+  return summary;
+}
+export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,lane=null,done=[],loaded=null}){
   // Lane-aware: the kind of this operation is the node's next lane step, not a fixed map of the node kind.
   const template=lane?.length?lane:(()=>{try{return graph.laneFor({kind:node.kind,layout:nodeLayout(node),repositoryRole:node.repository??null});}catch{return [];}})();
-  const step=(()=>{try{return graph.nextKind(template,done,{predicates:lanePredicates()});}catch{return null;}})();
+  const access={api,at:repoRoot,loaded};
+  const step=(()=>{try{return graph.nextKind(template,done,{predicates:lanePredicates(access,node)});}catch{return null;}})();
+  const design=DESIGN_KINDS.includes(step??'');
   return toOp({id,nodeId:node.id,
     kind:step??WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),
     ledgerIds:[node.id],allowlist:node.allowlist,
-    references:unique([node.path,...(node.refs??[]),...(DESIGN_KINDS.includes(step??'')?grammarReferences():[])]),
+    // A design-family step reads two bodies of material it may never invent: the installed grammar and the
+    // product's own brand record with its assets.
+    references:unique([node.path,...(node.refs??[]),...(design?grammarReferences():[]),...(design?brandReferencesOf(api,loaded):[])]),
     // The whole-tree validator is the kernel's own gate at acceptance: parallel operations must not fail on a sibling's in-progress ledger write.
     checks:node.checks.filter(check=>!KERNEL_CHECK.test(check.assertion??'')).map(check=>({name:check.assertion??check.command,command:check.command})),
     acceptance:node.assertions.length?node.assertions:[`${node.id} satisfies the Work contract it authored`],
@@ -497,6 +615,8 @@ export function syncLedgerOps(store,state,ctx){
   try{loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});}
   catch(error){store.appendEvent({event:'ledger-sync-failed',reason:error.message});return [];}
   ctx.work.loaded=loaded;
+  // A brand that moved since the last read is named here too: the re-read is what makes the new rev current.
+  noteBrand(store,state,loaded);
   // An operation created before the repository rule for a node another repository delivers is settled and blocked.
   for(const op of state.ops){
     if(!op.nodeId||op.refusal==='out-of-repository'||!ctx.work.code.repository||typeof ctx.work.api.nodeRepository!=='function')continue;
@@ -544,7 +664,7 @@ export function syncLedgerOps(store,state,ctx){
     const laneOps=mine.filter(op=>op.kind!==AUTHOR_KIND);
     // One step at a time: a node yields its next lane step only when nothing of it is still in flight.
     if(mine.some(op=>op.status!=='done'))continue;
-    const next=laneNext(entry);
+    const next=laneNext(entry,lanePredicates({api:ctx.work.api,at:ctx.work.at,loaded},node));
     // No next step means the lane is walked; `review.verify` is the kernel's own (planVerifyOps), not the node's.
     const onDisk=(()=>{try{return ctx.work.api.readNode(ctx.work.at,node)?.state??node.state;}catch{return node.state;}})();
     if(!next&&laneOps.length&&onDisk==='todo'&&!entry.recordedAttempt){
@@ -559,7 +679,7 @@ export function syncLedgerOps(store,state,ctx){
     }
     if(!next||KERNEL_PLANNED_KINDS.includes(next)||mine.some(op=>op.kind===next))continue;
     const id=laneOpId(node.id,next,!laneOps.length,taken);opOfNode.set(node.id,id);
-    const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done});
+    const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done,loaded});
     op.difficulty=op.difficulty??'medium';
     op.createdIteration=state.iterations;
     state.ops.push(op);
@@ -675,6 +795,8 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
   state.decisions=ledgerApi.decisionCandidates(loaded,{scope}).map(node=>({id:node.id,kind:node.kind,path:node.path,
     operation:DECISION_OPERATION[node.kind]??'business.decide',title:describeNode(ledgerApi,at,node)}));
   state.ledgerSummary=ledgerApi.ledgerSummary(loaded,{scope});
+  // The brand is part of what the user approves: goal.md and goal.json name the record every design step reads.
+  noteBrand(store,state,loaded,{silent:true});
   if(!loaded.ok)state.needUser.push({kind:'ledger',detail:`the Work tree does not validate, so no node in it is a trustworthy TODO: ${ledgerErrorText(loaded.errors)}`});
   for(const node of incomplete)state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
   need(ready.length||incomplete.length||state.decisions.length,
@@ -687,8 +809,8 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
     lane:[...(state.lanes[node.id]?.lane??[])]}));
   const taken=new Set(),opOfNode=new Map();
   for(const node of ready)opOfNode.set(node.id,workOpId(node.id,taken));
-  state.ops=ready.map((node,index)=>deriveWorkOp(ledgerApi,repoRoot,node,
-    {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[]}));
+  state.ops=ready.map((node,index)=>deriveWorkOp(ledgerApi,at,node,
+    {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[],loaded}));
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
   const assessed=typeof assessGoal==='function'?assessGoal({job:state.job,inputs:state.inputs,
     ledger:state.ledger.map(item=>({id:item.id,kind:item.kind,title:item.title,module:item.module})),
@@ -715,7 +837,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
     ledgerMode:state.ledgerMode,scope:state.scope,workRoot:slash(loaded.workRoot),ledgerValid:loaded.ok,
     ledgerSource:binding.source,ledgerShared:binding.sharedLedger,ledgerOwner:state.ledgerOwner,codeRepository:repository,codeSide:binding.side??null,
     definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,
-    ledger:state.ledger,decisions:state.decisions,ledgerSummary:state.ledgerSummary,
+    ledger:state.ledger,decisions:state.decisions,ledgerSummary:state.ledgerSummary,brand:state.brand??null,
     lanes:Object.fromEntries(Object.entries(state.lanes??{}).map(([node,entry])=>[node,[...entry.lane]])),
     ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
       allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
@@ -856,8 +978,22 @@ export function laneLine(state,op){
   return `Lane: ${laneText(entry.lane)} (this op: step ${at<0?(entry.done??[]).length+1:at+1} of ${entry.lane.length})`;
 }
 
+/**
+ * The brand, in the contract of every operation that may draw, build or judge a surface. It is short on
+ * purpose - the identity, the rev and where the artwork is - because the record itself is in the references
+ * right above it: the block exists so no design operation can claim it did not know the brand was there.
+ */
+function brandBlock(op,brand){
+  if(!plain(brand)||!DESIGN_KINDS.includes(op.kind))return [];
+  return [`## Brand`,
+    `- name: ${brand.name??'(unnamed)'} - family: ${brand.family??'-'} - rev: ${brand.rev??'-'}`,
+    ...(brand.file?[`- record: \`${brand.file}\``]:[]),
+    ...(brand.mascotAssets?.length?brand.mascotAssets.map(entry=>`- mascot/logo: \`${entry}\``):[`- no mascot or logo asset is declared`]),
+    `Every colour, font, icon and illustration you produce comes from this record and the installed grammar; you never invent one beside them.`,``];
+}
+
 export function renderContract({template,op,state,store,launcher=state.launcher,run=state.run,
-  guards=kernelGuards,protectedPaths=null}){
+  guards=kernelGuards,protectedPaths=null,brand=state.brand??null}){
   const text=String(template??'');
   for(const heading of ['## Cook until done','## Ping (mandatory)','## Never'])
     need(text.includes(heading),`The operation template has no "${heading}" section`);
@@ -885,6 +1021,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `## Resources`,...(locks.length?locks.map(entry=>`- \`${entry}\``):['- none: this operation claims no shared resource']),
     `Two operations that share a resource never run at the same time; never start, stop or reset one you did not declare.`,``,
     `## References`,...(op.references.length?op.references.map(entry=>`- ${entry}`):['- the goal and the allowlist above']),``,
+    ...brandBlock(op,brand),
     ...(op.priorOpen.length?[`## Open items you inherit`,...op.priorOpen.map(item=>`- ${item}`),``]:[]),
     ...(op.findings.length?[`## Findings you must resolve`,...op.findings.map(item=>`- ${typeof item==='string'?item:JSON.stringify(item)}`),``]:[]),
     `## Acceptance`,...(op.acceptance.length?op.acceptance.map((item,index)=>`${index+1}. ${item}`):['1. the goal above holds']),``,
@@ -1066,6 +1203,12 @@ export function launchWithCandidate(orca,{cwd,run,workflowTask,from,worktree,ope
 
 function launchOp(orca,store,state,op,allocated,ctx){
   if(op.needsReplan)replanOp(store,state,op,ctx);
+  // A design operation derived before the brand was decided gets the record now: its references are the material
+  // it must read, and by launch time that material exists.
+  if(DESIGN_KINDS.includes(op.kind)){
+    const brand=brandReferencesOf(ctx.work?.api,ctx.work?.loaded);
+    if(brand.length)op.references=unique([...op.references,...brand]);
+  }
   op.kernelOwned=kernelOwnedPaths(state,op,ctx);
   const contract=renderContract({template:ctx.template,op,state,store,guards:ctx.guards,protectedPaths:op.kernelOwned});
   fs.writeFileSync(store.contractPath(op.id),contract);
@@ -1130,6 +1273,69 @@ function launchableFor(allocator,kind){
   try{return allocator.launchableTargets(kind);}catch{return null;}
 }
 
+/**
+ * The brand node of the tree: the one the brand record names, or the `brand` node the tree carries. A node
+ * still `todo` is preferred, because that is the one a decision is owed.
+ */
+function brandNode(ctx){
+  const loaded=ledgerAccess(ctx)?.loaded;
+  if(!loaded)return null;
+  const named=loaded.brand?.node?loaded.nodes?.get?.(loaded.brand.node)??null:null;
+  if(named)return named;
+  const list=loaded.list??[];
+  return list.find(node=>node.kind===BRAND_KIND&&node.state==='todo')??list.find(node=>node.kind===BRAND_KIND)??null;
+}
+/**
+ * The `brand.decide` operation: one per workflow, created the moment a design operation needs a brand record
+ * the tree does not have. It is a decision - it authors the brand record and its assets, and its only check is
+ * that the tree still validates afterwards - so it is created exactly the way the `sds-gap` route creates
+ * `architecture.revise`, from the node the tree already carries. A tree that carries no brand node at all is
+ * the one thing the kernel cannot invent: a brand is the product's identity, so it asks the user once.
+ */
+function ensureBrandDecide(store,state,ctx){
+  const existing=state.ops.find(op=>op.kind===BRAND_DECIDE&&op.refusal!=='superseded');
+  if(existing)return existing;
+  const node=brandNode(ctx);
+  if(!node){
+    const detail='no brand record: author .starciwork/brand/index.yaml (a work.author or brand.decide op)';
+    if(!state.needUser.some(item=>item.kind==='brand')){
+      state.needUser.push({kind:'brand',detail});
+      store.appendEvent({event:'brand-missing',detail});
+    }
+    return null;
+  }
+  const file=`.starciwork/${slash(node.path)}`;
+  // The record and the folder around it: the assets a brand decision produces live beside the file it writes.
+  const folder=`.starciwork/${slash(path.dirname(node.path))}/**`;
+  const op=addOp(store,state,{id:nextId(state,'brand'),kind:BRAND_DECIDE,nodeId:node.id,
+    goal:`Decide the brand in ${node.id}: the name, the design family, every colour token with the role it plays, the fonts, the mascot and logo assets, what is forbidden and the rules every imagery prompt must carry. Every design operation of this workflow is built and judged against this record.`,
+    // No ledger item: a decision is not a slice of the goal, it is what the slices are measured against.
+    ledgerIds:[],allowlist:unique([file,folder]),
+    references:unique([node.path,...(node.refs??[]),...grammarReferences()]),
+    checks:[{name:'work-tree-validates',command:workValidateCommand(ctx)}],
+    acceptance:[`${node.id} records the brand: name, family, colour tokens with their roles, the mascot and logo assets, the forbidden list and the imagery prompt rules`,
+      'the Work tree still validates'],origin:'ledger'},
+    'a design operation cannot run before the brand is decided');
+  op.difficulty='hard';
+  store.appendEvent({event:'brand-decide-created',op:op.id,node:node.id,allowlist:op.allowlist});
+  return op;
+}
+/**
+ * A design-family operation reads the brand; without a brand record it would invent one, so it does not run.
+ * The op waits behind the `brand.decide` operation this creates (and, if the tree carries no brand node, behind
+ * the user) instead of being launched with nothing to read.
+ */
+function deferForBrand(store,state,op,ctx){
+  if(!DESIGN_KINDS.includes(op.kind)||!brandAware(ctx)||brandOf(ctx))return false;
+  const decide=ensureBrandDecide(store,state,ctx);
+  if(decide&&decide.id!==op.id&&!op.dependsOn.includes(decide.id)){
+    op.dependsOn=unique([...op.dependsOn,decide.id]);
+    op.status='pending';
+  }
+  store.appendEvent({event:'schedule-deferred',op:op.id,reason:'brand missing',...(decide?{waitingFor:decide.id}:{})});
+  return true;
+}
+
 function scheduleOps(orca,store,state,ctx){
   for(const op of state.ops){
     if(op.status!=='pending')continue;
@@ -1146,6 +1352,8 @@ function scheduleOps(orca,store,state,ctx){
   for(const op of state.ops.filter(item=>item.status==='ready')){
     const busy=state.ops.filter(item=>['running','answering'].includes(item.status));
     if(busy.length>=ctx.allocator.maxParallelOps)break;
+    // A design operation on a tree with no brand record is not launched at all: the brand is decided first.
+    if(deferForBrand(store,state,op,ctx))continue;
     // On the Work ledger the authored files decide parallelism, through the ledger's own prefix semantics.
     const overlaps=other=>ctx.work?!ctx.work.api.disjoint(other.allowlist,op.allowlist):allowlistsOverlap(other.allowlist,op.allowlist);
     if(busy.some(overlaps)){
@@ -1311,17 +1519,19 @@ function kernelProof(ctx,nodeId){
 function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op.head}={}){
   if(!ctx.work||!nodeId)return;
   verified={...verified,checks:[...(verified?.checks??[]),...kernelProof(ctx,nodeId)]};
-  const decision=['architecture.decide','architecture.revise','business.decide'].includes(op.kind)||kindRole(op.kind)==='decide';
+  const decision=['architecture.decide','architecture.revise','business.decide',BRAND_DECIDE].includes(op.kind)||kindRole(op.kind)==='decide';
   if(decision){
     ledgerWrite(store,state,op,ctx,'decided',node=>ctx.work.api.markDecided(ctx.work.at,node,{
       by:'starci-kernel',
       // A revision of an accepted design bumps its rev, so a reopened decision is not read as the first one.
-      rev:op.kind==='architecture.revise'?nextRev(ctx,node):null,
+      // A brand decision always does: every surface already built from the old brand is bound to that rev.
+      rev:['architecture.revise',BRAND_DECIDE].includes(op.kind)?nextRev(ctx,node):null,
       digest:ctx.work.digest,
       review:{reviewer:op.runtime??'starci-kernel',
         authority:`the kernel accepted ${op.id} after re-running its checks itself`,
         observations:decisionObservations(ctx,node,op),
         limitations:['Only the operation allowlist was reviewed.']}}),nodeId);
+    if(op.kind===BRAND_DECIDE)rereadBrand(store,state,op,ctx);
     return;
   }
   // A completion binds its source directly (starci/source-identity@1) so the tree needs no repository resource record;
@@ -1340,6 +1550,20 @@ function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op.head}=
     opId:op.id,head:head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,repository,bindSource:bindsCode(node),...(identity&&bindsCode(node)?{sourceIdentity:identity}:{}),
     evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',
       servedVersionEvidence:`Checks re-run by the StarCi kernel in workflow ${state.id} on branch ${state.branch}`}}),nodeId);
+}
+
+/**
+ * An accepted brand decision is read back from the tree at once, and that is all the kernel does about it: the
+ * new record and its rev become the material of every operation launched from here on, and the Work validator -
+ * which binds a completion to the digest of what it was built from - is what reopens the frontend-facing nodes
+ * that were built against the old brand. `syncLedgerOps` then picks them up as newly schedulable nodes.
+ */
+function rereadBrand(store,state,op,ctx){
+  try{
+    const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});
+    if(loaded.ok)ctx.work.loaded=loaded;
+    noteBrand(store,state,loaded,{op});
+  }catch(error){store.appendEvent({event:'ledger-sync-failed',op:op.id,reason:error.message});}
 }
 
 /** The rev a revision writes: one past whatever the node's kernel block carries, and 1 when it carries none. */
@@ -1376,7 +1600,7 @@ function advanceLanes(store,state,op,ctx,verified){
     entry.done=unique([...(entry.done??[]),op.kind]);
     entry.checks=mergeProven([...(entry.checks??[]),...provenChecks(verified.checks)]);
     entry.head=op.head??entry.head??null;
-    const next=laneNext(entry);
+    const next=laneNext(entry,lanePredicates(ctx,ctx.work.node(nodeId)));
     store.appendEvent({event:'lane-step',op:op.id,node:nodeId,kind:op.kind,
       step:laneProgress(entry),lane:entry.lane,next:next??null});
     if(next){
@@ -1653,6 +1877,9 @@ function validateAccepted(store,state,op,ctx,{files,verified}){
   const diff=opDiff(state,op,files,ctx);
   let result;
   try{result=ctx.validateOp({op,node:validatorNode(ctx,op),diff,checks:verified.checks,references:op.references,
+    // The brand travels with every verdict: a colour, a font, an icon or an artwork slot outside it is a defect,
+    // and the validator can only say so if it was given the record the operation was supposed to read.
+    brand:brandPayload(ctx.work?.loaded),
     memory:readValidatorMemory(store),providers,skip:coolingRuntimes(ctx.allocator),cwd:ctx.cwd});}
   catch(error){result={ok:false,verdict:'unavailable',reason:error.message};}
   const verdict=llm.VALIDATOR_VERDICTS.includes(result?.verdict)?result.verdict:'unavailable';
@@ -2179,16 +2406,16 @@ function verifyComponents(state,ready){
  */
 // A review is the LAST prove step of a lane: it is planned only when every step before it is accepted, so a
 // backend node is reviewed after its e2e scenarios are green, never in parallel with them.
-const laneWantsReview=(state,id)=>{
+const laneWantsReview=(state,id,ctx=null)=>{
   const entry=state?.lanes?.[id];
   if(!entry?.lane?.length)return true;
-  return entry.lane.includes('review.verify')&&laneNext(entry)==='review.verify';
+  return entry.lane.includes('review.verify')&&laneNext(entry,lanePredicates(ctx,ctx?.work?.node?.(id)??null))==='review.verify';
 };
 
 /** A ledger group whose implementing operations are all done gets one independent review. */
 function planVerifyOps(store,state,ctx){
   const ready=state.ledger.filter(item=>item.status==='implemented').map(item=>item.id)
-    .filter(id=>laneWantsReview(state,id))
+    .filter(id=>laneWantsReview(state,id,ctx))
     .filter(id=>{
       const ops=state.ops.filter(op=>op.ledgerIds.includes(id));
       return ops.some(implementsLedger)&&ops.filter(implementsLedger).every(op=>op.status==='done')
@@ -2260,7 +2487,7 @@ function refreshLedgerSummary(state,ctx){
 
 function finish(store,state,outcome,reason=null,ctx=null){
   const final={schema:FINAL_REPORT,id:state.id,job:state.job,outcome,reason,branch:state.branch,head:state.head,
-    ledgerMode:state.ledgerMode,scope:state.scope,ledgerSummary:refreshLedgerSummary(state,ctx),decisions:state.decisions,
+    ledgerMode:state.ledgerMode,scope:state.scope,ledgerSummary:refreshLedgerSummary(state,ctx),decisions:state.decisions,brand:state.brand??null,
     ledgerRoot:state.ledgerRoot?slash(state.ledgerRoot):null,ledgerShared:Boolean(state.ledgerShared),ledgerOwner:state.ledgerOwner??null,
     definitionOfDone:state.definitionOfDone,
     ledger:state.ledger.map(item=>({...item})),
@@ -2505,6 +2732,8 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
       code,ledger,at,shared:Boolean(shared),side:binding.side??null,source:binding.source,
       repoRoot:ledger.repoRoot,workRoot:ledger.workRoot,origin:code.origin,repository:code.repository};
     repairKernelRecords(store,state,ctx,loaded);
+    // The brand of this tree, as it stands at the start of the run: every design contract prints it from here.
+    noteBrand(store,state,loaded,{silent:true});
     store.appendEvent({event:'ledger-loaded',workRoot:slash(loaded.workRoot),valid:loaded.ok,nodes:loaded.list.length,
       scope:state.scope,source:binding.source,code:code.repository,...(shared?{'ledger-shared':shared}:{})});
     // A shared tree is somebody else's working copy: the kernel commits into it, so it refuses to start over
@@ -2712,7 +2941,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       iterations:state.iterations,head:state.head,ledgerMode:state.ledgerMode,scope:state.scope,
       ledgerRoot:state.ledgerRoot?slash(state.ledgerRoot):null,ledgerSource:state.ledgerSource??null,
       ledgerShared:Boolean(state.ledgerShared),ledgerOwner:state.ledgerOwner??null,codeSide:state.codeSide??null,
-      ledgerSummary:state.ledgerSummary,decisions:state.decisions,preflight:state.preflight??null,
+      ledgerSummary:state.ledgerSummary,decisions:state.decisions,brand:state.brand??null,preflight:state.preflight??null,
       dynamicOps:state.dynamicOps??0,dynamicOpsBudget:dynamicBudget(state),sharedQueue:state.sharedQueue??[],
       ledger:state.ledger.map(item=>({id:item.id,status:item.status,title:item.title,evidence:item.evidence})),
       ops:state.ops.map(op=>({id:op.id,kind:op.kind,status:op.status,runtime:op.runtime,attempt:op.attempt})),

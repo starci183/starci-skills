@@ -220,3 +220,35 @@ test('validateOp frames the op, the diff, the checks and the memory; drops a fin
   assert.equal(closed.ok,false);assert.equal(closed.verdict,'unavailable');assert.match(closed.reason,/every validator provider is unavailable/);
   assert.equal(prompts.length,1,'no provider was called for a closed chain');
 });
+
+/**
+ * The brand travels with every verdict, as data beside the diff and as rules the validator is held to: a colour,
+ * a font, an icon, a forbidden element or an artwork slot outside the record is a defect, not a preference.
+ */
+test('validateOp carries the brand record into the prompt, with the rules that make it binding, and omits it when the tree has none',()=>{
+  const prompts=[];
+  const op={id:'op-cart',kind:'frontend.implement',goal:'Build the cart surface.',acceptance:['the cart renders'],allowlist:['apps/web/src/cart/index.tsx'],attempt:1};
+  const diff={files:['apps/web/src/cart/index.tsx'],text:'diff --git a/apps/web/src/cart/index.tsx b/apps/web/src/cart/index.tsx\n+const ink="#fff";\n',truncated:false};
+  const brand={name:'Aurora',family:'aurora',rev:4,
+    colorTokens:{'--brand-ink':{value:'oklch(0.21 0.01 275)',role:'text'}},
+    mascotAssets:['brand/assets/mascot-front.png'],forbidden:['the bare word white inside a style tag'],
+    imageryPromptRules:['every imagery prompt names the mascot sheet']};
+  const call=(extra={})=>validateOp({op,diff,checks:[],references:['brand/index.yaml'],
+    providers:['gpt-5.6-sol'],runHeadless:(provider,prompt)=>{prompts.push(prompt);return JSON.stringify({verdict:'accept',summary:'inside the brand'});},...extra});
+  call({brand});
+  const prompt=prompts[0];
+  for(const needle of ['"name": "Aurora"','"rev": 4','--brand-ink','"role": "text"','brand/assets/mascot-front.png',
+    'the bare word white inside a style tag','every imagery prompt names the mascot sheet'])
+    assert.ok(prompt.includes(needle),`the prompt carries ${needle}`);
+  for(const rule of ['when a `brand` record is given it is binding',
+    'outside the brand colour tokens (each with the role the record gives it) and the installed grammar is a defect',
+    'an interface.asset result is the artwork of the slots the design record declared',
+    'artwork that ignores the brand mascot and logo references the record names, is a defect',
+    'a frontend.implement result that substitutes its own image for a declared artwork slot, or omits a declared slot altogether, is a defect'])
+    assert.ok(prompt.includes(rule),`the rules bind the brand: ${rule}`);
+  // A tree with no brand record sends no brand key at all: an empty one would read as "the brand allows nothing".
+  prompts.length=0;
+  call();
+  assert.doesNotMatch(prompts[0],/"brand"/);
+  assert.match(prompts[0],/when a `brand` record is given it is binding/,'the rule still says what happens when there is one');
+});
