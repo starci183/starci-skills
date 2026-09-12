@@ -1113,12 +1113,15 @@ function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op.head}=
   // Source identity names the repository the slice is IN, which is the worktree this kernel commits in - never
   // the repository that happens to own the ledger the record is written to.
   const repository=ctx.work.code.repository??path.basename(ctx.work.code.repoRoot);
-  const identity=ctx.work.code.origin&&/^[a-f0-9]{40,64}$/.test(String(op.head??''))&&typeof ctx.work.api.buildSourceIdentity==='function'
+  // Only a code-bearing node (implementation, release) binds its source; the validator refuses a source identity or
+  // code refs on any other kind, and that is what a review found and an agent "fixed" by hand once.
+  const bindsCode=node=>['implementation','release'].includes(String(node?.kind??''));
+  const identity=ctx.work.code.origin&&/^[a-f0-9]{40,64}$/.test(String(head??''))&&typeof ctx.work.api.buildSourceIdentity==='function'
     ?ctx.work.api.buildSourceIdentity({repository,origin:ctx.work.code.origin,commit:head,paths:op.allowlist??[],
       dependencyCoverage:'Dependencies were not re-verified by this operation.',limitations:['Only the operation allowlist was verified by the kernel.']})
     :null;
   ledgerWrite(store,state,op,ctx,'done',node=>ctx.work.api.markDone(ctx.work.at,node,{
-    opId:op.id,head:head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,repository,...(identity?{sourceIdentity:identity}:{}),
+    opId:op.id,head:head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,repository,bindSource:bindsCode(node),...(identity&&bindsCode(node)?{sourceIdentity:identity}:{}),
     evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',
       servedVersionEvidence:`Checks re-run by the StarCi kernel in workflow ${state.id} on branch ${state.branch}`}}),nodeId);
 }
@@ -1508,6 +1511,15 @@ function createSharedOp(store,state,op,detail,paths){
 
 /** One shared request: merge into an existing shared op, create one, or queue it for the next iteration. */
 function requestSharedChange(store,state,op,{paths,detail,open=[]}){
+  // The Work tree is the kernel's record, never an operation's: a shared change that names a ledger path is
+  // refused and carried to the user as a finding. A read-only kind may not request one at all.
+  const ledgerPaths=paths.filter(entry=>/^\.?\/?\.starciwork\//.test(slash(entry)));
+  if(ledgerPaths.length||graph.isReadOnly?.(op.kind)){
+    op.status='blocked';
+    state.needUser.push({op:op.id,kind:'ledger-path',detail:`${op.id} (${op.kind}) asked for a change the kernel will not delegate: ${ledgerPaths.length?ledgerPaths.join(', '):'a read-only kind requested a shared change'}: ${detail}`});
+    store.appendEvent({event:'shared-change-refused',op:op.id,kind:op.kind,paths,reason:ledgerPaths.length?'ledger path':'read-only kind'});
+    return 'shared-change-refused';
+  }
   // A shared op that itself needs a shared change is a design problem, not a scheduling one: two levels deep it stops.
   if((op.sharedDepth??0)>=SHARED_DEPTH_LIMIT){
     op.status='blocked';

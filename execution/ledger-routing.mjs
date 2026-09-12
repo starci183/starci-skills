@@ -170,10 +170,28 @@ export function resolveLedgerRoot({repoRoot,host=null,options={},git=spawnSync}=
     const ledgerRoot=path.join(code,LEDGER_DIRECTORY);
     return settle({source:'local',ledgerRoot,ownerRepoRoot:code,project:null,role:null,ownerRole:null,binding:null},code,hasFeatures(ledgerRoot));
   }
+  // A worktree of the owner repository itself (a branch of the backend) works its OWN copy of the tree: the
+  // route names the repository, not one checkout of it, and the branch's tree is the one this job authored.
+  if(resolved.source==='workspace'&&sameRepository(resolved.ownerRepoRoot,code,git)){
+    const ledgerRoot=path.join(code,LEDGER_DIRECTORY);
+    return settle({...resolved,ledgerRoot,ownerRepoRoot:code},code,hasFeatures(ledgerRoot));
+  }
   need(hasFeatures(resolved.ledgerRoot),resolved.source==='workspace'
     ?`${slash(resolved.binding)} routes the Work of ${resolved.project} to ${slash(resolved.ledgerRoot)}, which has no features/ tree`
     :`--ledger-root ${slash(resolved.ledgerRoot)} has no features/ tree`);
   return settle(resolved,code,true);
+}
+
+/** Two checkouts of one repository share a git common dir (a worktree and its main checkout, or the same path). */
+export function sameRepository(a,b,git=spawnSync){
+  if(samePath(a,b))return true;
+  const common=root=>{
+    const probe=git('git',['rev-parse','--git-common-dir'],{cwd:root,encoding:'utf8',windowsHide:true});
+    if(probe.status!==0)return null;
+    return path.resolve(root,String(probe.stdout??'').trim()).toLowerCase();
+  };
+  const first=common(a),second=common(b);
+  return Boolean(first&&second&&first===second);
 }
 
 function settle(resolved,code,exists){

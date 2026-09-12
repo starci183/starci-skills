@@ -1004,6 +1004,13 @@ test('a shared change must name its paths, is deduped by path set, is capped per
       return applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,ctx);
     };
     const op=id=>harness.state.ops.find(item=>item.id===id);
+    // The Work tree is never delegated: a shared change naming a ledger path is refused and reaches the user.
+    harness.state.ops.push({...structuredClone(harness.state.ops[0]),id:'op-ledger',status:'pending',dispatch:null,terminal:null,runtime:null});
+    assert.equal(block('op-ledger','.starciwork/features/sales/migration/index.yaml must drop its source identity'),'shared-change-refused');
+    assert.equal(op('op-ledger').status,'blocked');
+    assert.match(harness.state.needUser.find(item=>item.kind==='ledger-path').detail,/\.starciwork\/features\/sales\/migration\/index\.yaml/);
+    assert.equal(events(harness.store).at(-1).event,'shared-change-refused');
+    assert.equal(harness.state.ops.some(item=>item.origin==='shared'),false,'no shared op was created for a ledger path');
     // One concrete path set becomes one shared op, and the requester is paused - never pending, never rescheduled.
     assert.equal(block('op-a','packages/contracts/widget.ts must register the entity'),'shared-change');
     const shared=op('shared-1');

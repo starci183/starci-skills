@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {KERNEL_OWNED_LEDGER,ROLE_SIDES,bindingRoutes,readBindings,registryRoot,resolveLedgerRoot,sharedLedgerStatus} from '../execution/ledger-routing.mjs';
+import {sameRepository} from '../execution/ledger-routing.mjs';
+import {spawnSync as runGit} from 'node:child_process';
 
 /**
  * One product, two repositories, one Work tree. The fixture is the shape the host route registry actually
@@ -164,4 +166,18 @@ test('a shared ledger refuses to start over pending changes the kernel does not 
   // A tree git cannot read blocks nothing: the refusal needs an actual pending change, not a failed probe.
   assert.equal(sharedLedgerStatus({ownerRepoRoot:fixture.backend,ledgerRoot,git:noRemote}).ok,true);
   assert.equal(sharedLedgerStatus({ownerRepoRoot:fixture.backend,ledgerRoot,git:noRemote}).readable,false);
+});
+
+test('a worktree and the checkout it was cut from are one repository; two repositories are not',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-same-repo-'));
+  const git=(cwd,...args)=>runGit('git',args,{cwd,encoding:'utf8',windowsHide:true});
+  try{
+    const main=path.join(root,'main'),other=path.join(root,'other'),wt=path.join(root,'wt');
+    for(const dir of [main,other]){fs.mkdirSync(dir);git(dir,'init','-q');git(dir,'-c','user.email','t@t','-c','user.name','t','commit','-q','--allow-empty','-m','init');}
+    git(main,'worktree','add','-q',wt,'-b','branch');
+    assert.equal(sameRepository(main,wt),true);
+    assert.equal(sameRepository(wt,main),true);
+    assert.equal(sameRepository(main,other),false);
+    assert.equal(sameRepository(main,main),true);
+  }finally{try{git(path.join(root,'main'),'worktree','remove','--force',path.join(root,'wt'));}catch{}fs.rmSync(root,{recursive:true,force:true});}
 });

@@ -405,3 +405,18 @@ test('a node that names no repository belongs to the side of the product its lay
     assert.throws(()=>executableCandidates(ledger,{side:'middle'}),/A layout side is frontend or backend/);
   }finally{cleanup(root);}
 });
+
+test('a kind without a code profile binds no source at all: neither a source identity nor code refs, on the node or its evidence',()=>{
+  const root=fakeRepo();
+  try{
+    const identity=buildSourceIdentity({repository:'demo-backend',origin:'https://github.com/demo/demo-backend.git',commit:HEAD,paths:['src/ledger/writer.ts']});
+    const receipt=markDone(root,NODES[1],{...bound,opId:'op-ops',head:HEAD,checks:[check,types],sourceIdentity:identity,bindSource:false,evidence:{environment:'local'}});
+    const done=parseYaml(fs.readFileSync(nodeFile(root,NODES[1]),'utf8'));
+    assert.equal(done.completion.sourceIdentity,undefined);
+    assert.equal(done.completion.codeRefs,undefined);
+    const manifest=parseYaml(fs.readFileSync(receipt.evidence,'utf8'));
+    assert.equal(manifest.sourceIdentity,undefined);
+    assert.equal(manifest.codeRefs,undefined);
+    assert.equal(manifest.provenance.servedVersions[0].commit,HEAD,'provenance still names what ran');
+  }finally{cleanup(root);}
+});

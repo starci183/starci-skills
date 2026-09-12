@@ -444,7 +444,8 @@ export function buildSourceIdentity({repository,origin,commit,paths=[],dependenc
       :{kind:'full-tree',paths:[],dependencyCoverage,limitations}
   }]};
 }
-const sourceBinding=(repository,head,sourceIdentity)=>sourceIdentity
+/** Only a code-bearing profile (implementation, release) binds its source; any other kind binds nothing, or the validator refuses it. */
+const sourceBinding=(repository,head,sourceIdentity,bindSource=true)=>!bindSource?{}:sourceIdentity
   ?{sourceIdentity}
   :(HEX.test(String(head??''))?{codeRefs:[{repository,commit:String(head)}]}:{});
 
@@ -463,7 +464,7 @@ export function markInProgress(repoRoot,node,{opId,dispatch=null,startedAt=null,
  * node's authored assertions are not all proven by a passing check, so a green receipt always
  * names what proved it.
  */
-export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,parse=parseYaml}={}){
+export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,bindSource=true,parse=parseYaml}={}){
   const id=text(opId,'operation id'),evidenceId=evidenceIdFor(id);
   return transact(repoRoot,node,register=>{
     const {raw,kernel}=existingKernel(repoRoot,node);
@@ -474,9 +475,9 @@ export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='sta
     const bound=settledDigest(repoRoot,node,{inputDigest,digest});
     // The manifest has to bind the same settled digest, so write it here rather than before pass one.
     const folder=path.join(nodeDirectory(repoRoot,node),'evidence',evidenceId),fresh=evidence&&!fs.existsSync(folder);
-    const written=evidence?writeEvidence(repoRoot,node,{...(plain(evidence)?evidence:{}),opId:id,head,checks,repository:repo,assertions,sourceIdentity,inputDigest:bound}):null;
+    const written=evidence?writeEvidence(repoRoot,node,{...(plain(evidence)?evidence:{}),opId:id,head,checks,repository:repo,assertions,sourceIdentity:bindSource?sourceIdentity:null,bindSource,inputDigest:bound}):null;
     if(fresh)register(()=>fs.rmSync(folder,{recursive:true,force:true}));
-    const completion={inputDigest:bound,evidence:[evidenceId],...sourceBinding(repo,head,sourceIdentity)};
+    const completion={inputDigest:bound,evidence:[evidenceId],...sourceBinding(repo,head,sourceIdentity,bindSource)};
     return {...writeNode(repoRoot,node,{state:'done',completion,parse}),evidence:written};
   });
 }
@@ -577,7 +578,7 @@ export function writeEvidence(repoRoot,node,evidence={}){
       capturedAt:evidence.capturedAt??nowIso(),
       servedVersionEvidence:evidence.servedVersionEvidence??`Kernel-run checks on ${repository}@${head??'worktree'}`
     },
-    ...(evidence.sourceIdentity?{sourceIdentity:evidence.sourceIdentity}:(HEX.test(String(head??''))?{codeRefs:[{repository,commit:String(head)}]}:{})),
+    ...(evidence.bindSource===false?{}:evidence.sourceIdentity?{sourceIdentity:evidence.sourceIdentity}:(HEX.test(String(head??''))?{codeRefs:[{repository,commit:String(head)}]}:{})),
     ...(checks.length?{extensions:{work3:{kernel:{checks:checks.map(check=>({name:String(check.name??''),command:String(check.command??''),exitCode:Number(check.exitCode)}))}}}}:{})
   };
   const file=path.join(directory,'manifest.yaml');
