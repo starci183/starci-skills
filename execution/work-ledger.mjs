@@ -438,7 +438,10 @@ function coverAssertions(raw,checks,assertions){
 /** Direct source identity for an implementation node; `origin` must be a credential-free URL. */
 export function buildSourceIdentity({repository,origin,commit,paths=[],dependencyCoverage='Dependencies were not re-verified by this operation.',limitations=[]}){
   need(HEX.test(String(commit??'')),'A source identity needs a full commit sha');
-  const scoped=paths.filter(item=>typeof item==='string'&&item.trim()).map(item=>slash(item.trim()));
+  // Coverage names source files, normalized the way the validator wants: no trailing slash, no empty segment, no
+  // ledger record (the tree is the kernel's, never the slice's source) - an allowlist entry that is not a source path is dropped.
+  const scoped=paths.filter(item=>typeof item==='string'&&item.trim()).map(item=>slash(item.trim()).replace(/\/+$/,''))
+    .filter(item=>item&&!item.startsWith('/')&&!/(^|\/)\.starciwork(\/|$)/.test(item)&&!/(^|\/)_local(\/|$)/.test(item)&&item.split('/').every(segment=>segment&&segment!=='.'&&segment!=='..'));
   return {schema:'starci/source-identity@1',repositories:[{
     repository:sanitizeId(repository),origin:text(origin,'repository origin url'),state:'committed',commit:String(commit),
     coverage:scoped.length

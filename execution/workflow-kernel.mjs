@@ -489,12 +489,7 @@ export function syncLedgerOps(store,state,ctx){
   let loaded;
   try{loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});}
   catch(error){store.appendEvent({event:'ledger-sync-failed',reason:error.message});return [];}
-  if(!loaded.ok)return [];
   ctx.work.loaded=loaded;
-  const scope=state.scope.length?state.scope:null;
-  const taken=new Set(state.ops.map(op=>op.id));
-  const opOfNode=new Map(state.ops.filter(op=>op.nodeId).map(op=>[op.nodeId,op.id]));
-  const added=[];
   // An operation created before the repository rule for a node another repository delivers is settled and blocked.
   for(const op of state.ops){
     if(!op.nodeId||op.refusal==='out-of-repository'||!ctx.work.code.repository||typeof ctx.work.api.nodeRepository!=='function')continue;
@@ -510,6 +505,11 @@ export function syncLedgerOps(store,state,ctx){
     for(const item of state.ledger)if(item.id===op.nodeId)item.status='out-of-repository';
     store.appendEvent({event:'op-out-of-repository',op:op.id,node:op.nodeId,repository:foreign,own:ctx.work.code.repository});
   }
+  if(!loaded.ok)return [];
+  const scope=state.scope.length?state.scope:null;
+  const taken=new Set(state.ops.map(op=>op.id));
+  const opOfNode=new Map(state.ops.filter(op=>op.nodeId).map(op=>[op.nodeId,op.id]));
+  const added=[];
   const candidates=ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.code.repository,side:ctx.work.side});
   // A "ledger incomplete" item is only as current as the tree: once its node is schedulable, done, or no longer
   // a candidate at all (foreign, ineligible), the item is stale and goes.
@@ -2386,7 +2386,8 @@ export function triageAnomaly(store,state,signature,ctx){
   const option=chosen?.ok&&TRIAGE_OPTIONS.includes(chosen.value.option)?chosen.value.option:'needUser';
   entry.triaged={option,rationale:chosen?.ok?chosen.value.rationale:null,at:Date.now()};
   store.appendEvent({event:'triage',signature,option,rationale:entry.triaged.rationale,count:entry.count});
-  if(option==='resume-ops'){for(const op of state.ops)if(op.status==='blocked'&&op.refusal!=='dynamic-op'){op.status='ready';op.dispatch=null;op.terminal=null;}}
+  // Resume only what a transient cause blocked: an op with a refusal (out of repository, superseded, dynamic budget) stays blocked whatever the anomaly.
+  if(option==='resume-ops'){for(const op of state.ops)if(op.status==='blocked'&&!op.refusal){op.status='ready';op.dispatch=null;op.terminal=null;}}
   else if(option==='park-runtime'){const runtime=entry.detail?.runtime;if(runtime)ctx.allocator.failed(runtime,{reason:`triage: ${signature}`});}
   else if(option==='settle-op'){const op=state.ops.find(item=>item.id===entry.detail?.op&&item.status==='running');if(op){settleDispatch(ctx.orca,op.dispatch,{cwd:state.worktree,reason:'triage',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});op.status='ready';op.dispatch=null;op.terminal=null;}}
   else if(option==='restart-kernel'){fs.writeFileSync(path.join(store.dir,'stop.flag'),'triage restart');}

@@ -420,3 +420,9 @@ test('a kind without a code profile binds no source at all: neither a source ide
     assert.equal(manifest.provenance.servedVersions[0].commit,HEAD,'provenance still names what ran');
   }finally{cleanup(root);}
 });
+
+test('a source identity keeps only normalized source paths: no trailing slash, no ledger record, no empty segment',()=>{
+  const identity=buildSourceIdentity({repository:'demo-backend',origin:'https://github.com/demo/demo-backend.git',commit:HEAD,
+    paths:['src/a.ts','.starciwork/features/x/index.yaml','src/dir/','src/./b.ts','', '.starciwork/features/x/evidence/','src/c.ts']});
+  assert.deepEqual(identity.repositories[0].coverage.paths,['src/a.ts','src/dir','src/c.ts']);
+});
