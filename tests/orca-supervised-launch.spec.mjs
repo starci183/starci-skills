@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import {buildMonitorLaunch,buildOperationLaunch,startOperation} from '../execution/orca-supervised-launch.mjs';
+import {buildMonitorLaunch,buildOperationLaunch,defaultOrcaExecutable,startOperation} from '../execution/orca-supervised-launch.mjs';
 
 const worktree='fixtures/orca/agentos-r14-sales';
 const worktreePath=path.resolve(worktree);
@@ -15,6 +15,10 @@ function receipt({agent='qwen-code',model='qwen3.8-flash',title='[Op] review.ver
     observation:{exactWorker:true},terminal:{title,worktreePath}
   }};
 }
+
+test('native Orca runner uses an executable instead of a Windows command shim',()=>{
+  assert.equal(defaultOrcaExecutable,process.platform==='win32'?'orca.exe':'orca');
+});
 
 test('operation request resolves Qwen first and owns the canonical Task identity',()=>{
   const planned=buildOperationLaunch(input);

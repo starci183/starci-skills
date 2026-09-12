@@ -10,6 +10,7 @@ const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const required=(value,label)=>{need(typeof value==='string'&&value.trim(),`Missing ${label}`);return value.trim();};
 const qwenModel='qwen3.8-flash';
+export const defaultOrcaExecutable=process.platform==='win32'?'orca.exe':'orca';
 
 function parseArgs(argv){
   const [command,...rest]=argv;
@@ -103,7 +104,7 @@ export function buildMonitorLaunch({run,parentTask,from,worktree,workflow,spec})
     worktree:target,workflow:name,displayName,taskArgs};
 }
 
-export function createOrcaRunner({executable=process.platform==='win32'?'orca.cmd':'orca',timeoutMs=90000}={}){
+export function createOrcaRunner({executable=defaultOrcaExecutable,timeoutMs=90000}={}){
   return (args,{cwd}={})=>{
     const completed=spawnSync(executable,args,{cwd,encoding:'utf8',windowsHide:true,timeout:timeoutMs,shell:false});
     need(!completed.error,`Unable to execute Orca: ${completed.error?.message}`);
