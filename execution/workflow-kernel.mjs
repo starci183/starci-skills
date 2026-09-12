@@ -918,6 +918,42 @@ const ledgerErrorText=errors=>errors.slice(0,3).map(error=>typeof error==='strin
  * "ledger incomplete" in goal.md, because guessing a scope for authored work is not the kernel's to do.
  * The model is asked for one thing only: the definition of done and the risks and questions around it.
  */
+/** Whether a scope entry names this node: by id prefix or by tree path, the way the ledger's own scope filter reads it. */
+function scopeNames(node,entry){
+  const key=slash(String(entry??'')).replace(/\/+$/,''),id=String(node?.id??''),where=slash(node?.path??'');
+  return Boolean(key)&&(id===key||id.startsWith(`${key}.`)||where===key||where.startsWith(`${key}/`)||where.startsWith(`features/${key}/`));
+}
+/**
+ * The intake operation of a scope entry the tree does not know. `brand` is authored and decided by one
+ * `brand.decide` op on the one brand record; a feature is authored by one `work.author` op that mirrors the shape
+ * of an existing feature - module record, business overview and SRS drafts, architecture skeleton - every record
+ * `todo`, so the owner reads drafts and the decisions stay the owner's. Neither op closes a Work node: the records
+ * it writes are the nodes the tree has afterwards.
+ */
+function intakeOp(state,{workRoot,loaded,index,entry=null}){
+  const name=slash(String(entry??'')).replace(/\/+$/,'');
+  const check={name:'work-tree-validates',command:validateCommandAt(workRoot)};
+  if(name==='brand'){
+    return {id:`brand-${index+1}`,kind:BRAND_DECIDE,nodeId:null,intake:{scope:'brand'},
+      goal:`Author and decide the brand record .starciwork/brand/index.yaml of this product from the job: ${state.job}. The name, the design family, every colour token with the role it plays and the source file it is traced to, the fonts, the mascot and logo assets (generate a placeholder mascot with the image model when the product has none), what is forbidden and the rules every imagery prompt must carry.`,
+      ledgerIds:[],allowlist:['.starciwork/brand/index.yaml','.starciwork/brand/**'],
+      references:unique(['workspace.yaml',...grammarReferences()]),checks:[check],
+      acceptance:['.starciwork/brand/index.yaml is a valid brand node: name, family, colour tokens with their roles and sources, the mascot and logo assets, the forbidden list and the imagery prompt rules','the Work tree still validates'],origin:'ledger'};
+  }
+  // The example the drafts mirror: the first feature module the tree already has, with its business and architecture roots.
+  const paths=loaded.list.map(node=>slash(node.path??''));
+  const features=unique(paths.map(where=>(where.match(/^features\/([^/]+)\//)??[])[1]).filter(Boolean)).sort();
+  const example=features[0]?`features/${features[0]}`:null;
+  const roots=example?[`${example}/index.yaml`,`${example}/business/index.yaml`,`${example}/business/overview/index.yaml`,`${example}/architecture/index.yaml`,`${example}/architecture/overview/index.yaml`]:[];
+  const found=paths.filter(where=>roots.includes(where));
+  // Always a real record to mirror: the module roots when the tree has them, else the first record under the example.
+  const exampleRefs=found.length?found:paths.filter(where=>example&&where.startsWith(`${example}/`)).sort().slice(0,1);
+  return {id:`${name.replace(/[^A-Za-z0-9._-]+/g,'-')}-intake`,kind:AUTHOR_KIND,nodeId:null,intake:{scope:name,example},
+    goal:`Author the Work records of the feature ${name} from the job: ${state.job}. Mirror the shape of the existing feature ${example??'(none yet)'}: the module record, the business overview and SRS as full drafts, the architecture as a skeleton; every record todo, every open question an open decision.`,
+    ledgerIds:[],allowlist:[`.starciwork/features/${name}/**`],
+    references:unique(['workspace.yaml',...exampleRefs]),checks:[check],
+    acceptance:[`features/${name} has a module record, a business overview, SRS records and an architecture skeleton, all todo and valid`,'no existing feature changed','the Work tree still validates'],origin:'ledger'};
+}
 export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless,
   ledgerRoot=null,git=spawnSync,resolveLedger=resolveLedgerRoot}={}){
   need(!state.approved,`Workflow ${state.id} is already approved; run workflow-run`);
@@ -932,6 +968,11 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
   const scope=state.scope.length?state.scope:null;
   const executables=ledgerApi.executableCandidates(loaded,{scope,repository,side:binding.side});
   const ready=executables.filter(node=>node.schedulable),incomplete=executables.filter(node=>!node.schedulable);
+  // A scope entry that names nothing in the tree is a feature - or the brand - still to be authored. The workflow
+  // then begins with one intake operation that writes those records from the job, and the tree, once it has them,
+  // says what follows: decisions the owner takes, lanes the kernel walks. Nothing is invented by the kernel itself.
+  const absent=(scope??[]).filter(entry=>!loaded.list.some(node=>scopeNames(node,entry)));
+  const intake=absent.map((entry,index)=>intakeOp(state,{workRoot:binding.ledgerRoot,loaded,index,entry}));
   state.decisions=ledgerApi.decisionCandidates(loaded,{scope}).map(node=>({id:node.id,kind:node.kind,path:node.path,
     operation:DECISION_OPERATION[node.kind]??'business.decide',title:describeNode(ledgerApi,at,node)}));
   state.ledgerSummary=ledgerApi.ledgerSummary(loaded,{scope});
@@ -939,7 +980,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
   noteBrand(store,state,loaded,{silent:true});
   if(!loaded.ok)state.needUser.push({kind:'ledger',detail:`the Work tree does not validate, so no node in it is a trustworthy TODO: ${ledgerErrorText(loaded.errors)}`});
   for(const node of incomplete)state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
-  need(ready.length||incomplete.length||state.decisions.length,
+  need(ready.length||incomplete.length||state.decisions.length||intake.length,
     `No eligible Work node in scope ${scope?scope.join(', '):'(the whole tree)'}: there is nothing for this workflow to do`);
   // The lane is the template the user approves: every node gets its record here, before any op exists. A
   // frontend build whose drawing is not done yet keeps its lane and waits; it enters the ops once the ui node is.
@@ -953,8 +994,10 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
     lane:[...(state.lanes[node.id]?.lane??[])]}));
   const taken=new Set(),opOfNode=new Map();
   for(const node of launchable)opOfNode.set(node.id,workOpId(node.id,taken));
-  state.ops=launchable.map((node,index)=>deriveWorkOp(ledgerApi,at,node,
-    {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[],loaded}));
+  state.ops=[...launchable.map((node,index)=>deriveWorkOp(ledgerApi,at,node,
+    {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[],loaded})),
+    ...intake.map((raw,index)=>{const op=toOp(raw,launchable.length+index);op.intake=raw.intake;op.difficulty='hard';return op;})];
+  for(const op of state.ops.filter(item=>item.intake))store.appendEvent({event:'intake-planned',op:op.id,scope:op.intake.scope,kind:op.kind,allowlist:op.allowlist});
   for(const op of state.ops)locateSharedTreePaths(op,{work:{shared:binding.sharedLedger,ledger:{repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot}}});
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
   const assessed=typeof assessGoal==='function'?assessGoal({job:state.job,inputs:state.inputs,
@@ -1361,8 +1404,15 @@ function launchOp(orca,store,state,op,allocated,ctx){
   fs.writeFileSync(store.contractPath(op.id),contract);
   op.contractFile=store.contractPath(op.id);
   const relative=path.relative(process.cwd(),state.worktree)||'.';
-  const launched=ctx.launch(orca,{cwd:state.worktree,run:state.run,workflowTask:state.workflowTask??state.id,from:state.from,
-    worktree:relative,operation:launchOperator(op.kind),kind:op.kind,scope:op.id,spec:contract,candidate:allocated.candidate,runtime:allocated.runtime,wait:ctx.wait});
+  // A launch that throws - Orca unreachable, a spec the command line cannot carry - is a failed launch, never the
+  // end of the kernel: the op records it, avoids the runtime, and the loop goes on.
+  let launched;
+  try{
+    launched=ctx.launch(orca,{cwd:state.worktree,run:state.run,workflowTask:state.workflowTask??state.id,from:state.from,
+      worktree:relative,operation:launchOperator(op.kind),kind:op.kind,scope:op.id,spec:operationSpec(op,contract),candidate:allocated.candidate,runtime:allocated.runtime,wait:ctx.wait});
+  }catch(error){
+    launched={ok:false,stopReason:String(error?.message??error).slice(0,300),attempts:[{target:allocated.target,stage:'launch',effectState:'threw',reason:String(error?.message??error).slice(0,240)}]};
+  }
   op.launch={ok:Boolean(launched?.ok),target:launched?.selection?.target??allocated.target,
     task:launched?.task?.id??null,dispatch:launched?.dispatchId??null,stopReason:launched?.stopReason??null};
   if(!launched?.ok){
@@ -1670,6 +1720,7 @@ function kernelProof(ctx,nodeId){
 }
 
 function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op.head}={}){
+  if(ctx.work&&!nodeId&&op.kind===BRAND_DECIDE){rereadBrand(store,state,op,ctx);return;}
   if(!ctx.work||!nodeId)return;
   verified={...verified,checks:[...(verified?.checks??[]),...kernelProof(ctx,nodeId)]};
   const decision=['architecture.decide','architecture.revise','business.decide',BRAND_DECIDE].includes(op.kind)||kindRole(op.kind)==='decide';
@@ -1943,7 +1994,8 @@ function architectureNodeFor(ctx,op,detail){
 }
 
 /** The check a design change must survive: the Work tree still validates after the decision is written. */
-const workValidateCommand=ctx=>`node ${slash(path.join(skillRoot,'bin','starci.mjs'))} validate ${slash(ctx.work.ledger?.workRoot??path.join(ctx.work.repoRoot,'.starciwork'))}`;
+const validateCommandAt=workRoot=>`node ${slash(path.join(skillRoot,'bin','starci.mjs'))} validate ${slash(workRoot)}`;
+const workValidateCommand=ctx=>validateCommandAt(ctx.work.ledger?.workRoot??path.join(ctx.work.repoRoot,'.starciwork'));
 
 /** `then: reopen` - the reporter waits for the op the route created and runs again with the settled material. */
 function reopenRequester(store,state,op,open,created,note){
@@ -2846,7 +2898,38 @@ export function validatorRuntimes(host){
     return runtimes.length?runtimes:llm.DEFAULT_VALIDATOR_RUNTIMES;
   }catch{return llm.DEFAULT_VALIDATOR_RUNTIMES;}
 }
+/**
+ * The task spec travels on one Orca command line, and Windows bounds a command line near 32k characters: a
+ * 142-file allowlist once made `task-create` fail with ENAMETOOLONG and took the kernel down with it. A contract
+ * past this length is handed over as its head plus where the whole of it is, and the agent reads the file.
+ */
+export const SPEC_LIMIT=12000;
+export function operationSpec(op,contract){
+  const text=String(contract??'');
+  if(text.length<=SPEC_LIMIT)return text;
+  const file=slash(String(op?.contractFile??''));
+  const head=text.slice(0,SPEC_LIMIT-900);
+  return `${head}\n\n[...]\n\nThis contract is longer than a task can carry (${text.length} characters). The COMPLETE contract - the allowlist, the working order, the report command and every rule after this point - is in the file \`${file}\`. Read that file in full before you do anything: it is the task, and a rule you did not read still binds you.`;
+}
 export const TRIAGE_AFTER=3;
+/**
+ * One stage of an iteration that throws is recorded (`kernel-error`) and the loop goes on; the same stage
+ * failing this many times in a row stops the workflow for the user instead of letting a supervisor restart a
+ * kernel that dies at the same line every minute.
+ */
+export const KERNEL_ERROR_LIMIT=5;
+function guardedStage(store,state,ctx,stage,fn){
+  try{fn();state.kernelErrors=0;return 'ok';}
+  catch(error){
+    const message=String(error?.stack??error?.message??error).slice(0,600);
+    state.kernelErrors=(state.kernelErrors??0)+1;
+    store.appendEvent({event:'kernel-error',stage,count:state.kernelErrors,message});
+    if(state.kernelErrors<KERNEL_ERROR_LIMIT){store.saveState(state);return 'error';}
+    state.needUser.push({kind:'environment',detail:`the kernel failed ${state.kernelErrors} times in a row at ${stage}: ${String(error?.message??error).slice(0,240)}`});
+    finish(store,state,'blocked',`the kernel keeps failing at ${stage}`,ctx);
+    return 'stop';
+  }
+}
 export const TRIAGE_OPTIONS=['resume-ops','park-runtime','settle-op','restart-kernel','needUser'];
 export function noteAnomaly(store,state,signature,detail){
   state.anomalies=state.anomalies??{};
@@ -2969,13 +3052,13 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     answerQuestions(orca,store,state,ctx);
     resumePaused(store,state);
     drainSharedQueue(store,state);
-    syncLedgerOps(store,state,ctx);
-    planVerifyOps(store,state,ctx);
-    scheduleOps(orca,store,state,ctx);
+    if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);planVerifyOps(store,state,ctx);})==='stop')break;
+    if(guardedStage(store,state,ctx,'schedule',()=>scheduleOps(orca,store,state,ctx))==='stop')break;
     state.allocation=typeof allocator.serialize==='function'?allocator.serialize():allocator.snapshot?.()??null;
     const running=state.ops.filter(op=>op.status==='running');
     // Fast path: an operation whose report is already on disk is accepted before any blocking wait.
-    const early=acceptReports(orca,store,state,ctx);
+    let early=null;
+    if(guardedStage(store,state,ctx,'accept',()=>{early=acceptReports(orca,store,state,ctx);})==='stop')break;
     if(Array.isArray(early)&&early.length){store.appendEvent({event:'accepted-early',ops:early.map(item=>item.op)});store.saveState(state);continue;}
     if(running.length){
       const tick=waitTick(orca,{cwd:state.worktree,run:state.run,from:state.from,timeoutMs:waitTimeoutMs,tickMs,
@@ -2983,7 +3066,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
       if(tick.event==='check-failed'){noteAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{reason:tick.check?.reason??null});triageAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{...ctx,orca});}
     store.appendEvent({event:'wait',result:tick.event,ticks:tick.ticks,
         liveness:(tick.liveness??[]).map(item=>`${item.dispatch}:${item.liveness}`)});
-      acceptReports(orca,store,state,ctx);
+      if(guardedStage(store,state,ctx,'accept',()=>acceptReports(orca,store,state,ctx))==='stop')break;
       settleStalled(orca,store,state,ctx,tick);
       store.saveState(state);
       continue;

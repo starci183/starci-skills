@@ -240,6 +240,14 @@ That is all it does: the Work validator binds a completion to the digest of what
 frontend-facing nodes that were built against the old brand are reopened in the tree itself, and `syncLedgerOps`
 picks them up on the next iteration like any other newly schedulable node.
 
+**Intake.** A `--scope` entry the tree does not know is not an error: the goal phase plans one intake operation
+for it (`intake-planned`) and the tree, once it has the records, says what follows. `brand` becomes one
+`brand.decide` op on `.starciwork/brand/**` that authors and decides the one brand record; a feature becomes one
+`work.author` op on `.starciwork/features/<feature>/**` that mirrors the shape of an existing feature - module
+record, business overview and SRS as full drafts, architecture skeleton - with every record `todo`, so the owner
+reads drafts and the decisions stay the owner's. Neither op closes a Work node (`ledgerIds: []`); the records
+it writes are the nodes the next `syncLedgerOps` sees.
+
 **The design record is the feature's `ui` node.** Its `ui:` spec - surfaces, states, the candidate images under
 its own `assets/` and the `artworkSlots` the drawing declared - is the authority for the interface lanes, and
 `lanePredicates` reads it from disk (`designRecord`): a `ui` node reads itself, an implementation node reads

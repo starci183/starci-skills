@@ -12,7 +12,7 @@ import {validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
 import {createStore} from '../execution/workflow-store.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,SPEC_LIMIT,operationSpec,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -723,6 +723,54 @@ function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
   return {...tree,api,store,state,goal,fake,git,run,commits,allocator,cleanup:()=>fs.rmSync(path.dirname(tree.repo),{recursive:true,force:true})};
 }
+
+/**
+ * A scope the tree does not know yet is not an error and not a guess: the workflow begins with the one op that
+ * authors it - a feature's records as drafts, or the brand record - and the tree says what follows.
+ */
+test('a scope entry that names nothing in the tree begins with an intake operation: a feature is authored as drafts, the brand is authored and decided',()=>{
+  const collab=setupWork({scope:['collab']});
+  try{
+    assert.equal(collab.goal.ok,true);
+    assert.deepEqual(collab.state.ops.map(op=>[op.id,op.kind,op.nodeId,op.origin,op.intake]),
+      [['collab-intake','work.author',null,'ledger',{scope:'collab',example:'features/payments'}]]);
+    const op=collab.state.ops[0];
+    assert.deepEqual(op.allowlist,['.starciwork/features/collab/**']);
+    assert.deepEqual(op.ledgerIds,[],'an intake closes no node: the records it writes are the nodes');
+    // The first feature of the tree is the example: its business overview is one of the roots the drafts mirror.
+    assert.ok(op.references.includes('workspace.yaml')&&op.references.includes('features/payments/business/overview/index.yaml'),'the example feature is a reference');
+    assert.deepEqual(op.checks.map(check=>check.name),['work-tree-validates']);
+    assert.match(op.goal,/Author the Work records of the feature collab from the job: Finish the sales slice/);
+    assert.deepEqual(events(collab.store).filter(event=>event.event==='intake-planned').map(event=>[event.op,event.scope,event.kind]),[['collab-intake','collab','work.author']]);
+    assert.deepEqual(collab.state.ledger,[],'nothing is a goal item until the tree has it');
+    // The contract renders the intake sequence, not a record completion.
+    const contract=renderContract({template,op,state:collab.state,store:collab.store,launcher:'L.mjs',run:'run_wf'});
+    assert.match(contract,/Sequence `work\.intake`/);
+    assert.match(contract,/mirror that shape exactly under the allowlist/);
+    assert.doesNotMatch(contract,/## Work node you author/);
+  }finally{collab.cleanup();}
+  const brand=setupWork({scope:['brand'],ledgerApi:brandlessLedger});
+  try{
+    assert.deepEqual(brand.state.ops.map(op=>[op.id,op.kind,op.nodeId,op.intake]),[['brand-1',BRAND_DECIDE,null,{scope:'brand'}]]);
+    assert.deepEqual(brand.state.ops[0].allowlist,['.starciwork/brand/index.yaml','.starciwork/brand/**']);
+    assert.ok(brand.state.ops[0].references.some(entry=>/knowledge\/grammars\//.test(entry)),'the brand is decided inside the installed grammar');
+    assert.match(brand.state.ops[0].goal,/Author and decide the brand record/);
+  }finally{brand.cleanup();}
+  // A scope the tree does know plans no intake.
+  const known=setupWork({scope:['payments']});
+  try{assert.equal(known.state.ops.some(op=>op.intake),false);}finally{known.cleanup();}
+});
+
+test('a contract longer than a task can carry is handed over as its head plus the file it lives in',()=>{
+  const short='## Goal\nshort';
+  assert.equal(operationSpec({contractFile:'D:/w/contracts/op.md'},short),short);
+  const long=`## Goal\n${'x'.repeat(SPEC_LIMIT+5000)}\n## Never\nthe tail rule`;
+  const spec=operationSpec({contractFile:'D:\\w\\contracts\\gate-1.md'},long);
+  assert.ok(spec.length<SPEC_LIMIT,'the spec fits a command line');
+  assert.ok(spec.startsWith('## Goal\nxxx'),'the head of the contract is kept');
+  assert.match(spec,/COMPLETE contract .* is in the file `D:\/w\/contracts\/gate-1\.md`/);
+  assert.match(spec,/longer than a task can carry \(\d+ characters\)/);
+});
 
 test('on the Work ledger the goal is derived from the authored nodes, and a node without checks is named as needing the user',()=>{
   const asked=[];
