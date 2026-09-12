@@ -231,3 +231,47 @@ node .claude/.dist/execution/orca-supervised-launch.mjs workflow-supervise --hos
 ### Review rounds and the dynamic budget
 
 A review round is counted per reviewed node set (`verifyRounds[<ids joined by +>]`), never per feature: counting per module burned a feature's three rounds on three different nodes. After the last round the group is parked as `review-exhausted` with one needUser item instead of being re-planned every tick. Ops the kernel derives itself (origins `ledger`, `verify`, `gate`, `architecture`) never count against `--allow-dynamic`; only `shared` and `repair` ops do, and `--allow-dynamic 0` forbids them.
+
+## Reading a workflow
+
+A workflow has no monitor agent to ask, so the one way to know where it stands is its own files.
+`execution/workflow-view.mjs` derives a single page from them - `state.json`, `events.jsonl`, `kernel.lock`,
+`stop.flag`, `validator/verdicts.jsonl` and the repository's `supervisor.log` - and the launcher prints it:
+
+```
+orca-supervised-launch.mjs workflow-status --id <id> [--json true]
+orca-supervised-launch.mjs workflow-list
+```
+
+`workflow-status` prints the page; `--json true` prints the machine record instead (the kernel's own status
+fields, unchanged, plus the whole view under `view`). `workflow-list` prints one line per workflow of the
+repository: phase, operations done, whether a kernel process is alive, how old the last event is.
+`buildView({repoRoot,id,now})` is the same view as a plain object, `renderView` the page, `renderJson` the
+record. The view never calls Orca, never asks a model and never writes - it does not even open a store, so
+reading a workflow cannot create one - and a missing file is an empty field, never an error: a tree whose
+kernel keeps no validator verdicts and no lanes still renders a complete page.
+
+| section | what the number means |
+| --- | --- |
+| `kernel` | the pid in `kernel.lock` and whether that process exists, plus `silentMs`: how long ago the **last event** was appended |
+| `supervisor` | the last `supervisor-round` in `supervisor.log`, and what that round decided for this workflow. There is no pid to probe, so `alive` means only "a round landed in the last 5 minutes" |
+| `runtimes` | `running` is counted from the operations that are actually running (saved loads may belong to a dead kernel), `max` is this workflow's `--allocation` slot count, `cooling` is the allocator's wake time |
+| `ops` | the status histogram, every running op with its age since `launched`, its restarts and the last thing the log said about it (`lastPing`), and every blocked op with its refusal |
+| `ledger` | `done` = `verified` + `preexisting`, `implemented`, `todo` = `planned`, `outOfRepository`, and `eligible` = the items a live op is carrying. `byFeature` groups by the first two segments of the Work node id (`<product>.<feature>`). `treeEligible`/`treeTotal` are the whole tree's numbers from `ledgerSummary`, not this workflow's |
+| `reviews` | rounds per reviewed node set (`verifyRounds`) and the groups a `verify-exhausted` event has parked |
+| `validator` | accepted / rejected / unavailable verdicts, from `validator/verdicts.jsonl` when the kernel keeps it and from the `validated` / `validator-rejected` / `validator-unavailable` events otherwise |
+| `rate` | `op-done` events per hour and distinct nodes finished per hour over the last 3 hours - or over the workflow's whole life when it is younger than that, so a 20 minute old run never reads as idle |
+| `anomalies` | `state.anomalies`: one signature per repeated oddity, its count and the triage option that settled it |
+| `recent` | the last 15 events, one line each: time, seq, event and the fields that matter |
+
+**When `kernel.silentMs` grows.** Up to one wait tick (15 min) of silence is normal: the kernel is inside
+`waitTick`. Past the supervisor's health window (25 min) the supervisor itself kills and restarts the kernel,
+so the honest reading is the pair: silence **and** a supervisor whose last round is recent means the restart
+is already someone's job; silence with no supervisor log means nothing is watching - start
+`workflow-supervise`, or run `workflow-run --id <id>` yourself. A silent kernel whose `pid` is gone and whose
+`finished` is null was killed; the store is complete, so starting it again resumes the same workflow.
+
+**When `needUser` is not empty.** Nothing else will clear those items: the policy table has already decided
+it cannot. A `ledger` item wants an allowlist or checks authored on the node; a `dynamic-op` item wants
+`workflow-approve --id <id> --allow-dynamic N`; `environment` and `authority` items want you. Until then the
+workflow keeps running everything else and stops `blocked` at the end with those items in its final report.

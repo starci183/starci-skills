@@ -9,6 +9,8 @@ import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} fr
 import {protocolMain} from './orca-protocol.mjs';
 import {kernelMain} from './workflow-kernel.mjs';
 import {supervisorMain} from './kernel-supervisor.mjs';
+import {WORKFLOW_LIST,buildList,buildView,renderList,renderView} from './workflow-view.mjs';
+import {repositoryRoot} from './workflow-store.mjs';
 
 /**
  * Canonical supervised launcher for Orca operation agents, plus the CLI surface of the 5.0 workflow
@@ -476,20 +478,44 @@ function usage(){return `Usage:
     runs the kernel loop: up to 10 operation agents in one worktree, machine-verified acceptance, gates, final report.
     On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and
     committed with a "Work: <node id>" trailer.
-  node orca-supervised-launch.mjs workflow-status --id <workflow-id> [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-status --id <workflow-id> [--json true] [--worktree <relative-path>]
+    prints one status view of the workflow, derived from its own files: kernel liveness, runtimes, running
+    and blocked operations, the ledger by feature, reviews, the validator, what needs you, the rate and the
+    last events. --json true prints the machine shape (the kernel's own status fields plus view).
+  node orca-supervised-launch.mjs workflow-list [--json true] [--worktree <relative-path>]
+    one line per workflow of this repository: phase, operations done, kernel liveness, last event age
   node orca-supervised-launch.mjs workflow-stop --id <workflow-id> [--worktree <relative-path>]
   node orca-supervised-launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000] [--worktree <repo>]
   node orca-supervised-launch.mjs verify`;}
 
 const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-run','workflow-status','workflow-stop','workflow-supervise'];
+/** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
+const VIEW_COMMANDS=['workflow-list'];
+
+/**
+ * A command may answer with text instead of a record: `print` is written verbatim by the CLI, so a status
+ * page reaches a terminal as a page and not as a JSON string with escaped newlines in it.
+ */
+const printed=(schema,command,print,rest={})=>({schema,command,...rest,print});
 
 export function main(argv=process.argv.slice(2),{orca,wait}={}){
   const {command,options}=parseArgs(argv);
-  need(['start-op','settle','sweep','verify','notify','report','wait',...KERNEL_COMMANDS].includes(command),usage());
+  need(['start-op','settle','sweep','verify','notify','report','wait',...KERNEL_COMMANDS,...VIEW_COMMANDS].includes(command),usage());
+  if(VIEW_COMMANDS.includes(command)){
+    // Reading a workflow needs no Orca runner at all, so a status page works where Orca is not even installed.
+    const workflows=buildList({repoRoot:repositoryRoot(options.worktree?exactWorktree(options.worktree).path:process.cwd())});
+    return options.json==='true'?{schema:WORKFLOW_LIST,command,workflows}:printed(WORKFLOW_LIST,command,renderList(workflows),{workflows:workflows.length});
+  }
   const runner=orca??createOrcaCalls();
   if(KERNEL_COMMANDS.includes(command)){
     const cwd=options.worktree?exactWorktree(options.worktree).path:process.cwd();
   if(command==='workflow-supervise')return supervisorMain(options,{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd()});
+    if(command==='workflow-status'){
+      // The kernel's own status record stays the machine shape; the view is the page a human reads.
+      const status=kernelMain(command,options,{orca:runner,cwd,wait});
+      const view=buildView({repoRoot:repositoryRoot(cwd),id:required(options.id,'workflow id')});
+      return options.json==='true'?{...status,view}:printed(view.schema,command,renderView(view),{id:view.id,dir:view.dir});
+    }
     return kernelMain(command,options,{orca:runner,cwd,wait});
   }
   if(['report','wait'].includes(command)){
@@ -509,7 +535,8 @@ const direct=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(impo
 if(direct){
   try{
     const output=main();
-    process.stdout.write(`${JSON.stringify(output,null,2)}\n`);
+    // A text view prints as text; everything else is the record it always was.
+    process.stdout.write(typeof output?.print==='string'?output.print.endsWith('\n')?output.print:`${output.print}\n`:`${JSON.stringify(output,null,2)}\n`);
     if(output?.ok===false)process.exitCode=1;
   }catch(error){process.stderr.write(`${JSON.stringify({ok:false,error:{message:error.message}},null,2)}\n`);process.exitCode=1;}
 }
