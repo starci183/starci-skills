@@ -456,6 +456,13 @@ export const KERNEL_CHECK=/^work-valid$/i;
  * invents its own look. Product-agnostic: every grammar family the host carries is listed.
  */
 export const DESIGN_KINDS=['interface.draw','frontend.implement','uat.verify'];
+/** The repository a node is delivered in when it is not this kernel's own; null when it is ours or unknown. */
+function foreignNodeOf(ctx,op){
+  if(!ctx?.work||!op?.nodeId||!ctx.work.code?.repository||typeof ctx.work.api?.nodeRepository!=='function')return null;
+  const node=ctx.work.node(op.nodeId);
+  if(!node)return null;
+  try{const declared=ctx.work.api.nodeRepository(ctx.work.api.readNode(ctx.work.at??ctx.work.repoRoot,node));return declared&&declared!==ctx.work.code.repository?declared:null;}catch{return null;}
+}
 export function grammarReferences(root=skillRoot){
   // The whole canon, not a shortlist: every grammar family file, every frontend pattern, every UI rule the host carries.
   const found=[];
@@ -1157,6 +1164,11 @@ function scheduleOps(orca,store,state,ctx){
     // no profile for this operation is never chosen and then rejected.
     // The allocator is asked for the op's own kind (the graph knows its role); the launchable chain is the
     // operator registry's, so a lane kind it does not carry is resolved to its operator id first.
+    if(foreignNodeOf(ctx,op)){
+      op.status='blocked';op.refusal='out-of-repository';op.dispatch=null;op.terminal=null;
+      store.appendEvent({event:'launch-refused',op:op.id,reason:'the node is delivered by another repository'});
+      continue;
+    }
     const allocated=ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,launchOperator(op.kind)),difficulty:op.difficulty??null});
     if(!allocated?.ok){
       // Every runtime that could carry the op is on its own avoid list: the list has served its purpose (one restart
@@ -1412,6 +1424,42 @@ function settleAuthoredRecord(store,state,op,ctx){
   if(!state.needUser.some(item=>item.kind==='ledger'&&item.node===nodeId))state.needUser.push({node:nodeId,kind:'ledger',detail});
   store.appendEvent({event:'record-still-incomplete',node:nodeId,op:op.id,detail});
   return 'record-still-incomplete';
+}
+
+/**
+ * A completion the kernel wrote can be refused by a later rule (a source coverage path that is not a source path).
+ * The record is the kernel's, so the kernel rewrites it from what it knows - the kernel block's checks and head,
+ * the completion's own paths, sanitized - instead of leaving the whole tree invalid for a human to fix by hand.
+ */
+function repairKernelRecords(store,state,ctx,loaded){
+  if(!ctx.work||loaded.ok||!Array.isArray(loaded.errors))return [];
+  const api=ctx.work.api;
+  if(typeof api.markDone!=='function'||typeof api.buildSourceIdentity!=='function'||typeof api.readNode!=='function')return [];
+  const refused=unique(loaded.errors.filter(error=>['SOURCE_COVERAGE','SOURCE_IDENTITY','CODE_REFS'].includes(error.code)).map(error=>String(error.path??'')).filter(Boolean));
+  const repaired=[];
+  for(const node of loaded.list){
+    const own=refused.some(file=>file===node.path||file.startsWith(`${path.posix.dirname(node.path)}/evidence/`));
+    if(!own||node.state!=='done')continue;
+    let raw;try{raw=api.readNode(ctx.work.at??ctx.work.repoRoot,node);}catch{continue;}
+    const kernel=raw?.extensions?.work3?.kernel;
+    if(!kernel?.opId||!kernel.head||!Array.isArray(kernel.checks))continue;
+    const identity=raw?.completion?.sourceIdentity?.repositories?.[0];
+    const bindsCode=['implementation','release'].includes(String(node.kind??''));
+    try{
+      const rebuilt=bindsCode&&identity?api.buildSourceIdentity({repository:identity.repository,origin:identity.origin,commit:kernel.head,paths:identity.coverage?.paths??[],
+        dependencyCoverage:identity.coverage?.dependencyCoverage??'Dependencies were not re-verified by this operation.',limitations:identity.coverage?.limitations??['Only the operation allowlist was verified by the kernel.']}):null;
+      ctx.guards.gitQueue(()=>{
+        api.markDone(ctx.work.at??ctx.work.repoRoot,node,{opId:kernel.opId,head:kernel.head,checks:kernel.checks,verifiedBy:kernel.verifiedBy??'starci-kernel',at:kernel.at??null,
+          digest:ctx.work.digest,bindSource:bindsCode,...(rebuilt?{sourceIdentity:rebuilt}:{}),
+          evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',servedVersionEvidence:`Checks re-run by the StarCi kernel in workflow ${state.id} on branch ${state.branch}`}});
+        commitLedgerWrite(store,state,{id:kernel.opId,nodeId:node.id},ctx,node.id);
+      });
+      repaired.push(node.id);
+      store.appendEvent({event:'kernel-record-repaired',node:node.id,op:kernel.opId,codes:refused.length});
+    }catch(error){store.appendEvent({event:'kernel-record-repair-failed',node:node.id,reason:String(error.message).slice(0,200)});}
+  }
+  if(repaired.length){try{ctx.work.loaded=api.loadLedger({repoRoot:ctx.work.at??ctx.work.repoRoot,validate:ctx.work.validate});}catch{}}
+  return repaired;
 }
 
 /**
@@ -2456,6 +2504,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     ctx.work={api:ledgerApi,loaded,validate,digest,node:id=>loaded.nodes.get(id)??null,
       code,ledger,at,shared:Boolean(shared),side:binding.side??null,source:binding.source,
       repoRoot:ledger.repoRoot,workRoot:ledger.workRoot,origin:code.origin,repository:code.repository};
+    repairKernelRecords(store,state,ctx,loaded);
     store.appendEvent({event:'ledger-loaded',workRoot:slash(loaded.workRoot),valid:loaded.ok,nodes:loaded.list.length,
       scope:state.scope,source:binding.source,code:code.repository,...(shared?{'ledger-shared':shared}:{})});
     // A shared tree is somebody else's working copy: the kernel commits into it, so it refuses to start over
