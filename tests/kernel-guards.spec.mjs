@@ -85,7 +85,7 @@ test('an operation declares some locks and its own checks prove the rest', () =>
   assert.deepEqual(resourceLocks({kind:'backend.implement',checks:[{name:'integration',command:'npx testcontainers up'}]}),[]);
   assert.deepEqual(resourceLocks({kind:'backend.implement',checks:[{name:'stack',command:'psql -h localhost:5432'}]}),['local-stack']);
   assert.deepEqual(resourceLocks({kind:'uat.verify',resources:['fe-slot'],checks:[{name:'walk',command:'npx playwright test uat/sign-in.spec.ts'}]}),['e2e-runtime','fe-slot']);
-  assert.deepEqual(resourceLocks({kind:'uat.execute',checks:[{name:'flow',command:'npm run test:e2e'}]}),['e2e-runtime']);
+  assert.deepEqual(resourceLocks({kind:'uat.execute',checks:[{name:'flow',command:'npm run test:e2e'}]}),[],'the API e2e suite runs on its own throwaway stack: no lock, ops run it in parallel');
   assert.deepEqual(resourceLocks({kind:'operations.apply',checks:[{name:'deploy',command:'kubectl apply -f k8s/billing.yaml'}]}),['cluster']);
   assert.deepEqual(resourceLocks({kind:'operations.apply',checks:[{name:'chart',command:'KUBECONFIG=./kube.yaml helm upgrade billing .'}]}),['cluster']);
   assert.deepEqual(resourceLocks({kind:'uat.verify'}),['e2e-runtime'],'the kind alone can prove a lock');

@@ -102,8 +102,8 @@ const FALLBACK_GUARDS={
   parseSharedChangePaths:detail=>pathsIn(detail),
   resourceLocks:op=>unique([...(op?.resources??[]),...(op?.checks??[]).flatMap(check=>{
     const command=String(check?.command??'');
-    return [/test:container|postgres/i.test(command)?'postgres':null,/\be2e\b/i.test(command)?'e2e-runtime':null,
-      /docker/i.test(command)?'docker':null,/kubectl|helm/i.test(command)?'cluster':null].filter(Boolean);
+    return [/localhost:5432|127\.0\.0\.1:5432|localhost:8089|start:dev|docker compose/i.test(command)?'local-stack':null,
+      /playwright|uat\.verify/i.test(command)?'e2e-runtime':null,/kubectl|helm/i.test(command)?'cluster':null].filter(Boolean);
   })]),
   resourcesClash:(a,b)=>FALLBACK_GUARDS.resourceLocks(a).some(lock=>FALLBACK_GUARDS.resourceLocks(b).includes(lock)),
   gitQueue:fn=>fn(),
@@ -319,7 +319,10 @@ export function validateWorkTree({repoRoot,workRoot=null}={}){
 /** An operation id that is also a safe file name: the Work id with every other character folded to `-`. */
 /** One Work node -> one operation form; the goal phase and the run-time ledger sync both use it. */
 /** Checks the kernel runs itself as gates (whole-tree validator, end-to-end suites): never per operation, never in parallel. */
-export const KERNEL_CHECK=/^(work-valid|backend-e2e-pass|producer-e2e-pass|.*e2e.*)$/i;
+// Only the whole-tree validator is the kernel's own check. End-to-end checks belong to the op that owns them: the
+// product's e2e suite starts its own throwaway stack (Testcontainers), so ops may run it in parallel and a slice
+// is not accepted until its e2e scenarios are green.
+export const KERNEL_CHECK=/^work-valid$/i;
 export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0}){
   return toOp({id,nodeId:node.id,
     kind:WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),

@@ -12,10 +12,9 @@ import {nodeDirectory,nodeFile} from './work-ledger.mjs';
 export const PROTECTED_SUFFIX='/**';
 /** Locks inferred from what an operation actually runs, so two ops that need one machine never overlap. */
 export const LOCK_RULES=[
-  // Testcontainers isolate their own database per run, so container suites do not clash; only the shared local
-  // stack (fixed ports), the e2e runtime and the cluster are exclusive resources.
+  // Testcontainers isolate their own stack per run, so container suites and the API e2e suite do not clash and run
+  // in parallel; only the shared local stack (fixed ports), a served UI walked by UAT, and the cluster are exclusive.
   {pattern:/localhost:5432|127\.0\.0\.1:5432|localhost:8089|start:dev|docker compose/i,locks:['local-stack']},
-  {pattern:/test:e2e|e2e/i,locks:['e2e-runtime']},
   {pattern:/kubectl|helm|KUBECONFIG/i,locks:['cluster']},
   {pattern:/uat\.verify|playwright/i,locks:['e2e-runtime']}
 ];

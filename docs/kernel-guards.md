@@ -22,7 +22,7 @@ a record: the kernel reverts it and writes the record through `execution/work-le
 Disjoint allowlists are what make two operations parallel, but two disjoint operations can still
 want one Docker daemon. `resourceLocks(op)` unions `op.resources` with the locks its own `kind` and
 `checks[].command` prove it will reach for: `test:container|testcontainers|docker` → `docker` and
-`postgres`, `test:e2e|e2e` and `uat.verify|playwright` → `e2e-runtime`, `kubectl|helm|KUBECONFIG` →
+`postgres`; the API e2e suite takes no lock (Testcontainers give each run its own stack); `uat.verify|playwright` → `e2e-runtime`, `kubectl|helm|KUBECONFIG` →
 `cluster`. The result is sorted and unique, and `resourcesClash(a,b)` (two ops, or two lock lists)
 is the question the scheduler asks before it runs them at the same time.
 
