@@ -193,6 +193,9 @@ wait:
     - escalation
     - worker_done
     - worker_failed
+  tickMs: 120000
+  heartbeatGraceMs: 600000
+  ping: operation-heartbeat-every-5-minutes-peeked-per-tick
   tick:
     - check-wait-with-previous-batch-acknowledged
     - scan-report-files

@@ -518,7 +518,7 @@ function usage(){return `Usage:
   node orca-supervised-launch.mjs sweep --worktree <relative-path> --from <monitor-terminal> [--keep <handle,handle>]
   node orca-supervised-launch.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
   node orca-supervised-launch.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
-  node orca-supervised-launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
+  node orca-supervised-launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
   node orca-supervised-launch.mjs start-coordinator --plan <name> --spec-file <file> (--run <run> | --objective <text>) [--worktree <relative-path>]
   node orca-supervised-launch.mjs verify`;}
 

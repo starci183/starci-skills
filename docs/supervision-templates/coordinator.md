@@ -20,6 +20,7 @@ Write its contract from `<host .claude>/docs/supervision-templates/monitor.md` t
 
 ## Wait (the loop you own)
 `node <launcher> wait --run <run> --from <me> --worktree . --timeout-ms 900000`
+Inside one call the launcher pings every live Monitor every 120 s and returns at the first boundary; you never sleep, poll or read terminals yourself.
 - `event: report` → read every message and every report file listed (`reports[]`, schema `starci/workflow-report@1`), decide, act, then call `wait` again.
 - `stalled-idle` / `stalled-silent` / `stalled-prompt` → `node <launcher> notify --terminal <that Monitor terminal> --text "Report your state with the launcher report command now"`; if it stays stalled for two ticks, `replace-monitor`.
 - `dead` → `node <launcher> replace-monitor ... --task <monitor task> --dispatch <dead dispatch>`.

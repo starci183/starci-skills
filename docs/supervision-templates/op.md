@@ -11,6 +11,11 @@ Runtime StarCi 4.1. Worktree `<child path>` (branch `<branch>`). Work only insid
 ## References
 <SRS/SDS files and sections; existing branch work is input, not proof>
 
+## Ping (mandatory)
+Every 5 minutes at most, and before any command that may run longer than a minute, send
+`orca orchestration send --from <your terminal> --type heartbeat --subject alive --task-id <op task> --dispatch-id <your dispatch> --phase "<what you are doing>" --json`.
+A worker without a ping and without output for 10 minutes is polled, settled and restarted by the Monitor; the ping is how you prove you are alive.
+
 ## Checks to run
 <exact commands, e.g. npx vitest run apps/.../x.spec.ts, npm run lint:check -- <paths>>. Record every command with its exit code in a JSON array file `<runtime dir>/checks-<op task>.json` (`[{"name","command","exitCode","evidence"}]`).
 

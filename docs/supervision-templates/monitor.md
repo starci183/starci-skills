@@ -20,8 +20,10 @@ No `--skip`: the launcher walks `qwen3.8-flash → claude-opus → gpt-5.6-sol` 
 
 ## Wait (the loop you own)
 `node <launcher> wait --run <nested run> --from <me> --worktree . --timeout-ms 900000`
+Inside one call the launcher pings every live operation every 120 s (screen, output age, terminal) and returns at the first boundary; you never sleep, poll or read terminals yourself.
 - `report` → read the report file (`starci/op-report@1`; `validation.ok` must be true, files inside the allowlist, checks actually run). `done` → `worker-release --dispatch <op>` and start the next DAG node. `partial` → next bounded operation carries `open[]`. `failed` → bounded repair (at most 3 per node) or report `failed` upward. `ask` → answer by `notify --terminal <op terminal> --text "<answer>"` if it is inside your authority, otherwise forward as `blocked`. `blocked` (`shared-change`, `sds-gap`) → forward one normalized `blocked` report to the Coordinator and keep the operation working on everything else.
-- `stalled-idle` / `stalled-prompt` → `notify --terminal <op terminal> --text "Continue; when finished report with the launcher report command exactly once"`; still stalled next tick → `settle --dispatch <op> --terminal <op terminal> --close true`, then `start-op` again.
+- `stalled-idle` → `notify --terminal <op terminal> --text "Continue; when finished report with the launcher report command exactly once"`; still stalled next tick → `settle --dispatch <op> --terminal <op terminal> --close true`, then `start-op` again.
+- `stalled-prompt` → the agent sits in a confirmation dialog and cannot read a notify: `settle --dispatch <op> --terminal <op terminal> --close true` immediately, then `start-op` again.
 - `stalled-silent` / `dead` → `settle` then `start-op` again.
 - `timeout` → call `wait` again. A timeout is never a reason to end your turn.
 

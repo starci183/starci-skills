@@ -15,6 +15,7 @@ export const WAIT_TICK='starci/orca-wait-tick@1';
 export const COORDINATOR_LAUNCH='starci/orca-supervised-coordinator-launch@1';
 export const BOUNDARY_TYPES='worker_done,worker_failed,question,escalation';
 const DEFAULT_STALLED_AFTER_MS=20*60*1000;
+export const DEFAULT_HEARTBEAT_GRACE_MS=10*60*1000;
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
@@ -73,7 +74,27 @@ export function classifyWorker({screen,terminal,now,stalledAfterMs=DEFAULT_STALL
  * liveness of every live worker, sweep of dead terminals and title re-canonicalization. `timeout` means
  * "call wait again", never "end the turn".
  */
-export function waitTick(orca,{cwd,run,from,timeoutMs=900000,reportsDir=null,stalledAfterMs=DEFAULT_STALLED_AFTER_MS,ack=null,noAck=false,now=Date.now,wait=sleepSync}){
+export const DEFAULT_TICK_MS=120000;
+/**
+ * Ping-pong: the blocking check is sliced into short ticks so every live worker is inspected at least
+ * once per tick while the supervisor keeps waiting; the call returns at the first boundary (report, stalled,
+ * dead) or after the whole timeout with `timeout`.
+ */
+export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK_MS,reportsDir=null,stalledAfterMs=DEFAULT_STALLED_AFTER_MS,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack=null,noAck=false,now=Date.now,wait=sleepSync}){
+  const started=now();
+  const ticks=[];
+  let ackOnce=ack,noAckOnce=noAck;
+  for(;;){
+    const remaining=timeoutMs-(now()-started);
+    const slice=Math.max(1000,Math.min(tickMs,remaining));
+    const tick=singleTick(orca,{cwd,run,from,timeoutMs:slice,reportsDir,stalledAfterMs,heartbeatGraceMs,ack:ackOnce,noAck:noAckOnce,now,wait});
+    ackOnce=null;noAckOnce=false;
+    ticks.push({at:now(),event:tick.event,liveness:tick.liveness.map(item=>`${item.dispatch}:${item.liveness}`)});
+    if(tick.event!=='timeout'||now()-started>=timeoutMs)return {...tick,ticks:ticks.length,elapsedMs:now()-started};
+  }
+}
+
+function singleTick(orca,{cwd,run,from,timeoutMs,reportsDir,stalledAfterMs,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack,noAck,now,wait}){
   const directory=reportsDirectory(cwd,required(run,'run id'),reportsDir);
   const stateFile=path.join(directory,'wait-state.json');
   const state=readJson(stateFile,{lastDeliveryId:null,seenReports:{}});
@@ -83,20 +104,40 @@ export function waitTick(orca,{cwd,run,from,timeoutMs=900000,reportsDir=null,sta
   const checked=orca.invoke('check',checkParams,{cwd});
   const messages=(getPath(checked.receipt,'result.messages')??[]).map(m=>({id:m.id,type:m.type,subject:m.subject??'',body:m.body??'',createdAt:m.created_at??m.createdAt??null,payload:(()=>{try{return JSON.parse(m.payload??'{}');}catch{return {};}})()}));
   const deliveryId=getPath(checked.receipt,'result.deliveryId')??null;
+  // Ping: the latest heartbeat per Dispatch, peeked so nothing is marked read.
+  const pings=new Map();
+  const peeked=orca.invoke('check',{run,terminal:from,peek:true,types:'heartbeat'},{cwd});
+  for(const m of (getPath(peeked.receipt,'result.messages')??[])){let p={};try{p=JSON.parse(m.payload??'{}');}catch{}const at=Date.parse(m.created_at??m.createdAt??'')||0;if(p.dispatchId&&at>=(pings.get(p.dispatchId)??0))pings.set(p.dispatchId,at);}
   const reports=readReports(directory).filter(report=>report?.dispatch&&!state.seenReports[report.dispatch]).map(report=>({...report,validation:validateReport(report)}));
   const workers=(getPath(orca.invoke('worker-list',{run},{cwd}).receipt,'result.workers')??[]);
   const listed=getPath(orca.invoke('terminal-list',{},{cwd}).receipt,'result.terminals')??[];
   const tasks=getPath(orca.invoke('task-list',{run},{cwd}).receipt,'result.tasks')??[];
   const names=new Map(tasks.map(task=>[task.id,task.display_name]));
   const reportedDispatches=new Set(readReports(directory).map(report=>report?.dispatch).filter(Boolean));
-  const liveness=[],renamed=[];
+  const liveness=[],renamed=[],approvals=[];
   for(const worker of workers.filter(isLive)){
     const handle=worker.agentTerminalHandle;
     const terminal=listed.find(t=>t.handle===handle)??null;
     const read=terminal?orca.invoke('terminal-read',{terminal:handle,screen:true},{cwd}):null;
     const screen=read?.outcome==='ok'?(getPath(read.receipt,'result.terminal.tail')??[]).join('\n'):'';
-    const verdict=classifyWorker({screen,terminal,now:now(),stalledAfterMs,reported:reportedDispatches.has(worker.dispatchId)});
-    liveness.push({dispatch:worker.dispatchId,task:worker.taskId,name:names.get(worker.taskId)??null,terminal:handle,workerState:worker.workerState,...verdict});
+    const lastPing=pings.get(worker.dispatchId)??null;
+    const pingAgeMs=lastPing===null?null:now()-lastPing;
+    let verdict=classifyWorker({screen,terminal,now:now(),stalledAfterMs,reported:reportedDispatches.has(worker.dispatchId)});
+    // A command-terminal operation runs in an isolated worktree under a contract allowlist, so an interactive
+    // confirmation is answered by the supervisor ("allow once"), never left for a human. Only a prompt that
+    // survives the answer is reported as stalled-prompt.
+    if(verdict.liveness==='stalled-prompt'&&terminal){
+      const answered=orca.invoke('terminal-send',{terminal:handle,text:'1',enter:true},{cwd});
+      wait(3000);
+      const again=orca.invoke('terminal-read',{terminal:handle,screen:true},{cwd});
+      const after=again.outcome==='ok'?(getPath(again.receipt,'result.terminal.tail')??[]).join('\n'):'';
+      const still=classifyWorker({screen:after,terminal,now:now(),stalledAfterMs});
+      approvals.push({dispatch:worker.dispatchId,terminal:handle,sent:answered.outcome,cleared:still.liveness!=='stalled-prompt'});
+      verdict=still.liveness==='stalled-prompt'?{liveness:'stalled-prompt',reason:'confirmation prompt survived an allow-once answer'}:{liveness:'working',reason:'confirmation prompt answered by the supervisor'};
+    }
+    // No ping inside the grace window and no visible activity: the worker is polled and reported as silent.
+    if(verdict.liveness==='working'&&verdict.reason==='recent output'&&(pingAgeMs===null||pingAgeMs>heartbeatGraceMs)&&(now()-Number(terminal?.lastOutputAt??0))>heartbeatGraceMs)verdict={liveness:'stalled-silent',reason:`no heartbeat for ${pingAgeMs===null?'the whole attempt':`${Math.round(pingAgeMs/60000)} min`} and no output for ${Math.round((now()-Number(terminal?.lastOutputAt??0))/60000)} min`};
+    liveness.push({dispatch:worker.dispatchId,task:worker.taskId,name:names.get(worker.taskId)??null,terminal:handle,workerState:worker.workerState,lastPingAt:lastPing,pingAgeMs,...verdict});
     const canonical=names.get(worker.taskId);
     if(terminal&&canonical&&terminal.title!==canonical&&verdict.liveness!=='dead'){
       const rename=orca.invoke('terminal-rename',{terminal:handle,title:canonical},{cwd});
@@ -109,8 +150,8 @@ export function waitTick(orca,{cwd,run,from,timeoutMs=900000,reportsDir=null,sta
   writeJson(stateFile,state);
   const stalled=liveness.filter(item=>item.liveness.startsWith('stalled')||item.liveness==='dead');
   const event=messages.length||reports.length?'report':stalled.length?stalled[0].liveness:checked.outcome==='ok'?'timeout':'check-failed';
-  return {schema:WAIT_TICK,run,event,deliveryId,check:{outcome:checked.outcome,reason:checked.reason??null},messages,reports,liveness,renamed,sweep:{closed:sweep.closed,kept:sweep.kept.length},
-    next:event==='timeout'?'call wait again; a timeout is not a boundary':event==='report'?'process every message and report, then call wait again':'act on the stalled or dead worker (notify to report, or settle and retry), then call wait again'};
+  return {schema:WAIT_TICK,run,event,deliveryId,check:{outcome:checked.outcome,reason:checked.reason??null},messages,reports,liveness,renamed,approvals,sweep:{closed:sweep.closed,kept:sweep.kept.length},
+    next:event==='timeout'?'call wait again; a timeout is not a boundary':event==='report'?'process every message and report, then call wait again':event==='stalled-prompt'?'the agent is inside a confirmation dialog and cannot read a notify: settle it (--close true) and start-op again, then call wait again':'act on the stalled or dead worker (notify to report, or settle and retry), then call wait again'};
 }
 
 /** Bootstrap the persistent Plan Coordinator agent through a temporary helper terminal that is closed afterwards. */
@@ -187,7 +228,7 @@ export function protocolMain(command,options,{orca,cwd}){
       branch:options.branch??null,head:options.head??null,gates:options.gates?csv(options.gates).map(gate=>{const [name,status]=gate.split('=');return {name,status:status??'passed'};}):[],
       observations:options.observations?[options.observations]:[],reportsDir:options['reports-dir']??null,capability:options.capability??null});
   }
-  if(command==='wait')return waitTick(orca,{cwd,run:required(options.run,'run id'),from:required(options.from,'own terminal handle'),timeoutMs:Number(options['timeout-ms']??900000),reportsDir:options['reports-dir']??null,stalledAfterMs:Number(options['stalled-after-ms']??DEFAULT_STALLED_AFTER_MS),ack:options.ack??null,noAck:options['no-ack']==='true'});
+  if(command==='wait')return waitTick(orca,{cwd,run:required(options.run,'run id'),from:required(options.from,'own terminal handle'),timeoutMs:Number(options['timeout-ms']??900000),tickMs:Number(options['tick-ms']??DEFAULT_TICK_MS),reportsDir:options['reports-dir']??null,stalledAfterMs:Number(options['stalled-after-ms']??DEFAULT_STALLED_AFTER_MS),ack:options.ack??null,noAck:options['no-ack']==='true'});
   if(command==='start-coordinator')return startCoordinator(orca,{cwd,plan:required(options.plan,'plan name'),spec:options.spec,run:options.run??null,objective:options.objective??null});
   throw Error(`Unsupported protocol command: ${command}`);
 }

@@ -77,7 +77,7 @@ test('wait tick acknowledges the previous batch, reads report files, classifies 
     fs.writeFileSync(path.join(dir,'ctx_done.json'),JSON.stringify(buildReport({...base,dispatch:'ctx_done',outcome:'done',files:['apps/sales/a.ts'],checks:[check]})));
     const renames=[],checks=[];
     const fake=fakeOrca({
-      check:(args)=>{checks.push(args);return json(0,{ok:true,result:{deliveryId:'delivery_2',messages:[{id:'msg_q',type:'question',subject:'Which order?',body:'a or b',payload:'{"taskId":"task_q","dispatchId":"ctx_q"}'}]}});},
+      check:(args)=>{if(args.includes('--peek'))return json(0,{ok:true,result:{messages:[{id:'hb',type:'heartbeat',created_at:'1970-01-01T00:00:04Z',payload:'{"dispatchId":"ctx_done"}'}]}});checks.push(args);return json(0,{ok:true,result:{deliveryId:'delivery_2',messages:[{id:'msg_q',type:'question',subject:'Which order?',body:'a or b',payload:'{"taskId":"task_q","dispatchId":"ctx_q"}'}]}});},
       'worker-list':()=>json(0,{ok:true,result:{workers:[
         {dispatchId:'ctx_done',taskId:'task_done',workerState:'ready',dispatchStatus:'dispatched',agentTerminalHandle:'term_done'},
         {dispatchId:'ctx_idle',taskId:'task_idle',workerState:'unsupervised',dispatchStatus:'dispatched',agentTerminalHandle:'term_idle'},
@@ -132,4 +132,47 @@ test('report files of a linked worktree live in the main repository so op and Mo
   assert.ok(fs.existsSync(path.join(root,'.git')));
   assert.equal(reportsDirectory(process.cwd(),'run_x'),path.join(root,'.starciwork','_local','runtime','reports','run_x'));
   assert.equal(reportsDirectory(process.cwd(),'run_x','C:/explicit'),path.resolve('C:/explicit'));
+});
+
+test('wait pings every live worker each tick instead of sleeping through the whole timeout',()=>{
+  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+  try{
+    let clock=0,checks=0;const reads=[];
+    const fake=fakeOrca({
+      check:(args)=>{if(args.includes('--peek'))return json(0,{ok:true,result:{messages:[]}});checks+=1;clock+=Number(args[args.indexOf('--timeout-ms')+1]);return json(0,{ok:true,result:{deliveryId:null,messages:[]}});},
+      'worker-list':()=>json(0,{ok:true,result:{workers:[{dispatchId:'ctx_p',taskId:'task_p',workerState:'unsupervised',dispatchStatus:'dispatched',agentTerminalHandle:'term_p'}]}}),
+      'terminal-list':()=>json(0,{ok:true,result:{terminals:[{handle:'term_p',title:'[Op] review.verify - Sales',worktreePath:cwd,status:'running',lastOutputAt:0}]}}),
+      'task-list':()=>json(0,{ok:true,result:{tasks:[{id:'task_p',display_name:'[Op] review.verify - Sales'}]}}),
+      'terminal-read':()=>{reads.push(clock);const prompt=checks===3?answers.length===0:checks>=4;return json(0,{ok:true,result:{terminal:{handle:'term_p',tail:prompt?['Allow execution of: orca?','> 1. Yes, allow once','Waiting for user confirmation...']:['Reading files','esc to cancel']}}});},
+      'terminal-send':(args)=>{answers.push(args);return json(0,{ok:true,result:{}});}
+    });
+    const answers=[];
+    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',reportsDir:dir,timeoutMs:900000,tickMs:120000,now:()=>clock,wait:()=>{}});
+    // tick 3: the prompt is answered once and clears (working); tick 4: a prompt survives the answer -> stalled-prompt.
+    assert.equal(result.event,'stalled-prompt');
+    assert.equal(checks,4);
+    assert.equal(result.ticks,4);
+    assert.ok(answers.every(args=>args.includes('--enter')&&args[args.indexOf('--text')+1]==='1'));
+    assert.equal(result.approvals.length,1);
+    assert.equal(result.approvals[0].cleared,false);
+    assert.equal(answers.length,2);
+    assert.match(result.next,/settle/);
+    assert.deepEqual(reads.slice(0,3),[120000,240000,360000]);
+  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+});
+
+test('a worker that neither pings nor prints inside the grace window is reported silent',()=>{
+  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+  try{
+    const fake=fakeOrca({
+      check:(args)=>args.includes('--peek')?json(0,{ok:true,result:{messages:[{id:'hb',type:'heartbeat',created_at:'1970-01-01T00:00:00Z',payload:'{"dispatchId":"ctx_s"}'}]}}):json(0,{ok:true,result:{deliveryId:null,messages:[]}}),
+      'worker-list':()=>json(0,{ok:true,result:{workers:[{dispatchId:'ctx_s',taskId:'task_s',workerState:'ready',dispatchStatus:'dispatched',agentTerminalHandle:'term_s'}]}}),
+      'terminal-list':()=>json(0,{ok:true,result:{terminals:[{handle:'term_s',title:'[Op] backend.implement - Sales',worktreePath:cwd,status:'running',lastOutputAt:0}]}}),
+      'task-list':()=>json(0,{ok:true,result:{tasks:[{id:'task_s',display_name:'[Op] backend.implement - Sales'}]}}),
+      'terminal-read':()=>json(0,{ok:true,result:{terminal:{handle:'term_s',tail:['Compiling...']}}})
+    });
+    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',reportsDir:dir,timeoutMs:1000,tickMs:1000,now:()=>11*60*1000,stalledAfterMs:20*60*1000,wait:()=>{}});
+    assert.equal(result.event,'stalled-silent');
+    assert.equal(result.liveness[0].pingAgeMs,11*60*1000);
+  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
 });
