@@ -65,18 +65,20 @@ export function superviseOnce({repoRoot,launcher,healthMs=DEFAULT_HEALTH_MS,now=
     let outcome=null;
     if(decision.action==='restart'){stopKernel(info,{killFn,log});try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,log});}
     else if(decision.action==='start'){try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,log});}
-    rounds.push({id:info.id,...decision,alive:info.alive,silentMs:info.silentMs,outcome});
+    rounds.push({id:info.id,...decision,approved:info.approved,finished:info.finished,stopRequested:info.stopRequested,alive:info.alive,silentMs:info.silentMs,outcome});
   }
   return {schema:SUPERVISOR,at:now(),rounds};
 }
 
-/** The long-running supervisor: poll, act, sleep; exits when every workflow is finished. */
+/** The long-running supervisor: poll, act, sleep; exits only when no approved workflow is unfinished. */
 export function superviseForever({repoRoot,launcher,pollMs=DEFAULT_POLL_MS,healthMs,log=()=>{},maxRounds=Infinity,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}){
   let round=0;
   for(;;){
     const result=superviseOnce({repoRoot,launcher,healthMs,log});
     log({event:'supervisor-round',round,rounds:result.rounds.map(item=>`${item.id}:${item.action}`)});
-    const active=result.rounds.filter(item=>item.action!=='leave'||item.reason==='healthy');
+    // The supervisor lives as long as any approved workflow is unfinished: a stop flag pauses a kernel, it does not
+    // end supervision, because the flag is removed when the kernel may run again.
+    const active=result.rounds.filter(item=>item.approved&&!item.finished);
     if(!active.length||++round>=maxRounds)return result;
     sleep(pollMs);
   }
