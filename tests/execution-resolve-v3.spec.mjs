@@ -24,12 +24,14 @@ test('resolver preserves each exact operator chain and its environment metadata'
   assert.deepEqual(backend.map(value => value.target), [
     'qwen3.8-flash', 'claude-opus', 'gpt-5.6-sol'
   ]);
+  // Every runtime that carries the verify role in profiles/runtimes.yaml is declared here, so the
+  // allocator can hand review.verify to any of them and still obtain a launch shape.
   const review = flattenOperationCandidates({operation: 'review.verify', registry});
   assert.deepEqual(review.map(value => value.target), [
-    'qwen3.8-flash', 'claude-fable-5.1', 'gpt-5.6-sol'
+    'qwen3.8-flash', 'claude-fable-5.1', 'gpt-5.6-sol', 'claude-opus', 'gpt-6-astra'
   ]);
   const reasoning = flattenOperationCandidates({operation: 'architecture.decide', registry});
-  assert.deepEqual(reasoning.map(value => value.target), ['claude-fable-5.1', 'gpt-6-astra']);
+  assert.deepEqual(reasoning.map(value => value.target), ['claude-fable-5.1', 'gpt-6-astra', 'claude-opus']);
 });
 
 test('automatic Orca chains accept return-preamble command terminals and reject any other terminal form', () => {

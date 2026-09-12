@@ -40,10 +40,12 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.equal(registry.executionModes.orchestrated.worktree,'isolated-child-per-workflow-attempt');
   assert.equal(registry.executionModes.orchestrated.maxConcurrentOperationAgents,3);
   assert.deepEqual(Object.keys(registry.operators).sort(),[...ops].sort());
-  const reasoningOps=new Set(['business.decide','architecture.decide']);
+  // An operator declares every runtime that carries its role, so runtime allocation always resolves a
+  // launch shape: the decide ops gained Opus as the reasoning overflow, review.verify gained Opus and Astra.
+  const expectedCounts={'business.decide':3,'architecture.decide':3,'review.verify':5};
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
-    const expectedCount=reasoningOps.has(op)?2:3;
+    const expectedCount=expectedCounts[op]??3;
     assert.equal(route.candidates.length,expectedCount,op);
     assert.equal(new Set(route.candidates.map(x=>x.target)).size,expectedCount);
     assert.ok(route.candidates.every(candidate=>candidate.orcaLaunch.kind==='managed-agent'||(candidate.orcaLaunch.kind==='command-terminal'&&candidate.orcaLaunch.dispatch==='return-preamble-and-send')),op);
@@ -60,7 +62,8 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.equal(resolveExecutionChain({op:'backend.implement'}).candidates[0].profile,'qwen3.8-flash-worker');
   assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[2].profile,'gpt-5.6-sol-reviewer');
   assert.equal(registry.targetAliases['qwen-qwen3.8-flash-worker'],'qwen3.8-flash');
-  assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates.map(x=>x.target),['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol']);
+  assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates.map(x=>x.target),['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol','claude-opus','gpt-6-astra']);
+  assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[3].profile,'opus-reviewer');
   assert.deepEqual(resolveExecutionChain({op:'knowledge.repair'}).candidates.map(x=>x.target),['claude-opus','gpt-5.6-sol','qwen3.8-flash']);
   assert.deepEqual(registry.skills.starci.chains.working,['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
   assert.deepEqual(registry.skills.starci.chains.reasoning,['claude-fable-5.1','gpt-6-astra']);
@@ -103,8 +106,8 @@ test('Qwen Flash executes then Opus then Sol, Sol draws, Fable then Astra reason
     assert.deepEqual(chain[0].orcaLaunch,qwenLaunch);
   }
   assert.equal(review[0].target,'qwen3.8-flash');
-  assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra']);
-  assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra']);
+  assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus']);
+  assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus']);
   const ops=Object.keys(readPublicJson('profiles/registry.json').operators);
   for(const op of ops){
     const chain=resolveExecutionChain({op}).candidates;

@@ -94,6 +94,7 @@ targets:
     requestedModel: null
     profiles:
       working: opus
+      reasoning: opus-reviewer
     orcaLaunch:
       kind: managed-agent
       agent: claude
@@ -170,9 +171,9 @@ supervisors:
 operators:
   architecture.decide:
     skill: starci
-    chain: [claude-fable-5.1, gpt-6-astra]
+    chain: [claude-fable-5.1, gpt-6-astra, claude-opus]
     environments:
-      - {environment: claude, profiles: [claude-fable-5.1]}
+      - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
       - {environment: codex, profiles: [gpt-6-astra]}
   backend.implement:
     skill: starci
@@ -183,9 +184,9 @@ operators:
       - {environment: codex, profiles: [gpt-5.6-sol]}
   business.decide:
     skill: starci
-    chain: [claude-fable-5.1, gpt-6-astra]
+    chain: [claude-fable-5.1, gpt-6-astra, claude-opus]
     environments:
-      - {environment: claude, profiles: [claude-fable-5.1]}
+      - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
       - {environment: codex, profiles: [gpt-6-astra]}
   content.generate:
     skill: starci
@@ -224,11 +225,11 @@ operators:
       - {environment: codex, profiles: [gpt-5.6-sol]}
   review.verify:
     skill: starci
-    chain: [qwen3.8-flash, claude-fable-5.1, gpt-5.6-sol]
+    chain: [qwen3.8-flash, claude-fable-5.1, gpt-5.6-sol, claude-opus, gpt-6-astra]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
-      - {environment: claude, profiles: [claude-fable-5.1]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-6-astra]}
   runtime.operate:
     skill: starci
     chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
@@ -307,7 +308,12 @@ costPolicy: |-
   Never infer price or quality superiority from a subscription label; benchmark bounded
   representative operations before proposing another routing change. A native worker is released
   after its exact worker_done result is accepted; the workflow child remains until integration is
-  complete.
+  complete. In runtime 5.0 the chain no longer decides who runs an operation - `profiles/runtimes.yaml`
+  does, by role preference - so every operator's `environments` must declare every runtime that carries
+  that operation's role and owns a profile for it, and the chain lists exactly those targets so
+  `candidateFor` can answer with a launch shape for whichever runtime the allocator picked. A runtime
+  whose role has no profile for an operation's role (Astra reasons but cannot work, so it cannot take a
+  `uat.verify`) stays out of that operator and is excluded from allocation by `restrictTo`.
 assetFallback: When image generation is unavailable, reuse verified assets first; Claude may leave
   decorative image slots blank with a concrete deferred brief. Never mark missing artwork generated
   or satisfy a functional criterion with a blank slot.

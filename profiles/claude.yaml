@@ -12,6 +12,15 @@ profiles:
     roleDescription: "Heavy authoring and high-stakes mutation inside a frozen boundary: source apply,
       backend implementation, release and platform operations."
     toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
+  opus-reviewer:
+    role: reasoning
+    legacyModelPreference: claude-opus-5
+    model: null
+    imageGeneration: false
+    roleDescription: "Judge, decide and verify on the evidence without repairing the product under
+      review: the reasoning half of the Opus pool, so allocation may hand Opus a review or a decision
+      when the dedicated reasoning pools are saturated or cooling."
+    toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
   fable-5.1:
     role: reasoning
     legacyModelPreference: claude-fable-5-1
