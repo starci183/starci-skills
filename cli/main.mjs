@@ -14,6 +14,7 @@ Usage:
   starci storage <backend-root>
   starci source-layout <backend-root> <frontend-root>
   starci validate <work-root>
+  starci brand check <work-root> [--source <repository-root>] [--json]
   starci tree <work-root>
   starci impact <work-root> <node-or-resource-id>
   starci stale <work-root>
@@ -182,6 +183,25 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       }
       exactArgs(input,5);
       emit(createSharedConflictEscalation({plan:dataFile(input[0]),operationId:input[1],taskId:input[2],dispatchId:input[3],files:csv(input[4],'Shared files')}));return 0;
+    }
+    if(command==='brand'){
+      // Read-only: re-derives the brand record's claims from shipped source, assets and the grammar canon.
+      const [action,...input]=args;
+      if(action!=='check')throw Error('Use starci brand check <work-root> [--source <repository-root>] [--json].');
+      const json=input.includes('--json');
+      const rest=input.filter(value=>value!=='--json');
+      const at=rest.indexOf('--source');
+      let source=null;
+      if(at!==-1){
+        source=rest[at+1];
+        if(!source||source.startsWith('--'))throw Error('--source needs one repository root.');
+        rest.splice(at,2);
+      }
+      exactArgs(rest,1);
+      const {runBrandChecks,formatBrandChecks}=await import('../execution/brand-checks.mjs');
+      const result=runBrandChecks({tree:directory(rest[0]),sourceRoot:source?directory(source):null});
+      emit(json?result:formatBrandChecks(result));
+      return result.ok?0:1;
     }
     if(command==='storage'){exactArgs(args,1);const result=inspectStorage(directory(args[0]));emit(result);return result.newWorkAllowed?0:1;}
     if(command==='source-layout'){

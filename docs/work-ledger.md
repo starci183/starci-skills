@@ -118,3 +118,7 @@ What follows from a shared ledger (`sharedLedger:true`):
 `ledgerLocation(where)` is how the path helpers take all of this: every function in this module that took a
 repository root still does, and also takes `{repoRoot,workRoot}` — the repository that owns the tree plus
 the tree itself.
+
+The product brand record (`<tree>/brand/index.yaml`, schema `work/node@2`, `kind: brand`) is a record the
+kernel does not write either, and its claims are re-derived from shipped source rather than trusted: see
+[brand-checks.md](brand-checks.md) for `starci brand check` and the six checks it runs.

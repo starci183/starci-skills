@@ -16,6 +16,7 @@ specifications/srs-v3.mjs
 specifications/v2.mjs
 profiles/select.mjs
 approvals/policy.mjs
+execution/brand-checks.mjs
 execution/contracts.mjs
 execution/api.mjs
 execution/resolve.mjs
