@@ -134,8 +134,28 @@ export function buildMonitorLaunch({run,parentTask,from,worktree,workflow,spec})
 }
 
 /** Stop, release and verify one Dispatch. Returns a typed settlement; never throws on Orca failure. */
-export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt'}={}){
-  const stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd});
+const SETTLE_RECONCILE_ATTEMPTS=6,SETTLE_RECONCILE_WAIT_MS=5000;
+const sleepSync=ms=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);};
+
+/** After an unknown stop, wait for the process to settle and prove it read-only before stopping again. */
+function reconcileUnknownStop(orca,dispatchId,{cwd,wait=sleepSync}){
+  const observed=[];
+  for(let attempt=1;attempt<=SETTLE_RECONCILE_ATTEMPTS;attempt+=1){
+    wait(SETTLE_RECONCILE_WAIT_MS);
+    const show=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});
+    const result=resultOf(show.receipt),state=result?.worker?.state??null,status=result?.observation?.status??null;
+    observed.push({attempt,state,status});
+    if(show.outcome==='ok'&&(status==='exited'||['failed','stopped','abandoned'].includes(state)))return {settled:true,observed};
+  }
+  return {settled:false,observed};
+}
+
+export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt',wait}={}){
+  let stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd}),reconciliation=null;
+  if(stop.outcome==='unknown'){
+    reconciliation=reconcileUnknownStop(orca,dispatchId,{cwd,wait});
+    if(reconciliation.settled)stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd});
+  }
   const release=stop.outcome==='unknown'?null:orca.invoke('worker-release',{dispatch:dispatchId},{cwd});
   const stopState=getPath(stop.receipt,'result.state')??null;
   const releaseState=getPath(release?.receipt,'result.state')??null;
@@ -149,7 +169,7 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
     effectState='none';residualTerminal={state:releaseState,reason:releaseReason,processAction};
   }
   else if(release?.outcome==='failed'&&release.effectState==='partial')effectState='partial';
-  return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal,
+  return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal,reconciliation,
     stop:{outcome:stop.outcome,effectState:stop.effectState,state:stopState,alreadySettled:getPath(stop.receipt,'result.alreadySettled')??null,reason:stop.reason},
     release:release?{outcome:release.outcome,effectState:release.effectState,state:releaseState,processAction,reason:releaseReason??release.reason}:{outcome:'skipped',reason:'worker-stop outcome unknown'}};
 }

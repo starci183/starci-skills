@@ -245,12 +245,24 @@ test('a dead worker whose terminal Orca keeps as identity_unproven settles to no
 });
 
 test('settlement reports unknown when stop cannot be confirmed and never calls release afterwards',()=>{
-  const fake=fakeOrca({'worker-stop':()=>json(1,{ok:false,result:{dispatchId:'ctx_x',state:'stop_unknown'}})});
-  const settlement=settleDispatch(fake.orca,'ctx_1',{cwd:'.'});
+  const fake=fakeOrca({'worker-stop':()=>json(1,{ok:false,result:{dispatchId:'ctx_x',state:'stop_unknown'}}),
+    'worker-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_1'},worker:{state:'ready'},observation:{status:'live'}}})});
+  const settlement=settleDispatch(fake.orca,'ctx_1',{cwd:'.',wait:()=>{}});
   assert.equal(settlement.schema,'starci/orca-supervised-settlement@1');
   assert.equal(settlement.effectState,'unknown');
   assert.equal(settlement.release.outcome,'skipped');
+  assert.equal(settlement.reconciliation.settled,false);
+  assert.equal(settlement.reconciliation.observed.length,6);
   assert.equal(fake.spawned.filter(args=>args[1]==='worker-release').length,0);
+  const exits=fakeOrca({
+    'worker-stop':(args,nth)=>nth<=2?json(1,{ok:false,result:{dispatchId:'ctx_2',state:'stop_unknown'}}):json(0,{ok:true,result:{dispatchId:'ctx_2',state:'failed',alreadySettled:true}}),
+    'worker-show':(args,nth)=>json(0,{ok:true,result:{dispatch:{id:'ctx_2'},worker:{state:nth<2?'ready':'failed'},observation:{status:nth<2?'live':'exited'}}}),
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_2',state:'retained',reason:'identity_unproven',processAction:'none'}})
+  });
+  const settled=settleDispatch(exits.orca,'ctx_2',{cwd:'.',wait:()=>{}});
+  assert.equal(settled.effectState,'none');
+  assert.equal(settled.reconciliation.settled,true);
+  assert.equal(exits.spawned.filter(args=>args[1]==='worker-stop').length,3);
   const cli=main(['settle','--dispatch','ctx_2'],{orca:fakeOrca({'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'released'}})}).orca});
   assert.equal(cli.effectState,'none');
 });
