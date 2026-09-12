@@ -20,6 +20,7 @@ test('every sequence renders a numbered working order and a definition of done, 
     'implement.gate':[op({origin:'gate',findings:['lint failed (exit 1): 3 errors']}),null],
     'review.verify':[op({kind:'review.verify',origin:'verify'}),null],
     'interface.draw':[op({kind:'interface.draw',origin:'interface',allowlist:['features/sales/ui/intake/index.yaml'],checks:[]}),{kind:'ui'}],
+    'interface.asset':[op({kind:'interface.asset',origin:'interface',allowlist:['apps/web/public/assets/intake'],checks:[]}),{kind:'ui'}],
     'frontend.implement':[op({kind:'frontend.implement',allowlist:['src/screens/intake/page.tsx']}),{kind:'implementation',inputRef:'features/sales/implementation/frontend/intake/index.yaml'}],
     uat:[op({kind:'task.execute',allowlist:['e2e/checkout.spec.ts'],resources:['e2e-runtime']}),{kind:'uat'}],
     'e2e.verify':[op({kind:'e2e.verify',allowlist:['src/tests/e2e/checkout.e2e-spec.ts'],resources:['e2e-runtime'],acceptance:['order-persisted']}),{kind:'uat'}],
@@ -36,7 +37,9 @@ test('every sequence renders a numbered working order and a definition of done, 
     const text=stepsFor(operation,{node});
     assert.ok(text.startsWith(STEPS_HEADING),`${key} starts with the heading`);
     assert.match(text,new RegExp(`Sequence \`${key.replace('.','\\.')}\``));
-    assert.ok(steps(text).length>=5&&steps(text).length<=7,`${key} has ${steps(text).length} steps`);
+    // A working order stays readable: five steps at the least, eight at the most. The three frontend design
+    // and build sequences sit at the top of that range because each of them carries the artwork slots too.
+    assert.ok(steps(text).length>=5&&steps(text).length<=8,`${key} has ${steps(text).length} steps`);
     assert.ok(done(text).length>=2,`${key} has a definition of done`);
     assert.match(text,/Report `done` exactly once|report `done` exactly once/i);
     // Concrete: the op's own allowlist and check command are in the steps, never only generic wording.
@@ -106,11 +109,56 @@ test('interface.draw enumerates every screen state and writes the design record 
   assert.match(text,/interface design record at the path the allowlist names \(`features\/sales\/ui\/intake\/index\.yaml`\)/);
   assert.match(text,/blueprint \(the regions in order\)/);assert.match(text,/contract slots/);assert.match(text,/the exact copy/);
   assert.match(text,/one candidate PNG per screen state and viewport WITH THE IMAGE MODEL.*is NOT a candidate/);assert.match(text,/never a capture of a working feature/);
+  // The artwork the chosen candidate embeds is declared, so nothing of the approved picture is lost at build time.
+  assert.match(drawn[5],/List every artwork the chosen candidate embeds/);
+  for(const part of ['each illustration','each appearance of the brand mascot','each decorative image','each chart or media placeholder'])assert.ok(drawn[5].includes(part),part);
+  assert.match(drawn[5],/as an `artworkSlots` entry/);
+  for(const field of ['id','screen','state','region \\(the blueprint region it sits in\\)','purpose','brief \\(the prompt that reproduces it\\)','size \\{w, h, viewport\\}','format','references','crop \\{x, y, w, h\\} of the candidate it was taken from'])
+    assert.match(drawn[5],new RegExp(field),field);
+  assert.match(drawn[5],/A candidate whose embedded artwork the record does not list is an incomplete record/);
+  assert.match(drawn[6],/every artwork visible in the chosen candidate has its `artworkSlots` entry with a crop that locates it/);
+  assert.match(text,/every artwork the chosen candidate embeds is declared as an `artworkSlots` entry with its region, purpose, brief, size, format, brand references and candidate crop; a candidate with artwork the record does not list is incomplete/);
   assert.match(text,/every assertion \(`intake-screen-shows-every-state`\) maps to a named screen state/);
   assert.match(text,/`blocked` with blocker `sds-gap` and the exact question, never a guess/);
   // A design operation writes no product code and carries no red-spec rule.
   assert.doesNotMatch(text,/MUST fail now/);assert.match(text,/no product code/);
-  assert.match(text,/Lane: this op is one step of `interface\.draw` -> `frontend\.implement` -> `uat\.verify`; the node is done only after `uat\.verify`\./);
+  assert.match(text,/Lane: this op is one step of `interface\.draw` -> `interface\.asset` \(when the design record declares artwork slots\) -> `frontend\.implement` -> `uat\.verify`; the node is done only after `uat\.verify`\./);
+});
+
+test('interface.asset re-renders each declared slot from the approved candidate and the brand masters, writes only asset paths, and records slot -> file back into the record',()=>{
+  const text=stepsFor(op({kind:'interface.asset',origin:'interface',allowlist:['apps/web/public/assets/intake'],checks:[],
+    references:['features/sales/ui/intake/index.yaml'],acceptance:['intake-screen-shows-every-state']}),{node:{kind:'ui'}});
+  const made=steps(text);
+  assert.match(text,/Sequence `interface\.asset`/);
+  // It reads the drawing's slots; it never authors one, and undeclared artwork goes back to the drawing.
+  assert.match(made[0],/interface design record among the references \(`features\/sales\/ui\/intake\/index\.yaml`\) and its `artworkSlots`/);
+  assert.match(made[0],/locate each slot's crop inside it/);
+  assert.match(made[0],/`blocked` with blocker `interface-gap` naming the screen, state and region/);
+  assert.match(made[0],/the drawing declares artwork, this operation never invents a brief/);
+  assert.match(made[1],/brand record/);assert.match(made[1],/placements each one allows and forbids/);
+  assert.match(made[2],/WITH THE IMAGE MODEL/);
+  assert.match(made[2],/candidate crop and the brand masters it references as actual input references \(`-i`\)/);
+  assert.match(made[2],/the artwork the person approved rather than a new one that matches the same words/);
+  assert.match(made[2],/exactly the declared size and format, one file per slot/);
+  // It writes asset files and the record, nothing else: wiring is the build's step.
+  assert.match(made[3],/asset path the allowlist names \(`apps\/web\/public\/assets\/intake`\)/);
+  assert.match(made[3],/no component, no stylesheet, no configuration and no other product file is touched here/);
+  assert.match(made[3],/`blocked` with `shared-change` and the exact paths/);
+  assert.match(made[4],/record `\{slot -> file, sha256\}` back into the design record/);
+  assert.match(made[4],/Change no brief, region, size, format or crop/);
+  assert.match(made[5],/git status/);
+  assert.match(made[6],/slot -> file table \(slot id, file path, size, format, sha256\)/);
+  assert.match(made[6],/`blocked` with blocker `brand-gap` naming the exact rule and the exact brief that conflict/);
+  assert.match(made[6],/a scripted, hand-drawn or placeholder file is never a generated asset/);
+  assert.match(made[6],/a slot left empty is never a `done`/);
+  // It generates images, so it carries no red spec and changes no product code.
+  assert.doesNotMatch(text,/MUST fail now/);
+  assert.match(text,/no product code changed/);
+  assert.match(text,/Lane: this op is one step of `interface\.draw` -> `interface\.asset`/);
+  // Neither a node kind nor an origin reroutes it into a build or repair sequence.
+  assert.equal(sequenceFor(op({kind:'interface.asset'})),'interface.asset');
+  assert.equal(sequenceFor(op({kind:'interface.asset',origin:'repair',findings:['a']}),{node:{kind:'ui'}}),'interface.asset');
+  assert.equal(sequenceFor(op({kind:'interface.asset'}),{node:{kind:'implementation',inputRef:'features/sales/implementation/frontend/intake/index.yaml'}}),'interface.asset');
 });
 
 test('frontend.implement reads the design record first, refuses to invent a screen with interface-gap, and updates stories and skeletons',()=>{
@@ -122,15 +170,23 @@ test('frontend.implement reads the design record first, refuses to invent a scre
   assert.match(text,/Sequence `frontend\.implement`/);
   // Design before code: the record is step one and nothing may be invented beyond it.
   assert.match(built[0],/interface design record named in `features\/sales\/ui\/intake\/index\.yaml` first/);
-  assert.match(built[0],/`blocked` with blocker `interface-gap` naming the missing screen and state instead of improvising a layout/);
+  assert.match(built[0],/its `artworkSlots` with the file and sha256 each slot was generated to/);
+  assert.match(built[0],/`blocked` with blocker `interface-gap` naming the missing screen, state or region instead of improvising a layout/);
   assert.match(built[1],/failing story\/spec per screen state in the record/);assert.match(built[1],/MUST fail now/);
   assert.match(built[2],/typed components of the installed design grammar only/);assert.match(built[2],/no screen the record does not describe/);
-  assert.match(built[3],/stories and the skeleton of every layout you changed/);
-  assert.match(built[4],/lint: `npm run lint`; typecheck: `npx tsc --noEmit`; unit: `npx vitest run intake`/);
-  assert.match(built[5],/no screen exists that the record does not describe/);
-  assert.match(built[6],/`blocked` `interface-gap`/);assert.match(built[6],/`blocked` `shared-change` with the exact paths/);
+  // The generated artwork is consumed, never remade: the build imports the file the record names and nothing else.
+  assert.match(built[3],/Wire every artwork slot: import the exact file the record names for that slot into the typed component bound to its region/);
+  assert.match(built[3],/Never regenerate, redraw, resize beyond the declared slot, substitute another image or ship an empty region/);
+  assert.match(built[3],/`blocked` with `interface-gap` or `brand-gap`, never an image you invented, picked or drew yourself/);
+  assert.match(built[4],/stories and the skeleton of every layout you changed/);
+  assert.match(built[5],/lint: `npm run lint`; typecheck: `npx tsc --noEmit`; unit: `npx vitest run intake`/);
+  assert.match(built[6],/every `artworkSlots` entry is listed with the component and region it is wired into and the exact file it imports/);
+  assert.match(built[6],/no screen or image exists that the record does not describe/);
+  assert.match(built[7],/`blocked` `interface-gap`/);assert.match(built[7],/`blocked` `brand-gap` for artwork you cannot ship inside the brand rules/);
+  assert.match(built[7],/`blocked` `shared-change` with the exact paths/);
   assert.match(text,/red before your change and is green after it/);
-  assert.match(text,/Lane: this op is one step of `interface\.draw` -> `frontend\.implement` -> `uat\.verify`/);
+  assert.match(text,/every `artworkSlots` entry is wired into the component the record binds to its region, importing the generated file the record names - no artwork was regenerated, substituted or invented here/);
+  assert.match(text,/Lane: this op is one step of `interface\.draw` -> `interface\.asset`/);
 });
 
 test('uat.verify walks the rendered surface with a screenshot per step, compares against the design record, and never reports done on a partial walk',()=>{
@@ -144,12 +200,16 @@ test('uat.verify walks the rendered surface with a screenshot per step, compares
   assert.match(walked[2],/never through the API/);assert.match(walked[2],/a step proven by a request or a mutation is not walked/);
   assert.match(walked[3],/screenshot at every step/);assert.match(walked[3],/a step without a capture did not happen/);
   assert.match(walked[4],/interface design record and the node assertions \(`checkout-flow-passes`\)/);
+  // The artwork the lane generated is proven on screen, not assumed from the record.
+  assert.match(walked[4],/every `artworkSlots` entry of that screen state - the declared artwork is visible in your screenshot, in its own region, and is the file the record names/);
+  assert.match(walked[4],/A missing artwork, an empty region where a slot is declared, or a different image than the slot's file is that step failing/);
+  assert.match(text,/every artwork slot of the screen states you walked is visible at its region in that step's screenshot and is the file the record names; a missing or different asset is a failed step/);
   assert.match(walked[5],/run record under the flow folder at the path the allowlist names \(`uat\/checkout\/runs\/20260912-1\/run\.md`\)/);
   assert.match(walked[6],/only when every step of the walk passed/);
   assert.match(walked[6],/a runtime that cannot start is `failed` with the exact reason \(an environment you cannot fix is `blocked` with `environment`\)/);
   assert.match(walked[6],/a walk that stopped early is `partial` or `failed`, never `done`/);
   assert.match(text,/never a `done`/);
-  assert.match(text,/Lane: this op is one step of `interface\.draw` -> `frontend\.implement` -> `uat\.verify`/);
+  assert.match(text,/Lane: this op is one step of `interface\.draw` -> `interface\.asset`/);
 });
 
 test('architecture.revise edits one SDS section, bumps rev, keeps the decision log and writes no code',()=>{

@@ -295,6 +295,38 @@ test('draw and FE discovery both expose applicable presentation and Grammar pack
   for(const step of draw.steps.slice(0,3)) assert.ok(step.reads.includes('grammar'));
   assert.deepEqual(validateCatalog(generated,{root,repositoryRoot:repository,documents:outputs()}).errors,[]);
 });
+test('the artwork operator re-renders the slots the drawing declared, writes only asset paths and the record, and leaves the wiring to the build',()=>{
+  const document=fs.readFileSync(path.join(root,'interface.asset','operator.yaml'),'utf8');
+  const op=catalogue.ops.find(x=>x.id==='interface.asset');
+  const draw=catalogue.ops.find(x=>x.id==='interface.draw');
+  assert.ok(op,'the catalogue carries the artwork operator');
+  const contract=JSON.stringify(op.contract);
+  for(const text of [document,contract]) {
+    // The slots, the approved candidate crop, the brand masters and the recorded bytes are all in the contract.
+    for(const required of [/artworkSlots/,/image generator|image model/i,/crop/,/sha256/,/brand record/,/declared size and format|declared pixel size/]) {
+      assert.match(text,required,String(required));
+    }
+  }
+  // It is a design-side op on the same node as the drawing it serves, and it owns its own document.
+  assert.deepEqual(op.nodeKinds,draw.nodeKinds);
+  assert.equal(op.completionProfile,draw.completionProfile);
+  assert.equal(op.document,'interface.asset/operator.yaml');
+  assert.equal(op.contract.graphPolicy.mode,'read-only');
+  // Its whole write ceiling: the allowlisted asset destination, the design record, its own evidence.
+  assert.deepEqual(op.writeScope,['repository:<repo-id>/<asset-path>','N/index.yaml','E/manifest.yaml + E/artwork-slots.yaml + E/prompt.txt']);
+  const source=op.contract.writes.find(w=>w.id==='source');
+  assert.equal(op.contract.writes.filter(w=>String(w.path).startsWith('repository:')).length,1);
+  assert.deepEqual(source.fields,['generated artwork files only']);
+  assert.equal(op.sideEffects.length,1);
+  assert.match(op.sideEffects[0],/artwork files inside the owned asset paths/);
+  // It reads the record that declares the slots, the candidate, the brand and the host's image capability.
+  assert.deepEqual(op.contract.reads.map(r=>r.id),['target','design','brand','repo','profile']);
+  // Its blockers refuse rather than improvise: no brief is authored here and no placeholder counts as artwork.
+  assert.deepEqual(op.contract.blockers.map(b=>b.code).sort(),
+    ['ARTWORK_SLOT_UNDECLARED','BRAND_RULE_UNSATISFIABLE','DECLARED_DEPENDENCY_UNMET','IMAGE_MODEL_UNAVAILABLE','SCOPE_OUTSIDE_ALLOWLIST']);
+  assert.deepEqual(op.contract.proofs.map(p=>p.id),['slot-coverage','candidate-fidelity','brand-conformance','binding']);
+});
+
 test('consumer graph policy cannot add prerequisites, accept NA or dispatch a successor',()=>{
   const c=fresh();const op=c.ops.find(o=>o.id==='uat.verify');
   assert.equal(op.contract.graphPolicy.mode,'read-only');

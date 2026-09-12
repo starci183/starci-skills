@@ -12,16 +12,21 @@ vocabularies:
   families: [design, build, prove, repair]
   # The allocator role of profiles/runtimes.yaml; `roleOfKind` there must agree with `role` here.
   roles: [decide, plan, implement, verify, write]
-  # What a kind is allowed to change. `readOnly: true` means this list is empty. `record` is the authored Work
-  # record itself - the fields a node must declare before the kernel can launch it - and only `work.author` has it.
-  mutates: [code, sds, srs, decision, design, runtime, record]
+  # What a kind is allowed to change. `readOnly: true` means this list is empty. `design` is the interface
+  # design record, `asset` the artwork files that record declares and the build then wires in, and `record` is
+  # the authored Work record itself - the fields a node must declare before the kernel can launch it, which
+  # only `work.author` has.
+  mutates: [code, sds, srs, decision, design, asset, runtime, record]
   # Why an operation exists, as the kernel records it on the op.
   origins: [ledger, shared, repair, gate, verify, architecture]
   # The report outcomes of execution/reports.mjs.
   outcomes: [done, partial, failed, ask, blocked]
   # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
-  # walk that finds the interface design silent is not an SDS gap and must not be routed as one.
-  blockers: [shared-change, sds-gap, interface-gap, environment, authority]
+  # walk that finds the interface design silent is not an SDS gap and must not be routed as one. `brand-gap` is
+  # the same distinction one layer in: artwork the approved candidate embeds but the brand record does not
+  # permit is neither a silent design nor a missing screen, and an operation may not close it by inventing an
+  # image. Keep this list in step with `BLOCKER_KINDS` of `execution/reports.mjs`.
+  blockers: [shared-change, sds-gap, interface-gap, brand-gap, environment, authority]
   # Verdicts the kernel computes about a report (never the reporter's own claim) and routes on.
   verdicts: [pass, findings, rejected, gate-failed]
   # What happens to the operation that produced the report:
@@ -35,6 +40,10 @@ predicates:
   node.hasInterfaceDesign: |-
     The node already binds an interface design that was reviewed - screens, contracts and states exist as a
     design record the node references - so drawing it again would produce nothing.
+  node.hasNoArtworkSlots: |-
+    The interface design record the node binds declares no artwork slot: the approved candidate embeds no
+    illustration, no brand mascot, no decorative image and no chart placeholder, so there is no asset for the
+    build to wire in and nothing for an asset operation to generate.
 kinds:
   business.decide:
     family: design
@@ -76,6 +85,16 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [sds-gap, shared-change, authority]
+  interface.asset:
+    family: design
+    role: write
+    operator: interface.asset
+    readOnly: false
+    mutates: [asset, design]
+    purpose: Generate the artwork the approved candidate embeds as real repository assets, at the size and format the design record declares.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [brand-gap, interface-gap, shared-change, authority]
   frontend.implement:
     family: build
     role: implement
@@ -85,7 +104,7 @@ kinds:
     purpose: Build the interface the drawing settled, against that drawing and nothing invented beside it.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
-      blockers: [shared-change, sds-gap, interface-gap, environment, authority]
+      blockers: [shared-change, sds-gap, interface-gap, brand-gap, environment, authority]
   backend.implement:
     family: build
     role: implement
@@ -158,10 +177,12 @@ lanes:
     match:
       - {kind: implementation, role: frontend}
       - {kind: ui}
-    purpose: Interface work is drawn before it is built and walked end to end before it is believed.
+    purpose: Interface work is drawn before it is built, its artwork exists before it is wired, and it is walked end to end before it is believed.
     steps:
       - kind: interface.draw
         optionalWhen: node.hasInterfaceDesign
+      - kind: interface.asset
+        optionalWhen: node.hasNoArtworkSlots
       - kind: frontend.implement
       - kind: uat.verify
   - id: implementation/backend
@@ -266,6 +287,16 @@ routes:
     limit: 2
     then: reopen
     purpose: A missing screen, state or contract is drawn first; it is never improvised in the build.
+  - id: brand-gap-redraws-inside-the-brand
+    on: {blocker: brand-gap}
+    from: any
+    to: {kind: interface.draw, origin: architecture}
+    limit: 2
+    then: reopen
+    purpose: |-
+      Artwork the brand record does not permit is drawn again inside it - a slot brief the brand rules forbid
+      is a defect of the drawing, never a licence to generate outside those rules or to invent an image in the
+      build. Past the limit the workflow asks the user, which is where a brand the product has not settled belongs.
   - id: shared-change-is-a-scoped-build
     on: {blocker: shared-change}
     from: any

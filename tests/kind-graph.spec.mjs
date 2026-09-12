@@ -65,7 +65,9 @@ test('every lane is a sequence of catalogued kinds, and every declared node shap
     }
   }
   assert.deepEqual(laneFor({kind:'implementation',layout:'backend'},{profile}),['backend.implement','e2e.verify','review.verify'],'a backend slice is proven through its API before it is read');
-  assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'},{profile}),['interface.draw','frontend.implement','uat.verify']);
+  // The artwork a candidate embeds is its own step between the drawing and the build: the files exist before
+  // anything imports them, and the step is optional only for a record that declares no artwork slot.
+  assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'},{profile}),['interface.draw','interface.asset','frontend.implement','uat.verify']);
   assert.deepEqual(laneFor({kind:'uat',layout:null},{profile}),['e2e.verify'],'a scenario node outside the frontend is an API scenario');
   assert.deepEqual(laneFor({kind:'uat',layout:'frontend'},{profile}),['uat.verify'],'a frontend scenario node walks the surface');
   assert.deepEqual(laneFor({kind:'e2e',layout:null},{profile}),['e2e.verify'],'an e2e node is proven through the API');
@@ -75,30 +77,33 @@ test('every lane is a sequence of catalogued kinds, and every declared node shap
   assert.deepEqual(laneFor({kind:'business-overview',layout:null},{profile}),['business.decide']);
   // A ledger node that names no layout but is delivered in a frontend repository still walks the frontend lane.
   assert.deepEqual(laneFor({kind:'implementation',layout:null,repositoryRole:'frontend'},{profile}),
-    ['interface.draw','frontend.implement','uat.verify']);
+    ['interface.draw','interface.asset','frontend.implement','uat.verify']);
   // A node that names neither is behind-the-interface work; a kind no lane claims is never given a default.
   assert.deepEqual(laneFor({kind:'implementation',layout:null},{profile}),['backend.implement','e2e.verify','review.verify']);
   assert.deepEqual(laneFor({kind:'knowledge',layout:null},{profile}),[]);
   assert.equal(laneRecordFor({kind:'knowledge',layout:null},{profile}),null);
   assert.equal(laneRecordFor({kind:'ui',layout:null},{profile}).id,'implementation/frontend');
-  assert.equal(laneById('implementation/frontend',{profile}).steps.length,3);
+  assert.equal(laneById('implementation/frontend',{profile}).steps.length,4);
   assert.equal(describeLane(lane('frontend'),{profile}),
-    'implementation/frontend: `interface.draw` (optional when `node.hasInterfaceDesign`) -> `frontend.implement` -> `uat.verify`');
+    'implementation/frontend: `interface.draw` (optional when `node.hasInterfaceDesign`) -> `interface.asset` (optional when `node.hasNoArtworkSlots`) -> `frontend.implement` -> `uat.verify`');
   assert.equal(describeLane('uat',{profile}),'uat: `e2e.verify`');
 });
 
-test('the frontend lane order is mandatory: draw, then build, then walk',()=>{
+test('the frontend lane order is mandatory: draw, then generate the artwork, then build, then walk',()=>{
   const frontend=lane('frontend');
   assert.equal(nextKind(frontend,[],{profile}),'interface.draw');
-  assert.equal(nextKind(frontend,['interface.draw'],{profile}),'frontend.implement');
-  assert.equal(nextKind(frontend,['interface.draw','frontend.implement'],{profile}),'uat.verify');
-  assert.equal(nextKind(frontend,['interface.draw','frontend.implement','uat.verify'],{profile}),null);
+  assert.equal(nextKind(frontend,['interface.draw'],{profile}),'interface.asset');
+  assert.equal(nextKind(frontend,['interface.draw','interface.asset'],{profile}),'frontend.implement');
+  assert.equal(nextKind(frontend,['interface.draw','interface.asset','frontend.implement'],{profile}),'uat.verify');
+  assert.equal(nextKind(frontend,['interface.draw','interface.asset','frontend.implement','uat.verify'],{profile}),null);
   // A step cannot be skipped: with the drawing missing the lane asks for the drawing again, whatever else ran.
   assert.equal(nextKind(frontend,['frontend.implement'],{profile}),'interface.draw');
   assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{profile}),'interface.draw');
+  // Nor may the build start on artwork that was never generated: without the predicate the asset step is due.
+  assert.equal(nextKind(frontend,['interface.draw','frontend.implement','uat.verify'],{profile}),'interface.asset');
   // The same answers from a lane id and from a lane record, so a status view and the kernel agree.
   assert.equal(nextKind('implementation/frontend',[],{profile}),'interface.draw');
-  assert.equal(nextKind(laneById('implementation/frontend',{profile}),['interface.draw'],{profile}),'frontend.implement');
+  assert.equal(nextKind(laneById('implementation/frontend',{profile}),['interface.draw'],{profile}),'interface.asset');
   assert.equal(nextKind(lane('backend'),[],{profile}),'backend.implement');
   assert.equal(nextKind(lane('backend'),['backend.implement'],{profile}),'e2e.verify');
   assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify'],{profile}),'review.verify');
@@ -107,17 +112,51 @@ test('the frontend lane order is mandatory: draw, then build, then walk',()=>{
 
 test('optionalWhen skips a step only for a named predicate the kernel satisfied',()=>{
   const frontend=lane('frontend');
-  assert.deepEqual(Object.keys(predicatesOf({profile})),['node.hasInterfaceDesign']);
-  assert.equal(nextKind(frontend,[],{predicates:{'node.hasInterfaceDesign':true},profile}),'frontend.implement');
-  assert.equal(nextKind(frontend,[],{predicates:{'node.hasInterfaceDesign':()=>true},profile}),'frontend.implement');
+  assert.deepEqual(Object.keys(predicatesOf({profile})),['node.hasInterfaceDesign','node.hasNoArtworkSlots']);
+  assert.equal(nextKind(frontend,[],{predicates:{'node.hasInterfaceDesign':true},profile}),'interface.asset');
+  assert.equal(nextKind(frontend,[],{predicates:{'node.hasInterfaceDesign':()=>true},profile}),'interface.asset');
   // False, absent or unknown: the default is to run the mandatory step, never to assume it away.
   assert.equal(nextKind(frontend,[],{predicates:{'node.hasInterfaceDesign':false},profile}),'interface.draw');
   assert.equal(nextKind(frontend,[],{predicates:{},profile}),'interface.draw');
   assert.equal(nextKind(frontend,[],{predicates:{'node.somethingElse':true},profile}),'interface.draw');
+  // A design record that declares no artwork slot has nothing to generate, so the asset step is skipped - and
+  // only then; a record whose slots the kernel has not read keeps the step, because the default is to run it.
+  assert.equal(nextKind(frontend,['interface.draw'],{predicates:{'node.hasNoArtworkSlots':true},profile}),'frontend.implement');
+  assert.equal(nextKind(frontend,['interface.draw'],{predicates:{'node.hasNoArtworkSlots':()=>true},profile}),'frontend.implement');
+  assert.equal(nextKind(frontend,['interface.draw'],{predicates:{'node.hasNoArtworkSlots':false},profile}),'interface.asset');
+  assert.equal(nextKind(frontend,['interface.draw'],{predicates:{},profile}),'interface.asset');
+  // Both optional steps satisfied at once still leaves the mandatory build and walk in order.
+  assert.equal(nextKind(frontend,[],{predicates:{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':true},profile}),'frontend.implement');
   // A satisfied optional step does not let the rest of the lane be skipped either.
-  assert.equal(nextKind(frontend,['frontend.implement'],{predicates:{'node.hasInterfaceDesign':true},profile}),'uat.verify');
+  assert.equal(nextKind(frontend,['frontend.implement'],{predicates:{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':true},profile}),'uat.verify');
   // No step of the backend lane is optional.
   for(const step of laneById('implementation/backend',{profile}).steps)assert.equal(step.optionalWhen,undefined);
+});
+
+test('the artwork kind writes assets and the design record, runs on the image-model role, and a brand gap goes back to the drawing',()=>{
+  // It produces images like the drawing does, so it carries the same allocator role, and its operator is its own.
+  assert.equal(familyOf('interface.asset',{profile}),'design');
+  assert.equal(roleOf('interface.asset',{profile}),roleOf('interface.draw',{profile}));
+  assert.equal(roleOf('interface.asset',{profile}),'write');
+  assert.equal(runtimes.roleOfKind['interface.asset'],'write');
+  assert.equal(isReadOnly('interface.asset',{profile}),false);
+  assert.deepEqual(mutationsOf('interface.asset',{profile}),['asset','design']);
+  assert.equal(operatorOf('interface.asset',{profile}),'interface.asset');
+  assert.ok(operators.includes('interface.asset'));
+  // It never writes the authored Work record, and it is the only kind that may change an asset.
+  assert.equal(mutationsOf('interface.asset',{profile}).includes('record'),false);
+  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('asset')),['interface.asset']);
+  // A brief the brand rules cannot satisfy is a defect of the drawing; the build may raise the same blocker.
+  assert.ok(reportsOf('interface.asset',{profile}).blockers.includes('brand-gap'));
+  assert.ok(reportsOf('frontend.implement',{profile}).blockers.includes('brand-gap'));
+  assert.ok(BLOCKERS.includes('brand-gap'));
+  const brandGap=routeFor({outcome:'blocked',blocker:'brand-gap',kind:'interface.asset',lane:lane('frontend')},{profile});
+  assert.deepEqual({kind:brandGap.kind,origin:brandGap.origin,then:brandGap.then,limit:brandGap.limit},
+    {kind:'interface.draw',origin:'architecture',then:'reopen',limit:2});
+  // From the build it is the same answer: the artwork is drawn again inside the brand, never invented in code.
+  assert.equal(routeFor({outcome:'blocked',blocker:'brand-gap',kind:'frontend.implement',lane:lane('frontend')},{profile}).kind,'interface.draw');
+  // A red walk still repairs the build of the lane, not the asset step: the lane's build kind is unchanged.
+  assert.equal(routeFor({outcome:'failed',kind:'uat.verify',lane:lane('frontend')},{profile}).kind,'frontend.implement');
 });
 
 test('every declared route resolves, carries a limit and says what happens to the requester',()=>{
