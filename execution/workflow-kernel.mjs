@@ -1667,7 +1667,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     state.launcher=state.launcher??launcherOf(state.host);
     store.appendEvent({event:binding?'run-bound':'run-resumed',run:state.run,from:state.from,iterations:state.iterations});
     const finished=(()=>{const release=acquireKernelLock(store);try{fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});return runLoop(orca,store,state,{cwd:worktree,wait,
-      allocator:createAllocator({state:state.allocation??undefined,quota:state.quota??null}),template:templateOf(state.host),
+      // Slots are derived from the operations that are actually running; saved loads may belong to a dead kernel.
+      allocator:createAllocator({state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null}),template:templateOf(state.host),
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:finished.phase,ledgerMode:finished.ledgerMode,
       finished:finished.finished,ledger:finished.ledger.map(item=>`${item.id}=${item.status}`),
