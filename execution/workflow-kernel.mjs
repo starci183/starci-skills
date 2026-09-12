@@ -164,7 +164,9 @@ export function detectLedgerMode(repoRoot,requested=null,ledgerRoot=null){
  * another tree because a route file changed underneath it. An explicit `--ledger-root` always re-resolves.
  */
 export function ledgerBinding(state,{repoRoot,host=null,ledgerRoot=null,git=spawnSync,resolve=resolveLedgerRoot}={}){
-  if(!ledgerRoot&&state.ledgerRoot&&plain(state.ledgerOwner)&&state.ledgerOwner.repoRoot)
+  // Only a tree the user named (--ledger-root) is remembered as given; a routed or local one is resolved again on
+  // every start, so a binding recorded by an older rule never outlives the rule.
+  if(!ledgerRoot&&state.ledgerSource==='option'&&state.ledgerRoot&&plain(state.ledgerOwner)&&state.ledgerOwner.repoRoot)
     return {source:state.ledgerSource??'state',ledgerRoot:state.ledgerRoot,ownerRepoRoot:state.ledgerOwner.repoRoot,
       ownerRepository:state.ledgerOwner.repository??null,ownerRole:state.ledgerOwner.role??null,
       project:state.ledgerOwner.project??null,role:state.codeRole??null,side:state.codeSide??null,
