@@ -20,14 +20,15 @@ common:
     open: items left for the next operation
 kinds:
   backend.implement:
+    loop: the operation itself iterates implement -> checks -> fix until every acceptance holds; the supervisor never splits that loop into nodes
     inputs:
-      priorOpen: open items carried from the previous report on the same node
+      priorOpen: open items carried from the previous attempt of the same node (resume) or the reviewer's findings (repair)
       findings: review findings this attempt must resolve (repair attempts only)
     outputs:
       coverage: srs/sds id -> implemented | partial | absent with evidence
     resultPolicy:
       done: next-node
-      partial: repair-node-from-open
+      partial: resume-node
       failed: repair-node-from-checks
       ask: answer-if-local-else-escalate
       blocked.shared-change: escalate-and-continue
@@ -36,6 +37,7 @@ kinds:
       blocked.authority: escalate
       chain-exhausted: escalate
       repairLimit: 3
+      resumeLimit: 5
       overLimit: decide
   review.verify:
     inputs:
@@ -86,6 +88,7 @@ kinds:
       overLimit: escalate
 actions:
   next-node: mark the node done and start the next ready node
+  resume-node: the operation ran out of budget, not out of work - start the same node again with the report's open[] as priorOpen; resumes are not repairs
   repair-node-from-open: create one bounded backend.implement node whose priorOpen is the report's open[]
   repair-node-from-checks: create one bounded backend.implement node whose findings are the failing checks
   repair-node-from-findings: create one bounded backend.implement node whose findings are the review findings, then a fresh review.verify node

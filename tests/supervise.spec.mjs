@@ -49,7 +49,7 @@ function scriptedOrca({reports,reportsDir}){
   return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),spawned,sends};
 }
 
-test('the supervisor drives implement -> repair -> review to a committed workflow report with the model only filling forms',()=>{
+test('the supervisor drives implement (resumed once) -> review to a committed workflow report with the model only filling forms',()=>{
   const dir=tmp();const parentDir=path.join(dir,'parent');fs.mkdirSync(parentDir);
   const check={name:'unit',command:'npx vitest run sales',exitCode:0,evidence:'ok'};
   const fake=scriptedOrca({reportsDir:dir,reports:[
@@ -66,12 +66,15 @@ test('the supervisor drives implement -> repair -> review to a committed workflo
       decide:()=>{throw Error('decide must not be called on a policy-covered path');},
       git:(cmd,args)=>{gits.push(args[0]);return {status:0,stdout:args[0]==='rev-parse'?'abc123\n':'',stderr:''};}});
     assert.equal(result.finished.outcome,'done');
-    assert.deepEqual(result.nodes.map(n=>[n.id,n.operation,n.status]),[['implement-1','backend.implement','done'],['implement-repair-1','backend.implement','done'],['review-1','review.verify','done']]);
-    assert.deepEqual(planCalls,['implement-1','implement-repair-1','review-1']);
-    assert.deepEqual(result.nodes[1].priorOpen,['receipt not persisted']);
+    // partial = out of budget: the same node resumes (attempt 2) with the open items; no repair node is created.
+    assert.deepEqual(result.nodes.map(n=>[n.id,n.operation,n.status,n.attempt]),[['implement-1','backend.implement','done',2],['review-1','review.verify','done',1]]);
+    assert.deepEqual(planCalls,['implement-1','implement-1','review-1']);
+    assert.equal(result.nodes[0].resumes,1);
+    assert.equal(result.repairs.implement,0);
+    assert.deepEqual(result.nodes[0].reports.map(r=>r.outcome),['partial','done']);
     assert.ok(fs.existsSync(result.nodes[0].contractFile));
     const contract=fs.readFileSync(result.nodes[0].contractFile,'utf8');
-    assert.match(contract,/## Ping \(mandatory\)/);assert.match(contract,/## Acceptance/);assert.doesNotMatch(contract,/<launcher>|<nested run>|<runtime dir>/);
+    assert.match(contract,/## Cook until done/);assert.match(contract,/## Ping \(mandatory\)/);assert.match(contract,/## Acceptance/);assert.doesNotMatch(contract,/<launcher>|<nested run>|<runtime dir>/);
     assert.deepEqual(gits,['add','commit','rev-parse']);
     const workflowReport=JSON.parse(fs.readFileSync(path.join(parentDir,'ctx_wf.json'),'utf8'));
     assert.equal(workflowReport.outcome,'done');assert.equal(workflowReport.head,'abc123');

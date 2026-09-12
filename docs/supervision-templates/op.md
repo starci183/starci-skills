@@ -11,6 +11,9 @@ Runtime StarCi 4.1. Worktree `<child path>` (branch `<branch>`). Work only insid
 ## References
 <SRS/SDS files and sections; existing branch work is input, not proof>
 
+## Cook until done (you own this loop)
+Implement, run every check, read the failures, fix, run again. Repeat until every acceptance statement holds and every check exits 0; only then report `done`. Do not stop early to ask whether to continue, do not hand unfinished work back as `partial`: `partial` is allowed only when your session budget (turns or wall time) is about to end, and its `open[]` must say exactly where to resume. Report `failed` only after your own attempts are exhausted and a check still fails (say which and why). Report `ask` only for a decision you cannot take from the SRS/SDS and the contract; report `blocked` only for a change outside your allowlist (`shared-change`), a real SDS gap (`sds-gap`), or an environment you cannot fix (`environment`).
+
 ## Ping (mandatory)
 Every 5 minutes at most, and before any command that may run longer than a minute, send
 `orca orchestration send --from <your terminal> --type heartbeat --subject alive --task-id <op task> --dispatch-id <your dispatch> --phase "<what you are doing>" --json`.

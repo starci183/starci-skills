@@ -58,8 +58,8 @@ export function renderContract({template,plan,node,state}){
     ``,`## Checks to run`,...plan.checks.map(check=>`- ${check.name}: \`${check.command}\``),
     `Record every command with its exit code in \`${state.runtimeDir}/checks-${node.id}.json\` as a JSON array \`[{"name","command","exitCode","evidence"}]\`.`
   ];
-  const process_=template.split('## Ping (mandatory)')[1]??'';
-  return `${sections.join('\n')}\n\n## Ping (mandatory)${process_}`
+  const process_=template.split('## Cook until done')[1]??'';
+  return `${sections.join('\n')}\n\n## Cook until done${process_}`
     .replaceAll('<launcher>',`node ${state.launcher}`).replaceAll('<nested run>',state.run).replaceAll('<runtime dir>',state.runtimeDir)
     .replaceAll('<runtime dir>/checks-<op task>.json',`${state.runtimeDir}/checks-${node.id}.json`).replaceAll('checks-<op task>.json',`checks-${node.id}.json`);
 }
@@ -106,7 +106,7 @@ function launchNode(orca,state,node,{cwd,planOp,template,wait}){
 function policyFor(io,operation,report){
   const kind=io.kinds[operation];need(kind,`No op-io policy for ${operation}`);
   const key=report.outcome==='blocked'?`blocked.${report.blocker?.kind}`:report.outcome;
-  return {action:kind.resultPolicy[key]??'escalate',repairLimit:kind.resultPolicy.repairLimit??3,overLimit:kind.resultPolicy.overLimit??'escalate'};
+  return {action:kind.resultPolicy[key]??'escalate',repairLimit:kind.resultPolicy.repairLimit??3,resumeLimit:kind.resultPolicy.resumeLimit??5,overLimit:kind.resultPolicy.overLimit??'escalate'};
 }
 
 function insertAfter(state,anchor,node){const index=state.nodes.findIndex(n=>n.id===anchor.id);state.nodes.splice(index+1,0,node);}
@@ -114,8 +114,14 @@ function insertAfter(state,anchor,node){const index=state.nodes.findIndex(n=>n.i
 /** Apply the deterministic result policy to an accepted report. */
 export function applyReport(state,node,report,{io,decide,cwd}){
   node.reports=[...(node.reports??[]),{outcome:report.outcome,summary:report.summary,files:report.files,open:report.open,checks:report.checks,blocker:report.blocker,question:report.question,findings:report.findings??[]}];
-  let {action,repairLimit,overLimit}=policyFor(io,node.operation,report);
+  let {action,repairLimit,resumeLimit,overLimit}=policyFor(io,node.operation,report);
   const repairs=state.repairs[node.base]??0;
+  if(action==='resume-node'&&(node.resumes??0)>=resumeLimit){
+    // The op keeps running out of budget on the same work: that is a crisis, not a resume.
+    const chosen=decide({situation:`${node.operation} for ${state.workflow} reported partial ${node.resumes} times`,options:['resume-once-more','escalate','accept-partial'],context:{summary:report.summary,open:report.open},cwd});
+    action=chosen.ok?({'resume-once-more':'resume-node','escalate':'escalate','accept-partial':'next-node'})[chosen.value.option]:'escalate';
+    log(state,{node:node.id,event:'decide',option:chosen.ok?chosen.value.option:null,rationale:chosen.ok?chosen.value.rationale:null});
+  }
   if(/^repair-node/.test(action)&&repairs>=repairLimit){
     if(overLimit==='decide'){
       const chosen=decide({situation:`${node.operation} for ${state.workflow} still ${report.outcome} after ${repairs} repairs`,options:['one-more-repair','escalate','accept-partial'],context:{summary:report.summary,open:report.open,findings:report.findings??[]},cwd});
@@ -138,6 +144,7 @@ export function applyReport(state,node,report,{io,decide,cwd}){
   };
   switch(action){
     case 'next-node':case 'workflow-goal-if-last-node':node.status='done';break;
+    case 'resume-node':node.status='ready';node.attempt+=1;node.resumes=(node.resumes??0)+1;node.priorOpen=report.open??[];node.dispatch=null;node.terminal=null;node.nudged=false;break;
     case 'repair-node-from-open':node.status='done';repairNode({open:report.open});break;
     case 'repair-node-from-checks':node.status='done';repairNode({findings:report.checks.filter(c=>c.exitCode!==0).map(c=>`${c.name} failed (exit ${c.exitCode}): ${c.evidence??''}`)});break;
     case 'repair-node-from-findings':node.status='done';repairNode({findings:(report.findings?.length?report.findings:report.open)??[]});break;
@@ -220,8 +227,9 @@ export function superviseLoop(orca,state,{cwd,io=loadOpIo(),planOp=planOpFn,deci
         insertAfter(state,node,{id:`${node.base}-repair-${state.repairs[node.base]}`,operation:'backend.implement',base:node.base,status:'pending',attempt:node.attempt+1,restarts:0,priorOpen:[],findings:checked.errors.map(e=>`previous report rejected: ${e}`)});
         continue;
       }
+      const finishedDispatch=node.dispatch;
       applyReport(state,node,report,{io,decide,cwd});
-      orca.invoke('worker-release',{dispatch:node.dispatch},{cwd});
+      orca.invoke('worker-release',{dispatch:finishedDispatch},{cwd});
       sweepWorktree(orca,{cwd,from:state.from});
       continue;
     }
