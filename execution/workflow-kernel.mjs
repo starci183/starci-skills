@@ -231,7 +231,8 @@ export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0}){
     kind:WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),
     ledgerIds:[node.id],allowlist:node.allowlist,
     references:unique([node.path,...(node.refs??[])]),
-    checks:node.checks.map(check=>({name:check.assertion??check.command,command:check.command})),
+    // The whole-tree validator is the kernel's own gate at acceptance: parallel operations must not fail on a sibling's in-progress ledger write.
+    checks:node.checks.filter(check=>check.assertion!=='work-valid').map(check=>({name:check.assertion??check.command,command:check.command})),
     acceptance:node.assertions.length?node.assertions:[`${node.id} satisfies the Work contract it authored`],
     // An eligible node has no unsettled dependency, so a dependency inside this set is already done; the
     // mapping is kept so a tree that validates differently still schedules in dependency order.
@@ -886,6 +887,10 @@ function handleBlocked(store,state,op,report,ctx){
 
 /** One accepted report, one deterministic action. `done` passes through machine verification and a commit. */
 export function applyOpReport(orca,store,state,op,report,ctx){
+  if(validatorOnlyBlock(report)){
+    store.appendEvent({event:'validator-only-block',op:op.id,note:'treated as partial: the kernel owns work-valid'});
+    report={...report,outcome:'partial',open:[...(report.open??[]),'previous attempt was blocked only by the whole-tree validator while a sibling wrote the ledger; the kernel validates at acceptance'],blocker:null,signal:{type:'worker_done',orcaOutcome:'succeeded'}};
+  }
   const checked=validateReport(report,{allowlist:op.allowlist});
   op.reports.push({attempt:op.attempt,runtime:op.runtime,outcome:report.outcome,summary:report.summary,
     files:report.files,open:report.open,checks:report.checks,blocker:report.blocker,question:report.question,valid:checked.ok});
@@ -967,6 +972,13 @@ function repairFromVerify(store,state,op,findings,ctx){
 }
 
 /* ------------------------------------------------------------------ accept, verify, gates */
+
+/** The validator is the kernel's gate; an operation blocked only by it is resumed, never escalated as a shared change. */
+function validatorOnlyBlock(report){
+  if(report?.outcome!=='blocked'||report?.blocker?.kind!=='shared-change')return false;
+  const failing=(report.checks??[]).filter(check=>check.exitCode!==0);
+  return failing.length>0&&failing.every(check=>/work-valid/i.test(check.name??''))&&/\.starciwork|work-valid|validator/i.test(report.blocker.detail??'');
+}
 
 function acceptReports(orca,store,state,ctx){
   const reports=store.readReports().filter(report=>report?.sent);
@@ -1162,6 +1174,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     store.appendEvent({event:'ledger-loaded',workRoot:slash(loaded.workRoot),valid:loaded.ok,nodes:loaded.list.length,scope:state.scope});
   }
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
+    if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});store.saveState(state);return state;}
     state.iterations+=1;
     store.appendEvent({event:'tick',iteration:state.iterations,
       ops:state.ops.map(op=>`${op.id}=${op.status}`),ledger:state.ledger.map(item=>`${item.id}=${item.status}`)});
@@ -1225,8 +1238,14 @@ function bindRun(orca,{cwd,state,from}){
   const created=orca.invoke('run-create',{objective:`Workflow ${state.id}: ${firstLine(state.job)}`,from},{cwd});
   need(created.outcome==='ok',`run-create failed: ${created.reason}`);
   const run=getPath(created.receipt,'result.run.id');
-  const bound=orca.invoke('run-use',{id:run,from},{cwd});
-  need(bound.outcome==='ok',`run-use failed: ${bound.reason}`);
+  const shownRun=orca.invoke('run-show',{id:run},{cwd});
+  const coordinator=getPath(shownRun.receipt,'result.run.coordinator_handle')??null;
+  if(coordinator!==from){
+    // Binding is a one-time hand-off: a repeated run-use from the same terminal bumps Orca's consumer generation
+    // and invalidates every live Dispatch of the Run, so a resumed kernel never re-binds.
+    const bound=orca.invoke('run-use',{id:run,from},{cwd});
+    need(bound.outcome==='ok',`run-use failed: ${bound.reason}`);
+  }
   return run;
 }
 
@@ -1254,6 +1273,19 @@ export function parseQuota(value){
   }
   return {order,slots,tags,total:Object.values(slots).reduce((a,b)=>a+b,0)};
 }
+
+/** One kernel per workflow: a pid lock in the store refuses a second process; a stop flag ends the loop cleanly. */
+function acquireKernelLock(store){
+  const lock=path.join(store.dir,'kernel.lock');
+  const existing=(()=>{try{return JSON.parse(fs.readFileSync(lock,'utf8'));}catch{return null;}})();
+  if(existing?.pid&&existing.pid!==process.pid){
+    let alive=false;try{process.kill(existing.pid,0);alive=true;}catch{alive=false;}
+    need(!alive,`Another kernel (pid ${existing.pid}) already runs workflow ${store.id}; run workflow-stop first`);
+  }
+  fs.writeFileSync(lock,JSON.stringify({pid:process.pid,startedAt:Date.now()}));
+  return ()=>{try{const now=JSON.parse(fs.readFileSync(lock,'utf8'));if(now.pid===process.pid)fs.rmSync(lock);}catch{}};
+}
+export function stopRequested(store){return fs.existsSync(path.join(store.dir,'stop.flag'));}
 
 export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleepSync,functions={}}={}){
   const worktree=path.resolve(cwd);
@@ -1283,6 +1315,11 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       ledgerMode,scope:state.scope});
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,...goalPhase(store,state,{cwd:worktree,...functions})};
   }
+  if(command==='workflow-stop'){
+    const {store}=open(options.id);
+    fs.writeFileSync(path.join(store.dir,'stop.flag'),String(Date.now()));
+    return {schema:WORKFLOW_KERNEL,command,id:options.id,dir:store.dir,stopRequested:true,next:'the running kernel exits at its next iteration (at most one wait tick); workflow-run resumes from state.json'};
+  }
   if(command==='workflow-approve'){
     const {store,state}=open(options.id);
     return {schema:WORKFLOW_KERNEL,command,dir:store.dir,...approve(store,state,{allocation:options.allocation??null})};
@@ -1309,9 +1346,9 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     state.host=state.host??hostOf(options,repoRoot);
     state.launcher=state.launcher??launcherOf(state.host);
     store.appendEvent({event:'run-bound',run:state.run,from:state.from});
-    const finished=runLoop(orca,store,state,{cwd:worktree,wait,
+    const finished=(()=>{const release=acquireKernelLock(store);try{fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});return runLoop(orca,store,state,{cwd:worktree,wait,
       allocator:createAllocator({state:state.allocation??undefined,quota:state.quota??null}),template:templateOf(state.host),
-      maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});
+      maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:finished.phase,ledgerMode:finished.ledgerMode,
       finished:finished.finished,ledger:finished.ledger.map(item=>`${item.id}=${item.status}`),
       ledgerSummary:finished.ledgerSummary,needUser:finished.needUser,head:finished.head,iterations:finished.iterations};

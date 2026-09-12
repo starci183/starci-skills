@@ -476,9 +476,10 @@ function usage(){return `Usage:
     On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and
     committed with a "Work: <node id>" trailer.
   node orca-supervised-launch.mjs workflow-status --id <workflow-id> [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-stop --id <workflow-id> [--worktree <relative-path>]
   node orca-supervised-launch.mjs verify`;}
 
-const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-run','workflow-status'];
+const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-run','workflow-status','workflow-stop'];
 
 export function main(argv=process.argv.slice(2),{orca,wait}={}){
   const {command,options}=parseArgs(argv);
