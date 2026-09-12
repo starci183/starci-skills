@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
 import {getPath} from './orca-calls.mjs';
@@ -8,6 +9,7 @@ import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepW
 import {validateReport} from './reports.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot} from './workflow-store.mjs';
 import {createAllocator,loadRuntimes} from './runtime-allocator.mjs';
+import {proofFinding,proofPlan,runAtBase} from './verify-proof.mjs';
 import * as work from './work-ledger.mjs';
 import * as llm from './llm-functions.mjs';
 
@@ -35,6 +37,9 @@ export const WORK_LEDGER='work';
 export const WORK_OPERATION={implementation:'backend.implement',ui:'interface.implement',uat:'uat.verify',operations:'runtime.operate'};
 export const DECISION_OPERATION={architecture:'architecture.decide',business:'business.decide','business-overview':'business.decide'};
 const RESUME_LIMIT=5,RETRY_LIMIT=3,RESTART_LIMIT=3,VERIFY_ROUNDS=3,GATE_ROUNDS=3,LAUNCH_LIMIT=3,STALL_LIMIT=3;
+/** Run-time growth is bounded too: ops nobody approved, shared changes per iteration, inferred rate limits. */
+export const DYNAMIC_OPS_BUDGET=6;
+const SHARED_OPS_PER_ITERATION=3,SILENCE_LIMIT=2,RATE_LIMIT_WINDOW_MS=30*60*1000;
 const CHECK_TIMEOUT_MS=30*60*1000,LAUNCH_WAIT_MS=180000,POLL_MS=5000;
 const REF_KINDS=['srs','sds','plan','brief','note','design','uat','file','dir','url'];
 
@@ -59,6 +64,50 @@ export const allowlistsOverlap=(a=[],b=[])=>a.some(one=>b.some(other=>covers(one
 const inside=(file,allowlist=[])=>allowlist.some(entry=>{const root=allowRoot(entry);return file===root||file.startsWith(`${root}/`);});
 /** Paths named inside free text (a blocker detail, a review finding): only tokens that carry a directory separator. */
 const pathsIn=text=>unique(String(text??'').match(/[A-Za-z0-9_@.][A-Za-z0-9_@./-]*\/[A-Za-z0-9_@./-]+/g)??[]).map(normalize);
+/**
+ * A dynamic op stays inside the approved scope, matched against the scope entries that name a path or a
+ * feature folder: an entry by prefix, or as a path segment. A scope given as a Work node id (`demo.sales`)
+ * constrains the ledger, not a file path, so it never refuses an op's allowlist here.
+ */
+const pathScopes=scope=>(scope??[]).map(entry=>normalize(entry).replace(/^features\//,'').replace(/\/+$/,''))
+  .filter(key=>key&&!(key.includes('.')&&!key.includes('/')));
+const inScopePath=(file,scope=[])=>{
+  const keys=pathScopes(scope);
+  return !keys.length||keys.some(key=>covers(key,file)||`/${normalize(file)}/`.includes(`/${key}/`));
+};
+
+/**
+ * The guard surface (`execution/kernel-guards.mjs`): path protection, resource locks, git serialization and
+ * the worktree preflight. It is loaded optionally, because a tree that ships without it must still run the
+ * kernel - the fallbacks below are the same contract, implemented minimally, and every call goes through
+ * `ctx.guards`, so a test or a host can inject its own.
+ */
+const FALLBACK_GUARDS={
+  protectedPaths:(node,repoRoot)=>{
+    const relative=slash(node?.path??'');
+    if(!relative)return [];
+    return [`.starciwork/${relative}`,`.starciwork/${slash(path.dirname(relative))}/evidence/**`];
+  },
+  revertProtected:(git,{cwd,paths=[]}={})=>{
+    const shown=git('git',['status','--porcelain','--',...paths.map(allowRoot)],{cwd,encoding:'utf8',windowsHide:true});
+    const changed=shown.status===0?unique((shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
+      .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,'')))):[];
+    if(changed.length)git('git',['checkout','--',...changed],{cwd,encoding:'utf8',windowsHide:true});
+    return {reverted:changed,removed:[]};
+  },
+  parseSharedChangePaths:detail=>pathsIn(detail),
+  resourceLocks:op=>unique([...(op?.resources??[]),...(op?.checks??[]).flatMap(check=>{
+    const command=String(check?.command??'');
+    return [/test:container|postgres/i.test(command)?'postgres':null,/\be2e\b/i.test(command)?'e2e-runtime':null,
+      /docker/i.test(command)?'docker':null,/kubectl|helm/i.test(command)?'cluster':null].filter(Boolean);
+  })]),
+  resourcesClash:(a,b)=>FALLBACK_GUARDS.resourceLocks(a).some(lock=>FALLBACK_GUARDS.resourceLocks(b).includes(lock)),
+  gitQueue:fn=>fn(),
+  preflight:()=>({ok:true,fixes:[],problems:[]})
+};
+const loadedGuards=await import('./kernel-guards.mjs').then(module=>module,()=>null);
+export const kernelGuards=Object.fromEntries(Object.entries(FALLBACK_GUARDS)
+  .map(([name,fallback])=>[name,typeof loadedGuards?.[name]==='function'?loadedGuards[name]:fallback]));
 
 function parseRef(ref){
   if(plain(ref))return {kind:ref.kind??'file',ref:required(ref.ref??ref.path,'input ref')};
@@ -97,12 +146,14 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     run:null,from:null,workflowTask:null,phase:'goal',approved:false,
     definitionOfDone:[],risks:[],questions:[],ledger:[],ops:[],needUser:[],gateResults:[],verifyRounds:{},gateRounds:0,
     decisions:[],ledgerSummary:null,
+    dynamicOps:0,dynamicOpsBudget:DYNAMIC_OPS_BUDGET,sharedQueue:[],silences:{},preflight:null,
     head:null,iterations:0,counters:{},stalls:0,allocation:null,finished:null,createdAt:Date.now()};
 }
 
 const byId=(state,id)=>state.ops.find(op=>op.id===id)??null;
 const ledgerItem=(state,id)=>state.ledger.find(item=>item.id===id)??null;
-const liveStatus=['pending','ready','running','answering'];
+/** `paused` is live too: an op waiting for its shared change is not finished and never lets the job finish. */
+const liveStatus=['pending','ready','running','answering','paused'];
 const nextId=(state,prefix)=>`${prefix}-${state.counters[prefix]=(state.counters[prefix]??0)+1}`;
 const componentKey=ledgerIds=>[...ledgerIds].sort().join('+')||'-';
 /** The key a review round is counted against: the module on the Work ledger, the item set on a plan ledger. */
@@ -120,17 +171,45 @@ function toOp(raw,index){
     ledgerIds:[...(raw.ledgerIds??[])],allowlist:[...(raw.allowlist??[])],references:[...(raw.references??[])],
     checks:(raw.checks??[]).map(check=>({name:required(check?.name,'check name'),command:required(check?.command,'check command')})),
     acceptance:[...(raw.acceptance??[])],dependsOn:[...(raw.dependsOn??[])],timeoutMs:raw.timeoutMs??null,
+    resources:[...(raw.resources??[])],requesters:[...(raw.requesters??[])],
     status:'pending',origin:raw.origin??'plan',attempt:1,resumes:0,repairs:0,restarts:0,launchFailures:0,
     priorOpen:[...(raw.priorOpen??[])],findings:[...(raw.findings??[])],avoidRuntimes:[...(raw.avoidRuntimes??[])],
     runtime:null,target:null,task:null,dispatch:null,terminal:null,contractFile:null,nudged:false,
+    kernelOwned:[],kernelOwnedAt:null,waitingFor:null,refusal:null,createdIteration:0,
     reports:[],files:[],head:null,verdict:null,needsReplan:Boolean(raw.needsReplan)};
 }
 function addOp(store,state,raw,reason){
   const op=toOp({...raw,id:raw.id??nextId(state,raw.origin??'op')},state.ops.length);
   need(op.allowlist.length,`Operation ${op.id} has an empty allowlist`);
+  op.createdIteration=state.iterations;
   state.ops.push(op);
   store.appendEvent({event:'op-created',op:op.id,kind:op.kind,origin:op.origin,reason,allowlist:op.allowlist,ledgerIds:op.ledgerIds});
+  gateDynamicOp(store,state,op);
   return op;
+}
+
+/* ------------------------------------------------------------------ the dynamic-op gate */
+
+export const dynamicBudget=state=>Number.isFinite(state?.dynamicOpsBudget)?state.dynamicOpsBudget:DYNAMIC_OPS_BUDGET;
+/**
+ * An op nobody approved is bounded twice. Past `state.dynamicOpsBudget` ops created at run time, and for an
+ * op whose whole allowlist falls outside the approved `scope`, the kernel refuses to run it: the op exists
+ * (so the graph and the final report still name it) but it is `blocked` and becomes a `needUser` item. A node
+ * derived op is scope-checked by the Work ledger itself, so only its budget is counted here.
+ */
+function gateDynamicOp(store,state,op){
+  state.dynamicOps=(state.dynamicOps??0)+1;
+  const budget=dynamicBudget(state);
+  const outside=op.nodeId||!state.scope?.length?[]:op.allowlist.filter(entry=>!inScopePath(entry,state.scope));
+  const reason=state.dynamicOps>budget?`beyond the dynamic-op budget of ${budget} for this workflow`
+    :outside.length===op.allowlist.length&&outside.length?`outside the approved scope ${state.scope.join(', ')}: ${outside.join(', ')}`:null;
+  if(!reason)return true;
+  op.status='blocked';op.refusal='dynamic-op';
+  state.needUser.push({op:op.id,kind:'dynamic-op',
+    detail:`${op.id} (${op.kind}) was created at run time ${reason}; raise it with workflow-approve --id ${state.id} --allow-dynamic <n>`});
+  store.appendEvent({event:'dynamic-op-refused',op:op.id,kind:op.kind,origin:op.origin,reason,
+    dynamicOps:state.dynamicOps,budget,allowlist:op.allowlist});
+  return false;
 }
 
 /* ------------------------------------------------------------------ phase: goal */
@@ -234,6 +313,7 @@ export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0}){
     // The whole-tree validator is the kernel's own gate at acceptance: parallel operations must not fail on a sibling's in-progress ledger write.
     checks:node.checks.filter(check=>check.assertion!=='work-valid').map(check=>({name:check.assertion??check.command,command:check.command})),
     acceptance:node.assertions.length?node.assertions:[`${node.id} satisfies the Work contract it authored`],
+    resources:[...(node.resources??[])],
     // An eligible node has no unsettled dependency, so a dependency inside this set is already done; the
     // mapping is kept so a tree that validates differently still schedules in dependency order.
     dependsOn:(node.dependsOn??[]).map(dep=>opOfNode.get(dep)).filter(Boolean),origin:'ledger'},index);
@@ -264,10 +344,12 @@ export function syncLedgerOps(store,state,ctx){
     const id=workOpId(node.id,taken);opOfNode.set(node.id,id);
     const op=deriveWorkOp(ctx.work.api,ctx.work.repoRoot,node,{id,opOfNode,index:state.ops.length});
     op.difficulty=op.difficulty??'medium';
+    op.createdIteration=state.iterations;
     state.ops.push(op);
     state.ledger.push({id:node.id,title:describeNode(ctx.work.api,ctx.work.repoRoot,node),inputRef:node.path,kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[]});
     added.push(op.id);
     store.appendEvent({event:'op-added',op:op.id,node:node.id,reason:'newly schedulable Work node'});
+    gateDynamicOp(store,state,op);
   }
   return added;
 }
@@ -419,16 +501,28 @@ export function proposeQuota(state,{runtimes=null}={}){
   return proposal;
 }
 
-export function approve(store,state,{allocation=null}={}){
+export function approve(store,state,{allocation=null,allowDynamic=null}={}){
   if(allocation)state.quota=parseQuota(allocation);
+  // `--allow-dynamic N` is the user raising the run-time op budget; ops the gate refused are reinstated with it.
+  if(allowDynamic!==null&&allowDynamic!==undefined&&String(allowDynamic).trim()){
+    const budget=Number(allowDynamic);
+    need(Number.isInteger(budget)&&budget>0,`--allow-dynamic takes a positive integer: ${allowDynamic}`);
+    const raised=budget>dynamicBudget(state);
+    state.dynamicOpsBudget=budget;
+    if(raised){
+      for(const op of state.ops.filter(item=>item.status==='blocked'&&item.refusal==='dynamic-op')){op.status='pending';op.refusal=null;}
+      state.needUser=state.needUser.filter(item=>item.kind!=='dynamic-op');
+    }
+  }
   // The user sets the runtime allocation at approval; without --allocation the proposal from goal.md is used and recorded.
   if(!state.quota){const proposal=state.quotaProposal??proposeQuota(state);state.quota=parseQuota(proposal.text);state.quotaSource='proposal';}else state.quotaSource=allocation?'user':state.quotaSource??'user';
   need(state.ops.length,`Workflow ${state.id} has no plan to approve; run workflow-goal first`);
   state.approved=true;
   if(state.phase!=='finished')state.phase='run';
-  store.appendEvent({event:'approved',ops:state.ops.length,quota:state.quota});
+  store.appendEvent({event:'approved',ops:state.ops.length,quota:state.quota,dynamicOpsBudget:dynamicBudget(state)});
   store.saveState(state);
-  return {ok:true,id:state.id,phase:state.phase,approved:true,ops:state.ops.length,ledger:state.ledger.length,quota:state.quota};
+  return {ok:true,id:state.id,phase:state.phase,approved:true,ops:state.ops.length,ledger:state.ledger.length,
+    quota:state.quota,dynamicOpsBudget:dynamicBudget(state)};
 }
 
 /* ------------------------------------------------------------------ contract */
@@ -446,7 +540,8 @@ function jobRulings(store){
   return body?[`## Job rulings (apply to every operation)`,body,``]:[];
 }
 
-export function renderContract({template,op,state,store,launcher=state.launcher,run=state.run}){
+export function renderContract({template,op,state,store,launcher=state.launcher,run=state.run,
+  guards=kernelGuards,protectedPaths=null}){
   const text=String(template??'');
   for(const heading of ['## Cook until done','## Ping (mandatory)','## Never'])
     need(text.includes(heading),`The operation template has no "${heading}" section`);
@@ -456,6 +551,8 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
   const checksFile=slash(store.checksPath(op.id));
   const reportsDir=slash(store.paths.reports);
   const items=(op.ledgerIds??[]).map(id=>{const item=ledgerItem(state,id);return `- \`${id}\` ${item?.title??'(unknown goal item)'}${item?.inputRef?` - ${item.inputRef}`:''}`;});
+  const locks=guards.resourceLocks(op);
+  const owned=protectedPaths??op.kernelOwned??[];
   const sections=[
     `# Operation contract - \`${op.kind}\` - op \`${op.id}\` - attempt ${op.attempt}`,``,
     `Runtime StarCi 5.0. One worktree \`${slash(state.worktree)}\` on branch \`${state.branch}\`. Other operations are running beside you in this same worktree: never touch a path outside your allowlist, never commit, never switch branches. Your Task id, Dispatch id and terminal handle are in the dispatch preamble.`,``,
@@ -463,7 +560,11 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     ...(op.nodeId?[`## Work node you close`,`- \`${op.nodeId}\` - the kernel writes its \`state\`, \`completion\` and evidence itself after it has reproduced your checks. Never edit a Work \`index.yaml\` unless it is in your allowlist.`,``]:[]),
     ...(items.length?[`## Goal items you close`,...items,``]:[]),
     `## Allowlist`,...op.allowlist.map(entry=>`- \`${entry}\``),
-    `Anything else is out of scope. Name the exact paths you need in \`open[]\`, or report \`blocked\` with \`shared-change\` and the paths in the detail.`,``,
+    `Anything else is out of scope. Name the exact paths you need in \`open[]\`, or report \`blocked\` with \`shared-change\` and the exact repository paths in the detail - a \`shared-change\` that names no path is sent straight back to you.`,``,
+    ...(owned.length?[`## Never touch (kernel-owned)`,...owned.map(entry=>`- \`${entry}\``),
+      `The kernel owns the node's \`state\`, \`completion\`, \`extensions.work3.kernel\` and its evidence. It reverts anything you write here and downgrades your report to \`failed\`.`,``]:[]),
+    `## Resources`,...(locks.length?locks.map(entry=>`- \`${entry}\``):['- none: this operation claims no shared resource']),
+    `Two operations that share a resource never run at the same time; never start, stop or reset one you did not declare.`,``,
     `## References`,...(op.references.length?op.references.map(entry=>`- ${entry}`):['- the goal and the allowlist above']),``,
     ...(op.priorOpen.length?[`## Open items you inherit`,...op.priorOpen.map(item=>`- ${item}`),``]:[]),
     ...(op.findings.length?[`## Findings you must resolve`,...op.findings.map(item=>`- ${typeof item==='string'?item:JSON.stringify(item)}`),``]:[]),
@@ -483,6 +584,55 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
   const contract=`${sections.join('\n').replace(/\n{3,}/g,'\n\n')}\n`;
   need(!/<launcher>|<nested run>|<runtime dir>|<reports dir>/.test(contract),'The rendered contract still carries a template placeholder');
   return contract;
+}
+
+/* ------------------------------------------------------------------ kernel-owned paths */
+
+/**
+ * The ledger paths this kernel owns for an operation's node - its `index.yaml` (where `state`, `completion`
+ * and `extensions.work3.kernel` live) and its `evidence/**`. An operation is granted one only when its own
+ * allowlist names that exact file (an `architecture.decide` op authors the design body of its node), never
+ * through a directory glob.
+ */
+export function kernelOwnedPaths(state,op,ctx){
+  if(!ctx?.work||!op.nodeId)return [];
+  const node=ctx.work.node(op.nodeId);
+  if(!node)return [];
+  const granted=(op.allowlist??[]).map(normalize);
+  return unique(((ctx.guards??kernelGuards).protectedPaths(node,ctx.work.repoRoot)??[]).map(normalize))
+    .filter(file=>!granted.includes(file));
+}
+
+/** Content fingerprint of those paths: at acceptance the only pending change there must be the kernel's own. */
+export function protectedFingerprint(root,paths=[]){
+  const files=[];
+  const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true}))
+    entry.isDirectory()?walk(path.join(dir,entry.name)):files.push(path.join(dir,entry.name));};
+  for(const entry of paths){
+    const target=path.join(root,allowRoot(entry));
+    try{if(fs.statSync(target).isDirectory())walk(target);else files.push(target);}catch{files.push(target);}
+  }
+  return unique(files).sort().map(file=>{
+    const name=normalize(path.relative(root,file));
+    try{return `${name}:${crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex')}`;}catch{return `${name}:absent`;}
+  }).join('\n');
+}
+
+/**
+ * Before any machine verification: revert what the operation wrote into the kernel's own ledger paths and
+ * report it. A report that touched them is never accepted - it is downgraded to `failed` and comes back.
+ */
+function guardKernelPaths(store,state,op,ctx){
+  const paths=op.kernelOwned??[];
+  if(!paths.length)return [];
+  const root=ctx.work?.repoRoot??state.worktree;
+  if(protectedFingerprint(root,paths)===(op.kernelOwnedAt??''))return [];
+  const result=ctx.guards.gitQueue(()=>ctx.guards.revertProtected(ctx.git,{cwd:state.worktree,paths}))??{};
+  const reverted=unique([...(result.reverted??[]),...(result.removed??[])]).map(normalize);
+  op.kernelOwnedAt=protectedFingerprint(root,paths);
+  const touched=reverted.length?reverted:paths;
+  store.appendEvent({event:'kernel-paths-modified',op:op.id,node:op.nodeId,paths:touched,reverted,protected:paths});
+  return touched;
 }
 
 /* ------------------------------------------------------------------ launch */
@@ -512,7 +662,8 @@ export function launchWithCandidate(orca,{cwd,run,workflowTask,from,worktree,ope
 
 function launchOp(orca,store,state,op,allocated,ctx){
   if(op.needsReplan)replanOp(store,state,op,ctx);
-  const contract=renderContract({template:ctx.template,op,state,store});
+  op.kernelOwned=kernelOwnedPaths(state,op,ctx);
+  const contract=renderContract({template:ctx.template,op,state,store,guards:ctx.guards,protectedPaths:op.kernelOwned});
   fs.writeFileSync(store.contractPath(op.id),contract);
   op.contractFile=store.contractPath(op.id);
   const relative=path.relative(process.cwd(),state.worktree)||'.';
@@ -532,11 +683,14 @@ function launchOp(orca,store,state,op,allocated,ctx){
     return {ok:false,reason:launched?.stopReason??'launch failed'};
   }
   op.status='running';op.runtime=allocated.runtime;op.target=allocated.target;
+  if(!op.baseHead){const shown=ctx.git('git',['rev-parse','HEAD'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});op.baseHead=shown.status===0?(shown.stdout??'').trim():null;}
   op.task=launched.task.id;op.dispatch=launched.dispatchId;op.terminal=launched.terminal;op.nudged=false;
   store.appendEvent({event:'launched',op:op.id,kind:op.kind,node:op.nodeId,attempt:op.attempt,runtime:op.runtime,target:op.target,
     dispatch:op.dispatch,terminal:op.terminal,allocation:launched.allocation??null});
   // Work v2 authors only uninvestigate, todo and done, so the launch is recorded in the node's kernel block.
   ledgerWrite(store,state,op,ctx,'in-progress',node=>ctx.work.api.markInProgress(ctx.work.repoRoot,node,{opId:op.id,dispatch:op.dispatch}));
+  // The baseline is taken after the kernel's own in-progress write, so only the operation's edits are caught.
+  op.kernelOwnedAt=op.kernelOwned.length?protectedFingerprint(ctx.work?.repoRoot??state.worktree,op.kernelOwned):null;
   return {ok:true};
 }
 
@@ -587,6 +741,13 @@ function scheduleOps(orca,store,state,ctx){
       store.appendEvent({event:'schedule-deferred',op:op.id,reason:'allowlist overlaps a running operation'});
       continue;
     }
+    // Declared and inferred resource locks (postgres, e2e-runtime, docker, cluster) are as serializing as paths.
+    const clashing=busy.filter(other=>ctx.guards.resourcesClash(op,other));
+    if(clashing.length){
+      store.appendEvent({event:'schedule-deferred',op:op.id,reason:'resource lock clashes a running operation',
+        resources:ctx.guards.resourceLocks(op),clashes:clashing.map(other=>other.id)});
+      continue;
+    }
     const avoid=unique([...op.avoidRuntimes,...avoidForVerify(state,op)]);
     // Allocation stays inside the targets this operation can actually launch, so a runtime whose role has
     // no profile for this operation is never chosen and then rejected.
@@ -627,13 +788,16 @@ export function machineVerify(state,op,{exec,cwd=state.worktree}={}){
   return {ok:checks.every(check=>check.exitCode===0),checks,failed:checks.filter(check=>check.exitCode!==0)};
 }
 
-/** The changed files of this worktree, filtered to the operation's allowlist: the kernel never trusts report.files. */
-export function changedFiles(state,op,{git},allowlist=op.allowlist){
+/**
+ * The changed files of this worktree, filtered to the operation's allowlist: the kernel never trusts
+ * report.files. `exclude` is the kernel-owned ledger set, which no operation commit may ever carry.
+ */
+export function changedFiles(state,op,{git},allowlist=op.allowlist,{exclude=[]}={}){
   const shown=git('git',['status','--porcelain'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
   if(shown.status!==0)return [];
   return unique((shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
     .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))))
-    .filter(file=>inside(file,allowlist));
+    .filter(file=>inside(file,allowlist)&&!inside(file,exclude));
 }
 
 function commitOp(state,op,files,{git}){
@@ -846,22 +1010,110 @@ function answerOrEscalate(orca,store,state,op,report,ctx){
   return 'escalate-to-user';
 }
 
+/* ------------------------------------------------------------------ shared changes */
+
+/**
+ * A shared change is a path outside the operation's allowlist that its slice needs. The discipline is four
+ * rules: the blocker must name concrete repository paths (a detail that names none is sent straight back to
+ * the operation, as if it had asked a question); one shared op per distinct path set, where a path-prefix
+ * overlap merges into the pending or running shared op and appends the requester; at most
+ * three new shared ops per iteration, the rest queued; and the requester is `paused` - not `pending`, so
+ * nothing reschedules it - until its shared op is `done`.
+ */
+const sharedAlive=op=>op.origin==='shared'&&liveStatus.includes(op.status);
+const pathSetsOverlap=(a=[],b=[])=>a.some(one=>b.some(other=>covers(one,other)));
+const sharedThisIteration=state=>state.ops.filter(op=>op.origin==='shared'&&op.createdIteration===state.iterations).length;
+
+function pauseForShared(store,state,op,open,shared,note){
+  op.status='paused';op.waitingFor=shared?.id??null;
+  op.priorOpen=unique([...open,note]);
+  op.dispatch=null;op.terminal=null;op.nudged=false;
+  if(shared)op.dependsOn=unique([...op.dependsOn,shared.id]);
+  store.appendEvent({event:'op-paused',op:op.id,waitingFor:op.waitingFor,note});
+}
+
+function createSharedOp(store,state,op,detail,paths){
+  return addOp(store,state,{kind:'backend.implement',goal:`Apply the shared change ${op.id} cannot make: ${detail}`,
+    ledgerIds:op.ledgerIds,allowlist:paths,references:op.references,checks:op.checks,
+    acceptance:[detail],origin:'shared',requesters:[op.id]},`shared-change reported by ${op.id}`);
+}
+
+/** One shared request: merge into an existing shared op, create one, or queue it for the next iteration. */
+function requestSharedChange(store,state,op,{paths,detail,open=[]}){
+  const existing=state.ops.find(item=>sharedAlive(item)&&pathSetsOverlap(item.allowlist,paths));
+  if(existing){
+    existing.requesters=unique([...(existing.requesters??[]),op.id]);
+    // A shared op that has not launched yet absorbs the new paths; one already running keeps its allowlist.
+    if(['pending','ready','paused'].includes(existing.status))existing.allowlist=unique([...existing.allowlist,...paths]);
+    store.appendEvent({event:'shared-change-merged',op:op.id,shared:existing.id,paths,
+      allowlist:existing.allowlist,requesters:existing.requesters});
+    pauseForShared(store,state,op,open,existing,`the shared change is made by ${existing.id}; continue your own allowlist afterwards`);
+    return 'shared-change-merged';
+  }
+  if(sharedThisIteration(state)>=SHARED_OPS_PER_ITERATION){
+    state.sharedQueue=[...(state.sharedQueue??[]),{op:op.id,paths,detail,open}];
+    store.appendEvent({event:'shared-change-deferred',op:op.id,paths,cap:SHARED_OPS_PER_ITERATION});
+    pauseForShared(store,state,op,open,null,`the shared change for ${paths.join(', ')} waits for a free shared slot`);
+    return 'shared-change-deferred';
+  }
+  const shared=createSharedOp(store,state,op,detail,paths);
+  pauseForShared(store,state,op,open,shared,`the shared change is made by ${shared.id}; continue your own allowlist afterwards`);
+  return 'shared-change';
+}
+
+/** Queued shared requests are retried once per iteration, under the same merge rule and the same cap. */
+export function drainSharedQueue(store,state){
+  const queue=state.sharedQueue??[];
+  if(!queue.length)return [];
+  // Emptied first: a request the cap defers again re-queues itself through the same path.
+  state.sharedQueue=[];
+  const created=[];
+  for(const request of queue){
+    const op=byId(state,request.op);
+    if(!op||op.status!=='paused')continue;
+    if(requestSharedChange(store,state,op,request)==='shared-change')created.push(op.waitingFor);
+  }
+  return created;
+}
+
+/** A paused op returns to `ready` exactly when its shared op is done, carrying the head that proves it. */
+export function resumePaused(store,state){
+  const resumed=[];
+  for(const op of state.ops.filter(item=>item.status==='paused'&&item.waitingFor)){
+    const shared=byId(state,op.waitingFor);
+    if(!shared)continue;
+    if(shared.status==='done'){
+      op.status='ready';op.attempt+=1;op.waitingFor=null;
+      op.priorOpen=[`shared change ${shared.id} done at ${shared.head??state.head??'unknown'}`];
+      op.dispatch=null;op.terminal=null;op.nudged=false;
+      store.appendEvent({event:'shared-change-resumed',op:op.id,shared:shared.id,head:shared.head??state.head??null});
+      resumed.push(op.id);
+      continue;
+    }
+    if(['blocked','failed'].includes(shared.status)){
+      op.status='blocked';op.waitingFor=null;
+      state.needUser.push({op:op.id,kind:'shared-change',detail:`${op.id} waits for the shared change ${shared.id}, which is ${shared.status}`});
+      store.appendEvent({event:'shared-change-blocked',op:op.id,shared:shared.id});
+    }
+  }
+  return resumed;
+}
+
 function handleBlocked(store,state,op,report,ctx){
   const blocker=report.blocker??{kind:'environment',detail:report.summary};
   if(blocker.kind==='shared-change'){
-    const paths=pathsIn(`${blocker.detail} ${(report.open??[]).join(' ')}`).filter(file=>!inside(file,op.allowlist));
+    const named=ctx.guards.parseSharedChangePaths(`${blocker.detail} ${(report.open??[]).join(' ')}`)??[];
+    const paths=unique(named.map(normalize)).filter(file=>!inside(file,op.allowlist));
     if(!paths.length){
-      op.status='blocked';
-      state.needUser.push({op:op.id,kind:'shared-change',detail:`${blocker.detail} (the report named no path outside the allowlist)`});
-      return 'escalate-to-user';
+      // No path, no shared op: this is a question to the kernel, and the kernel answers it in the terminal.
+      const file=store.reportPath(op.dispatch);
+      if(fs.existsSync(file))fs.renameSync(file,`${file}.answered-${op.reports.length}`);
+      op.answer=`Your shared-change block named no repository path outside your allowlist. Name the exact paths you need changed, repository-relative, one per line, then report again.`;
+      op.status='answering';
+      store.appendEvent({event:'shared-change-unnamed',op:op.id,detail:blocker.detail});
+      return 'shared-change-unnamed';
     }
-    const shared=addOp(store,state,{kind:'backend.implement',goal:`Apply the shared change ${op.id} cannot make: ${blocker.detail}`,
-      ledgerIds:op.ledgerIds,allowlist:paths,references:op.references,checks:op.checks,
-      acceptance:[blocker.detail],origin:'shared'},`shared-change reported by ${op.id}`);
-    op.status='pending';op.attempt+=1;op.dependsOn=unique([...op.dependsOn,shared.id]);
-    op.priorOpen=unique([...(report.open??[]),`the shared change is made by ${shared.id}; continue your own allowlist afterwards`]);
-    op.dispatch=null;op.terminal=null;
-    return 'shared-change';
+    return requestSharedChange(store,state,op,{paths,detail:blocker.detail,open:[...(report.open??[])]});
   }
   if(blocker.kind==='sds-gap'){
     if(ctx.work&&reopenArchitecture(store,state,op,report,ctx,blocker))return 'sds-gap';
@@ -899,6 +1151,12 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     return retryOp(store,state,op,checked.errors.map(error=>`your previous report was rejected: ${error}`),ctx,'report-rejected');
   }
   store.appendEvent({event:'report',op:op.id,outcome:report.outcome,runtime:op.runtime,attempt:op.attempt});
+  // The kernel-owned ledger paths are reverted before anything is verified, and writing them is never accepted.
+  const touched=guardKernelPaths(store,state,op,ctx);
+  if(touched.length){
+    op.reports.at(-1).downgradedTo='failed';
+    return retryOp(store,state,op,[`operation modified kernel-owned ledger paths: ${touched.join(', ')}`],ctx,'kernel-paths-modified');
+  }
   if(report.outcome==='done'){
     const verified=machineVerify(state,op,ctx);
     writeJson(store.checksPath(`${op.id}-kernel`),{schema:'starci/workflow-kernel-checks@1',op:op.id,attempt:op.attempt,
@@ -908,8 +1166,21 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       store.appendEvent({event:'machine-verify-failed',op:op.id,failed:verified.failed.map(check=>`${check.name}=${check.exitCode}`)});
       return retryOp(store,state,op,verified.failed.map(check=>`the kernel re-ran ${check.name} (\`${check.command}\`) and it exited ${check.exitCode}: ${check.evidence}`),ctx,'machine-verify-failed');
     }
-    const files=changedFiles(state,op,ctx);
-    const commit=commitOp(state,op,files,ctx);
+    const files=changedFiles(state,op,ctx,op.allowlist,{exclude:op.kernelOwned??[]});
+    // Proof by contrast: the specs this operation added must fail on the code it started from. A green check
+    // alone is not evidence that the behavior changed.
+    const plan=proofPlan(op,{changedFiles:files});
+    if(plan.mode==='fail-before'&&op.baseHead){
+      const proof=runAtBase({worktree:state.worktree,baseHead:op.baseHead,opHead:state.head??op.baseHead,specs:plan.specs,commands:plan.commands,git:ctx.git,exec:ctx.exec,timeoutMs:op.timeoutMs??CHECK_TIMEOUT_MS});
+      op.proof={verdict:proof.verdict,reason:proof.reason??null,specs:plan.specs};
+      store.appendEvent({event:'proof',op:op.id,verdict:proof.verdict,specs:plan.specs,reason:proof.reason??null});
+      if(proof.verdict==='contradiction'){
+        op.reports.at(-1).downgradedTo='failed';
+        return retryOp(store,state,op,[proofFinding(proof)],ctx,'proof-contradiction');
+      }
+      if(proof.verdict==='weak'){const finding=proofFinding(proof);op.proofFindings=[...(op.proofFindings??[]),finding];state.needUser.push({op:op.id,kind:'proof',detail:finding});}
+    }
+    const commit=ctx.guards.gitQueue(()=>commitOp(state,op,files,ctx));
     if(!commit.committed&&files.length){
       op.status='blocked';
       state.needUser.push({op:op.id,kind:'environment',detail:`the work could not be committed: ${commit.reason}`});
@@ -924,7 +1195,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       op.verdict='pass';
     }
     recordDone(store,state,op,ctx,verified);
-    commitLedgerWrite(store,state,op,ctx);
+    ctx.guards.gitQueue(()=>commitLedgerWrite(store,state,op,ctx));
     markLedger(state,op,op.head);
     store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
       checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
@@ -1109,7 +1380,25 @@ function finish(store,state,outcome,reason=null,ctx=null){
   return final;
 }
 
-function settleStalled(orca,store,state,ctx,tick){
+/**
+ * Nobody reports a rate limit: the runtime simply goes quiet. Two `stalled-silent` settlements of the same
+ * runtime inside half an hour are read as exactly that, the allocator is told, and the window is cleared so
+ * the inference needs two fresh silences before it fires again.
+ */
+function noteSilence(store,state,op,ctx){
+  const runtime=op.runtime;
+  if(!runtime)return false;
+  const at=ctx.now();
+  const window=[...(state.silences?.[runtime]??[]),at].filter(time=>at-time<=RATE_LIMIT_WINDOW_MS);
+  state.silences={...(state.silences??{}),[runtime]:window};
+  if(window.length<SILENCE_LIMIT)return false;
+  ctx.allocator.failed(runtime,{reason:'rate-limited (inferred from repeated silence)'});
+  state.silences[runtime]=[];
+  store.appendEvent({event:'rate-limit-inferred',op:op.id,runtime,silences:window.length,windowMs:RATE_LIMIT_WINDOW_MS});
+  return true;
+}
+
+export function settleStalled(orca,store,state,ctx,tick){
   for(const op of state.ops.filter(item=>item.status==='running')){
     const observed=(tick.liveness??[]).find(item=>item.dispatch===op.dispatch);
     if(!observed)continue;
@@ -1120,9 +1409,11 @@ function settleStalled(orca,store,state,ctx,tick){
       store.appendEvent({event:'nudged',op:op.id,liveness:observed.liveness});
       continue;
     }
-    if(!['stalled-prompt','stalled-silent','stalled-idle','dead'].includes(observed.liveness))continue;
+    if(!['stalled-prompt','stalled-silent','stalled-idle','dead','rate-limited'].includes(observed.liveness))continue;
     settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:observed.liveness,terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
-    ctx.allocator.release(op.runtime);
+    if(observed.liveness==='rate-limited'){ctx.allocator.failed(op.runtime,{reason:`rate-limited (${observed.reason??'provider screen'})`});store.appendEvent({event:'rate-limit-parked',op:op.id,runtime:op.runtime});}
+    else ctx.allocator.release(op.runtime);
+    if(observed.liveness==='stalled-silent'&&noteSilence(store,state,op,ctx))op.avoidRuntimes=unique([...op.avoidRuntimes,op.runtime].filter(Boolean));
     op.restarts+=1;
     store.appendEvent({event:'settled',op:op.id,liveness:observed.liveness,restarts:op.restarts});
     if(op.restarts>RESTART_LIMIT){
@@ -1151,13 +1442,25 @@ function answerQuestions(orca,store,state,ctx){
  * Every iteration appends a `tick` event and saves state, so re-running `workflow-run` continues.
  */
 export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,template,
-  wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,
+  wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
   ledgerApi=work,validate=validateWorkTree,waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   need(plain(allocator),'A runtime allocator is required');
   need(typeof template==='string'&&template.trim(),'The operation contract template is required');
   required(state.run,'Orca run id');required(state.from,'own terminal handle');
-  const ctx={cwd,allocator,planOp,decide,template,wait,exec,git,launch,now,work:null};
+  const ctx={cwd,allocator,planOp,decide,template,wait,exec,git,launch,now,guards,work:null};
+  // A state written before these bounds existed resumes with them.
+  state.dynamicOps=Number.isFinite(state.dynamicOps)?state.dynamicOps:0;
+  state.dynamicOpsBudget=dynamicBudget(state);
+  state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
+  state.silences=plain(state.silences)?state.silences:{};
+  // The worktree itself is a precondition: long paths, the hooks env for kernel commits, the autocrlf state.
+  const checked=guards.preflight({worktree:state.worktree,git})??{};
+  state.preflight={ok:Boolean(checked.ok),fixes:[...(checked.fixes??[])],problems:[...(checked.problems??[])]};
+  store.appendEvent({event:'preflight',ok:state.preflight.ok,fixes:state.preflight.fixes,problems:state.preflight.problems});
+  for(const problem of state.preflight.problems)
+    if(!state.needUser.some(item=>item.kind==='environment'&&item.detail===problem))
+      state.needUser.push({kind:'environment',detail:problem});
   if(state.ledgerMode===WORK_LEDGER){
     // The Work tree is read once per run: every write below goes back into the node the operation closes.
     const repoRoot=state.repoRoot??repositoryRoot(state.worktree);
@@ -1179,6 +1482,8 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     store.appendEvent({event:'tick',iteration:state.iterations,
       ops:state.ops.map(op=>`${op.id}=${op.status}`),ledger:state.ledger.map(item=>`${item.id}=${item.status}`)});
     answerQuestions(orca,store,state,ctx);
+    resumePaused(store,state);
+    drainSharedQueue(store,state);
     syncLedgerOps(store,state,ctx);
     planVerifyOps(store,state,ctx);
     scheduleOps(orca,store,state,ctx);
@@ -1322,13 +1627,15 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   }
   if(command==='workflow-approve'){
     const {store,state}=open(options.id);
-    return {schema:WORKFLOW_KERNEL,command,dir:store.dir,...approve(store,state,{allocation:options.allocation??null})};
+    return {schema:WORKFLOW_KERNEL,command,dir:store.dir,
+      ...approve(store,state,{allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null})};
   }
   if(command==='workflow-status'){
     const {store,state}=open(options.id);
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:state.phase,approved:state.approved,
       iterations:state.iterations,head:state.head,ledgerMode:state.ledgerMode,scope:state.scope,
-      ledgerSummary:state.ledgerSummary,decisions:state.decisions,
+      ledgerSummary:state.ledgerSummary,decisions:state.decisions,preflight:state.preflight??null,
+      dynamicOps:state.dynamicOps??0,dynamicOpsBudget:dynamicBudget(state),sharedQueue:state.sharedQueue??[],
       ledger:state.ledger.map(item=>({id:item.id,status:item.status,title:item.title,evidence:item.evidence})),
       ops:state.ops.map(op=>({id:op.id,kind:op.kind,status:op.status,runtime:op.runtime,attempt:op.attempt})),
       workNodes:state.ops.filter(op=>op.nodeId).map(op=>({op:op.id,node:op.nodeId,status:op.status})),
@@ -1342,10 +1649,12 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     let from=options.from??state.from,run=options.run??state.run;
     if(!from){const launch=awaitLaunch(launchFile,{wait});from=launch.from;run=run??launch.run??null;state.workflowTask=launch.task??state.workflowTask;}
     state.from=required(from,'own terminal handle');
+    // `run-bound` is the one-time hand-off this kernel performed; joining a run it already has is `run-resumed`.
+    const binding=!run;
     state.run=run??bindRun(orca,{cwd:worktree,state,from:state.from});
     state.host=state.host??hostOf(options,repoRoot);
     state.launcher=state.launcher??launcherOf(state.host);
-    store.appendEvent({event:'run-bound',run:state.run,from:state.from});
+    store.appendEvent({event:binding?'run-bound':'run-resumed',run:state.run,from:state.from,iterations:state.iterations});
     const finished=(()=>{const release=acquireKernelLock(store);try{fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});return runLoop(orca,store,state,{cwd:worktree,wait,
       allocator:createAllocator({state:state.allocation??undefined,quota:state.quota??null}),template:templateOf(state.host),
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()

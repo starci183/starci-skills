@@ -10,7 +10,7 @@ import {buildReport} from '../execution/reports.mjs';
 import {spawnSync} from 'node:child_process';
 import {validateGoalPlan} from '../execution/llm-functions.mjs';
 import {createStore} from '../execution/workflow-store.mjs';
-import {approve,createWorkflowState,detectLedgerMode,goalPhase,kernelMain,renderContract,runLoop,workModule,workOpId} from '../execution/workflow-kernel.mjs';
+import {DYNAMIC_OPS_BUDGET,applyOpReport,approve,changedFiles,createWorkflowState,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,renderContract,resumePaused,runLoop,settleStalled,workModule,workOpId} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -163,6 +163,31 @@ function fakeGit(dirty){
   },dirty:()=>pending,add:file=>pending.push(file)};
 }
 
+/**
+ * The `execution/kernel-guards.mjs` surface, stubbed so each test owns exactly what the path protection, the
+ * resource locks, the git queue and the preflight do. The kernel defaults to the real module; these tests
+ * inject the contract instead, because a fake worktree git cannot check anything out.
+ */
+function stubGuards(overrides={}){
+  const calls={queue:0,enter:[],preflight:0};
+  const slashed=value=>String(value).replaceAll('\\','/');
+  const locks=op=>[...new Set(op?.resources??[])];
+  return {calls,
+    protectedPaths:node=>{const relative=slashed(node.path);return [`.starciwork/${relative}`,`.starciwork/${slashed(path.dirname(relative))}/evidence/**`];},
+    revertProtected:()=>({reverted:[],removed:[]}),
+    resourceLocks:locks,
+    resourcesClash:(a,b)=>locks(a).some(lock=>locks(b).includes(lock)),
+    gitQueue:fn=>{calls.queue+=1;return fn();},
+    preflight:()=>{calls.preflight+=1;return {ok:true,fixes:[],problems:[]};},
+    parseSharedChangePaths:detail=>[...new Set(String(detail??'').match(/[A-Za-z0-9_@.][A-Za-z0-9_@.*/-]*\/[A-Za-z0-9_@.*/-]+/g)??[])],
+    ...overrides};
+}
+const running=(state,id,dispatch,runtime='qwen3.8-flash')=>{
+  const op=state.ops.find(item=>item.id===id);
+  Object.assign(op,{status:'running',dispatch,runtime,terminal:`term_${dispatch}`});
+  return op;
+};
+
 function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,allocator=fakeAllocator(),gates=[]}){
   const repo=tmp();
   const store=createStore({repoRoot:repo,id:'20260912-104251-kernel-spec'});
@@ -286,7 +311,9 @@ test('a done report whose check the kernel cannot reproduce is downgraded and re
     assert.equal(intake.reports[0].downgradedTo,'failed');
     assert.deepEqual(intake.files,[file]);
     assert.equal(intake.head,'abc1234');
-    assert.deepEqual(harness.git.calls.filter(name=>['add','commit','rev-parse'].includes(name)).slice(0,3),['add','commit','rev-parse']);
+    // The preflight probes git first (rev-parse), so the commit sequence is read from the first `add`.
+    const gitCalls=harness.git.calls.filter(name=>['add','commit','rev-parse'].includes(name));
+    assert.deepEqual(gitCalls.slice(gitCalls.indexOf('add'),gitCalls.indexOf('add')+3),['add','commit','rev-parse']);
     assert.deepEqual(state.ledger.map(item=>[item.id,item.status]),[['goal-1','verified']]);
     assert.deepEqual(state.ledger[0].evidence.map(item=>[item.opId,item.kind,item.head]),
       [['op-intake','backend.implement','abc1234'],['verify-1','review.verify','abc1234']]);
@@ -676,4 +703,324 @@ test('a reported SDS gap reopens the architecture node and schedules the decisio
     const steps=harness.store.readEvents().filter(event=>event.event==='ledger-write').map(event=>event.step);
     assert.deepEqual(steps,['in-progress','reopened','in-progress','decided','in-progress','done']);
   }finally{harness.cleanup();}
+});
+
+/* ------------------------------------------------------------------ the kernel-owned ledger paths */
+
+test('the kernel-owned ledger paths are protected: the contract forbids them, changedFiles drops them, and an operation that wrote them is reverted and never accepted',()=>{
+  const file='apps/agentos-controlplane/src/sales/intake.ts';
+  const nodeId='demo.sales.implementation.backend.intake';
+  const done=summary=>({outcome:'done',summary,files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]});
+  const harness=setupWork({dirty:[file],
+    scripts:{[nodeId]:[done('Intake implemented, and the node marked done.'),done('Intake implemented.')],
+      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const nodeFile=harness.node(nodeId);
+    const forgery='# forged by the operation\n';
+    // The stub stands in for `git checkout --`: the forged line is what a revert takes back out.
+    const guards=stubGuards({revertProtected:(git,{paths})=>{
+      const before=fs.readFileSync(nodeFile,'utf8');
+      if(!before.includes(forgery))return {reverted:[],removed:[]};
+      fs.writeFileSync(nodeFile,before.replaceAll(forgery,''));
+      return {reverted:[paths[0]],removed:[]};
+    }});
+    // The operation writes the node's own index.yaml while it runs: the first wait tick is that moment.
+    let forged=false;
+    const orca={...harness.fake.orca,invoke:(name,params,options)=>{
+      const result=harness.fake.orca.invoke(name,params,options);
+      if(name==='check'&&!forged){forged=true;fs.appendFileSync(nodeFile,forgery);}
+      return result;
+    }};
+    const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:noWait,
+      validate:harness.validate,guards,exec:command=>({status:0,stdout:`${command} ok`,stderr:''}),
+      git:harness.git.git,waitTimeoutMs:2000,tickMs:1000,maxIterations:12});
+    const op=state.ops.find(item=>item.id===nodeId);
+    // Every contract of the node names what the kernel owns, so "never touch" is not folklore.
+    const contract=fs.readFileSync(harness.store.contractPath(nodeId),'utf8');
+    assert.match(contract,/## Never touch \(kernel-owned\)/);
+    assert.match(contract,/- `\.starciwork\/features\/sales\/implementation\/backend\/intake\/index\.yaml`/);
+    assert.match(contract,/- `\.starciwork\/features\/sales\/implementation\/backend\/intake\/evidence\/\*\*`/);
+    assert.deepEqual(op.kernelOwned,['.starciwork/features/sales/implementation/backend/intake/index.yaml',
+      '.starciwork/features/sales/implementation/backend/intake/evidence/**']);
+    const log=events(harness.store);
+    const modified=log.find(event=>event.event==='kernel-paths-modified');
+    assert.ok(modified,'the write into the kernel-owned paths was caught');
+    assert.deepEqual(modified.reverted,['.starciwork/features/sales/implementation/backend/intake/index.yaml']);
+    // The report is downgraded to failed with the finding, never accepted, and the op comes back.
+    assert.equal(op.reports[0].outcome,'done');
+    assert.equal(op.reports[0].downgradedTo,'failed');
+    const retried=log.find(event=>event.event==='retry'&&event.op===nodeId);
+    assert.match(retried.findings[0],/^operation modified kernel-owned ledger paths: \.starciwork\/features\/sales/);
+    assert.ok(log.findIndex(event=>event.event==='kernel-paths-modified')<log.findIndex(event=>event.event==='op-done'),
+      'the revert happened before anything was accepted');
+    // The forgery was taken back out, and the second attempt is the one the kernel accepted.
+    assert.equal(fs.readFileSync(nodeFile,'utf8').includes(forgery),false);
+    assert.equal(op.status,'done');assert.equal(op.attempt,2);
+    assert.equal(harness.read(nodeId).state,'done');
+    assert.equal(harness.read(nodeId).extensions.work3.kernel.verifiedBy,'starci-kernel');
+  }finally{harness.cleanup();}
+});
+
+test('changedFiles never carries a kernel-owned path, even when the allowlist is the whole feature folder',()=>{
+  const ledger='.starciwork/features/sales/implementation/backend/intake';
+  const git=fakeGit([`${ledger}/index.yaml`,`${ledger}/evidence/run-1/manifest.yaml`,'.starciwork/features/sales/notes.md']).git;
+  const state={worktree:cwd},op={allowlist:['.starciwork/features/sales/**']};
+  assert.equal(changedFiles(state,op,{git}).length,3);
+  assert.deepEqual(changedFiles(state,op,{git},op.allowlist,{exclude:[`${ledger}/index.yaml`,`${ledger}/evidence/**`]}),
+    ['.starciwork/features/sales/notes.md']);
+});
+
+/* ------------------------------------------------------------------ shared-change discipline */
+
+const sharedPlan={definitionOfDone:['the slice works'],
+  ledger:[{id:'goal-1',title:'Sales slice',inputRef:'sds:3',status:'absent'}],
+  ops:['a','b','c','d','e','f'].map(name=>({id:`op-${name}`,kind:'backend.implement',goal:`Implement ${name}.`,
+    ledgerIds:['goal-1'],allowlist:[`apps/web/src/${name}/index.ts`],references:['sds.md'],
+    checks:[{name:'unit',command:`npx vitest run ${name}`}],acceptance:[`${name} works`],dependsOn:[]}))};
+
+test('a shared change must name its paths, is deduped by path set, is capped per iteration, and pauses its requester until it is done',()=>{
+  const harness=setup({plan:sharedPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state,{allowDynamic:9});
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    harness.state.iterations=1;
+    const guards=stubGuards();
+    const ctx={cwd,allocator:harness.allocator,guards,git:harness.git.git,exec:()=>({status:0,stdout:'',stderr:''}),
+      now:()=>0,work:null,wait:noWait,decide:()=>{throw Error('a shared change is not a decision');}};
+    const block=(id,detail)=>{
+      const op=running(harness.state,id,`ctx_${id}`);
+      const report=buildReport({outcome:'blocked',run:'run_wf',task:`task_${id}`,dispatch:op.dispatch,from:op.terminal,
+        summary:`${id} cannot make the change alone.`,blocker:{kind:'shared-change',detail}});
+      report.sent={messageId:`msg_${id}`,sentAt:1,type:report.signal.type};
+      return applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,ctx);
+    };
+    const op=id=>harness.state.ops.find(item=>item.id===id);
+    // One concrete path set becomes one shared op, and the requester is paused - never pending, never rescheduled.
+    assert.equal(block('op-a','packages/contracts/widget.ts must register the entity'),'shared-change');
+    const shared=op('shared-1');
+    assert.equal(shared.origin,'shared');
+    assert.deepEqual(shared.allowlist,['packages/contracts/widget.ts']);
+    assert.deepEqual(shared.requesters,['op-a']);
+    assert.equal(op('op-a').status,'paused');
+    assert.equal(op('op-a').waitingFor,'shared-1');
+    // A path-prefix overlap merges into the existing shared op and appends the requester.
+    assert.equal(block('op-b','packages/contracts/** must expose the same entity'),'shared-change-merged');
+    assert.deepEqual(shared.requesters,['op-a','op-b']);
+    assert.deepEqual(shared.allowlist,['packages/contracts/widget.ts','packages/contracts/**']);
+    assert.equal(harness.state.ops.filter(item=>item.origin==='shared').length,1);
+    // Distinct path sets get their own shared ops, up to three in one iteration.
+    assert.equal(block('op-c','libs/telemetry/trace.ts needs the span'),'shared-change');
+    assert.equal(block('op-d','src/shared/env.ts needs the flag'),'shared-change');
+    assert.equal(block('op-e','apps/api/src/registry.ts needs the route'),'shared-change-deferred');
+    assert.deepEqual(harness.state.ops.filter(item=>item.origin==='shared').map(item=>item.id),['shared-1','shared-2','shared-3']);
+    assert.equal(op('op-e').status,'paused');
+    assert.equal(op('op-e').waitingFor,null);
+    assert.deepEqual(harness.state.sharedQueue.map(item=>item.op),['op-e']);
+    // The cap is per iteration: the queued request waits while the iteration is full, then becomes its own op.
+    assert.deepEqual(drainSharedQueue(harness.store,harness.state),[]);
+    assert.deepEqual(harness.state.sharedQueue.map(item=>item.op),['op-e']);
+    harness.state.iterations=2;
+    assert.deepEqual(drainSharedQueue(harness.store,harness.state),['shared-4']);
+    assert.deepEqual(harness.state.sharedQueue,[]);
+    assert.equal(op('op-e').waitingFor,'shared-4');
+    assert.deepEqual(op('shared-4').allowlist,['apps/api/src/registry.ts']);
+    // A shared-change block that names no path is a question to the kernel, answered in the operation's terminal.
+    assert.equal(block('op-f','the core module has to register it first'),'shared-change-unnamed');
+    assert.equal(op('op-f').status,'answering');
+    assert.match(op('op-f').answer,/[Nn]ame the exact paths/);
+    assert.equal(harness.state.ops.filter(item=>item.origin==='shared').length,4);
+    // A paused requester returns to ready only when its shared op is done, carrying the head that proves it.
+    Object.assign(op('shared-1'),{status:'done',head:'def5678'});
+    assert.deepEqual(resumePaused(harness.store,harness.state).sort(),['op-a','op-b']);
+    assert.equal(op('op-a').status,'ready');
+    assert.equal(op('op-a').attempt,2);
+    assert.deepEqual(op('op-a').priorOpen,['shared change shared-1 done at def5678']);
+    // A shared op that ends blocked blocks its requesters instead of leaving them paused forever.
+    op('shared-2').status='blocked';
+    resumePaused(harness.store,harness.state);
+    assert.equal(op('op-c').status,'blocked');
+    assert.match(harness.state.needUser.find(item=>item.op==='op-c').detail,/waits for the shared change shared-2, which is blocked/);
+    const log=events(harness.store).map(event=>event.event);
+    for(const name of ['shared-change-merged','shared-change-deferred','op-paused','shared-change-unnamed','shared-change-resumed','shared-change-blocked'])
+      assert.ok(log.includes(name),`the log records ${name}`);
+  }finally{harness.cleanup();}
+});
+
+/* ------------------------------------------------------------------ the dynamic-op gate */
+
+test('an operation created at run time past the dynamic budget, or wholly outside the approved scope, becomes a needUser item instead of running',()=>{
+  const file='apps/agentos-controlplane/src/sales/intake.ts';
+  const harness=setup({plan:salesPlan,dirty:[file],
+    scripts:{'op-intake':[{outcome:'done',summary:'Intake done.',files:[file],checks:[passing('unit','npx vitest run sales')]}],
+      'verify-1':[{outcome:'partial',summary:'Review round 1 rejected the work.',files:[],
+        checks:[passing('review','npx vitest run sales')],open:[`${file} does not persist the receipt`]}]}});
+  try{
+    assert.equal(harness.state.dynamicOpsBudget,DYNAMIC_OPS_BUDGET);
+    const approved=approve(harness.store,harness.state,{allowDynamic:1});
+    assert.equal(approved.dynamicOpsBudget,1);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:20,guards:stubGuards()});
+    // The review was the one dynamic op the budget allowed; the repair it asked for is refused, not run.
+    const refused=state.ops.find(item=>item.origin==='repair');
+    assert.equal(refused.status,'blocked');
+    assert.equal(refused.refusal,'dynamic-op');
+    assert.equal(refused.runtime,null);
+    const event=events(harness.store).find(item=>item.event==='dynamic-op-refused');
+    assert.equal(event.op,refused.id);
+    assert.match(event.reason,/beyond the dynamic-op budget of 1/);
+    assert.match(state.needUser.find(item=>item.kind==='dynamic-op').detail,/--allow-dynamic/);
+    assert.equal(state.finished.outcome,'blocked');
+    // The user raising the budget reinstates exactly the ops the gate refused.
+    const raised=approve(harness.store,harness.state,{allowDynamic:9});
+    assert.equal(raised.dynamicOpsBudget,9);
+    assert.equal(state.ops.find(item=>item.origin==='repair').status,'pending');
+    assert.equal(state.needUser.some(item=>item.kind==='dynamic-op'),false);
+  }finally{harness.cleanup();}
+  // Scope is the second bound: a run-time op whose whole allowlist is outside the approved feature folders waits.
+  const scoped=setup({plan:salesPlan,dirty:['apps/agentos-controlplane/src/sales/intake.ts'],
+    scripts:{'op-intake':[{outcome:'done',summary:'Intake done.',files:['apps/agentos-controlplane/src/sales/intake.ts'],
+      checks:[passing('unit','npx vitest run sales')]}]}});
+  try{
+    approve(scoped.store,scoped.state);
+    scoped.state.scope=['payments'];
+    scoped.state.run='run_wf';scoped.state.from='term_kernel';
+    const state=scoped.run({maxIterations:6,guards:stubGuards()});
+    const refused=state.ops.find(item=>item.kind==='review.verify');
+    assert.equal(refused.status,'blocked');
+    const event=events(scoped.store).find(item=>item.event==='dynamic-op-refused');
+    assert.match(event.reason,/outside the approved scope payments/);
+    assert.equal(state.finished.outcome,'blocked');
+  }finally{scoped.cleanup();}
+});
+
+/* ------------------------------------------------------------------ resource locks, the git queue, the preflight */
+
+test('two operations that need the same resource never run at once, the contract lists the locks, and the gates run with nothing running',()=>{
+  const file=name=>`apps/agentos-controlplane/src/${name}/index.ts`;
+  const plan={definitionOfDone:['both slices work'],ledger:[{id:'goal-1',title:'Sales slice',inputRef:'sds:3',status:'absent'}],
+    ops:['intake','receipt'].map(name=>({id:`op-${name}`,kind:'backend.implement',goal:`Implement ${name}.`,ledgerIds:['goal-1'],
+      allowlist:[file(name)],references:['sds.md'],resources:['postgres'],
+      checks:[{name:'integration',command:`npx vitest run ${name}`}],acceptance:[`${name} works`],dependsOn:[]}))};
+  const done=name=>({outcome:'done',summary:`${name} done.`,files:[file(name)],checks:[passing('integration',`npx vitest run ${name}`)]});
+  const gateRuns=[];
+  const harness=setup({plan,gates:['unit=npm test'],dirty:[file('intake'),file('receipt')],
+    scripts:{'op-intake':[done('intake')],'op-receipt':[done('receipt')],
+      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('integration','npx vitest run intake')]}]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({guards:stubGuards(),exec:command=>{
+      // The job gates are the kernel's own commands and are never run beside a live operation.
+      if(command==='npm test')gateRuns.push(harness.state.ops.filter(op=>op.status==='running').map(op=>op.id));
+      return {status:0,stdout:`${command} ok`,stderr:''};
+    }});
+    const log=events(harness.store);
+    const deferred=log.find(event=>event.event==='schedule-deferred'&&/resource lock/.test(event.reason));
+    assert.ok(deferred,'the second operation was deferred by the resource lock');
+    assert.deepEqual(deferred.resources,['postgres']);
+    assert.equal(deferred.clashes.length,1);
+    const launches=log.filter(event=>event.event==='launched').map(event=>event.op);
+    const waits=log.filter(event=>event.event==='wait');
+    assert.deepEqual(launches.slice(0,2),['op-intake','op-receipt']);
+    assert.ok(log.findIndex(event=>event.event==='launched'&&event.op==='op-receipt')>log.indexOf(waits[0]),
+      'the second operation launched only after a wait, never beside the first');
+    const contract=fs.readFileSync(harness.store.contractPath('op-intake'),'utf8');
+    assert.match(contract,/## Resources/);
+    assert.match(contract,/- `postgres`/);
+    assert.ok(gateRuns.length>=1,'the gates ran');
+    for(const snapshot of gateRuns.filter(Array.isArray))assert.deepEqual(snapshot,[],'a gate ran while an operation was running');
+    assert.equal(state.finished.outcome,'done');
+  }finally{harness.cleanup();}
+});
+
+test('the preflight runs once at the start, its problems become needUser items, and every kernel git mutation goes through the queue',()=>{
+  const file='apps/agentos-controlplane/src/sales/intake.ts';
+  const harness=setup({plan:salesPlan,dirty:[file],
+    scripts:{'op-intake':[{outcome:'done',summary:'Intake done.',files:[file],checks:[passing('unit','npx vitest run sales')]}],
+      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('review','npx vitest run sales')]}]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const order=[];
+    const guards=stubGuards({
+      preflight:()=>({ok:false,fixes:['set core.longpaths true so a deep evidence path can be written'],
+        problems:['the pre-commit secrets guard does not honour ALLOW_SECRET_SCAN']}),
+      gitQueue:fn=>{order.push('queue-enter');try{return fn();}finally{order.push('queue-exit');}}
+    });
+    const state=harness.run({guards,git:(executable,args)=>{order.push(args[0]);return harness.git.git(executable,args);}});
+    const preflight=events(harness.store).filter(event=>event.event==='preflight');
+    assert.equal(preflight.length,1,'the preflight is one call per run, not one per iteration');
+    assert.equal(preflight[0].ok,false);
+    assert.deepEqual(preflight[0].fixes,['set core.longpaths true so a deep evidence path can be written']);
+    assert.equal(state.preflight.problems.length,1);
+    assert.deepEqual(state.needUser.filter(item=>item.kind==='environment').map(item=>item.detail),
+      ['the pre-commit secrets guard does not honour ALLOW_SECRET_SCAN']);
+    // The operation commit is one serialized block: nothing else touches the index inside it.
+    const add=order.indexOf('add');
+    assert.deepEqual(order.slice(add-1,add+4),['queue-enter','add','commit','rev-parse','queue-exit']);
+    assert.equal(state.finished.outcome,'blocked','a preflight problem the kernel cannot fix stops the workflow at the user');
+  }finally{harness.cleanup();}
+});
+
+/* ------------------------------------------------------------------ run binding and inferred rate limits */
+
+test('a kernel that already has its run records run-resumed; only a real bind records run-bound',()=>{
+  const repo=tmp();
+  spawnSync('git',['init','--quiet'],{cwd:repo,encoding:'utf8',windowsHide:true});
+  const functions={assessGoal:()=>({ok:true,provider:'fake',value:salesPlan}),extractMaterial:()=>[]};
+  const {orca}=scriptedOrca({reportsDir:path.join(repo,'reports'),scripts:{}});
+  try{
+    const host=path.resolve('.');
+    const resumedGoal=kernelMain('workflow-goal',{job:'Resume the sales slice',host},{orca,cwd:repo,functions});
+    kernelMain('workflow-approve',{id:resumedGoal.id},{orca,cwd:repo});
+    kernelMain('workflow-run',{id:resumedGoal.id,from:'term_kernel',run:'run_wf','max-iterations':'0'},{orca,cwd:repo,functions});
+    const resumedEvents=createStore({repoRoot:repo,id:resumedGoal.id}).readEvents().map(event=>event.event);
+    assert.ok(resumedEvents.includes('run-resumed'));
+    assert.equal(resumedEvents.includes('run-bound'),false);
+    const boundGoal=kernelMain('workflow-goal',{job:'Bind the sales slice',host},{orca,cwd:repo,functions});
+    kernelMain('workflow-approve',{id:boundGoal.id},{orca,cwd:repo});
+    kernelMain('workflow-run',{id:boundGoal.id,from:'term_kernel','max-iterations':'0'},{orca,cwd:repo,functions});
+    const boundEvents=createStore({repoRoot:repo,id:boundGoal.id}).readEvents().map(event=>event.event);
+    assert.ok(boundEvents.includes('run-bound'));
+    assert.equal(boundEvents.includes('run-resumed'),false);
+  }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+});
+
+test('two silent stalls of one runtime inside half an hour are inferred as a rate limit and reported to the allocator',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const failed=[];
+    const allocator={...harness.allocator,failed:(runtime,info)=>failed.push([runtime,info?.reason??null])};
+    let clock=0;
+    const ctx={cwd,allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>clock,work:null};
+    const silence=dispatch=>{
+      running(harness.state,'op-intake',dispatch);
+      settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch,liveness:'stalled-silent'}]});
+    };
+    silence('ctx_s1');
+    assert.deepEqual(failed,[],'one silence is a stall, not a rate limit');
+    clock=10*60*1000;
+    silence('ctx_s2');
+    assert.deepEqual(failed,[['qwen3.8-flash','rate-limited (inferred from repeated silence)']]);
+    const inferred=events(harness.store).find(event=>event.event==='rate-limit-inferred');
+    assert.equal(inferred.runtime,'qwen3.8-flash');
+    assert.equal(inferred.windowMs,30*60*1000);
+    assert.deepEqual(harness.state.silences['qwen3.8-flash'],[],'the window is cleared, so the inference needs two fresh silences');
+    assert.ok(harness.state.ops[0].avoidRuntimes.includes('qwen3.8-flash'));
+    clock=60*60*1000;
+    silence('ctx_s3');
+    assert.equal(failed.length,1,'a silence outside the window does not infer a second rate limit');
+  }finally{harness.cleanup();}
+});
+
+test('the kernel defaults to the real guard module when it is on disk',()=>{
+  assert.equal(typeof kernelGuards.protectedPaths,'function');
+  assert.equal(kernelGuards.gitQueue(()=>7),7);
+  assert.deepEqual(kernelGuards.resourceLocks({kind:'backend.implement',resources:['postgres'],checks:[]}),['postgres']);
+  assert.equal(kernelGuards.resourcesClash({resources:['docker']},{resources:['docker']}),true);
+  assert.equal(kernelGuards.resourcesClash({resources:['docker']},{resources:['postgres']}),false);
 });

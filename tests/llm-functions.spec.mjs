@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {GOAL_FORM,GOAL_PLAN,assessGoal,extractCodex,extractMaterial,renderGoalMarkdown,validateGoalPlan} from '../execution/llm-functions.mjs';
+import {DECISION_FORM,GOAL_FORM,GOAL_PLAN,assessGoal,callFunction,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan} from '../execution/llm-functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
   references:['.starciwork/features/sales/sds.md#3'],checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:[`${id} works`],dependsOn:[],...extra});
@@ -121,6 +121,51 @@ test('extractCodex returns the last assistant message of a JSONL stream and fall
   assert.equal(extractCodex('{"type":"item.completed","item":{"type":"agent_message","text":"only one"}}\n'),'only one');
   assert.equal(extractCodex('{"type":"turn.completed"}\n{"odd":"shape"}'),'{"odd":"shape"}');
   assert.equal(extractCodex(''),'');
+});
+
+test('each provider envelope is read for what the call cost, and nothing is invented when it reports none',()=>{
+  // Claude: one envelope with `usage` and the priced total. Cache reads and writes are billed as input.
+  const claude=JSON.stringify({type:'result',is_error:false,result:'{"option":"a"}',
+    usage:{input_tokens:120,output_tokens:30,cache_read_input_tokens:400,cache_creation_input_tokens:100},total_cost_usd:0.0123});
+  assert.deepEqual(usageClaude(claude),{input:620,output:30,total:650,cost:0.0123});
+  assert.equal(usageClaude(JSON.stringify({type:'result',result:'{}'})),null);
+  assert.equal(usageClaude('not json'),null);
+
+  // Qwen: a final `stats` tree with one token block per model, or a per-event `usage`, or neither.
+  const qwenStats=JSON.stringify([{type:'result',result:'{"a":1}'},
+    {type:'stats',stats:{models:{'qwen3.8-flash':{api:{totalRequests:3},tokens:{prompt:200,candidates:50,total:250,cached:0}}},tools:{totalCalls:4}}}]);
+  assert.deepEqual(usageQwen(qwenStats),{input:200,output:50,total:250,cost:null});
+  assert.deepEqual(usageQwen(JSON.stringify([{type:'result',result:'x',usage:{input_tokens:10,output_tokens:2}}])),{input:10,output:2,total:12,cost:null});
+  assert.equal(usageQwen(JSON.stringify([{type:'result',result:'x'}])),null);
+  assert.equal(usageQwen('not json'),null);
+
+  // Codex: `token_count` carries a cumulative total, so the last one wins; per-turn `usage` events are summed.
+  const codexCounts=[
+    '{"type":"token_count","info":{"total_token_usage":{"input_tokens":900,"output_tokens":120,"total_tokens":1020},"last_token_usage":{"input_tokens":100,"output_tokens":20}}}',
+    '{"type":"token_count","info":{"total_token_usage":{"input_tokens":1800,"output_tokens":240,"total_tokens":2040},"last_token_usage":{"input_tokens":900,"output_tokens":120}}}'
+  ].join('\n');
+  assert.deepEqual(usageCodex(codexCounts),{input:1800,output:240,total:2040,cost:null});
+  assert.deepEqual(usageCodex('{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}\n{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}'),
+    {input:20,output:10,total:30,cost:null});
+  assert.equal(usageCodex('{"type":"thread.started","thread_id":"t1"}\nnot json'),null);
+  assert.equal(usageCodex(''),null);
+});
+
+test('a call charges every attempt it paid for, and a plain string runner simply has no usage to charge',()=>{
+  const form={...DECISION_FORM,option:{type:'string',enum:['a']}};
+  const answers=[{text:'{}',usage:{input:10,output:2,total:12,cost:null}},
+    {text:JSON.stringify({option:'a',rationale:'because'}),usage:{input:20,output:5,total:25,cost:0.01}}];
+  const charged=callFunction({kind:'decide',payload:{},form,providers:['claude-opus'],runHeadless:()=>answers.shift()});
+  assert.equal(charged.ok,true);
+  assert.equal(charged.attempt,1);
+  // The invalid first try is paid for too: the kernel charges the runtime the whole call, not only its last try.
+  assert.deepEqual(charged.usage,{input:30,output:7,total:37,cost:0.01});
+  // An exhausted chain still reports what it spent, so a failed call is not a free call.
+  const failed=callFunction({kind:'decide',payload:{},form,providers:['claude-opus'],retries:0,
+    runHeadless:()=>({text:'{}',usage:{input:4,output:1,total:5,cost:null}})});
+  assert.equal(failed.ok,false);
+  assert.deepEqual(failed.usage,{input:4,output:1,total:5,cost:null});
+  assert.equal(callFunction({kind:'decide',payload:{},form,providers:['claude-opus'],runHeadless:()=>JSON.stringify({option:'a',rationale:'r'})}).usage,null);
 });
 
 test('the goal-plan schema file documents the form the runtime validates',()=>{

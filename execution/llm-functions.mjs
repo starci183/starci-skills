@@ -15,10 +15,10 @@ const need=(condition,message)=>{if(!condition)throw Error(message);};
 
 /** Headless provider commands. The prompt goes on stdin; the JSON answer is extracted from the provider's own envelope. */
 export const HEADLESS_PROVIDERS={
-  'claude-opus':{command:['claude','-p','--output-format','json','--model','opus'],extract:extractClaude},
-  'claude-fable-5.1':{command:['claude','-p','--output-format','json','--model','claude-fable-5-1'],extract:extractClaude},
-  'qwen3.8-flash':{command:['qwen','--model','qwen3.8-flash','--approval-mode','yolo','--output-format','json','--exclude-tools','agent'],extract:extractQwen},
-  'gpt-5.6-sol':{command:['codex','exec','--json','--model','gpt-5.6-sol'],extract:extractCodex}
+  'claude-opus':{command:['claude','-p','--output-format','json','--model','opus'],extract:extractClaude,usage:usageClaude},
+  'claude-fable-5.1':{command:['claude','-p','--output-format','json','--model','claude-fable-5-1'],extract:extractClaude,usage:usageClaude},
+  'qwen3.8-flash':{command:['qwen','--model','qwen3.8-flash','--approval-mode','yolo','--output-format','json','--exclude-tools','agent'],extract:extractQwen,usage:usageQwen},
+  'gpt-5.6-sol':{command:['codex','exec','--json','--model','gpt-5.6-sol'],extract:extractCodex,usage:usageCodex}
 };
 /** A provider that refuses with a quota signal is not broken: the chain moves on without retrying it. */
 export const RATE_LIMITED=/429|rate.?limit|too many requests|overloaded/i;
@@ -57,6 +57,84 @@ function codexText(value){
   if(Array.isArray(value))return value.map(codexText).filter(Boolean).join('\n');
   if(plain(value))return codexText(value.text??value.content??'');
   return '';
+}
+
+/**
+ * Token accounting. Every provider prints what the call cost, in its own shape and under its own key names;
+ * the runtime needs one number per call so the allocator can charge a day's budget (`usage.total` is what
+ * `release(runtime, {tokens})` takes). Usage is telemetry, never a contract: a provider that reports nothing
+ * yields `null` and the answer still stands.
+ */
+const INPUT_KEYS=['input_tokens','inputTokens','prompt_tokens','promptTokens','promptTokenCount','prompt','input'];
+const OUTPUT_KEYS=['output_tokens','outputTokens','completion_tokens','completionTokens','candidatesTokenCount','candidates','output'];
+const TOTAL_KEYS=['total_tokens','totalTokens','totalTokenCount','total'];
+const COST_KEYS=['total_cost_usd','cost_usd','costUsd','cost'];
+const TOKEN_NODES=['usage','stats','tokens','token_count','token_usage','total_token_usage'];
+const pickNumber=(source,keys)=>{for(const key of keys){const value=Number(source?.[key]);if(Number.isFinite(value))return value;}return null;};
+const hasTokens=block=>plain(block)&&[INPUT_KEYS,OUTPUT_KEYS,TOTAL_KEYS].some(keys=>pickNumber(block,keys)!==null);
+/** One usage record: input, output, their total (or the provider's own total) and the cost when one is priced. */
+export function tokenUsage({input=null,output=null,total=null,cost=null}={}){
+  if([input,output,total,cost].every(value=>value===null))return null;
+  const sum=total??((input??0)+(output??0));
+  return {input:input??0,output:output??0,total:Number.isFinite(sum)?sum:0,cost:cost===null?null:cost};
+}
+const fromBlock=block=>hasTokens(block)?tokenUsage({input:pickNumber(block,INPUT_KEYS),output:pickNumber(block,OUTPUT_KEYS),total:pickNumber(block,TOTAL_KEYS),cost:pickNumber(block,COST_KEYS)}):null;
+/** Sum usage records across attempts and providers; `null` stays `null` until one provider reports something. */
+export function addUsage(total,next){
+  if(!next)return total;
+  const base=total??{input:0,output:0,total:0,cost:null};
+  const cost=next.cost===null?base.cost:(base.cost??0)+next.cost;
+  return {input:base.input+(next.input??0),output:base.output+(next.output??0),total:base.total+(next.total??0),cost};
+}
+const parseOrNull=text=>{try{return JSON.parse(text);}catch{return null;}};
+
+/** Claude prints one envelope with `usage` and the priced total. Cache reads and writes are billed as input. */
+export function usageClaude(stdout){
+  const envelope=parseOrNull(stdout);
+  if(!plain(envelope))return null;
+  const usage=plain(envelope.usage)?envelope.usage:{};
+  const cached=['cache_creation_input_tokens','cache_read_input_tokens'].map(key=>Number(usage[key])).filter(Number.isFinite);
+  const input=pickNumber(usage,INPUT_KEYS);
+  const cost=pickNumber(envelope,COST_KEYS)??pickNumber(usage,COST_KEYS);
+  if(input===null&&pickNumber(usage,OUTPUT_KEYS)===null&&cost===null)return null;
+  return tokenUsage({input:input===null&&!cached.length?null:(input??0)+cached.reduce((a,b)=>a+b,0),output:pickNumber(usage,OUTPUT_KEYS),cost});
+}
+
+/** Qwen reports either a per-event `usage` object or a final `stats` tree with one token block per model. */
+export function usageQwen(stdout){
+  const parsed=parseOrNull(stdout);
+  if(parsed===null)return null;
+  const blocks=tokenBlocks(parsed);
+  const leaves=blocks.filter(block=>block.name==='tokens');
+  const chosen=leaves.length?leaves:blocks;
+  return chosen.reduce((total,block)=>addUsage(total,fromBlock(block.value)),null);
+}
+/** Every named token node that actually carries numbers, without descending into one that already does. */
+function tokenBlocks(value,name=null,found=[]){
+  if(Array.isArray(value)){for(const item of value)tokenBlocks(item,name,found);return found;}
+  if(!plain(value))return found;
+  if(TOKEN_NODES.includes(name)&&hasTokens(value)){found.push({name,value});return found;}
+  for(const [key,inner] of Object.entries(value))tokenBlocks(inner,key,found);
+  return found;
+}
+
+/**
+ * Codex streams JSONL: `token_count` carries a cumulative `total_token_usage`, while a per-turn `usage` is one
+ * turn only. The cumulative number wins when it is present; otherwise the per-turn records are summed.
+ */
+export function usageCodex(stdout){
+  let cumulative=null,perTurn=null;
+  for(const line of String(stdout??'').split(/\r?\n/)){
+    const event=parseOrNull(line.trim());
+    if(!plain(event))continue;
+    for(const candidate of [event,event.info,event.msg,event.item,event.response]){
+      if(!plain(candidate))continue;
+      if(hasTokens(candidate.total_token_usage))cumulative=fromBlock(candidate.total_token_usage);
+      else if(hasTokens(candidate.usage))perTurn=addUsage(perTurn,fromBlock(candidate.usage));
+      else if(hasTokens(candidate.token_usage))perTurn=addUsage(perTurn,fromBlock(candidate.token_usage));
+    }
+  }
+  return cumulative??perTurn;
 }
 
 /** Pull the first JSON object out of free text (models wrap answers in fences or prose). */
@@ -119,8 +197,12 @@ function frame(kind,payload,form){
   ].join('\n');
 }
 
-/** Run one headless provider with a prompt on stdin; returns the raw answer text. */
-export function runHeadless(provider,prompt,{cwd,timeoutMs=600000,spawn=spawnSync}={}){
+/**
+ * Run one headless provider with a prompt on stdin; returns the answer text and what the call cost. Usage is
+ * read from the same stdout the answer came from, and a provider that reports none yields `usage:null` rather
+ * than failing a valid answer.
+ */
+export function runHeadlessWithUsage(provider,prompt,{cwd,timeoutMs=600000,spawn=spawnSync}={}){
   const spec=HEADLESS_PROVIDERS[provider];
   need(spec,`Unknown headless provider: ${provider}`);
   const [executable,...args]=spec.command;
@@ -130,30 +212,45 @@ export function runHeadless(provider,prompt,{cwd,timeoutMs=600000,spawn=spawnSyn
     if(RATE_LIMITED.test(output))throw Error(`rate-limited: ${provider} refused with a quota signal: ${output.trim().slice(-200)}`);
     need(false,`${provider} headless exited ${result.status}: ${(result.stderr??'').slice(-400)}`);
   }
-  try{return spec.extract(result.stdout);}
+  let text;
+  try{text=spec.extract(result.stdout);}
   catch(error){
     if(RATE_LIMITED.test(error.message))throw Error(`rate-limited: ${provider} answered with a quota signal: ${error.message}`);
     throw error;
   }
+  let usage=null;
+  try{usage=spec.usage?spec.usage(result.stdout):null;}catch{usage=null;}
+  return {text,usage};
 }
 
-/** Call a model function over a provider chain with validation and one retry per provider; `extra` adds cross-field rules. */
-export function callFunction({kind,payload,form,providers,cwd,runHeadless:run=runHeadless,retries=1,extra}){
+/** The string-returning call every existing caller uses; the usage of that same call is read by `callFunction`. */
+export function runHeadless(provider,prompt,options={}){return runHeadlessWithUsage(provider,prompt,options).text;}
+
+/**
+ * Call a model function over a provider chain with validation and one retry per provider; `extra` adds
+ * cross-field rules. `usage` is the sum over every attempt the call paid for, including the invalid ones: the
+ * kernel charges the whole call to the runtime that ran it, not only its last try.
+ */
+export function callFunction({kind,payload,form,providers,cwd,runHeadless:run=runHeadlessWithUsage,retries=1,extra}){
   const attempts=[];
+  let usage=null;
   for(const provider of providers){
     for(let attempt=0;attempt<=retries;attempt+=1){
-      let answer;
-      try{answer=run(provider,frame(kind,payload,form)+(attempt?`\nYour previous answer was invalid: ${attempts.at(-1).errors.join('; ')}. Answer again with the full JSON object.`:''),{cwd});}
+      let answered;
+      try{answered=run(provider,frame(kind,payload,form)+(attempt?`\nYour previous answer was invalid: ${attempts.at(-1).errors.join('; ')}. Answer again with the full JSON object.`:''),{cwd});}
       catch(error){attempts.push({provider,attempt,errors:/^rate-limited:/.test(error.message)?['rate-limited']:[error.message]});break;}
+      // A caller may inject a plain string-returning runner; then the call simply has no usage to charge.
+      const answer=typeof answered==='string'?answered:answered?.text;
+      if(typeof answered!=='string')usage=addUsage(usage,answered?.usage??null);
       let parsed;
       try{parsed=extractJson(answer);}catch(error){attempts.push({provider,attempt,errors:[error.message]});continue;}
       const checked=validateForm(parsed,form);
       const errors=checked.ok?(extra?extra(parsed).errors??[]:[]):checked.errors;
-      if(!errors.length)return {ok:true,provider,attempt,value:parsed,attempts};
+      if(!errors.length)return {ok:true,provider,attempt,value:parsed,attempts,usage};
       attempts.push({provider,attempt,errors});
     }
   }
-  return {ok:false,attempts,reason:'no provider produced a valid form'};
+  return {ok:false,attempts,usage,reason:'no provider produced a valid form'};
 }
 
 /** planOp: fill the input form of one operation node from SRS/SDS material and prior reports. */

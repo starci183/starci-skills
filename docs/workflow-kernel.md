@@ -9,10 +9,13 @@ Entry points are the canonical launcher's four commands, which route straight in
 
 ```
 orca-supervised-launch.mjs workflow-goal    --job <text> [--inputs a,b] [--gates name=command,...] [--ledger work|plan] [--scope f1,f2] [--id <id>]
-orca-supervised-launch.mjs workflow-approve --id <id>
+orca-supervised-launch.mjs workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>],...] [--allow-dynamic N]
 orca-supervised-launch.mjs workflow-run     --id <id> [--from <own terminal> --run <run>] [--launch-file <f>] [--max-iterations N]
 orca-supervised-launch.mjs workflow-status  --id <id>
 ```
+
+`--allow-dynamic N` raises this workflow's run-time operation budget (default `DYNAMIC_OPS_BUDGET` = 6) and
+reinstates the operations the dynamic-op gate refused. Re-approving is how a user answers that gate.
 
 All runtime state of one workflow lives in one directory (`execution/workflow-store.mjs`):
 `state.json` (atomic snapshot), `events.jsonl` (append-only audit), `goal.md` / `goal.json`, `contracts/`,
@@ -51,19 +54,30 @@ approved by the user, never verified by the kernel, and named as such in the fin
 
 **approval.** `approve` sets `state.approved`. This is the only human gate; nothing is launched before it.
 
-**`run`.** One iteration of `runLoop`:
+**`run`.** `runLoop` first runs the worktree **preflight** once (`kernel-guards.preflight`: `core.longpaths`,
+the hooks environment for the kernel's own commits, the recorded `autocrlf` state, the branch) and appends one
+`preflight` event; a fix it applied is recorded, a problem it cannot fix becomes a `needUser` item. Then, per
+iteration:
 
 1. **answer** every op waiting for an answer (`notifyTerminal`), then
-2. **review** - create a `review.verify` op for each ledger group whose implementing ops are all done, then
-3. **schedule** - every op whose `dependsOn` are done and whose allowlist does not overlap a running op's
-   allowlist, up to `allocator.maxParallelOps`, gets a runtime from `allocator.allocate(kind,{avoid})`, a
-   rendered contract, and a launch; then
-4. **wait** - one `waitTick` on the workflow run (it classifies every live op), then
-5. **accept** every report that arrived, then settle every op the tick found stalled or dead; and
-6. when nothing is left to run: **gates**, then the **final report**.
+2. **shared changes** - return every `paused` op whose shared op is `done` to `ready`, and create the shared
+   ops a full earlier iteration had to queue, then
+3. **review** - create a `review.verify` op for each ledger group whose implementing ops are all done, then
+4. **schedule** - every op whose `dependsOn` are done, whose allowlist does not overlap a running op's
+   allowlist and whose resource locks do not clash a running op's, up to `allocator.maxParallelOps`, gets a
+   runtime from `allocator.allocate(kind,{avoid})`, a rendered contract, and a launch; then
+5. **wait** - one `waitTick` on the workflow run (it classifies every live op), then
+6. **accept** every report that arrived, then settle every op the tick found stalled or dead; and
+7. when nothing is left to run: **gates**, then the **final report**.
 
 Every iteration appends a `tick` event and saves `state.json`, so re-running `workflow-run` continues the
-same workflow - the same counters, the same event log, the same ledger.
+same workflow - the same counters, the same event log, the same ledger. The first binding of the Orca run is
+the `run-bound` event; a kernel that already has its run (a resume, or a run handed in) appends `run-resumed`,
+because re-binding a Run would invalidate every live Dispatch on it.
+
+An op is `pending` -> `ready` -> `running` (`answering` while the kernel types an answer into its terminal,
+`paused` while it waits for a shared change) -> `done` | `blocked`. `paused` counts as live: a job never
+finishes while an op is waiting for someone else's change.
 
 A ledger item moves `planned` -> `implemented` (an op's reproduced `done` was committed) -> `verified` (an
 independent review accepted it); `preexisting` is the fourth state, for an item the approved plan reported as
@@ -98,7 +112,11 @@ report - is this code.
 | `partial` | resume the same op (`attempt+1`, `priorOpen` = `open[]`) | 5, then `decide` |
 | `failed` | retry the same op with the failing checks as findings | 3, then `decide` (`retry-other-runtime` / `split` / `escalate-to-user`) |
 | `ask` | `decide` `answer` or `escalate-to-user`; an answer is typed into the op's terminal and its report file is kept aside so it can report once more | - |
-| `blocked` `shared-change` | create a new op for the paths named in the blocker; the blocked op depends on it and resumes afterwards | - |
+| `blocked` `shared-change` with paths | one shared op per distinct path set (a path-prefix overlap merges into the pending or running shared op and appends the requester); the requester is `paused` and returns to `ready` only when that op is `done`, carrying `priorOpen: ["shared change <op> done at <head>"]` | 3 new shared ops per iteration, the rest queued |
+| `blocked` `shared-change` naming no path | treated as an `ask` to the kernel: the op is answered in its terminal with "name the exact paths" and reports again | - |
+| a report whose op wrote a kernel-owned path | `revertProtected`, report downgraded to `failed` with the finding `operation modified kernel-owned ledger paths: <paths>`, op retried | retry bound |
+| an op created at run time past `state.dynamicOpsBudget`, or whose whole allowlist is outside `state.scope` | the op is created `blocked` and becomes a `needUser` item; `workflow-approve --allow-dynamic N` reinstates it | 6 dynamic ops per workflow |
+| two `stalled-silent` settlements of one runtime within 30 minutes | `allocator.failed(runtime,{reason:'rate-limited (inferred from repeated silence)'})` and a `rate-limit-inferred` event | the window is cleared after it fires |
 | `blocked` `sds-gap` | on the Work ledger: `markReopened` the architecture node the report names (or the one in the op's module) and create an `architecture.decide` op on that node's `index.yaml`, whose own check is that the Work tree still validates; `markDecided` settles it when the op is accepted. On a plan ledger: an `architecture.decide` op on the design inputs, re-planned with `planOp` afterwards. Either way the blocked op depends on it and resumes afterwards | - |
 | `blocked` `environment` / `authority` | `needUser`, op blocked | - |
 | review with findings | one `backend.implement` repair op on the files the findings name inside the group's allowlists, then a fresh review | 3 rounds per ledger group |
@@ -107,7 +125,38 @@ report - is this code.
 | nothing launchable and nothing running | `needUser`, stop `blocked` | 3 iterations |
 
 A review never runs on a runtime that implemented the ledger items it judges (`avoid`), and two ops whose
-allowlists overlap never run at the same time, so one worktree stays safe for a whole pool.
+allowlists overlap - or whose resource locks clash - never run at the same time, so one worktree stays safe
+for a whole pool.
+
+## The guards the kernel owes itself
+
+`execution/kernel-guards.mjs` is the only place these mechanical protections live; the kernel reaches every
+one of them through `ctx.guards` (default `kernelGuards`), so a host or a test can inject the contract, and a
+tree shipped without the module falls back to a minimal implementation of the same contract.
+
+| guard | what the kernel does with it |
+| --- | --- |
+| `protectedPaths(node, repoRoot)` | the node's `index.yaml` (where `state`, `completion` and `extensions.work3.kernel` live) and its `evidence/**`. Every contract of that node lists them under **Never touch (kernel-owned)**; `changedFiles` excludes them, so no operation commit can ever carry one. An op is granted one only when its own allowlist names that exact file - how an `architecture.decide` op authors the design body of its node - never through a directory glob |
+| `revertProtected(git, {cwd, paths})` | run before any machine verification. The kernel fingerprints those paths right after its own `markInProgress` write, so only the operation's edits are caught; a changed fingerprint is reverted and the report is downgraded to `failed` with the finding `operation modified kernel-owned ledger paths: <paths>`. A completion an agent writes itself is a claim, not a record |
+| `resourceLocks(op)` / `resourcesClash(a, b)` | the declared `op.resources` plus what the op's kind and check commands prove it reaches for (`postgres`, `e2e-runtime`, `docker`, `cluster`). The scheduler treats a clash exactly like an overlapping allowlist, and the contract renders them under **Resources** |
+| `gitQueue(fn)` | every git mutation the kernel makes - the op commit, the ledger commit, a protected-path revert - runs alone through this queue, because one worktree has one index |
+| `preflight({worktree, git})` | once at the start of `runLoop`: the fixes it applied and the problems it could not are one `preflight` event, `state.preflight`, and - for a problem - a `needUser` item |
+
+## Bounds on what a run may grow
+
+The kernel creates ops at run time (reviews, repairs, shared changes, design decisions, gate repairs, newly
+schedulable Work nodes). Two bounds keep that from drifting away from what the user approved:
+`state.dynamicOpsBudget` (6) caps how many run-time ops a workflow may create, and an op whose whole
+allowlist falls outside the approved `scope` is refused the same way - matched against the scope entries that
+name a path or a feature folder, since a scope given as a Work node id constrains the ledger and not a file
+path, and never against an op derived from a node the ledger already scoped. A refused op is still
+created - so the graph and the final report name it - but it is `blocked` with a `dynamic-op` entry in
+`needUser[]`, and `workflow-approve --id <id> --allow-dynamic N` is how the user lifts it.
+
+A shared change is the other growth path, and it is disciplined: the blocker must name concrete repository
+paths (one that names none is sent back to the operation as a question), identical and prefix-overlapping path
+sets share one op with every requester appended to it, at most three new shared ops are created per iteration,
+and a requester waits `paused` - never `pending`, so nothing reschedules it early.
 
 Anything the table cannot settle becomes an entry in `needUser[]`, and the workflow stops with outcome
 `blocked` and a `final-report.json` that says exactly what a human has to decide.
@@ -131,7 +180,9 @@ green slice over a ledger that does not say so. The most common refusal is hones
 write `done` unless a passing check proves every assertion the node authored.
 
 The op's own commit carries a `Work: <node id>` trailer; the kernel's ledger write is committed after it, in
-its own `work(<node id>): ...` commit scoped to that node's directory, so the tree is never left dirty.
+its own `work(<node id>): ...` commit scoped to that node's directory, so the tree is never left dirty. Both
+commits go through `gitQueue`, and the node's `index.yaml` and `evidence/**` are kernel-owned for the whole
+life of the op: see the guards above.
 
 ## The single-candidate launch
 
@@ -146,8 +197,9 @@ no profile for that operation is never chosen and then rejected.
 
 ## The operation contract
 
-`renderContract` owns every concrete value - goal, goal items, allowlist, references, inherited open items,
-findings, acceptance, the exact check commands, the checks file, the report command with `--reports-dir`.
+`renderContract` owns every concrete value - goal, goal items, allowlist, the kernel-owned paths the op may
+never touch, its resource locks, references, inherited open items, findings, acceptance, the exact check
+commands, the checks file, the report command with `--reports-dir`.
 The process prose (`## Cook until done`, `## Ping (mandatory)`, `## Never`) is reused verbatim from
 `docs/supervision-templates/op.md`, so one template serves every operation kind and no placeholder survives
 into a rendered contract.

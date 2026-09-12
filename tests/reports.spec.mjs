@@ -69,6 +69,14 @@ test('a live worker is classified from its screen, never from a fresh heartbeat'
   assert.equal(classifyWorker({screen:'Reading files...',terminal:term,now:1000+30*60*1000,stalledAfterMs:20*60*1000}).liveness,'stalled-silent');
   assert.equal(classifyWorker({screen:'',terminal:null,now:2000}).liveness,'dead');
   assert.equal(classifyWorker({screen:'❯',terminal:term,now:2000,reported:true}).liveness,'reported');
+  // classifyWorker is the protocol-side name for `observe`: it also names the family and that family's
+  // accepting keystroke, so the supervisor answers a dialog the way its provider expects (see
+  // tests/provider-observe.spec.mjs for the whole signature table).
+  const dialog=classifyWorker({screen:'Allow command `npm test`? (y/n)',terminal:term,now:2000});
+  assert.deepEqual([dialog.liveness,dialog.provider,dialog.answer],['stalled-prompt','codex','y']);
+  const qwen=classifyWorker({screen:'⠦ Thinking… (14s · esc to cancel)\nqwen3.8-flash (Token Plan Singapore)',terminal:term,now:2000});
+  assert.deepEqual([qwen.liveness,qwen.provider,qwen.answer],['working','qwen','1']);
+  assert.equal(classifyWorker({screen:'API Error: 429 rate_limit_error',terminal:term,now:2000}).liveness,'rate-limited');
 });
 
 test('wait tick acknowledges the previous batch, reads report files, classifies workers, sweeps and re-canonicalizes titles',()=>{

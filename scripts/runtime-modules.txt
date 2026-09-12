@@ -25,10 +25,13 @@ execution/supervision.mjs
 execution/orca-calls.mjs
 execution/orca-supervised-launch.mjs
 execution/orca-protocol.mjs
+execution/provider-observe.mjs
 execution/reports.mjs
 execution/llm-functions.mjs
 execution/workflow-store.mjs
 execution/workflow-kernel.mjs
+execution/kernel-guards.mjs
+execution/verify-proof.mjs
 execution/runtime-allocator.mjs
 execution/work-ledger.mjs
 execution/orca-adapter.mjs

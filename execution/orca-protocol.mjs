@@ -3,6 +3,7 @@ import path from 'node:path';
 import {getPath} from './orca-calls.mjs';
 import {buildReport,readReports,reportBody,reportPath,reportsDirectory,validateReport} from './reports.mjs';
 import {notifyTerminal,settleDispatch,sweepWorktree} from './orca-supervised-launch.mjs';
+import {DEFAULT_STALLED_AFTER_MS,observe} from './provider-observe.mjs';
 
 /**
  * The operation-side protocol on top of the typed Orca runner: `report` (one typed outcome, file first,
@@ -14,7 +15,6 @@ import {notifyTerminal,settleDispatch,sweepWorktree} from './orca-supervised-lau
 export const REPORT_RESULT='starci/orca-report-result@1';
 export const WAIT_TICK='starci/orca-wait-tick@1';
 export const BOUNDARY_TYPES='worker_done,question,escalation';
-const DEFAULT_STALLED_AFTER_MS=20*60*1000;
 export const DEFAULT_HEARTBEAT_GRACE_MS=10*60*1000;
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
@@ -53,21 +53,13 @@ export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome
 }
 
 const isLive=w=>['ready','running','starting'].includes(w.workerState)||(w.workerState==='unsupervised'&&['dispatched','pending','ready'].includes(w.dispatchStatus));
-const CLAUDE_BUSY=/esc to interrupt/i,CLAUDE_IDLE=/(^|\n)\s*❯\s*$/m,QWEN_BUSY=/esc to cancel/i,QWEN_IDLE=/Type your message/i,QWEN_PROMPT=/Allow execution|Waiting for user confirmation|\(y\/n\)/i;
 
-/** Classify one live worker from its screen and terminal metadata. */
-export function classifyWorker({screen,terminal,now,stalledAfterMs=DEFAULT_STALLED_AFTER_MS,reported=false}){
-  if(!terminal)return {liveness:'dead',reason:'terminal not listed'};
-  if(terminal.status&&/exited|closed/i.test(terminal.status))return {liveness:'dead',reason:`terminal ${terminal.status}`};
-  if(reported)return {liveness:'reported',reason:'report file present'};
-  const flat=String(screen??'');
-  if(QWEN_PROMPT.test(flat))return {liveness:'stalled-prompt',reason:'agent is waiting for an interactive confirmation'};
-  if(CLAUDE_BUSY.test(flat)||QWEN_BUSY.test(flat))return {liveness:'working',reason:'agent is running'};
-  if(CLAUDE_IDLE.test(flat)||QWEN_IDLE.test(flat))return {liveness:'stalled-idle',reason:'agent is idle at its prompt without a report'};
-  const last=Number(terminal.lastOutputAt??0);
-  if(last&&now-last>stalledAfterMs)return {liveness:'stalled-silent',reason:`no output for ${Math.round((now-last)/60000)} min`};
-  return {liveness:'working',reason:'recent output'};
-}
+/**
+ * Classify one live worker from its screen and terminal metadata. The signatures live with the provider
+ * adapters in `provider-observe.mjs`, so this is the protocol-side name for `observe`: the same verdict, plus
+ * the family that produced it and the keystroke that family's confirmation dialog accepts.
+ */
+export const classifyWorker=input=>observe(input);
 
 /**
  * One owned wait tick for a Run: blocking check (with the previous batch acknowledged), report-file scan,
@@ -127,12 +119,14 @@ function singleTick(orca,{cwd,run,from,timeoutMs,reportsDir,stalledAfterMs,heart
     // confirmation is answered by the supervisor ("allow once"), never left for a human. Only a prompt that
     // survives the answer is reported as stalled-prompt.
     if(verdict.liveness==='stalled-prompt'&&terminal){
-      const answered=orca.invoke('terminal-send',{terminal:handle,text:'1',enter:true},{cwd});
+      // The accepting keystroke belongs to the provider, not to the supervisor: Claude and Qwen number their
+      // choices, Codex and a shell answer `y`.
+      const answered=orca.invoke('terminal-send',{terminal:handle,text:verdict.answer??'1',enter:true},{cwd});
       wait(3000);
       const again=orca.invoke('terminal-read',{terminal:handle,screen:true},{cwd});
       const after=again.outcome==='ok'?(getPath(again.receipt,'result.terminal.tail')??[]).join('\n'):'';
-      const still=classifyWorker({screen:after,terminal,now:now(),stalledAfterMs});
-      approvals.push({dispatch:worker.dispatchId,terminal:handle,sent:answered.outcome,cleared:still.liveness!=='stalled-prompt'});
+      const still=classifyWorker({screen:after,terminal,now:now(),stalledAfterMs,provider:verdict.provider});
+      approvals.push({dispatch:worker.dispatchId,terminal:handle,provider:verdict.provider,answer:verdict.answer??'1',sent:answered.outcome,cleared:still.liveness!=='stalled-prompt'});
       verdict=still.liveness==='stalled-prompt'?{liveness:'stalled-prompt',reason:'confirmation prompt survived an allow-once answer'}:{liveness:'working',reason:'confirmation prompt answered by the supervisor'};
     }
     // No ping inside the grace window and no visible activity: the worker is polled and reported as silent.
@@ -148,10 +142,11 @@ function singleTick(orca,{cwd,run,from,timeoutMs,reportsDir,stalledAfterMs,heart
   for(const report of reports)state.seenReports[report.dispatch]=now();
   if(deliveryId)state.lastDeliveryId=deliveryId;
   writeJson(stateFile,state);
-  const stalled=liveness.filter(item=>item.liveness.startsWith('stalled')||item.liveness==='dead');
+  // A rate-limited provider is a boundary too: the runtime must be parked now, not when the whole timeout ends.
+  const stalled=liveness.filter(item=>item.liveness.startsWith('stalled')||['dead','rate-limited'].includes(item.liveness));
   const event=messages.length||reports.length?'report':stalled.length?stalled[0].liveness:checked.outcome==='ok'?'timeout':'check-failed';
   return {schema:WAIT_TICK,run,event,deliveryId,check:{outcome:checked.outcome,reason:checked.reason??null},messages,reports,liveness,renamed,approvals,sweep:{closed:sweep.closed,kept:sweep.kept.length},
-    next:event==='timeout'?'call wait again; a timeout is not a boundary':event==='report'?'process every message and report, then call wait again':event==='stalled-prompt'?'the agent is inside a confirmation dialog and cannot read a notify: settle it (--close true) and start-op again, then call wait again':'act on the stalled or dead worker (notify to report, or settle and retry), then call wait again'};
+    next:event==='timeout'?'call wait again; a timeout is not a boundary':event==='report'?'process every message and report, then call wait again':event==='rate-limited'?'the provider refused with a quota signal: park that runtime (allocator.failed with the reason) and re-dispatch the op elsewhere, then call wait again':event==='stalled-prompt'?'the agent is inside a confirmation dialog and cannot read a notify: settle it (--close true) and start-op again, then call wait again':'act on the stalled or dead worker (notify to report, or settle and retry), then call wait again'};
 }
 
 
