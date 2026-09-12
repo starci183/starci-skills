@@ -75,7 +75,7 @@ kinds:
   # is the only kind besides `work.author` that writes an authored record, because that record IS its decision.
   brand.decide:
     family: design
-    role: decide
+    role: write  # it generates the placeholder mascot with the image model, so it runs where image generation is: the Codex working profile
     operator: brand.decide
     readOnly: false
     mutates: [record, asset]

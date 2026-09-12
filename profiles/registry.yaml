@@ -70,7 +70,6 @@ defaults:
 reasoningOps:
   - business.decide
   - architecture.decide
-  - brand.decide
   - review.verify
   - work.author
 targets:
@@ -190,10 +189,10 @@ operators:
     # placeholder with the image model, and only the Codex runtime carries one ($imagegen). So the chain leads
     # with Codex for the launch - the same reason interface.draw is Codex-first - and then falls back to the
     # runtimes that actually own the decide role, which decide the identity and defer the artwork with a brief.
-    chain: [gpt-5.6-sol, claude-fable-5.1, gpt-6-astra, claude-opus]
+    chain: [gpt-5.6-sol, claude-opus]
     environments:
-      - {environment: codex, profiles: [gpt-5.6-sol, gpt-6-astra]}
-      - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
+      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: claude, profiles: [claude-opus]}
   business.decide:
     skill: starci
     chain: [claude-fable-5.1, gpt-6-astra, claude-opus]

@@ -52,7 +52,7 @@ test('the shipped catalog validates against the allocator profile and the operat
   // The identity kind is the other one that writes an authored record, because that record IS its decision, and
   // the only kind that may produce asset bytes: a placeholder mascot the product does not have yet.
   assert.equal(familyOf('brand.decide',{profile}),'design');
-  assert.equal(roleOf('brand.decide',{profile}),'decide');
+  assert.equal(roleOf('brand.decide',{profile}),'write');
   assert.equal(isReadOnly('brand.decide',{profile}),false);
   assert.equal(operatorOf('brand.decide',{profile}),'brand.decide');
   assert.deepEqual(mutationsOf('brand.decide',{profile}),['record','asset']);
