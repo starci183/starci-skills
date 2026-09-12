@@ -1,0 +1,98 @@
+schema: starci/op-io@1
+purpose: |-
+  Input and output form of every operation kind, and the deterministic result policy a supervisor
+  program applies to each outcome. The LLM planner only fills `inputs`; the operation only produces
+  `outputs` inside starci/op-report@1; the supervisor never asks a model what to do next unless the
+  policy cell says `decide`.
+common:
+  inputs:
+    goal: one paragraph naming the SRS/SDS ids the operation must satisfy
+    srsIds: SRS requirement ids in scope
+    sdsIds: SDS design ids in scope
+    allowlist: exact paths the operation may change
+    references: SRS/SDS files and sections to read
+    checks: commands the operation must run and record with exit codes
+    acceptance: observable statements the review will verify one by one
+  outputs:
+    outcome: done | partial | failed | ask | blocked
+    files: changed paths inside the allowlist
+    checks: commands actually run with exit codes
+    open: items left for the next operation
+kinds:
+  backend.implement:
+    inputs:
+      priorOpen: open items carried from the previous report on the same node
+      findings: review findings this attempt must resolve (repair attempts only)
+    outputs:
+      coverage: srs/sds id -> implemented | partial | absent with evidence
+    resultPolicy:
+      done: next-node
+      partial: repair-node-from-open
+      failed: repair-node-from-checks
+      ask: answer-if-local-else-escalate
+      blocked.shared-change: escalate-and-continue
+      blocked.sds-gap: insert-architecture-decide
+      blocked.environment: escalate
+      blocked.authority: escalate
+      chain-exhausted: escalate
+      repairLimit: 3
+      overLimit: decide
+  review.verify:
+    inputs:
+      revision: the worktree state under review (head plus dirty files)
+      acceptance: the acceptance statements of the reviewed operation
+    outputs:
+      findings: "[{id, severity: blocker | major | minor, sdsRef, detail}]"
+      verdict: pass | fail
+    resultPolicy:
+      done: workflow-goal-if-last-node
+      partial: repair-node-from-findings
+      failed: repair-node-from-findings
+      ask: answer-if-local-else-escalate
+      blocked.sds-gap: insert-architecture-decide
+      blocked.shared-change: escalate-and-continue
+      blocked.environment: escalate
+      blocked.authority: escalate
+      chain-exhausted: escalate
+      repairLimit: 3
+      overLimit: decide
+  architecture.decide:
+    inputs:
+      gap: the sds-gap blocker that triggered the sidearm
+      sdsAllowlist: SDS files the sidearm may change
+    outputs:
+      sdsChanges: SDS files changed with the decision recorded
+    resultPolicy:
+      done: replan-node-that-was-blocked
+      partial: decide
+      failed: escalate
+      ask: escalate
+      blocked.authority: escalate
+      chain-exhausted: escalate
+      repairLimit: 1
+      overLimit: escalate
+  business.decide:
+    inputs:
+      question: the product question to settle
+    outputs:
+      decision: the settled answer with SRS references
+    resultPolicy:
+      done: replan-node-that-was-blocked
+      partial: escalate
+      failed: escalate
+      ask: escalate
+      chain-exhausted: escalate
+      repairLimit: 1
+      overLimit: escalate
+actions:
+  next-node: mark the node done and start the next ready node
+  repair-node-from-open: create one bounded backend.implement node whose priorOpen is the report's open[]
+  repair-node-from-checks: create one bounded backend.implement node whose findings are the failing checks
+  repair-node-from-findings: create one bounded backend.implement node whose findings are the review findings, then a fresh review.verify node
+  workflow-goal-if-last-node: when no node is left, commit the branch and report the workflow done to the Coordinator
+  answer-if-local-else-escalate: the supervisor answers from the contract when the question is inside ownership; otherwise it is forwarded as blocked
+  escalate: report blocked to the Coordinator program and pause the node
+  escalate-and-continue: report blocked to the Coordinator program and keep the node working on everything else
+  insert-architecture-decide: insert an architecture.decide node before the blocked node and run it first
+  replan-node-that-was-blocked: call the planner again for the blocked node with the new SDS as input
+  decide: call the model decide function with the closed option set of the cell

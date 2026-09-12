@@ -7,6 +7,7 @@ import {resolveExecutionChain} from '../profiles/select.mjs';
 import {createOrcaCalls,defaultOrcaExecutable,getPath} from './orca-calls.mjs';
 import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} from './supervision.mjs';
 import {protocolMain} from './orca-protocol.mjs';
+import {superviseMain} from './supervise.mjs';
 
 /**
  * Canonical supervised launcher for Orca operation agents and Workflow Monitors.
@@ -520,12 +521,14 @@ function usage(){return `Usage:
   node orca-supervised-launch.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
   node orca-supervised-launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
   node orca-supervised-launch.mjs start-coordinator --plan <name> --spec-file <file> (--run <run> | --objective <text>) [--worktree <relative-path>]
+  node orca-supervised-launch.mjs supervise --run <nested-run> --from <own-terminal> --worktree . --workflow <name> --branch <branch> --ownership a/**,b/** --sds file,file --parent-run <run> --workflow-task <task> --monitor-dispatch <dispatch> --runtime-dir <dir> --host <path-to-.claude> [--max-iterations N]
   node orca-supervised-launch.mjs verify`;}
 
 export function main(argv=process.argv.slice(2),{orca}={}){
   const {command,options}=parseArgs(argv);
-  need(['start-op','start-monitor','replace-monitor','settle','sweep','verify','notify','report','wait','start-coordinator'].includes(command),usage());
+  need(['start-op','start-monitor','replace-monitor','settle','sweep','verify','notify','report','wait','start-coordinator','supervise'].includes(command),usage());
   const runner=orca??createOrcaCalls();
+  if(command==='supervise')return superviseMain(options,{orca:runner,cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd()});
   if(['report','wait','start-coordinator'].includes(command)){
     const cwd=options.worktree?exactWorktree(options.worktree).path:process.cwd();
     return protocolMain(command,{...options,spec:options['spec-file']?specText(options['spec-file']):options.spec},{orca:runner,cwd});
