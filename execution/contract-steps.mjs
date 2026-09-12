@@ -7,7 +7,7 @@
  * `stepsFor` renders a mandatory, numbered sequence per operation kind, interpolated from the operation's own
  * values (allowlist, checks, acceptance, references, resources, requesters, findings), so the contract tells
  * the agent what to do first, what must be red before code, and how to report exactly once with the real
- * report vocabulary (`done|partial|failed|ask|blocked`; blockers `shared-change|sds-gap|interface-gap|environment|authority`).
+ * report vocabulary (`done|partial|failed|ask|blocked`; blockers `shared-change|sds-gap|interface-gap|brand-gap|environment|authority`).
  *
  * The frontend lane is three operations, never one: `interface.draw` writes the interface design record
  * (screens, every state, blueprint, contract slots, copy), `frontend.implement` may only build what that
@@ -24,7 +24,7 @@
 
 export const STEPS_HEADING='## Working order (mandatory, in this order)';
 export const DONE_HEADING='## Definition of done for this kind';
-export const SEQUENCES=['work.author','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','frontend.implement','review.verify','e2e.verify','uat','uat.verify','operations','migration','architecture.revise','decide','generic'];
+export const SEQUENCES=['work.author','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','frontend.implement','review.verify','e2e.verify','uat','uat.verify','operations','migration','architecture.revise','decide','brand.decide','generic'];
 
 const IMPLEMENT_KINDS=['backend.implement','interface.implement','frontend.implement'];
 const IMPLEMENT_NODES=['implementation','ui'];
@@ -57,6 +57,8 @@ export function sequenceFor(op,{node=null}={}){
   if(kind==='work.author')return 'work.author';
   if(kind==='review.verify')return 'review.verify';
   if(kind==='interface.draw')return 'interface.draw';
+  // The identity record is settled before anything is drawn inside it, and it is the node's whole lane.
+  if(kind==='brand.decide'||nodeKind==='brand')return 'brand.decide';
   if(kind==='architecture.revise')return 'architecture.revise';
   if(DECIDE_KINDS.includes(kind))return 'decide';
   if(kind==='uat.verify')return 'uat.verify';
@@ -319,6 +321,27 @@ const SEQUENCE_STEPS={
       done:[`the node records one chosen option with a rationale`,`the decision stays inside its own layer: ${forbidden}`,`no code changed`]
     };
   },
+  // The identity every later drawing and build reads, settled once in one record. Its one hard rule is that
+  // nothing in it is chosen: every value is read out of a real source file and traceable back to it, so the
+  // record describes the product that exists rather than the one the operation would have preferred.
+  'brand.decide':v=>({
+    steps:[
+      `Read ${v.references} - the accepted scope and the rulings the owner has already made about identity - and the node assertions (${v.acceptance}); restate in three lines what this identity must state and which of its decisions are already settled.`,
+      `Open the real token and style files of the product's interface - the global stylesheet, the installed design grammar's family root, the theme and token files - and read every value out of them: per token, the grammar token name the renderer actually consumes, the value, and the exact file and declaration it came from. A value you cannot trace to a declaration is not yours to choose.`,
+      `Map the owner's rulings onto those token names and write the policy the set is judged against: which role each token fills, whether the danger role may share the primary value, and the minimum contrast every text-on-surface pair must hold; measure the pairs you declare and record the ratios rather than asserting them.`,
+      `Settle typography, the one icon set the product may use, the mascot and the logo: reuse the assets that already exist with their real paths and hashes, and only when no mascot asset exists at all, generate ONE placeholder with the image model from the owner's description and store it beside the record with its sha256, marked a placeholder awaiting acceptance - with no generator available, write a concrete brief and leave the slot empty, and never describe a missing file as generated.`,
+      `Write the record at the path the allowlist names (${v.allowlist}): identity and family, the traced tokens with their roles and policy, typography, mascot and logo with where each may and may never appear, the icon set, the imagery rules whose prompt rules oblige every later image prompt to name this identity, the artwork-slot conventions, voice, motion, the forbidden list, and the source files every value was read from; no product code.`,
+      `Run the listed check verbatim: ${v.declared}; keep its output, then bump the record's \`rev\` and state in one line what changed.`,
+      `Report \`done\` exactly once with the new \`rev\`, the checks and the token-to-source trace. A value no source file declares is \`ask\` naming the token and the file it should live in, never a colour you picked; a source file the record needs and that does not exist is \`blocked\` with \`environment\` and the exact path; an identity decision nobody has ruled is \`ask\` with the closed options and what each one costs.`
+    ],
+    done:[
+      `the record at ${v.allowlist} states the whole identity - tokens with their roles and policy, typography, mascot, logo, one icon set, imagery and artwork rules, voice, motion, forbidden - and names the real source file every value came from`,
+      `every assertion (${v.acceptance}) is covered and every token value is traceable to a declaration in one of those files; an untraceable value was asked about, never written`,
+      `the listed checks exit 0: ${v.declared}`,
+      `\`rev\` is higher than it was and the record says what changed`,
+      `no product code changed, and no asset was claimed that does not exist with its recorded hash`
+    ]
+  }),
   generic:v=>({
     steps:[
       `Read ${v.references} and the acceptance (${v.acceptance}); restate in three lines what must be true when you are done.`,

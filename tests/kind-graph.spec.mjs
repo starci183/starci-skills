@@ -43,13 +43,24 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.equal(operatorOf('e2e.verify',{profile}),'e2e.verify');
   assert.equal(operatorOf('uat.verify',{profile}),'uat.verify');
   assert.equal(roleOf('architecture.revise',{profile}),'decide');
-  // The record-authoring kind is the only one that changes an authored Work record, and the only one no lane walks.
+  // The record-authoring kind completes the fields a node needs before its lane may start, and no lane walks it.
   assert.deepEqual(mutationsOf('work.author',{profile}),['record']);
   assert.equal(familyOf('work.author',{profile}),'design');
   assert.equal(roleOf('work.author',{profile}),'plan');
   assert.equal(operatorOf('work.author',{profile}),'work.author');
   assert.deepEqual(reportsOf('work.author',{profile}),{outcomes:['done','partial','failed','ask'],blockers:[]});
-  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('record')),['work.author']);
+  // The identity kind is the other one that writes an authored record, because that record IS its decision, and
+  // the only kind that may produce asset bytes: a placeholder mascot the product does not have yet.
+  assert.equal(familyOf('brand.decide',{profile}),'design');
+  assert.equal(roleOf('brand.decide',{profile}),'decide');
+  assert.equal(isReadOnly('brand.decide',{profile}),false);
+  assert.equal(operatorOf('brand.decide',{profile}),'brand.decide');
+  assert.deepEqual(mutationsOf('brand.decide',{profile}),['record','asset']);
+  assert.deepEqual(reportsOf('brand.decide',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['environment','authority']});
+  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('asset')),['brand.decide']);
+  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('record')),['brand.decide','work.author']);
+  // A drawing that finds no settled identity says so with its own blocker; it never invents a colour instead.
+  assert.ok(reportsOf('interface.draw',{profile}).blockers.includes('brand-gap'));
   for(const entry of profile.lanes)assert.equal(entry.steps.some(step=>step.kind==='work.author'),false,entry.id);
   // And no route creates it: the kernel starts it itself when the ledger reports a node incomplete.
   for(const route of profile.routes)assert.notEqual(route.to?.kind,'work.author');
@@ -73,6 +84,11 @@ test('every lane is a sequence of catalogued kinds, and every declared node shap
   assert.deepEqual(laneFor({kind:'architecture',layout:null},{profile}),['architecture.decide']);
   assert.deepEqual(laneFor({kind:'business',layout:null},{profile}),['business.decide']);
   assert.deepEqual(laneFor({kind:'business-overview',layout:null},{profile}),['business.decide']);
+  // One identity record, one operation: a brand node has nothing to build and nothing to walk.
+  assert.deepEqual(laneFor({kind:'brand',layout:null},{profile}),['brand.decide']);
+  assert.deepEqual(laneFor({kind:'brand',layout:'frontend'},{profile}),['brand.decide']);
+  assert.equal(laneRecordFor({kind:'brand',layout:null},{profile}).id,'brand');
+  assert.equal(nextKind(laneFor({kind:'brand',layout:null},{profile}),['brand.decide'],{profile}),null);
   // A ledger node that names no layout but is delivered in a frontend repository still walks the frontend lane.
   assert.deepEqual(laneFor({kind:'implementation',layout:null,repositoryRole:'frontend'},{profile}),
     ['interface.draw','frontend.implement','uat.verify']);
@@ -142,6 +158,13 @@ test('every declared route resolves, carries a limit and says what happens to th
   const interfaceGap=routeFor({outcome:'blocked',blocker:'interface-gap',kind:'frontend.implement',lane:lane('frontend')},{profile});
   assert.deepEqual({kind:interfaceGap.kind,origin:interfaceGap.origin,then:interfaceGap.then},
     {kind:'interface.draw',origin:'architecture',then:'reopen'});
+  // A missing identity is settled in the brand record, bounded, and the requester reads it again afterwards.
+  const brandGap=routeFor({outcome:'blocked',blocker:'brand-gap',kind:'interface.draw',lane:lane('frontend')},{profile});
+  assert.deepEqual({kind:brandGap.kind,origin:brandGap.origin,then:brandGap.then,limit:brandGap.limit},
+    {kind:'brand.decide',origin:'architecture',then:'reopen',limit:2});
+  // It is declared from `any`, so whichever operation discovers the gap waits for the same one record.
+  assert.equal(routeFor({outcome:'blocked',blocker:'brand-gap',kind:'backend.implement',lane:lane('backend')},{profile}).kind,'brand.decide');
+  assert.equal(routeFor({outcome:'blocked',blocker:'brand-gap',kind:'interface.draw'},{profile}).unresolved,null,'a named target needs no lane context');
   // A shared change is the requester's own kind, scoped, and the requester waits for it.
   const sharedFrontend=routeFor({outcome:'blocked',blocker:'shared-change',kind:'frontend.implement',lane:lane('frontend')},{profile});
   assert.deepEqual({kind:sharedFrontend.kind,origin:sharedFrontend.origin,then:sharedFrontend.then},

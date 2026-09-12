@@ -21,14 +21,14 @@ import {parseYaml} from '../core/yaml.mjs';
  */
 export const KIND_GRAPH='starci/kind-graph@1';
 /** The closed catalog. `validateGraph` refuses a profile that adds to it or drops from it. */
-export const KINDS=Object.freeze(['business.decide','architecture.decide','architecture.revise','interface.draw','e2e.verify',
+export const KINDS=Object.freeze(['business.decide','architecture.decide','architecture.revise','brand.decide','interface.draw','e2e.verify',
   'frontend.implement','backend.implement','runtime.operate','uat.verify','review.verify','work.author']);
 export const FAMILIES=Object.freeze(['design','build','prove','repair']);
 export const ROLES=Object.freeze(['decide','plan','implement','verify','write']);
-export const MUTATIONS=Object.freeze(['code','sds','srs','decision','design','runtime','record']);
+export const MUTATIONS=Object.freeze(['code','sds','srs','decision','design','runtime','record','asset']);
 export const ORIGINS=Object.freeze(['ledger','shared','repair','gate','verify','architecture']);
 export const OUTCOMES=Object.freeze(['done','partial','failed','ask','blocked']);
-export const BLOCKERS=Object.freeze(['shared-change','sds-gap','interface-gap','environment','authority']);
+export const BLOCKERS=Object.freeze(['shared-change','sds-gap','interface-gap','brand-gap','environment','authority']);
 export const VERDICTS=Object.freeze(['pass','findings','rejected','gate-failed']);
 export const THEN=Object.freeze(['retry','reopen','pause','settle','needUser']);
 /** Route targets that are resolved from the reporter's context instead of naming a kind outright. */

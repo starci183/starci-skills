@@ -70,6 +70,7 @@ defaults:
 reasoningOps:
   - business.decide
   - architecture.decide
+  - brand.decide
   - review.verify
   - work.author
 targets:
@@ -183,6 +184,16 @@ operators:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol]}
+  brand.decide:
+    skill: starci
+    # A decide operation that also produces bytes: when the product has no mascot, this op generates one
+    # placeholder with the image model, and only the Codex runtime carries one ($imagegen). So the chain leads
+    # with Codex for the launch - the same reason interface.draw is Codex-first - and then falls back to the
+    # runtimes that actually own the decide role, which decide the identity and defer the artwork with a brief.
+    chain: [gpt-5.6-sol, claude-fable-5.1, gpt-6-astra, claude-opus]
+    environments:
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-6-astra]}
+      - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
   business.decide:
     skill: starci
     chain: [claude-fable-5.1, gpt-6-astra, claude-opus]
@@ -312,6 +323,10 @@ costPolicy: |-
   Sol reviewer third. work.author reads a Work record, its neighbours and the code an implementation would
   touch, so it carries the `plan` role and leads with Claude Opus, then Claude Fable 5.1; Codex gpt-5.6-sol
   stays in its chain as the launchable fallback even though the allocator prefers the plan-role runtimes.
+  brand.decide is the mirror of that case: it carries the `decide` role, so the allocator prefers Claude Fable
+  5.1 and Codex gpt-6-astra, but the op also generates a placeholder mascot when the product has none and only
+  Codex gpt-5.6-sol carries an image generator, so that target leads its chain as the launchable candidate and
+  the decide-role runtimes follow and defer the artwork with a concrete brief.
   interface.draw keeps Codex gpt-5.6-sol first for image generation, then Claude
   Opus with deferred artwork, then Qwen 3.8 Flash. knowledge.repair edits this runtime and therefore
   leads with Claude Opus. Plan Coordinator and Workflow Monitor supervisors lead with Claude Opus and

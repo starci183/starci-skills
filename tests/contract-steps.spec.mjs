@@ -28,6 +28,8 @@ test('every sequence renders a numbered working order and a definition of done, 
     migration:[op({allowlist:['src/migrations/0007-orders.ts'],resources:['postgres']}),{kind:'implementation'}],
     'architecture.revise':[op({kind:'architecture.revise',origin:'sds-gap',allowlist:['features/sales/architecture/sds/intake/index.yaml'],findings:['intake has no rule for an expired cart']}),null],
     decide:[op({kind:'architecture.decide',origin:'architecture',allowlist:['features/sales/architecture/sds/intake/index.yaml'],checks:[]}),null],
+    'brand.decide':[op({kind:'brand.decide',origin:'architecture',allowlist:['brand/index.yaml'],
+      acceptance:['every colour token names its source file'],checks:[{name:'unit-tests-pass',command:'npx vitest run intake'}]}),{kind:'brand'}],
     generic:[op({kind:'task.execute',origin:'plan'}),null]
   };
   assert.deepEqual(Object.keys(samples).sort(),[...SEQUENCES].sort());
@@ -235,6 +237,42 @@ test('decide chooses among the closed options only and writes no code; unknown k
   assert.match(generic,/the goal and the allowlist above/);
   assert.equal(sequenceFor({kind:'',allowlist:[]}),'generic');
   assert.equal(sequenceFor(op({kind:'backend.implement',origin:'plan'})),'implement.ledger');
+});
+
+test('brand.decide reads every value out of a real source file, bumps the rev, and asks instead of picking a colour',()=>{
+  const brand=op({kind:'brand.decide',origin:'architecture',allowlist:['brand/index.yaml'],
+    references:['business/overview/index.yaml'],acceptance:['every colour token names its source file'],
+    checks:[{name:'brand-checks',command:'node bin/starci.mjs brand check .'}]});
+  const text=stepsFor(brand,{node:{kind:'brand'}});
+  const settled=steps(text);
+  assert.match(text,/Sequence `brand\.decide`/);
+  assert.match(settled[0],/business\/overview\/index\.yaml/);
+  assert.match(settled[0],/rulings the owner has already made about identity/);
+  // Nothing in the record is chosen: every value is read out of a file and traceable back to it.
+  assert.match(settled[1],/Open the real token and style files/);
+  assert.match(settled[1],/the grammar token name the renderer actually consumes/);
+  assert.match(settled[1],/A value you cannot trace to a declaration is not yours to choose/);
+  assert.match(settled[2],/whether the danger role may share the primary value/);
+  assert.match(settled[2],/minimum contrast/);
+  assert.match(settled[3],/only when no mascot asset exists at all, generate ONE placeholder with the image model/);
+  assert.match(settled[3],/never describe a missing file as generated/);
+  assert.match(settled[4],/record at the path the allowlist names \(`brand\/index\.yaml`\)/);
+  assert.match(settled[4],/prompt rules oblige every later image prompt to name this identity/);
+  assert.match(settled[4],/no product code/);
+  assert.match(settled[5],/brand-checks: `node bin\/starci\.mjs brand check \.`/);
+  assert.match(settled[5],/bump the record's `rev`/);
+  // The two refusals: an untraceable value is a question, a missing source file is the user's environment.
+  assert.match(settled[6],/`ask` naming the token and the file it should live in, never a colour you picked/);
+  assert.match(settled[6],/`blocked` with `environment` and the exact path/);
+  assert.match(text,/every token value is traceable to a declaration in one of those files/);
+  // A decision operation writes no product code and carries no red-spec rule.
+  assert.doesNotMatch(text,/MUST fail now/);
+  assert.doesNotMatch(text,/Lane: this op is one step/);
+  // The node kind alone reaches the sequence, and an authoring or review op on a brand node keeps its own.
+  assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'brand'}}),'brand.decide');
+  assert.equal(sequenceFor(op({kind:'brand.decide'})),'brand.decide');
+  assert.equal(sequenceFor(op({kind:'work.author'}),{node:{kind:'brand'}}),'work.author');
+  assert.equal(sequenceFor(op({kind:'review.verify'}),{node:{kind:'brand'}}),'review.verify');
 });
 
 test('the module carries no product path or repository name',async()=>{

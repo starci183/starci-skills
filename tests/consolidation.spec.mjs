@@ -26,6 +26,11 @@ test('the complete jobs replace the old catalogue, each is classified once, and 
     for(const to of mapping.to)assert.ok(catalogue.ops.some(op=>op.id===to));
   }
   for(const id of ['identity.provision','data.plan','data.seed'])assert.equal(catalogue.ops.some(op=>op.id===id),false);
+  // The identity job is one added supporting operator, registered exactly once and classified on one side only.
+  assert.equal(registry.ops.filter(id=>id==='brand.decide').length,1);
+  assert.ok(registry.consolidation.supporting.includes('brand.decide'));
+  assert.equal(registry.consolidation.basic.includes('brand.decide'),false);
+  assert.ok(registry.consolidation.added.includes('brand.decide'));
   assert.match(JSON.stringify(contract('uat.verify')),/No plan\/account\/seed predecessor/);
 });
 test('English-only YAML is the maintained operator source with no runtime mirrors',()=>{

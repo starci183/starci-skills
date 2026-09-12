@@ -12,16 +12,20 @@ vocabularies:
   families: [design, build, prove, repair]
   # The allocator role of profiles/runtimes.yaml; `roleOfKind` there must agree with `role` here.
   roles: [decide, plan, implement, verify, write]
-  # What a kind is allowed to change. `readOnly: true` means this list is empty. `record` is the authored Work
-  # record itself - the fields a node must declare before the kernel can launch it - and only `work.author` has it.
-  mutates: [code, sds, srs, decision, design, runtime, record]
+  # What a kind is allowed to change. `readOnly: true` means this list is empty. `record` is an authored Work
+  # record itself: `work.author` completes the fields a node must declare before the kernel can launch it, and
+  # `brand.decide` authors the one brand record. `asset` is bytes beside such a record - a generated mascot or
+  # logo file under its own `assets/` - which no other kind may produce.
+  mutates: [code, sds, srs, decision, design, runtime, record, asset]
   # Why an operation exists, as the kernel records it on the op.
   origins: [ledger, shared, repair, gate, verify, architecture]
   # The report outcomes of execution/reports.mjs.
   outcomes: [done, partial, failed, ask, blocked]
   # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
-  # walk that finds the interface design silent is not an SDS gap and must not be routed as one.
-  blockers: [shared-change, sds-gap, interface-gap, environment, authority]
+  # walk that finds the interface design silent is not an SDS gap and must not be routed as one. `brand-gap` is
+  # that same distinction one layer earlier: a drawing with no settled identity to draw inside - no colour token,
+  # no typography, no mascot rule - is missing the brand record, not a screen and not a design decision.
+  blockers: [shared-change, sds-gap, interface-gap, brand-gap, environment, authority]
   # Verdicts the kernel computes about a report (never the reporter's own claim) and routes on.
   verdicts: [pass, findings, rejected, gate-failed]
   # What happens to the operation that produced the report:
@@ -66,6 +70,19 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, authority]
+  # The identity every drawing and every build reads: one record, one spec, done with a `rev`. It is a decision
+  # kind and not a build one - it settles what the product looks like, it never renders a product screen - and it
+  # is the only kind besides `work.author` that writes an authored record, because that record IS its decision.
+  brand.decide:
+    family: design
+    role: decide
+    operator: brand.decide
+    readOnly: false
+    mutates: [record, asset]
+    purpose: Settle the product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one brand record every drawing and build reads.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [environment, authority]
   interface.draw:
     family: design
     role: write
@@ -75,7 +92,7 @@ kinds:
     purpose: Draw the interface before any interface code exists - screens, contracts, states, empty and error.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
-      blockers: [sds-gap, shared-change, authority]
+      blockers: [sds-gap, brand-gap, shared-change, authority]
   frontend.implement:
     family: build
     role: implement
@@ -211,6 +228,12 @@ lanes:
     purpose: A business node is settled once, before any design is drawn against it.
     steps:
       - kind: business.decide
+  - id: brand
+    match:
+      - {kind: brand}
+    purpose: The product's identity is settled once, in one record; a drawing reads it instead of inventing a colour.
+    steps:
+      - kind: brand.decide
 # Bounded outcome routing. `on` is the report shape the kernel observed, `from` the kind that produced it
 # (`any` for every kind), `to` the operation the graph creates - `same` is the reporter's own kind and
 # `lane.build` the build step of the reporter's lane, so a frontend repair is never a backend op. `limit`
@@ -266,6 +289,16 @@ routes:
     limit: 2
     then: reopen
     purpose: A missing screen, state or contract is drawn first; it is never improvised in the build.
+  - id: brand-gap-settles-the-brand
+    on: {blocker: brand-gap}
+    from: any
+    to: {kind: brand.decide, origin: architecture}
+    limit: 2
+    then: reopen
+    purpose: |-
+      An operation with no settled identity to work inside waits for the brand record and then reads it. A
+      colour token, a typeface or a mascot rule is settled once, in one place; it is never invented by the
+      operation that happened to need it first.
   - id: shared-change-is-a-scoped-build
     on: {blocker: shared-change}
     from: any
