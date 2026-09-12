@@ -450,6 +450,23 @@ export function validateWorkTree({repoRoot,workRoot=null}={}){
 // product's e2e suite starts its own throwaway stack (Testcontainers), so ops may run it in parallel and a slice
 // is not accepted until its e2e scenarios are green.
 export const KERNEL_CHECK=/^work-valid$/i;
+/**
+ * The design grammar the host installs (knowledge/grammars/<family>/{DNA,family,idioms}.yaml and the UI composition
+ * state canon) is a reference of every design-family operation: a drawing, a frontend build or a walk without it
+ * invents its own look. Product-agnostic: every grammar family the host carries is listed.
+ */
+export const DESIGN_KINDS=['interface.draw','frontend.implement','uat.verify'];
+export function grammarReferences(root=skillRoot){
+  const found=[];
+  try{
+    const grammars=path.join(root,'knowledge','grammars');
+    for(const family of fs.readdirSync(grammars,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name))
+      for(const file of ['DNA.yaml','family.yaml','idioms.yaml']){const candidate=path.join(grammars,family,file);if(fs.existsSync(candidate))found.push(slash(candidate));}
+    const composition=path.join(root,'knowledge','ui','composition','state.yaml');
+    if(fs.existsSync(composition))found.push(slash(composition));
+  }catch{}
+  return found;
+}
 export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,lane=null,done=[]}){
   // Lane-aware: the kind of this operation is the node's next lane step, not a fixed map of the node kind.
   const template=lane?.length?lane:(()=>{try{return graph.laneFor({kind:node.kind,layout:nodeLayout(node),repositoryRole:node.repository??null});}catch{return [];}})();
@@ -457,7 +474,7 @@ export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,la
   return toOp({id,nodeId:node.id,
     kind:step??WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),
     ledgerIds:[node.id],allowlist:node.allowlist,
-    references:unique([node.path,...(node.refs??[])]),
+    references:unique([node.path,...(node.refs??[]),...(DESIGN_KINDS.includes(step??'')?grammarReferences():[])]),
     // The whole-tree validator is the kernel's own gate at acceptance: parallel operations must not fail on a sibling's in-progress ledger write.
     checks:node.checks.filter(check=>!KERNEL_CHECK.test(check.assertion??'')).map(check=>({name:check.assertion??check.command,command:check.command})),
     acceptance:node.assertions.length?node.assertions:[`${node.id} satisfies the Work contract it authored`],
