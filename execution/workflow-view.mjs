@@ -107,9 +107,9 @@ function readLanes(state,statusOf){
  * The one view. `now` is injected so a status line is reproducible in a test and so two sections of one
  * render can never disagree about the time.
  */
-export function buildView({repoRoot,id,now=Date.now()}){
+export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
   const stamp=typeof now==='function'?now():now;
-  const dir=workflowDir(repoRoot,id);
+  const dir=given?path.resolve(given):workflowDir(repoRoot,id);
   const state=readJson(path.join(dir,'state.json'));
   need(plain(state),`No workflow state in ${dir.replaceAll('\\','/')}`);
   const events=readJsonLines(path.join(dir,'events.jsonl'));

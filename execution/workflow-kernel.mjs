@@ -502,7 +502,15 @@ export function syncLedgerOps(store,state,ctx){
   // a candidate at all (foreign, ineligible), the item is stale and goes.
   const incomplete=new Set(candidates.filter(node=>!node.schedulable).map(node=>node.id));
   const doneNow=new Set(loaded.list.filter(node=>node.state==='done').map(node=>node.id));
-  state.needUser=state.needUser.filter(item=>item.kind!=='ledger'||(item.node?incomplete.has(item.node):!doneNow.has(state.ops.find(op=>op.id===item.op)?.nodeId??'')));
+  state.needUser=state.needUser.filter(item=>{
+    if(item.kind!=='ledger')return true;
+    if(item.node)return incomplete.has(item.node);
+    // An op-keyed item (a refused write) is stale once that op is done and its node is back in the tree, or the node is done.
+    const op=state.ops.find(candidate=>candidate.id===item.op);
+    if(!op)return true;
+    if(doneNow.has(op.nodeId??''))return false;
+    return !(op.status==='done'&&op.nodeId&&loaded.nodes.has(op.nodeId));
+  });
   for(const node of candidates){
     if(!node.schedulable){
       const authored=authorRecordOp(store,state,ctx,node,taken);

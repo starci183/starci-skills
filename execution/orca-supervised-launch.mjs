@@ -523,7 +523,8 @@ export function main(argv=process.argv.slice(2),{orca,wait}={}){
     if(command==='workflow-status'){
       // The kernel's own status record stays the machine shape; the view is the page a human reads.
       const status=kernelMain(command,options,{orca:runner,cwd,wait});
-      const view=buildView({repoRoot:repositoryRoot(cwd),id:required(options.id,'workflow id')});
+      // The view reads the directory the kernel resolved (a named ledger keeps its store beside the tree), not a guess from cwd.
+      const view=buildView({repoRoot:repositoryRoot(cwd),id:required(options.id,'workflow id'),dir:status.dir??null});
       return options.json==='true'?{...status,view}:printed(view.schema,command,renderView(view),{id:view.id,dir:view.dir});
     }
     return kernelMain(command,options,{orca:runner,cwd,wait});
