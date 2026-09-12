@@ -35,6 +35,7 @@ execution/kernel-supervisor.mjs
 execution/verify-proof.mjs
 execution/runtime-allocator.mjs
 execution/work-ledger.mjs
+execution/ledger-routing.mjs
 execution/orca-adapter.mjs
 providers/validate.mjs
 scripts/config.mjs

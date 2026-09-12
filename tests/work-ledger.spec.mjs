@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {
-  DECISION_KINDS,EXECUTABLE_KINDS,decisionCandidates,disjoint,executableCandidates,ledgerSummary,nodeRepository,
+  DECISION_KINDS,EXECUTABLE_KINDS,decisionCandidates,disjoint,executableCandidates,layoutOf,layoutSide,ledgerSummary,nodeRepository,
   buildSourceIdentity,checkAssertions,loadLedger,markDecided,markDone,markInProgress,markReopened,
   nodeFile,readNode,writeEvidence
 } from '../execution/work-ledger.mjs';
@@ -377,5 +377,31 @@ test('a node another repository delivers is never a candidate for this repositor
     assert.deepEqual(executableCandidates(ledger).map(node=>[node.id,node.repository]),[['demo.billing.implementation.backend.ledger',null],['demo.billing.implementation.frontend.invoice','demo-frontend']]);
     assert.deepEqual(executableCandidates(ledger,{repository:'demo-backend'}).map(node=>node.id),['demo.billing.implementation.backend.ledger']);
     assert.deepEqual(executableCandidates(ledger,{repository:'demo-frontend'}).map(node=>node.id),['demo.billing.implementation.backend.ledger','demo.billing.implementation.frontend.invoice'],'a node naming no repository belongs to every job');
+  }finally{cleanup(root);}
+});
+
+test('a node that names no repository belongs to the side of the product its layout sits in',()=>{
+  const root=fakeRepo();
+  try{
+    const ledger=open(root);
+    assert.equal(layoutOf(NODES[1]),'implementation/backend/ledger');
+    assert.equal(layoutOf(NODES[2]),'implementation/frontend/invoice');
+    assert.equal(layoutOf(NODES[0]),'architecture/sds/ledger');
+    assert.equal(layoutOf('features/billing/uat/checkout/index.yaml'),'uat/checkout');
+    assert.equal(layoutOf('business/index.yaml'),'business','a node outside features/<feature>/ keeps its own directory path');
+    assert.deepEqual([layoutSide(NODES[1]),layoutSide(NODES[2]),layoutSide(NODES[0]),layoutSide(NODES[3])],['backend','frontend',null,null]);
+    // Neither side picks up the other's implementation leaf, and a layout with no side belongs to both.
+    assert.deepEqual(executableCandidates(ledger,{side:'backend'}).map(node=>node.id),['demo.billing.implementation.backend.ledger']);
+    assert.deepEqual(executableCandidates(ledger,{side:'frontend'}).map(node=>node.id),['demo.billing.implementation.frontend.invoice']);
+    assert.deepEqual(executableCandidates(ledger,{side:'frontend'}).map(node=>[node.layout,node.side]),[['implementation/frontend/invoice','frontend']]);
+    // A declared repository is the stronger statement: it decides on its own, whatever side asks. Here the
+    // frontend-layout node says the backend delivers it, so the backend job takes both and the frontend none.
+    const file=nodeFile(root,NODES[2]);
+    fs.writeFileSync(file,`${fs.readFileSync(file,'utf8')}extensions:\n  work3:\n    scope:\n      repository: demo-backend\n`);
+    const mixed=open(root);
+    assert.deepEqual(executableCandidates(mixed,{repository:'demo-backend',side:'backend'}).map(node=>node.id),
+      ['demo.billing.implementation.backend.ledger','demo.billing.implementation.frontend.invoice']);
+    assert.deepEqual(executableCandidates(mixed,{repository:'demo-frontend',side:'frontend'}).map(node=>node.id),[]);
+    assert.throws(()=>executableCandidates(ledger,{side:'middle'}),/A layout side is frontend or backend/);
   }finally{cleanup(root);}
 });

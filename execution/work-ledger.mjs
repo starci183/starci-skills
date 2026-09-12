@@ -18,6 +18,10 @@ export const KERNEL_EXTENSION=['extensions','work3','kernel'];
 export const EVIDENCE_SCHEMA='work/evidence@1';
 export const REVIEW_SCHEMA='starci/design-review@1';
 export const HOST_BIN=new URL('../bin/starci.mjs',import.meta.url);
+/** The directory a repository keeps its Work tree in, when the tree is its own. */
+export const LEDGER_DIRECTORY='.starciwork';
+/** The two sides of a product an `implementation/<side>/**` layout names. */
+export const LAYOUT_SIDES=['frontend','backend'];
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
@@ -43,10 +47,25 @@ function runValidator(workRoot){
   try{return JSON.parse(out);}catch{throw Error(`Work validator did not print JSON for ${workRoot}`);}
 }
 
+/**
+ * Where a ledger lives: the repository that owns it and the tree inside it. Every path helper below takes
+ * this, as a plain repository root (the tree is then `<root>/.starciwork`) or as `{repoRoot,workRoot}` — which
+ * is how a workflow in one repository works a ledger another repository owns.
+ */
+export function ledgerLocation(where){
+  if(plain(where)){
+    const root=path.resolve(text(where.repoRoot,'repository root'));
+    return {repoRoot:root,workRoot:where.workRoot?path.resolve(where.workRoot):path.join(root,LEDGER_DIRECTORY)};
+  }
+  const root=path.resolve(text(where,'repository root'));
+  return {repoRoot:root,workRoot:path.join(root,LEDGER_DIRECTORY)};
+}
+
 /** Load the Work tree. `validate` is injectable so the kernel and the tests share one shape. */
 export function loadLedger({repoRoot,workRoot=null,validate=null}={}){
-  const root=path.resolve(text(repoRoot,'repository root'));
-  const work=workRoot?path.resolve(workRoot):path.join(root,'.starciwork');
+  const at=ledgerLocation(repoRoot);
+  const root=at.repoRoot;
+  const work=workRoot?path.resolve(workRoot):at.workRoot;
   const raw=validate?validate({repoRoot:root,workRoot:work}):runValidator(work);
   need(plain(raw),'The Work validator result must be an object');
   const list=Array.isArray(raw.nodes)?raw.nodes.filter(node=>plain(node)&&typeof node.id==='string'):[];
@@ -54,7 +73,7 @@ export function loadLedger({repoRoot,workRoot=null,validate=null}={}){
     ok:raw.ok===true,
     errors:Array.isArray(raw.errors)?raw.errors:[],
     warnings:Array.isArray(raw.warnings)?raw.warnings:[],
-    repoRoot:root,workRoot:work,
+    repoRoot:root,workRoot:work,at:{repoRoot:root,workRoot:work},
     nodes:new Map(list.map(node=>[node.id,node])),list,
     resources:Array.isArray(raw.resources)?raw.resources:[]
   };
@@ -62,10 +81,11 @@ export function loadLedger({repoRoot,workRoot=null,validate=null}={}){
 
 /** Absolute path of a node's index.yaml. A node may carry an explicit `file` for out-of-tree reads. */
 export function nodeFile(repoRoot,node){
-  if(typeof node==='string')return path.join(path.resolve(repoRoot),'.starciwork',node);
+  const {workRoot}=ledgerLocation(repoRoot);
+  if(typeof node==='string')return path.join(workRoot,node);
   need(plain(node),'A Work node is required');
   if(node.file)return path.resolve(node.file);
-  return path.join(path.resolve(repoRoot),'.starciwork',text(node.path,`path of node ${node.id}`));
+  return path.join(workRoot,text(node.path,`path of node ${node.id}`));
 }
 export const nodeDirectory=(repoRoot,node)=>path.dirname(nodeFile(repoRoot,node));
 
@@ -131,28 +151,52 @@ export function nodeRepository(raw){
   return typeof declared==='string'&&declared.trim()?sanitizeId(declared.trim()):null;
 }
 
+/**
+ * Where a node sits inside its feature: `implementation/frontend/receipt` for
+ * `features/sales/implementation/frontend/receipt/index.yaml`. A node outside `features/<feature>/` keeps its
+ * whole directory path, so the layout is always the authored shape and never a guess about the id.
+ */
+export function layoutOf(node){
+  const file=slash(typeof node==='string'?node:node?.path??'');
+  const parts=file.replace(/\/index\.ya?ml$/,'').replace(/\/+$/,'').split('/').filter(Boolean);
+  return (parts[0]==='features'&&parts.length>2?parts.slice(2):parts).join('/');
+}
+/** The side of the product a layout claims: `implementation/frontend/**` is frontend work, `implementation/backend/**` backend. */
+export function layoutSide(node){
+  const parts=layoutOf(node).split('/');
+  return parts[0]==='implementation'&&LAYOUT_SIDES.includes(parts[1])?parts[1]:null;
+}
+
 function enrich(ledger,node){
-  const raw=readNode(ledger.repoRoot,node);
+  const raw=readNode(ledger.at??ledger.repoRoot,node);
   const allowlist=nodeAllowlist(raw),checks=nodeChecks(raw);
   const assertions=Array.isArray(raw.assertions)?raw.assertions.filter(item=>typeof item==='string'):[];
   const missing=[];
   if(!allowlist.length)missing.push('implementation.changes[].files');
   if(!checks.length)missing.push('extensions.work3.checks');
-  return {...node,file:nodeFile(ledger.repoRoot,node),repository:nodeRepository(raw),allowlist,checks,assertions,schedulable:missing.length===0,reason:missing.length?`Node ${node.id} declares no ${missing.join(' and no ')}; the kernel cannot launch it`:null};
+  return {...node,file:nodeFile(ledger.at??ledger.repoRoot,node),repository:nodeRepository(raw),layout:layoutOf(node),side:layoutSide(node),
+    allowlist,checks,assertions,schedulable:missing.length===0,reason:missing.length?`Node ${node.id} declares no ${missing.join(' and no ')}; the kernel cannot launch it`:null};
 }
 
 /**
  * Executable work the kernel may consider now: an executable kind, authored todo, and unblocked by
  * the validator. A candidate without an allowlist or without checks is returned with
  * `schedulable:false` and a reason; the kernel must refuse to launch it rather than guess a scope.
+ *
+ * `repository` and `side` are the two ways a node belongs to a job. A node that names its repository is
+ * delivered there and nowhere else. A node that names none is claimed by the side of the product its layout
+ * sits in, so a backend workflow never picks up `implementation/frontend/**` and a frontend workflow never
+ * picks up `implementation/backend/**` — which is what lets both work one shared tree.
  */
-export function executableCandidates(ledger,{scope=null,repository=null}={}){
+export function executableCandidates(ledger,{scope=null,repository=null,side=null}={}){
   const scopes=scopeList(scope);
+  need(!side||LAYOUT_SIDES.includes(side),`A layout side is ${LAYOUT_SIDES.join(' or ')}: ${side}`);
   return ledger.list
     .filter(node=>EXECUTABLE_KINDS.includes(node.kind)&&node.state==='todo'&&node.eligible===true&&inScope(node,scopes))
     .map(node=>enrich(ledger,node))
-    // A node delivered in another repository (a frontend leaf in a backend job) is never this kernel's work.
-    .filter(node=>!repository||!node.repository||node.repository===repository);
+    .filter(node=>node.repository
+      ?(!repository||node.repository===repository)
+      :(!side||!node.side||node.side===side));
 }
 
 /** Decision work: a model or the user answers it; nothing is launched into a worktree. */
@@ -482,14 +526,15 @@ export function markDecided(repoRoot,node,{rev=null,review,by='starci-kernel',at
 // ---------------------------------------------------------------------------- evidence
 
 export function repositoryName(repoRoot){
-  const manifest=path.join(path.resolve(repoRoot),'package.json');
+  const root=ledgerLocation(repoRoot).repoRoot;
+  const manifest=path.join(root,'package.json');
   if(fs.existsSync(manifest)){
     try{
       const name=JSON.parse(fs.readFileSync(manifest,'utf8')).name;
       if(typeof name==='string'&&name.trim())return sanitizeId(name.replace(/^@/,'').replaceAll('/','-'));
     }catch{/* a malformed manifest is not the ledger's problem */}
   }
-  return sanitizeId(path.basename(path.resolve(repoRoot)));
+  return sanitizeId(path.basename(root));
 }
 
 /**
