@@ -144,7 +144,7 @@ test('the ledger is the Work tree: candidates split by kind and a node without a
   const root=fakeRepo();
   try{
     assert.deepEqual(DECISION_KINDS,['business','business-overview','architecture']);
-    assert.deepEqual(EXECUTABLE_KINDS,['implementation','uat','operations','ui']);
+    assert.deepEqual(EXECUTABLE_KINDS,['implementation','uat','e2e','operations','ui']);
     const ledger=open(root);
     assert.equal(ledger.ok,true);
     assert.equal(ledger.nodes.get('demo.billing.implementation.backend.ledger').kind,'implementation');
