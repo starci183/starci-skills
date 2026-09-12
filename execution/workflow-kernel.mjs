@@ -373,6 +373,14 @@ export function approve(store,state){
  * checks, report command); the process prose - cook until done, the mandatory ping, the never list - is
  * reused from docs/supervision-templates/op.md so one template serves every operation kind.
  */
+/** Job-wide rulings the user gave at approval time (`<store>/rulings.md`) travel inside every contract. */
+function jobRulings(store){
+  const file=path.join(store.dir,'rulings.md');
+  if(!fs.existsSync(file))return [];
+  const body=fs.readFileSync(file,'utf8').trim();
+  return body?[`## Job rulings (apply to every operation)`,body,``]:[];
+}
+
 export function renderContract({template,op,state,store,launcher=state.launcher,run=state.run}){
   const text=String(template??'');
   for(const heading of ['## Cook until done','## Ping (mandatory)','## Never'])
@@ -395,6 +403,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     ...(op.priorOpen.length?[`## Open items you inherit`,...op.priorOpen.map(item=>`- ${item}`),``]:[]),
     ...(op.findings.length?[`## Findings you must resolve`,...op.findings.map(item=>`- ${typeof item==='string'?item:JSON.stringify(item)}`),``]:[]),
     `## Acceptance`,...(op.acceptance.length?op.acceptance.map((item,index)=>`${index+1}. ${item}`):['1. the goal above holds']),``,
+    ...jobRulings(store),
     cook,``,
     `## Checks to run`,...(op.checks.length?op.checks.map(check=>`- ${check.name}: \`${check.command}\``):['- none were declared: run the checks this code already has and record them']),
     `Record every command with its exit code in \`${checksFile}\` as a JSON array \`[{"name","command","exitCode","evidence"}]\`.`,
