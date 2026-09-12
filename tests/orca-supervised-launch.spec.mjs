@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {createOrcaCalls} from '../execution/orca-calls.mjs';
-import {buildMonitorLaunch,buildOperationLaunch,defaultOrcaExecutable,main,promptDelivery,replaceMonitor,resolveSupervisorChain,settleDispatch,startMonitor,startOperation} from '../execution/orca-supervised-launch.mjs';
+import {buildMonitorLaunch,buildOperationLaunch,defaultOrcaExecutable,main,parseSkip,promptDelivery,replaceMonitor,resolveSupervisorChain,settleDispatch,startMonitor,startOperation} from '../execution/orca-supervised-launch.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';
@@ -324,4 +324,26 @@ test('an idle native TUI that Orca cannot stop is contained by closing exactly i
   assert.equal(result.attempts[0].settlement.closedTerminal.handle,'term_ctx_qwen');
   assert.equal(result.attempts[0].settlement.reconciliation.afterClose,true);
   assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='close').length,1);
+});
+
+test('--skip records a verified no-effect failure for a chain target and starts at the next candidate',()=>{
+  const planned=buildOperationLaunch({...input,skip:'qwen-qwen3.8-flash-reviewer:unavailable'});
+  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['claude-fable-5.1','codex-gpt-5.6-sol-reviewer']);
+  assert.deepEqual(planned.skipped,[{target:'qwen-qwen3.8-flash-reviewer',reason:'unavailable',effectState:'none',source:'monitor-verified-skip'}]);
+  assert.throws(()=>buildOperationLaunch({...input,skip:'qwen-qwen3.8-flash-reviewer:permission-denied'}),/reason must be one of/);
+  assert.throws(()=>buildOperationLaunch({...input,skip:'codex-gpt-5.6-sol:unavailable'}),/outside this operation chain/);
+  assert.throws(()=>buildOperationLaunch({...input,skip:'qwen-qwen3.8-flash-reviewer,claude-fable-5.1,codex-gpt-5.6-sol-reviewer'}),/Every candidate/);
+  const fake=fakeOrca({
+    'run-show':()=>json(0,runShow),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
+    'worker-start':(args)=>{assert.ok(has(args,'--agent','claude'));return json(0,started('ctx_claude','task_operation_sales'));},
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const result=startOperation({...input,skip:'qwen-qwen3.8-flash-reviewer'},{orca:fake.orca});
+  assert.equal(result.ok,true);
+  assert.equal(result.selection.target,'claude-fable-5.1');
+  assert.deepEqual(result.attempts.map(attempt=>[attempt.target,attempt.reason,attempt.effectState]),[['qwen-qwen3.8-flash-reviewer','unavailable','none']]);
+  assert.equal(fake.spawned.filter(args=>args[1]==='worker-start').length,1);
+  assert.deepEqual(parseSkip('',[]),[]);
 });

@@ -95,14 +95,29 @@ export function resolveSupervisorChain(role,registry=readDistJson('profiles','re
   });
 }
 
-export function buildOperationLaunch({run,workflowTask,from,worktree,operation,scope,spec}){
+/** Parse `--skip target:reason[,target:reason]` into registry-allowed no-effect attempts. */
+export function parseSkip(value,chain,registry=readDistJson('profiles','registry.json')){
+  if(value===undefined||value===null||value==='')return [];
+  const allowed=registry.fallback.allowedReasons;
+  return String(value).split(',').filter(Boolean).map(entry=>{
+    const [target,reason='unavailable']=entry.split(':');
+    need(chain.some(candidate=>candidate.target===target),`--skip names a target outside this operation chain: ${target}`);
+    need(allowed.includes(reason),`--skip reason must be one of ${allowed.join(', ')}: ${reason}`);
+    return {target,reason,effectState:'none',source:'monitor-verified-skip'};
+  });
+}
+
+export function buildOperationLaunch({run,workflowTask,from,worktree,operation,scope,spec,skip}){
   const runId=required(run,'nested workflow Run ID'),workflow=required(workflowTask,'parent workflow Task ID');
   const monitor=required(from,'Workflow Monitor terminal handle');
   need(monitor.startsWith('term_'),'--from must be the exact Workflow Monitor terminal handle');
   const target=exactWorktree(worktree),op=required(operation,'operation'),opScope=required(scope,'operation scope');
   const contract=required(spec,'operation spec');
-  const chain=resolveExecutionChain({skill:'starci',op}).candidates;
-  need(chain.length,'Operation provider chain is empty');
+  const fullChain=resolveExecutionChain({skill:'starci',op}).candidates;
+  need(fullChain.length,'Operation provider chain is empty');
+  const skipped=parseSkip(skip,fullChain);
+  const chain=fullChain.filter(candidate=>!skipped.some(item=>item.target===candidate.target));
+  need(chain.length,'Every candidate of the operation chain was skipped');
   const displayName=formatOrcaDisplayName('operation-agent',{operation:op,scope:opScope});
   const candidates=chain.map(selection=>{
     const planned=planOperationAgentLaunch({taskId:'$operationTaskId',worktree:target.selector,selection,operation:op,scope:opScope});
@@ -113,7 +128,7 @@ export function buildOperationLaunch({run,workflowTask,from,worktree,operation,s
     return {selection,workerParams};
   });
   return {schema:'starci/orca-supervised-op-request@2',runId,workflowTask:workflow,from:monitor,worktree:target,operation:op,scope:opScope,displayName,
-    selection:candidates[0].selection,candidates,
+    selection:candidates[0].selection,candidates,skipped,
     runAttestationParams:{id:runId},
     taskParams:{run:runId,from:monitor,'task-title':`${op} - ${opScope}`,'display-name':displayName,spec:contract}};
 }
@@ -266,8 +281,9 @@ export function startOperation(input,{orca=createOrcaCalls()}={}){
   need(task.display_name===request.displayName,`Created Task name mismatch: ${task.display_name??'unknown'}`);
   const attest=(selection,{workerShow,phase})=>attestOperationWorker({taskId:task.id,operation:request.operation,scope:request.scope,selection,taskRecord:task,workerShow,phase});
   const chain=runChain(orca,{cwd,request,candidates:request.candidates,taskId:task.id,taskRecord:task,attest,expectedPath:cwd});
-  if(chain.ok)return {schema:OP_LAUNCH,ok:true,task,dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,attestation:chain.result.attestation,titleDrift:chain.result.titleDrift??false,attempts:chain.attempts};
-  return {schema:OP_LAUNCH,ok:false,task,exhausted:chain.exhausted,stopReason:chain.stopReason,attempts:chain.attempts,
+  const attempts=[...request.skipped,...chain.attempts];
+  if(chain.ok)return {schema:OP_LAUNCH,ok:true,task,dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,attestation:chain.result.attestation,titleDrift:chain.result.titleDrift??false,attempts};
+  return {schema:OP_LAUNCH,ok:false,task,exhausted:chain.exhausted,stopReason:chain.stopReason,attempts,
     recovery:chain.exhausted?'report-workflow-boundary-worker_failed':'reconcile-residual-resources-before-retry'};
 }
 
@@ -325,7 +341,8 @@ export function replaceMonitor(input,{orca=createOrcaCalls()}={}){
 }
 
 function usage(){return `Usage:
-  node orca-supervised-launch.mjs start-op --run <nested-workflow-run> --workflow-task <parent-workflow-task> --from <monitor-terminal> --worktree <relative-path> --operation <op> --scope <scope> --spec-file <relative-file> [--dry-run]
+  node orca-supervised-launch.mjs start-op --run <nested-workflow-run> --workflow-task <parent-workflow-task> --from <monitor-terminal> --worktree <relative-path> --operation <op> --scope <scope> --spec-file <relative-file> [--skip <target:reason[,target:reason]>] [--dry-run]
+    --skip records a Monitor-verified no-effect failure for a chain target (reason from registry fallback.allowedReasons) so the chain starts at the next candidate
   node orca-supervised-launch.mjs start-monitor --run <run> --parent-task <task> --from <coordinator-terminal> --worktree <relative-path> --workflow <name> --spec-file <relative-file> [--dry-run]
   node orca-supervised-launch.mjs replace-monitor --run <run> --parent-task <task> --task <monitor-task> --dispatch <dead-dispatch> --from <coordinator-terminal> --worktree <relative-path> --workflow <name> --spec-file <relative-file>
   node orca-supervised-launch.mjs settle --dispatch <dispatch> [--worktree <relative-path>]
@@ -339,7 +356,7 @@ export function main(argv=process.argv.slice(2),{orca}={}){
   if(command==='settle')return settleDispatch(runner,required(options.dispatch,'dispatch'),{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),reason:'explicit-settle'});
   const common={run:options.run,from:options.from,worktree:options.worktree,spec:specText(options['spec-file'])};
   if(command==='start-op'){
-    const input={...common,workflowTask:options['workflow-task'],operation:options.operation,scope:options.scope};
+    const input={...common,workflowTask:options['workflow-task'],operation:options.operation,scope:options.scope,skip:options.skip};
     return options['dry-run']?buildOperationLaunch(input):startOperation(input,{orca:runner});
   }
   const input={...common,parentTask:options['parent-task'],workflow:options.workflow};

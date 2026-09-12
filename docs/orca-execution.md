@@ -154,7 +154,9 @@ the resolved chain: for each candidate it starts one fresh native worker, proves
 canonicalizes the title, and accepts. A failed candidate is classified; when a Dispatch exists it is
 settled (`worker-stop`, `worker-release` must report `released` or `already_released`). Only a proven
 `effectState: none` admits the next candidate; `partial` or `unknown` stops with a typed reconciliation
-request, and an exhausted chain returns `ok:false, exhausted:true, attempts[]`. Companion commands are
+request, and an exhausted chain returns `ok:false, exhausted:true, attempts[]`. A Monitor that has verified, from receipts, that a chain target cannot start on this host passes
+`--skip <target:reason>` (reason from the registry's `fallback.allowedReasons`); the skip is recorded
+as a no-effect attempt and the chain starts at the next candidate. Companion commands are
 `start-monitor` (supervisor chain, no hardcoded provider), `replace-monitor` (settle a dead Monitor,
 relaunch with `--retry-of`; a live Monitor is never replaced), `settle --dispatch` and `verify`.
 `execution/orca-adapter.mjs` is the concrete adapter for `execution/orca.mjs` on the same runner,
