@@ -24,6 +24,8 @@ execution/orca.mjs
 execution/supervision.mjs
 execution/orca-calls.mjs
 execution/orca-supervised-launch.mjs
+execution/orca-protocol.mjs
+execution/reports.mjs
 execution/orca-adapter.mjs
 providers/validate.mjs
 scripts/config.mjs
