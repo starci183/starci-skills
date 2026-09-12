@@ -81,8 +81,9 @@ test('a deleted index.yaml is restored and an untracked evidence tree is removed
 });
 
 test('an operation declares some locks and its own checks prove the rest', () => {
-  assert.deepEqual(resourceLocks({kind:'backend.implement',checks:[{name:'integration',command:'npm run test:container -- billing'}]}),['docker','postgres']);
-  assert.deepEqual(resourceLocks({kind:'backend.implement',checks:[{name:'integration',command:'npx testcontainers up'}]}),['docker','postgres']);
+  assert.deepEqual(resourceLocks({kind:'backend.implement',checks:[{name:'integration',command:'npm run test:container -- billing'}]}),[],'testcontainers isolate their own database');
+  assert.deepEqual(resourceLocks({kind:'backend.implement',checks:[{name:'integration',command:'npx testcontainers up'}]}),[]);
+  assert.deepEqual(resourceLocks({kind:'backend.implement',checks:[{name:'stack',command:'psql -h localhost:5432'}]}),['local-stack']);
   assert.deepEqual(resourceLocks({kind:'uat.verify',resources:['fe-slot'],checks:[{name:'walk',command:'npx playwright test uat/sign-in.spec.ts'}]}),['e2e-runtime','fe-slot']);
   assert.deepEqual(resourceLocks({kind:'uat.execute',checks:[{name:'flow',command:'npm run test:e2e'}]}),['e2e-runtime']);
   assert.deepEqual(resourceLocks({kind:'operations.apply',checks:[{name:'deploy',command:'kubectl apply -f k8s/billing.yaml'}]}),['cluster']);
@@ -96,11 +97,13 @@ test('an operation declares some locks and its own checks prove the rest', () =>
   const docker={kind:'backend.implement',checks:[{name:'compose',command:'docker compose up -d'}]};
   const cluster={kind:'operations.apply',checks:[{name:'deploy',command:'kubectl rollout status deploy/billing'}]};
   const unit={kind:'backend.implement',checks:[{name:'unit',command:'npx vitest run src/x.spec.ts'}]};
-  assert.equal(resourcesClash(container,docker),true);
+  assert.equal(resourcesClash(container,docker),false,'a testcontainers suite does not need the shared local stack');
+  const stack={kind:'backend.implement',checks:[{name:'e2e-db',command:'psql -h localhost:5432 -c select'}]};
+  assert.equal(resourcesClash(stack,docker),true,'docker compose and the fixed-port stack are the same exclusive resource');
   assert.equal(resourcesClash(container,cluster),false);
   assert.equal(resourcesClash(container,unit),false);
   assert.equal(resourcesClash(unit,unit),false,'two operations that need nothing exclusive never clash');
-  assert.equal(resourcesClash(['docker'],container),true);
+  assert.equal(resourcesClash(['local-stack'],docker),true);
   assert.equal(resourcesClash(['e2e-runtime'],container),false);
 });
 
