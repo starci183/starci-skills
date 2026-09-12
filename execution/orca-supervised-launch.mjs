@@ -183,9 +183,18 @@ function launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName,expec
   if(rename.outcome!=='ok')return fence(`terminal rename: ${rename.reason}`);
   show=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});
   if(show.outcome!=='ok')return fence(`worker-show after rename: ${show.reason}`);
-  try{attestation=attest({workerShow:show.receipt,phase:'canonical-title'});}
+  // Immutable identity is re-attested; the title is mutable native UI metadata. A native agent may
+  // overwrite it immediately with an activity title, so drift is recorded and recanonicalized, never fenced.
+  try{attestation=attest({workerShow:show.receipt,phase:'runtime'});}
   catch(error){return fence(error.message);}
-  return {ok:true,dispatchId,terminal:attestation.terminalHandle,attestation,call:started,taskRecord};
+  let observedTitle=resultOf(show.receipt)?.terminal?.title??null;
+  if(observedTitle!==displayName){
+    const again=orca.invoke('terminal-rename',{terminal:attestation.terminalHandle,title:displayName},{cwd});
+    if(again.outcome==='ok'){const check=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});if(check.outcome==='ok')observedTitle=resultOf(check.receipt)?.terminal?.title??observedTitle;}
+  }
+  const canonical=observedTitle===displayName;
+  attestation={...attestation,terminalTitle:{observed:observedTitle,canonical,mutableUiMetadata:true,action:canonical?'none':'recanonicalize-without-fencing'}};
+  return {ok:true,dispatchId,terminal:attestation.terminalHandle,attestation,titleDrift:!canonical,call:started,taskRecord};
 }
 
 /** The native agent must have consumed its Task input: state ready and no dispatch_input failure. */
@@ -223,7 +232,7 @@ export function startOperation(input,{orca=createOrcaCalls()}={}){
   need(task.display_name===request.displayName,`Created Task name mismatch: ${task.display_name??'unknown'}`);
   const attest=(selection,{workerShow,phase})=>attestOperationWorker({taskId:task.id,operation:request.operation,scope:request.scope,selection,taskRecord:task,workerShow,phase});
   const chain=runChain(orca,{cwd,request,candidates:request.candidates,taskId:task.id,taskRecord:task,attest,expectedPath:cwd});
-  if(chain.ok)return {schema:OP_LAUNCH,ok:true,task,dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,attestation:chain.result.attestation,attempts:chain.attempts};
+  if(chain.ok)return {schema:OP_LAUNCH,ok:true,task,dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,attestation:chain.result.attestation,titleDrift:chain.result.titleDrift??false,attempts:chain.attempts};
   return {schema:OP_LAUNCH,ok:false,task,exhausted:chain.exhausted,stopReason:chain.stopReason,attempts:chain.attempts,
     recovery:chain.exhausted?'report-workflow-boundary-worker_failed':'reconcile-residual-resources-before-retry'};
 }
@@ -244,7 +253,7 @@ export function startMonitor(input,{orca=createOrcaCalls()}={}){
     return {schema:'starci/orca-monitor-provider-attestation@1',ok:true,taskId:task.id,dispatchId:result.dispatch?.id??null,terminalHandle,displayName:request.displayName,target:selection.target,agent:effective.agent,model:effective.model??null};
   };
   const chain=runChain(orca,{cwd,request,candidates:request.candidates,taskId:task.id,taskRecord:task,attest,expectedPath:cwd});
-  if(chain.ok)return {schema:MONITOR_LAUNCH,ok:true,task,dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,attestation:chain.result.attestation,attempts:chain.attempts};
+  if(chain.ok)return {schema:MONITOR_LAUNCH,ok:true,task,dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,attestation:chain.result.attestation,titleDrift:chain.result.titleDrift??false,attempts:chain.attempts};
   return {schema:MONITOR_LAUNCH,ok:false,task,exhausted:chain.exhausted,stopReason:chain.stopReason,attempts:chain.attempts,
     recovery:chain.exhausted?'report-coordinator-boundary-workflow-manager-failure':'reconcile-residual-resources-before-retry'};
 }
@@ -265,12 +274,20 @@ export function replaceMonitor(input,{orca=createOrcaCalls()}={}){
     need(plain(effective)&&effective.agent===selection.orcaLaunch.agent,`Workflow Monitor provider attestation failed: expected agent ${selection.orcaLaunch.agent}`);
     const terminalHandle=result?.worker?.agent_terminal_handle;need(typeof terminalHandle==='string'&&terminalHandle,'Workflow Monitor receipt is missing the agent terminal handle');
     if(phase==='canonical-title')need(result?.terminal?.title===request.displayName,`Workflow Monitor title mismatch: expected ${request.displayName}`);
-    return {schema:'starci/orca-monitor-provider-attestation@1',ok:true,taskId:input.task,dispatchId:result.dispatch?.id??null,terminalHandle,displayName:request.displayName,target:selection.target,agent:effective.agent,model:effective.model??null};
+    return {schema:'starci/orca-monitor-provider-attestation@1',ok:true,taskId:null,dispatchId:result.dispatch?.id??null,terminalHandle,displayName:request.displayName,target:selection.target,agent:effective.agent,model:effective.model??null};
   };
-  const taskId=required(input.task,'existing Workflow Monitor Task ID');
-  const chain=runChain(orca,{cwd,request:retryRequest,candidates:retryRequest.candidates,taskId,taskRecord:{id:taskId,display_name:request.displayName},attest,expectedPath:cwd});
-  if(chain.ok)return {schema:MONITOR_LAUNCH,ok:true,replaced:dead,settlement,task:{id:taskId,display_name:request.displayName},dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,attestation:chain.result.attestation,attempts:chain.attempts};
-  return {schema:MONITOR_LAUNCH,ok:false,replaced:dead,settlement,exhausted:chain.exhausted,stopReason:chain.stopReason,attempts:chain.attempts,recovery:chain.exhausted?'report-coordinator-boundary-workflow-manager-failure':'reconcile-residual-resources-before-retry'};
+  // Orca delivers the Task's stored spec as the agent prompt, so a replacement Monitor needs a fresh
+  // Task carrying the current contract; the dead Task is closed and linked, never reused.
+  const previousTask=required(input.task,'previous Workflow Monitor Task ID');
+  const created=orca.invoke('task-create',request.taskParams,{cwd});
+  need(created.outcome==='ok',`Replacement Monitor Task creation failed (${created.effectState}): ${created.reason}`);
+  const task=taskFromReceipt(created.receipt);
+  need(task.display_name===request.displayName,`Created Monitor Task name mismatch: ${task.display_name??'unknown'}`);
+  const closed=orca.invoke('task-update',{id:previousTask,status:'failed',run:request.runId,from:request.from,result:JSON.stringify({replacedBy:task.id,replacedDispatch:dead,reason:'workflow-manager-replaced'})},{cwd});
+  const chain=runChain(orca,{cwd,request:retryRequest,candidates:retryRequest.candidates,taskId:task.id,taskRecord:task,attest,expectedPath:cwd});
+  const previous={task:previousTask,closed:closed.outcome==='ok',closeReason:closed.outcome==='ok'?null:closed.reason};
+  if(chain.ok)return {schema:MONITOR_LAUNCH,ok:true,replaced:dead,previous,settlement,task,dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,attestation:chain.result.attestation,titleDrift:chain.result.titleDrift??false,attempts:chain.attempts};
+  return {schema:MONITOR_LAUNCH,ok:false,replaced:dead,previous,settlement,task,exhausted:chain.exhausted,stopReason:chain.stopReason,attempts:chain.attempts,recovery:chain.exhausted?'report-coordinator-boundary-workflow-manager-failure':'reconcile-residual-resources-before-retry'};
 }
 
 function usage(){return `Usage:

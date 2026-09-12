@@ -202,10 +202,12 @@ test('Workflow Monitor launch tries Claude Opus first and falls through to Codex
 
 test('a dead Workflow Monitor is settled and replaced with --retry-of; a live one is never replaced',()=>{
   const fake=fakeOrca({
-    'worker-show':(args,nth)=>has(args,'--dispatch','ctx_dead')?json(0,{ok:true,result:{dispatch:{id:'ctx_dead',task_id:'task_monitor_sales'},worker:{state:'failed',stage:'process_exited'}}}):json(0,shown({dispatch:'ctx_new',task:'task_monitor_sales',agent:'claude',model:null,title:nth>=3?'[Monitor] Sales':'Working'})),
+    'worker-show':(args,nth)=>has(args,'--dispatch','ctx_dead')?json(0,{ok:true,result:{dispatch:{id:'ctx_dead',task_id:'task_monitor_sales'},worker:{state:'failed',stage:'process_exited'}}}):json(0,shown({dispatch:'ctx_new',task:'task_monitor_sales_2',agent:'claude',model:null,title:nth>=3?'[Monitor] Sales':'Working'})),
     'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
     'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'already_released'}}),
-    'worker-start':()=>json(0,started('ctx_new','task_monitor_sales')),
+    'task-create':()=>json(0,taskCreated('task_monitor_sales_2','[Monitor] Sales')),
+    'task-update':()=>json(0,{ok:true,result:{task:{id:'task_monitor_sales',status:'failed'}}}),
+    'worker-start':()=>json(0,started('ctx_new','task_monitor_sales_2')),
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
   const result=replaceMonitor({...monitorInput,task:'task_monitor_sales',dispatch:'ctx_dead'},{orca:fake.orca});
@@ -213,9 +215,14 @@ test('a dead Workflow Monitor is settled and replaced with --retry-of; a live on
   assert.equal(result.replaced,'ctx_dead');
   assert.equal(result.settlement.effectState,'none');
   assert.equal(result.dispatchId,'ctx_new');
+  assert.equal(result.task.id,'task_monitor_sales_2');
+  assert.deepEqual(result.previous,{task:'task_monitor_sales',closed:true,closeReason:null});
   const start=fake.spawned.find(args=>args[1]==='worker-start');
-  assert.ok(has(start,'--retry-of','ctx_dead'));
-  assert.equal(fake.spawned.filter(args=>args[1]==='task-create').length,0);
+  assert.ok(has(start,'--retry-of','ctx_dead')&&has(start,'--task','task_monitor_sales_2'));
+  const create=fake.spawned.find(args=>args[1]==='task-create');
+  assert.ok(has(create,'--parent','task_parent')&&has(create,'--display-name','[Monitor] Sales')&&has(create,'--spec',monitorInput.spec));
+  const close=fake.spawned.find(args=>args[1]==='task-update');
+  assert.ok(has(close,'--id','task_monitor_sales')&&has(close,'--status','failed'));
   const live=fakeOrca({'worker-show':()=>json(0,shown({dispatch:'ctx_live',task:'task_monitor_sales',agent:'claude',model:null,title:'[Monitor] Sales'}))});
   assert.throws(()=>replaceMonitor({...monitorInput,task:'task_monitor_sales',dispatch:'ctx_live'},{orca:live.orca}),/a live Monitor is never replaced/);
 });
@@ -255,4 +262,30 @@ test('verify command reports live contract drift before any effect',()=>{
   assert.equal(result.schema,'starci/orca-live-contract-verification@1');
   assert.equal(result.ok,true);
   assert.equal(result.commandCount,232);
+});
+
+test('native activity title drift after the canonical rename is recorded, never fenced',()=>{
+  const fake=fakeOrca({
+    'run-show':()=>json(0,runShow),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
+    'worker-start':()=>json(0,started('ctx_qwen','task_operation_sales')),
+    'worker-show':()=>json(0,shown({title:'◐ Reviewing the Sales module'})),
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const result=startOperation(input,{orca:fake.orca});
+  assert.equal(result.ok,true);
+  assert.equal(result.titleDrift,true);
+  assert.deepEqual(result.attestation.terminalTitle,{observed:'◐ Reviewing the Sales module',canonical:false,mutableUiMetadata:true,action:'recanonicalize-without-fencing'});
+  assert.equal(fake.spawned.filter(args=>args[0]==='terminal').length,2);
+  assert.equal(fake.spawned.filter(args=>args[1]==='worker-stop').length,0);
+  const monitor=fakeOrca({
+    'task-create':()=>json(0,taskCreated('task_monitor_sales','[Monitor] Sales')),
+    'worker-start':()=>json(0,started('ctx_claude','task_monitor_sales')),
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',task:'task_monitor_sales',agent:'claude',model:null,title:'◑ Orca Plan Coordinator'})),
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const started2=startMonitor(monitorInput,{orca:monitor.orca});
+  assert.equal(started2.ok,true);
+  assert.equal(started2.titleDrift,true);
+  assert.equal(started2.selection.target,'claude-opus');
 });
