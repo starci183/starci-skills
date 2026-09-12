@@ -16,9 +16,9 @@ function skipOpsDeclarative(outRel) {
   const rel = outRel.replace(/^ops\//, '');
   if (rel === 'catalog.json' || rel === 'basic-ops.json' || rel === 'consolidation.json') return true;
   if (rel === 'common.json' || rel === 'registry.json') return true; // common → policy/common.json; registry is authoring-only
-  if (/^[a-z]+(?:\.[a-z]+)+\/authority\.json$/.test(rel)) return true;
-  if (/^[a-z]+(?:\.[a-z]+)+\/operator\.json$/.test(rel)) return true; // projected from contracts into .dist
-  if (/^[a-z]+(?:\.[a-z]+)+\/specification\.json$/.test(rel)) return true;
+  if (/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+\/authority\.json$/.test(rel)) return true;
+  if (/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+\/operator\.json$/.test(rel)) return true; // projected from contracts into .dist
+  if (/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+\/specification\.json$/.test(rel)) return true;
   return false;
 }
 

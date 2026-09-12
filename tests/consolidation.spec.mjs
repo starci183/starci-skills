@@ -14,10 +14,14 @@ import {readWorkflow} from './helpers/read-public.mjs';
 const matrices=readWorkflow('jobs.json');
 const contract=id=>catalogue.ops.find(o=>o.id===id).contract;
 
-test('fourteen complete jobs replace the old catalogue; twenty-two extras have explicit ownership',()=>{
-  assert.equal(catalogue.ops.length,14);
+test('fifteen complete jobs replace the old catalogue; twenty-two extras have explicit ownership',()=>{
+  assert.equal(catalogue.ops.length,15);
   assert.equal(registry.consolidation.basic.length,6);
-  assert.equal(registry.consolidation.supporting.length,8);
+  assert.equal(registry.consolidation.supporting.length,9);
+  // The added jobs are named, not absorbed: both are real operator documents outside the consolidation mappings.
+  assert.deepEqual(registry.consolidation.added,['task.execute','e2e.verify']);
+  for(const id of registry.consolidation.added)assert.ok(catalogue.ops.some(op=>op.id===id),id);
+  assert.ok(registry.consolidation.supporting.includes('e2e.verify'));
   assert.equal(registry.consolidation.mappings.length+registry.consolidation.unchanged.length,22);
   for(const mapping of registry.consolidation.mappings){
     assert.equal(catalogue.ops.some(op=>op.id===mapping.from),false);

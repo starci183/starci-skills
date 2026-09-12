@@ -21,6 +21,8 @@ const AUTHORING_POLICIES=Object.freeze({
   })
 });
 
+/** An operator ID is dotted lowercase; a segment may carry digits after its first letter (`e2e.verify`). */
+const OP_ID=/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+$/;
 const nonempty = value=>typeof value==='string'&&value.trim().length>0;
 const safeRelative = value=>nonempty(value)&&!path.posix.isAbsolute(value)&&!path.win32.isAbsolute(value)&&!value.split(/[\\/]/).some(p=>p==='..'||p==='.')&&!value.includes('\\');
 const unique = values=>new Set(values).size===values.length;
@@ -66,7 +68,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles,documents=
   if(!unique(catalog.ops.map(o=>o.document))) issue(errors,'DUPLICATE_DOCUMENT','catalog','Each op must own its document');
   for(const op of catalog.ops) {
     const at=op.id;
-    if(!/^[a-z]+(?:\.[a-z]+)+$/.test(at??'')) issue(errors,'OP_ID',at,'Invalid operator ID');
+    if(!OP_ID.test(at??'')) issue(errors,'OP_ID',at,'Invalid operator ID');
     fileRef(op.document,at); if(Object.hasOwn(op,'mirror')) issue(errors,'RETIRED_MIRROR',at,'Operator contracts are English only');
     fileRef(op.authority,at);
     if (root && typeof op.authority === 'string' && safeRelative(op.authority) && (documents.has(op.authority)||fs.existsSync(path.join(root,op.authority)))) {
@@ -140,6 +142,11 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles,documents=
       if(!c.uatPolicy||Object.entries(expected).some(([key,value])=>c.uatPolicy[key]!==value)||JSON.stringify(c.uatPolicy.scripts)!==JSON.stringify(['seed','delete','resource-management'])) issue(errors,'UAT_POLICY',at,'UAT must preserve sequential UX-only execution, real recordings and owned verified cleanup');
       if(!['flows','accounts','fixtures','scripts','effects'].every(id=>c.reads.some(r=>r.id===id))||!['source','resources','evidence'].every(id=>c.writes.some(w=>w.id===id))||!['sequence','journey','ux','recording','scripts','cleanup'].every(id=>c.proofs.some(p=>p.id===id))) issue(errors,'UAT_BINDING',at,'UAT requires setup/script/effect inputs and sequence, UX, recording and cleanup proof');
     }
+    if(at==='e2e.verify') {
+      const expected={proofSurface:'public-api-only',interfaceDriving:false,stack:'real-started-by-the-suite',mocks:'none-for-the-unit-under-proof',scenarios:'one-per-assertion',checks:'listed-commands-verbatim',productCode:'unchanged',environmentBlocker:'provably-unfixable-only',teardown:'run-owned-ephemeral-disposed'};
+      if(!c.e2ePolicy||Object.entries(expected).some(([key,value])=>c.e2ePolicy[key]!==value)) issue(errors,'E2E_POLICY',at,'End-to-end proof stays on the public API against a real stack the suite starts, one scenario per assertion, listed checks verbatim and no product change');
+      if(!['architecture','suite','stack','checks','effects'].every(id=>c.reads.some(r=>r.id===id))||!['source','evidence'].every(id=>c.writes.some(w=>w.id===id))||!['coverage','api','stack','run','scope','teardown'].every(id=>c.proofs.some(p=>p.id===id))) issue(errors,'E2E_BINDING',at,'End-to-end proof requires design, suite, stack, check and effect inputs and coverage, API-surface, stack, run, scope and teardown proof');
+    }
     if(c.goal.en!==op.goal||c.completionProfile!==op.completionProfile||JSON.stringify(c.sideEffects)!==JSON.stringify(op.sideEffects)) issue(errors,'CATALOG_DRIFT',at,'Summary and contract differ');
     if(JSON.stringify(c.writes.map(w=>w.path))!==JSON.stringify(op.writeScope)) issue(errors,'WRITE_SCOPE_DRIFT',at,'Write scope must derive from write matrix');
     const readIds=c.reads.map(r=>r.id),writeIds=c.writes.map(w=>w.id);
@@ -167,7 +174,7 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles,documents=
     if(!unique(c.blockers.map(b=>b.code))||!c.blockers.every(b=>/^[A-Z][A-Z_]+$/.test(b.code)&&pair(b.condition))) issue(errors,'BLOCKER_SHAPE',at,'Concrete English blocker conditions required');
   }
   if(root) {
-    const actualDocuments=fs.readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirectory()&&/^[a-z]+(?:\.[a-z]+)+$/.test(e.name)&&(fs.existsSync(path.join(root,e.name,'operator.yaml'))||fs.existsSync(path.join(root,e.name,'operator.json')))).map(e=>fs.existsSync(path.join(root,e.name,'operator.yaml'))?e.name+'/operator.yaml':e.name+'/operator.json').sort();
+    const actualDocuments=fs.readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirectory()&&OP_ID.test(e.name)&&(fs.existsSync(path.join(root,e.name,'operator.yaml'))||fs.existsSync(path.join(root,e.name,'operator.json')))).map(e=>fs.existsSync(path.join(root,e.name,'operator.yaml'))?e.name+'/operator.yaml':e.name+'/operator.json').sort();
     const declaredDocuments=catalog.ops.map(op=>op.document).sort();
     if(JSON.stringify(actualDocuments)!==JSON.stringify(declaredDocuments)) issue(errors,'DOCUMENT_COVERAGE','catalog','Catalogue must name each actual V3 operator document exactly once');
   }

@@ -400,7 +400,7 @@ test('source and relocated payload contain only current runtime, presets and dom
   assert.equal(Object.hasOwn(installed.scripts, 'test:legacy'), false);
   assert.equal(fs.existsSync(path.join(root,'.claude/skills/catalog.json')),false);
   assert.match(read(root,'.claude/SKILL.md'),/^name: starci$/m);
-  assert.equal(JSON.parse(read(root, '.claude/.dist/ops/catalog.json')).ops.length, 14);
+  assert.equal(JSON.parse(read(root, '.claude/.dist/ops/catalog.json')).ops.length, 15);
 });
 
 test('a 300-piece multi-repository tree accepts a new unfinished domain without restructuring', t => {

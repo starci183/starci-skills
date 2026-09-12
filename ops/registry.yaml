@@ -4,6 +4,7 @@ ops:
   - backend.implement
   - business.decide
   - content.generate
+  - e2e.verify
   - interface.draw
   - interface.implement
   - knowledge.repair
@@ -25,6 +26,7 @@ consolidation:
     - backend.implement
     - uat.verify
   supporting:
+    - e2e.verify
     - workspace.manage
     - runtime.operate
     - release.deliver
@@ -166,3 +168,4 @@ consolidation:
     frontend runtime remains separately gated.
   added:
     - task.execute
+    - e2e.verify
