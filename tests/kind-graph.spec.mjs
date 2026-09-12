@@ -51,9 +51,10 @@ test('every lane is a sequence of catalogued kinds, and every declared node shap
       if(step.optionalWhen)assert.ok(Object.hasOwn(predicatesOf({profile}),step.optionalWhen),step.optionalWhen);
     }
   }
-  assert.deepEqual(laneFor({kind:'implementation',layout:'backend'},{profile}),['backend.implement','review.verify']);
+  assert.deepEqual(laneFor({kind:'implementation',layout:'backend'},{profile}),['backend.implement','e2e.verify','review.verify'],'a backend slice is proven through its API before it is read');
   assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'},{profile}),['interface.draw','frontend.implement','uat.verify']);
-  assert.deepEqual(laneFor({kind:'uat',layout:null},{profile}),['uat.verify']);
+  assert.deepEqual(laneFor({kind:'uat',layout:null},{profile}),['e2e.verify'],'a scenario node outside the frontend is an API scenario');
+  assert.deepEqual(laneFor({kind:'uat',layout:'frontend'},{profile}),['uat.verify'],'a frontend scenario node walks the surface');
   assert.deepEqual(laneFor({kind:'operations',layout:null},{profile}),['runtime.operate','review.verify']);
   assert.deepEqual(laneFor({kind:'architecture',layout:null},{profile}),['architecture.decide']);
   assert.deepEqual(laneFor({kind:'business',layout:null},{profile}),['business.decide']);
@@ -62,14 +63,14 @@ test('every lane is a sequence of catalogued kinds, and every declared node shap
   assert.deepEqual(laneFor({kind:'implementation',layout:null,repositoryRole:'frontend'},{profile}),
     ['interface.draw','frontend.implement','uat.verify']);
   // A node that names neither is behind-the-interface work; a kind no lane claims is never given a default.
-  assert.deepEqual(laneFor({kind:'implementation',layout:null},{profile}),['backend.implement','review.verify']);
+  assert.deepEqual(laneFor({kind:'implementation',layout:null},{profile}),['backend.implement','e2e.verify','review.verify']);
   assert.deepEqual(laneFor({kind:'knowledge',layout:null},{profile}),[]);
   assert.equal(laneRecordFor({kind:'knowledge',layout:null},{profile}),null);
   assert.equal(laneRecordFor({kind:'ui',layout:null},{profile}).id,'implementation/frontend');
   assert.equal(laneById('implementation/frontend',{profile}).steps.length,3);
   assert.equal(describeLane(lane('frontend'),{profile}),
     'implementation/frontend: `interface.draw` (optional when `node.hasInterfaceDesign`) -> `frontend.implement` -> `uat.verify`');
-  assert.equal(describeLane('uat',{profile}),'uat: `uat.verify`');
+  assert.equal(describeLane('uat',{profile}),'uat: `e2e.verify`');
 });
 
 test('the frontend lane order is mandatory: draw, then build, then walk',()=>{
@@ -85,8 +86,9 @@ test('the frontend lane order is mandatory: draw, then build, then walk',()=>{
   assert.equal(nextKind('implementation/frontend',[],{profile}),'interface.draw');
   assert.equal(nextKind(laneById('implementation/frontend',{profile}),['interface.draw'],{profile}),'frontend.implement');
   assert.equal(nextKind(lane('backend'),[],{profile}),'backend.implement');
-  assert.equal(nextKind(lane('backend'),['backend.implement'],{profile}),'review.verify');
-  assert.equal(nextKind(lane('backend'),['backend.implement','review.verify'],{profile}),null);
+  assert.equal(nextKind(lane('backend'),['backend.implement'],{profile}),'e2e.verify');
+  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify'],{profile}),'review.verify');
+  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify','review.verify'],{profile}),null);
 });
 
 test('optionalWhen skips a step only for a named predicate the kernel satisfied',()=>{

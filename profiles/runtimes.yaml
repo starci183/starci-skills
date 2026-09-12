@@ -60,6 +60,7 @@ roleOfKind:
   release.deliver: implement
   runtime.operate: implement
   review.verify: verify
+  e2e.verify: verify
   uat.verify: verify
   architecture.decide: decide
   business.decide: decide

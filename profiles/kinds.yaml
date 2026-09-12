@@ -115,6 +115,16 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, interface-gap, environment, authority]
+  e2e.verify:
+    family: prove
+    role: verify
+    operator: uat.verify
+    readOnly: false
+    mutates: [code]
+    purpose: Prove one delivered slice through its public API on the real stack, never a screen, and leave the scenario spec and its run output.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, sds-gap, environment, authority]
   review.verify:
     family: prove
     role: verify
@@ -144,16 +154,23 @@ lanes:
     match:
       - {kind: implementation, role: backend}
       - {kind: implementation}
-    purpose: A node that names no frontend side is behind-the-interface work, built then independently read.
+    purpose: A node that names no frontend side is behind-the-interface work, built, proven through its API on the real stack, then independently read.
     steps:
       - kind: backend.implement
+      - kind: e2e.verify
       - kind: review.verify
+  - id: uat/frontend
+    match:
+      - {kind: uat, role: frontend}
+    purpose: A frontend UAT node is the walk itself; there is nothing to build first.
+    steps:
+      - kind: uat.verify
   - id: uat
     match:
       - {kind: uat}
-    purpose: A UAT node is the walk itself; there is nothing to build first.
+    purpose: A backend scenario node is proven through the API on the real stack; there is nothing to build first.
     steps:
-      - kind: uat.verify
+      - kind: e2e.verify
   - id: operations
     match:
       - {kind: operations}
@@ -187,6 +204,13 @@ routes:
     limit: 3
     then: settle
     purpose: A red end-to-end scenario is a defect in the build it walked, not in the walk.
+  - id: e2e-red-repairs-the-build
+    on: {outcome: failed}
+    from: e2e.verify
+    to: {kind: lane.build, origin: repair}
+    limit: 3
+    then: settle
+    purpose: A red API scenario is a defect in the slice it exercised, not in the scenario.
   - id: review-findings-repair-the-build
     on: {verdict: findings}
     from: review.verify

@@ -39,7 +39,8 @@ may change, and `operator` is the launchable operator contract in `ops/` that ca
 | `frontend.implement` | build | implement | no | code | `interface.implement` | Build the interface the drawing settled. |
 | `backend.implement` | build | implement | no | code | `backend.implement` | Build one slice of behind-the-interface behaviour. |
 | `runtime.operate` | build | implement | no | runtime, code | `runtime.operate` | Migrations, environment, deployment, infrastructure. |
-| `uat.verify` | prove | verify | no | code | `uat.verify` | Walk one end-to-end scenario and leave it with its evidence. |
+| `e2e.verify` | prove | verify | no | code | `uat.verify` | Prove one delivered slice through its public API on the real stack, never a screen, and leave the scenario spec with its run output. |
+| `uat.verify` | prove | verify | no | code | `uat.verify` | Walk one end-to-end scenario on the rendered surface and leave it with its evidence. |
 | `review.verify` | prove | verify | **yes** | - | `review.verify` | Read the slice against its acceptance and report findings, repairing nothing. |
 
 Each kind also declares `reports`: the outcomes it may end with and the blocker kinds it may raise. That is
@@ -55,8 +56,9 @@ list runs from the most specific to the least.
 | lane | node shape | mandatory sequence |
 | --- | --- | --- |
 | `implementation/frontend` | `implementation` + frontend side, or `ui` | `interface.draw` (optional when `node.hasInterfaceDesign`) -> `frontend.implement` -> `uat.verify` |
-| `implementation/backend` | `implementation` + backend side, or no side named | `backend.implement` -> `review.verify` |
-| `uat` | `uat` | `uat.verify` |
+| `implementation/backend` | `implementation` + backend side, or no side named | `backend.implement` -> `e2e.verify` -> `review.verify` |
+| `uat/frontend` | `uat` + frontend side | `uat.verify` |
+| `uat` | `uat` | `e2e.verify` |
 | `operations` | `operations` | `runtime.operate` -> `review.verify` |
 | `architecture` | `architecture` | `architecture.decide` |
 | `business` | `business`, `business-overview` | `business.decide` |
@@ -86,6 +88,7 @@ walk repairs what that lane builds). Both need the reporter's context; an unreso
 | on | from | to | origin | limit | then |
 | --- | --- | --- | --- | --- | --- |
 | outcome `failed` | `uat.verify` | `lane.build` | repair | 3 | settle |
+| outcome `failed` | `e2e.verify` | `lane.build` | repair | 3 | settle |
 | verdict `findings` | `review.verify` | `lane.build` | repair | 3 | settle |
 | verdict `rejected` | any | `same` | - | 2 | retry |
 | verdict `gate-failed` | any | `lane.build` | gate | 3 | settle |

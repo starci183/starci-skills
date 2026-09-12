@@ -21,7 +21,7 @@ import {parseYaml} from '../core/yaml.mjs';
  */
 export const KIND_GRAPH='starci/kind-graph@1';
 /** The closed catalog. `validateGraph` refuses a profile that adds to it or drops from it. */
-export const KINDS=Object.freeze(['business.decide','architecture.decide','architecture.revise','interface.draw',
+export const KINDS=Object.freeze(['business.decide','architecture.decide','architecture.revise','interface.draw','e2e.verify',
   'frontend.implement','backend.implement','runtime.operate','uat.verify','review.verify']);
 export const FAMILIES=Object.freeze(['design','build','prove','repair']);
 export const ROLES=Object.freeze(['decide','plan','implement','verify','write']);
