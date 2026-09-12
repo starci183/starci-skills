@@ -105,7 +105,7 @@ test('interface.draw enumerates every screen state and writes the design record 
   assert.match(text,/installed design grammar/);assert.match(text,/invent no component family/);
   assert.match(text,/interface design record at the path the allowlist names \(`features\/sales\/ui\/intake\/index\.yaml`\)/);
   assert.match(text,/blueprint \(the regions in order\)/);assert.match(text,/contract slots/);assert.match(text,/the exact copy/);
-  assert.match(text,/one rendered candidate per screen state/);assert.match(text,/never a capture of a working feature/);
+  assert.match(text,/one candidate per screen state BY COMPOSING THE INSTALLED DESIGN GRAMMAR.*hand-drawn SVG or PNG.*is NOT a candidate/);assert.match(text,/never a capture of a working feature/);
   assert.match(text,/every assertion \(`intake-screen-shows-every-state`\) maps to a named screen state/);
   assert.match(text,/`blocked` with blocker `sds-gap` and the exact question, never a guess/);
   // A design operation writes no product code and carries no red-spec rule.

@@ -173,13 +173,13 @@ const SEQUENCE_STEPS={
       `For each screen, enumerate every state it can be in before you draw anything (at least loading, empty, error, populated and permission-denied where the requirement allows it); a state you do not enumerate is a state nobody will build.`,
       `Draw inside the project's frontend design rules named in the references - the installed design grammar and its contract components, the blueprint vocabulary, the typed component rules; invent no component family and no token of your own.`,
       `Write the interface design record at the path the allowlist names (${v.allowlist}): per screen its blueprint (the regions in order), each enumerated state with what it shows, the contract slots each region fills and the exact copy; no product code.`,
-      `Where the runtime supports rendering, produce one rendered candidate per screen state and store it in the owning node's own \`assets/\` beside the record the allowlist names (${v.allowlist}), each labelled screen + state + viewport and marked a proposed design, never a capture of a working feature.`,
+      `Render one candidate per screen state BY COMPOSING THE INSTALLED DESIGN GRAMMAR: build the screen from the product's contract components on a blueprint page or story, serve it, and capture a PNG per state and viewport with a headless browser; store each under the owning node's own \`assets/\` beside the record the allowlist names (${v.allowlist}), labelled screen + state + viewport and marked a proposed design. A hand-drawn SVG or PNG, a script that paints boxes and text, a mockup-tool export or an image produced outside the grammar is NOT a candidate: it is a rejected result, because the person picks a design by eye from what the real components render.`,
       `Self-check: every assertion (${v.acceptance}) maps to a named screen state, every enumerated state has its blueprint, slots and copy, and nothing in the record rests on a business rule the references do not state.`,
       `Report \`done\` exactly once with the record path(s) and the rendered candidates; a business rule the references do not settle is \`blocked\` with blocker \`sds-gap\` and the exact question, never a guess, and a change outside the allowlist is \`blocked\` with \`shared-change\` and the exact paths.`
     ],
     done:[
       `the record at ${v.allowlist} names every screen and every enumerated state (loading, empty, error, populated, permission-denied where it applies)`,
-      `every assertion (${v.acceptance}) maps to one screen state, with a rendered candidate per state wherever the runtime can render`,
+      `every assertion (${v.acceptance}) maps to one screen state, with a candidate per state rendered from the installed grammar's real components and captured with a headless browser - never hand-drawn`,
       `no product code changed; the drawing stays inside the installed design grammar`,
       LANE
     ]

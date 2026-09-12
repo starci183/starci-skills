@@ -424,6 +424,7 @@ const VALIDATOR_RULES=[
   'every finding must name a file of the diff (the `files` list); a finding on any other file is dropped by the kernel, so put the defect where the diff is',
   'reject only for a concrete defect: an acceptance statement or assertion the diff does not satisfy, a check that proves nothing, a spec that cannot fail, code the goal did not ask for, a machine check whose evidence contradicts the claim; style and preference are never findings',
   'stay consistent with the memory: the same kind of result gets the same verdict as before, and a job ruling in the memory is binding',
+  'a design candidate of an interface.draw operation counts only if it is a render of the product installed design grammar (its real components on a blueprint page or story, captured with a headless browser); a hand-drawn SVG or PNG, a script that paints boxes and text, or an image produced outside the grammar is a defect and the result is rejected',
   'an assertion listed under node.deferred is proven by the kernel itself or by a later step of the node lane (an end-to-end run, a review): never reject this operation for it, and never ask this operation to prove it',
   'the process (retry, commit, ledger) is the kernel\'s; you answer accept or reject and one line of summary'
 ];
