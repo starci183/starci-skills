@@ -19,6 +19,7 @@ test('every sequence renders a numbered working order and a definition of done, 
     'interface.draw':[op({kind:'interface.draw',origin:'interface',allowlist:['features/sales/ui/intake/index.yaml'],checks:[]}),{kind:'ui'}],
     'frontend.implement':[op({kind:'frontend.implement',allowlist:['src/screens/intake/page.tsx']}),{kind:'implementation',inputRef:'features/sales/implementation/frontend/intake/index.yaml'}],
     uat:[op({kind:'task.execute',allowlist:['e2e/checkout.spec.ts'],resources:['e2e-runtime']}),{kind:'uat'}],
+    'e2e.verify':[op({kind:'e2e.verify',allowlist:['src/tests/e2e/checkout.e2e-spec.ts'],resources:['e2e-runtime'],acceptance:['order-persisted']}),{kind:'uat'}],
     'uat.verify':[op({kind:'uat.verify',allowlist:['uat/checkout/runs/1/run.md'],resources:['e2e-runtime']}),{kind:'uat'}],
     operations:[op({kind:'runtime.operate',allowlist:['ops/rotate.sh'],resources:['postgres']}),{kind:'operations'}],
     migration:[op({allowlist:['src/migrations/0007-orders.ts'],resources:['postgres']}),{kind:'implementation'}],
@@ -237,4 +238,17 @@ test('the module carries no product path or repository name',async()=>{
   const fs=await import('node:fs');
   const source=fs.readFileSync(new URL('../execution/contract-steps.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(source,/starci-academy|agentos|nivo|apps\/|\.starciwork/i);
+});
+
+test('e2e.verify proves a backend slice through the API on the real stack, never a screen, and a backend uat node resolves to it while a frontend one walks the surface',()=>{
+  const e2e=op({kind:'e2e.verify',allowlist:['src/tests/e2e/checkout.e2e-spec.ts'],resources:['e2e-runtime'],acceptance:['order-persisted'],checks:[{name:'e2e',command:'npm run test:e2e -- checkout'}]});
+  const rendered=stepsFor(e2e,{node:{kind:'uat'}});
+  assert.match(rendered,/Sequence `e2e.verify`/);
+  assert.match(rendered,/through the public API on the real stack/);
+  assert.match(rendered,/never through a screen/);
+  assert.match(rendered,/`npm run test:e2e -- checkout`/);
+  assert.match(rendered,/never `done` on an unrun or partial spec/);
+  assert.match(rendered,/prove step of `backend.implement` -> `e2e.verify` -> `review.verify`/);
+  assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'uat',path:'features/sales/uat/checkout/index.yaml'}}),'uat');
+  assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'uat',path:'features/sales/implementation/frontend/checkout/index.yaml'}}),'uat.verify');
 });

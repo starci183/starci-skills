@@ -19,7 +19,7 @@
 
 export const STEPS_HEADING='## Working order (mandatory, in this order)';
 export const DONE_HEADING='## Definition of done for this kind';
-export const SEQUENCES=['implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','frontend.implement','review.verify','uat','uat.verify','operations','migration','architecture.revise','decide','generic'];
+export const SEQUENCES=['implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','frontend.implement','review.verify','e2e.verify','uat','uat.verify','operations','migration','architecture.revise','decide','generic'];
 
 const IMPLEMENT_KINDS=['backend.implement','interface.implement','frontend.implement'];
 const IMPLEMENT_NODES=['implementation','ui'];
@@ -52,7 +52,10 @@ export function sequenceFor(op,{node=null}={}){
   if(kind==='architecture.revise')return 'architecture.revise';
   if(DECIDE_KINDS.includes(kind))return 'decide';
   if(kind==='uat.verify')return 'uat.verify';
-  if(nodeKind==='uat')return 'uat';
+  // End-to-end proof of a backend slice goes through the API on a real stack, never a screen: `e2e.verify` is the
+  // backend lane's prove step, and a ledger `uat` node outside the frontend layout is such a scenario.
+  if(kind==='e2e.verify')return 'e2e.verify';
+  if(nodeKind==='uat')return frontendNode(node)?'uat.verify':'uat';
   const implement=IMPLEMENT_KINDS.includes(kind)||IMPLEMENT_NODES.includes(nodeKind);
   if(implement&&origin==='shared')return 'implement.shared';
   if(implement&&origin==='repair')return 'implement.repair';
@@ -179,6 +182,22 @@ const SEQUENCE_STEPS={
       `Report \`done\` exactly once with the findings in \`open[]\` (empty when the group is clean) and the checks file; report \`failed\` only when a check could not run at all.`
     ],
     done:[`every check ran and its exit code is recorded`,`every assertion was compared against the code`,`findings name file, line and assertion; no product file changed`]
+  }),
+  'e2e.verify':v=>({
+    steps:[
+      `Read the design (SDS) and requirement (SRS) material in ${v.references} and the node assertions (${v.acceptance}); restate, per assertion, the request a client sends and the observable effect the stack must show.`,
+      `Write or extend the end-to-end spec at the path the allowlist names (${v.allowlist}): one scenario per assertion, exercised through the public API on the real stack (database, identity, containers) with no mock of the unit under proof; never through a screen.`,
+      `Start only the end-to-end runtime named in resources (${v.resources}) and seed it as the scenario needs; touch no other runtime and change no product code - a behavior that is wrong is a finding to report, not a fix to make here.`,
+      `Run the listed check verbatim (${v.checks}) and keep the run output; a scenario that passes without the stack running proves nothing and is a defect of the spec.`,
+      `Self-audit: every assertion has a scenario, every scenario ran on ${v.resources}, and \`git status\` shows only ${v.allowlist}.`,
+      `Report \`done\` exactly once with the run output in the summary and the spec paths; a failing scenario is \`failed\` naming the assertion and the observed response; a runtime that cannot start is \`failed\` with the exact reason (\`blocked\` \`environment\` only when it provably cannot be fixed from the allowlist); never \`done\` on an unrun or partial spec.`
+    ],
+    done:[
+      `the spec at ${v.allowlist} exercises every assertion (${v.acceptance}) through the API on the real stack`,
+      `it ran on ${v.resources} and its output is in the report`,
+      `a failing scenario or a runtime that did not start is \`failed\`, never a \`done\``,
+      'Lane: this op is the prove step of `backend.implement` -> `e2e.verify` -> `review.verify`; the node is done only after `review.verify` accepts the slice this spec proved.'
+    ]
   }),
   uat:v=>({
     steps:[
