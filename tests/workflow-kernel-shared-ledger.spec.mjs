@@ -220,13 +220,15 @@ test('a workflow refuses to start on a shared ledger that carries changes the ke
   run.state.run='run_wf';run.state.from='term_kernel';
   // Somebody is authoring business material in the owner repository right now.
   fs.writeFileSync(path.join(run.work,'features','sales','brief.md'),'# Sales\n\nA pending draft nobody committed.\n');
+  git(run.owner,'add','--','.starciwork/features/sales/brief.md');
   const orca=scriptedOrca({reportsDir:run.store.paths.reports,worktree:run.code,scripts:{}});
   const state=runLoop(orca.orca,run.store,run.state,{cwd:run.code,allocator:fakeAllocator(),template,wait:noWait,
     validate:validateWorkTree,git:spawnSync,exec:()=>({status:0,stdout:'',stderr:''}),
     launch:()=>{throw Error('nothing may be launched over a ledger the kernel cannot commit into');},
     maxIterations:4});
-  assert.equal(state.finished.outcome,'blocked');
-  assert.match(state.finished.reason,/shared Work ledger carries uncommitted changes/);
+  // Not a finish: the kernel steps back and the supervisor tries again once the owner has committed or dropped it.
+  assert.equal(state.finished,null);
+  assert.match(run.store.readEvents().find(event=>event.event==='preflight-blocked').reason,/shared Work ledger carries uncommitted changes/);
   assert.ok(state.needUser.some(item=>item.kind==='ledger'&&/features\/sales\/brief\.md/.test(item.detail)));
   const dirty=run.store.readEvents().find(event=>event.event==='ledger-shared-dirty');
   assert.deepEqual(dirty.foreign,['.starciwork/features/sales/brief.md']);

@@ -424,6 +424,7 @@ const VALIDATOR_RULES=[
   'every finding must name a file of the diff (the `files` list); a finding on any other file is dropped by the kernel, so put the defect where the diff is',
   'reject only for a concrete defect: an acceptance statement or assertion the diff does not satisfy, a check that proves nothing, a spec that cannot fail, code the goal did not ask for, a machine check whose evidence contradicts the claim; style and preference are never findings',
   'stay consistent with the memory: the same kind of result gets the same verdict as before, and a job ruling in the memory is binding',
+  'an assertion listed under node.deferred is proven by the kernel itself or by a later step of the node lane (an end-to-end run, a review): never reject this operation for it, and never ask this operation to prove it',
   'the process (retry, commit, ledger) is the kernel\'s; you answer accept or reject and one line of summary'
 ];
 const normalizeFile=value=>String(value??'').replaceAll('\\','/').replace(/^\.\//,'').replace(/^\/+/,'').trim();
@@ -438,7 +439,7 @@ export function validateOp({op,node=null,diff,checks=[],references=[],memory='',
   if(!chain.length)return {ok:false,verdict:'unavailable',reason:`every validator provider is unavailable (${providers.join(', ')})`,attempts:[],usage:null,findings:[],dropped:[]};
   const payload={
     op:{id:op.id,kind:op.kind,goal:op.goal,attempt:op.attempt??1,acceptance:op.acceptance??[],allowlist:op.allowlist??[]},
-    ...(node?{node:{id:node.id??op.nodeId??null,description:node.description??null,assertions:node.assertions??[]}}:{}),
+    ...(node?{node:{id:node.id??op.nodeId??null,description:node.description??null,assertions:node.assertions??[],deferred:node.deferred??[]}}:{}),
     checks:checks.map(check=>({name:check.name,command:check.command,exitCode:check.exitCode,evidence:check.evidence??null})),
     references,
     diff:{files,truncated:Boolean(diff?.truncated),text:String(diff?.text??'')},

@@ -683,7 +683,15 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
-    const state=harness.run();
+    // The validator is told which assertions are not this op's to prove: the kernel-owned work-valid, and the ones
+    // a later lane step (e2e, review) carries; it must never reject the op for those.
+    const seen=[];
+    const capture=input=>{seen.push({op:input.op.id,assertions:input.node?.assertions??null,deferred:input.node?.deferred??null});return acceptAll();};
+    const state=harness.run({validateOp:capture});
+    const judged=seen.find(item=>item.op==='demo.sales.implementation.backend.intake');
+    assert.deepEqual(judged.assertions,['unit-tests-pass']);
+    assert.deepEqual(judged.deferred,['work-valid']);
+
     const node=harness.read('demo.sales.implementation.backend.intake');
     assert.equal(node.state,'done');
     assert.equal(node.completion.inputDigest,DIGEST('f'));

@@ -162,6 +162,11 @@ test('a shared ledger refuses to start over pending changes the kernel does not 
     ' M .starciwork/features/sales/implementation/backend/intake/index.yaml']);
   assert.equal(foreign.ok,false);
   assert.deepEqual(foreign.foreign,['.starciwork/features/sales/architecture/sds/intake/assets/flow.png']);
+  // An untracked path nobody owns is a stray for the owner kernel's sweep, not a pending change: it blocks nothing.
+  const strayed=status(['?? .starciwork/features/sales/ui/assets/','?? .starciwork/verification/',' M .starciwork/features/sales/implementation/backend/intake/index.yaml']);
+  assert.equal(strayed.ok,true);
+  assert.deepEqual(strayed.strays,['.starciwork/features/sales/ui/assets/','.starciwork/verification/']);
+  assert.deepEqual(strayed.foreign,[]);
   assert.ok(KERNEL_OWNED_LEDGER.test('.starciwork/features/sales/business/srs/index.yaml'));
   assert.equal(KERNEL_OWNED_LEDGER.test('.starciwork/features/sales/architecture/sds/intake/assets/flow.png'),false);
   // A tree git cannot read blocks nothing: the refusal needs an actual pending change, not a failed probe.

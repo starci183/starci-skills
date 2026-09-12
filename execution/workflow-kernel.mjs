@@ -863,6 +863,28 @@ function cleanStrayFiles(store,state,op,ctx){
   return op.strayFiles;
 }
 
+/**
+ * Untracked paths under the Work tree that no live operation's allowlist covers were left by an operation that
+ * was never accepted (settled, blocked, out of repository): the owner kernel removes them, so a kernel sharing
+ * the tree never has to step around them. Tracked changes and kernel-owned records are never touched here.
+ */
+function sweepTreeStrays(store,state,ctx){
+  if(!ctx.work||ctx.work.shared||typeof ctx.git!=='function')return [];
+  const shown=ctx.git('git',['status','--porcelain','--','.starciwork'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
+  if(shown.status!==0)return [];
+  // Only what a known, no-longer-live operation could have left is swept: an untracked path inside the allowlist of
+  // a blocked or settled op. A path no op ever owned may be a person's draft and is left where it is.
+  const live=state.ops.filter(item=>['running','paused','answering','ready','pending'].includes(item.status)).flatMap(item=>item.allowlist??[]);
+  const abandoned=state.ops.filter(item=>['blocked','ready','pending'].includes(item.status)&&!item.dispatch).flatMap(item=>item.allowlist??[]);
+  const owned=/(?:^|\/)(?:evidence|_local)\/|(?:^|\/)index\.ya?ml$/;
+  const strays=(shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(line=>line.startsWith('??'))
+    .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,'')))
+    .filter(file=>file.startsWith('.starciwork/')&&!owned.test(file)&&!inside(file,live)&&inside(file,abandoned));
+  for(const file of strays){try{fs.rmSync(path.join(state.worktree,file),{recursive:true,force:true});}catch{}}
+  if(strays.length)store.appendEvent({event:'tree-strays-removed',strays});
+  return strays;
+}
+
 function guardKernelPaths(store,state,op,ctx){
   const paths=op.kernelOwned??[];
   if(!paths.length)return [];
@@ -1364,8 +1386,17 @@ function validatorNode(ctx,op){
   if(!ctx.work||!op.nodeId)return null;
   const node=ctx.work.node(op.nodeId);
   if(!node)return null;
-  try{const raw=ctx.work.api.readNode(ctx.work.repoRoot,node);return {id:node.id,description:raw?.description??null,assertions:Array.isArray(raw?.assertions)?raw.assertions.map(String):[]};}
-  catch{return {id:node.id,description:null,assertions:[]};}
+  try{
+    const raw=ctx.work.api.readNode(ctx.work.repoRoot,node);
+    const all=Array.isArray(raw?.assertions)?raw.assertions.map(String):[];
+    // An assertion this op does not carry a check for is proven elsewhere: by the kernel (work-valid) or by a later
+    // lane step (the e2e run, the review). The validator is told so, or it rejects the op for what is not its job.
+    const own=new Set((op.checks??[]).map(check=>String(check.name??'')));
+    let named=[];try{named=ctx.work.api.nodeChecks(raw).map(check=>check.assertion).filter(Boolean);}catch{named=[];}
+    const deferred=all.filter(assertion=>KERNEL_CHECK.test(assertion)||(named.includes(assertion)&&!own.has(assertion)));
+    return {id:node.id,description:raw?.description??null,assertions:all.filter(assertion=>!deferred.includes(assertion)),deferred};
+  }
+  catch{return {id:node.id,description:null,assertions:[],deferred:[]};}
 }
 /** Runtimes the allocator has parked: the validator skips them instead of paying a call into a closed door. */
 const coolingRuntimes=allocator=>{try{return (allocator?.snapshot?.()?.cooling??[]).map(item=>item?.runtime).filter(Boolean);}catch{return [];}};
@@ -2168,6 +2199,8 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   // never reinstated by --allow-dynamic, and its needUser item goes with it.
   state.dynamicOps=state.ops.filter(item=>countsAgainstBudget(item)).length;
   for(const op of state.ops)if(!countsAgainstBudget(op)&&op.refusal==='dynamic-op'){op.refusal='superseded';state.needUser=state.needUser.filter(item=>item.op!==op.id||item.kind!=='dynamic-op');}
+  // An op the validator exhausted gets one more round on a fresh kernel start: the validator's rules may have changed.
+  for(const op of state.ops)if(op.status==='blocked'&&!op.refusal&&(op.validatorRejects??0)>=validatorRejectLimit()&&!op.validatorReset){op.status='ready';op.validatorRejects=0;op.validatorReset=true;op.dispatch=null;op.terminal=null;state.needUser=state.needUser.filter(item=>!(item.op===op.id&&item.kind==='validator'));}
   state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
   state.silences=plain(state.silences)?state.silences:{};
   state.lanes=plain(state.lanes)?state.lanes:{};
@@ -2215,11 +2248,14 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     // a pending change it does not own rather than sweep that change into a `work(...)` commit.
     if(shared){
       const status=sharedLedgerStatus({ownerRepoRoot:ledger.repoRoot,ledgerRoot:ledger.workRoot,git:ctx.git});
+      if(status.strays?.length)store.appendEvent({event:'ledger-shared-strays',owner:shared.owner,root:shared.root,strays:status.strays});
       if(!status.ok){
+        // Not a finish: the pending change is somebody's work in progress, so this kernel steps back and the
+        // supervisor tries again next round; the item stays in needUser until the owner commits or drops it.
         const detail=`the Work ledger ${shared.root} is owned by ${shared.owner} and carries uncommitted changes the kernel does not own: ${status.foreign.slice(0,12).join(', ')}`;
         if(!state.needUser.some(item=>item.kind==='ledger'&&item.detail===detail))state.needUser.push({kind:'ledger',detail});
         store.appendEvent({event:'ledger-shared-dirty',owner:shared.owner,root:shared.root,foreign:status.foreign});
-        finish(store,state,'blocked','the shared Work ledger carries uncommitted changes the kernel does not own',ctx);
+        store.appendEvent({event:'preflight-blocked',reason:'the shared Work ledger carries uncommitted changes the kernel does not own'});
         store.saveState(state);
         return state;
       }
@@ -2228,8 +2264,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   // Operations created before a rule change carry their old check lists: the kernel-owned checks are stripped on load.
   for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
   reconcileWithOrca(orca,store,state,{cwd,wait,allocator});
+  sweepTreeStrays(store,state,ctx);
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
-    if(iteration>0&&iteration%RECONCILE_EVERY===0)reconcileWithOrca(orca,store,state,{cwd,wait,allocator});
+    if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});sweepTreeStrays(store,state,ctx);}
     if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});store.saveState(state);return state;}
     state.iterations+=1;
     store.appendEvent({event:'tick',iteration:state.iterations,

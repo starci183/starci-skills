@@ -220,9 +220,12 @@ export function sharedLedgerStatus({ownerRepoRoot,ledgerRoot,git=spawnSync}={}){
   const root=slash(path.relative(owner,path.resolve(required(ledgerRoot,'ledger root'))))||'.';
   const shown=git('git',['status','--porcelain','--',root],{cwd:owner,encoding:'utf8',windowsHide:true});
   if(shown?.status!==0)return {ok:true,root,readable:false,foreign:[],kernelOwned:[]};
-  const files=unique((shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
-    .map(line=>slash(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))));
-  const kernelOwned=files.filter(file=>KERNEL_OWNED_LEDGER.test(file));
-  const foreign=files.filter(file=>!KERNEL_OWNED_LEDGER.test(file));
-  return {ok:foreign.length===0,root,readable:true,foreign,kernelOwned};
+  const entries=unique((shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean))
+    .map(line=>({untracked:line.startsWith('??'),file:slash(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))}));
+  const kernelOwned=entries.filter(entry=>KERNEL_OWNED_LEDGER.test(entry.file)).map(entry=>entry.file);
+  // A tracked change nobody owns is somebody's pending work and blocks; an untracked path nobody owns is a stray
+  // (an unaccepted op left it) and is reported for the owner kernel's sweep, never a reason to stop.
+  const foreign=entries.filter(entry=>!KERNEL_OWNED_LEDGER.test(entry.file)&&!entry.untracked).map(entry=>entry.file);
+  const strays=entries.filter(entry=>!KERNEL_OWNED_LEDGER.test(entry.file)&&entry.untracked).map(entry=>entry.file);
+  return {ok:foreign.length===0,root,readable:true,foreign,strays,kernelOwned};
 }
