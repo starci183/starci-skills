@@ -1,0 +1,61 @@
+schema: starci/runtimes@1
+purpose: |-
+  Runtime allocation replaces provider chains. Every runtime is a pool with parallel slots, a daily budget
+  and a cooldown. The workflow kernel never spreads work evenly: each role has a preference order and every
+  ready operation takes the first preferred runtime that still has the role, a free slot, budget and no
+  cooldown, overflowing to the next only when the earlier ones are saturated or cooling, and returning to a
+  preferred runtime as soon as one of its slots frees. A runtime that fails is classified and parked for the
+  cooldown of that failure kind, doubling per repeat.
+maxParallelOps: 10
+allocation:
+  policy: prefer-then-overflow
+  preference:
+    implement: [claude-opus, gpt-5.6-sol, qwen3.8-flash]
+    verify: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol, qwen3.8-flash]
+    decide: [claude-fable-5.1, gpt-6-astra, claude-opus]
+    plan: [claude-opus, claude-fable-5.1]
+    write: [claude-opus, gpt-5.6-sol, qwen3.8-flash]
+  verifyAvoidsImplementRuntime: true
+  onLaunchFailure: next-available-runtime
+  tieBreak: round-robin
+  cooldownMs: {rate-limited: 600000, quota: 3600000, auth: 86400000, other: 300000}
+  backoffFactor: 2
+  maxCooldownMs: 3600000
+runtimes:
+  gpt-5.6-sol:
+    target: gpt-5.6-sol
+    roles: [implement, verify, write]
+    maxParallel: 3
+    budget: {opsPerDay: 60, tokensPerDay: 12000000}
+  claude-opus:
+    target: claude-opus
+    roles: [implement, verify, write, plan]
+    maxParallel: 5
+    budget: {opsPerDay: 60, tokensPerDay: 20000000}
+  claude-fable-5.1:
+    target: claude-fable-5.1
+    roles: [verify, decide, plan, write]
+    maxParallel: 2
+    budget: {opsPerDay: 40, tokensPerDay: 8000000}
+  gpt-6-astra:
+    target: gpt-6-astra
+    roles: [decide, verify]
+    maxParallel: 1
+    budget: {opsPerDay: 20, tokensPerDay: 4000000}
+  qwen3.8-flash:
+    target: qwen3.8-flash
+    roles: [implement, verify, write]
+    maxParallel: 4
+    budget: {opsPerDay: 120}
+roleOfKind:
+  backend.implement: implement
+  interface.implement: implement
+  content.generate: write
+  release.deliver: implement
+  runtime.operate: implement
+  review.verify: verify
+  uat.verify: verify
+  architecture.decide: decide
+  business.decide: decide
+  interface.draw: write
+  task.execute: implement
