@@ -242,7 +242,9 @@ export function laneOf(state,node){
   const existing=state.lanes[id];
   if(existing?.lane?.length)return existing;
   const lane=(()=>{try{return graph.laneFor({kind:node?.kind??null,layout:nodeLayout(node),repositoryRole:node?.repository??null});}catch{return [];}})();
-  return state.lanes[id]={lane:[...lane],done:[...(existing?.done??[])],checks:[...(existing?.checks??[])],head:existing?.head??null};
+  // A node that already has accepted ops (a state from before lanes existed) starts its lane where those ops left it.
+  const accepted=state.ops.filter(op=>op.nodeId===id&&op.status==='done').map(op=>op.kind);
+  return state.lanes[id]={lane:[...lane],done:unique([...(existing?.done??[]),...accepted]),checks:[...(existing?.checks??[])],head:existing?.head??state.ops.find(op=>op.nodeId===id&&op.status==='done'&&op.head)?.head??null};
 }
 /** Predicates an `optionalWhen` lane step reads. No step declares one yet; the seam is here, not in the graph. */
 const lanePredicates=()=>({});
@@ -481,7 +483,13 @@ export function syncLedgerOps(store,state,ctx){
     for(const item of state.ledger)if(item.id===op.nodeId)item.status='out-of-repository';
     store.appendEvent({event:'op-out-of-repository',op:op.id,node:op.nodeId,repository:foreign,own:ctx.work.code.repository});
   }
-  for(const node of ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.code.repository,side:ctx.work.side})){
+  const candidates=ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.code.repository,side:ctx.work.side});
+  // A "ledger incomplete" item is only as current as the tree: once its node is schedulable, done, or no longer
+  // a candidate at all (foreign, ineligible), the item is stale and goes.
+  const incomplete=new Set(candidates.filter(node=>!node.schedulable).map(node=>node.id));
+  const doneNow=new Set(loaded.list.filter(node=>node.state==='done').map(node=>node.id));
+  state.needUser=state.needUser.filter(item=>item.kind!=='ledger'||(item.node?incomplete.has(item.node):!doneNow.has(state.ops.find(op=>op.id===item.op)?.nodeId??'')));
+  for(const node of candidates){
     if(!node.schedulable){
       if(!state.needUser.some(item=>item.node===node.id))state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
       continue;
@@ -2001,9 +2009,9 @@ function answerQuestions(orca,store,state,ctx){
  * (a launch the kernel lost) and is settled; the check is cheap and runs at start and every RECONCILE_EVERY ticks.
  */
 export const RECONCILE_EVERY=10;
-export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync}={}){
+export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync,allocator=null}={}){
   const listed=orca.invoke('worker-list',{run:state.run},{cwd});
-  if(listed.outcome!=='ok')return {orphans:[],reason:listed.reason};
+  if(listed.outcome!=='ok')return {orphans:[],dead:[],reason:listed.reason};
   const live=(getPath(listed.receipt,'result.workers')??[]).filter(w=>['ready','running','starting'].includes(w.workerState)||(w.workerState==='unsupervised'&&['dispatched','pending','ready'].includes(w.dispatchStatus)));
   const known=new Set(state.ops.map(op=>op.dispatch).filter(Boolean));
   const orphans=[];
@@ -2013,7 +2021,29 @@ export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=slee
     orphans.push({dispatch:worker.dispatchId,terminal:worker.agentTerminalHandle??null,effectState:settlement.effectState});
   }
   if(orphans.length)store.appendEvent({event:'reconciled-orphans',orphans});
-  return {orphans};
+  // The other direction: an op the kernel believes is running, whose Dispatch Orca no longer lists and whose
+  // terminal is gone, has no agent behind it. Nothing would ever observe it, so it is settled and queued again
+  // here; a report file it left is not touched - acceptReports consumes that first.
+  const terminals=orca.invoke('terminal-list',{},{cwd});
+  const handles=new Set((getPath(terminals.receipt,'result.terminals')??[]).map(item=>item.handle).filter(Boolean));
+  const liveDispatches=new Set(live.map(worker=>worker.dispatchId));
+  const dead=[];
+  if(terminals.outcome==='ok')for(const op of state.ops.filter(item=>item.status==='running'&&item.dispatch)){
+    if(liveDispatches.has(op.dispatch)||(op.terminal&&handles.has(op.terminal)))continue;
+    if(fs.existsSync(path.join(store.paths.reports,`${op.dispatch}.json`)))continue;
+    const settlement=settleDispatch(orca,op.dispatch,{cwd,reason:'dead: no worker and no terminal',terminalHandle:op.terminal,closeTerminal:false,wait});
+    if(allocator&&op.runtime)allocator.release(op.runtime);
+    op.restarts+=1;
+    dead.push({op:op.id,dispatch:op.dispatch,terminal:op.terminal,runtime:op.runtime,effectState:settlement.effectState,restarts:op.restarts});
+    if(op.restarts>RESTART_LIMIT){
+      op.status='blocked';op.dispatch=null;op.terminal=null;
+      state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} lost its agent ${op.restarts} times; the last terminal ${op.terminal??'?'} no longer exists`});
+      continue;
+    }
+    op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;
+  }
+  if(dead.length)store.appendEvent({event:'reconciled-dead',dead});
+  return {orphans,dead};
 }
 
 /**
@@ -2152,9 +2182,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   }
   // Operations created before a rule change carry their old check lists: the kernel-owned checks are stripped on load.
   for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
-  reconcileWithOrca(orca,store,state,{cwd,wait});
+  reconcileWithOrca(orca,store,state,{cwd,wait,allocator});
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
-    if(iteration>0&&iteration%RECONCILE_EVERY===0)reconcileWithOrca(orca,store,state,{cwd,wait});
+    if(iteration>0&&iteration%RECONCILE_EVERY===0)reconcileWithOrca(orca,store,state,{cwd,wait,allocator});
     if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});store.saveState(state);return state;}
     state.iterations+=1;
     store.appendEvent({event:'tick',iteration:state.iterations,

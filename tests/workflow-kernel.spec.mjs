@@ -1250,6 +1250,20 @@ test('reconcile settles a live dispatch no operation names, and a repeated anoma
     assert.ok(!harness.fake.live.has('ctx_orphan'),'the orphan is released');
     assert.equal(events(harness.store).at(-1).event,'reconciled-orphans');
 
+    // The other direction: a running op whose dispatch Orca no longer lists and whose terminal is gone is dead:
+    // settled, its runtime released, queued again; one whose terminal still exists is left alone.
+    harness.state.ops.push({...structuredClone(harness.state.ops[0]),id:'op-ship',status:'pending',dispatch:null,terminal:null,runtime:null,restarts:0});
+    running(harness.state,'op-ship','ctx_gone');harness.state.ops.find(op=>op.id==='op-ship').terminal='term_gone';
+    harness.fake.terminals.set('term_k',{handle:'term_k',title:'k',status:'running',sent:true,worktreePath:cwd,lastOutputAt:Date.now()});
+    const released=[];
+    const dead=reconcileWithOrca(harness.fake.orca,harness.store,harness.state,{cwd,wait:noWait,allocator:{release:runtime=>released.push(runtime)}});
+    assert.deepEqual(dead.dead.map(item=>[item.op,item.restarts]),[['op-ship',1]]);
+    assert.deepEqual(released,['qwen3.8-flash']);
+    const ship=harness.state.ops.find(op=>op.id==='op-ship');
+    assert.equal(ship.status,'ready');assert.equal(ship.dispatch,null);
+    assert.equal(harness.state.ops.find(op=>op.id==='op-intake').status,'running','a dispatch Orca still lists is alive');
+    assert.equal(events(harness.store).at(-1).event,'reconciled-dead');
+
     const asked=[];
     const decide=({situation,options})=>{asked.push({situation,options});return {ok:true,value:{option:'park-runtime',rationale:'the runtime keeps dying'}};};
     const parked=[];
