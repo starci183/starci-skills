@@ -434,7 +434,7 @@ test('the review loop is bounded: three rounds of findings end in needUser inste
     // Each repair is scoped to the file the finding named, inside the reviewed group's allowlist.
     assert.deepEqual(state.ops.find(op=>op.id==='repair-1').allowlist,[file]);
     assert.equal(state.verifyRounds['goal-1'],3);
-    assert.equal(state.ledger[0].status,'implemented');
+    assert.equal(state.ledger[0].status,'review-exhausted','the group is parked, not re-planned every tick');
     assert.equal(state.finished.outcome,'blocked');
     assert.match(state.needUser.find(item=>item.kind==='review').detail,/still fails review after 3 rounds/);
     const log=events(harness.store);
@@ -442,7 +442,7 @@ test('the review loop is bounded: three rounds of findings end in needUser inste
     assert.equal(log.filter(event=>event.event==='op-created'&&event.kind==='review.verify').length,3);
     const final=JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8'));
     assert.equal(final.outcome,'blocked');
-    assert.deepEqual(final.ledger.map(item=>item.status),['implemented']);
+    assert.deepEqual(final.ledger.map(item=>item.status),['review-exhausted']);
   }finally{harness.cleanup();}
 });
 
@@ -654,7 +654,7 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     assert.equal(verify.id,'verify-1');
     assert.equal(verify.nodeId,null);
     assert.notEqual(verify.runtime,state.ops[0].runtime);
-    assert.equal(state.verifyRounds['features/sales'],1);
+    assert.equal(state.verifyRounds['demo.sales.implementation.backend.intake'],1,'rounds are counted per reviewed node set, not per feature');
     assert.deepEqual(state.ledger.map(item=>[item.module,item.status]),[['features/sales','verified']]);
     assert.equal(state.finished.outcome,'blocked','the frontend node is still ledger-incomplete');
     const final=JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8'));
@@ -858,18 +858,18 @@ test('an operation created at run time past the dynamic budget, or wholly outsid
         checks:[passing('review','npx vitest run sales')],open:[`${file} does not persist the receipt`]}]}});
   try{
     assert.equal(harness.state.dynamicOpsBudget,DYNAMIC_OPS_BUDGET);
-    const approved=approve(harness.store,harness.state,{allowDynamic:1});
-    assert.equal(approved.dynamicOpsBudget,1);
+    const approved=approve(harness.store,harness.state,{allowDynamic:0});
+    assert.equal(approved.dynamicOpsBudget,0);
     harness.state.run='run_wf';harness.state.from='term_kernel';
     const state=harness.run({maxIterations:20,guards:stubGuards()});
-    // The review was the one dynamic op the budget allowed; the repair it asked for is refused, not run.
+    // The review is the kernel's own op and counts against nothing; the repair it asked for is the first dynamic op and is refused, not run.
     const refused=state.ops.find(item=>item.origin==='repair');
     assert.equal(refused.status,'blocked');
     assert.equal(refused.refusal,'dynamic-op');
     assert.equal(refused.runtime,null);
     const event=events(harness.store).find(item=>item.event==='dynamic-op-refused');
     assert.equal(event.op,refused.id);
-    assert.match(event.reason,/beyond the dynamic-op budget of 1/);
+    assert.match(event.reason,/beyond the dynamic-op budget of 0/);
     assert.match(state.needUser.find(item=>item.kind==='dynamic-op').detail,/--allow-dynamic/);
     assert.equal(state.finished.outcome,'blocked');
     // The user raising the budget reinstates exactly the ops the gate refused.
@@ -879,15 +879,19 @@ test('an operation created at run time past the dynamic budget, or wholly outsid
     assert.equal(state.needUser.some(item=>item.kind==='dynamic-op'),false);
   }finally{harness.cleanup();}
   // Scope is the second bound: a run-time op whose whole allowlist is outside the approved feature folders waits.
+  // The kernel's own review is never gated; the repair it derives from a finding is.
   const scoped=setup({plan:salesPlan,dirty:['apps/agentos-controlplane/src/sales/intake.ts'],
     scripts:{'op-intake':[{outcome:'done',summary:'Intake done.',files:['apps/agentos-controlplane/src/sales/intake.ts'],
-      checks:[passing('unit','npx vitest run sales')]}]}});
+      checks:[passing('unit','npx vitest run sales')]}],
+      'verify-1':[{outcome:'partial',summary:'Review round 1 rejected the work.',files:[],
+        checks:[passing('review','npx vitest run sales')],open:['apps/agentos-controlplane/src/sales/intake.ts does not persist the receipt']}]}});
   try{
     approve(scoped.store,scoped.state);
     scoped.state.scope=['payments'];
     scoped.state.run='run_wf';scoped.state.from='term_kernel';
-    const state=scoped.run({maxIterations:6,guards:stubGuards()});
-    const refused=state.ops.find(item=>item.kind==='review.verify');
+    const state=scoped.run({maxIterations:8,guards:stubGuards()});
+    assert.equal(state.ops.find(item=>item.kind==='review.verify').status,'done','the review ran: kernel-origin ops are not scope-gated');
+    const refused=state.ops.find(item=>item.origin==='repair');
     assert.equal(refused.status,'blocked');
     const event=events(scoped.store).find(item=>item.event==='dynamic-op-refused');
     assert.match(event.reason,/outside the approved scope payments/);

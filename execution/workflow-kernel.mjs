@@ -156,11 +156,12 @@ const ledgerItem=(state,id)=>state.ledger.find(item=>item.id===id)??null;
 const liveStatus=['pending','ready','running','answering','paused'];
 const nextId=(state,prefix)=>`${prefix}-${state.counters[prefix]=(state.counters[prefix]??0)+1}`;
 const componentKey=ledgerIds=>[...ledgerIds].sort().join('+')||'-';
-/** The key a review round is counted against: the module on the Work ledger, the item set on a plan ledger. */
+/**
+ * The key a review round is counted against: the reviewed item set. Counting per module burned a feature's
+ * three rounds on three different nodes, so the fourth node of a feature was never reviewed at all.
+ */
 const groupKey=(state,ledgerIds)=>{
-  if(state.ledgerMode!==WORK_LEDGER)return componentKey(ledgerIds);
-  const modules=unique(ledgerIds.map(id=>ledgerItem(state,id)?.module).filter(Boolean)).sort();
-  return modules.length?modules.join('+'):componentKey(ledgerIds);
+  return componentKey(ledgerIds);
 };
 const implementsLedger=op=>op.kind!=='review.verify'&&(op.ledgerIds??[]).length>0;
 
@@ -197,8 +198,14 @@ export const dynamicBudget=state=>Number.isFinite(state?.dynamicOpsBudget)?state
  * (so the graph and the final report still name it) but it is `blocked` and becomes a `needUser` item. A node
  * derived op is scope-checked by the Work ledger itself, so only its budget is counted here.
  */
+const KERNEL_ORIGINS=['ledger','verify','gate','architecture'];
+/** Ops the kernel itself derives from the ledger or its own rules: counted against nothing but their own bounds. */
+const countsAgainstBudget=op=>!KERNEL_ORIGINS.includes(op.origin);
 function gateDynamicOp(store,state,op){
-  state.dynamicOps=(state.dynamicOps??0)+1;
+  if(!countsAgainstBudget(op))return true;
+  state.dynamicOps=state.ops.filter(item=>countsAgainstBudget(item)).length;
+  // A kernel-origin op an older build refused under the budget is superseded, never reinstated by --allow-dynamic.
+  for(const op of state.ops)if(!countsAgainstBudget(op)&&op.refusal==='dynamic-op'){op.refusal='superseded';state.needUser=state.needUser.filter(item=>item.op!==op.id||item.kind!=='dynamic-op');}
   const budget=dynamicBudget(state);
   // In Work-ledger mode the scope names features (ledger ids), not file paths: the ledger itself bounds the
   // work, so only the budget gates a dynamic op there.
@@ -525,7 +532,7 @@ export function approve(store,state,{allocation=null,allowDynamic=null}={}){
   // `--allow-dynamic N` is the user raising the run-time op budget; ops the gate refused are reinstated with it.
   if(allowDynamic!==null&&allowDynamic!==undefined&&String(allowDynamic).trim()){
     const budget=Number(allowDynamic);
-    need(Number.isInteger(budget)&&budget>0,`--allow-dynamic takes a positive integer: ${allowDynamic}`);
+    need(Number.isInteger(budget)&&budget>=0,`--allow-dynamic takes a non-negative integer (0 forbids run-time ops): ${allowDynamic}`);
     const raised=budget>dynamicBudget(state);
     state.dynamicOpsBudget=budget;
     if(raised){
@@ -1374,7 +1381,12 @@ function planVerifyOps(store,state,ctx){
     const ledgerIds=[...component].sort();
     const key=groupKey(state,ledgerIds);
     // The review of one group is bounded: past the last round the group waits for the user, it is not reviewed again.
-    if((state.verifyRounds[key]??0)>=VERIFY_ROUNDS){store.appendEvent({event:'verify-exhausted',component:key,rounds:state.verifyRounds[key]});continue;}
+    if((state.verifyRounds[key]??0)>=VERIFY_ROUNDS){
+      for(const id of ledgerIds){const item=ledgerItem(state,id);if(item)item.status='review-exhausted';}
+      state.needUser.push({kind:'review',detail:`${key} used its ${VERIFY_ROUNDS} review rounds and is implemented again; decide whether the last findings stand`});
+      store.appendEvent({event:'verify-exhausted',component:key,rounds:state.verifyRounds[key]});
+      continue;
+    }
     const implementers=state.ops.filter(op=>implementsLedger(op)&&op.ledgerIds.some(id=>ledgerIds.includes(id)));
     state.verifyRounds[key]=(state.verifyRounds[key]??0)+1;
     const op=addOp(store,state,{kind:'review.verify',
@@ -1588,7 +1600,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   required(state.run,'Orca run id');required(state.from,'own terminal handle');
   const ctx={cwd,allocator,planOp,decide,template,wait,exec,git,launch,now,guards,work:null,orca,supervisor:supervisor??supervisorRuntimes(state.host??'')};
   // A state written before these bounds existed resumes with them.
-  state.dynamicOps=Number.isFinite(state.dynamicOps)?state.dynamicOps:0;
+  state.dynamicOps=state.ops.filter(item=>countsAgainstBudget(item)).length;
   state.dynamicOpsBudget=dynamicBudget(state);
   state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
   state.silences=plain(state.silences)?state.silences:{};
