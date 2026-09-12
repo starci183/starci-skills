@@ -56,8 +56,10 @@ export function featureOf(item){
 }
 
 /** The last supervision round, from `_local/workflows/supervisor.log`, plus what that round decided for this workflow. */
-function readSupervisor(repoRoot,id,now){
-  const rounds=readJsonLines(path.join(workflowsRoot(repoRoot),'supervisor.log')).filter(entry=>entry.event==='supervisor-round');
+function readSupervisor(repoRoot,id,now,dir=null){
+  // The log beside the workflow (a named-ledger store) or the repository's own: whichever the supervisor wrote.
+  const files=[...new Set([path.join(workflowsRoot(repoRoot),'supervisor.log'),...(dir?[path.join(path.dirname(dir),'supervisor.log')]:[])])];
+  const rounds=files.flatMap(file=>readJsonLines(file)).filter(entry=>entry.event==='supervisor-round').sort((a,b)=>(a.at??0)-(b.at??0));
   const lastRound=rounds.at(-1)??null;
   const lastRoundAt=at(lastRound);
   const mine=last(rounds,entry=>Array.isArray(entry.rounds)&&entry.rounds.some(item=>String(item).startsWith(`${id}:`)));
@@ -178,7 +180,7 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
     phase:state.phase??null,finished:state.finished??null,stopRequested:fs.existsSync(path.join(dir,'stop.flag')),
     kernel:{alive:processAlive(lock?.pid),pid:lock?.pid??null,startedAt:lock?.startedAt??null,
       lastEventAt,lastEvent:lastEvent?.event??null,silentMs:lastEventAt===null?null:stamp-lastEventAt,events:events.length},
-    supervisor:readSupervisor(repoRoot,state.id??id,stamp),
+    supervisor:readSupervisor(repoRoot,state.id??id,stamp,dir),
     runtimes,
     ops:{total:ops.length,counts:opStatus,live:ops.filter(op=>LIVE_OPS.includes(op.status)).length,running,blocked},
     ledger:{total:ledger.length,counts:ledgerStatus,

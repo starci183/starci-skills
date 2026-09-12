@@ -96,8 +96,10 @@ export function supervisorMain(options,{cwd}){
   const roots=[repoRoot,path.resolve(cwd)];
   const host=path.resolve(options.host??'');
   const launcher=path.join(host,'.dist','execution','orca-supervised-launch.mjs');
-  const logFile=path.join(workflowsRoot(repoRoot),'supervisor.log');
-  const log=event=>{try{fs.mkdirSync(path.dirname(logFile),{recursive:true});fs.appendFileSync(logFile,`${JSON.stringify({at:Date.now(),...event})}\n`);}catch{}};
+  // One line per round into every store root this supervisor covers, so each workflow's view finds its supervisor beside it.
+  const logFiles=[...new Set(roots.map(root=>path.join(workflowsRoot(root),'supervisor.log')))];
+  const log=event=>{const line=`${JSON.stringify({at:Date.now(),...event})}
+`;for(const file of logFiles){try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.appendFileSync(file,line);}catch{}}};
   if(options.once==='true')return superviseOnce({repoRoot,roots,launcher,log,only:options.id?[options.id]:null});
   return superviseForever({repoRoot,roots,launcher,log,pollMs:Number(options['poll-ms']??DEFAULT_POLL_MS),healthMs:Number(options['health-ms']??DEFAULT_HEALTH_MS)});
 }
