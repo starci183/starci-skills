@@ -1252,7 +1252,8 @@ function validatorOnlyBlock(report){
 }
 
 function acceptReports(orca,store,state,ctx){
-  const reports=store.readReports().filter(report=>report?.sent);
+  // The report file is the source of truth: a report whose Orca signal failed to send is still a report.
+  const reports=store.readReports().filter(report=>report?.dispatch&&report?.outcome);
   const actions=[];
   for(const op of state.ops.filter(item=>item.status==='running')){
     const report=reports.find(item=>item.dispatch===op.dispatch);
@@ -1489,6 +1490,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     scheduleOps(orca,store,state,ctx);
     state.allocation=typeof allocator.serialize==='function'?allocator.serialize():allocator.snapshot?.()??null;
     const running=state.ops.filter(op=>op.status==='running');
+    // Fast path: an operation whose report is already on disk is accepted before any blocking wait.
+    const early=acceptReports(orca,store,state,ctx);
+    if(Array.isArray(early)&&early.length){store.appendEvent({event:'accepted-early',ops:early.map(item=>item.op)});store.saveState(state);continue;}
     if(running.length){
       const tick=waitTick(orca,{cwd:state.worktree,run:state.run,from:state.from,timeoutMs:waitTimeoutMs,tickMs,
         reportsDir:store.paths.reports,now,wait});
