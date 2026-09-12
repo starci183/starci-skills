@@ -34,7 +34,8 @@ export function validateProviderContracts(){
   catch(error){errors.push(error.message);return {ok:false,errors};}
 
   add(errors,orca.index?.schema==='starci/orca-provider@1','Missing Orca provider index');
-  add(errors,orca.index?.names?.planCoordinator==='[Coordinator] <Plan>','Invalid Orca Plan Coordinator name');
+  add(errors,orca.index?.names?.planCoordinatorWorktree==='[Coordinator] <Plan>','Invalid Orca Plan Coordinator worktree name');
+  add(errors,orca.index?.names?.planCoordinator==='[Monitor] <Plan>','Invalid Orca Plan Coordinator agent name');
   add(errors,orca.index?.names?.workflowWorktree==='[Workflow] <Workflow>','Invalid Orca workflow worktree name');
   add(errors,orca.index?.names?.workflowMonitor==='[Monitor] <Workflow>','Invalid Orca Workflow Monitor name');
   add(errors,orca.index?.names?.operationAgent==='[Op] <operation> - <scope>','Invalid Orca operation name');

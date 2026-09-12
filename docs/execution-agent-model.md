@@ -67,7 +67,8 @@ normalized manager boundaries and never performs workflow-local or operation wor
 
 ```text
 Orca main worktree
-└─ [Coordinator] AgentOS Backend
+└─ [Coordinator] AgentOS Backend            (main worktree)
+   └─ [Monitor] AgentOS Backend             (persistent Plan Coordinator agent)
    ├─ [Workflow] Core (child worktree)
    │  └─ [Monitor] Core
    │     └─ [Op] <operation> - Core

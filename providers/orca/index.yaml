@@ -30,7 +30,9 @@ ui:
     - supervised-worker-receipt
   note: 'A sidebar subtitle such as "Bash: orca orchestration check" means the native agent is currently using Bash; it does not mean the terminal is a shell-only worker.'
 names:
-  planCoordinator: "[Coordinator] <Plan>"
+  planCoordinatorWorktree: "[Coordinator] <Plan>"
+  planCoordinator: "[Monitor] <Plan>"
+  rule: A worktree carries the scope role (Coordinator for the Plan main worktree, Workflow for a child); the persistent agent running inside a worktree is always its Monitor; operation agents are Op.
   workflowWorktree: "[Workflow] <Workflow>"
   workflowMonitor: "[Monitor] <Workflow>"
   operationAgent: "[Op] <operation> - <scope>"
@@ -43,9 +45,12 @@ planCoordinator:
     startAgent:
       api: orchestration.worker-start
       cli: 'orca orchestration worker-start --task <task-id> --worktree current --agent codex --json'
+    nameWorktree:
+      api: worktree.set
+      cli: 'orca worktree set --worktree <exact-main-worktree-selector> --display-name "[Coordinator] <Plan>" --json'
     nameAgent:
       api: terminal.rename
-      cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Coordinator] <Plan>" --json'
+      cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Monitor] <Plan>" --json'
     waitBoundary:
       api: orchestration.check
       cli: 'orca orchestration check --wait --types worker_done,worker_failed,escalation,question --timeout-ms 900000 --json'

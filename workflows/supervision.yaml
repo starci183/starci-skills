@@ -87,7 +87,8 @@ waitHierarchy:
     operationExecution: forbidden
 workerLifecycle:
   displayNames:
-    coordinator: "[Coordinator] <Plan>"
+    coordinatorWorktree: "[Coordinator] <Plan>"
+    coordinator: "[Monitor] <Plan>"
     workflowWorktree: "[Workflow] <Workflow>"
     workflowManager: "[Monitor] <Workflow>"
     operationAgent: "[Op] <operation> - <scope>"

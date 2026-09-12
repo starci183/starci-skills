@@ -8,9 +8,11 @@ recipes:
       - orchestration.run-create
       - orchestration.task-create
       - orchestration.worker-start
+      - worktree.set-display-name
       - terminal.rename
       - orchestration.run-use
-    terminalName: "[Coordinator] <Plan>"
+    worktreeName: "[Coordinator] <Plan>"
+    terminalName: "[Monitor] <Plan>"
     environmentBinding: current-runtime-by-omitting---on
     then: external-bootstrap-leaves-control-loop
   start-workflow-coordinator:

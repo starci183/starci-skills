@@ -16,7 +16,8 @@ const uniqueStrings=value=>Array.isArray(value)&&value.length>0&&value.every(ite
 const oneLine=(value,label)=>text(value,label).replace(/\s+/g,' ');
 
 export function formatOrcaDisplayName(kind,{plan,workflow,operation,scope}={}){
-  if(kind==='coordinator')return `[Coordinator] ${oneLine(plan,'plan name')}`;
+  if(kind==='coordinator-worktree')return `[Coordinator] ${oneLine(plan,'plan name')}`;
+  if(kind==='coordinator')return `[Monitor] ${oneLine(plan,'plan name')}`;
   if(kind==='workflow-worktree')return `[Workflow] ${oneLine(workflow,'workflow name')}`;
   if(kind==='workflow-manager')return `[Monitor] ${oneLine(workflow,'workflow name')}`;
   if(kind==='operation-agent')return `[Op] ${oneLine(operation,'operation name')} - ${oneLine(scope,'operation scope')}`;
@@ -108,7 +109,7 @@ export function validateSupervisionPolicy(policy){
   const operationAgent=policy?.workerLifecycle?.operationAgent;
   const names=policy?.workerLifecycle?.displayNames;
   const qwenLaunch=operationAgent?.qwenLaunch,nativeFailure=operationAgent?.nativeLaunchFailure;
-  if(names?.coordinator!=='[Coordinator] <Plan>'||names?.workflowWorktree!=='[Workflow] <Workflow>'||names?.workflowManager!=='[Monitor] <Workflow>'||names?.operationAgent!=='[Op] <operation> - <scope>'||names?.applyAgentNameWith!=='task-display-name-then-provider-attestation-then-terminal-canonicalization')errors.push('Orca display naming contract is invalid');
+  if(names?.coordinatorWorktree!=='[Coordinator] <Plan>'||names?.coordinator!=='[Monitor] <Plan>'||names?.workflowWorktree!=='[Workflow] <Workflow>'||names?.workflowManager!=='[Monitor] <Workflow>'||names?.operationAgent!=='[Op] <operation> - <scope>'||names?.applyAgentNameWith!=='task-display-name-then-provider-attestation-then-terminal-canonicalization')errors.push('Orca display naming contract is invalid');
   if(operationAgent?.lifetime!=='operation-attempt'||operationAgent?.launch!=='supervised-native-agent'||operationAgent?.isolation!=='one-operation-one-agent'||operationAgent?.release!=='after-accepted-worker_done'||operationAgent?.reuse!=='forbidden')errors.push('Operation agent lifecycle is invalid');
   const admission=operationAgent?.dispatchAdmission,sidearm=operationAgent?.architectureSidearm;
   if(!uniqueStrings(admission?.required)||!['expected-operation-from-active-dag-node','exact-operation-contract','resolved-provider-selection','canonical-display-name'].every(rule=>admission.required.includes(rule))||admission?.providerProof!=='worker-show-exact-effective-agent-model'||admission?.effectAcceptance!=='only-after-provider-proof'||admission?.onOperationMismatch!=='fence-reconcile-release-and-dispatch-expected-operation'||admission?.onProviderMismatch!=='fence-reconcile-release-and-retry-resolved-target')errors.push('Operation dispatch admission is invalid');

@@ -132,7 +132,8 @@ unsupervised terminal as a successful operation.
 
 The display contract is mandatory at creation time:
 
-- main agent: `[Coordinator] <Plan>`;
+- main worktree: `[Coordinator] <Plan>`;
+- persistent main agent (the Plan Coordinator): `[Monitor] <Plan>`;
 - child worktree: `[Workflow] <Workflow>`;
 - persistent child manager: `[Monitor] <Workflow>`;
 - isolated operation agent: `[Op] <operation> - <scope>`.

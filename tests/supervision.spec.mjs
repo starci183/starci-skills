@@ -104,7 +104,8 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
 });
 
 test('display names distinguish plan coordinator, workflow Monitor and operation roles',()=>{
-  assert.equal(formatOrcaDisplayName('coordinator',{plan:'AgentOS Backend'}),'[Coordinator] AgentOS Backend');
+  assert.equal(formatOrcaDisplayName('coordinator-worktree',{plan:'AgentOS Backend'}),'[Coordinator] AgentOS Backend');
+  assert.equal(formatOrcaDisplayName('coordinator',{plan:'AgentOS Backend'}),'[Monitor] AgentOS Backend');
   assert.equal(formatOrcaDisplayName('workflow-worktree',{workflow:'Chatbot'}),'[Workflow] Chatbot');
   assert.equal(formatOrcaDisplayName('workflow-manager',{workflow:'Chatbot'}),'[Monitor] Chatbot');
   assert.equal(formatOrcaDisplayName('operation-agent',{operation:'review.verify',scope:'Chatbot'}),'[Op] review.verify - Chatbot');

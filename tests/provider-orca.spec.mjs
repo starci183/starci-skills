@@ -6,7 +6,8 @@ import {loadProviderContract,validateProviderContracts} from '../providers/valid
 test('Orca provider contract fixes hierarchy names and exact native API calls',()=>{
   const contract=readPublicJson('providers/orca/index.json');
   assert.equal(contract.schema,'starci/orca-provider@1');
-  assert.equal(contract.names.planCoordinator,'[Coordinator] <Plan>');
+  assert.equal(contract.names.planCoordinatorWorktree,'[Coordinator] <Plan>');
+  assert.equal(contract.names.planCoordinator,'[Monitor] <Plan>');
   assert.equal(contract.names.workflowWorktree,'[Workflow] <Workflow>');
   assert.equal(contract.names.workflowMonitor,'[Monitor] <Workflow>');
   assert.equal(contract.names.operationAgent,'[Op] <operation> - <scope>');
