@@ -49,3 +49,19 @@ test('a stop flag pauses a kernel but does not end supervision; only finished wo
     assert.equal(slept.length,2,'a finished workflow ends the loop without another sleep');
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('a workflow whose tree was named explicitly is started with the same --ledger-root, and a worktree store is covered beside the repository store',()=>{
+  const root=tmp();const other=tmp();const now=()=>10_000_000;
+  try{
+    const dir=workflow(root,'named',{lastAt:1});
+    const state=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));
+    fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({...state,ledgerRoot:'X:/tree/.starciwork',ledgerSource:'option'}));
+    workflow(other,'beside',{lastAt:1});
+    const spawned=[];
+    const result=superviseOnce({repoRoot:root,roots:[root,other],launcher:'L.mjs',now,spawnFn:(exe,args)=>{spawned.push(args);return {pid:1,unref(){}};},killFn:()=>{},log:()=>{}});
+    assert.deepEqual(result.rounds.map(item=>[item.id,item.action]),[['named','start'],['beside','start']]);
+    const named=spawned.find(args=>args.includes('named'));
+    assert.deepEqual(named.slice(named.indexOf('--ledger-root')),['--ledger-root','X:/tree/.starciwork']);
+    assert.ok(!spawned.find(args=>args.includes('beside')).includes('--ledger-root'),'a routed or local tree is resolved by the kernel itself');
+  }finally{fs.rmSync(root,{recursive:true,force:true});fs.rmSync(other,{recursive:true,force:true});}
+});

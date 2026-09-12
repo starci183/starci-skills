@@ -28,7 +28,7 @@ export function inspectWorkflow(entry,{now=Date.now}={}){
   const finished=Boolean(state?.finished);
   const approved=Boolean(state?.approved);
   const stopRequested=fs.existsSync(path.join(entry.dir,'stop.flag'));
-  return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null};
+  return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null};
 }
 
 /** Decide, for one workflow, what the supervisor does this round. */
@@ -42,7 +42,9 @@ export function supervisorAction(info,{healthMs=DEFAULT_HEALTH_MS}={}){
 /** Start one kernel process detached; its lock file is the only thing that keeps a second one out. */
 export function startKernel(info,{launcher,spawnFn=spawn,log=()=>{}}){
   if(!info.worktree)return {ok:false,reason:'the workflow state names no worktree'};
-  const args=[launcher,'workflow-run','--id',info.id,'--worktree','.','--host',info.host??''].filter(Boolean);
+  // A workflow whose tree was named explicitly at goal time is reached the same way: its store follows that tree.
+  const named=info.ledgerSource==='option'&&info.ledgerRoot?['--ledger-root',info.ledgerRoot]:[];
+  const args=[launcher,'workflow-run','--id',info.id,'--worktree','.','--host',info.host??'',...named].filter(Boolean);
   const child=spawnFn(process.execPath,args,{cwd:info.worktree,detached:true,stdio:'ignore',windowsHide:true});
   child.unref?.();
   log({event:'kernel-started',id:info.id,pid:child.pid});
@@ -56,9 +58,13 @@ export function stopKernel(info,{killFn=pid=>process.kill(pid),log=()=>{}}={}){
 }
 
 /** One supervision round over every workflow of a repository. */
-export function superviseOnce({repoRoot,launcher,healthMs=DEFAULT_HEALTH_MS,now=Date.now,spawnFn,killFn,log=()=>{},only=null}){
+export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEALTH_MS,now=Date.now,spawnFn,killFn,log=()=>{},only=null}){
   const rounds=[];
-  for(const entry of listWorkflows(repoRoot)){
+  // Every store root this supervisor covers: the repository's own and, when it runs from a worktree, that worktree's (a shared ledger puts a workflow's store beside the tree it was named with).
+  const stores=[...new Set((roots??[repoRoot]).map(root=>path.resolve(root)))];
+  const seen=new Set();
+  for(const entry of stores.flatMap(root=>{try{return listWorkflows(root);}catch{return [];}})){
+    if(seen.has(entry.dir))continue;seen.add(entry.dir);
     if(only&&!only.includes(entry.id))continue;
     const info=inspectWorkflow(entry,{now});
     const decision=supervisorAction(info,{healthMs});
@@ -71,10 +77,10 @@ export function superviseOnce({repoRoot,launcher,healthMs=DEFAULT_HEALTH_MS,now=
 }
 
 /** The long-running supervisor: poll, act, sleep; exits only when no approved workflow is unfinished. */
-export function superviseForever({repoRoot,launcher,pollMs=DEFAULT_POLL_MS,healthMs,log=()=>{},maxRounds=Infinity,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}){
+export function superviseForever({repoRoot,roots=null,launcher,pollMs=DEFAULT_POLL_MS,healthMs,log=()=>{},maxRounds=Infinity,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}){
   let round=0;
   for(;;){
-    const result=superviseOnce({repoRoot,launcher,healthMs,log});
+    const result=superviseOnce({repoRoot,roots,launcher,healthMs,log});
     log({event:'supervisor-round',round,rounds:result.rounds.map(item=>`${item.id}:${item.action}`)});
     // The supervisor lives as long as any approved workflow is unfinished: a stop flag pauses a kernel, it does not
     // end supervision, because the flag is removed when the kernel may run again.
@@ -87,10 +93,11 @@ export function superviseForever({repoRoot,launcher,pollMs=DEFAULT_POLL_MS,healt
 export function supervisorMain(options,{cwd}){
   // The workflow store lives in the repository the worktree belongs to (git common dir), exactly as the kernel resolves it.
   const repoRoot=repositoryRoot(path.resolve(cwd));
+  const roots=[repoRoot,path.resolve(cwd)];
   const host=path.resolve(options.host??'');
   const launcher=path.join(host,'.dist','execution','orca-supervised-launch.mjs');
   const logFile=path.join(workflowsRoot(repoRoot),'supervisor.log');
   const log=event=>{try{fs.mkdirSync(path.dirname(logFile),{recursive:true});fs.appendFileSync(logFile,`${JSON.stringify({at:Date.now(),...event})}\n`);}catch{}};
-  if(options.once==='true')return superviseOnce({repoRoot,launcher,log,only:options.id?[options.id]:null});
-  return superviseForever({repoRoot,launcher,log,pollMs:Number(options['poll-ms']??DEFAULT_POLL_MS),healthMs:Number(options['health-ms']??DEFAULT_HEALTH_MS)});
+  if(options.once==='true')return superviseOnce({repoRoot,roots,launcher,log,only:options.id?[options.id]:null});
+  return superviseForever({repoRoot,roots,launcher,log,pollMs:Number(options['poll-ms']??DEFAULT_POLL_MS),healthMs:Number(options['health-ms']??DEFAULT_HEALTH_MS)});
 }

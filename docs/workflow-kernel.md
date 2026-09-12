@@ -406,3 +406,5 @@ is already someone's job; silence with no supervisor log means nothing is watchi
 it cannot. A `ledger` item wants an allowlist or checks authored on the node; a `dynamic-op` item wants
 `workflow-approve --id <id> --allow-dynamic N`; `environment` and `authority` items want you. Until then the
 workflow keeps running everything else and stops `blocked` at the end with those items in its final report.
+
+The supervisor covers two store roots: the repository's own (`<repo>/.starciwork/_local/workflows`) and, when it runs from a worktree, that worktree's, because a workflow whose tree was named with `--ledger-root` keeps its store beside that tree; such a workflow is started with the same `--ledger-root`.
