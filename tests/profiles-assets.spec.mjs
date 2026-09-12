@@ -42,7 +42,8 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.deepEqual(Object.keys(registry.operators).sort(),[...ops].sort());
   // An operator declares every runtime that carries its role, so runtime allocation always resolves a
   // launch shape: the decide ops gained Opus as the reasoning overflow, review.verify gained Opus and Astra.
-  const expectedCounts={'business.decide':3,'architecture.decide':3,'review.verify':5};
+  // interface.draw generates PNG candidates with the image model, which only the Codex runtime carries: one link, no overflow.
+  const expectedCounts={'business.decide':3,'architecture.decide':3,'review.verify':5,'interface.draw':1};
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
     const expectedCount=expectedCounts[op]??3;
