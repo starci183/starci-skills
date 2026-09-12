@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {createOrcaCalls} from '../execution/orca-calls.mjs';
-import {buildMonitorLaunch,buildOperationLaunch,defaultOrcaExecutable,main,notifyTerminal,parseSkip,promptDelivery,qwenLaunchMode,replaceMonitor,resolveSupervisorChain,settleDispatch,startMonitor,startOperation,sweepWorktree} from '../execution/orca-supervised-launch.mjs';
+import {resolveExecutionChain} from '../profiles/select.mjs';
+import {buildOperationLaunch,defaultOrcaExecutable,main,notifyTerminal,parseSkip,promptDelivery,qwenLaunchMode,resolveSupervisorChain,settleDispatch,startOperation,sweepWorktree} from '../execution/orca-supervised-launch.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';
@@ -17,7 +18,6 @@ const input={run:'run_sales',workflowTask:'task_workflow_sales',from:'term_monit
 // Reasoning op: managed agents only (Fable, then Astra).
 const reasonName='[Op] architecture.decide - Sales';
 const reasonInput={...input,operation:'architecture.decide',spec:'Decide the bounded Sales SDS gap.'};
-const monitorInput={run:'run_parent',parentTask:'task_parent',from:'term_parent',worktree,workflow:'Sales',spec:'Manage the Sales operation DAG without performing operation work.'};
 
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
 const runShow={ok:true,result:{run:{id:'run_sales',coordinator_handle:'term_monitor_sales'}}};
@@ -90,17 +90,11 @@ test('operation request carries the whole chain with its launch kinds and owns t
   assert.equal(planned.taskParams['display-name'],opName);
   assert.throws(()=>buildOperationLaunch({...input,worktree:'current'}),/filesystem-relative path/);
   assert.throws(()=>buildOperationLaunch({...input,worktree:worktreePath}),/must be relative/);
-  assert.deepEqual(buildOperationLaunch(reasonInput).candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['claude-fable-5.1','managed-agent'],['gpt-6-astra','managed-agent']]);
+  assert.deepEqual(buildOperationLaunch(reasonInput).candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['claude-fable-5.1','managed-agent'],['gpt-6-astra','managed-agent'],['claude-opus','managed-agent']]);
 });
 
-test('Workflow Monitor launch resolves the supervisor chain instead of a hardcoded provider',()=>{
+test('a supervisor chain resolves from the registry with its model and effort, never from a hardcoded provider',()=>{
   assert.deepEqual(resolveSupervisorChain('workflowMonitor').map(candidate=>[candidate.target,candidate.model,candidate.effort]),[['claude-opus',null,null],['gpt-5.6-sol','gpt-5.6-sol','high']]);
-  const planned=buildMonitorLaunch(monitorInput);
-  assert.equal(planned.displayName,'[Monitor] Sales');
-  assert.deepEqual(planned.candidates.map(candidate=>candidate.workerParams.agent),['claude','codex']);
-  assert.equal(planned.candidates[1].workerParams.model,'gpt-5.6-sol');
-  assert.equal(planned.candidates[1].workerParams.effort,'high');
-  assert.equal(planned.taskParams.parent,'task_parent');
   assert.throws(()=>resolveSupervisorChain('nobody'),/Supervisor chain is missing/);
 });
 
@@ -278,46 +272,6 @@ test('native activity title drift after the canonical rename is recorded, never 
   assert.equal(fake.spawned.filter(args=>args[1]==='worker-stop').length,0);
 });
 
-test('Workflow Monitor launch tries Claude Opus first and falls through to Codex Sol only after a no-effect failure',()=>{
-  const fake=fakeOrca({
-    'task-create':()=>json(0,taskCreated('task_monitor_sales','[Monitor] Sales')),
-    'worker-start':(args)=>has(args,'--agent','claude')?json(1,{ok:false,error:{code:'startup_failure',message:'claude did not start'},result:{failedStage:'agent_start',residualResources:[]}}):json(0,started('ctx_codex','task_monitor_sales')),
-    'worker-show':(args,nth)=>json(0,shown({dispatch:'ctx_codex',task:'task_monitor_sales',agent:'codex',model:'gpt-5.6-sol',title:nth===1?'Working':'[Monitor] Sales'})),
-    'terminal-rename':()=>json(0,{ok:true,result:{}})
-  });
-  const result=startMonitor(monitorInput,{orca:fake.orca});
-  assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'gpt-5.6-sol');
-  assert.equal(result.attempts[0].target,'claude-opus');
-  const codexStart=fake.spawned.filter(args=>args[1]==='worker-start').at(-1);
-  assert.ok(has(codexStart,'--model','gpt-5.6-sol')&&has(codexStart,'--effort','high'));
-});
-
-test('a dead Workflow Monitor is settled and replaced on a fresh Task with --retry-of; a live one is never replaced',()=>{
-  const fake=fakeOrca({
-    'worker-show':(args,nth)=>has(args,'--dispatch','ctx_dead')?json(0,{ok:true,result:{dispatch:{id:'ctx_dead',task_id:'task_monitor_sales'},worker:{state:'failed',stage:'process_exited'}}}):json(0,shown({dispatch:'ctx_new',task:'task_monitor_sales_2',agent:'claude',model:null,title:nth>=3?'[Monitor] Sales':'Working'})),
-    'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'failed'}}),
-    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_x',state:'already_released'}}),
-    'task-create':()=>json(0,taskCreated('task_monitor_sales_2','[Monitor] Sales')),
-    'task-update':()=>json(0,{ok:true,result:{task:{id:'task_monitor_sales',status:'failed'}}}),
-    'worker-start':()=>json(0,started('ctx_new','task_monitor_sales_2')),
-    'terminal-rename':()=>json(0,{ok:true,result:{}})
-  });
-  const result=replaceMonitor({...monitorInput,task:'task_monitor_sales',dispatch:'ctx_dead'},{orca:fake.orca});
-  assert.equal(result.ok,true);
-  assert.equal(result.replaced,'ctx_dead');
-  assert.equal(result.settlement.effectState,'none');
-  assert.equal(result.dispatchId,'ctx_new');
-  assert.equal(result.task.id,'task_monitor_sales_2');
-  assert.deepEqual(result.previous,{task:'task_monitor_sales',closed:true,closeReason:null});
-  const start=fake.spawned.find(args=>args[1]==='worker-start');
-  assert.ok(has(start,'--retry-of','ctx_dead')&&has(start,'--task','task_monitor_sales_2'));
-  const create=fake.spawned.find(args=>args[1]==='task-create');
-  assert.ok(has(create,'--parent','task_parent')&&has(create,'--display-name','[Monitor] Sales')&&has(create,'--spec',monitorInput.spec));
-  const live=fakeOrca({'worker-show':()=>json(0,shown({dispatch:'ctx_live',task:'task_monitor_sales',agent:'claude',model:null,title:'[Monitor] Sales'}))});
-  assert.throws(()=>replaceMonitor({...monitorInput,task:'task_monitor_sales',dispatch:'ctx_live'},{orca:live.orca}),/a live Monitor is never replaced/);
-});
-
 test('a dead worker whose terminal Orca keeps as identity_unproven settles to none with the residual terminal recorded',()=>{
   const fake=fakeOrca({
     'worker-stop':()=>json(0,JSON.parse(fs.readFileSync(new URL('./fixtures/orca/live-1.4.188/worker-stop-already-settled.json',import.meta.url),'utf8'))),
@@ -378,6 +332,34 @@ test('--skip records a verified no-effect failure for a chain target and starts 
   assert.deepEqual(result.attempts.map(attempt=>[attempt.target,attempt.reason,attempt.effectState]),[['qwen3.8-flash','unavailable','none']]);
   assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='create').length,0);
   assert.deepEqual(parseSkip('',[]),[]);
+});
+
+test('an explicit candidate list replaces chain resolution, so the allocator launches exactly one runtime',()=>{
+  const chain=resolveExecutionChain({skill:'starci',op:'backend.implement'}).candidates;
+  const opus=chain.find(candidate=>candidate.target==='claude-opus');
+  const planned=buildOperationLaunch({...input,candidates:[opus]});
+  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['claude-opus']);
+  assert.deepEqual(planned.selection,opus);
+  assert.deepEqual(planned.skipped,[]);
+  assert.equal(planned.candidates[0].launch,'managed-agent');
+  // The list is the decision: it cannot be combined with --skip and it cannot be empty or unresolved.
+  assert.throws(()=>buildOperationLaunch({...input,candidates:[opus],skip:'qwen3.8-flash:unavailable'}),/cannot narrow it further/);
+  assert.throws(()=>buildOperationLaunch({...input,candidates:[]}),/at least one resolved selection/);
+  assert.throws(()=>buildOperationLaunch({...input,candidates:[{target:'claude-opus'}]}),/resolved selection with a target and an Orca launch shape/);
+  const fake=fakeOrca({
+    'run-show':()=>json(0,runShow),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
+    'worker-start':args=>{assert.ok(has(args,'--agent','claude'));return json(0,started('ctx_claude','task_operation_sales'));},
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'terminal-rename':()=>json(0,{ok:true,result:{}})
+  });
+  const result=startOperation(input,{orca:fake.orca,wait:noWait,candidates:[opus]});
+  assert.equal(result.ok,true);
+  assert.equal(result.selection.target,'claude-opus');
+  // Qwen leads this chain, yet no terminal was created and no attempt was recorded against it.
+  assert.deepEqual(result.attempts,[]);
+  assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='create').length,0);
+  assert.deepEqual(fake.spawned.filter(args=>args[1]==='worker-start').map(args=>value(args,'--agent')),['claude']);
 });
 
 test('verify command reports live contract drift before any effect',()=>{

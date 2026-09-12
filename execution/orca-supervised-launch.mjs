@@ -7,18 +7,17 @@ import {resolveExecutionChain} from '../profiles/select.mjs';
 import {createOrcaCalls,defaultOrcaExecutable,getPath} from './orca-calls.mjs';
 import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} from './supervision.mjs';
 import {protocolMain} from './orca-protocol.mjs';
-import {superviseMain} from './supervise.mjs';
+import {kernelMain} from './workflow-kernel.mjs';
 
 /**
- * Canonical supervised launcher for Orca operation agents and Workflow Monitors.
- * Every Orca call goes through the typed runner; every candidate attempt is classified, and a
+ * Canonical supervised launcher for Orca operation agents, plus the CLI surface of the 5.0 workflow
+ * kernel. Every Orca call goes through the typed runner; every candidate attempt is classified, and a
  * failed candidate is fenced, settled and proven effect-free before the next candidate starts.
  */
 export {defaultOrcaExecutable};
 export const supervisedQwenModel='qwen3.8-flash';
 export const qwenLaunchMode='command-terminal';
 const OP_LAUNCH='starci/orca-supervised-op-launch@2';
-const MONITOR_LAUNCH='starci/orca-supervised-monitor-launch@2';
 const SETTLEMENT='starci/orca-supervised-settlement@1';
 const WORKER_START_TIMEOUT_MS=120000;
 
@@ -112,15 +111,27 @@ export function parseSkip(value,chain,registry=readDistJson('profiles','registry
   });
 }
 
-export function buildOperationLaunch({run,workflowTask,from,worktree,operation,scope,spec,skip}){
+/**
+ * Build the launch request for one operation. By default the ordered candidates come from the operation's
+ * own chain and `--skip` removes verified no-effect targets. `candidates` replaces that resolution outright
+ * with an explicit, already-resolved selection list: that is the seam runtime allocation uses, since the
+ * allocator - not the chain - decides which runtime an operation gets, and the launcher must then try
+ * exactly that one. A caller passes either `skip` or `candidates`, never both.
+ */
+export function buildOperationLaunch({run,workflowTask,from,worktree,operation,scope,spec,skip,candidates:allocated=null}){
   const runId=required(run,'nested workflow Run ID'),workflow=required(workflowTask,'parent workflow Task ID');
-  const monitor=required(from,'Workflow Monitor terminal handle');
-  need(monitor.startsWith('term_'),'--from must be the exact Workflow Monitor terminal handle');
+  const monitor=required(from,'own supervising terminal handle');
+  need(monitor.startsWith('term_'),'--from must be the exact supervising terminal handle');
   const target=exactWorktree(worktree),op=required(operation,'operation'),opScope=required(scope,'operation scope');
   const contract=required(spec,'operation spec');
-  const fullChain=resolveExecutionChain({skill:'starci',op}).candidates;
+  if(allocated!==null){
+    need(Array.isArray(allocated)&&allocated.length,'An explicit candidate list must name at least one resolved selection');
+    need(skip===undefined||skip===null||skip==='','An explicit candidate list already is the decision: --skip cannot narrow it further');
+    for(const selection of allocated)need(plain(selection)&&plain(selection.orcaLaunch)&&typeof selection.target==='string'&&selection.target.trim(),'Each explicit candidate must be a resolved selection with a target and an Orca launch shape');
+  }
+  const fullChain=allocated??resolveExecutionChain({skill:'starci',op}).candidates;
   need(fullChain.length,'Operation provider chain is empty');
-  const skipped=parseSkip(skip,fullChain);
+  const skipped=allocated?[]:parseSkip(skip,fullChain);
   const chain=fullChain.filter(candidate=>!skipped.some(item=>item.target===candidate.target));
   need(chain.length,'Every candidate of the operation chain was skipped');
   const displayName=formatOrcaDisplayName('operation-agent',{operation:op,scope:opScope});
@@ -139,21 +150,6 @@ export function buildOperationLaunch({run,workflowTask,from,worktree,operation,s
     selection:candidates[0].selection,candidates,skipped,
     runAttestationParams:{id:runId},
     taskParams:{run:runId,from:monitor,'task-title':`${op} - ${opScope}`,'display-name':displayName,spec:contract}};
-}
-
-export function buildMonitorLaunch({run,parentTask,from,worktree,workflow,spec}){
-  const runId=required(run,'run ID'),parent=required(parentTask,'parent Coordinator Task ID');
-  const coordinator=required(from,'parent Coordinator terminal handle');
-  need(coordinator.startsWith('term_'),'--from must be the exact parent Coordinator terminal handle');
-  const target=exactWorktree(worktree),name=required(workflow,'workflow name'),contract=required(spec,'Workflow Monitor spec');
-  const displayName=formatOrcaDisplayName('workflow-manager',{workflow:name});
-  const candidates=resolveSupervisorChain('workflowMonitor').map(selection=>{
-    const workerParams={task:'$monitorTaskId',worktree:target.selector,agent:selection.orcaLaunch.agent,run:runId,from:coordinator,'display-name':displayName,'timeout-ms':WORKER_START_TIMEOUT_MS};
-    if(selection.model){workerParams.model=selection.model;if(selection.effort)workerParams.effort=selection.effort;}
-    return {selection,launch:'managed-agent',workerParams};
-  });
-  return {schema:'starci/orca-supervised-monitor-request@2',runId,parentTask:parent,from:coordinator,worktree:target,workflow:name,displayName,candidates,
-    taskParams:{run:runId,parent,from:coordinator,'task-title':`Monitor ${name}`,'display-name':displayName,spec:contract}};
 }
 
 /** Stop, release and verify one Dispatch. Returns a typed settlement; never throws on Orca failure. */
@@ -438,8 +434,12 @@ export function sweepWorktree(orca,{cwd,from,keep=[]}){
   return {schema:SWEEP,worktree:cwd,closed,kept};
 }
 
-export function startOperation(input,{orca=createOrcaCalls(),wait}={}){
-  const request=buildOperationLaunch(input),cwd=request.worktree.path;
+/**
+ * Launch one attested operation agent. `candidates` is the allocator's seam: pass the one resolved
+ * selection it chose and the launcher tries exactly that candidate instead of walking the chain.
+ */
+export function startOperation(input,{orca=createOrcaCalls(),wait,candidates=null}={}){
+  const request=buildOperationLaunch(candidates===null?input:{...input,candidates}),cwd=request.worktree.path;
   const run=orca.invoke('run-show',request.runAttestationParams,{cwd});
   need(run.outcome==='ok',`Nested workflow Run attestation failed: ${run.reason}`);
   const observedRun=resultOf(run.receipt)?.run;
@@ -457,79 +457,38 @@ export function startOperation(input,{orca=createOrcaCalls(),wait}={}){
     recovery:chain.exhausted?'report-workflow-boundary-worker_failed':'reconcile-residual-resources-before-retry'};
 }
 
-export function startMonitor(input,{orca=createOrcaCalls()}={}){
-  const request=buildMonitorLaunch(input),cwd=request.worktree.path;
-  const created=orca.invoke('task-create',request.taskParams,{cwd});
-  need(created.outcome==='ok',`Monitor Task creation failed (${created.effectState}): ${created.reason}`);
-  const task=taskFromReceipt(created.receipt);
-  need(task.display_name===request.displayName,`Created Monitor Task name mismatch: ${task.display_name??'unknown'}`);
-  const attest=(selection,{workerShow,phase})=>{
-    const result=resultOf(workerShow),effective=result?.worker?.startOptions?.launch?.effective;
-    need(plain(effective)&&effective.agent===selection.orcaLaunch.agent,`Workflow Monitor provider attestation failed: expected agent ${selection.orcaLaunch.agent}, received ${effective?.agent??'unknown'}`);
-    if(selection.model)need(effective.model===selection.model,`Workflow Monitor provider attestation failed: expected model ${selection.model}, received ${effective.model??'unknown'}`);
-    const terminalHandle=result?.worker?.agent_terminal_handle;
-    need(typeof terminalHandle==='string'&&terminalHandle,'Workflow Monitor receipt is missing the agent terminal handle');
-    if(phase==='canonical-title')need(result?.terminal?.title===request.displayName,`Workflow Monitor title mismatch: expected ${request.displayName}, received ${result?.terminal?.title??'unknown'}`);
-    return {schema:'starci/orca-monitor-provider-attestation@1',ok:true,taskId:task.id,dispatchId:result.dispatch?.id??null,terminalHandle,displayName:request.displayName,target:selection.target,agent:effective.agent,model:effective.model??null};
-  };
-  const chain=runChain(orca,{cwd,request,candidates:request.candidates,taskId:task.id,taskRecord:task,attest,expectedPath:cwd});
-  if(chain.ok)return {schema:MONITOR_LAUNCH,ok:true,task,dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,attestation:chain.result.attestation,titleDrift:chain.result.titleDrift??false,attempts:chain.attempts};
-  return {schema:MONITOR_LAUNCH,ok:false,task,exhausted:chain.exhausted,stopReason:chain.stopReason,attempts:chain.attempts,
-    recovery:chain.exhausted?'report-coordinator-boundary-workflow-manager-failure':'reconcile-residual-resources-before-retry'};
-}
-
-/** Replace a dead Workflow Monitor: prove it is settled, then start a fresh one linked with --retry-of. */
-export function replaceMonitor(input,{orca=createOrcaCalls()}={}){
-  const dead=required(input.dispatch,'dead Workflow Monitor Dispatch ID');
-  const request=buildMonitorLaunch(input),cwd=request.worktree.path;
-  const show=orca.invoke('worker-show',{dispatch:dead},{cwd});
-  const state=resultOf(show.receipt)?.worker?.state??null;
-  need(show.outcome==='ok','Dead Workflow Monitor could not be inspected');
-  need(!['ready','running'].includes(state),`Workflow Monitor ${dead} is ${state}; a live Monitor is never replaced`);
-  const settlement=settleDispatch(orca,dead,{cwd,reason:'replace-dead-monitor'});
-  if(settlement.effectState!=='none')return {schema:MONITOR_LAUNCH,ok:false,replaced:dead,settlement,stopReason:'dead-monitor-not-settled',recovery:'reconcile-residual-resources-before-retry',attempts:[]};
-  const retryRequest={...request,candidates:request.candidates.map(candidate=>({...candidate,workerParams:{...candidate.workerParams,'retry-of':dead}}))};
-  const attest=(selection,{workerShow,phase})=>{
-    const result=resultOf(workerShow),effective=result?.worker?.startOptions?.launch?.effective;
-    need(plain(effective)&&effective.agent===selection.orcaLaunch.agent,`Workflow Monitor provider attestation failed: expected agent ${selection.orcaLaunch.agent}`);
-    const terminalHandle=result?.worker?.agent_terminal_handle;need(typeof terminalHandle==='string'&&terminalHandle,'Workflow Monitor receipt is missing the agent terminal handle');
-    if(phase==='canonical-title')need(result?.terminal?.title===request.displayName,`Workflow Monitor title mismatch: expected ${request.displayName}`);
-    return {schema:'starci/orca-monitor-provider-attestation@1',ok:true,taskId:null,dispatchId:result.dispatch?.id??null,terminalHandle,displayName:request.displayName,target:selection.target,agent:effective.agent,model:effective.model??null};
-  };
-  // Orca delivers the Task's stored spec as the agent prompt, so a replacement Monitor needs a fresh
-  // Task carrying the current contract; the dead Task is closed and linked, never reused.
-  const previousTask=required(input.task,'previous Workflow Monitor Task ID');
-  const created=orca.invoke('task-create',request.taskParams,{cwd});
-  need(created.outcome==='ok',`Replacement Monitor Task creation failed (${created.effectState}): ${created.reason}`);
-  const task=taskFromReceipt(created.receipt);
-  need(task.display_name===request.displayName,`Created Monitor Task name mismatch: ${task.display_name??'unknown'}`);
-  const closed=orca.invoke('task-update',{id:previousTask,status:'failed',run:request.runId,from:request.from,result:JSON.stringify({replacedBy:task.id,replacedDispatch:dead,reason:'workflow-manager-replaced'})},{cwd});
-  const chain=runChain(orca,{cwd,request:retryRequest,candidates:retryRequest.candidates,taskId:task.id,taskRecord:task,attest,expectedPath:cwd});
-  const previous={task:previousTask,closed:closed.outcome==='ok',closeReason:closed.outcome==='ok'?null:closed.reason};
-  if(chain.ok)return {schema:MONITOR_LAUNCH,ok:true,replaced:dead,previous,settlement,task,dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,attestation:chain.result.attestation,titleDrift:chain.result.titleDrift??false,attempts:chain.attempts};
-  return {schema:MONITOR_LAUNCH,ok:false,replaced:dead,previous,settlement,task,exhausted:chain.exhausted,stopReason:chain.stopReason,attempts:chain.attempts,recovery:chain.exhausted?'report-coordinator-boundary-workflow-manager-failure':'reconcile-residual-resources-before-retry'};
-}
-
 function usage(){return `Usage:
   node orca-supervised-launch.mjs start-op --run <nested-workflow-run> --workflow-task <parent-workflow-task> --from <monitor-terminal> --worktree <relative-path> --operation <op> --scope <scope> --spec-file <relative-file> [--skip <target:reason[,target:reason]>] [--dry-run]
     --skip records a Monitor-verified no-effect failure for a chain target (reason from registry fallback.allowedReasons) so the chain starts at the next candidate
-  node orca-supervised-launch.mjs start-monitor --run <run> --parent-task <task> --from <coordinator-terminal> --worktree <relative-path> --workflow <name> --spec-file <relative-file> [--dry-run]
-  node orca-supervised-launch.mjs replace-monitor --run <run> --parent-task <task> --task <monitor-task> --dispatch <dead-dispatch> --from <coordinator-terminal> --worktree <relative-path> --workflow <name> --spec-file <relative-file>
   node orca-supervised-launch.mjs settle --dispatch <dispatch> [--worktree <relative-path>] [--terminal <own-agent-terminal>] [--close true]
   node orca-supervised-launch.mjs sweep --worktree <relative-path> --from <monitor-terminal> [--keep <handle,handle>]
   node orca-supervised-launch.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
   node orca-supervised-launch.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
   node orca-supervised-launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
-  node orca-supervised-launch.mjs start-coordinator --plan <name> --spec-file <file> (--run <run> | --objective <text>) [--worktree <relative-path>]
-  node orca-supervised-launch.mjs supervise --run <nested-run> --from <own-terminal> --worktree . --workflow <name> --branch <branch> --ownership a/**,b/** --sds file,file --parent-run <run> --workflow-task <task> --monitor-dispatch <dispatch> --runtime-dir <dir> --host <path-to-.claude> [--max-iterations N]
+  node orca-supervised-launch.mjs workflow-goal --job <text> [--id <workflow-id>] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--host <path-to-.claude>] [--worktree <relative-path>]
+    turns the job into a goal and prints it for the one user approval. With a Work tree under
+    <repo>/.starciwork/features the ledger is that tree (--ledger work, the default): the ops are derived
+    from the eligible nodes in --scope and a node without an allowlist or checks is named as needing you.
+    Without one the ledger is assessed by a model (--ledger plan).
+  node orca-supervised-launch.mjs workflow-approve --id <workflow-id> [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--max-iterations N] [--host <path-to-.claude>] [--worktree <relative-path>]
+    runs the kernel loop: up to 10 operation agents in one worktree, machine-verified acceptance, gates, final report.
+    On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and
+    committed with a "Work: <node id>" trailer.
+  node orca-supervised-launch.mjs workflow-status --id <workflow-id> [--worktree <relative-path>]
   node orca-supervised-launch.mjs verify`;}
 
-export function main(argv=process.argv.slice(2),{orca}={}){
+const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-run','workflow-status'];
+
+export function main(argv=process.argv.slice(2),{orca,wait}={}){
   const {command,options}=parseArgs(argv);
-  need(['start-op','start-monitor','replace-monitor','settle','sweep','verify','notify','report','wait','start-coordinator','supervise'].includes(command),usage());
+  need(['start-op','settle','sweep','verify','notify','report','wait',...KERNEL_COMMANDS].includes(command),usage());
   const runner=orca??createOrcaCalls();
-  if(command==='supervise')return superviseMain(options,{orca:runner,cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd()});
-  if(['report','wait','start-coordinator'].includes(command)){
+  if(KERNEL_COMMANDS.includes(command)){
+    const cwd=options.worktree?exactWorktree(options.worktree).path:process.cwd();
+    return kernelMain(command,options,{orca:runner,cwd,wait});
+  }
+  if(['report','wait'].includes(command)){
     const cwd=options.worktree?exactWorktree(options.worktree).path:process.cwd();
     return protocolMain(command,{...options,spec:options['spec-file']?specText(options['spec-file']):options.spec},{orca:runner,cwd});
   }
@@ -537,14 +496,9 @@ export function main(argv=process.argv.slice(2),{orca}={}){
   if(command==='notify')return notifyTerminal(runner,{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),terminal:required(options.terminal,'monitor terminal handle'),file:options.file??null,text:options.text??null});
   if(command==='verify'){const result=runner.verify();return {schema:'starci/orca-live-contract-verification@1',...result,result:undefined};}
   if(command==='settle')return settleDispatch(runner,required(options.dispatch,'dispatch'),{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),reason:'explicit-settle',terminalHandle:options.terminal??null,closeTerminal:options.close==='true'});
-  const common={run:options.run,from:options.from,worktree:options.worktree,spec:specText(options['spec-file'])};
-  if(command==='start-op'){
-    const input={...common,workflowTask:options['workflow-task'],operation:options.operation,scope:options.scope,skip:options.skip};
-    return options['dry-run']?buildOperationLaunch(input):startOperation(input,{orca:runner});
-  }
-  const input={...common,parentTask:options['parent-task'],workflow:options.workflow};
-  if(command==='start-monitor')return options['dry-run']?buildMonitorLaunch(input):startMonitor(input,{orca:runner});
-  return replaceMonitor({...input,task:options.task,dispatch:options.dispatch},{orca:runner});
+  const input={run:options.run,from:options.from,worktree:options.worktree,spec:specText(options['spec-file']),
+    workflowTask:options['workflow-task'],operation:options.operation,scope:options.scope,skip:options.skip};
+  return options['dry-run']?buildOperationLaunch(input):startOperation(input,{orca:runner,wait});
 }
 
 const direct=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
