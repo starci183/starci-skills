@@ -27,7 +27,7 @@ const workflow = () => ({
 
 test('execution request and receipt schemas compile in strict draft-2020 mode', () => {
   const ajv = new Ajv2020({strict: true});
-  for (const name of ['execution-request.schema.yaml', 'execution-receipt.schema.yaml', 'profile-registry-v3.schema.yaml']) {
+  for (const name of ['execution-request.schema.yaml', 'execution-receipt.schema.yaml', 'profile-registry-v3.schema.yaml', 'orca-call.schema.yaml']) {
     assert.doesNotThrow(() => ajv.compile(parseYaml(fs.readFileSync(new URL(`../schemas/${name}`, import.meta.url), 'utf8'))));
   }
 });
@@ -90,7 +90,7 @@ test('workflow receipts preserve operation order and requested/observed models i
   assert.deepEqual(receipt.operations.map(value => value.operationId), ['design', 'implement']);
   const recorded = recordOperationReceipt(receipt, {
     operationId: 'design', operation: 'architecture.decide', status: 'completed',
-    environment: 'codex', profile: 'gpt-6-astra-reviewer', requestedModel: 'gpt-6-astra', observedModel: 'gpt-6-astra', observations: []
+    environment: 'codex', profile: 'gpt-6-astra', requestedModel: 'gpt-6-astra', observedModel: 'gpt-6-astra', observations: []
   });
   assert.equal(recorded.operations[0].requestedModel, 'gpt-6-astra');
   assert.equal(recorded.operations[0].observedModel, 'gpt-6-astra');

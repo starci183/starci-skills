@@ -17,17 +17,19 @@ const request = (operation = 'interface.implement') => ({
 test('resolver preserves each exact operator chain and its environment metadata', () => {
   const candidates = flattenOperationCandidates({operation: 'interface.implement', registry});
   assert.deepEqual(candidates.map(value => value.target), [
-    'qwen-qwen3.8-flash-worker', 'codex-gpt-5.6-sol'
+    'qwen-qwen3.8-flash-worker', 'claude-opus', 'codex-gpt-5.6-sol'
   ]);
-  assert.deepEqual(candidates.map(value => [value.environmentPriority, value.profilePriority]), [[0, 0], [1, 0]]);
+  assert.deepEqual(candidates.map(value => [value.environmentPriority, value.profilePriority]), [[0, 0], [1, 0], [2, 0]]);
   const backend = flattenOperationCandidates({operation: 'backend.implement', registry});
   assert.deepEqual(backend.map(value => value.target), [
-    'qwen-qwen3.8-flash-worker', 'codex-gpt-5.6-sol'
+    'qwen-qwen3.8-flash-worker', 'claude-opus', 'codex-gpt-5.6-sol'
   ]);
   const review = flattenOperationCandidates({operation: 'review.verify', registry});
   assert.deepEqual(review.map(value => value.target), [
-    'qwen-qwen3.8-flash-reviewer', 'codex-gpt-5.6-sol-reviewer'
+    'qwen-qwen3.8-flash-reviewer', 'claude-fable-5.1', 'codex-gpt-5.6-sol-reviewer'
   ]);
+  const reasoning = flattenOperationCandidates({operation: 'architecture.decide', registry});
+  assert.deepEqual(reasoning.map(value => value.target), ['claude-fable-5.1', 'codex-gpt-6-astra']);
 });
 
 test('automatic Orca chains reject command-terminal targets', () => {
@@ -55,7 +57,10 @@ test('resolver selects deterministically and preserves unavailable observations'
   assert.equal(result.observations.find(value => value.target === 'codex-gpt-5.6-sol').reason, null);
   assert.equal(result.observations[0].status, 'unavailable');
   assert.equal(result.observations[0].observation.environment, 'qwen');
-  assert.equal(result.observations.length, 2);
+  assert.equal(result.observations[1].target, 'claude-opus');
+  assert.equal(result.observations[1].status, 'unavailable');
+  assert.equal(result.observations[1].observation, null);
+  assert.equal(result.observations.length, 3);
 });
 
 test('unknown observations are unavailable and unsafe fallback never advances the chain', () => {
@@ -81,5 +86,5 @@ test('Codex and Claude solo stay host-local while Orca solo may resolve provider
   solo.spec.soloHost = 'orca';
   const orca = resolveOperationExecution({workflowRequest: solo, operationId: 'work', registry, inventory: ['qwen', 'codex', 'claude']});
   assert.equal(orca.selected.environment, 'qwen');
-  assert.equal(orca.observations.length, 2);
+  assert.equal(orca.observations.length, 3);
 });

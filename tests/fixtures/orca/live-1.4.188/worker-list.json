@@ -1,0 +1,95 @@
+{
+  "id": "d024ce49-fbea-48b1-8b28-1263b47506f4",
+  "ok": true,
+  "result": {
+    "workers": [
+      {
+        "dispatchId": "ctx_d54000752ea9",
+        "taskId": "task_bed65825d697",
+        "runId": "run_4f84cba16322",
+        "workerState": "failed",
+        "dispatchStatus": "failed",
+        "agentTerminalHandle": "term_0921e818-f9ae-4c6c-a1c7-6ae585e84a81",
+        "terminalState": "retained",
+        "resource": {
+          "id": "wtr_3f55cec8d74d",
+          "ownershipState": "owned",
+          "releaseState": "retained",
+          "retainedReason": "identity_unproven",
+          "terminalHandle": "term_0921e818-f9ae-4c6c-a1c7-6ae585e84a81",
+          "worktreeId": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-core",
+          "originDispatchId": "ctx_d54000752ea9",
+          "ownerDispatchId": "ctx_d54000752ea9",
+          "releaseRequestedAt": "2026-09-11 15:41:01",
+          "releaseCompletedAt": null,
+          "releaseError": null,
+          "archive": {
+            "source": null,
+            "status": null
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_82d171134642",
+        "taskId": "task_590cdf83be4a",
+        "runId": "run_4f84cba16322",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "term_35aba08c-f143-42ce-bc73-cfbb76bd1d3a",
+        "terminalState": "retained",
+        "resource": {
+          "id": "wtr_12864c0880fb",
+          "ownershipState": "owned",
+          "releaseState": "retained",
+          "retainedReason": "identity_unproven",
+          "terminalHandle": "term_35aba08c-f143-42ce-bc73-cfbb76bd1d3a",
+          "worktreeId": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-accounting",
+          "originDispatchId": "ctx_82d171134642",
+          "ownerDispatchId": "ctx_82d171134642",
+          "releaseRequestedAt": "2026-09-11 12:26:08",
+          "releaseCompletedAt": null,
+          "releaseError": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_a7a7b599bc7d",
+        "taskId": "task_53c03d3a20c9",
+        "runId": "run_4f84cba16322",
+        "workerState": "failed",
+        "dispatchStatus": "failed",
+        "agentTerminalHandle": "term_de3871c9-c56b-4cf5-97cc-c8330974eea9",
+        "terminalState": "retained",
+        "resource": {
+          "id": "wtr_8d3e9eca3bac",
+          "ownershipState": "owned",
+          "releaseState": "retained",
+          "retainedReason": "identity_unproven",
+          "terminalHandle": "term_de3871c9-c56b-4cf5-97cc-c8330974eea9",
+          "worktreeId": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-chatbot",
+          "originDispatchId": "ctx_a7a7b599bc7d",
+          "ownerDispatchId": "ctx_a7a7b599bc7d",
+          "releaseRequestedAt": "2026-09-11 15:41:01",
+          "releaseCompletedAt": null,
+          "releaseError": null,
+          "archive": {
+            "source": null,
+            "status": null
+          }
+        }
+      }
+    ],
+    "counts": {
+      "retained": 64,
+      "released": 22,
+      "release_unknown": 14,
+      "reclaimable": 5
+    }
+  },
+  "_meta": {
+    "runtimeId": "a014f786-0897-4403-befc-ca6d9896a272"
+  }
+}

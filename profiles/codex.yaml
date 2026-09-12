@@ -19,7 +19,7 @@ profiles:
       decision, plan or verification artifacts the operator owns; never repair the product being
       judged.
     toolPolicy: intersection-of-observed-tools-operator-scope-and-existing-authorization
-  gpt-6-astra-reviewer:
+  gpt-6-astra:
     role: reasoning
     model: gpt-6-astra
     imageGeneration: false

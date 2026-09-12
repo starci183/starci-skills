@@ -1,0 +1,135 @@
+{
+  "id": "c72b5818-e71f-48cf-b8e5-edb04b9c5f10",
+  "ok": true,
+  "result": {
+    "dispatch": {
+      "id": "ctx_82d171134642",
+      "run_id": "run_4f84cba16322",
+      "task_id": "task_590cdf83be4a",
+      "contract_version": 1,
+      "launch_token_hash": "4d6305780bd8b79df5f8f63f1a226d93efe20415ef5c956551136bc2a6f20673",
+      "assignee_handle": "term_35aba08c-f143-42ce-bc73-cfbb76bd1d3a",
+      "assignee_pane_key": "3cb9e4e9-2250-4327-a793-f2579a691466:d7fa64c1-9db1-4fd7-bcba-89a6e7d9d1a0",
+      "capability_hash": "baa3886efeaa3543496cabfe6248a0d875d1191c1bfa6b520df9083224d65a50",
+      "process_incarnation": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-accounting@@5dc85bb3:2651b439-0827-4b18-ac93-93067a586231",
+      "capability_revoked_at": "2026-09-11 12:23:41",
+      "status": "completed",
+      "failure_count": 0,
+      "last_failure": null,
+      "termination_reason": null,
+      "dispatched_at": "2026-09-11 11:45:49",
+      "completed_at": "2026-09-11 12:23:41",
+      "created_at": "2026-09-11 11:45:49",
+      "last_heartbeat_at": "2026-09-11T12:21:45Z"
+    },
+    "worker": {
+      "dispatch_id": "ctx_82d171134642",
+      "runtime_epoch": "629c12d3-0d66-4d62-b28c-65255211de9a",
+      "state": "succeeded",
+      "stage": "settled",
+      "worktree_id": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-accounting",
+      "agent_terminal_handle": "term_35aba08c-f143-42ce-bc73-cfbb76bd1d3a",
+      "setup_state": "not_configured",
+      "effects": [
+        {
+          "kind": "worktree",
+          "action": "created_child",
+          "id": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-accounting"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "reused_agent_terminal",
+          "id": "term_35aba08c-f143-42ce-bc73-cfbb76bd1d3a",
+          "tabId": "3cb9e4e9-2250-4327-a793-f2579a691466",
+          "leafId": "d7fa64c1-9db1-4fd7-bcba-89a6e7d9d1a0"
+        },
+        {
+          "kind": "setup",
+          "action": "skip",
+          "requested": "skip",
+          "effective": "skip",
+          "source": "explicit_request",
+          "hookFound": false,
+          "startupPolicy": "start-immediately",
+          "state": "not_configured"
+        },
+        {
+          "kind": "dispatch_input",
+          "role": "agent",
+          "id": "term_35aba08c-f143-42ce-bc73-cfbb76bd1d3a",
+          "state": "accepted"
+        }
+      ],
+      "residual_resources": "[{\"kind\":\"worktree\",\"action\":\"created_child\",\"id\":\"39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-accounting\"},{\"kind\":\"terminal\",\"role\":\"agent\",\"action\":\"reused_agent_terminal\",\"id\":\"term_35aba08c-f143-42ce-bc73-cfbb76bd1d3a\",\"tabId\":\"3cb9e4e9-2250-4327-a793-f2579a691466\",\"leafId\":\"d7fa64c1-9db1-4fd7-bcba-89a6e7d9d1a0\"}]",
+      "start_options": "{\"worktree\":\"new-child\",\"resolvedWorktreeId\":null,\"name\":\"agentos-r14-accounting\",\"repo\":\"path:<repositories>/nivo-backend\",\"baseBranch\":\"main\",\"terminal\":null,\"agent\":\"codex\",\"launch\":{\"requested\":{\"agent\":\"codex\",\"model\":\"gpt-5.6-sol\",\"effort\":\"high\"},\"effective\":{\"agent\":\"codex\",\"model\":\"gpt-5.6-sol\",\"effort\":\"high\"}},\"timeoutMs\":30000,\"setup\":\"skip\",\"setupSource\":\"explicit_request\"}",
+      "last_error": null,
+      "created_at": "2026-09-11 11:45:49",
+      "updated_at": "2026-09-11 12:23:41",
+      "residualResources": [
+        {
+          "kind": "worktree",
+          "action": "created_child",
+          "id": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-accounting"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "reused_agent_terminal",
+          "id": "term_35aba08c-f143-42ce-bc73-cfbb76bd1d3a",
+          "tabId": "3cb9e4e9-2250-4327-a793-f2579a691466",
+          "leafId": "d7fa64c1-9db1-4fd7-bcba-89a6e7d9d1a0"
+        }
+      ],
+      "startOptions": {
+        "worktree": "new-child",
+        "resolvedWorktreeId": null,
+        "name": "agentos-r14-accounting",
+        "repo": "path:<repositories>/nivo-backend",
+        "baseBranch": "main",
+        "terminal": null,
+        "agent": "codex",
+        "launch": {
+          "requested": {
+            "agent": "codex",
+            "model": "gpt-5.6-sol",
+            "effort": "high"
+          },
+          "effective": {
+            "agent": "codex",
+            "model": "gpt-5.6-sol",
+            "effort": "high"
+          }
+        },
+        "timeoutMs": 30000,
+        "setup": "skip",
+        "setupSource": "explicit_request"
+      }
+    },
+    "terminal": null,
+    "observation": {
+      "status": "missing",
+      "exactWorker": false
+    },
+    "terminalResource": {
+      "id": "wtr_12864c0880fb",
+      "ownershipState": "owned",
+      "releaseState": "retained",
+      "retainedReason": "identity_unproven",
+      "terminalHandle": "term_35aba08c-f143-42ce-bc73-cfbb76bd1d3a",
+      "worktreeId": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-accounting",
+      "originDispatchId": "ctx_82d171134642",
+      "ownerDispatchId": "ctx_82d171134642",
+      "releaseRequestedAt": "2026-09-11 12:26:08",
+      "releaseCompletedAt": null,
+      "releaseError": null,
+      "archive": {
+        "source": "transcript",
+        "status": "captured"
+      }
+    }
+  },
+  "_meta": {
+    "runtimeId": "a014f786-0897-4403-befc-ca6d9896a272"
+  }
+}

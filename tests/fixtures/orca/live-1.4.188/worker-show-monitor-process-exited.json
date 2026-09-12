@@ -1,0 +1,135 @@
+{
+  "id": "411add32-be17-49fd-9e48-ba5d39299cfd",
+  "ok": true,
+  "result": {
+    "dispatch": {
+      "id": "ctx_d54000752ea9",
+      "run_id": "run_4f84cba16322",
+      "task_id": "task_bed65825d697",
+      "contract_version": 1,
+      "launch_token_hash": "23084672fbf5620f26d20503e8ee4e10d9696417e93b84ba51fbf81970046a03",
+      "assignee_handle": "term_0921e818-f9ae-4c6c-a1c7-6ae585e84a81",
+      "assignee_pane_key": "4c07ea89-dcb4-412b-8271-ac23b206447e:2d408d7c-5987-43b2-b498-c4b6c10b67f3",
+      "capability_hash": "bd8a9fed436c59e1d3fa15cf407f03a75c724916c81ed1bf368b2c4f4fee35af",
+      "process_incarnation": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-core@@a9b8fc50:13ded321-68a4-43af-b547-c50514b83bee",
+      "capability_revoked_at": "2026-09-11 13:03:07",
+      "status": "failed",
+      "failure_count": 1,
+      "last_failure": "Agent process stop was requested but never confirmed",
+      "termination_reason": "unknown",
+      "dispatched_at": "2026-09-11 11:45:38",
+      "completed_at": "2026-09-11 13:03:07",
+      "created_at": "2026-09-11 11:45:38",
+      "last_heartbeat_at": "2026-09-11T12:51:12Z"
+    },
+    "worker": {
+      "dispatch_id": "ctx_d54000752ea9",
+      "runtime_epoch": "629c12d3-0d66-4d62-b28c-65255211de9a",
+      "state": "failed",
+      "stage": "process_exited",
+      "worktree_id": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-core",
+      "agent_terminal_handle": "term_0921e818-f9ae-4c6c-a1c7-6ae585e84a81",
+      "setup_state": "not_configured",
+      "effects": [
+        {
+          "kind": "worktree",
+          "action": "created_child",
+          "id": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-core"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "reused_agent_terminal",
+          "id": "term_0921e818-f9ae-4c6c-a1c7-6ae585e84a81",
+          "tabId": "4c07ea89-dcb4-412b-8271-ac23b206447e",
+          "leafId": "2d408d7c-5987-43b2-b498-c4b6c10b67f3"
+        },
+        {
+          "kind": "setup",
+          "action": "skip",
+          "requested": "skip",
+          "effective": "skip",
+          "source": "explicit_request",
+          "hookFound": false,
+          "startupPolicy": "start-immediately",
+          "state": "not_configured"
+        },
+        {
+          "kind": "dispatch_input",
+          "role": "agent",
+          "id": "term_0921e818-f9ae-4c6c-a1c7-6ae585e84a81",
+          "state": "accepted"
+        }
+      ],
+      "residual_resources": "[{\"kind\":\"worktree\",\"action\":\"created_child\",\"id\":\"39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-core\"},{\"kind\":\"terminal\",\"role\":\"agent\",\"action\":\"reused_agent_terminal\",\"id\":\"term_0921e818-f9ae-4c6c-a1c7-6ae585e84a81\",\"tabId\":\"4c07ea89-dcb4-412b-8271-ac23b206447e\",\"leafId\":\"2d408d7c-5987-43b2-b498-c4b6c10b67f3\"}]",
+      "start_options": "{\"worktree\":\"new-child\",\"resolvedWorktreeId\":null,\"name\":\"agentos-r14-core\",\"repo\":\"path:<repositories>/nivo-backend\",\"baseBranch\":\"main\",\"terminal\":null,\"agent\":\"codex\",\"launch\":{\"requested\":{\"agent\":\"codex\",\"model\":\"gpt-5.6-sol\",\"effort\":\"high\"},\"effective\":{\"agent\":\"codex\",\"model\":\"gpt-5.6-sol\",\"effort\":\"high\"}},\"timeoutMs\":30000,\"setup\":\"skip\",\"setupSource\":\"explicit_request\"}",
+      "last_error": "Agent process stop was requested but never confirmed",
+      "created_at": "2026-09-11 11:45:38",
+      "updated_at": "2026-09-11 13:03:07",
+      "residualResources": [
+        {
+          "kind": "worktree",
+          "action": "created_child",
+          "id": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-core"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "reused_agent_terminal",
+          "id": "term_0921e818-f9ae-4c6c-a1c7-6ae585e84a81",
+          "tabId": "4c07ea89-dcb4-412b-8271-ac23b206447e",
+          "leafId": "2d408d7c-5987-43b2-b498-c4b6c10b67f3"
+        }
+      ],
+      "startOptions": {
+        "worktree": "new-child",
+        "resolvedWorktreeId": null,
+        "name": "agentos-r14-core",
+        "repo": "path:<repositories>/nivo-backend",
+        "baseBranch": "main",
+        "terminal": null,
+        "agent": "codex",
+        "launch": {
+          "requested": {
+            "agent": "codex",
+            "model": "gpt-5.6-sol",
+            "effort": "high"
+          },
+          "effective": {
+            "agent": "codex",
+            "model": "gpt-5.6-sol",
+            "effort": "high"
+          }
+        },
+        "timeoutMs": 30000,
+        "setup": "skip",
+        "setupSource": "explicit_request"
+      }
+    },
+    "terminal": null,
+    "observation": {
+      "status": "missing",
+      "exactWorker": false
+    },
+    "terminalResource": {
+      "id": "wtr_3f55cec8d74d",
+      "ownershipState": "owned",
+      "releaseState": "retained",
+      "retainedReason": "identity_unproven",
+      "terminalHandle": "term_0921e818-f9ae-4c6c-a1c7-6ae585e84a81",
+      "worktreeId": "39493d21-fa8e-4d31-b929-120b1315ead4::<orca-workspaces>/nivo-backend/agentos-r14-core",
+      "originDispatchId": "ctx_d54000752ea9",
+      "ownerDispatchId": "ctx_d54000752ea9",
+      "releaseRequestedAt": "2026-09-11 15:41:01",
+      "releaseCompletedAt": null,
+      "releaseError": null,
+      "archive": {
+        "source": null,
+        "status": null
+      }
+    }
+  },
+  "_meta": {
+    "runtimeId": "a014f786-0897-4403-befc-ca6d9896a272"
+  }
+}
