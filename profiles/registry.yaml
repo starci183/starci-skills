@@ -113,7 +113,7 @@ targets:
       reasoning: qwen3.8-flash-reviewer
     orcaLaunch:
       kind: command-terminal
-      command: qwen --model qwen3.8-flash --approval-mode auto --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      command: qwen --model qwen3.8-flash --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       reasoningCommand: qwen --model qwen3.8-flash --approval-mode plan --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
   qwen3.8-max:
@@ -124,7 +124,7 @@ targets:
       reasoning: qwen3.8-max-reviewer
     orcaLaunch:
       kind: command-terminal
-      command: qwen --model qwen3.8-max --approval-mode auto --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      command: qwen --model qwen3.8-max --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
   deepseek-v4-pro:
     runtime: qwen
@@ -134,7 +134,7 @@ targets:
       reasoning: deepseek-v4-pro-reviewer
     orcaLaunch:
       kind: command-terminal
-      command: qwen --model deepseek-v4-pro --approval-mode auto --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
+      command: qwen --model deepseek-v4-pro --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
 targetAliases:
   qwen-qwen3.8-flash-worker: qwen3.8-flash

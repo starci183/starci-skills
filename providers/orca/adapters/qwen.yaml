@@ -32,9 +32,13 @@ submission:
   maxEnter: 2
 modelMarker: qwen3.8-flash
 approvalMode:
-  working: auto
+  working: yolo
   reasoning: plan
-  reason: A review operation has no write authority; Qwen's plan mode refuses file edits and shell mutations at the tool layer instead of trusting the prompt.
+  reason: |-
+    A review operation has no write authority; Qwen's plan mode refuses file edits and shell mutations at the tool layer instead of trusting the prompt.
+    Working operations run unattended in an isolated child worktree under an allowlist, so they use yolo. The auto mode was
+    rejected live (OBS-27): it asks a remote classifier, and when that classifier is unavailable Qwen parks at an
+    interactive "Allow execution?" prompt that no supervisor can see; the heartbeat stays fresh while nothing runs.
 start:
   - api: terminal.create
     binding: declared-target-command-with-credential-refresh
