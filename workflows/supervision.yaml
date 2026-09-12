@@ -89,7 +89,7 @@ workerLifecycle:
   displayNames:
     coordinator: "[Coordinator] <Plan>"
     workflowWorktree: "[Workflow] <Workflow>"
-    workflowManager: "[Coordinator] <Workflow>"
+    workflowManager: "[Monitor] <Workflow>"
     operationAgent: "[Op] <operation> - <scope>"
     applyAgentNameWith: task-display-name-then-provider-attestation-then-terminal-canonicalization
   coordinator:

@@ -24,12 +24,12 @@ recipes:
       - worktree.set-display-name
       - terminal.rename
     worktreeName: "[Workflow] <Workflow>"
-    terminalName: "[Coordinator] <Workflow>"
+    terminalName: "[Monitor] <Workflow>"
     environmentBinding: current-runtime-by-omitting---on
     beforeOperationTaskCreate: parent-lineage-attested
   start-qwen-operation:
     mode: orchestrated
-    actor: workflow-coordinator
+    actor: workflow-monitor
     sequence:
       - assert-expected-active-dag-operation
       - resolve-operation-provider-chain
@@ -47,7 +47,7 @@ recipes:
     environmentBinding: current-runtime-by-omitting---on
   start-managed-operation:
     mode: orchestrated
-    actor: workflow-coordinator
+    actor: workflow-monitor
     sequence:
       - assert-expected-active-dag-operation
       - resolve-operation-provider-chain
@@ -73,7 +73,7 @@ recipes:
       - orchestration.send-worker-result
       - idle
   accept-operation:
-    actor: workflow-coordinator
+    actor: workflow-monitor
     sequence:
       - validate-normalized-operation-output
       - terminal.rename-canonical-before-release

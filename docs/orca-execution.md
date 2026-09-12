@@ -134,19 +134,21 @@ The display contract is mandatory at creation time:
 
 - main agent: `[Coordinator] <Plan>`;
 - child worktree: `[Workflow] <Workflow>`;
-- persistent child manager: `[Coordinator] <Workflow>`;
+- persistent child manager: `[Monitor] <Workflow>`;
 - isolated operation agent: `[Op] <operation> - <scope>`.
 
-The executable call contract is `providers/orca/index.yaml`. It records the exact `orca` API/CLI call for
-creating, attaching, naming, waiting, reporting, releasing and acknowledging every layer. A visible
+The executable call contract is `providers/orca/index.yaml`. A Workflow Monitor starts an operation only
+through `execution/orca-supervised-launch.mjs start-op`; it never assembles `task-create`, `worker-start`,
+provider fallback or terminal naming commands itself. The launcher records and enforces the exact `orca`
+API/CLI calls for creating, attaching, naming and attesting the operation agent. A visible
 `Bash: ...` subtitle is only the native agent's current tool activity; identity comes from the native
 immutable Task display name and supervised worker/provider receipt. The terminal title is mutable UI
-metadata: native activity may change it while the agent works. The Workflow Coordinator restores the
+metadata: native activity may change it while the agent works. The Workflow Monitor restores the
 canonical `[Op] ...` title without fencing the worker when the immutable identities still match, and
 restores it once more before release. Title drift alone never invalidates otherwise valid operation effects.
 
-Send a parent Coordinator control instruction to a Workflow Coordinator with
-`orchestration send --type escalation`. Workflow Coordinators block on escalation plus operation
+Send a parent Coordinator control instruction to a Workflow Monitor with
+`orchestration send --type escalation`. Workflow Monitors block on escalation plus operation
 question/outcome events; `status` is informational and cannot carry control because it does not wake
 that subscription.
 

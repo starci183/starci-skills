@@ -36,7 +36,7 @@ export function validateProviderContracts(){
   add(errors,orca.index?.schema==='starci/orca-provider@1','Missing Orca provider index');
   add(errors,orca.index?.names?.planCoordinator==='[Coordinator] <Plan>','Invalid Orca Plan Coordinator name');
   add(errors,orca.index?.names?.workflowWorktree==='[Workflow] <Workflow>','Invalid Orca workflow worktree name');
-  add(errors,orca.index?.names?.workflowCoordinator==='[Coordinator] <Workflow>','Invalid Orca Workflow Coordinator name');
+  add(errors,orca.index?.names?.workflowMonitor==='[Monitor] <Workflow>','Invalid Orca Workflow Monitor name');
   add(errors,orca.index?.names?.operationAgent==='[Op] <operation> - <scope>','Invalid Orca operation name');
   add(errors,orca.index?.environmentBinding?.currentRuntime==='omit---on','Current Orca runtime must omit --on');
   add(errors,orca.index?.environmentBinding?.namedRuntimeAuthority==='live-runtime-inventory-only','Named Orca runtime must come from live inventory');
@@ -48,6 +48,7 @@ export function validateProviderContracts(){
   add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.runtimeTitleDrift?.whenImmutableIdentityRemainsExact==='recanonicalize-without-fencing'&&orca.index?.operationAgent?.admission?.afterWorkerStart?.runtimeTitleDrift?.effectDecision==='never-reject-solely-for-title-drift','Orca runtime title-drift policy is invalid');
   add(errors,orca.index?.operationAgent?.admission?.architectureSidearm?.onlyTrigger==='active implementation secondary_request','Architecture sidearm trigger is too broad');
   add(errors,orca.index?.operationAgent?.admission?.architectureSidearm?.exactReason==='sds-technical-gap','Architecture sidearm reason is invalid');
+  add(errors,orca.index?.operationAgent?.canonicalLauncher?.module==='execution/orca-supervised-launch.mjs'&&orca.index?.operationAgent?.canonicalLauncher?.command==='start-op'&&orca.index?.operationAgent?.canonicalLauncher?.authority==='exclusive-effectful-construction-path','Orca operation launcher contract is invalid');
   add(errors,/--type escalation/.test(orca.index?.routing?.coordinatorToWorkflow?.cli||'')&&orca.index?.routing?.coordinatorToWorkflow?.forbiddenType==='status','Coordinator-to-Workflow control must use escalation, not status');
   const commands=orca.api?.publicCommands;
   add(errors,Array.isArray(commands)&&commands.length===orca.api?.snapshot?.observedCommandCount,'Orca API inventory count mismatch');
@@ -68,7 +69,7 @@ export function validateProviderContracts(){
   add(errors,orca.index?.operationAgent?.qwen38Flash?.agent===qwen?.agent&&orca.index?.operationAgent?.qwen38Flash?.model===qwen?.requiredModel,'Orca index and Qwen adapter identities disagree');
   const workerStartTemplates=[
     orca.index?.planCoordinator?.calls?.startAgent?.cli,
-    orca.index?.workflowCoordinator?.calls?.startChildAgent?.cli,
+    orca.index?.workflowMonitor?.calls?.startChildAgent?.cli,
     orca.index?.operationAgent?.qwen38Flash?.calls?.startAgent?.cli,
     orca.index?.operationAgent?.managedFallback?.calls?.startAgent?.cli,
     codex.index?.orcaManagedForm?.start?.cli,

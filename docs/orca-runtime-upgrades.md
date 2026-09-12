@@ -106,7 +106,7 @@ While the Orca parent coordinates the Core/shared, Accounting, Chatbot, and Sale
 ### Native Codex activity titles can drift after canonical operation naming
 
 - Expected: an operation remains visibly named `[Op] <operation> - <scope>` while its immutable Task, Dispatch and provider identity remain stable.
-- Observed: after a successful canonical rename, native Codex later changed the terminal title to `Report terminal task outcome | <worktree>` while the Task `display_name`, exact Dispatch/worker, `codex` agent and `gpt-5.6-sol` model remained correct. A Workflow Coordinator treated that mutable title as an identity mismatch and stopped a valid Accounting implementation attempt.
+- Observed: after a successful canonical rename, native Codex later changed the terminal title to `Report terminal task outcome | <worktree>` while the Task `display_name`, exact Dispatch/worker, `codex` agent and `gpt-5.6-sol` model remained correct. A Workflow Monitor treated that mutable title as an identity mismatch and stopped a valid Accounting implementation attempt.
 - Impact: correct operation effects can be discarded because native activity metadata is mistaken for ownership or provider provenance.
 - Resolution in StarCi: attest immutable Task/Dispatch/worker/provider identity first, then rename and verify the canonical title. During execution, recanonicalize title drift without fencing when immutable identity still matches; before release, rename once more. Never reject verified effects solely because the native terminal activity title drifted.
 - Upgrade candidate: Orca should separate a stable user-assigned display title from its generated activity title so native adapters cannot overwrite the role label.

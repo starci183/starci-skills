@@ -12,7 +12,7 @@ roles:
     nativeAgent: required
     location: main-worktree
     lifetime: parent-run
-  workflowCoordinator:
+  workflowMonitor:
     nativeAgent: required
     location: isolated-child-worktree
     lifetime: workflow-attempt

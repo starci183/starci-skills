@@ -31,7 +31,7 @@ ui:
 names:
   planCoordinator: "[Coordinator] <Plan>"
   workflowWorktree: "[Workflow] <Workflow>"
-  workflowCoordinator: "[Coordinator] <Workflow>"
+  workflowMonitor: "[Monitor] <Workflow>"
   operationAgent: "[Op] <operation> - <scope>"
 planCoordinator:
   role: persistent-native-agent
@@ -48,7 +48,7 @@ planCoordinator:
     waitBoundary:
       api: orchestration.check
       cli: 'orca orchestration check --wait --types worker_done,worker_failed,escalation,question --timeout-ms 900000 --json'
-workflowCoordinator:
+workflowMonitor:
   role: persistent-native-agent-in-isolated-child-worktree
   calls:
     createTask:
@@ -70,7 +70,7 @@ workflowCoordinator:
       cli: 'orca worktree set --worktree <worker.worktree_id> --display-name "[Workflow] <Workflow>" --json'
     nameAgent:
       api: terminal.rename
-      cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Coordinator] <Workflow>" --json'
+      cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Monitor] <Workflow>" --json'
     waitOperationBoundary:
       api: orchestration.check
       cli: 'orca orchestration check --wait --types worker_done,worker_failed,escalation,question --timeout-ms 900000 --json'
@@ -79,6 +79,20 @@ workflowCoordinator:
       cli: 'orca orchestration send --type <worker_done|worker_failed|escalation|question> --subject "<normalized-subject>" --body "<normalized-workflow-envelope>" --task-id <workflow-task-id> --dispatch-id <workflow-dispatch-id> --json'
 operationAgent:
   role: one-supervised-native-agent-per-operation-attempt
+  canonicalLauncher:
+    module: execution/orca-supervised-launch.mjs
+    command: start-op
+    authority: exclusive-effectful-construction-path
+    input: [nested-workflow-run, workflow-task, from, worktree, operation, scope, spec-file]
+    guarantees:
+      - resolves-first-operator-chain-candidate
+      - attests-from-is-nested-run-coordinator-handle
+      - creates-canonical-operation-task
+      - starts-fresh-native-agent-in-exact-workflow-worktree
+      - omits-model-for-native-qwen-code
+      - attests-effective-agent-model-and-worktree
+      - canonicalizes-and-verifies-terminal-title
+      - fences-provider-or-worktree-mismatch
   admission:
     expectedOperation: active-dag-node
     providerSelection: profiles-registry-resolver-output
@@ -156,10 +170,11 @@ routing:
     api: orchestration.send
     cli: 'orca orchestration send --to dispatch:<workflow-dispatch-id> --type escalation --subject "<decision>" --body "<normalized-decision-envelope>" --json'
     forbiddenType: status
-    reason: Workflow Coordinators block on escalation but do not subscribe to status.
+    reason: Workflow Monitors block on escalation but do not subscribe to status.
   coordinatorToOperation: forbidden
   operationToParentCoordinator: forbidden
 forbiddenCalls:
+  - raw-operation-task-create-or-worker-start-outside-canonical-launcher
   - orchestration.dispatch-inject-for-operation
   - orchestration.dispatch-return-preamble-for-operation
   - orchestration.dispatch-to-existing-terminal-for-operation

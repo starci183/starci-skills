@@ -8,16 +8,19 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.equal(contract.schema,'starci/orca-provider@1');
   assert.equal(contract.names.planCoordinator,'[Coordinator] <Plan>');
   assert.equal(contract.names.workflowWorktree,'[Workflow] <Workflow>');
-  assert.equal(contract.names.workflowCoordinator,'[Coordinator] <Workflow>');
+  assert.equal(contract.names.workflowMonitor,'[Monitor] <Workflow>');
   assert.equal(contract.names.operationAgent,'[Op] <operation> - <scope>');
   assert.equal(contract.environmentBinding.currentRuntime,'omit---on');
   assert.equal(contract.environmentBinding.namedRuntimeAuthority,'live-runtime-inventory-only');
   assert.match(contract.planCoordinator.calls.startAgent.cli,/orchestration worker-start .*--agent codex/);
-  assert.match(contract.workflowCoordinator.calls.startChildAgent.cli,/--worktree new-child .*--agent codex/);
-  assert.match(contract.workflowCoordinator.calls.bindParent.cli,/worktree set .*--parent-worktree/);
-  assert.match(contract.workflowCoordinator.calls.attestParent.cli,/worktree show/);
-  assert.match(contract.workflowCoordinator.calls.attestParent.acceptOnlyWhen,/parentWorktreeId/);
-  assert.match(contract.workflowCoordinator.calls.nameAgent.cli,/\[Coordinator\] <Workflow>/);
+  assert.match(contract.workflowMonitor.calls.startChildAgent.cli,/--worktree new-child .*--agent codex/);
+  assert.match(contract.workflowMonitor.calls.bindParent.cli,/worktree set .*--parent-worktree/);
+  assert.match(contract.workflowMonitor.calls.attestParent.cli,/worktree show/);
+  assert.match(contract.workflowMonitor.calls.attestParent.acceptOnlyWhen,/parentWorktreeId/);
+  assert.match(contract.workflowMonitor.calls.nameAgent.cli,/\[Monitor\] <Workflow>/);
+  assert.equal(contract.operationAgent.canonicalLauncher.module,'execution/orca-supervised-launch.mjs');
+  assert.equal(contract.operationAgent.canonicalLauncher.command,'start-op');
+  assert.equal(contract.operationAgent.canonicalLauncher.authority,'exclusive-effectful-construction-path');
   assert.equal(contract.operationAgent.qwen38Flash.launch,'direct-native-worker-start');
   assert.equal(contract.operationAgent.qwen38Flash.agent,'qwen-code');
   assert.equal(contract.operationAgent.qwen38Flash.model,'qwen3.8-flash');
@@ -42,7 +45,7 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.ok(contract.forbiddenCalls.includes('operation-agent-tool-agent'));
   for(const cli of [
     contract.planCoordinator.calls.startAgent.cli,
-    contract.workflowCoordinator.calls.startChildAgent.cli,
+    contract.workflowMonitor.calls.startChildAgent.cli,
     contract.operationAgent.qwen38Flash.calls.startAgent.cli,
     contract.operationAgent.managedFallback.calls.startAgent.cli
   ])assert.doesNotMatch(cli,/--on\s+(?:windows|macos|linux)(?:\s|$)/i);

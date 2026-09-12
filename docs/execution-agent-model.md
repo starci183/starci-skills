@@ -69,16 +69,16 @@ normalized manager boundaries and never performs workflow-local or operation wor
 Orca main worktree
 └─ [Coordinator] AgentOS Backend
    ├─ [Workflow] Core (child worktree)
-   │  └─ [Coordinator] Core
+   │  └─ [Monitor] Core
    │     └─ [Op] <operation> - Core
    ├─ [Workflow] Accounting (child worktree)
-   │  └─ [Coordinator] Accounting
+   │  └─ [Monitor] Accounting
    │     └─ [Op] <operation> - Accounting
    ├─ [Workflow] Chatbot (child worktree)
-   │  └─ [Coordinator] Chatbot
+   │  └─ [Monitor] Chatbot
    │     └─ [Op] <operation> - Chatbot
    └─ [Workflow] Sales (child worktree)
-      └─ [Coordinator] Sales
+      └─ [Monitor] Sales
          └─ [Op] <operation> - Sales
 ```
 

@@ -49,6 +49,7 @@ receipts:
       - terminal-rename-to-canonical-op-name
       - record-ui-defect-if-terminal-is-no-longer-writable
 dispatchAssertions:
+  - Workflow Monitors invoke execution/orca-supervised-launch.mjs start-op; they never compose task-create, worker-start, provider fallback or terminal naming calls themselves.
   - A workflow child is explicitly bound with worktree set --parent-worktree to the exact main Coordinator worktree and worktree show attests that parentWorktreeId before any operation Task is created.
   - A null, stale or wrong workflow-child parentWorktreeId stops dispatch; orchestration Task membership alone never substitutes for Orca worktree lineage.
   - Operation equals the expected active DAG node before Task creation.
@@ -64,7 +65,7 @@ dispatchAssertions:
 uiAssertions:
   - Main terminal title equals [Coordinator] <Plan>.
   - Workflow child display name equals [Workflow] <Workflow>.
-  - Workflow coordinator title equals [Coordinator] <Workflow>.
+  - Workflow Monitor title equals [Monitor] <Workflow>.
   - Operation title is canonicalized to [Op] <operation> - <scope> after native readiness and again before release.
   - Bash in the subtitle is accepted only as activity metadata beneath a native agent identity.
 messageAssertions:

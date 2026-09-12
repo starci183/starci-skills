@@ -59,7 +59,7 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.equal(policy.waitHierarchy.coordinator.actsBy,'decide-schedule-recover-or-replace-workflow-manager');
   assert.equal(policy.waitHierarchy.coordinator.workflowLocalExecution,'forbidden');
   assert.equal(policy.waitHierarchy.coordinator.operationExecution,'forbidden');
-  assert.equal(policy.workerLifecycle.displayNames.workflowManager,'[Coordinator] <Workflow>');
+  assert.equal(policy.workerLifecycle.displayNames.workflowManager,'[Monitor] <Workflow>');
   assert.equal(policy.workerLifecycle.displayNames.operationAgent,'[Op] <operation> - <scope>');
   assert.equal(policy.workerLifecycle.displayNames.applyAgentNameWith,'task-display-name-then-provider-attestation-then-terminal-canonicalization');
   assert.equal(policy.workerLifecycle.operationAgent.launch,'supervised-native-agent');
@@ -103,10 +103,10 @@ test('supervision policy is a strict event-driven coordinator contract',()=>{
   assert.ok(policy.forbidden.includes('dispatch-operation-to-existing-terminal'));
 });
 
-test('display names distinguish plan coordinator, workflow coordinator and operation roles',()=>{
+test('display names distinguish plan coordinator, workflow Monitor and operation roles',()=>{
   assert.equal(formatOrcaDisplayName('coordinator',{plan:'AgentOS Backend'}),'[Coordinator] AgentOS Backend');
   assert.equal(formatOrcaDisplayName('workflow-worktree',{workflow:'Chatbot'}),'[Workflow] Chatbot');
-  assert.equal(formatOrcaDisplayName('workflow-manager',{workflow:'Chatbot'}),'[Coordinator] Chatbot');
+  assert.equal(formatOrcaDisplayName('workflow-manager',{workflow:'Chatbot'}),'[Monitor] Chatbot');
   assert.equal(formatOrcaDisplayName('operation-agent',{operation:'review.verify',scope:'Chatbot'}),'[Op] review.verify - Chatbot');
 });
 

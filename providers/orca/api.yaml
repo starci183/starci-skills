@@ -267,7 +267,7 @@ starciOrchestrationAllowlist:
     - orchestration gate-list
     - worktree set
     - terminal rename
-  workflowCoordinator:
+  workflowMonitor:
     - orchestration task-create
     - orchestration task-list
     - orchestration task-update

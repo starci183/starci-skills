@@ -34,7 +34,8 @@ invariants:
   - The Workflow Manager decides, dispatches, retries, replaces and waits; implementation, repair, test execution and output production belong exclusively to operation agents.
   - The Workflow Manager waits for operation boundaries, while the parent Coordinator waits for normalized Workflow Manager boundaries.
   - A Qwen, Claude, Codex or other operation agent executes exactly one operation and never substitutes for the Workflow Manager.
-  - The persistent agent inside each workflow child is displayed as [Coordinator] <Workflow>; [Monitor] is not a StarCi agent role.
+  - The persistent agent inside each workflow child is displayed as [Monitor] <Workflow>; Coordinator is reserved for the parent Plan/DAG agent.
+  - A Workflow Monitor invokes the canonical supervised operation launcher and cannot assemble task creation, provider selection, worker startup or terminal naming commands itself.
   - Every operation message targets its Workflow Manager; module-local decisions are settled there without notifying the parent Coordinator.
   - A Workflow Manager emits only normalized cross-workflow, shared-owner, authority, human-decision, manager-failure or workflow-done boundaries to the parent Coordinator.
   - The parent Coordinator replies through the Workflow Manager and never controls an operation agent directly.
