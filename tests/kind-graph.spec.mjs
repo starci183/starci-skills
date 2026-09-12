@@ -39,6 +39,9 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.deepEqual(mutationsOf('architecture.revise',{profile}),['sds']);
   assert.equal(familyOf('architecture.revise',{profile}),'repair');
   assert.equal(operatorOf('frontend.implement',{profile}),'interface.implement');
+  // The API prove step launches under its own contract, not the frontend walk's.
+  assert.equal(operatorOf('e2e.verify',{profile}),'e2e.verify');
+  assert.equal(operatorOf('uat.verify',{profile}),'uat.verify');
   assert.equal(roleOf('architecture.revise',{profile}),'decide');
 });
 

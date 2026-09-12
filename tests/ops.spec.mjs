@@ -94,6 +94,48 @@ test('UAT contract rejects parallel/visual execution and incomplete cleanup or r
   assert.ok(errors(c).includes('UAT_BINDING'));
 });
 
+test('API end-to-end contract keeps the proof on the public API against a real stack it starts, with one scenario per assertion',()=>{
+  for(const [key,value] of [['proofSurface','any-surface'],['interfaceDriving',true],['stack','mocked'],['mocks','allowed-for-the-unit-under-proof'],['scenarios','one-per-slice'],['checks','agent-chosen-commands'],['productCode','repairable'],['environmentBlocker','any-failure'],['teardown','optional']]) {
+    const c=fresh();c.ops.find(o=>o.id==='e2e.verify').contract.e2ePolicy[key]=value;
+    assert.ok(errors(c).includes('E2E_POLICY'),key);
+  }
+  for(const id of ['coverage','api','stack','run','scope','teardown']) {
+    const c=fresh(),op=c.ops.find(o=>o.id==='e2e.verify');op.contract.proofs=op.contract.proofs.filter(p=>p.id!==id);
+    assert.ok(errors(c).includes('E2E_BINDING'),id);
+  }
+  for(const id of ['architecture','suite','stack','checks','effects']) {
+    const c=fresh(),op=c.ops.find(o=>o.id==='e2e.verify');
+    op.contract.reads=op.contract.reads.filter(r=>r.id!==id);
+    for(const step of op.contract.steps)step.reads=step.reads.filter(r=>r!==id);
+    assert.ok(errors(c).includes('E2E_BINDING'),id);
+  }
+});
+
+test('the API end-to-end operator proves through the stack and the API only, and names no surface, capture or product repair',()=>{
+  const document=fs.readFileSync(path.join(root,'e2e.verify','operator.yaml'),'utf8');
+  const contract=JSON.stringify(catalogue.ops.find(op=>op.id==='e2e.verify').contract);
+  for(const text of [document,contract]) {
+    // This is not the frontend walk: no surface, no capture, no human-driven browsing may enter this contract.
+    for(const forbidden of [/screenshot/i,/video/i,/rendered/i,/browser/i,/walk/i,/screens?/i,/visual/i]) {
+      assert.doesNotMatch(text,forbidden,String(forbidden));
+    }
+    // It is the API proof on a real stack the suite starts, with the listed checks and no mock of the unit under proof.
+    for(const required of [/public API/,/real stack/,/container/,/one scenario per assertion|one assertion is one scenario/i,
+      /verbatim/,/no mock, stub, fake or spy of the unit under proof/,/never report done on an unrun|never .*done on an unrun/i]) {
+      assert.match(text,required,String(required));
+    }
+  }
+  const policy=catalogue.ops.find(op=>op.id==='e2e.verify').contract.e2ePolicy;
+  assert.equal(policy.proofSurface,'public-api-only');
+  assert.equal(policy.interfaceDriving,false);
+  assert.equal(policy.stack,'real-started-by-the-suite');
+  assert.equal(policy.checks,'listed-commands-verbatim');
+  assert.equal(policy.productCode,'unchanged');
+  // Its blockers refuse rather than improvise: no missing check is replaced, no ceiling widened.
+  const codes=catalogue.ops.find(op=>op.id==='e2e.verify').contract.blockers.map(blocker=>blocker.code);
+  assert.deepEqual(codes.sort(),['ASSERTION_REQUEST_INCOMPLETE','CHECK_UNRUNNABLE','DECLARED_DEPENDENCY_UNMET','PROOF_SURFACE_UNAVAILABLE','SCOPE_OUTSIDE_ALLOWLIST','STACK_UNAVAILABLE']);
+});
+
 test('all generated authority/catalogue bytes are reproducible without writes in check mode',()=>{
   const before=outputs();
   assert.deepEqual(outputs(),before);

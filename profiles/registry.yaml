@@ -195,6 +195,13 @@ operators:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol]}
+  e2e.verify:
+    skill: starci
+    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+    environments:
+      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: claude, profiles: [claude-opus]}
+      - {environment: qwen, profiles: [qwen3.8-flash]}
   interface.draw:
     skill: starci
     chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash]

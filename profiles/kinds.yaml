@@ -118,7 +118,7 @@ kinds:
   e2e.verify:
     family: prove
     role: verify
-    operator: uat.verify
+    operator: e2e.verify
     readOnly: false
     mutates: [code]
     purpose: Prove one delivered slice through its public API on the real stack, never a screen, and leave the scenario spec and its run output.

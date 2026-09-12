@@ -73,10 +73,10 @@ Checker offenders today should match the **35** authored-declarative JSON paths 
 | `ops/catalog.json` | generated → `.dist` only | Owner: `ops/generate.mjs` via `ops/contracts.mjs`. |
 | `ops/basic-ops.json` | generated → `.dist` only | Owner: `ops/generate.mjs` (`ops/basic-ops.mjs` view). |
 | `ops/consolidation.json` | generated → `.dist` only | Owner: `ops/generate.mjs` (from `registry.consolidation`). |
-| `ops/*/authority.json` (14) | generated → `.dist` only | Owner: `ops/generate.mjs` + `ops/role-authority.mjs`. |
+| `ops/*/authority.json` (15) | generated → `.dist` only | Owner: `ops/generate.mjs` + `ops/role-authority.mjs`. |
 
 Operator directories:
-`architecture.decide`, `backend.implement`, `business.decide`, `content.generate`, `interface.draw`, `interface.implement`, `knowledge.repair`, `release.deliver`, `review.verify`, `runtime.operate`, `scope.retire`, `task.execute`, `uat.verify`, `workspace.manage`.
+`architecture.decide`, `backend.implement`, `business.decide`, `content.generate`, `e2e.verify`, `interface.draw`, `interface.implement`, `knowledge.repair`, `release.deliver`, `review.verify`, `runtime.operate`, `scope.retire`, `task.execute`, `uat.verify`, `workspace.manage`.
 
 ---
 
