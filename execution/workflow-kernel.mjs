@@ -280,54 +280,82 @@ const ledgerAccess=ctx=>{
 };
 const workRootOf=at=>typeof at==='string'?path.join(at,'.starciwork')
   :plain(at)?(at.workRoot?String(at.workRoot):at.repoRoot?path.join(String(at.repoRoot),'.starciwork'):null):null;
+const UI_KIND='ui';
 /**
- * The interface design record of a node: the one design file the node's own `design/` folder names (`index.yaml`
- * first, then the only file there). It is the authority for what the interface lane still has to do - which
- * screens were drawn and which artwork slots the drawing declared - so it is read from disk, never inferred.
- * A node whose design was never drawn has no record, and then every drawing step of its lane stays mandatory.
+ * The `ui` node that is a node's interface design record: itself when it is one, else the ui node it references,
+ * else the one beside it under its feature (`features/<feature>/ui/index.yaml`). The projection is asked first;
+ * a record written after the tree was read is still found on disk, because the record, not the projection, is
+ * the authority for what the interface lane still has to do.
+ */
+function designNodeOf(access,node){
+  if(!plain(node))return null;
+  if(node.kind===UI_KIND)return node;
+  const nodes=access?.loaded?.nodes;
+  const byRef=(Array.isArray(node.refs)?node.refs:[]).map(id=>typeof nodes?.get==='function'?nodes.get(id):null).find(item=>item?.kind===UI_KIND);
+  if(byRef)return byRef;
+  const module=workModule(node);
+  const beside=(access?.loaded?.list??[]).find(item=>item?.kind===UI_KIND&&slash(item.path??'')===`${module}/ui/index.yaml`);
+  if(beside)return beside;
+  const root=workRootOf(access?.at);
+  if(!root||!module.startsWith('features/'))return null;
+  const file=path.join(root,module,'ui','index.yaml');
+  return fs.existsSync(file)?{id:null,path:`${module}/ui/index.yaml`,kind:UI_KIND,state:null}:null;
+}
+/**
+ * The interface design record a node reads: the `ui:` spec of its ui node - surfaces, states, the candidate
+ * images under the node's own assets and the `artworkSlots` the drawing declared - with the record's own state
+ * and file. It is read from disk, never inferred: a feature whose ui node was never drawn has surfaces without
+ * candidates, and a feature with no ui node at all has no record.
  */
 export function designRecord(ctx,node){
   const access=ledgerAccess(ctx);
-  if(!access?.api||!plain(node))return null;
-  let directory=null;
-  try{directory=typeof access.api.nodeDirectory==='function'?access.api.nodeDirectory(access.at??'',node):null;}catch{directory=null;}
-  if(!directory){
-    const root=workRootOf(access.at);
-    directory=root&&node.path?path.join(root,path.dirname(String(node.path))):null;
-  }
-  if(!directory)return null;
-  const folder=path.join(directory,'design');
-  let names=[];
-  try{names=fs.readdirSync(folder,{withFileTypes:true}).filter(entry=>entry.isFile()&&/\.(ya?ml|json)$/i.test(entry.name)).map(entry=>entry.name).sort();}catch{return null;}
-  const file=names.find(name=>/^index\.(ya?ml|json)$/i.test(name))??names[0];
-  if(!file)return null;
-  try{
-    const text=fs.readFileSync(path.join(folder,file),'utf8');
-    const parsed=/\.json$/i.test(file)?JSON.parse(text):parseYaml(text);
-    if(!plain(parsed))return null;
-    return plain(parsed.design)?{...parsed,...parsed.design,file:slash(path.join(folder,file))}:{...parsed,file:slash(path.join(folder,file))};
-  }catch{return null;}
+  if(!access||!plain(node))return null;
+  const design=designNodeOf(access,node);
+  const root=workRootOf(access.at);
+  if(!design||!root||!design.path)return null;
+  const file=path.join(root,String(design.path));
+  let raw;
+  try{raw=parseYaml(fs.readFileSync(file,'utf8'));}catch{return null;}
+  if(!plain(raw)||raw.kind!==UI_KIND)return null;
+  const spec=plain(raw.ui)?raw.ui:{};
+  return {...spec,node:raw.id??design.id??null,state:raw.state??design.state??null,file:slash(file)};
 }
 const declared=value=>Array.isArray(value)?value.length>0:plain(value)?Object.keys(value).length>0:false;
+const slotGenerated=slot=>plain(slot)&&typeof slot.file==='string'&&slot.file.trim()!=='';
 /**
  * Predicates an `optionalWhen` lane step reads. Both are facts of the node's design record, never a judgement:
- * `node.hasInterfaceDesign` is true when that record exists and declares screens (so there is nothing left to
- * draw), and `node.hasNoArtworkSlots` is true when it exists and declares no artwork slot (so there is no
- * artwork to produce). A node with no record satisfies neither: the step runs until the record says otherwise.
+ * `node.hasInterfaceDesign` is true when that record names its surfaces and the candidate images that drew them
+ * (so there is nothing left to draw), and `node.hasNoArtworkSlots` is true when it declares no artwork slot or
+ * every slot already names its generated file (so there is no artwork left to produce). A node with no record
+ * satisfies neither: the step runs until the record says otherwise.
  */
 export function lanePredicates(ctx=null,node=null){
   const record=designRecord(ctx,node);
+  const drawn=Boolean(record)&&declared(record.surfaces)&&declared(record.assets);
+  const slots=Array.isArray(record?.artworkSlots)?record.artworkSlots:[];
   return {
-    'node.hasInterfaceDesign':Boolean(record)&&declared(record.screens),
-    'node.hasNoArtworkSlots':Boolean(record)&&!declared(record.artworkSlots)
+    'node.hasInterfaceDesign':drawn,
+    // A record that was never drawn has declared nothing yet: the artwork step stays until the drawing says otherwise.
+    'node.hasNoArtworkSlots':drawn&&(!slots.length||slots.every(slotGenerated))
   };
 }
 const laneNext=(entry,predicates=null)=>{
   try{return graph.nextKind(entry?.lane??[],entry?.done??[],{predicates:predicates??{}});}catch{return null;}
 };
 const laneText=lane=>(lane??[]).join(' -> ');
-/** `2/3`: how much of a node's lane is accepted. What `workflow-status` prints per node. */
-const laneProgress=entry=>entry?.lane?.length?`${(entry.done??[]).filter(kind=>entry.lane.includes(kind)).length}/${entry.lane.length}`:null;
+/**
+ * The optional steps the node's own design record retires right now, kept on the lane entry so every line the
+ * user reads - the contract, the status view, the goal table - prints the lane as it is walked, not the template.
+ */
+const laneSkip=(entry,predicates=null)=>{
+  if(!entry?.lane?.length)return [];
+  try{entry.skipped=graph.skippedKinds(entry.lane,entry.done??[],{predicates:predicates??{}});}catch{entry.skipped=Array.isArray(entry.skipped)?entry.skipped:[];}
+  return entry.skipped;
+};
+/** The lane as the node walks it: every mandatory step and every optional step its record did not retire. */
+const laneWalked=entry=>(entry?.lane??[]).filter(kind=>!(entry?.skipped??[]).includes(kind));
+/** `2/3`: how much of a node's walked lane is accepted. What `workflow-status` prints per node. */
+const laneProgress=entry=>{const walked=laneWalked(entry);return walked.length?`${(entry.done??[]).filter(kind=>walked.includes(kind)).length}/${walked.length}`:null;};
 /** The build step of a lane: its one implement-role kind, which is what a repair of that node must be. */
 const laneBuildKind=entry=>(entry?.lane??[]).find(kind=>kindRole(kind)==='implement')??null;
 /** The lane an operation belongs to: its own node, or - for a kernel review - the node set it judges. */
@@ -540,7 +568,32 @@ export function grammarReferences(root=skillRoot){
  * kernel tells "this product has no brand yet" from "this tree was never asked about brands".
  */
 const brandAware=ctx=>{const access=ledgerAccess(ctx);return Boolean(access?.loaded)&&Object.hasOwn(access.loaded,'brand');};
-const brandOf=ctx=>ledgerAccess(ctx)?.loaded?.brand??null;
+/** A brand the kernel can hand to an operation: the node exists and its record carries a spec or a rev. A brand node with nothing authored yet is a brand still to decide, not one to read. */
+const brandOf=ctx=>{const brand=ledgerAccess(ctx)?.loaded?.brand;return plain(brand)&&(plain(brand.spec)||(brand.rev!==null&&brand.rev!==undefined))?brand:null;};
+/**
+ * The brand spec in the fields the kernel reads. The authored shape is the Work schema's (`identity.name`,
+ * `color.tokens[]`, `mascot.assets[]`, `imagery.promptRules`); a spec that already names these fields flat is
+ * read as it is, so an injected ledger and a real record answer the same. Asset paths are made tree-relative.
+ */
+export function brandFields(brand){
+  const spec=plain(brand?.spec)?brand.spec:{};
+  const treePath=entry=>{const p=slash(String(entry??'')).replace(/^\.\//,'');return !p?'':p.startsWith(`${BRAND_DIRECTORY}/`)?p:`${BRAND_DIRECTORY}/${p}`;};
+  const tokenMap=Array.isArray(spec.color?.tokens)
+    ?Object.fromEntries(spec.color.tokens.filter(plain).filter(item=>typeof item.token==='string'&&item.token).map(item=>[item.token,{value:item.value??null,role:item.role??null}]))
+    :null;
+  const mascot=Array.isArray(spec.mascot?.assets)?spec.mascot.assets.filter(plain).map(item=>treePath(item.path)).filter(Boolean):null;
+  const rev=spec.rev??brand?.rev??null;
+  return {
+    name:spec.identity?.name??spec.name??brand?.name??null,
+    family:spec.identity?.family??spec.family??brand?.family??null,
+    rev:rev===undefined?null:rev,
+    colorTokens:plain(spec.colorTokens)?spec.colorTokens:tokenMap,
+    mascotAssets:unique((Array.isArray(spec.mascotAssets)?spec.mascotAssets.map(entry=>slash(String(entry??''))):mascot??[]).filter(Boolean)),
+    forbidden:Array.isArray(spec.forbidden)?spec.forbidden:Array.isArray(spec.imagery?.forbidden)?spec.imagery.forbidden:null,
+    imageryPromptRules:Array.isArray(spec.imageryPromptRules)?spec.imageryPromptRules:Array.isArray(spec.imagery?.promptRules)?spec.imagery.promptRules:null
+  };
+}
+const BRAND_DIRECTORY='brand';
 /** The brand file and every asset beside it, as the ledger names them; a ledger that names none adds nothing. */
 const brandReferencesOf=(api,loaded)=>{
   if(typeof api?.brandReferences!=='function'||!loaded?.brand)return [];
@@ -549,23 +602,20 @@ const brandReferencesOf=(api,loaded)=>{
 /** What a contract prints and the status records: the brand's identity and its artwork, never the whole spec. */
 export function brandSummary(loaded){
   const brand=loaded?.brand;
-  if(!plain(brand))return null;
-  const spec=plain(brand.spec)?brand.spec:{};
-  const rev=brand.rev??spec.rev??null;
-  return {node:brand.node??null,file:brand.file?slash(String(brand.file)):null,
-    name:spec.name??brand.name??null,family:spec.family??brand.family??null,rev:rev===undefined?null:rev,
-    mascotAssets:unique((Array.isArray(spec.mascotAssets)?spec.mascotAssets:[]).map(entry=>slash(String(entry??''))).filter(Boolean))};
+  if(!plain(brand)||!(plain(brand.spec)||(brand.rev!==null&&brand.rev!==undefined)))return null;
+  const fields=brandFields(brand);
+  return {node:brand.node??null,file:brand.file?slash(String(brand.file)):null,name:fields.name,family:fields.family,rev:fields.rev,mascotAssets:fields.mascotAssets};
 }
 /** What the validator is given: the brand as rules, trimmed to the fields a verdict may be founded on. */
 export const BRAND_PAYLOAD=['name','family','rev','colorTokens','mascotAssets','forbidden','imageryPromptRules'];
 export function brandPayload(loaded){
   const brand=loaded?.brand;
   if(!plain(brand))return null;
-  const spec=plain(brand.spec)?brand.spec:{};
+  const fields=brandFields(brand);
   const value={};
   for(const field of BRAND_PAYLOAD){
-    const given=spec[field]??(field==='rev'?brand.rev:undefined);
-    if(given!==undefined&&given!==null)value[field]=given;
+    const given=fields[field];
+    if(given!==undefined&&given!==null&&!(Array.isArray(given)&&!given.length))value[field]=given;
   }
   return Object.keys(value).length?value:null;
 }
@@ -584,18 +634,93 @@ function noteBrand(store,state,loaded,{op=null,silent=false}={}){
     store.appendEvent({event:'brand-revised',rev:summary.rev,node:summary.node??null,...(op?{op:op.id}:{})});
   return summary;
 }
+/**
+ * On a shared ledger the Work tree is in the owner repository, not in this worktree: an allowlist entry under
+ * `.starciwork/` and a reference that names a tree file are rewritten to the owner's absolute path, so the
+ * operation writes and reads the one tree there is. A ledger that is here is left alone.
+ */
+function locateSharedTreePaths(op,ctx){
+  const owner=ctx?.work?.shared?ctx.work.ledger?.repoRoot:null;
+  if(!owner)return op;
+  const root=slash(owner),workRoot=slash(ctx.work.ledger?.workRoot??path.join(owner,'.starciwork'));
+  op.allowlist=unique((op.allowlist??[]).map(entry=>/^\.starciwork\//.test(slash(entry))?`${root}/${slash(entry)}`:entry));
+  op.references=unique((op.references??[]).map(entry=>{
+    const relative=slash(entry);
+    if(/^[A-Za-z]:\//.test(relative)||relative.startsWith('/'))return relative;
+    try{return fs.existsSync(path.join(workRoot,relative))?`${workRoot}/${relative}`:relative;}catch{return relative;}
+  }));
+  return op;
+}
+/**
+ * A frontend implementation is built against the drawing of its feature. While the `ui` node that is that
+ * drawing is not done the build waits (`lane-waits-design`, recorded once per drawing), and a feature with no ui
+ * node at all is the user's: a build that invents its own screen leaves nothing for the walk to compare
+ * against. True when the node must not start its lane now; the same answer in the goal phase and in the run.
+ */
+function designGate(store,state,access,node,entry){
+  if(!plain(node)||node.kind===UI_KIND||!(entry?.lane??[]).includes('frontend.implement'))return false;
+  const design=designRecord(access,node);
+  if(!design){
+    if(!state.needUser.some(item=>item.node===node.id&&item.kind==='design'))
+      state.needUser.push({node:node.id,kind:'design',detail:`no interface design record: the feature of ${node.id} has no ui node for the build to be drawn against; author one (features/<feature>/ui/index.yaml) or reference one`});
+    return true;
+  }
+  if(design.state!=='done'){
+    const waiting=design.node??design.file;
+    if(entry.waitsDesign!==waiting){entry.waitsDesign=waiting;store.appendEvent({event:'lane-waits-design',node:node.id,design:design.node??null,file:design.file});}
+    return true;
+  }
+  state.needUser=state.needUser.filter(item=>!(item.kind==='design'&&item.node===node.id));
+  delete entry.waitsDesign;
+  return false;
+}
+/**
+ * The candidate images a ui node's record names, as the hashed evidence assets of its completion: the `ui`
+ * completion profile requires a hashed local capture, and the drawing's candidates under the node's own `assets/`
+ * are exactly that. Read and hashed here, so the evidence binds the bytes the record was accepted with.
+ */
+function designEvidenceAssets(access,node){
+  if(!plain(node)||node.kind!==UI_KIND)return [];
+  const record=designRecord(access,node);
+  const root=workRootOf(access?.at);
+  if(!record||!root)return [];
+  const directory=path.join(root,path.dirname(String(node.path??'')));
+  const assets=[];
+  for(const entry of Array.isArray(record.assets)?record.assets:[]){
+    const relative=slash(String(entry?.path??'')).replace(/^\.\//,'');
+    if(!relative.startsWith('assets/')||relative.split('/').some(part=>part===''||part==='..'))continue;
+    try{
+      const bytes=fs.readFileSync(path.join(directory,relative));
+      assets.push({path:relative,scope:'node',sha256:crypto.createHash('sha256').update(bytes).digest('hex')});
+    }catch{/* a declared candidate that is not on disk is the validator's finding, not a kernel guess */}
+  }
+  return assets;
+}
+/** The design record of a node other than itself, tree-relative, as one reference of every op built or walked against it. */
+function designReferenceOf(access,node){
+  if(!plain(node)||node.kind===UI_KIND)return [];
+  const record=designRecord(access,node);
+  const root=workRootOf(access?.at);
+  if(!record?.file||!root)return [];
+  const relative=slash(path.relative(root,record.file));
+  return relative&&!relative.startsWith('..')?[relative]:[];
+}
 export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,lane=null,done=[],loaded=null}){
   // Lane-aware: the kind of this operation is the node's next lane step, not a fixed map of the node kind.
   const template=lane?.length?lane:(()=>{try{return graph.laneFor({kind:node.kind,layout:nodeLayout(node),repositoryRole:node.repository??null});}catch{return [];}})();
   const access={api,at:repoRoot,loaded};
   const step=(()=>{try{return graph.nextKind(template,done,{predicates:lanePredicates(access,node)});}catch{return null;}})();
   const design=DESIGN_KINDS.includes(step??'');
+  // A ui node's drawing and artwork steps author the design body of the node's own record - the `ui:` spec
+  // and the candidates and artwork under its assets - so the exact record path is granted, the way a decision
+  // is granted its own record; every other kind is kept off the record the kernel owns.
+  const ownRecord=node.kind===UI_KIND&&design?[`.starciwork/${slash(node.path)}`]:[];
   return toOp({id,nodeId:node.id,
     kind:step??WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),
-    ledgerIds:[node.id],allowlist:node.allowlist,
+    ledgerIds:[node.id],allowlist:unique([...node.allowlist,...ownRecord]),
     // A design-family step reads two bodies of material it may never invent: the installed grammar and the
     // product's own brand record with its assets.
-    references:unique([node.path,...(node.refs??[]),...(design?grammarReferences():[]),...(design?brandReferencesOf(api,loaded):[])]),
+    references:unique([node.path,...(node.refs??[]),...(design?grammarReferences():[]),...(design?brandReferencesOf(api,loaded):[]),...designReferenceOf(access,node)]),
     // The whole-tree validator is the kernel's own gate at acceptance: parallel operations must not fail on a sibling's in-progress ledger write.
     checks:node.checks.filter(check=>!KERNEL_CHECK.test(check.assertion??'')).map(check=>({name:check.assertion??check.command,command:check.command})),
     acceptance:node.assertions.length?node.assertions:[`${node.id} satisfies the Work contract it authored`],
@@ -632,11 +757,22 @@ export function syncLedgerOps(store,state,ctx){
     for(const item of state.ledger)if(item.id===op.nodeId)item.status='out-of-repository';
     store.appendEvent({event:'op-out-of-repository',op:op.id,node:op.nodeId,repository:foreign,own:ctx.work.code.repository});
   }
-  if(!loaded.ok)return [];
+  if(!loaded.ok){
+    // No node of an invalid tree is a trustworthy TODO, so nothing is derived from it - and that is said once per
+    // distinct set of errors, never silently and never on every tick.
+    const signature=unique(loaded.errors.map(error=>`${error.code}:${error.path??''}`)).sort().join('|');
+    if(state.ledgerInvalid!==signature){
+      state.ledgerInvalid=signature;
+      store.appendEvent({event:'ledger-invalid',errors:loaded.errors.slice(0,8).map(error=>({code:error.code,path:error.path??null,message:String(error.message??'').slice(0,160)}))});
+    }
+    return [];
+  }
+  if(state.ledgerInvalid){state.ledgerInvalid=null;store.appendEvent({event:'ledger-valid-again'});}
   const scope=state.scope.length?state.scope:null;
   const taken=new Set(state.ops.map(op=>op.id));
   const opOfNode=new Map(state.ops.filter(op=>op.nodeId).map(op=>[op.nodeId,op.id]));
   const added=[];
+  pruneAnsweredQuestions(store,state,loaded);
   const candidates=ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.code.repository,side:ctx.work.side});
   // A "ledger incomplete" item is only as current as the tree: once its node is schedulable, done, or no longer
   // a candidate at all (foreign, ineligible), the item is stale and goes.
@@ -664,7 +800,10 @@ export function syncLedgerOps(store,state,ctx){
     const laneOps=mine.filter(op=>op.kind!==AUTHOR_KIND);
     // One step at a time: a node yields its next lane step only when nothing of it is still in flight.
     if(mine.some(op=>op.status!=='done'))continue;
-    const next=laneNext(entry,lanePredicates({api:ctx.work.api,at:ctx.work.at,loaded},node));
+    if(!laneOps.length&&designGate(store,state,{api:ctx.work.api,at:ctx.work.at,loaded},node,entry))continue;
+    const predicates=lanePredicates({api:ctx.work.api,at:ctx.work.at,loaded},node);
+    laneSkip(entry,predicates);
+    const next=laneNext(entry,predicates);
     // No next step means the lane is walked; `review.verify` is the kernel's own (planVerifyOps), not the node's.
     const onDisk=(()=>{try{return ctx.work.api.readNode(ctx.work.at,node)?.state??node.state;}catch{return node.state;}})();
     if(!next&&laneOps.length&&onDisk==='todo'&&!entry.recordedAttempt){
@@ -680,6 +819,7 @@ export function syncLedgerOps(store,state,ctx){
     if(!next||KERNEL_PLANNED_KINDS.includes(next)||mine.some(op=>op.kind===next))continue;
     const id=laneOpId(node.id,next,!laneOps.length,taken);opOfNode.set(node.id,id);
     const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done,loaded});
+    locateSharedTreePaths(op,ctx);
     op.difficulty=op.difficulty??'medium';
     op.createdIteration=state.iterations;
     state.ops.push(op);
@@ -687,7 +827,7 @@ export function syncLedgerOps(store,state,ctx){
       state.ledger.push({id:node.id,title:describeNode(ctx.work.api,ctx.work.at,node),inputRef:node.path,kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[],lane:[...entry.lane]});
     added.push(op.id);
     store.appendEvent({event:'op-added',op:op.id,node:node.id,kind:op.kind,
-      reason:laneOps.length?`lane step ${entry.done.length+1} of ${entry.lane.length} (${laneText(entry.lane)})`:'newly schedulable Work node'});
+      reason:laneOps.length?`lane step ${entry.done.length+1} of ${laneWalked(entry).length} (${laneText(laneWalked(entry))})`:'newly schedulable Work node'});
     gateDynamicOp(store,state,op);
   }
   return added;
@@ -801,16 +941,21 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
   for(const node of incomplete)state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
   need(ready.length||incomplete.length||state.decisions.length,
     `No eligible Work node in scope ${scope?scope.join(', '):'(the whole tree)'}: there is nothing for this workflow to do`);
-  // The lane is the template the user approves: every node gets its record here, before any op exists.
+  // The lane is the template the user approves: every node gets its record here, before any op exists. A
+  // frontend build whose drawing is not done yet keeps its lane and waits; it enters the ops once the ui node is.
   state.lanes={};
   for(const node of ready)laneOf(state,node);
+  // A held node is still a goal item: it stays `planned` in the ledger with no op, so the workflow cannot finish
+  // around it, and its first op is created by `syncLedgerOps` once the drawing it waits for is done.
+  const launchable=ready.filter(node=>!designGate(store,state,{api:ledgerApi,at,loaded},node,state.lanes[node.id]));
   state.ledger=ready.map(node=>({id:node.id,title:describeNode(ledgerApi,repoRoot,node),inputRef:node.path,
     kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[],
     lane:[...(state.lanes[node.id]?.lane??[])]}));
   const taken=new Set(),opOfNode=new Map();
-  for(const node of ready)opOfNode.set(node.id,workOpId(node.id,taken));
-  state.ops=ready.map((node,index)=>deriveWorkOp(ledgerApi,at,node,
+  for(const node of launchable)opOfNode.set(node.id,workOpId(node.id,taken));
+  state.ops=launchable.map((node,index)=>deriveWorkOp(ledgerApi,at,node,
     {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[],loaded}));
+  for(const op of state.ops)locateSharedTreePaths(op,{work:{shared:binding.sharedLedger,ledger:{repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot}}});
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
   const assessed=typeof assessGoal==='function'?assessGoal({job:state.job,inputs:state.inputs,
     ledger:state.ledger.map(item=>({id:item.id,kind:item.kind,title:item.title,module:item.module})),
@@ -873,7 +1018,8 @@ function workGoalMarkdown(state,loaded){
   for(const op of state.ops){
     const item=ledgerItem(state,op.ledgerIds[0]);
     const entry=state.lanes?.[op.nodeId??''];
-    const lane=entry?.lane?.length?`${laneText(entry.lane)} (this op: step ${entry.lane.indexOf(op.kind)+1} of ${entry.lane.length})`:op.kind;
+    const walked=laneWalked(entry);
+    const lane=walked.length?`${laneText(walked)} (this op: step ${walked.indexOf(op.kind)+1} of ${walked.length})`:op.kind;
     lines.push(`| \`${op.id}\` | \`${op.nodeId}\` | ${item?.kind??'-'} | ${lane} | ${item?.module??'-'} | ${op.checks.length} | ${op.allowlist.map(entry=>`\`${entry}\``).join(', ')||'-'} |`);
   }
   if(state.decisions.length){
@@ -973,9 +1119,10 @@ export function laneLine(state,op){
   const entry=laneEntryOf(state,op);
   if(!entry?.lane?.length)return null;
   // An author op is no step of the lane: it is what makes the lane launchable, so it is named as preceding it.
-  if(op?.kind===AUTHOR_KIND)return `Lane: this op precedes ${laneText(entry.lane)}, which the kernel launches itself once this record is complete`;
-  const at=entry.lane.indexOf(op.kind);
-  return `Lane: ${laneText(entry.lane)} (this op: step ${at<0?(entry.done??[]).length+1:at+1} of ${entry.lane.length})`;
+  const walked=laneWalked(entry);
+  if(op?.kind===AUTHOR_KIND)return `Lane: this op precedes ${laneText(walked)}, which the kernel launches itself once this record is complete`;
+  const at=walked.indexOf(op.kind);
+  return `Lane: ${laneText(walked)} (this op: step ${at<0?(entry.done??[]).length+1:at+1} of ${walked.length})`;
 }
 
 /**
@@ -1460,7 +1607,13 @@ function markLedger(state,op,head){
     // Only the LAST step of a node's lane proves it (`review.verify` on a backend lane, `uat.verify` on a frontend
     // one); an earlier prove step such as `e2e.verify` leaves the item implemented so the review is still planned.
     const lane=op.nodeId?state.lanes?.[op.nodeId]?.lane:null;
-    const proves=Array.isArray(lane)&&lane.length?lane.at(-1)===op.kind:(op.kind==='review.verify'||kindRole(op.kind)==='verify');
+    // A lane that ends on a design step - a ui node, drawn then its artwork generated - is complete when that
+    // step is accepted: no review is planned for it, so its last step is the one that settles the item.
+    const entry=op.nodeId?state.lanes?.[op.nodeId]:null;
+    const walked=laneWalked(entry);
+    const proves=Array.isArray(lane)&&lane.length
+      ?lane.at(-1)===op.kind||(!lane.includes('review.verify')&&walked.length>0&&walked.every(kind=>kind===op.kind||(entry.done??[]).includes(kind)))
+      :(op.kind==='review.verify'||kindRole(op.kind)==='verify');
     item.status=proves?'verified':'implemented';
   }
 }
@@ -1549,6 +1702,8 @@ function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op.head}=
   ledgerWrite(store,state,op,ctx,'done',node=>ctx.work.api.markDone(ctx.work.at,node,{
     opId:op.id,head:head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,repository,bindSource:bindsCode(node),...(identity&&bindsCode(node)?{sourceIdentity:identity}:{}),
     evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',
+      // A ui node's completion carries its candidates as hashed captures: what the drawing produced is what is proven.
+      assets:designEvidenceAssets({api:ctx.work.api,at:ctx.work.at,loaded:ctx.work.loaded},node),
       servedVersionEvidence:`Checks re-run by the StarCi kernel in workflow ${state.id} on branch ${state.branch}`}}),nodeId);
 }
 
@@ -1600,9 +1755,11 @@ function advanceLanes(store,state,op,ctx,verified){
     entry.done=unique([...(entry.done??[]),op.kind]);
     entry.checks=mergeProven([...(entry.checks??[]),...provenChecks(verified.checks)]);
     entry.head=op.head??entry.head??null;
-    const next=laneNext(entry,lanePredicates(ctx,ctx.work.node(nodeId)));
+    const predicates=lanePredicates(ctx,ctx.work.node(nodeId));
+    laneSkip(entry,predicates);
+    const next=laneNext(entry,predicates);
     store.appendEvent({event:'lane-step',op:op.id,node:nodeId,kind:op.kind,
-      step:laneProgress(entry),lane:entry.lane,next:next??null});
+      step:laneProgress(entry),lane:entry.lane,skipped:[...(entry.skipped??[])],next:next??null});
     if(next){
       // Not done yet: the node keeps the kernel block of the step that just landed, and waits for the next one.
       ledgerWrite(store,state,op,ctx,'in-progress',node=>ctx.work.api.markInProgress(ctx.work.repoRoot,node,{opId:op.id,dispatch:op.dispatch}),nodeId);
@@ -1655,6 +1812,42 @@ function settleAuthoredRecord(store,state,op,ctx){
  * The record is the kernel's, so the kernel rewrites it from what it knows - the kernel block's checks and head,
  * the completion's own paths, sanitized - instead of leaving the whole tree invalid for a human to fix by hand.
  */
+/**
+ * A lane is templated the first time its node is seen. When the kinds profile later moves a node to another lane -
+ * a `ui` node that used to share the frontend lane, say - the recorded template is stale, so at load every lane
+ * whose fresh template differs and still contains every accepted step is re-templated; a lane that already
+ * walked a step the new template does not know keeps its old one, and the mismatch stays visible in the events.
+ */
+/**
+ * A `ledger` question on the user's list names a node the kernel could not record; when the tree now says that
+ * node is done - a later retry wrote it, or the record was repaired - the question is answered and is dropped,
+ * with an event, so the morning list carries only what is still true.
+ */
+function pruneAnsweredQuestions(store,state,loaded){
+  if(!Array.isArray(state.needUser)||!loaded?.nodes)return;
+  const kept=[];
+  for(const item of state.needUser){
+    const node=item?.kind==='ledger'&&item.node?loaded.nodes.get(item.node):null;
+    if(node&&node.state==='done'){store.appendEvent({event:'need-user-answered',node:item.node,kind:item.kind,detail:String(item.detail??'').slice(0,160)});continue;}
+    kept.push(item);
+  }
+  state.needUser=kept;
+}
+function retemplateLanes(store,state,loaded){
+  for(const [id,entry] of Object.entries(plain(state.lanes)?state.lanes:{})){
+    const node=loaded?.nodes?.get?.(id);
+    if(!node||!Array.isArray(entry?.lane)||!entry.lane.length)continue;
+    let fresh=[];
+    try{fresh=graph.laneFor({kind:node.kind,layout:nodeLayout(node),repositoryRole:node.repository??null});}catch{continue;}
+    if(!fresh.length||fresh.join('|')===entry.lane.join('|'))continue;
+    const done=entry.done??[];
+    if(!done.every(kind=>fresh.includes(kind))){store.appendEvent({event:'lane-template-stale',node:id,lane:entry.lane,fresh,done});continue;}
+    const before=[...entry.lane];
+    entry.lane=[...fresh];entry.skipped=[];
+    for(const item of state.ledger)if(item.id===id&&Array.isArray(item.lane))item.lane=[...fresh];
+    store.appendEvent({event:'lane-retemplated',node:id,from:before,to:fresh});
+  }
+}
 function repairKernelRecords(store,state,ctx,loaded){
   if(!ctx.work||loaded.ok||!Array.isArray(loaded.errors))return [];
   const api=ctx.work.api;
@@ -1906,13 +2099,21 @@ function validateAccepted(store,state,op,ctx,{files,verified}){
  * `interface-gap`: a frontend implementation found the accepted design silent about what it must build. The
  * route puts the lane's draw step back in front of it instead of letting it invent a surface of its own.
  */
-function reopenInterface(store,state,op,report,blocker){
+function reopenInterface(store,state,op,report,blocker,ctx=null){
   const route=routeOf({blocker:'interface-gap',kind:op.kind})??{kind:'interface.draw',origin:'architecture',then:'reopen'};
-  const draw=addOp(store,state,{id:nextId(state,'draw'),kind:routeKind(route,state,op)??'interface.draw',nodeId:op.nodeId,
+  // The gap is in the design record, so the drawing is done on the feature's ui node - its record and its
+  // assets - not on the implementation's code paths; a feature with no ui node redraws where the requester is.
+  const access=ctx?.work?{api:ctx.work.api,at:ctx.work.at,loaded:ctx.work.loaded}:null;
+  const design=access?designNodeOf(access,ctx.work.node(op.nodeId))??null:null;
+  const designPath=design?.path?slash(design.path):null;
+  const target=design?.id?{nodeId:design.id,allowlist:unique([`.starciwork/${path.posix.dirname(designPath)}/**`,`.starciwork/${designPath}`]),references:unique([designPath,...op.references])}
+    :{nodeId:op.nodeId,allowlist:op.allowlist,references:op.references};
+  const draw=addOp(store,state,{id:nextId(state,'draw'),kind:routeKind(route,state,op)??'interface.draw',nodeId:target.nodeId,
     goal:`Draw the surface ${op.id} found missing in the accepted design: ${blocker.detail}`,
-    ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,checks:op.checks,
+    ledgerIds:op.ledgerIds,allowlist:target.allowlist,references:target.references,checks:op.checks,
     acceptance:[`the accepted design answers: ${blocker.detail}`],origin:route.origin??'architecture'},
     `interface-gap reported by ${op.id}`);
+  if(draw)locateSharedTreePaths(draw,ctx);
   reopenRequester(store,state,op,report.open,draw,`the interface gap is drawn by ${draw.id}; read the accepted design again first`);
   routed(store,op,'interface-gap',draw.id,draw.origin,{kind:draw.kind,node:op.nodeId??null,then:route.then});
   return draw;
@@ -2127,7 +2328,7 @@ function handleBlocked(store,state,op,report,ctx){
   }
   // A frontend build that has no design to build from is drawn first, never guessed at.
   if(blocker.kind==='interface-gap'){
-    reopenInterface(store,state,op,report,blocker);
+    reopenInterface(store,state,op,report,blocker,ctx);
     return 'interface-gap';
   }
   if(blocker.kind==='sds-gap'){
@@ -2732,6 +2933,8 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
       code,ledger,at,shared:Boolean(shared),side:binding.side??null,source:binding.source,
       repoRoot:ledger.repoRoot,workRoot:ledger.workRoot,origin:code.origin,repository:code.repository};
     repairKernelRecords(store,state,ctx,loaded);
+    retemplateLanes(store,state,loaded);
+    pruneAnsweredQuestions(store,state,loaded);
     // The brand of this tree, as it stands at the start of the run: every design contract prints it from here.
     noteBrand(store,state,loaded,{silent:true});
     store.appendEvent({event:'ledger-loaded',workRoot:slash(loaded.workRoot),valid:loaded.ok,nodes:loaded.list.length,
@@ -2947,9 +3150,9 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       ops:state.ops.map(op=>({id:op.id,kind:op.kind,status:op.status,runtime:op.runtime,attempt:op.attempt})),
       // Per node: the lane it travels and how much of it is accepted - `lane: 2/3` is the line a user reads.
       lanes:Object.fromEntries(Object.entries(state.lanes??{}).map(([node,entry])=>
-        [node,{lane:laneText(entry.lane),done:[...(entry.done??[])],progress:laneProgress(entry)}])),
+        [node,{lane:laneText(laneWalked(entry)),done:[...(entry.done??[])],skipped:[...(entry.skipped??[])],progress:laneProgress(entry)}])),
       workNodes:state.ops.filter(op=>op.nodeId).map(op=>({op:op.id,node:op.nodeId,status:op.status,kind:op.kind,
-        lane:laneText(state.lanes?.[op.nodeId]?.lane??[])||null,progress:laneProgress(state.lanes?.[op.nodeId])})),
+        lane:laneText(laneWalked(state.lanes?.[op.nodeId]))||null,progress:laneProgress(state.lanes?.[op.nodeId])})),
       gates:state.gateResults,needUser:state.needUser,finished:state.finished,
       events:store.readEvents().slice(-20),final:readJson(store.paths.final,null)};
   }

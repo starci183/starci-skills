@@ -20,6 +20,120 @@ const RECEIPT='demo.sales.implementation.frontend.receipt';
 const INTAKE='demo.sales.implementation.backend.intake';
 const PAGE='app/receipt/page.tsx';
 
+const BRAND=`schema: work/node@2
+id: demo.brand
+kind: brand
+required: true
+state: todo
+description: The brand of the product - identity, colour tokens, mascot.
+assertions:
+  - brand-tokens-match-source
+assets:
+  - path: assets/mascot/rest.png
+    description: Mascot master at rest.
+brand:
+  rev: "1"
+  identity:
+    name: Demo
+    family: starci
+    owner: Product owner
+  color:
+    tokens:
+      - token: --demo-core-primary
+        value: "#c0203c"
+        role: primary
+    policy:
+      dangerMayMatchPrimary: true
+  typography:
+    family: Demo Sans, system-ui, sans-serif
+  mascot:
+    name: Demo mascot
+    assets:
+      - path: brand/assets/mascot/rest.png
+        purpose: Mascot master at rest, for empty states.
+    allowedIn: [empty states]
+    forbiddenIn: [error dialogs]
+    rules: [Never recolour the mascot.]
+  iconography:
+    set:
+      - "@demo/icons"
+  imagery:
+    style:
+      - Warm studio light.
+    promptRules:
+      - Name the mascot sheet and the primary token.
+  forbidden:
+    - Never recolour the mascot.
+  sources:
+    - repository: demo-frontend
+      path: src/app/globals.css
+      kind: css
+`;
+
+const UI='demo.sales.ui';
+/** The feature's design record: a ui node whose allowlist is its own folder in the tree, delivered by the frontend job. */
+const UI_RECORD=`schema: work/node@2
+id: demo.sales.ui
+kind: ui
+required: true
+state: todo
+description: The sales surfaces, drawn before they are built.
+assertions:
+  - sales-surfaces-drawn
+extensions:
+  work3:
+    allowlist:
+      files:
+        - .starciwork/features/sales/ui/**
+    checks:
+      - assertion: sales-surfaces-drawn
+        command: node starci.mjs validate .starciwork
+    scope:
+      repository: demo-frontend
+`;
+const UI_PAYLOAD=`ui:
+  status: proposed
+  intent: The receipt, drawn inside the grammar and the brand.
+  surfaces:
+    - name: receipt
+      route: /receipt
+      purpose: Read the receipt of an order.
+      actors:
+        - customer
+  states:
+    - name: loading
+      trigger: the order loads
+      behavior: skeleton lines
+    - name: empty
+      trigger: no order
+      behavior: the mascot says there is nothing to show
+    - name: error
+      trigger: the order cannot load
+      behavior: an inline error with retry
+    - name: interaction
+      trigger: a line is expanded
+      behavior: the line detail opens in place
+    - name: resting
+      trigger: order present
+      behavior: the receipt lines
+  accessibility:
+    - keyboard reachable
+  responsive:
+    - narrow and wide
+  assets:
+    - path: assets/receipt-resting.png
+      role: candidate for receipt resting, narrow
+      provenance: image model
+  observations: []
+  gaps: []
+  artworkSlots: []
+assets:
+  - path: assets/receipt-resting.png
+    description: Candidate for receipt resting, narrow.
+`;
+/** Bytes the validator reads as a PNG: the signature and a little padding. */
+const PNG_BYTES=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(24)]);
+
 const node=({id,directory,files,check,repository=null})=>`schema: work/node@2
 id: ${id}
 kind: implementation
@@ -83,6 +197,10 @@ function fixture(t){
   const work=path.join(owner,'.starciwork');
   const put=(relative,content)=>{const file=path.join(work,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content);};
   put('workspace.yaml','schema: work/workspace@1\nid: demo\n');
+  // The brand every design step reads: a frontend surface is never drawn on a tree that has none.
+  put('brand/index.yaml',BRAND);
+  put('brand/assets/mascot/rest.png','synthetic-mascot-bytes');
+  put('features/sales/ui/index.yaml',UI_RECORD);
   put(`features/sales/implementation/frontend/receipt/index.yaml`,
     node({id:RECEIPT,directory:'app/receipt',files:PAGE,check:'npx vitest run receipt',repository:'demo-frontend'}));
   put(`features/sales/implementation/backend/intake/index.yaml`,
@@ -127,10 +245,16 @@ test('a frontend workflow binds the Work tree its backend owns and takes only th
   assert.deepEqual(run.state.ledgerOwner,{repoRoot:run.owner,repository:'demo-backend',role:'be',project:'demo'});
   assert.equal(run.state.codeSide,'frontend');
   // The backend node names no repository and sits in implementation/backend/**: it is not this job's work.
-  assert.deepEqual(run.state.ops.map(op=>[op.id,op.nodeId,op.kind]),[[RECEIPT,RECEIPT,'interface.draw']]);
-  assert.deepEqual(run.state.ops[0].allowlist,[PAGE]);
-  assert.deepEqual(run.state.ledger.map(item=>item.id),[RECEIPT]);
-  assert.equal(run.state.needUser.length,0);
+  // The drawing is the ui node's own op, and its tree paths are located in the owner, because the tree is there.
+  assert.deepEqual(run.state.ops.map(op=>[op.id,op.nodeId,op.kind]),[[UI,UI,'interface.draw']]);
+  const owner=run.owner.replaceAll('\\','/');
+  assert.deepEqual(run.state.ops[0].allowlist,[`${owner}/.starciwork/features/sales/ui/**`,`${owner}/.starciwork/features/sales/ui/index.yaml`]);
+  assert.ok(run.state.ops[0].references.includes(`${owner}/.starciwork/features/sales/ui/index.yaml`));
+  // The receipt page waits for the drawing: it has a lane, no op yet, and the wait is recorded once.
+  assert.deepEqual(run.state.lanes[RECEIPT].lane,['frontend.implement','uat.verify']);
+  assert.deepEqual(run.store.readEvents().filter(event=>event.event==='lane-waits-design').map(event=>[event.node,event.design]),[[RECEIPT,UI]]);
+  assert.deepEqual(run.state.ledger.map(item=>[item.id,item.status]),[[RECEIPT,'planned'],[UI,'planned']],'the held page is still a goal item');
+  assert.deepEqual(run.state.needUser,[]);
   // The frontend repository keeps no Work tree of its own, not even the workflow's own runtime directory.
   assert.equal(fs.existsSync(path.join(run.code,'.starciwork')),false);
   assert.equal(run.store.dir.startsWith(run.owner),true);
@@ -149,14 +273,22 @@ test('the accepted slice is recorded and committed in the owner, names the front
   run.state.run='run_wf';run.state.from='term_kernel';
   const orca=scriptedOrca({reportsDir:run.store.paths.reports,worktree:run.code,
     // The frontend lane: the surface is drawn, then built, then walked; the node is done only after the walk.
-    scripts:{[RECEIPT]:[{outcome:'done',summary:'The receipt surface is drawn.',files:[],
-      checks:[passing('unit-tests-pass','npx vitest run receipt')]}],
-      [`${RECEIPT}-implement`]:[{outcome:'done',summary:'The receipt page renders.',files:[PAGE],
-      checks:[passing('unit-tests-pass','npx vitest run receipt')]}],
+    scripts:{[UI]:[{outcome:'done',summary:'The receipt surface is drawn.',
+      files:[`${run.owner.replaceAll('\\','/')}/.starciwork/features/sales/ui/index.yaml`],
+      checks:[passing('sales-surfaces-drawn','node starci.mjs validate .starciwork')],
+      // The drawing's payload on the ui record and its candidate image, written where the tree is - the owner.
+      effect:()=>{
+        const record=path.join(run.work,'features/sales/ui/index.yaml');
+        fs.appendFileSync(record,UI_PAYLOAD);
+        fs.mkdirSync(path.join(path.dirname(record),'assets'),{recursive:true});
+        fs.writeFileSync(path.join(path.dirname(record),'assets','receipt-resting.png'),PNG_BYTES);
+      }}],
+      [RECEIPT]:[{outcome:'done',summary:'The receipt page renders.',files:[PAGE],
+      checks:[passing('unit-tests-pass','npx vitest run receipt')],
+      // The agent's work: the page is written in the frontend worktree and nowhere else, by the build step.
+      effect:()=>fs.writeFileSync(path.join(run.code,PAGE),'export default function Receipt(){return <main>Receipt</main>;}\n')}],
       [`${RECEIPT}-verify`]:[{outcome:'done',summary:'The receipt flow passes on the surface.',files:[],
       checks:[passing('unit-tests-pass','npx vitest run receipt')]}]}});
-  // The agent's work: the page is written in the frontend worktree and nowhere else.
-  fs.writeFileSync(path.join(run.code,PAGE),'export default function Receipt(){return <main>Receipt</main>;}\n');
   const ownerHead=git(run.owner,'rev-parse','HEAD');
   const state=runLoop(orca.orca,run.store,run.state,{cwd:run.code,allocator:fakeAllocator(),template,wait:noWait,
     validate:validateWorkTree,git:spawnSync,exec:command=>({status:0,stdout:`${command} ok`,stderr:''}),
@@ -167,7 +299,10 @@ test('the accepted slice is recorded and committed in the owner, names the front
     waitTimeoutMs:2000,tickMs:1000,maxIterations:10});
 
   const built=state.ops.find(op=>op.kind==='frontend.implement'),last=state.ops.find(op=>op.kind==='uat.verify');
-  assert.deepEqual(state.ops.map(op=>op.kind),['interface.draw','frontend.implement','uat.verify']);
+  assert.deepEqual(state.ops.map(op=>[op.id,op.kind,op.status]),[[UI,'interface.draw','done'],[RECEIPT,'frontend.implement','done'],[`${RECEIPT}-verify`,'uat.verify','done']]);
+  // The drawing is recorded done in the owner, with its payload and its candidate beside it.
+  assert.equal(parseYaml(fs.readFileSync(path.join(run.work,'features/sales/ui/index.yaml'),'utf8')).state,'done');
+  assert.ok(fs.existsSync(path.join(run.work,'features/sales/ui/assets/receipt-resting.png')));
   const receipt=run.read(RECEIPT);
   assert.equal(receipt.state,'done');
   assert.equal(receipt.extensions.work3.kernel.verifiedBy,'starci-kernel');
@@ -202,7 +337,10 @@ test('the accepted slice is recorded and committed in the owner, names the front
   assert.deepEqual(loaded['ledger-shared'],{owner:'demo-backend',root:run.work.replaceAll('\\','/')});
   assert.equal(loaded.source,'workspace');
   assert.equal(loaded.code,'demo-frontend');
-  const committed=events.find(event=>event.event==='ledger-commit');
+  // Two ledger commits in the owner: the drawing's and the receipt's; the receipt's is the owner's head.
+  const ledgerCommits=events.filter(event=>event.event==='ledger-commit');
+  assert.deepEqual(ledgerCommits.map(event=>event.node),[UI,RECEIPT]);
+  const committed=ledgerCommits.at(-1);
   assert.equal(committed.ledgerCommit,ledgerCommit);
   assert.equal(committed.shared,true);
   assert.equal(committed.repository,'demo-backend');
@@ -255,7 +393,9 @@ test('the launcher commands reach one workflow directory in the owner, from the 
   assert.equal(status.ledgerSource,'workspace');
   assert.equal(status.codeSide,'frontend');
   assert.equal(status.ledgerOwner.repository,'demo-backend');
-  assert.deepEqual(status.workNodes.map(item=>item.node),[RECEIPT]);
+  // The drawing is the one op; the receipt page has its lane and waits for it.
+  assert.deepEqual(status.workNodes.map(item=>item.node),[UI]);
+  assert.deepEqual(Object.keys(status.lanes).sort(),[RECEIPT,UI].sort());
   // The same workflow is reachable by naming the tree outright instead of the host.
   assert.equal(kernelMain('workflow-status',{id:goal.id,'ledger-root':fixed.work},{orca:null,cwd:fixed.code}).dir,goal.dir);
 });

@@ -21,11 +21,11 @@ import {parseYaml} from '../core/yaml.mjs';
  */
 export const KIND_GRAPH='starci/kind-graph@1';
 /** The closed catalog. `validateGraph` refuses a profile that adds to it or drops from it. */
-export const KINDS=Object.freeze(['business.decide','architecture.decide','architecture.revise','brand.decide','interface.draw','e2e.verify',
+export const KINDS=Object.freeze(['business.decide','architecture.decide','architecture.revise','brand.decide','interface.draw','interface.asset','e2e.verify',
   'frontend.implement','backend.implement','runtime.operate','uat.verify','review.verify','work.author']);
 export const FAMILIES=Object.freeze(['design','build','prove','repair']);
 export const ROLES=Object.freeze(['decide','plan','implement','verify','write']);
-export const MUTATIONS=Object.freeze(['code','sds','srs','decision','design','runtime','record','asset']);
+export const MUTATIONS=Object.freeze(['code','sds','srs','decision','design','asset','runtime','record']);
 export const ORIGINS=Object.freeze(['ledger','shared','repair','gate','verify','architecture']);
 export const OUTCOMES=Object.freeze(['done','partial','failed','ask','blocked']);
 export const BLOCKERS=Object.freeze(['shared-change','sds-gap','interface-gap','brand-gap','environment','authority']);
@@ -178,6 +178,13 @@ export function nextKind(lane,doneKinds=[],{predicates={},profile=null}={}){
     return step.kind;
   }
   return null;
+}
+
+/** The optional steps of a lane a kernel would skip right now: satisfied by a named predicate and not done. */
+export function skippedKinds(lane,doneKinds=[],{predicates={},profile=null}={}){
+  const resolved=profileOf(profile);
+  const done=new Set(Array.isArray(doneKinds)?doneKinds:[doneKinds]);
+  return laneSteps(lane,resolved).filter(step=>!done.has(step.kind)&&typeof step.optionalWhen==='string'&&satisfied(step.optionalWhen,predicates)).map(step=>step.kind);
 }
 
 /** A one-line markdown rendering of a lane, for an operation contract, a status view or docs. */

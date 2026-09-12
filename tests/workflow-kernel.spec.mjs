@@ -107,7 +107,9 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
         const queue=scripts[dispatch.op];
         const file=path.join(reportsDir,`${dispatch.id}.json`);
         if(!queue?.length||fs.existsSync(file))continue;
-        const script=queue.shift();
+        const {effect,...script}=queue.shift();
+        // What the agent left on disk beside its report: a design record, a committed file.
+        if(typeof effect==='function')effect();
         const report=buildReport({...script,run,task:dispatch.task,dispatch:dispatch.id,from:dispatch.handle});
         report.sent={messageId:`msg_${dispatch.id}`,sentAt:1,type:report.signal.type};
         fs.mkdirSync(reportsDir,{recursive:true});
@@ -590,6 +592,26 @@ const WORK_NODES=[
   {id:'demo.payments.business.overview',path:'features/payments/business/overview/index.yaml',kind:'business-overview',state:'todo',eligible:true,inputDigest:DIGEST('e'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null}
 ];
 const FRONTEND_NODE={id:'demo.sales.implementation.frontend.cart',path:'features/sales/implementation/frontend/cart/index.yaml',kind:'implementation',state:'todo',eligible:true,inputDigest:DIGEST('g'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null};
+const UI='demo.sales.ui';
+const UI_FILE='.starciwork/features/sales/ui/index.yaml';
+const UI_RECORD=`schema: work/node@2
+id: demo.sales.ui
+kind: ui
+required: true
+state: todo
+description: The sales surfaces, drawn before they are built.
+assertions:
+  - sales-surfaces-drawn
+extensions:
+  work3:
+    allowlist:
+      files:
+        - .starciwork/features/sales/ui/**
+    checks:
+      - assertion: sales-surfaces-drawn
+        command: node starci.mjs validate .starciwork
+`;
+const UI_NODE={id:UI,path:'features/sales/ui/index.yaml',kind:'ui',state:'todo',eligible:true,inputDigest:DIGEST('u'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null,authored:UI_RECORD};
 const UNAUTHORED_NODE={id:'demo.sales.implementation.backend.refund',path:'features/sales/implementation/backend/refund/index.yaml',kind:'implementation',state:'todo',eligible:true,inputDigest:DIGEST('h'),dependsOn:[],refs:['features/sales/architecture/sds/intake/index.yaml'],blockedBy:[],children:[],completion:null};
 const AUTHORED={'demo.sales.architecture.sds.intake':ARCHITECTURE,'demo.sales.implementation.backend.intake':BACKEND,
   'demo.sales.implementation.frontend.receipt':UNCHECKED,'demo.payments.business.overview':OVERVIEW,
@@ -655,9 +677,7 @@ const brandLedger=tree=>({...work,
     const brand=Number.isFinite(rev)?{node:'demo.brand',rev,file:'brand/index.yaml',spec:brandSpec(rev)}:null;
     return {...loaded,brand};
   },
-  brandReferences:loaded=>loaded?.brand?[loaded.brand.file,...(loaded.brand.spec?.mascotAssets??[])]:[],
-  decisionCandidates:(loaded,options)=>[...work.decisionCandidates(loaded,options),
-    ...loaded.list.filter(node=>node.kind==='brand'&&node.state==='todo')]});
+  brandReferences:loaded=>loaded?.brand?[loaded.brand.file,...(loaded.brand.spec?.mascotAssets??[])]:[]});
 /** A ledger that knows about brands and whose tree carries no brand node at all. */
 const brandlessLedger=()=>({...work,loadLedger:where=>({...work.loadLedger(where),brand:null}),brandReferences:()=>[]});
 const brandDone=summary=>({outcome:'done',summary,files:[],
@@ -684,6 +704,7 @@ const receiptAuthor=()=>({'demo.sales.implementation.frontend.receipt-author':[{
 function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal,
   ledgerApi,validateOp=acceptAll}={}){
   const tree=workRepo(nodes);
+  activeRepo=tree.repo;
   const store=createStore({repoRoot:tree.repo,id:'20260912-110000-work-ledger'});
   const state=createWorkflowState({job:'Finish the sales slice',worktree:cwd,branch:'starci183/sales',
     gates,store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'work',scope,repoRoot:tree.repo});
@@ -910,14 +931,71 @@ const cartFile='apps/web/src/cart/index.tsx';
 const cartDone=summary=>({outcome:'done',summary,files:[cartFile],checks:[passing('cart-renders','npx vitest run cart')]});
 const cartRed=summary=>({outcome:'failed',summary,files:[],
   checks:[{name:'cart-renders',command:'npx vitest run cart',exitCode:1,evidence:'1 failed spec: the total is empty'}]});
+/**
+ * What a real drawing leaves behind: the node's design record. This one declares the screen and no artwork
+ * slot, so the lane's optional `interface.asset` step is retired and the build follows the drawing directly.
+ */
+let activeRepo=null;
+const UI_PAYLOAD=(slots='[]')=>`ui:
+  status: proposed
+  intent: The cart, drawn inside the grammar and the brand.
+  surfaces:
+    - name: cart
+      route: /cart
+      purpose: Review the cart before paying.
+      actors:
+        - customer
+  states:
+    - name: loading
+      trigger: the items load
+      behavior: skeleton rows
+    - name: empty
+      trigger: no item
+      behavior: the mascot invites a first item
+    - name: error
+      trigger: the cart cannot load
+      behavior: an inline error with retry
+    - name: interaction
+      trigger: a quantity is edited
+      behavior: the line total updates in place
+    - name: resting
+      trigger: items present
+      behavior: lists the items
+  accessibility:
+    - keyboard reachable
+  responsive:
+    - narrow and wide
+  assets:
+    - path: assets/cart-resting.png
+      role: candidate for cart resting, narrow
+      provenance: image model
+  observations: []
+  gaps: []
+  artworkSlots: ${slots}
+assets:
+  - path: assets/cart-resting.png
+    description: Candidate for cart resting, narrow.
+`;
+/** Bytes the validator reads as a PNG: the signature and a little padding. */
+const PNG_BYTES=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(24)]);
+const drawn=(report,slots='[]')=>({...report,effect:()=>{
+  const file=path.join(activeRepo,UI_FILE);
+  fs.appendFileSync(file,UI_PAYLOAD(slots));
+  fs.mkdirSync(path.join(path.dirname(file),'assets'),{recursive:true});
+  fs.writeFileSync(path.join(path.dirname(file),'assets','cart-resting.png'),PNG_BYTES);
+}});
+const uiDone=summary=>({outcome:'done',summary,files:[UI_FILE],checks:[passing('sales-surfaces-drawn','node starci.mjs validate .starciwork')]});
 
 test('the kind graph is the lane and route authority: it validates, and the kernel reads the same answers from it',()=>{
   assert.deepEqual(validateGraph(),[]);
-  assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'}),['interface.draw','frontend.implement','uat.verify']);
+  // The ui node is the design record and walks its own lane; the implementation node builds against it.
+  assert.deepEqual(laneFor({kind:'ui'}),['interface.draw','interface.asset']);
+  assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'}),['frontend.implement','uat.verify']);
   assert.deepEqual(laneFor({kind:'implementation',layout:null}),['backend.implement','e2e.verify','review.verify']);
   assert.deepEqual(laneFor({kind:'operations'}),['runtime.operate','review.verify']);
-  assert.equal(nextKind(laneFor({kind:'implementation',layout:'frontend'}),['interface.draw']),'frontend.implement');
-  assert.equal(nextKind(laneFor({kind:'implementation',layout:'frontend'}),['interface.draw','frontend.implement','uat.verify']),null);
+  assert.equal(nextKind(laneFor({kind:'ui'}),['interface.draw']),'interface.asset','with no record read the artwork step is mandatory');
+  assert.equal(nextKind(laneFor({kind:'ui'}),['interface.draw'],{predicates:{'node.hasNoArtworkSlots':true}}),null);
+  assert.equal(nextKind(laneFor({kind:'implementation',layout:'frontend'}),['frontend.implement']),'uat.verify');
   assert.equal(describeLane(['interface.draw','frontend.implement']),'`interface.draw` -> `frontend.implement`');
   assert.equal(routeFor({blocker:'sds-gap',kind:'backend.implement'}).kind,'architecture.revise');
   assert.equal(routeFor({blocker:'shared-change',kind:'frontend.implement'}).kind,'frontend.implement','`same` is the requester own kind');
@@ -933,31 +1011,37 @@ test('the kind graph is the lane and route authority: it validates, and the kern
 });
 
 test('a frontend Work node travels its lane: interface.draw, then frontend.implement, then uat.verify, and the node is recorded done only after the UAT step',()=>{
-  const harness=setupWork({nodes:[FRONTEND_NODE],dirty:[cartFile],
-    scripts:{[CART]:[cartDone('The cart surface is drawn.')],
-      [`${CART}-implement`]:[cartDone('The cart is built from the accepted design.')],
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
+    scripts:{[UI]:[drawn(uiDone('The cart surface is drawn.'))],
+      [CART]:[cartDone('The cart is built from the accepted design.')],
       [`${CART}-verify`]:[cartDone('The cart flow passes end to end.')]}});
   try{
     // The lane is in goal.md before anything launches: the user approves a template, not a pile of ops.
     const markdown=fs.readFileSync(harness.store.paths.goal,'utf8');
-    assert.match(markdown,/interface\.draw.*frontend\.implement.*uat\.verify \(this op: step 1 of 3\)/);
-    assert.deepEqual(harness.state.lanes[CART].lane,['interface.draw','frontend.implement','uat.verify']);
-    assert.deepEqual(harness.state.ops.map(op=>[op.id,op.kind]),[[CART,'interface.draw']]);
+    assert.match(markdown,/interface\.draw.*interface\.asset \(this op: step 1 of 2\)/);
+    assert.deepEqual(harness.state.lanes[UI].lane,['interface.draw','interface.asset']);
+    assert.deepEqual(harness.state.lanes[CART].lane,['frontend.implement','uat.verify']);
+    // The implementation waits for the drawing: its first op exists only once the ui node is done.
+    assert.deepEqual(harness.state.ops.map(op=>[op.id,op.kind]),[[UI,'interface.draw']]);
+    assert.deepEqual(events(harness.store).filter(event=>event.event==='lane-waits-design').map(event=>[event.node,event.design]),[[CART,UI]]);
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
     const state=harness.run({maxIterations:20});
     // One step at a time, each one its own operation on the node's own allowlist.
-    assert.deepEqual(state.ops.map(op=>[op.id,op.kind,op.status]),
-      [[CART,'interface.draw','done'],[`${CART}-implement`,'frontend.implement','done'],[`${CART}-verify`,'uat.verify','done']]);
-    assert.equal(state.ops.every(op=>op.nodeId===CART),true);
-    assert.deepEqual(state.lanes[CART].done,['interface.draw','frontend.implement','uat.verify']);
+    assert.deepEqual(state.ops.map(op=>[op.id,op.kind,op.status,op.nodeId]),
+      [[UI,'interface.draw','done',UI],[CART,'frontend.implement','done',CART],[`${CART}-verify`,'uat.verify','done',CART]]);
+    assert.deepEqual(state.lanes[UI].done,['interface.draw']);
+    assert.deepEqual(state.lanes[CART].done,['frontend.implement','uat.verify']);
+    // The build read the drawing: the ui record is a reference of every op built or walked against it.
+    assert.ok(state.ops.find(op=>op.id===CART).references.includes('features/sales/ui/index.yaml'));
     const log=events(harness.store);
-    assert.deepEqual(log.filter(event=>event.event==='lane-step').map(event=>[event.kind,event.step,event.next]),
-      [['interface.draw','1/3','frontend.implement'],['frontend.implement','2/3','uat.verify'],['uat.verify','3/3',null]]);
-    // The ledger hears `in-progress` for every step but the last, and `done` exactly once, from the UAT step.
+    // The drawing's record declares no artwork slot, so the asset step is retired and the ui lane is walked as one.
+    assert.deepEqual(log.filter(event=>event.event==='lane-step').map(event=>[event.kind,event.step,event.skipped,event.next]),
+      [['interface.draw','1/1',['interface.asset'],null],['frontend.implement','1/2',[],'uat.verify'],['uat.verify','2/2',[],null]]);
+    // Each node hears `done` exactly once, from the step that closes its lane; the build step only reports progress.
     const writes=log.filter(event=>event.event==='ledger-write');
-    assert.deepEqual(writes.map(event=>event.step),['in-progress','in-progress','in-progress','in-progress','in-progress','done']);
-    assert.equal(writes.filter(event=>event.step==='done').length,1);
+    assert.deepEqual(writes.filter(event=>event.step==='done').map(event=>[event.op,event.node]),[[UI,UI],[`${CART}-verify`,CART]]);
+    assert.ok(writes.some(event=>event.step==='in-progress'&&event.op===CART));
     assert.equal(writes.at(-1).op,`${CART}-verify`);
     const node=harness.read(CART);
     assert.equal(node.state,'done');
@@ -965,24 +1049,24 @@ test('a frontend Work node travels its lane: interface.draw, then frontend.imple
     assert.deepEqual(node.extensions.work3.kernel.checks.map(check=>[check.assertion,check.exitCode]),[['cart-renders',0]]);
     // A frontend lane proves itself with its own UAT step: no kernel review is planned for it.
     assert.equal(state.ops.some(op=>op.kind==='review.verify'),false);
-    assert.deepEqual(state.ledger.map(item=>[item.id,item.status]),[[CART,'verified']]);
+    assert.deepEqual(state.ledger.map(item=>[item.id,item.status]),[[UI,'verified'],[CART,'verified']]);
     assert.equal(state.finished.outcome,'done');
     // Every contract says which lane it belongs to and which step it is.
-    assert.match(fs.readFileSync(harness.store.contractPath(`${CART}-implement`),'utf8'),
-      /Lane: interface\.draw -> frontend\.implement -> uat\.verify \(this op: step 2 of 3\)/);
-    assert.equal(laneLine(state,{nodeId:CART,kind:'uat.verify'}),'Lane: interface.draw -> frontend.implement -> uat.verify (this op: step 3 of 3)');
+    assert.match(fs.readFileSync(harness.store.contractPath(CART),'utf8'),/Lane: frontend\.implement -> uat\.verify \(this op: step 1 of 2\)/);
+    assert.equal(laneLine(state,{nodeId:CART,kind:'uat.verify'}),'Lane: frontend.implement -> uat.verify (this op: step 2 of 2)');
+    assert.equal(laneLine(state,{nodeId:UI,kind:'interface.draw'}),'Lane: interface.draw (this op: step 1 of 1)');
     // The status command prints the lane per node.
     const status=kernelMain('workflow-status',{id:harness.store.id},{orca:{invoke:()=>{throw Error('status makes no Orca call');}},cwd:harness.repo});
-    assert.deepEqual(status.lanes[CART],{lane:'interface.draw -> frontend.implement -> uat.verify',
-      done:['interface.draw','frontend.implement','uat.verify'],progress:'3/3'});
+    assert.deepEqual(status.lanes[UI],{lane:'interface.draw',done:['interface.draw'],skipped:['interface.asset'],progress:'1/1'});
+    assert.deepEqual(status.lanes[CART],{lane:'frontend.implement -> uat.verify',done:['frontend.implement','uat.verify'],skipped:[],progress:'2/2'});
     assert.deepEqual(status.workNodes.map(item=>[item.op,item.progress]),
-      [[CART,'3/3'],[`${CART}-implement`,'3/3'],[`${CART}-verify`,'3/3']]);
+      [[UI,'1/1'],[CART,'2/2'],[`${CART}-verify`,'2/2']]);
   }finally{harness.cleanup();}
 });
 
 test('a red UAT run routes to a repair of the lane build step and reopens the run behind it, bounded by the review rounds',()=>{
-  const harness=setupWork({nodes:[FRONTEND_NODE],dirty:[cartFile],
-    scripts:{[CART]:[cartDone('Drawn.')],[`${CART}-implement`]:[cartDone('Built.')],
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
+    scripts:{[UI]:[drawn(uiDone('Drawn.'))],[CART]:[cartDone('Built.')],
       [`${CART}-verify`]:[cartRed('The cart total stays empty.'),cartDone('The flow passes now.')],
       'repair-1':[cartDone('The total is summed.')]}});
   try{
@@ -1015,10 +1099,10 @@ test('a red UAT run routes to a repair of the lane build step and reopens the ru
  */
 test('a design operation carries the brand record and its assets, prints the Brand block in its contract, and the validator is given the brand as rules',()=>{
   const judged=[];
-  const harness=setupWork({nodes:[FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile],ledgerApi:brandLedger,
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
     validateOp:payload=>{judged.push(payload);return acceptAll();},
-    scripts:{[CART]:[cartDone('The cart surface is drawn.')],
-      [`${CART}-implement`]:[cartDone('The cart is built from the accepted design.')],
+    scripts:{[UI]:[drawn(uiDone('The cart surface is drawn.'))],
+      [CART]:[cartDone('The cart is built from the accepted design.')],
       [`${CART}-verify`]:[cartDone('The cart flow passes end to end.')]}});
   try{
     // The brand of the tree is what the user approves, and it is on the state before any op is launched.
@@ -1047,7 +1131,7 @@ test('a design operation carries the brand record and its assets, prints the Bra
     assert.equal(state.ops.some(item=>item.kind===BRAND_DECIDE),false);
     // The verdict on a design result is founded on the brand, trimmed to the fields a rule can be read from.
     // Only the drawing leaves a diff here - the fake git's commit clears it - and a result with no diff is not judged.
-    assert.deepEqual(judged.map(payload=>payload.op.kind),['interface.draw']);
+    assert.deepEqual(judged.map(payload=>payload.op.kind),['interface.draw','frontend.implement']);
     for(const payload of judged)
       assert.deepEqual(Object.keys(payload.brand).sort(),[...BRAND_PAYLOAD].sort(),`${payload.op.kind} was judged against the brand`);
     assert.equal(judged[0].brand.name,'Aurora');
@@ -1069,17 +1153,17 @@ test('a design operation carries the brand record and its assets, prints the Bra
  * `brand.decide` operation from the brand node the tree already carries and the design op waits behind it.
  */
 test('a design operation on a tree with no brand record is deferred and waits for the brand.decide op the kernel creates from the todo brand node',()=>{
-  const harness=setupWork({nodes:[FRONTEND_NODE,BRAND_TODO],dirty:[cartFile],ledgerApi:brandLedger,allocator:brandAllocator(),
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_TODO],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,allocator:brandAllocator(),
     scripts:{'brand-1':[brandDone('The brand is decided: tokens, mascot, forbidden list.')],
-      [CART]:[cartDone('Drawn inside the decided brand.')],
-      [`${CART}-implement`]:[cartDone('Built from the drawing and the brand assets.')],
+      [UI]:[drawn(uiDone('Drawn inside the decided brand.'))],
+      [CART]:[cartDone('Built from the drawing and the brand assets.')],
       [`${CART}-verify`]:[cartDone('The flow passes end to end.')]}});
   try{
     // No record yet: the brand is a decision in the goal, the drawing op is the only operation, and it carries
     // no brand reference because there is nothing to reference.
     assert.equal(harness.state.brand,null);
     assert.deepEqual(harness.state.decisions.map(item=>[item.id,item.kind,item.operation]),[['demo.brand','brand','brand.decide']]);
-    assert.deepEqual(harness.state.ops.map(op=>[op.id,op.kind]),[[CART,'interface.draw']]);
+    assert.deepEqual(harness.state.ops.map(op=>[op.id,op.kind]),[[UI,'interface.draw']]);
     assert.equal(harness.state.ops[0].references.includes('brand/index.yaml'),false);
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
@@ -1087,7 +1171,7 @@ test('a design operation on a tree with no brand record is deferred and waits fo
     const log=events(harness.store);
     // The drawing was deferred for the brand, and told what it waits for.
     const deferred=log.filter(event=>event.event==='schedule-deferred'&&event.reason==='brand missing');
-    assert.deepEqual(deferred.map(event=>[event.op,event.waitingFor]),[[CART,'brand-1']]);
+    assert.deepEqual(deferred.map(event=>[event.op,event.waitingFor]),[[UI,'brand-1']]);
     // The decide op is the brand node's own record plus the folder its assets live in, and its only check is
     // that the tree still validates.
     const decide=state.ops.find(op=>op.kind===BRAND_DECIDE);
@@ -1108,25 +1192,25 @@ test('a design operation on a tree with no brand record is deferred and waits fo
     assert.deepEqual(log.filter(event=>event.event==='brand-revised').map(event=>[event.rev,event.node,event.op]),[[1,'demo.brand','brand-1']]);
     assert.deepEqual(state.brand,{node:'demo.brand',file:'brand/index.yaml',name:'Aurora',family:'aurora',rev:1,mascotAssets:[MASCOT]});
     // Only then did the drawing launch - and it launched with the brand it had to read.
-    const launchedDraw=log.findIndex(event=>event.event==='launched'&&event.op===CART);
+    const launchedDraw=log.findIndex(event=>event.event==='launched'&&event.op===UI);
     const brandAccepted=log.findIndex(event=>event.event==='op-done'&&event.op==='brand-1');
     assert.ok(brandAccepted>=0&&launchedDraw>brandAccepted,'the drawing launched after the brand was decided');
-    const draw=state.ops.find(op=>op.id===CART);
+    const draw=state.ops.find(op=>op.id===UI);
     assert.ok(draw.dependsOn.includes('brand-1'));
     assert.ok(draw.references.includes('brand/index.yaml')&&draw.references.includes(MASCOT));
-    assert.match(fs.readFileSync(harness.store.contractPath(CART),'utf8'),/## Brand\n- name: Aurora - family: aurora - rev: 1/);
+    assert.match(fs.readFileSync(harness.store.contractPath(UI),'utf8'),/## Brand\n- name: Aurora - family: aurora - rev: 1/);
     // The node still walked its whole lane and is recorded done by its last step.
     assert.deepEqual(state.ops.map(op=>[op.id,op.kind,op.status]),
-      [[CART,'interface.draw','done'],['brand-1',BRAND_DECIDE,'done'],
-        [`${CART}-implement`,'frontend.implement','done'],[`${CART}-verify`,'uat.verify','done']]);
+      [[UI,'interface.draw','done'],['brand-1',BRAND_DECIDE,'done'],
+        [CART,'frontend.implement','done'],[`${CART}-verify`,'uat.verify','done']]);
     assert.equal(harness.read(CART).state,'done');
     assert.equal(state.finished.outcome,'done');
   }finally{harness.cleanup();}
 });
 
 test('a tree that knows about brands and carries no brand node asks the user once and launches no design operation',()=>{
-  const harness=setupWork({nodes:[FRONTEND_NODE],dirty:[cartFile],ledgerApi:brandlessLedger,
-    scripts:{[CART]:[cartDone('This must never run.')]}});
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE],dirty:[cartFile,UI_FILE],ledgerApi:brandlessLedger,
+    scripts:{[UI]:[drawn(uiDone('This must never run.'))]}});
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
@@ -1144,77 +1228,81 @@ test('a tree that knows about brands and carries no brand node asks the user onc
 });
 
 /**
- * `interface.asset` is optional, and what makes it optional is a fact of the node's own design record, never a
- * judgement: the slots the drawing declared. The same record answers whether there is anything left to draw.
+ * The interface design record is the feature's `ui` node - its `ui:` spec, read from disk - and it answers the
+ * two lane predicates as facts, never a judgement: whether the surfaces were drawn (surfaces and candidate
+ * images named) and whether every declared artwork slot already has its generated file.
  */
-test('the lane predicates read the node design record: declared artwork slots keep the asset step, a record with screens and no slots skips both',()=>{
-  const harness=setupWork({nodes:[FRONTEND_NODE,BRAND_DECIDED],ledgerApi:brandLedger});
+test('the lane predicates read the ui record: declared artwork slots keep the asset step, generated slots or none retire it, and an implementation node reads the ui node beside it',()=>{
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],ledgerApi:brandLedger});
   try{
     const access={api:work,at:{repoRoot:harness.repo}};
-    const design=text=>{
-      const folder=path.join(harness.repo,'.starciwork',path.dirname(FRONTEND_NODE.path),'design');
-      fs.mkdirSync(folder,{recursive:true});
-      fs.writeFileSync(path.join(folder,'index.yaml'),text);
-    };
-    // The lane of the frontend node, as the kinds profile will declare it once the asset step lands.
-    const lane=['interface.draw','interface.asset','frontend.implement','uat.verify'];
-    const profile={kinds:{},lanes:[{id:'implementation/frontend',match:[{kind:'implementation',role:'frontend'}],
-      steps:[{kind:'interface.draw',optionalWhen:'node.hasInterfaceDesign'},
-        {kind:'interface.asset',optionalWhen:'node.hasNoArtworkSlots'},{kind:'frontend.implement'},{kind:'uat.verify'}]}]};
+    const record=text=>fs.writeFileSync(path.join(harness.repo,UI_FILE),text);
+    const lane=['interface.draw','interface.asset'];
+    const profile={kinds:{},lanes:[{id:'design/ui',match:[{kind:'ui'}],steps:[{kind:'interface.draw'},{kind:'interface.asset',optionalWhen:'node.hasNoArtworkSlots'}]}]};
     const next=(done,predicates)=>nextKind(lane,done,{predicates,profile});
-    // No record at all: neither predicate holds, so the drawing runs and the artwork step after it is required.
-    assert.equal(designRecord(access,FRONTEND_NODE),null);
-    assert.deepEqual(lanePredicates(access,FRONTEND_NODE),{'node.hasInterfaceDesign':false,'node.hasNoArtworkSlots':false});
-    assert.equal(next([],lanePredicates(access,FRONTEND_NODE)),'interface.draw');
-    assert.equal(next(['interface.draw'],lanePredicates(access,FRONTEND_NODE)),'interface.asset');
-    // A record that declares slots: the artwork step stays, and the screens it declares retire the drawing.
-    design(`schema: starci/interface-design@1
-screens:
-  - id: cart
-    states: [resting, empty]
-artworkSlots:
-  - id: empty-cart-mascot
-    screen: cart
-    state: empty
-    region: hero
-    purpose: the empty cart says something
-    brief: the mascot holding an empty basket
-    size: 960x720
-    format: png
-    references: [${MASCOT}]
-    crop: none
-`);
-    const drawn=designRecord(access,FRONTEND_NODE);
-    assert.deepEqual(drawn.artworkSlots.map(slot=>[slot.id,slot.screen,slot.state]),[['empty-cart-mascot','cart','empty']]);
-    assert.deepEqual(lanePredicates(access,FRONTEND_NODE),{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':false});
-    assert.equal(next([],lanePredicates(access,FRONTEND_NODE)),'interface.asset','nothing left to draw, the artwork is next');
-    assert.equal(next(['interface.asset'],lanePredicates(access,FRONTEND_NODE)),'frontend.implement');
-    // The same record with no slot: the artwork step is skipped and the build follows the drawing directly.
-    design(`schema: starci/interface-design@1
-screens:
-  - id: cart
-    states: [resting]
-artworkSlots: []
-`);
+    const slot=file=>`
+    - id: empty-cart-mascot
+      screen: cart
+      state: empty
+      region: hero
+      purpose: the empty cart says something
+      brief: the mascot holding an empty basket
+      size:
+        w: 960
+        h: 720
+        viewport: narrow
+      format: png
+      references:
+        - ${MASCOT}
+      crop:
+        x: 120
+        y: 80
+        w: 480
+        h: 360${file?`
+      file: ${file}
+      sha256: ${'a'.repeat(64)}
+      status: generated`:''}`;
+    // A ui record with no spec yet: neither predicate holds, the drawing runs and the artwork step after it is due.
+    const bare=designRecord(access,UI_NODE);
+    assert.equal(bare.node,UI);assert.equal(bare.state,'todo');assert.equal(bare.surfaces,undefined);
+    assert.deepEqual(lanePredicates(access,UI_NODE),{'node.hasInterfaceDesign':false,'node.hasNoArtworkSlots':false});
+    assert.equal(next([],lanePredicates(access,UI_NODE)),'interface.draw');
+    assert.equal(next(['interface.draw'],lanePredicates(access,UI_NODE)),'interface.asset');
+    // Drawn, with a slot the asset step still owes: the artwork step stays.
+    record(UI_RECORD+UI_PAYLOAD(slot(null)));
+    const drawn=designRecord(access,UI_NODE);
+    assert.deepEqual(drawn.artworkSlots.map(entry=>[entry.id,entry.screen,entry.state,entry.size.w,entry.crop.x]),[['empty-cart-mascot','cart','empty',960,120]]);
+    assert.deepEqual(lanePredicates(access,UI_NODE),{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':false});
+    assert.equal(next(['interface.draw'],lanePredicates(access,UI_NODE)),'interface.asset');
+    // The slot generated: nothing left to produce.
+    record(UI_RECORD+UI_PAYLOAD(slot('assets/artwork/empty-cart-mascot.png')));
+    assert.deepEqual(lanePredicates(access,UI_NODE),{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':true});
+    assert.equal(next(['interface.draw'],lanePredicates(access,UI_NODE)),null);
+    // No slot at all: the same answer, straight from the drawing.
+    record(UI_RECORD+UI_PAYLOAD('[]'));
+    assert.deepEqual(lanePredicates(access,UI_NODE),{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':true});
+    // An implementation node of the feature reads the same record - the ui node beside it - and a node of a
+    // feature with no ui node has none.
+    const read=designRecord(access,FRONTEND_NODE);
+    assert.equal(read.node,UI);assert.equal(read.file,path.join(harness.repo,UI_FILE).replaceAll('\\','/'));
     assert.deepEqual(lanePredicates(access,FRONTEND_NODE),{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':true});
-    assert.equal(next([],lanePredicates(access,FRONTEND_NODE)),'frontend.implement');
-    assert.equal(next(['frontend.implement'],lanePredicates(access,FRONTEND_NODE)),'uat.verify');
-    // A record that is not a mapping, or a design folder with nothing in it, is no record: the steps stay.
-    design('- not a record\n');
-    assert.equal(designRecord(access,FRONTEND_NODE),null);
-    assert.deepEqual(lanePredicates(access,FRONTEND_NODE),{'node.hasInterfaceDesign':false,'node.hasNoArtworkSlots':false});
+    assert.equal(designRecord(access,{...FRONTEND_NODE,id:'demo.payments.implementation.frontend.pay',path:'features/payments/implementation/frontend/pay/index.yaml'}),null);
+    // A record that is not a mapping, or not a ui node, is no record: the steps stay.
+    record('- not a record\n');
+    assert.equal(designRecord(access,UI_NODE),null);
+    assert.deepEqual(lanePredicates(access,UI_NODE),{'node.hasInterfaceDesign':false,'node.hasNoArtworkSlots':false});
     assert.equal(designRecord(access,null),null);
-    assert.equal(designRecord(null,FRONTEND_NODE),null);
+    assert.equal(designRecord(null,UI_NODE),null);
   }finally{harness.cleanup();}
 });
 
 test('a frontend implementation that reports an interface gap routes to interface.draw and reopens the requester',()=>{
   const gap={outcome:'blocked',summary:'The accepted design never drew the empty cart.',files:[],checks:[],
     blocker:{kind:'interface-gap',detail:'the accepted design has no empty state for apps/web/src/cart/index.tsx'}};
-  const harness=setupWork({nodes:[FRONTEND_NODE],dirty:[cartFile],
-    scripts:{[CART]:[cartDone('Drawn.')],
-      [`${CART}-implement`]:[gap,cartDone('Built from the completed design.')],
-      'draw-1':[cartDone('The empty state is drawn.')],
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
+    scripts:{[UI]:[drawn(uiDone('Drawn.'))],
+      [CART]:[gap,cartDone('Built from the completed design.')],
+      'draw-1':[uiDone('The empty state is drawn.')],
       [`${CART}-verify`]:[cartDone('The flow passes.')]}});
   try{
     approve(harness.store,harness.state);
@@ -1222,18 +1310,21 @@ test('a frontend implementation that reports an interface gap routes to interfac
     const state=harness.run({maxIterations:24});
     const draw=state.ops.find(op=>op.id==='draw-1');
     assert.equal(draw.kind,'interface.draw');
-    assert.equal(draw.nodeId,CART);
+    // The gap is drawn on the feature's design record, never on the implementation's code paths.
+    assert.equal(draw.nodeId,UI);
+    assert.deepEqual(draw.allowlist,['.starciwork/features/sales/ui/**',UI_FILE]);
+    assert.ok(draw.references.includes('features/sales/ui/index.yaml'));
     assert.equal(draw.origin,'architecture');
     assert.equal(draw.status,'done');
     const route=events(harness.store).find(event=>event.event==='routed'&&event.on==='interface-gap');
     assert.deepEqual([route.op,route.to,route.origin,route.kind,route.then],
-      [`${CART}-implement`,'draw-1','architecture','interface.draw','reopen']);
-    const build=state.ops.find(op=>op.id===`${CART}-implement`);
+      [CART,'draw-1','architecture','interface.draw','reopen']);
+    const build=state.ops.find(op=>op.id===CART);
     assert.ok(build.dependsOn.includes('draw-1'));
     assert.equal(build.attempt,2);
     assert.equal(build.status,'done');
     assert.match(build.priorOpen.at(-1),/the interface gap is drawn by draw-1/);
-    assert.deepEqual(state.lanes[CART].done,['interface.draw','frontend.implement','uat.verify']);
+    assert.deepEqual(state.lanes[CART].done,['frontend.implement','uat.verify']);
     assert.equal(harness.read(CART).state,'done');
     assert.equal(state.finished.outcome,'done');
   }finally{harness.cleanup();}

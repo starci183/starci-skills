@@ -36,7 +36,8 @@ may change, and `operator` is the launchable operator contract in `ops/` that ca
 | `architecture.decide` | design | decide | no | sds, decision | `architecture.decide` | Settle how the product realises a requirement. |
 | `architecture.revise` | repair | decide | no | sds | `architecture.decide` | Repair a design record a builder found silent or wrong; bump its `rev`. |
 | `brand.decide` | design | decide | no | record, asset | `brand.decide` | Settle the visual identity - colour tokens traced to real source files, typography, mascot, logo, imagery rules - in the one brand record. |
-| `interface.draw` | design | write | no | design | `interface.draw` | Draw screens, contracts and states before any interface code exists. |
+| `interface.draw` | design | write | no | design | `interface.draw` | Draw screens, contracts and states before any interface code exists, and declare every artwork the chosen candidate embeds. |
+| `interface.asset` | design | write | no | asset, design | `interface.asset` | Generate the artwork the design record declares as real repository assets, and bind each file back to its slot. |
 | `frontend.implement` | build | implement | no | code | `interface.implement` | Build the interface the drawing settled. |
 | `backend.implement` | build | implement | no | code | `backend.implement` | Build one slice of behind-the-interface behaviour. |
 | `runtime.operate` | build | implement | no | runtime, code | `runtime.operate` | Migrations, environment, deployment, infrastructure. |
@@ -78,7 +79,8 @@ list runs from the most specific to the least.
 
 | lane | node shape | mandatory sequence |
 | --- | --- | --- |
-| `implementation/frontend` | `implementation` + frontend side, or `ui` | `interface.draw` (optional when `node.hasInterfaceDesign`) -> `frontend.implement` -> `uat.verify` |
+| `design/ui` | `ui` (the feature's interface design record) | `interface.draw` -> `interface.asset` (optional when `node.hasNoArtworkSlots`) |
+| `implementation/frontend` | `implementation` + frontend side | `frontend.implement` -> `uat.verify`, held until the feature's `ui` node is done |
 | `implementation/backend` | `implementation` + backend side, or no side named | `backend.implement` -> `e2e.verify` -> `review.verify` |
 | `e2e` | `e2e` (API scenario node; completion profile `e2e`: assertions only) | `e2e.verify` |
 | `uat/frontend` | `uat` + frontend side | `uat.verify` |
@@ -91,9 +93,21 @@ list runs from the most specific to the least.
 `nextKind(lane, doneKinds)` answers the one step that may run now. The order is mandatory in the strong
 sense: a step that is neither done nor a satisfied optional is returned *even when a later step already ran*,
 so a frontend node whose code exists but whose drawing does not is sent back to `interface.draw` rather than
-waved through. A step is optional only through a named predicate - `optionalWhen: node.hasInterfaceDesign`
-- which the kernel evaluates; a predicate that is absent or false is false, so the default is always to run
-the step.
+waved through. A step is optional only through a named predicate - `optionalWhen: node.hasNoArtworkSlots` -
+which the kernel evaluates; a predicate that is absent or false is false, so the default is always to run the
+step. Both predicates are facts of the feature's interface design record: its `ui` node, the one the
+implementation node references or the one beside it under `features/<feature>/ui`, read from disk.
+
+| predicate | true when | the step it makes optional |
+| --- | --- | --- |
+| `node.hasInterfaceDesign` | the ui record names its surfaces and the candidate images that drew them | none today; the drawing is never optional on the ui lane, and an implementation node is held until that record is done |
+| `node.hasNoArtworkSlots` | the ui record is drawn and declares no `artworkSlots` entry, or every slot already names its generated file | `interface.asset` |
+
+The artwork predicate is the asymmetry that matters. A record with no artwork slot has nothing to generate, so
+the asset step is skipped; a record whose slots nobody has read keeps the step, because the default is to run
+it. That is what stops the approved picture from quietly losing its illustration between the drawing and the
+page: the build may only import files the record names, and those files exist because this step produced
+them.
 
 Two invariants the validator enforces on every lane: a lane that builds must prove afterwards
 (`lane-build-without-proof`), and no design step may stand after a build step (`lane-design-after-build`).
@@ -130,6 +144,13 @@ walk repairs what that lane builds). Both need the reporter's context; an unreso
 `then` is what happens to the operation that reported: `retry` runs the same op again (no new op), `reopen`
 returns it to pending behind the routed op, `pause` parks it until the routed op is done, `settle` finishes it
 and lets the routed op carry the work forward, `needUser` stops the workflow.
+
+`brand-gap` is the identity counterpart of `interface-gap`. A drawing with nothing settled to draw inside, or a
+slot brief the brand record cannot satisfy - a mascot in a placement the record forbids, imagery rules the brief
+contradicts - both mean the brand record is missing or silent, so the route settles the brand (`brand.decide`)
+and the reporting operation reads it again. Neither the drawing, the asset operation nor the build may close the
+gap themselves: one would invent an identity, one would generate outside it, one would invent the picture. Past
+the bound of two the workflow asks the user, which is where a brand the product has not settled belongs.
 
 The first matching route wins, so the ordered list is the specificity order, and `validateGraph` refuses a
 route an earlier one already shadows (`route-shadowed`), a blocker no route answers (`unrouted-blocker`), a

@@ -96,15 +96,16 @@ is a profile edit, not a patch to the control loop.
 | lane | steps | who creates each step |
 | --- | --- | --- |
 | `implementation/backend` | `backend.implement` -> `review.verify` | the node, then the kernel's review planner |
-| `implementation/frontend` | `interface.draw` -> `interface.asset` (optional) -> `frontend.implement` -> `uat.verify` | the node, all four |
+| `design/ui` | `interface.draw` -> `interface.asset` (optional) | the ui node, both |
+| `implementation/frontend` | `frontend.implement` -> `uat.verify` | the node, both - held (`lane-waits-design`) until the feature's ui node is done, a `design` question when the feature has none |
 | `operations` | `runtime.operate` -> `review.verify` | the node, then the review planner |
 | `uat` | `uat.verify` | the node |
 | `architecture` / `business` / `brand` | `architecture.decide` / `business.decide` / `brand.decide` | answered as a decision, never launched |
 
-The two optional steps of the frontend lane are decided by the node's own design record, not by a judgement:
+The optional artwork step of the ui lane is decided by the node's own design record, not by a judgement:
 see [Brand and artwork](#brand-and-artwork). The layout comes from the node path: a node under `implementation/frontend/**` takes the frontend lane, one
 under `implementation/backend/**` (or any implementation node that names no layout) the backend lane. A `ui`
-node is frontend by kind. `state.lanes[nodeId] = {lane, done, checks, head}` is the whole bookkeeping.
+node is the feature's interface design record and walks the `design/ui` lane. `state.lanes[nodeId] = {lane, done, checks, head}` is the whole bookkeeping.
 
 Three rules follow, and they are the difference from 4.x:
 
@@ -239,21 +240,31 @@ That is all it does: the Work validator binds a completion to the digest of what
 frontend-facing nodes that were built against the old brand are reopened in the tree itself, and `syncLedgerOps`
 picks them up on the next iteration like any other newly schedulable node.
 
-**Artwork slots and the optional step.** The interface design record under the node's own `design/` folder is
-the authority for the rest of the interface lane, and `lanePredicates` reads it from disk (`designRecord`):
+**The design record is the feature's `ui` node.** Its `ui:` spec - surfaces, states, the candidate images under
+its own `assets/` and the `artworkSlots` the drawing declared - is the authority for the interface lanes, and
+`lanePredicates` reads it from disk (`designRecord`): a `ui` node reads itself, an implementation node reads
+the ui node it references or the one beside it under `features/<feature>/ui`. The ui node walks `design/ui`
+(`interface.draw -> interface.asset`); its drawing and artwork ops are granted the record's exact path, because
+the design body is theirs to author. On a shared ledger those tree paths are located in the owner repository
+(`locateSharedTreePaths`), because that is where the one tree is. When the ui node is recorded done, the
+candidates its record names under the node's `assets/` become the hashed captures of its evidence
+(`designEvidenceAssets`), which is what the `ui` completion profile requires.
 
 | predicate | true when | effect |
 | --- | --- | --- |
-| `node.hasInterfaceDesign` | the record exists and declares `screens` | `interface.draw` is skipped: there is nothing left to draw |
-| `node.hasNoArtworkSlots` | the record exists and declares no `artworkSlots` | `interface.asset` is skipped: there is no artwork to produce |
+| `node.hasInterfaceDesign` | the record names its surfaces and the candidates that drew them | informational: the drawing is never optional |
+| `node.hasNoArtworkSlots` | the record is drawn and declares no `artworkSlots`, or every slot names its generated `file` | `interface.asset` is skipped: there is no artwork left to produce |
 
-A node with no record satisfies neither, so both steps run: the default is to do the work, and only the record
-may retire it. A slot is `{id, screen, state, region, purpose, brief, size, format, references, crop, file?,
-sha256?}`, which is what makes the asset step checkable - the files it produced, against the slots that were
-declared. The frontend lane is therefore `interface.draw -> interface.asset (optionalWhen
-node.hasNoArtworkSlots) -> frontend.implement -> uat.verify`, with both predicates evaluated every time the
-kernel asks `nextKind` - when the lane's next step is derived, when a step is accepted, and when the review
-planner asks whether a lane still owes a review.
+A node whose record was never drawn satisfies neither, so both steps run: the default is to do the work, and
+only the record may retire it. A slot is `{id, screen, state, region, purpose, brief, size, format,
+references, crop, file?, sha256?, status?}`, which is what makes the asset step checkable - the files it
+produced, against the slots that were declared. An implementation node is held before its first step
+(`lane-waits-design`, once per drawing) while the feature's ui node is not done, and a feature with no ui node
+raises a `design` question for the user: a build that invents its own screen leaves nothing for the walk to
+compare against. An `interface-gap` from the build is drawn on that ui node, never on the build's code paths.
+The lane bookkeeping prints the lane as walked: a step the record retired is in `skipped` and out of the
+progress count. A lane templated by an older profile is re-templated at load (`lane-retemplated`) when nothing
+accepted is lost.
 
 **The validator is given the brand too**, trimmed to the fields a verdict can be founded on (`brandPayload`:
 name, family, rev, colorTokens, mascotAssets, forbidden, imageryPromptRules) and with three rules that make it

@@ -66,5 +66,6 @@ roleOfKind:
   business.decide: decide
   brand.decide: write
   interface.draw: write
+  interface.asset: write
   work.author: plan
   task.execute: implement

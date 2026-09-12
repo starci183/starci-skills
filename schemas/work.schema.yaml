@@ -1508,6 +1508,81 @@ $defs:
       gaps:
         $ref: "#/$defs/stringList"
         description: Unimplemented or unresolved differences between observed UI and target direction.
+      artworkSlots:
+        type: array
+        description: Artwork the approved candidate embeds - an illustration, the brand mascot, a decorative
+          image, a chart placeholder - declared by the drawing so the asset operation can generate each one
+          from its crop and the build can wire it by file. A slot names its file once it is generated.
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - id
+            - screen
+            - state
+            - purpose
+            - brief
+          properties:
+            id:
+              $ref: "#/$defs/string"
+            screen:
+              $ref: "#/$defs/string"
+              description: The surface the slot sits in, by its name in surfaces.
+            state:
+              $ref: "#/$defs/string"
+              description: The state of that surface the artwork belongs to.
+            region:
+              $ref: "#/$defs/string"
+              description: The blueprint region the slot fills.
+            purpose:
+              $ref: "#/$defs/string"
+            brief:
+              $ref: "#/$defs/string"
+              description: The prompt that reproduces the artwork, stated inside the brand imagery rules.
+            size:
+              type: object
+              additionalProperties: false
+              properties:
+                w:
+                  type: integer
+                h:
+                  type: integer
+                viewport:
+                  $ref: "#/$defs/string"
+            format:
+              enum:
+                - png
+                - svg
+                - webp
+            references:
+              $ref: "#/$defs/stringList"
+              description: Brand masters the artwork is drawn from, as brand/assets/ paths.
+            crop:
+              type: object
+              additionalProperties: false
+              properties:
+                x:
+                  type: integer
+                y:
+                  type: integer
+                w:
+                  type: integer
+                h:
+                  type: integer
+              description: Where the slot sits in the candidate image it was taken from.
+            file:
+              $ref: "#/$defs/string"
+              description: The generated file, as a ui-owned path under assets/, once the asset operation produced it.
+            sha256:
+              type: string
+              pattern: ^[a-f0-9]{64}$
+            status:
+              enum:
+                - declared
+                - generated
+                - wired
+            provenance:
+              $ref: "#/$defs/string"
   businessOverviewSpec:
     description: Customer-language product overview captured before module SRS work. Keep values as
       readable YAML block prose; this records stated intent and unknowns, not approval of inferred

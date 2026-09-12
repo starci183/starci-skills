@@ -85,7 +85,7 @@ validator never blocks a commit but three in a row are a `needUser` item. See
 one final report: goal, ledger status, every operation with its runtime, commits, checks and verdict.
 
 **The process itself is data.** Which operation kinds exist, the mandatory lane a ledger node walks
-(`interface.draw -> frontend.implement -> uat.verify`, never a step skipped) and the bounded route an outcome
+(`interface.draw -> interface.asset -> frontend.implement -> uat.verify`, the artwork step retired only by a design record that declares no slot, never a step skipped otherwise) and the bounded route an outcome
 may take live in `profiles/kinds.yaml`, read by the pure `execution/kind-graph.mjs`: see
 [kinds.md](kinds.md). The model fills an operation and picks among closed options; it never picks the process.
 

@@ -6,6 +6,7 @@ ops:
   - business.decide
   - content.generate
   - e2e.verify
+  - interface.asset
   - interface.draw
   - interface.implement
   - knowledge.repair
@@ -30,6 +31,7 @@ consolidation:
   supporting:
     - e2e.verify
     - brand.decide
+    - interface.asset
     - work.author
     - workspace.manage
     - runtime.operate

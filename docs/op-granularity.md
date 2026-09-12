@@ -47,8 +47,9 @@ the Work node kind and layout it closes, then from its allowlist; an unknown kin
 | `implement.shared` | origin `shared` | read the requester's paths -> minimal change, no refactor -> requester's checks -> report |
 | `implement.repair` | origin `repair` | map each finding -> confirm the check fails -> fix each -> re-run -> report with a finding -> fix map |
 | `implement.gate` | origin `gate` | read the failing gate -> re-run it -> fix exactly what it names -> re-run -> report |
-| `interface.draw` | kind `interface.draw` | read SRS/SDS + assertions -> enumerate every screen and every state -> draw inside the installed design grammar -> write the interface design record (blueprint, states, contract slots, copy) -> one rendered candidate per state where rendering is supported -> report; a missing business rule is `blocked` `sds-gap` |
-| `frontend.implement` | kind `frontend.implement`, or any implementing kind on an `implementation/frontend/**` node | read the interface design record first (a screen or state it lacks is `blocked` `interface-gap`) -> story/spec red per state -> implement with the typed components only -> update stories and skeletons -> lint/typecheck/unit -> report |
+| `interface.draw` | kind `interface.draw` | read SRS/SDS + assertions -> enumerate every screen and every state -> draw inside the installed design grammar -> write the interface design record (blueprint, states, contract slots, copy) -> one rendered candidate per state where rendering is supported -> declare every artwork the chosen candidate embeds as an `artworkSlots` entry -> report; a missing business rule is `blocked` `sds-gap` |
+| `interface.asset` | kind `interface.asset` | read the record's `artworkSlots` and locate each slot's crop in the chosen candidate (undeclared artwork is `blocked` `interface-gap`) -> read the brand record and the masters each slot references -> generate each slot with the image model from that crop and those masters as references -> write one file per slot at the allowlisted asset path only -> open every file, compare it against its slot, record `{slot -> file, sha256}` back into the record -> self-audit -> report the slot -> file table; a brief the brand rules cannot satisfy is `blocked` `brand-gap` |
+| `frontend.implement` | kind `frontend.implement`, or any implementing kind on an `implementation/frontend/**` node | read the interface design record first (a screen, state or artwork it lacks is `blocked` `interface-gap`) -> story/spec red per state -> implement with the typed components only -> wire each artwork slot's generated file into the component its region binds -> update stories and skeletons -> lint/typecheck/unit -> self-audit every slot as wired -> report |
 | `review.verify` | kind `review.verify` | read-only: run every check yourself -> compare against assertions and SDS -> findings name file+line+assertion -> never fix -> `done` with findings (empty when clean) |
 | `e2e.verify` | kind `e2e.verify` (the prove step of the backend lane) | read the design (SDS/SRS) + assertions -> one scenario per assertion at the allowlisted spec path, exercised through the public API on the real stack the suite starts itself (containers), never a screen and never a mock of the unit under proof -> run the listed check verbatim -> self-audit the allowlist -> `done` only with a green run and the spec paths; a red scenario or a runtime that cannot start is `failed` |
 | `uat` | a ledger `uat` node without an explicit `uat.verify` kind | read the flow folder (flow, seed, accounts) -> e2e spec at the allowlisted path -> run on the `resources` runtime -> report with the output; a runtime that cannot start is `failed`, never `done` |
@@ -69,18 +70,33 @@ the node's lane, it is bounded at one per node per workflow, and a record still 
 is the one case that does go back to the user.
 
 ### The frontend lane
-A frontend node is not one operation. Its sequences run in order - `interface.draw` -> `frontend.implement`
--> `uat.verify` - and each one says so in its definition of done ("the node is done only after
-`uat.verify`"), so no single operation of the lane can report the node finished:
+A frontend node is not one operation. Its sequences run in order - `interface.draw` -> `interface.asset` ->
+`frontend.implement` -> `uat.verify` - and each one says so in its definition of done ("the node is done only
+after `uat.verify`"), so no single operation of the lane can report the node finished:
 - `interface.draw` is design before code: it enumerates the screens and every state (loading, empty,
   error, populated, permission-denied) and records the blueprint, contract slots and copy. A state nobody
-  enumerated is a state nobody builds, and an implementer that has to guess one is the cost.
+  enumerated is a state nobody builds, and an implementer that has to guess one is the cost. It also declares
+  every artwork the chosen candidate embeds - an illustration, the mascot in an empty state, a decorative
+  image, a chart placeholder - as an `artworkSlots` entry carrying the region it sits in, its purpose, the
+  brief that reproduces it, its size and format, the brand masters it uses and the crop of the candidate it
+  came from. A candidate whose artwork the record does not list is an incomplete record.
+- `interface.asset` turns those slots into files. It generates each one with the image model from the slot's
+  own candidate crop and the brand masters it references, so the asset is the artwork that was approved rather
+  than a fresh reading of its words, writes it at the allowlisted asset path at the declared size and format,
+  and records `{slot -> file, sha256}` back into the record. It writes no product code: the wiring is the
+  build's step. A brief the brand rules cannot satisfy is `blocked` with blocker `brand-gap`, which routes back
+  to `interface.draw`; a host without an image model is `failed`, because a placeholder is not an asset. The
+  step is optional only through `node.hasNoArtworkSlots` - a record that declares no slot has nothing to make.
 - `frontend.implement` may only build what that record describes. A screen or state the record lacks is
   `blocked` with blocker `interface-gap`, which routes back to `interface.draw` - never an improvised
-  layout. Stories and skeletons move with every layout change, so each state stays renderable alone.
+  layout. Stories and skeletons move with every layout change, so each state stays renderable alone. It
+  consumes the generated artwork rather than producing any: each slot's file is imported into the typed
+  component the record binds to that region, and an image that is missing, substituted, redrawn or invented
+  here is a defect, not a shortcut - a slot it cannot ship is `blocked` `interface-gap`/`brand-gap`.
 - `uat.verify` walks the rendered surface with a screenshot per step and compares what is on screen to
-  the design record. A walk through the API proves the server, not the surface; a walk that stopped early
-  is `partial`/`failed`, never `done`.
+  the design record, artwork included: every declared slot is visible at its region in that step's capture and
+  is the file the record names, so a missing or different asset is a failed step. A walk through the API proves
+  the server, not the surface; a walk that stopped early is `partial`/`failed`, never `done`.
 - A design (SDS) gap found anywhere in the lane is `blocked` with `sds-gap` and routes to
   `architecture.revise`, which edits the named section, bumps its `rev` and writes no code.
 - An identity gap - no colour token, no typeface, no mascot rule to draw inside - is `blocked` with
@@ -99,6 +115,11 @@ Why the order matters:
 - Design before code, in both directions: the red spec proves the behavior, the interface design record
   proves the surface. An operation that invents the screen it implements leaves nothing for review to
   compare against, which is why `interface-gap` routes back instead of being improvised.
+- Declared, generated, wired - artwork is the same rule one level in. The approved candidate is a picture, and
+  the parts of it no component can draw are exactly the parts an unguarded build would drop or replace with
+  something close enough. Declaring each one as a slot makes it re-renderable, generating it from that slot's
+  crop makes it the same artwork, and wiring it by file name makes the shipped page show what the person
+  approved rather than a later interpretation of it.
 - Verify is read-only: a reviewer that fixes what it reviews leaves nothing for the repair operation and
   hides the finding from the ledger.
 

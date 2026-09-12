@@ -45,9 +45,14 @@ export function startKernel(info,{launcher,spawnFn=spawn,log=()=>{}}){
   // A workflow whose tree was named explicitly at goal time is reached the same way: its store follows that tree.
   const named=info.ledgerSource==='option'&&info.ledgerRoot?['--ledger-root',info.ledgerRoot]:[];
   const args=[launcher,'workflow-run','--id',info.id,'--worktree','.','--host',info.host??'',...named].filter(Boolean);
-  const child=spawnFn(process.execPath,args,{cwd:info.worktree,detached:true,stdio:'ignore',windowsHide:true});
+  // A kernel that dies must leave its last words: its stdout and stderr are appended to the workflow's own
+  // kernel.log, so a crash after a gate round or a launch is readable the next morning instead of inferred.
+  let out=null;
+  try{out=fs.openSync(path.join(info.dir,'kernel.log'),'a');fs.writeSync(out,`\n=== kernel start ${new Date().toISOString()} ===\n`);}catch{out=null;}
+  const child=spawnFn(process.execPath,args,{cwd:info.worktree,detached:true,stdio:out===null?'ignore':['ignore',out,out],windowsHide:true});
   child.unref?.();
-  log({event:'kernel-started',id:info.id,pid:child.pid});
+  if(out!==null){try{fs.closeSync(out);}catch{}}
+  log({event:'kernel-started',id:info.id,pid:child.pid,...(out!==null?{log:path.join(info.dir,'kernel.log')}:{})});
   return {ok:true,pid:child.pid};
 }
 

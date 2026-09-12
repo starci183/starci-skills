@@ -96,7 +96,9 @@ export function scriptedOrca({reportsDir,scripts,worktree,run='run_wf'}){
         const queue=scripts[dispatch.op];
         const file=path.join(reportsDir,`${dispatch.id}.json`);
         if(!queue?.length||fs.existsSync(file))continue;
-        const script=queue.shift();
+        const {effect,...script}=queue.shift();
+        // What the agent left on disk beside its report: a design record, a committed file.
+        if(typeof effect==='function')effect();
         const report=buildReport({...script,run,task:dispatch.task,dispatch:dispatch.id,from:dispatch.handle});
         report.sent={messageId:`msg_${dispatch.id}`,sentAt:1,type:report.signal.type};
         fs.mkdirSync(reportsDir,{recursive:true});
