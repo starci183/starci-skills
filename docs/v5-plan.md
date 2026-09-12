@@ -53,6 +53,19 @@ operation leaves nothing behind to unwind.
 told to avoid the runtime that implemented it. A model does not grade its own homework, and a provider
 outage does not take the grader with it.
 
+**One validator per workflow, before every commit.** Machine verification proves the checks pass; the
+proof by contrast proves a spec can fail; neither proves the diff is the work the goal asked for. So the
+kernel asks one validator - shared by the whole workflow - to accept or reject every op result after its
+own checks and before the commit. The validator is an identity with memory, not a process: a headless
+`validateOp` call per result (Sol first, Opus fallback, `validator.runtimes` in `config.json`), fed the
+op, the diff, the check results, the references and a kernel-maintained memory page
+(`<workflow>/validator/memory.md`, rebuilt from `verdicts.jsonl` and the job rulings, bounded), so it
+judges every op by the same standard without living in a terminal. Its verdict is closed and it has no
+authority outside the diff: a finding on a file the op did not change is dropped on the record. A reject
+sends the op back with the findings; a second reject of the same op stops it at the user; an unavailable
+validator never blocks a commit but three in a row are a `needUser` item. See
+[workflow-kernel.md](workflow-kernel.md#validator).
+
 **Gates, then the final report.** The kernel runs the workflow's gates after the last slice and writes
 one final report: goal, ledger status, every operation with its runtime, commits, checks and verdict.
 

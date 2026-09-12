@@ -41,6 +41,9 @@ const RESUME_LIMIT=5,RETRY_LIMIT=3,RESTART_LIMIT=3,VERIFY_ROUNDS=3,GATE_ROUNDS=3
 export const DYNAMIC_OPS_BUDGET=6;
 const SHARED_OPS_PER_ITERATION=3,SILENCE_LIMIT=2,RATE_LIMIT_WINDOW_MS=30*60*1000;
 const CHECK_TIMEOUT_MS=30*60*1000,LAUNCH_WAIT_MS=180000,POLL_MS=5000;
+/** The validator: two rejects of one op stop it at the user, three unavailable verdicts in a row name the outage; memory and diff are bounded in bytes. */
+export const VALIDATOR_REJECT_LIMIT=2,VALIDATOR_UNAVAILABLE_LIMIT=3;
+const VALIDATOR_MEMORY_LINES=40,VALIDATOR_MEMORY_BYTES=12*1024,VALIDATOR_DIFF_BYTES=120*1024;
 const REF_KINDS=['srs','sds','plan','brief','note','design','uat','file','dir','url'];
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
@@ -176,7 +179,7 @@ function toOp(raw,index){
     priorOpen:[...(raw.priorOpen??[])],findings:[...(raw.findings??[])],avoidRuntimes:[...(raw.avoidRuntimes??[])],
     runtime:null,target:null,task:null,dispatch:null,terminal:null,contractFile:null,nudged:false,
     kernelOwned:[],kernelOwnedAt:null,waitingFor:null,refusal:null,createdIteration:0,
-    reports:[],files:[],head:null,verdict:null,needsReplan:Boolean(raw.needsReplan)};
+    reports:[],files:[],head:null,verdict:null,validation:null,validatorRejects:0,needsReplan:Boolean(raw.needsReplan)};
 }
 function addOp(store,state,raw,reason){
   const op=toOp({...raw,id:raw.id??nextId(state,raw.origin??'op')},state.ops.length);
@@ -551,11 +554,14 @@ export function approve(store,state,{allocation=null,allowDynamic=null}={}){
  * checks, report command); the process prose - cook until done, the mandatory ping, the never list - is
  * reused from docs/supervision-templates/op.md so one template serves every operation kind.
  */
-/** Job-wide rulings the user gave at approval time (`<store>/rulings.md`) travel inside every contract. */
-function jobRulings(store){
+/** Job-wide rulings the user gave at approval time (`<store>/rulings.md`) travel inside every contract and in the validator memory. */
+function rulingsText(store){
   const file=path.join(store.dir,'rulings.md');
-  if(!fs.existsSync(file))return [];
-  const body=fs.readFileSync(file,'utf8').trim();
+  if(!fs.existsSync(file))return '';
+  return fs.readFileSync(file,'utf8').trim();
+}
+function jobRulings(store){
+  const body=rulingsText(store);
   return body?[`## Job rulings (apply to every operation)`,body,``]:[];
 }
 
@@ -995,6 +1001,115 @@ function reopenArchitecture(store,state,op,report,ctx,blocker){
   return decide;
 }
 
+/* ------------------------------------------------------------------ the validator */
+
+/**
+ * One validator per workflow, shared by every op: not an agent in a terminal (a serial bottleneck whose context
+ * rots and that would itself need supervising) but an identity with memory - a headless `validateOp` call the
+ * kernel makes for each result its own machine verification and proof already passed, before anything is
+ * committed or written into the ledger. The kernel owns the memory (`<store>/validator/memory.md`, rebuilt
+ * from `verdicts.jsonl` and the job rulings, bounded in lines and bytes) and hands it into every call, so the
+ * verdicts stay consistent across ops. The verdict is data: it decides accept, retry or stop-at-the-user and
+ * changes nothing else.
+ */
+const validatorPaths=store=>{const dir=path.join(store.dir,'validator');return {dir,memory:path.join(dir,'memory.md'),verdicts:path.join(dir,'verdicts.jsonl')};};
+export function readValidatorMemory(store){try{return fs.readFileSync(validatorPaths(store).memory,'utf8');}catch{return '';}}
+const oneLine=(text,max=200)=>String(text??'').replace(/\s*\r?\n\s*/g,' ').trim().slice(0,max);
+function readVerdicts(store){
+  let text='';try{text=fs.readFileSync(validatorPaths(store).verdicts,'utf8');}catch{return [];}
+  return text.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{try{return JSON.parse(line);}catch{return null;}}).filter(Boolean);
+}
+/** The memory page: job rulings first (binding), then the latest verdict lines, oldest dropped until the page fits. */
+export function renderValidatorMemory(store,state){
+  const lines=readVerdicts(store).slice(-VALIDATOR_MEMORY_LINES).map(item=>{
+    const finding=item.verdict==='reject'&&item.findings?.[0]?` - finding: ${item.findings[0].file}: ${oneLine(item.findings[0].detail,120)}`:'';
+    return `- ${item.op} | ${item.verdict} | ${oneLine(item.summary||item.reason||'')}${finding}`;
+  });
+  const rulings=oneLine(rulingsText(store),6*1024);
+  const render=list=>[`# Validator memory - workflow ${state.id}`,``,`Job: ${firstLine(state.job)}`,``,
+    ...(rulings?[`## Job rulings (binding)`,``,rulings,``]:[]),
+    `## Verdicts (oldest first, op | verdict | summary)`,``,...(list.length?list:['- none yet']),``].join('\n');
+  let text=render(lines);
+  while(Buffer.byteLength(text)>VALIDATOR_MEMORY_BYTES&&lines.length>1){lines.shift();text=render(lines);}
+  return text;
+}
+function recordVerdict(store,state,op,record){
+  const paths=validatorPaths(store);
+  fs.mkdirSync(paths.dir,{recursive:true});
+  fs.appendFileSync(paths.verdicts,`${JSON.stringify({at:Date.now(),op:op.id,node:op.nodeId,attempt:op.attempt,...record})}\n`);
+  fs.writeFileSync(paths.memory,renderValidatorMemory(store,state));
+}
+
+/** The unified diff of the op's changed files against the head it started from; an untracked file is rendered as an added one. */
+export function opDiff(state,op,files,{git}){
+  const run=args=>git('git',args,{cwd:state.worktree,encoding:'utf8',windowsHide:true,maxBuffer:64*1024*1024});
+  const base=op.baseHead??'HEAD';
+  let text='';
+  if(files.length){
+    const shown=run(['diff','--no-color',base,'--',...files]);
+    if(shown.status===0)text=shown.stdout??'';
+    // `git diff <head>` shows nothing for a file git does not track yet: an added file is rendered as one.
+    const others=run(['ls-files','--others','--exclude-standard','--',...files]);
+    for(const file of (others.status===0?(others.stdout??''):'').split('\n').map(line=>normalize(line.trim())).filter(Boolean)){
+      let body='';try{body=fs.readFileSync(path.join(state.worktree,file),'utf8');}catch{continue;}
+      text+=`diff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n${body.split('\n').map(line=>`+${line}`).join('\n')}\n`;
+    }
+  }
+  const truncated=Buffer.byteLength(text)>VALIDATOR_DIFF_BYTES;
+  if(truncated)text=`${Buffer.from(text).subarray(0,VALIDATOR_DIFF_BYTES).toString()}\n[diff truncated by the kernel at ${VALIDATOR_DIFF_BYTES} bytes; the validator sees a prefix]\n`;
+  return {files,base,text,truncated};
+}
+/** The authored node the op closes, as the validator reads it: id, description and the assertions it must satisfy. */
+function validatorNode(ctx,op){
+  if(!ctx.work||!op.nodeId)return null;
+  const node=ctx.work.node(op.nodeId);
+  if(!node)return null;
+  try{const raw=ctx.work.api.readNode(ctx.work.repoRoot,node);return {id:node.id,description:raw?.description??null,assertions:Array.isArray(raw?.assertions)?raw.assertions.map(String):[]};}
+  catch{return {id:node.id,description:null,assertions:[]};}
+}
+/** Runtimes the allocator has parked: the validator skips them instead of paying a call into a closed door. */
+const coolingRuntimes=allocator=>{try{return (allocator?.snapshot?.()?.cooling??[]).map(item=>item?.runtime).filter(Boolean);}catch{return [];}};
+const findingText=finding=>`validator: ${finding.file}${finding.line?`:${finding.line}`:''}${finding.assertion?` [${finding.assertion}]`:''} - ${finding.detail}`;
+
+/**
+ * Ask the validator about one result the kernel already reproduced. Returns `{verdict}` with `findings` on a
+ * reject. `unavailable` (no provider, no parseable answer) never blocks: it is recorded, counted, and after
+ * VALIDATOR_UNAVAILABLE_LIMIT in a row it is a needUser item. With `validateOp:null` the step is skipped once,
+ * on the record.
+ */
+function validateAccepted(store,state,op,ctx,{files,verified}){
+  if(ctx.validateOp===null||ctx.validateOp===undefined){
+    if(!state.validatorSkipped){state.validatorSkipped=true;store.appendEvent({event:'validator-skipped',reason:'no validator function was given to this kernel'});}
+    return {verdict:'skipped'};
+  }
+  // A review or a no-op slice changed nothing: there is no diff to judge, and a call on nothing could only misjudge.
+  if(!files.length){store.appendEvent({event:'validator-skipped',op:op.id,reason:'the operation changed nothing inside its allowlist, so there is no diff to judge'});return {verdict:'skipped'};}
+  const providers=ctx.validator??llm.DEFAULT_VALIDATOR_RUNTIMES;
+  const diff=opDiff(state,op,files,ctx);
+  let result;
+  try{result=ctx.validateOp({op,node:validatorNode(ctx,op),diff,checks:verified.checks,references:op.references,
+    memory:readValidatorMemory(store),providers,skip:coolingRuntimes(ctx.allocator),cwd:ctx.cwd});}
+  catch(error){result={ok:false,verdict:'unavailable',reason:error.message};}
+  const verdict=llm.VALIDATOR_VERDICTS.includes(result?.verdict)?result.verdict:'unavailable';
+  const summary=oneLine(result?.summary),provider=result?.provider??null,reason=oneLine(result?.reason)||null;
+  const findings=(Array.isArray(result?.findings)?result.findings:[]).filter(item=>item&&typeof item.file==='string');
+  op.validation={verdict,summary:summary||null,provider,at:ctx.now(),...(verdict==='unavailable'?{reason}:{})};
+  for(const dropped of Array.isArray(result?.dropped)?result.dropped:[])
+    store.appendEvent({event:'validator-finding-dropped',op:op.id,file:dropped.file,detail:oneLine(dropped.detail),diffFiles:files});
+  recordVerdict(store,state,op,{head:state.head??op.baseHead??null,verdict,summary,findings,provider,usage:result?.usage??null,reason,diffTruncated:diff.truncated});
+  if(verdict==='unavailable'){
+    state.validatorUnavailable=(state.validatorUnavailable??0)+1;
+    store.appendEvent({event:'validator-unavailable',op:op.id,reason,consecutive:state.validatorUnavailable,attempts:(result?.attempts??[]).length});
+    if(state.validatorUnavailable>=VALIDATOR_UNAVAILABLE_LIMIT&&!state.needUser.some(item=>item.kind==='validator'&&!item.op))
+      state.needUser.push({kind:'validator',detail:`the validator answered nothing usable for ${state.validatorUnavailable} op results in a row (${providers.join(', ')}); last: ${reason??'unknown'}`});
+    return {verdict};
+  }
+  state.validatorUnavailable=0;
+  if(verdict==='accept'){store.appendEvent({event:'validated',op:op.id,summary,provider,usage:result?.usage??null});return {verdict};}
+  store.appendEvent({event:'validator-rejected',op:op.id,summary,provider,findings:findings.slice(0,5).map(findingText),usage:result?.usage??null});
+  return {verdict,findings:findings.map(findingText)};
+}
+
 /* ------------------------------------------------------------------ result policy */
 
 function retryOp(store,state,op,findings,ctx,reason){
@@ -1244,6 +1359,20 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       }
       if(proof.verdict==='weak'){const finding=proofFinding(proof);op.proofFindings=[...(op.proofFindings??[]),finding];state.needUser.push({op:op.id,kind:'proof',detail:finding});}
     }
+    // The validator judges what the machine could not: a reject is a contradiction of the report, the op comes
+    // back with the findings; a second reject of the same op stops it at the user instead of a third launch.
+    const validation=validateAccepted(store,state,op,ctx,{files,verified});
+    if(validation.verdict==='reject'){
+      op.reports.at(-1).downgradedTo='failed';
+      op.validatorRejects=(op.validatorRejects??0)+1;
+      if(op.validatorRejects>=VALIDATOR_REJECT_LIMIT){
+        op.status='blocked';
+        state.needUser.push({op:op.id,kind:'validator',detail:`${op.id} was rejected by the validator ${op.validatorRejects} times: ${validation.findings[0]}`});
+        store.appendEvent({event:'validator-exhausted',op:op.id,rejects:op.validatorRejects,findings:validation.findings.slice(0,3)});
+        return 'validator-exhausted';
+      }
+      return retryOp(store,state,op,validation.findings,ctx,'validator-reject');
+    }
     const commit=ctx.guards.gitQueue(()=>commitOp(state,op,files,ctx));
     if(!commit.committed&&files.length){
       op.status='blocked';
@@ -1436,7 +1565,7 @@ function finish(store,state,outcome,reason=null,ctx=null){
     gates:state.gateResults.map(result=>({name:result.name,command:result.command,status:result.status,exitCode:result.exitCode})),
     needUser:state.needUser,
     ops:state.ops.map(op=>({id:op.id,kind:op.kind,node:op.nodeId,origin:op.origin,status:op.status,runtime:op.runtime,attempt:op.attempt,
-      allowlist:op.allowlist,ledgerIds:op.ledgerIds,head:op.head,verdict:op.verdict,files:op.files})),
+      allowlist:op.allowlist,ledgerIds:op.ledgerIds,head:op.head,verdict:op.verdict,validation:op.validation??null,files:op.files})),
     iterations:state.iterations,finishedAt:Date.now()};
   writeJson(store.paths.final,final);
   state.finished={outcome,reason,report:store.paths.final};
@@ -1555,6 +1684,15 @@ export function supervisorRuntimes(host){
     return runtimes.length?runtimes:DEFAULT_SUPERVISOR_RUNTIMES;
   }catch{return DEFAULT_SUPERVISOR_RUNTIMES;}
 }
+/** `<host>/config.json` may set `validator.runtimes`: the providers the one validator of a workflow is called on, in order. */
+export function validatorRuntimes(host){
+  try{
+    const config=JSON.parse(fs.readFileSync(path.join(host,'config.json'),'utf8'));
+    const listed=Array.isArray(config?.validator?.runtimes)?config.validator.runtimes:typeof config?.validator==='string'?[config.validator]:null;
+    const runtimes=(listed??[]).filter(item=>typeof item==='string'&&item.trim()).map(item=>item.trim());
+    return runtimes.length?runtimes:llm.DEFAULT_VALIDATOR_RUNTIMES;
+  }catch{return llm.DEFAULT_VALIDATOR_RUNTIMES;}
+}
 export const TRIAGE_AFTER=3;
 export const TRIAGE_OPTIONS=['resume-ops','park-runtime','settle-op','restart-kernel','needUser'];
 export function noteAnomaly(store,state,signature,detail){
@@ -1579,14 +1717,16 @@ export function triageAnomaly(store,state,signature,ctx){
   return option;
 }
 
-export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,template,supervisor=null,
+export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,validateOp=llm.validateOp,template,supervisor=null,validator=null,
   wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
   ledgerApi=work,validate=validateWorkTree,waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   need(plain(allocator),'A runtime allocator is required');
   need(typeof template==='string'&&template.trim(),'The operation contract template is required');
   required(state.run,'Orca run id');required(state.from,'own terminal handle');
-  const ctx={cwd,allocator,planOp,decide,template,wait,exec,git,launch,now,guards,work:null,orca,supervisor:supervisor??supervisorRuntimes(state.host??'')};
+  // `validateOp:null` is an explicit choice to run without the validator; it is recorded once as `validator-skipped`.
+  const ctx={cwd,allocator,planOp,decide,validateOp,template,wait,exec,git,launch,now,guards,work:null,orca,
+    supervisor:supervisor??supervisorRuntimes(state.host??''),validator:validator??validatorRuntimes(state.host??'')};
   // A state written before these bounds existed resumes with them.
   state.dynamicOps=Number.isFinite(state.dynamicOps)?state.dynamicOps:0;
   state.dynamicOpsBudget=dynamicBudget(state);
@@ -1805,7 +1945,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     store.appendEvent({event:binding?'run-bound':'run-resumed',run:state.run,from:state.from,iterations:state.iterations});
     const finished=(()=>{const release=acquireKernelLock(store);try{fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});return runLoop(orca,store,state,{cwd:worktree,wait,
       // Slots are derived from the operations that are actually running; saved loads may belong to a dead kernel.
-      supervisor:supervisorRuntimes(state.host),
+      supervisor:supervisorRuntimes(state.host),validator:validatorRuntimes(state.host),
       allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null}),template:templateOf(state.host),
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:finished.phase,ledgerMode:finished.ledgerMode,

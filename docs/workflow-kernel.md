@@ -19,7 +19,7 @@ reinstates the operations the dynamic-op gate refused. Re-approving is how a use
 
 All runtime state of one workflow lives in one directory (`execution/workflow-store.mjs`):
 `state.json` (atomic snapshot), `events.jsonl` (append-only audit), `goal.md` / `goal.json`, `contracts/`,
-`reports/`, `checks/`, `final-report.json`.
+`reports/`, `checks/`, `validator/` (the validator's memory and verdict log), `final-report.json`.
 
 ## Two ledgers
 
@@ -98,9 +98,55 @@ The model is asked for forms only, never for control flow:
 | `assessGoal` | a plan ledger: definition of done, ledger, ops (`starci/goal-plan@1`); on the Work ledger only the definition of done, risks and questions (`starci/work-goal@1`) |
 | `planOp` | the input form of one op that must be planned again after a design decision |
 | `decide` | one option of a closed set when a bounded policy cell ran out |
+| `validateOp` | the closed verdict of the workflow's one validator on a `done` the kernel already reproduced: `accept`, or `reject` with findings inside the diff (see **Validator**) |
 
 Everything else - scheduling, allowlist arbitration, runtime choice, retries, commits, gates, the final
 report - is this code.
+
+## Validator
+
+One validator per workflow, shared by every op, accepts or rejects every op result before the kernel commits
+it - so an op that satisfied its own checks with a spec that cannot fail, or with code the goal never asked
+for, does not get to fool the kernel. It is **an identity with memory, not a process**: not a long-lived agent
+in a terminal (a serial bottleneck whose context rots and that would itself need supervising), but a headless
+`validateOp` call the kernel makes per accepted result, with the same memory handed in every time.
+
+**When.** In `applyOpReport`, after `machineVerify` and the proof by contrast have passed and before
+`commitOp` and the ledger `done`. An op that changed nothing inside its allowlist (a review, an empty slice)
+has no diff to judge and is skipped on the record (`validator-skipped` with the op).
+
+**What it sees.** The op (id, kind, goal, acceptance, allowlist, attempt) and, on the Work ledger, the raw
+node's description and assertions; the unified diff of the op's changed files against `op.baseHead`
+(untracked files rendered as added; capped at 120 KB with a truncation note the validator can read); the
+checks the kernel re-ran (name, command, exit code, output tail); `op.references`; and the memory.
+
+**The verdict is closed.** `{verdict:'accept', summary}` or `{verdict:'reject', summary,
+findings:[{file, line?, assertion?, detail}]}`. A finding whose `file` is not in the diff's file list is dropped
+and recorded (`validator-finding-dropped`): the validator has no authority outside the diff. A reject with no
+finding is an invalid form and is asked again; a reject whose every finding was dropped is no verdict at all.
+An unparseable answer, a provider failure or an empty provider chain is `unavailable`.
+
+**What the kernel does with it** (`op.validation = {verdict, summary, provider, at}` is stored either way):
+
+| verdict | action | bound |
+| --- | --- | --- |
+| `accept` | `validated` event, then commit and ledger `done` exactly as before | - |
+| `reject` | the report is downgraded to `failed`, `validator-rejected` is recorded, and the same op is relaunched with the findings (`retry`, reason `validator-reject`) - like a proof contradiction | 2 rejects of one op: the second sets it `blocked` with a `validator` needUser item and a `validator-exhausted` event, never a third launch |
+| `unavailable` | never blocks: the commit proceeds, `validator-unavailable` is recorded and counted | 3 unavailable in a row: one `validator` needUser item names the outage; any accept or reject resets the count |
+
+The verdict is data. It changes nothing except these transitions.
+
+**Memory.** `<store>/validator/verdicts.jsonl` appends every verdict (op, head, verdict, findings, provider,
+usage, reason). `<store>/validator/memory.md` is rebuilt by the kernel from it after each verdict: the job
+rulings from `<store>/rulings.md` when present (binding), then the last 40 verdict lines `op | verdict |
+summary` (a reject carries its first finding), oldest lines dropped until the page stays under 12 KB. The
+whole page goes into every call, which is what keeps one validator consistent across ops.
+
+**Runtimes.** `validator.runtimes` in `config.json` (default `[gpt-5.6-sol, claude-opus]`: Sol first, Opus as
+the fallback) names the providers in order; the same `{runtimes: [...]}` shape as `supervisor`. A provider the
+allocator reports as cooling is skipped rather than tried; a provider that errors moves the chain on. Usage is
+read through `runHeadlessWithUsage` and recorded with the verdict. `runLoop({validateOp:null})` runs without
+the validator and writes `validator-skipped` once; tests inject a stub the same way.
 
 ## The policy table
 
@@ -108,6 +154,8 @@ report - is this code.
 | --- | --- | --- |
 | `done`, checks reproduce | commit the allowlisted changes, ledger item `implemented` (`verified` for a review) with evidence `{opId, head}`, release the runtime | - |
 | `done`, a check fails for the kernel | downgrade to `failed`, retry the same op with the failing check as the finding | retry bound |
+| `done`, checks reproduce, the validator rejects | downgrade to `failed`, retry the same op with the validator's findings | 2 rejects per op, then `blocked` + `needUser` |
+| `done`, checks reproduce, the validator is unavailable | commit anyway, count it | 3 in a row, then one `needUser` item |
 | report fails `validateReport` | retry the same op with the rejection as the finding | retry bound |
 | `partial` | resume the same op (`attempt+1`, `priorOpen` = `open[]`) | 5, then `decide` |
 | `failed` | retry the same op with the failing checks as findings | 3, then `decide` (`retry-other-runtime` / `split` / `escalate-to-user`) |

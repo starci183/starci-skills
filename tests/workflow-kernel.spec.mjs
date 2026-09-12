@@ -8,9 +8,9 @@ import {resolveExecutionChain} from '../profiles/select.mjs';
 import {createOrcaCalls} from '../execution/orca-calls.mjs';
 import {buildReport} from '../execution/reports.mjs';
 import {spawnSync} from 'node:child_process';
-import {validateGoalPlan} from '../execution/llm-functions.mjs';
+import {validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
 import {createStore} from '../execution/workflow-store.mjs';
-import {DYNAMIC_OPS_BUDGET,TRIAGE_AFTER,TRIAGE_OPTIONS,applyOpReport,approve,changedFiles,createWorkflowState,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,noteAnomaly,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,workModule,workOpId} from '../execution/workflow-kernel.mjs';
+import {DYNAMIC_OPS_BUDGET,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,changedFiles,createWorkflowState,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,workModule,workOpId} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -151,13 +151,14 @@ function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','clau
 }
 
 const passing=(name,command)=>({name,command,exitCode:0,evidence:'ok'});
-/** A fake worktree git: porcelain lists the dirty files until a commit clears them. */
+/** A fake worktree git: porcelain lists the dirty files until a commit clears the ones that were added. */
 function fakeGit(dirty){
-  const calls=[];let pending=[...dirty];
+  const calls=[];let pending=[...dirty],staged=[];
   return {calls,git:(executable,args)=>{
     calls.push(args[0]);
     if(args[0]==='status')return {status:0,stdout:pending.map(file=>` M ${file}`).join('\n'),stderr:''};
-    if(args[0]==='commit'){pending=[];return {status:0,stdout:'',stderr:''};}
+    if(args[0]==='add'){staged=args.slice(args.indexOf('--')+1);return {status:0,stdout:'',stderr:''};}
+    if(args[0]==='commit'){pending=pending.filter(file=>!staged.includes(file));staged=[];return {status:0,stdout:'',stderr:''};}
     if(args[0]==='rev-parse')return {status:0,stdout:'abc1234\n',stderr:''};
     return {status:0,stdout:'',stderr:''};
   },dirty:()=>pending,add:file=>pending.push(file)};
@@ -187,6 +188,8 @@ const running=(state,id,dispatch,runtime='qwen3.8-flash')=>{
   Object.assign(op,{status:'running',dispatch,runtime,terminal:`term_${dispatch}`});
   return op;
 };
+/** The validator as a stub: every result is accepted, so the tests above judge the kernel, not a model. */
+const acceptAll=()=>({ok:true,verdict:'accept',summary:'stub validator: accepted',findings:[],dropped:[],provider:'stub',usage:null});
 
 function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,allocator=fakeAllocator(),gates=[]}){
   const repo=tmp();
@@ -203,6 +206,7 @@ function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,alloc
     exec:exec??((command)=>{runs.push(command);return {status:0,stdout:`${command} ok`,stderr:''};}),
     git:git.git,planOp:()=>{throw Error('planOp must not be called on this path');},
     decide:()=>{throw Error('decide must not be called on a policy-covered path');},
+    validateOp:acceptAll,
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
   return {repo,store,state,goal,fake,git,run,runs,allocator,
     cleanup:()=>fs.rmSync(path.dirname(repo),{recursive:true,force:true})};
@@ -376,7 +380,7 @@ test('the loop is resumable: a run that stops after one iteration continues from
     const saved=harness.store.loadState();
     assert.equal(saved.ops[0].status,'done');
     assert.equal(saved.run,'run_wf');assert.equal(saved.approved,true);
-    const resumed=runLoop(harness.fake.orca,harness.store,saved,{cwd,allocator:fakeAllocator(),template,wait:noWait,
+    const resumed=runLoop(harness.fake.orca,harness.store,saved,{cwd,allocator:fakeAllocator(),template,wait:noWait,validateOp:acceptAll,
       exec:command=>({status:0,stdout:`${command} ok`,stderr:''}),git:harness.git.git,waitTimeoutMs:2000,tickMs:1000,maxIterations:8});
     assert.equal(resumed.finished.outcome,'done');
     // The second run continues the same counter and the same event log instead of starting over.
@@ -555,6 +559,7 @@ function setupWork({scope=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),
     exec:exec??(command=>({status:0,stdout:`${command} ok`,stderr:''})),
     git:(executable,args)=>{if(args[0]==='commit')commits.push(args[args.indexOf('-m')+1]);return git.git(executable,args);},
     decide:()=>{throw Error('decide must not be called on a policy-covered path');},
+    validateOp:acceptAll,
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
   return {...tree,store,state,goal,fake,git,run,commits,allocator,cleanup:()=>fs.rmSync(path.dirname(tree.repo),{recursive:true,force:true})};
 }
@@ -733,7 +738,7 @@ test('the kernel-owned ledger paths are protected: the contract forbids them, ch
       if(name==='check'&&!forged){forged=true;fs.appendFileSync(nodeFile,forgery);}
       return result;
     }};
-    const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:noWait,
+    const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:noWait,validateOp:acceptAll,
       validate:harness.validate,guards,exec:command=>({status:0,stdout:`${command} ok`,stderr:''}),
       git:harness.git.git,waitTimeoutMs:2000,tickMs:1000,maxIterations:12});
     const op=state.ops.find(item=>item.id===nodeId);
@@ -1055,5 +1060,178 @@ test('reconcile settles a live dispatch no operation names, and a repeated anoma
     const triaged=events(harness.store).find(event=>event.event==='triage');
     assert.equal(triaged.option,'park-runtime');
     assert.equal(triageAnomaly(harness.store,harness.state,'missing',{}),null,'no decider or no entry is a no-op');
+  }finally{harness.cleanup();}
+});
+
+/* ------------------------------------------------------------------ the validator */
+
+const intakeFile='apps/agentos-controlplane/src/sales/intake.ts',receiptFile='apps/agentos-controlplane/src/sales/receipt.ts';
+const twoOpPlan={definitionOfDone:['the slice works'],ledger:[{id:'goal-1',title:'Order intake',inputRef:'sds:3',status:'absent'}],
+  ops:[{id:'op-intake',kind:'backend.implement',goal:'Implement intake.',ledgerIds:['goal-1'],allowlist:[intakeFile],
+    references:['sds.md#3'],checks:[{name:'unit',command:'npx vitest run intake'}],acceptance:['intake persists'],dependsOn:[]},
+    {id:'op-receipt',kind:'backend.implement',goal:'Implement the receipt.',ledgerIds:['goal-1'],allowlist:[receiptFile],
+      references:['sds.md#4'],checks:[{name:'unit',command:'npx vitest run receipt'}],acceptance:['the receipt renders'],dependsOn:[]}]};
+const doneReport=(file,name)=>({outcome:'done',summary:`${name} implemented.`,files:[file],checks:[passing('unit',`npx vitest run ${name}`)]});
+const reviewPassed={outcome:'done',summary:'Review passed.',files:[],checks:[passing('review','npx vitest run intake')]};
+/** The fake worktree git answers `diff` with one hunk per requested file, so the validator input carries a real-looking diff. */
+const diffGit=git=>(executable,args)=>{
+  if(args[0]==='diff'){const files=args.slice(args.indexOf('--')+1);return {status:0,stdout:files.map(file=>`diff --git a/${file} b/${file}\n--- a/${file}\n+++ b/${file}\n@@ -1 +1 @@\n+export const changed='${path.basename(file)}';\n`).join(''),stderr:''};}
+  return git(executable,args);
+};
+
+test('the validator accepts a result the kernel reproduced: the commit follows, the verdict is remembered and the next call carries that memory',()=>{
+  const seen=[];
+  const validator=input=>{seen.push(input);return {ok:true,verdict:'accept',summary:`${input.op.id} satisfies its acceptance`,findings:[],dropped:[],provider:'gpt-5.6-sol',usage:{input:900,output:40,total:940,cost:null}};};
+  const harness=setup({plan:twoOpPlan,dirty:[intakeFile,receiptFile],
+    scripts:{'op-intake':[doneReport(intakeFile,'intake')],'op-receipt':[doneReport(receiptFile,'receipt')],'verify-1':[reviewPassed]}});
+  try{
+    fs.writeFileSync(path.join(harness.store.dir,'rulings.md'),'Never accept a spec without an assertion.\n');
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({validateOp:validator,git:diffGit(harness.git.git),validator:['gpt-5.6-sol','claude-opus']});
+    assert.equal(state.finished.outcome,'done');
+    // Exactly the two implementing results were judged; the review changed no file, so it was skipped on the record.
+    assert.deepEqual(seen.map(input=>input.op.id),['op-intake','op-receipt']);
+    const first=seen[0];
+    assert.deepEqual(first.providers,['gpt-5.6-sol','claude-opus']);
+    assert.deepEqual(first.diff.files,[intakeFile]);
+    assert.match(first.diff.text,/\+export const changed='intake\.ts';/);
+    assert.equal(first.diff.truncated,false);
+    assert.deepEqual(first.checks.map(check=>[check.name,check.exitCode]),[['unit',0]]);
+    assert.deepEqual(first.references,['sds.md#3']);
+    assert.deepEqual(first.op.acceptance,['intake persists']);
+    assert.equal(first.memory,'','the first call of a workflow has no verdict to remember yet');
+    // The second call carries the first verdict and the job rulings: one identity across ops.
+    assert.match(seen[1].memory,/## Job rulings \(binding\)\n\nNever accept a spec without an assertion\./);
+    assert.match(seen[1].memory,/- op-intake \| accept \| op-intake satisfies its acceptance/);
+    const log=events(harness.store);
+    const validated=log.filter(event=>event.event==='validated');
+    assert.deepEqual(validated.map(event=>[event.op,event.summary,event.provider]),[['op-intake','op-intake satisfies its acceptance','gpt-5.6-sol'],['op-receipt','op-receipt satisfies its acceptance','gpt-5.6-sol']]);
+    assert.ok(log.findIndex(event=>event.event==='validated'&&event.op==='op-intake')<log.findIndex(event=>event.event==='op-done'&&event.op==='op-intake'),'the verdict precedes the commit');
+    assert.deepEqual(log.filter(event=>event.event==='validator-skipped').map(event=>event.op),['verify-1']);
+    const intake=state.ops.find(op=>op.id==='op-intake');
+    assert.equal(intake.status,'done');
+    assert.deepEqual([intake.validation.verdict,intake.validation.provider,intake.validation.summary],['accept','gpt-5.6-sol','op-intake satisfies its acceptance']);
+    // Memory and verdict log live under the store, kernel-written.
+    const verdicts=fs.readFileSync(path.join(harness.store.dir,'validator','verdicts.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
+    assert.deepEqual(verdicts.map(item=>[item.op,item.verdict,item.provider,item.usage.total,item.head]),[['op-intake','accept','gpt-5.6-sol',940,'abc1234'],['op-receipt','accept','gpt-5.6-sol',940,'abc1234']]);
+    const memory=readValidatorMemory(harness.store);
+    assert.match(memory,/^# Validator memory - workflow 20260912-104251-kernel-spec/);
+    assert.match(memory,/- op-receipt \| accept \| op-receipt satisfies its acceptance\n$/);
+    assert.ok(Buffer.byteLength(memory)<12*1024);
+    const final=JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8'));
+    assert.equal(final.ops.find(op=>op.id==='op-intake').validation.verdict,'accept');
+  }finally{harness.cleanup();}
+});
+
+test('a validator reject sends the op back with the finding; the second reject of the same op stops it at the user',()=>{
+  const verdicts=[];
+  const validator=input=>{verdicts.push(input.op.attempt);return {ok:true,verdict:'reject',summary:'the spec cannot fail',
+    findings:[{file:intakeFile,line:12,assertion:'intake persists',detail:'the added spec asserts nothing about persistence'}],dropped:[],provider:'gpt-5.6-sol',usage:null};};
+  const harness=setup({plan:salesPlan,dirty:[intakeFile],
+    scripts:{'op-intake':[doneReport(intakeFile,'sales'),doneReport(intakeFile,'sales'),doneReport(intakeFile,'sales')]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({validateOp:validator,git:diffGit(harness.git.git)});
+    const op=state.ops[0];
+    assert.deepEqual(verdicts,[1,2],'the op was judged twice and never launched a third time');
+    assert.equal(op.status,'blocked');
+    assert.equal(op.validatorRejects,VALIDATOR_REJECT_LIMIT);
+    assert.equal(op.attempt,2);
+    assert.deepEqual(op.reports.map(report=>report.downgradedTo),['failed','failed']);
+    const log=events(harness.store);
+    const retried=log.find(event=>event.event==='retry'&&event.op==='op-intake');
+    assert.equal(retried.reason,'validator-reject');
+    assert.equal(retried.findings[0],'validator: apps/agentos-controlplane/src/sales/intake.ts:12 [intake persists] - the added spec asserts nothing about persistence');
+    // The relaunched contract carries the finding, so the operation knows what the validator refused.
+    assert.match(fs.readFileSync(harness.store.contractPath('op-intake'),'utf8'),/## Findings you must resolve\n- validator: apps\/agentos-controlplane\/src\/sales\/intake\.ts:12/);
+    const exhausted=log.find(event=>event.event==='validator-exhausted');
+    assert.equal(exhausted.op,'op-intake');assert.equal(exhausted.rejects,2);
+    assert.deepEqual(log.filter(event=>event.event==='validator-rejected').length,2);
+    assert.match(state.needUser.find(item=>item.kind==='validator').detail,/op-intake was rejected by the validator 2 times: validator: apps/);
+    // Nothing was ever committed: a rejected result leaves the worktree dirty for the retry, never the history.
+    assert.ok(!harness.git.calls.includes('commit'));
+    assert.equal(state.ledger[0].status,'planned');
+    assert.equal(state.finished.outcome,'blocked');
+    assert.equal(op.validation.verdict,'reject');
+  }finally{harness.cleanup();}
+});
+
+test('a finding outside the diff is dropped on the record, and a reject made only of such findings is no verdict',()=>{
+  const answers=[
+    {verdict:'reject',summary:'receipt and intake are wrong',findings:[{file:'apps/agentos-controlplane/src/sales/receipt.ts',detail:'the receipt is not rendered'},{file:`./${intakeFile}`,detail:'intake drops the order id'}]},
+    {verdict:'reject',summary:'the receipt is wrong',findings:[{file:'apps/agentos-controlplane/src/sales/receipt.ts',detail:'the receipt is not rendered'}]}
+  ];
+  // The real validateOp over a stubbed provider: the drop rule is the function's, the events are the kernel's.
+  const validator=input=>validateOp({...input,runHeadless:()=>JSON.stringify(answers.shift())});
+  const harness=setup({plan:salesPlan,dirty:[intakeFile],
+    scripts:{'op-intake':[doneReport(intakeFile,'sales'),doneReport(intakeFile,'sales')],'verify-1':[reviewPassed]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({validateOp:validator,git:diffGit(harness.git.git)});
+    const log=events(harness.store);
+    const dropped=log.filter(event=>event.event==='validator-finding-dropped');
+    assert.deepEqual(dropped.map(event=>[event.op,event.file,event.detail]),[['op-intake','apps/agentos-controlplane/src/sales/receipt.ts','the receipt is not rendered'],['op-intake','apps/agentos-controlplane/src/sales/receipt.ts','the receipt is not rendered']]);
+    assert.deepEqual(dropped[0].diffFiles,[intakeFile]);
+    // First result: one finding survived, so it is a reject and the op comes back with only that finding.
+    const retried=log.find(event=>event.event==='retry'&&event.op==='op-intake');
+    assert.deepEqual(retried.findings,['validator: apps/agentos-controlplane/src/sales/intake.ts - intake drops the order id']);
+    // Second result: every finding pointed outside the diff, so the answer counts as unavailable and the commit proceeds.
+    const unavailable=log.find(event=>event.event==='validator-unavailable');
+    assert.equal(unavailable.op,'op-intake');
+    assert.match(unavailable.reason,/every finding named a file outside the diff/);
+    assert.equal(unavailable.consecutive,1);
+    const op=state.ops[0];
+    assert.equal(op.status,'done');assert.equal(op.validatorRejects,1);assert.equal(op.validation.verdict,'unavailable');
+    assert.equal(state.finished.outcome,'done');
+  }finally{harness.cleanup();}
+});
+
+test('an unavailable validator never blocks a commit, is counted, and three in a row become one needUser item',()=>{
+  const file=name=>`apps/agentos-controlplane/src/${name}/index.ts`;
+  const plan={definitionOfDone:['the slice works'],ledger:[{id:'goal-1',title:'Sales slice',inputRef:'sds:3',status:'absent'}],
+    ops:['intake','catalog','pricing'].map(name=>({id:`op-${name}`,kind:'backend.implement',goal:`Implement ${name}.`,
+      ledgerIds:['goal-1'],allowlist:[file(name)],references:['sds.md'],checks:[{name:'unit',command:`npx vitest run ${name}`}],acceptance:[`${name} works`],dependsOn:[]}))};
+  let calls=0;
+  const validator=()=>{calls+=1;if(calls===1)throw Error('codex exec exited 1: no session');return {ok:false,verdict:'unavailable',reason:'no provider produced a valid verdict',attempts:[{provider:'gpt-5.6-sol',attempt:0,errors:['rate-limited']}],usage:null};};
+  const harness=setup({plan,dirty:['intake','catalog','pricing'].map(file),
+    scripts:{'op-intake':[doneReport(file('intake'),'intake')],'op-catalog':[doneReport(file('catalog'),'catalog')],'op-pricing':[doneReport(file('pricing'),'pricing')],'verify-1':[reviewPassed]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({validateOp:validator,git:diffGit(harness.git.git)});
+    assert.equal(calls,3);
+    assert.deepEqual(state.ops.filter(op=>op.kind==='backend.implement').map(op=>[op.status,op.validation.verdict]),[['done','unavailable'],['done','unavailable'],['done','unavailable']]);
+    const log=events(harness.store);
+    const unavailable=log.filter(event=>event.event==='validator-unavailable');
+    assert.deepEqual(unavailable.map(event=>event.consecutive),[1,2,3]);
+    assert.match(unavailable[0].reason,/codex exec exited 1/,'a throwing validator is an unavailable verdict, never a crash');
+    assert.equal(unavailable[1].attempts,1);
+    assert.equal(log.filter(event=>event.event==='op-done').length,4,'every result was committed regardless');
+    assert.equal(state.validatorUnavailable,VALIDATOR_UNAVAILABLE_LIMIT);
+    const asked=state.needUser.filter(item=>item.kind==='validator');
+    assert.equal(asked.length,1,'the outage is one item, not one per op');
+    assert.match(asked[0].detail,/the validator answered nothing usable for 3 op results in a row \(gpt-5.6-sol, claude-opus\)/);
+    assert.equal(state.finished.outcome,'blocked');
+    const verdicts=fs.readFileSync(path.join(harness.store.dir,'validator','verdicts.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
+    assert.deepEqual(verdicts.map(item=>item.verdict),['unavailable','unavailable','unavailable']);
+    assert.match(readValidatorMemory(harness.store),/- op-pricing \| unavailable \| no provider produced a valid verdict/);
+  }finally{harness.cleanup();}
+});
+
+test('with validateOp:null the step is skipped once on the record, and the kernel commits as before',()=>{
+  const harness=setup({plan:salesPlan,dirty:[intakeFile],scripts:{'op-intake':[doneReport(intakeFile,'sales')],'verify-1':[reviewPassed]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({validateOp:null});
+    assert.equal(state.finished.outcome,'done');
+    const skipped=events(harness.store).filter(event=>event.event==='validator-skipped');
+    assert.equal(skipped.length,1);
+    assert.match(skipped[0].reason,/no validator function/);
+    assert.equal(state.ops[0].validation,null);
+    assert.ok(!fs.existsSync(path.join(harness.store.dir,'validator')));
   }finally{harness.cleanup();}
 });

@@ -4,3 +4,6 @@ effort: medium
 # Models the workflow kernel uses for triage and decide operations, strongest first; lower it to save budget.
 supervisor:
   runtimes: [claude-fable-5.1, gpt-6-astra]
+# The one validator of a workflow: a headless call that accepts or rejects every op result before the kernel commits it, strongest first.
+validator:
+  runtimes: [gpt-5.6-sol, claude-opus]
