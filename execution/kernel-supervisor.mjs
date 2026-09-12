@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
-import {listWorkflows,workflowsRoot} from './workflow-store.mjs';
+import {listWorkflows,repositoryRoot,workflowsRoot} from './workflow-store.mjs';
 
 /**
  * The process supervisor for workflow kernels: one kernel per approved, unfinished workflow; a kernel that
@@ -83,7 +83,8 @@ export function superviseForever({repoRoot,launcher,pollMs=DEFAULT_POLL_MS,healt
 }
 
 export function supervisorMain(options,{cwd}){
-  const repoRoot=path.resolve(cwd);
+  // The workflow store lives in the repository the worktree belongs to (git common dir), exactly as the kernel resolves it.
+  const repoRoot=repositoryRoot(path.resolve(cwd));
   const host=path.resolve(options.host??'');
   const launcher=path.join(host,'.dist','execution','orca-supervised-launch.mjs');
   const logFile=path.join(workflowsRoot(repoRoot),'supervisor.log');
