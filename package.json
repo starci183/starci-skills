@@ -13,6 +13,7 @@
   "files": [
     "bin/",
     "init/",
+    "skills/",
     "SKILL.md",
     "config.example.yaml",
     "knowledge/",
