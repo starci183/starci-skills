@@ -53,6 +53,14 @@ function richStore(repoRoot,id='20260101-000000-rich'){
     verifyRounds:{'prod.alpha.one+prod.alpha.two':3,'prod.beta.one':1},
     reviewFindings:[{op:'verify-1',finding:'the migration is not reversible'}],
     needUser:[{kind:'dynamic-op',op:'shared-1',detail:'shared-1 was created beyond the dynamic-op budget'}],
+    // Decisions the runtime took on its own recommendation: nothing waits on them, so they are not "needs you"
+    // - but the owner is still owed the question, and a workflow that finished done may owe them all of these.
+    provisional:[
+      {decision:'prod.alpha.business.srs.policy-decision.d-refund',op:'ask-1',recommended:2,
+        options:['reopen the order','close it and issue a credit note'],at:NOW-60000,answered:null},
+      {decision:'prod.alpha.business.srs.policy-decision.d-retry',op:'ask-2',recommended:1,
+        options:['retry twice','retry five times'],at:NOW-60000,answered:{choice:'1',note:null,at:NOW}}
+    ],
     anomalies:{'settled:r1:stalled-idle':{count:4,firstAt:ago(60),lastAt:ago(5),triaged:{option:'settle-op'}},
       'launch-failed:r2':{count:1,firstAt:ago(20),lastAt:ago(20),triaged:null}},
     ledgerSummary:{total:50,eligible:40},gateResults:[],finished:null
@@ -197,6 +205,11 @@ test('the render is a plain terminal page with tables and no control codes',t=>{
   assert.match(page,/\| prod\.alpha\.one\+prod\.alpha\.two \| 3 \| yes \|/);
   assert.match(page,/## Validator {2}accepted 2, rejected 1, unavailable 0 \(from verdicts\)/);
   assert.match(page,/## Needs you \(1\)\n- dynamic-op shared-1: shared-1 was created beyond the dynamic-op budget/);
+  // Separate from "needs you": nothing is blocked on these, and only the ones the owner has not answered show.
+  assert.match(page,/## Provisional decisions \(1\)\n- prod\.alpha\.business\.srs\.policy-decision\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on\./);
+  assert.match(page,new RegExp(`workflow-answer --id ${id} --op ask-1 --choice <n>`));
+  assert.match(page,/a different option reopens what was built on it/);
+  assert.doesNotMatch(page,/d-retry/,'a decision the owner has answered is not still owed');
   assert.match(page,/## Anomalies \(5 in 2 signatures, 1 untriaged\)/);
   assert.match(page,/## Recent events \(12\)/);
   assert.equal(page.endsWith('\n'),true);

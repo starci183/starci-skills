@@ -22,7 +22,7 @@ test('every sequence renders a numbered working order and a definition of done, 
       allowlist:['.starciwork/features/sales/implementation/backend/checkout/**'],
       references:['features/sales/implementation/backend/checkout/index.yaml','features/sales/architecture/sds/checkout/index.yaml'],
       acceptance:['exactly one child is the seam, and every other child dependsOn it','the tree validates']}),{kind:'implementation'}],
-    'owner.ask':[op({kind:'owner.ask',origin:'ask',question:{kind:'credential',text:'Which Telegram bot token does the chatbot use, and where is it provided?',options:[],from:'op-intake'},allowlist:['.starciwork/features/chatbot/business/srs/decisions/**'],references:['features/chatbot/business/overview/index.yaml'],acceptance:['the question is answered from a decided record or drafted as one decision record']}),null],
+    'owner.ask':[op({kind:'owner.ask',origin:'ask',question:{kind:'credential',text:'Which Telegram bot token does the chatbot use, and where is it provided?',options:[],from:'op-intake'},allowlist:['.starciwork/features/chatbot/business/srs/business-rules/policy-decisions/**'],references:['features/chatbot/business/overview/index.yaml'],acceptance:['the question is answered from a decided record or drafted as one decision record']}),null],
     'implement.ledger':[op(),{kind:'implementation'}],
     'implement.shared':[op({origin:'shared',requesters:['op-catalog']}),null],
     'implement.repair':[op({origin:'repair',findings:['intake.ts:12 breaks unit-tests-pass']}),null],
@@ -595,6 +595,41 @@ test('e2e.verify proves a backend slice through the API on the real stack, never
 });
 
 /**
+ * The owner is at a keyboard, in front of this tab. Before 5-plus the ask op only drafted a record and left,
+ * and a one-word answer waited a day for someone to type a command somewhere else. It asks here now, and the
+ * two ways to answer are printed side by side. And a credential is never asked for as a value at all: the
+ * owner puts it into the tree's own encrypted custody with one command and says `set`; the op checks presence.
+ */
+test('the owner.ask sequence asks in its own terminal, and a credential is put into custody by the owner, never handed over',()=>{
+  const ask=op({kind:'owner.ask',origin:'ask',checks:[{name:'work-tree-validates',command:'node starci.mjs validate .starciwork'}],
+    question:{kind:'credential',text:'Which key does the payment client use?',options:[],from:'op-intake'},
+    allowlist:['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],
+    references:['features/sales/business/overview/index.yaml'],
+    acceptance:['the question is answered from a decided record or drafted as one decision record']});
+  const rendered=stepsFor(ask,{node:null});
+  // A decided record still answers first, and nothing is written when one does.
+  assert.match(rendered,/`answered-from: <record id>`/);
+  // The question is put in this terminal, with both doors, before any report.
+  assert.match(rendered,/ASK IN THIS TERMINAL, before you report/);
+  assert.match(rendered,/the owner may answer here with the number, or later with workflow-answer/);
+  assert.match(rendered,/`answered-by-owner: <n>`/);
+  // The recommendation is what the kernel takes provisionally, so it has to be reported as a number.
+  assert.match(rendered,/`decision: <record id>`, then a line `recommended: <n>`/);
+  assert.match(rendered,/takes your recommendation provisionally so the work continues/);
+  // Custody, not a value: the owner's own command, presence only, and nothing printed.
+  assert.match(rendered,/identity set <slug> --name <VAR>/);
+  assert.match(rendered,/reads the value from stdin, never from the command line, and never prints it/);
+  assert.match(rendered,/verify only PRESENCE and never the value/);
+  assert.match(rendered,/`credential: <VAR> present in identity:<slug>`/);
+  assert.match(rendered,/An environment variable is not custody/);
+  assert.match(rendered,/Never print, echo, log, copy or paste the value/);
+  assert.match(done(rendered).join('\n'),/no value of any credential or secret appears anywhere/);
+  // The record is a policy decision where the tree keeps them, never a folder the tree does not have.
+  assert.match(rendered,/srs-policy-decision` section with `decisionStatus: open`/);
+  assert.match(rendered,/`\.starciwork\/features\/sales\/business\/srs\/business-rules\/policy-decisions\/\*\*`/);
+});
+
+/**
  * The sequence that closes the hole four faked chatbot channels went through: `e2e.verify` may still fake
  * an outside provider, but it must now name it in the evidence, and the only operation that can call a
  * declared provider proven is one that actually calls it.
@@ -611,10 +646,18 @@ test('an integration is proven live or it is not proven: the credential is the o
   assert.equal(sequenceFor(op({kind:'task.execute',origin:'repair',allowlist:['db/migrations/9.sql']}),{node}),'integration.verify');
   assert.equal(sequenceFor(op({kind:'integration.verify'}),{node:null}),'integration.verify');
 
-  // The credential: one named variable, from the environment, and a missing one stops the work by name.
-  assert.match(rendered,/the environment variable the declaration names/);
-  assert.match(rendered,/Never read it from a file you create/);
-  assert.match(rendered,/`blocked` with blocker `environment` naming that exact variable and nothing else/);
+  // The credential: one named variable, out of the tree's own encrypted custody, read through sops at the
+  // moment of use so the value lives in one process - never an environment variable the op exported, which
+  // belongs to whichever terminal set it and is gone on the next machine. A custody that cannot give it stops
+  // the work by name, with the slug and the variable.
+  assert.match(rendered,/the encrypted identity resource the declaration's `custody` names/);
+  assert.match(rendered,/_resources\/identity\/<slug>\/secrets\.enc\.yaml/);
+  assert.match(rendered,/sops exec-env <work tree>\/_resources\/identity\/<slug>\/secrets\.enc\.yaml '<check>'/);
+  assert.match(rendered,/Never an environment variable you export, never a file you create/);
+  assert.match(rendered,/`blocked` with blocker `environment` naming the slug and that exact variable and nothing else/);
+  assert.match(rendered,/never copy it into a file, a fixture, an environment file, a log, the report or this contract/);
+  // The module is product-agnostic: it names the tree's layout, never a repository or a product path.
+  assert.doesNotMatch(rendered,/\.starciwork/);
   // No double of any spelling may stand in for the provider, and the secret never leaves the variable name.
   assert.match(rendered,/No fake, no stub, no mock, no recorded or replayed response, no local double/);
   assert.match(rendered,/calling the real provider's own sandbox over the network/);

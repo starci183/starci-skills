@@ -947,8 +947,11 @@ export function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op
   // The declaration this proof was accepted under travels with it, so a later change of that declaration is a
   // fact the next sync can see (`proof-under-old-rule`) instead of a proof nobody dares to trust or to reopen.
   const contractDigest=typeof ctx.contractDigest==='function'?(()=>{try{return ctx.contractDigest(op.kind);}catch{return null;}})():null;
+  // The decisions this proof rests on that the OWNER has not taken yet: the receipt names them, so a different
+  // answer later can find every node it was built on without guessing from the workflow's own memory.
   ledgerWrite(store,state,op,ctx,'done',node=>ctx.work.api.markDone(ctx.work.at,node,{
     opId:op.id,head:head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,repository,bindSource:bindsCode(node),...(identity&&bindsCode(node)?{sourceIdentity:identity}:{}),...(contractDigest?{contractDigest,contractKind:op.kind}:{}),
+    provisional:[...(op.provisional??[])],
     evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',
       // A ui node's completion carries its candidates as hashed captures: what the drawing produced is what is proven.
       assets:designEvidenceAssets({api:ctx.work.api,at:ctx.work.at,loaded:ctx.work.loaded},node),

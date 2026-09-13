@@ -86,6 +86,18 @@ writes. The chat is a monitor, never an agent layer above the kernel and never a
     with what a decided record settled and wrote the decision record under its own feature, so `--op` is
     the intake op's id and the answer is recorded on that decision record. Never re-run the intake to
     settle a conflict; the owner's answer is what settles it.
+  - `## Provisional decisions (n)` is **not** something the workflow is waiting on. The owner is stopped for
+    exactly two things - something only they can provide (a credential, an account on an outside system, a
+    real dataset, a legal authority) and an effect nobody can undo (a message to real customers, a payment,
+    a deletion of real data, a publish); every other open question is taken on the runtime's own
+    recommendation so the work continues, and a workflow can finish `done` still owing the owner a page of
+    them. Relay each one as "here is what the runtime decided for you, and here is how to change it", with
+    the same `workflow-answer --id <id> --op <ask op> --choice <n>`, and say the part that matters: **the
+    same option confirms what was built, a different one reopens every node that was built on it.** The
+    owner may also answer by typing the number in the operation's own terminal while its ask op is open.
+    For a credential the op asks them to run `starci identity set <slug> --name <VAR>` - stdin only, never
+    printed - and to reply `set`; it then checks presence alone. Never ask for a credential value in the
+    chat, never accept one if it is pasted, and never write one anywhere.
   - A `ledger` item wants an allowlist or checks authored on the named node; a `dynamic-op` item wants
     `workflow-approve --id <id> --allow-dynamic N`; a `merge` item wants the owner to merge the lane
     branch into the base worktree; `authority`, `environment` and every other kind want the owner's

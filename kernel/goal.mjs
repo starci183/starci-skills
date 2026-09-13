@@ -242,7 +242,8 @@ export function planCritiqueDecisions(store,state,{ctx=null}={}){
     const text=`${objection.claim}${objection.consequence?` - ${objection.consequence}`:''} (critique evidence: ${objection.evidence})`;
     // `question.kind: decision` is what makes this the provisional kind: the ask op writes the decision record
     // with numbered options and one recommendation, and the work continues on that recommendation.
-    openOwnerAsk(store,state,requester,{kind:'decision',text,options:[]},ctx);
+    // Prepared by the kernel from the critic's objection: provisional by construction, never read as a stop.
+    openOwnerAsk(store,state,requester,{kind:'decision',text,options:[],prepared:true},ctx);
     const ask=state.ops.find(op=>op.kind===OWNER_ASK&&op.question?.text===text)??null;
     if(!ask)continue;
     for(const op of touching)if(op.id!==ask.id&&op.id!==requester.id)op.dependsOn=unique([...(op.dependsOn??[]),ask.id]);

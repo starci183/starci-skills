@@ -32,8 +32,8 @@ import {renderChecksFor} from '../checks/render.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
 import {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
-import {MECHANICAL_QUESTION,OWNER_ASK,answerOrEscalate,answerOwnerQuestion,credentialNeed,decisionAllowlistFor,
-  openOwnerAsk,resumeWithAnswer,settleOwnerAsk} from './owner.mjs';
+import {OWNER_ASK,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
+  openOwnerAsk,provisionalLines,settleOwnerAsk,stopReasonFor} from './owner.mjs';
 import {BRAND_PAYLOAD,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
   rereadBrand,sharedCheckCommand,treeForVerdict,validateAccepted,validatorRejectLimit} from './verify.mjs';
@@ -75,7 +75,9 @@ export {WORKFLOW_KERNEL,FINAL_REPORT,GOAL_RECORD,LEDGER_MODES,WORK_LEDGER,WORK_O
 export {laneRowTitle,LANE_NAME,laneNameOf,laneOwnerOf,openLane,laneView} from './lanes.mjs';
 export {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,recoverCoordinatorTab,reconcileWithOrca,rebindRunIfNeeded,
   sweepStaleTerminals} from './terminals.mjs';
-export {OWNER_ASK,credentialNeed,openOwnerAsk,answerOwnerQuestion} from './owner.mjs';
+export {OWNER_ASK,PROVISION_KINDS,QUESTION_KINDS,STOP_KINDS,answerCommand,answerOwnerQuestion,credentialNeed,
+  decisionAllowlistFor,dedupeNeedUser,inheritProvisional,irreversibleEffect,openOwnerAsk,ownerProvisionNeed,
+  provisionalLines,redactSecrets,stopReasonFor} from './owner.mjs';
 export {BRAND_PAYLOAD,brandFields,brandPayload,brandSummary,changedFiles,machineVerify,opDiff,readValidatorMemory,
   renderValidatorMemory,sharedCheckCommand,treeForVerdict,treeVerdictFor,validatorRejectLimit} from './verify.mjs';
 export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,designRecord,deriveWorkOp,syncLedgerOps,
@@ -114,6 +116,11 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     ledgerRoles:null,
     run:null,from:null,workflowTask:null,phase:'goal',approved:false,
     definitionOfDone:[],risks:[],questions:[],ledger:[],ops:[],needUser:[],gateResults:[],verifyRounds:{},gateRounds:0,
+    // Decisions the runtime took on its own recommendation so the work could continue. They are NOT `needUser`:
+    // the workflow may finish `done` over them, and the owner's different answer is what reopens what rests on one.
+    provisional:[],
+    // The last findings per reviewed group, and how often that group's review was escalated inside the runtime today.
+    verifyFindings:{},verifyEscalations:{},
     lanes:{},
     decisions:[],ledgerSummary:null,brand:null,
     // The critique of the goal (`critiqueGoal`) and, when its verdict was `refuse`, the owner's own override of it.
@@ -331,10 +338,9 @@ function launchOp(orca,store,state,op,allocated,ctx){
     // The attempts travel with the event: a launch that failed is only diagnosable from what Orca said at each step.
     store.appendEvent({event:'launch-failed',op:op.id,runtime:allocated.runtime,stopReason:launched?.stopReason??null,attempts:launched?.attempts?.length??0,
       detail:(launched?.attempts??[]).slice(0,4).map(attempt=>({target:attempt.target??null,stage:attempt.stage??null,effectState:attempt.effectState??null,reason:String(attempt.reason??'').slice(0,240),...(attempt.trust?{trust:attempt.trust}:{}),...(attempt.recovery?{recovery:attempt.recovery}:{})}))});
-    if(op.launchFailures>=LAUNCH_LIMIT){
-      op.status='blocked';
-      state.needUser.push({op:op.id,kind:'environment',detail:`no runtime could launch ${op.id} (${op.launchFailures} attempts, last ${launched?.stopReason??'unknown'})`});
-    }
+    // Launch attempts are a mechanical bound: spent, the op cools and comes back by itself rather than becoming a
+    // question nobody can answer ("no runtime could launch op-3" is not a decision the owner can take).
+    if(op.launchFailures>=LAUNCH_LIMIT)coolOp(store,state,op,ctx,`no runtime could launch ${op.id} (${op.launchFailures} attempts, last ${launched?.stopReason??'unknown'})`);
     return {ok:false,reason:launched?.stopReason??'launch failed'};
   }
   op.status='running';op.runtime=allocated.runtime;op.target=allocated.target;op.coordinatorRecovered=false;
@@ -863,8 +869,50 @@ function refuseForeignShared(store,state,ctx){
     }
   }
 }
+/**
+ * The feature folder a shared change belongs under, in the tree's own spelling: the requester's node first, then
+ * its paths, then the first feature the tree carries. `null` only when this workflow has no Work tree at all.
+ */
+function sharedFeatureOf(op,ctx){
+  const folderOf=where=>{const match=slash(String(where??'')).match(/features\/([^/]+)\//);return match?match[1]:null;};
+  const fromTree=id=>{try{return folderOf(ctx?.work?.node?.(id)?.path);}catch{return null;}};
+  return [op?.nodeId,...(op?.ledgerIds??[])].filter(Boolean).map(fromTree).find(Boolean)
+    ??(op?.allowlist??[]).map(folderOf).find(Boolean)
+    ??(op?.references??[]).map(folderOf).find(Boolean)
+    ??(ctx?.work?.loaded?.list??[]).map(node=>folderOf(node.path)).find(Boolean)
+    ??null;
+}
+/**
+ * A shared change too deep to delegate is not a question for the owner and not a dead end: it is work nobody
+ * wrote down. The kernel creates one `work.author` op that authors a Work node for exactly those paths, and
+ * from then on the change travels the ordinary road - a record with a write scope and checks, a lane, a proof -
+ * instead of a third nested shared op nobody bounded.
+ */
+function authorSharedNode(store,state,op,ctx,{paths,detail,open}){
+  const feature=sharedFeatureOf(op,ctx);
+  if(!feature)return null;
+  const slug=`shared-${slash(String(op.id)).replace(/[^A-Za-z0-9]+/g,'-').toLowerCase()}`;
+  const folder=`.starciwork/features/${feature}/implementation/${slug}`;
+  const node=`${folder}/index.yaml`;
+  const author=addOp(store,state,{kind:AUTHOR_KIND,nodeId:null,
+    goal:`Author one Work node for the change ${op.id} cannot make inside its own slice, and do not make the change: ${detail}. Its write scope is exactly ${paths.join(', ')}; state what the change must achieve as testable assertions and one runnable check per assertion, \`state: todo\`, referring to the records this feature already holds. The kernel schedules that node's own operation afterwards.`,
+    ledgerIds:[],allowlist:[node,`${folder}/**`],
+    references:unique([...(op.references??[])]),
+    checks:ctx?.work?.at?.workRoot?[{name:'work-tree-validates',command:validateCommandAt(ctx.work.at.workRoot)}]:[],
+    acceptance:[`${node} is a valid Work node whose write scope is ${paths.join(', ')} and whose checks name its assertions`,
+      'no product code changed: this operation writes the record, the node\'s own operation does the work',
+      'the Work tree still validates'],origin:'ledger'},
+    `shared change ${op.id} is ${op.sharedDepth??0} levels deep`);
+  if(!author)return null;
+  author.difficulty='hard';
+  author.sharedAuthored=[...paths];
+  store.appendEvent({event:'shared-authored',node,op:op.id,author:author.id,depth:op.sharedDepth??0,paths});
+  pauseForShared(store,state,op,open,author,`the change is too deep to delegate again: ${author.id} authors the Work node ${node} for ${paths.join(', ')}, and that node's own operation makes the change`);
+  return author;
+}
+
 /** One shared request: merge into an existing shared op, create one, or queue it for the next iteration. */
-function requestSharedChange(store,state,op,{paths,detail,open=[]}){
+function requestSharedChange(store,state,op,{paths,detail,open=[]},ctx=null){
   // The Work tree is the kernel's record, never an operation's: a shared change that names a ledger path is
   // refused and carried to the user as a finding. A read-only kind may not request one at all.
   const ledgerPaths=paths.filter(entry=>/^\.?\/?\.starciwork\//.test(slash(entry)));
@@ -879,17 +927,36 @@ function requestSharedChange(store,state,op,{paths,detail,open=[]}){
     store.appendEvent({event:'shared-change-refused',op:op.id,kind:op.kind,paths:foreign,reason:'outside this repository'});
     return 'shared-change-foreign';
   }
+  // The Work tree is the kernel's record, never an operation's. An op that asked for record paths AND code paths
+  // is split rather than stopped: the record paths are refused with one event and the code paths carry on as the
+  // scoped shared op. A request that is record paths alone (or a read-only kind) is refused outright - told, in
+  // its own terminal, to report again without them - and is never an item on the owner's list: the owner cannot
+  // decide anything here, because the answer is a rule of the runtime.
+  const codePaths=paths.filter(entry=>!ledgerPaths.includes(entry));
   if(ledgerPaths.length||graph.isReadOnly?.(op.kind)){
-    op.status='blocked';
-    state.needUser.push({op:op.id,kind:'ledger-path',detail:`${op.id} (${op.kind}) asked for a change the kernel will not delegate: ${ledgerPaths.length?ledgerPaths.join(', '):'a read-only kind requested a shared change'}: ${detail}`});
-    store.appendEvent({event:'shared-change-refused',op:op.id,kind:op.kind,paths,reason:ledgerPaths.length?'ledger path':'read-only kind'});
-    return 'shared-change-refused';
+    const reason=ledgerPaths.length?'ledger path':'read-only kind';
+    store.appendEvent({event:'ledger-path-refused',op:op.id,kind:op.kind,paths:ledgerPaths,
+      continued:ledgerPaths.length&&codePaths.length?codePaths:[],reason});
+    if(!ledgerPaths.length||!codePaths.length){
+      const file=store.reportPath(op.dispatch);
+      if(fs.existsSync(file))fs.renameSync(file,`${file}.answered-${op.reports.length}`);
+      op.answer=`The Work tree is the kernel's own record: ${ledgerPaths.length?`${ledgerPaths.join(', ')} is not a change any operation may ask for`:`a ${op.kind} operation reads the tree and never changes it`}. The kernel writes \`state\`, \`completion\` and the kernel block itself. Report again naming only repository paths, or report what the record should say in \`open[]\` and let the kernel route it.`;
+      op.status='answering';
+      store.appendEvent({event:'shared-change-refused',op:op.id,kind:op.kind,paths,reason});
+      return 'shared-change-refused';
+    }
+    paths=codePaths;
   }
-  // A shared op that itself needs a shared change is a design problem, not a scheduling one: two levels deep it stops.
+  // A shared op that itself needs a shared change is a design problem, not a scheduling one - but a design
+  // problem is work, not a question: at the depth limit the change becomes one Work node of its own, authored
+  // by a `work.author` op and scheduled like any other node. Only paths outside this repository stay refused,
+  // and those were already answered above.
   if((op.sharedDepth??0)>=SHARED_DEPTH_LIMIT){
+    const authored=authorSharedNode(store,state,op,ctx,{paths,detail,open});
+    if(authored)return 'shared-authored';
     op.status='blocked';
     state.needUser.push({op:op.id,kind:'shared-depth',detail:`${op.id} is a shared change ${op.sharedDepth} levels deep and still needs ${paths.join(', ')}: ${detail}`});
-    store.appendEvent({event:'shared-change-depth',op:op.id,depth:op.sharedDepth,paths});
+    store.appendEvent({event:'shared-change-depth',op:op.id,depth:op.sharedDepth,paths,reason:'no feature folder in the tree to author a node under'});
     return 'shared-change-depth';
   }
   const existing=state.ops.find(item=>sharedAlive(item)&&pathSetsOverlap(item.allowlist,paths));
@@ -914,7 +981,7 @@ function requestSharedChange(store,state,op,{paths,detail,open=[]}){
 }
 
 /** Queued shared requests are retried once per iteration, under the same merge rule and the same cap. */
-export function drainSharedQueue(store,state){
+export function drainSharedQueue(store,state,ctx=null){
   const queue=state.sharedQueue??[];
   if(!queue.length)return [];
   // Emptied first: a request the cap defers again re-queues itself through the same path.
@@ -923,7 +990,7 @@ export function drainSharedQueue(store,state){
   for(const request of queue){
     const op=byId(state,request.op);
     if(!op||op.status!=='paused')continue;
-    if(requestSharedChange(store,state,op,request)==='shared-change')created.push(op.waitingFor);
+    if(requestSharedChange(store,state,op,request,ctx)==='shared-change')created.push(op.waitingFor);
   }
   return created;
 }
@@ -968,7 +1035,7 @@ function handleBlocked(store,state,op,report,ctx){
       store.appendEvent({event:'shared-change-unnamed',op:op.id,detail:blocker.detail});
       return 'shared-change-unnamed';
     }
-    return requestSharedChange(store,state,op,{paths,detail:blocker.detail,open:[...(report.open??[])]});
+    return requestSharedChange(store,state,op,{paths,detail:blocker.detail,open:[...(report.open??[])]},ctx);
   }
   // A frontend build that has no design to build from is drawn first, never guessed at.
   if(blocker.kind==='interface-gap'){
@@ -1007,10 +1074,16 @@ function handleBlocked(store,state,op,report,ctx){
     routed(store,op,'sds-gap',architecture.id,architecture.origin,{kind:architecture.kind,then:route.then});
     return 'sds-gap';
   }
-  // A credential or a configuration the environment lacks is the owner's to provide: the question is prepared for
-  // them, with the exact variable name, instead of a bare line nobody answers.
-  if(['environment','authority'].includes(blocker.kind)&&credentialNeed(blocker.detail))return openOwnerAsk(store,state,op,{kind:blocker.kind==='authority'?'authority':'credential',text:blocker.detail,options:[]},ctx,report);
-  // `environment`, `authority` and anything the graph has no rule for: the user decides, the kernel does not guess.
+  // Something only the owner can provide - a credential, an account on an outside system, a real dataset, a
+  // legal authority - or an effect nobody can undo: the question is prepared for them, naming the exact thing,
+  // instead of a bare line nobody answers. Both pause the op that asked, because there is nothing honest to do.
+  const stop=stopReasonFor({kind:blocker.kind,text:blocker.detail});
+  if(['environment','authority'].includes(blocker.kind)&&stop)
+    return openOwnerAsk(store,state,op,{kind:stop,text:blocker.detail,options:[]},ctx,report);
+  // An `authority` block that names nothing the owner must provide is a decision the records do not settle: the
+  // runtime takes it on its own recommendation and carries on, and the owner answers whenever they like.
+  if(blocker.kind==='authority')return openOwnerAsk(store,state,op,{kind:'decision',text:blocker.detail,options:[]},ctx,report);
+  // `environment` and anything the graph has no rule for: the user decides, the kernel does not guess.
   op.status='blocked';
   state.needUser.push({op:op.id,kind:blocker.kind,detail:blocker.detail});
   routed(store,op,blocker.kind,'needUser',null,{then:routeOf({blocker:blocker.kind,kind:op.kind})?.then??null});
@@ -1030,6 +1103,14 @@ function handleBlocked(store,state,op,report,ctx){
  */
 function settleAuthoredRecord(store,state,op,ctx){
   if(op.kind===OWNER_ASK){settleOwnerAsk(store,state,op,op.reports.at(-1)??{});return 'owner-ask-settled';}
+  // A node authored for a shared change closes nothing and completes no existing record: the tree is re-read so
+  // the next sync sees the new node, and the requester is released by `resumePaused` like any other shared op.
+  if(Array.isArray(op.sharedAuthored)){
+    try{const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});if(loaded.ok)ctx.work.loaded=loaded;}
+    catch(error){store.appendEvent({event:'ledger-sync-failed',op:op.id,reason:error.message});}
+    store.appendEvent({event:'shared-node-authored',op:op.id,paths:op.sharedAuthored,allowlist:op.allowlist});
+    return 'shared-node-authored';
+  }
   if(op.intake?.scope&&!op.nodeId){
     const settled=settleIntake(store,state,op,ctx);
     // A reconciliation the kernel could not accept comes back as findings, not as a verdict the intake acted on:
@@ -1223,17 +1304,100 @@ const reviewFindings=report=>{
 /** The review rounds one reviewed node set may use: the `review-findings` route's bound. */
 const reviewRounds=()=>routeOf({verdict:'fail',kind:'review.verify'})?.limit??VERIFY_ROUNDS;
 
+/**
+ * The decided records a set of findings actually cites: an SRS or SDS record of the tree, `done`, named by its
+ * id inside the finding text. That is the whole test for "the reviewer is arguing with a decision that exists".
+ */
+const DECIDED_RECORD=/(^|\/)(business\/srs|architecture\/sds)(\/|$)/;
+function citedDecidedRecords(ctx,findings){
+  const list=ctx?.work?.loaded?.list??[];
+  const text=(findings??[]).map(item=>typeof item==='string'?item:JSON.stringify(item)).join('\n');
+  return unique(list.filter(node=>node.state==='done'&&DECIDED_RECORD.test(slash(node.path??''))
+    &&typeof node.id==='string'&&node.id&&text.includes(node.id)).map(node=>node.id));
+}
+/** The runtime the allocator would pick for this kind if it were asked now; null when it cannot say. */
+const previewRuntime=(ctx,kind,avoid)=>{try{return ctx.allocator?.review?.(kind,{avoid})?.ready?.[0]?.runtime??null;}catch{return null;}};
+/** How often one reviewed group may be escalated inside the runtime in one day: twice its review rounds. */
+const escalationCap=()=>reviewRounds()*2;
+/** The escalations this group has already had today; a new day starts the bound again. */
+const escalationsToday=(state,ctx,key)=>{
+  const day=new Date(clockOf(ctx)).toISOString().slice(0,10);
+  const entry=state.verifyEscalations?.[key];
+  return plain(entry)&&entry.day===day?Number(entry.count)||0:0;
+};
+/**
+ * How many review rounds one group may use: its route's limit, plus one for every escalation the runtime has
+ * granted it today. An escalation buys the group a repair AND the review that judges it - a repair nobody
+ * reviews proves nothing - and the escalations themselves are capped, so the two bounds together terminate.
+ */
+const reviewRoundsFor=(state,ctx,key)=>reviewRounds()+escalationsToday(state,ctx,key);
+/**
+ * A spent review bound is a MECHANICAL bound, and a mechanical bound never becomes a question for the owner: it
+ * escalates inside the runtime. The escalation is always one more repair round, on the strongest implement
+ * runtime that has not worked this group yet - and the findings decide where its ruling comes from.
+ *
+ * When the last findings cite a decided record - an SRS or SDS record of this tree, by id - the argument is with
+ * work that exists, and the repair reads those records. When they cite no decided record at all, the reviewer
+ * and the builder are disagreeing about something nobody ever decided: that is a HIDDEN DECISION, put to the
+ * owner as a provisional question (rule 1), and the repair waits for the recommendation and carries it. Only a
+ * group that has spent its escalations for the day is parked for the owner, and that is the bound on the bound.
+ */
+function escalateVerify(store,state,ctx,{key,ledgerIds,findings,op}){
+  const day=new Date(clockOf(ctx)).toISOString().slice(0,10);
+  const count=escalationsToday(state,ctx,key);
+  const cited=citedDecidedRecords(ctx,findings);
+  const review=op??state.ops.filter(item=>item.kind==='review.verify'&&item.ledgerIds.some(id=>ledgerIds.includes(id))).at(-1)??null;
+  if(count<escalationCap()){
+    const implementers=state.ops.filter(item=>implementsLedger(item)&&item.ledgerIds.some(id=>ledgerIds.includes(id)));
+    const used=unique(implementers.map(item=>item.runtime).filter(Boolean));
+    const route=routeOf({verdict:'fail',kind:review?.kind??'review.verify'})??{kind:'lane-build',origin:'repair',then:'retry'};
+    const kind=routeKind(route,state,review??{kind:'review.verify',ledgerIds})??'backend.implement';
+    const allowlist=unique(implementers.flatMap(item=>item.allowlist??[]));
+    const repair=allowlist.length?addOp(store,state,{kind,
+      goal:cited.length
+        ?`Resolve the review findings of ${key} against the decided records they cite (${cited.join(', ')}). The ordinary review rounds are spent: read those records first and change the code to match them, or report \`blocked\` with \`sds-gap\` naming the record that cannot be met.`
+        :`Resolve the review findings of ${key}. Its reviewers keep disagreeing with its builders about a rule no decided record states, so the runtime is settling that rule now: the ruling reaches you as the answer to the question you inherit, and you build to it.`,
+      ledgerIds:[...ledgerIds],allowlist,
+      references:unique([...implementers.flatMap(item=>item.references??[]),...cited]),
+      checks:dedupeChecks(implementers.flatMap(item=>item.checks??[])),
+      acceptance:unique(implementers.flatMap(item=>item.acceptance??[])),
+      findings:[...findings],avoidRuntimes:used,origin:'repair'},`review escalation of ${key}`):null;
+    if(repair){
+      repair.difficulty='hard';
+      for(const id of ledgerIds){const item=ledgerItem(state,id);if(item&&item.status==='verified')item.status='implemented';}
+      state.verifyEscalations={...(plain(state.verifyEscalations)?state.verifyEscalations:{}),[key]:{day,count:count+1}};
+      store.appendEvent({event:'verify-escalated',group:key,component:key,round:count+1,cap:escalationCap(),
+        runtime:previewRuntime(ctx,kind,used),avoid:used,cited,hidden:!cited.length,op:repair.id});
+      if(!cited.length){
+        store.appendEvent({event:'verify-hidden-decision',group:key,component:key,rounds:state.verifyRounds[key]??0,
+          findings:findings.slice(0,3),op:repair.id});
+        openOwnerAsk(store,state,repair,{kind:'hidden-decision',
+          text:`The review of ${key} keeps failing and its findings cite no decided record: ${findings[0]??'no finding text'}. Which rule should hold here? State the numbered options and recommend one; the runtime takes the recommendation and carries on, and the owner may answer differently later.`,
+          options:[]},ctx);
+      }
+      return 'verify-escalated';
+    }
+  }
+  for(const id of ledgerIds){const item=ledgerItem(state,id);if(item)item.status='review-exhausted';}
+  state.needUser.push({...(review?{op:review.id}:{}),kind:'review',
+    detail:`${key} still fails review after ${state.verifyRounds[key]??reviewRounds()} rounds and ${count} escalation(s) inside the runtime: ${findings[0]??'no finding text'}`});
+  store.appendEvent({event:'verify-parked',group:key,component:key,rounds:state.verifyRounds[key]??0,cited,escalations:count});
+  return 'verify-parked';
+}
+
 /** A review that found something becomes one repair operation; the next review is created when it is done. */
 function repairFromVerify(store,state,op,findings,ctx){
   op.verdict='fail';
   const key=groupKey(state,op.ledgerIds);
   const route=routeOf({verdict:'fail',kind:op.kind})??{kind:'lane-build',origin:'repair',then:'retry',limit:VERIFY_ROUNDS};
-  const rounds=Number.isFinite(route.limit)?route.limit:VERIFY_ROUNDS;
+  const rounds=reviewRoundsFor(state,ctx,key);
   for(const id of op.ledgerIds){const item=ledgerItem(state,id);if(item&&item.status==='verified')item.status='implemented';}
+  // The last findings of this group are kept, because the escalation is decided from what they cite, and the
+  // stage that decides it (`planVerifyOps`) runs a tick later with no report in its hands.
+  if(findings.length)state.verifyFindings={...(plain(state.verifyFindings)?state.verifyFindings:{}),[key]:findings.slice(0,10)};
   if((state.verifyRounds[key]??1)>=rounds){
-    state.needUser.push({op:op.id,kind:'review',detail:`${key} still fails review after ${rounds} rounds: ${findings[0]??'no finding text'}`});
     store.appendEvent({event:'verify-limit',op:op.id,component:key,findings:findings.slice(0,3)});
-    return 'verify-limit';
+    return escalateVerify(store,state,ctx,{key,ledgerIds:[...op.ledgerIds],findings,op});
   }
   if(!findings.length){
     state.needUser.push({op:op.id,kind:'review',detail:`${op.id} failed review without naming a finding`});
@@ -1385,11 +1549,12 @@ function planVerifyOps(store,state,ctx){
     if(groupIncomplete(state,ledgerIds))continue;
     const kind=groupVerifyKind(state,ledgerIds);
     const review=kind==='review.verify';
-    // The review of one group is bounded: past the last round the group waits for the user, it is not reviewed again.
-    if(review&&(state.verifyRounds[key]??0)>=reviewRounds()){
-      for(const id of ledgerIds){const item=ledgerItem(state,id);if(item)item.status='review-exhausted';}
-      state.needUser.push({kind:'review',detail:`${key} used its ${reviewRounds()} review rounds and is implemented again; decide whether the last findings stand`});
-      store.appendEvent({event:'verify-exhausted',component:key,rounds:state.verifyRounds[key]});
+    // The review of one group is bounded, and the bound is mechanical: it escalates inside the runtime - one more
+    // repair round against the decided records the findings cite, or a provisional question when they cite none -
+    // instead of becoming a line on the owner's list that nobody can act on.
+    if(review&&(state.verifyRounds[key]??0)>=reviewRoundsFor(state,ctx,key)){
+      store.appendEvent({event:'verify-exhausted',component:key,group:key,rounds:state.verifyRounds[key]});
+      escalateVerify(store,state,ctx,{key,ledgerIds,findings:state.verifyFindings?.[key]??[],op:null});
       continue;
     }
     const implementers=state.ops.filter(op=>implementsLedger(op)&&op.ledgerIds.some(id=>ledgerIds.includes(id)));
@@ -1459,6 +1624,10 @@ function finish(store,state,outcome,reason=null,ctx=null){
   // The lane is merged first, because a refused merge changes the outcome this report states.
   const settled=settleLane(store,state,outcome,ctx);
   if(settled){outcome=settled.outcome;reason=settled.reason;}
+  dedupeNeedUser(state);
+  // A decision the runtime took for the owner is not a reason to finish blocked - the work is real and the
+  // recommendation is recorded - but it is never silent either: the report says which, and how to answer them.
+  const provisional=(state.provisional??[]).map(entry=>({...entry,answerWith:answerCommand(state,entry.op)}));
   const final={schema:FINAL_REPORT,id:state.id,job:state.job,outcome,reason,branch:state.branch,head:state.head,
     lane:laneView(state),
     ledgerMode:state.ledgerMode,scope:state.scope,ledgerSummary:refreshLedgerSummary(state,ctx),decisions:state.decisions,brand:state.brand??null,
@@ -1468,8 +1637,10 @@ function finish(store,state,outcome,reason=null,ctx=null){
     acceptedAsPreexisting:state.ledger.filter(item=>item.status==='preexisting').map(item=>item.id),
     gates:state.gateResults.map(result=>({name:result.name,command:result.command,status:result.status,exitCode:result.exitCode})),
     needUser:state.needUser,
+    provisional,provisionalReport:provisionalLines(state).join('\n'),
     ops:state.ops.map(op=>({id:op.id,kind:op.kind,node:op.nodeId,origin:op.origin,status:op.status,runtime:op.runtime,attempt:op.attempt,
-      allowlist:op.allowlist,ledgerIds:op.ledgerIds,head:op.head,ledgerCommit:op.ledgerCommit??null,verdict:op.verdict,validation:op.validation??null,files:op.files})),
+      allowlist:op.allowlist,ledgerIds:op.ledgerIds,head:op.head,ledgerCommit:op.ledgerCommit??null,verdict:op.verdict,validation:op.validation??null,
+      provisional:[...(op.provisional??[])],files:op.files})),
     iterations:state.iterations,finishedAt:Date.now()};
   writeJson(store.paths.final,final);
   state.finished={outcome,reason,report:store.paths.final};
@@ -1523,7 +1694,10 @@ export function settleStalled(orca,store,state,ctx,tick){
         // A provider limit is time, not a defect: the op cools down and comes back on another runtime by itself.
         op.refusal='rate-limited';op.coolUntil=ctx.now()+RATE_LIMIT_COOLDOWN_MS;
         store.appendEvent({event:'rate-limit-cooling',op:op.id,runtime:op.runtime,until:op.coolUntil,restarts:op.restarts});
-      }else state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} was restarted ${op.restarts} times (${observed.liveness})`});
+      // An op the restart limit caught for going idle is a mechanical bound too: it cools and is re-admitted,
+      // up to the daily cap. Every other liveness (dead, stalled-prompt, stalled-silent) is still the user's.
+      }else if(observed.liveness==='stalled-idle')coolOp(store,state,op,ctx,`${op.id} was restarted ${op.restarts} times (stalled-idle)`);
+      else state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} was restarted ${op.restarts} times (${observed.liveness})`});
       continue;
     }
     op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;avoidRuntime(op,op.runtime,clockOf(ctx));
@@ -1599,6 +1773,26 @@ export const KERNEL_ERROR_LIMIT=5;
 /** How long an op blocked by a provider rate limit waits before it is re-admitted on another runtime. */
 export const RATE_LIMIT_COOLDOWN_MS=60*60*1000;
 /**
+ * How often one operation may be re-admitted after a mechanical launch bound in one day. The bound itself is
+ * not a question for the owner - a launcher that will not start is time, not a decision - so the op cools and
+ * comes back; past this cap the environment really is broken and that IS the owner's, as an `environment` item.
+ */
+export const LAUNCH_DAILY_CAP=6;
+/**
+ * A mechanical launch bound: the op cools for the same window a provider limit uses and is re-admitted by
+ * `readmitCooled`, with its launch and restart counters cleared. `detail` is the line the owner would have been
+ * given; it is carried on the op so the item past the cap says exactly what kept failing.
+ */
+function coolOp(store,state,op,ctx,detail){
+  const now=clockOf(ctx);
+  op.status='blocked';op.refusal='launch-cooling';op.coolUntil=now+RATE_LIMIT_COOLDOWN_MS;
+  op.coolReason=String(detail).slice(0,240);
+  op.dispatch=null;op.terminal=null;op.nudged=false;
+  store.appendEvent({event:'launch-cooling',op:op.id,until:op.coolUntil,
+    launchFailures:op.launchFailures??0,restarts:op.restarts??0,detail:op.coolReason});
+  return 'launch-cooling';
+}
+/**
  * A runtime an op learned to avoid - it failed to launch there, stalled there, or was rate-limited there - is
  * avoided for the cooldown, not for ever: the stamp says when, and `readmitCooled` opens the runtime to the op
  * again once the cooldown has passed (`avoid-expired`). A verify op's avoidance of its implementers carries no
@@ -1630,6 +1824,22 @@ function readmitCooled(store,state,ctx){
     op.status='ready';op.refusal=null;op.coolUntil=null;op.restarts=0;op.dispatch=null;op.terminal=null;op.nudged=false;
     avoidRuntime(op,limited,now);
     store.appendEvent({event:'rate-limit-readmitted',op:op.id,avoid:op.avoidRuntimes});
+  }
+  // A mechanical launch bound is time, not a defect: once the cooldown has passed the op is admitted again with
+  // its counters cleared, up to the daily cap. Past the cap the environment is the owner's after all.
+  const day=new Date(now).toISOString().slice(0,10);
+  for(const op of state.ops.filter(candidate=>candidate.status==='blocked'&&candidate.refusal==='launch-cooling')){
+    if(!(Number(op.coolUntil??0)<=now))continue;
+    const seen=plain(op.launchReadmissions)&&op.launchReadmissions.day===day?op.launchReadmissions.count:0;
+    if(seen>=LAUNCH_DAILY_CAP){
+      op.refusal='launch-exhausted';op.coolUntil=null;
+      state.needUser.push({op:op.id,kind:'environment',detail:`${op.coolReason??`${op.id} could not be launched`}; it was re-admitted ${seen} times today and the environment still refuses it`});
+      store.appendEvent({event:'launch-cap-reached',op:op.id,readmissions:seen,cap:LAUNCH_DAILY_CAP});
+      continue;
+    }
+    op.launchReadmissions={day,count:seen+1};
+    op.status='ready';op.refusal=null;op.coolUntil=null;op.launchFailures=0;op.restarts=0;op.dispatch=null;op.terminal=null;op.nudged=false;
+    store.appendEvent({event:'launch-readmitted',op:op.id,readmissions:seen+1,cap:LAUNCH_DAILY_CAP,avoid:op.avoidRuntimes??[]});
   }
   // An avoidance older than the cooldown is over: the runtime is open to the op again.
   for(const op of state.ops.filter(candidate=>['pending','ready'].includes(candidate.status)&&plain(candidate.avoidedAt))){
@@ -1837,7 +2047,12 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     refuseForeignShared(store,state,{...ctx,orca});
     readmitCooled(store,state,ctx);
     resumePaused(store,state);
-    drainSharedQueue(store,state);
+    drainSharedQueue(store,state,ctx);
+    // A provisional decision travels to everything built behind it, and the owner's list carries one line per
+    // question - not the same line once per iteration.
+    inheritProvisional(state);
+    const merged=dedupeNeedUser(state);
+    if(merged)store.appendEvent({event:'need-user-deduplicated',dropped:merged,items:state.needUser.length});
     if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);planVerifyOps(store,state,ctx);})==='stop')break;
     if(guardedStage(store,state,ctx,'schedule',()=>scheduleOps(orca,store,state,ctx))==='stop')break;
     state.allocation=typeof allocator.serialize==='function'?allocator.serialize():allocator.snapshot?.()??null;
@@ -1954,7 +2169,7 @@ function applyInbox(store,state,ctx){
       // which the supervisor gives within a minute once this loop returns.
       if(quotaChanged)state.restartRequested='allocation changed';
     }else if(command.kind==='answer'){
-      try{const answered=answerOwnerQuestion(store,state,{op:command.op,choice:command.choice??null,note:command.note??null});store.appendEvent({event:'inbox-applied',kind:'answer',ask:answered.ask});}
+      try{const answered=answerOwnerQuestion(store,state,{op:command.op,choice:command.choice??null,note:command.note??null},ctx);store.appendEvent({event:'inbox-applied',kind:'answer',ask:answered.ask});}
       catch(error){store.appendEvent({event:'inbox-rejected',kind:'answer',reason:String(error?.message??error)});}
     }else store.appendEvent({event:'inbox-ignored',kind:command.kind??null});
   }
@@ -2091,7 +2306,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
         [node,{lane:laneText(laneWalked(entry)),done:[...(entry.done??[])],skipped:[...(entry.skipped??[])],progress:laneProgress(entry)}])),
       workNodes:state.ops.filter(op=>op.nodeId).map(op=>({op:op.id,node:op.nodeId,status:op.status,kind:op.kind,
         lane:laneText(laneWalked(state.lanes?.[op.nodeId]))||null,progress:laneProgress(state.lanes?.[op.nodeId])})),
-      gates:state.gateResults,needUser:state.needUser,finished:state.finished,
+      gates:state.gateResults,needUser:state.needUser,provisional:state.provisional??[],finished:state.finished,
       events:store.readEvents().slice(-20),final:readJson(store.paths.final,null)};
   }
   if(command==='workflow-run'){

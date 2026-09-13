@@ -29,6 +29,21 @@ export const INTEGRATION_DECLARING_KINDS=['business','business-overview','module
 export const PROOF_BOUNDARIES=['api','live'];
 /** A credential is the owner's. No other provider of one is a declaration the runtime will act on. */
 export const CREDENTIAL_PROVIDER='owner';
+/**
+ * Where a credential lives, and the only place one may live: an encrypted identity resource of this Work tree.
+ * `identity:<slug>` is `_resources/identity/<slug>/` - `resource.yaml` (the alias, the provider subject, the
+ * role and the variable NAMES, never a value) beside `secrets.enc.yaml` (sops, the host's own key).
+ *
+ * An environment variable is not custody: it belongs to whichever terminal happened to export it, it is gone on
+ * the next machine, and the tree cannot say who set it or when. `RESOURCE_ROOT` is where the tree keeps them.
+ */
+export const IDENTITY_CUSTODY=/^identity:[a-z0-9]+(?:[-_.][a-z0-9]+)*$/;
+export const IDENTITY_ROOT='_resources/identity';
+export const IDENTITY_RESOURCE_SCHEMA='work/resource@1';
+export const IDENTITY_SECRETS='secrets.enc.yaml';
+/** The paths of one identity custody inside a Work tree, from its slug. */
+export const identityPaths=slug=>({folder:`${IDENTITY_ROOT}/${slug}`,
+  resource:`${IDENTITY_ROOT}/${slug}/resource.yaml`,secrets:`${IDENTITY_ROOT}/${slug}/${IDENTITY_SECRETS}`});
 export const EVIDENCE_SCHEMA='work/evidence@1';
 export const REVIEW_SCHEMA='starci/design-review@1';
 export const HOST_BIN=new URL('../bin/starci.mjs',import.meta.url);
@@ -527,18 +542,21 @@ export function markInProgress(repoRoot,node,{opId,dispatch=null,startedAt=null,
  * node's authored assertions are not all proven by a passing check, so a green receipt always
  * names what proved it.
  */
-export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,bindSource=true,contractDigest=null,contractKind=null,proof=null,parse=parseYaml}={}){
+export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,bindSource=true,contractDigest=null,contractKind=null,proof=null,provisional=[],parse=parseYaml}={}){
   const id=text(opId,'operation id'),evidenceId=evidenceIdFor(id);
   // A proof remembers the rules it was proven under: the digest of the kind's declaration travels into the
   // kernel block, so a node completed under a rule that has since moved is reopened rather than trusted.
   const boundRules=contractDigest===null||contractDigest===undefined?null:String(contractDigest).trim();
   need(boundRules===null||HEX64.test(boundRules),'contractDigest must be a lowercase sha-256 of the kind declaration');
+  // A proof also remembers which decisions it rests on that the OWNER has not taken yet. An overturned
+  // provisional decision finds every node that lists it and reopens exactly those, and nothing else.
+  const open=[...new Set((Array.isArray(provisional)?provisional:[]).map(id=>String(id).trim()).filter(Boolean))];
   return transact(repoRoot,node,register=>{
     const {raw,kernel}=existingKernel(repoRoot,node);
     const verified=checkList(checks);
     coverAssertions(raw,verified,assertions);
     const repo=repository?sanitizeId(repository):repositoryName(repoRoot);
-    writeNode(repoRoot,node,{kernel:{...kernel,opId:id,head:head??null,checks:verified,verifiedBy:text(verifiedBy,'verifier'),at:at??nowIso(),...(boundRules?{contractDigest:boundRules,...(typeof contractKind==='string'&&contractKind.trim()?{contractKind:contractKind.trim()}:{})}:{})},parse});
+    writeNode(repoRoot,node,{kernel:{...kernel,opId:id,head:head??null,checks:verified,verifiedBy:text(verifiedBy,'verifier'),at:at??nowIso(),...(boundRules?{contractDigest:boundRules,...(typeof contractKind==='string'&&contractKind.trim()?{contractKind:contractKind.trim()}:{})}:{}),...(open.length?{provisional:open}:{})},parse});
     const bound=settledDigest(repoRoot,node,{inputDigest,digest});
     // The manifest has to bind the same settled digest, so write it here rather than before pass one.
     const folder=path.join(nodeDirectory(repoRoot,node),'evidence',evidenceId),fresh=evidence&&!fs.existsSync(folder);
@@ -726,7 +744,7 @@ const trimmed=value=>typeof value==='string'&&value.trim()?value.trim():null;
 function tryReadNode(ledger,node){try{return readNode(treeAt(ledger),node);}catch{return null;}}
 
 /**
- * The integrations a tree declares, as `{id, provider, credential:{name, providedBy, where}, sandbox?,
+ * The integrations a tree declares, as `{id, provider, credential:{name, providedBy, custody, slug, where}, sandbox?,
  * declaredBy}` under `list`, and every shape defect under `problems`. An entry the runtime cannot act on -
  * no credential name, or a credential somebody other than the owner provides - is a finding rather than a
  * silent skip, because that is exactly the declaration a faked proof hides behind. An entry with an id is
@@ -749,10 +767,22 @@ export function declaredIntegrations(ledger){
       const credential=plain(entry.credential)?entry.credential:null;
       const name=typeof credential?.name==='string'&&credential.name.trim()?credential.name.trim():null;
       const providedBy=typeof credential?.providedBy==='string'&&credential.providedBy.trim()?credential.providedBy.trim():null;
+      // Custody, not a place. An environment variable is nobody's: it is lost across machines and terminals and
+      // the tree cannot say who set it. A credential lives in an encrypted identity resource of the Work tree
+      // (`identity:<slug>` -> `_resources/identity/<slug>/secrets.enc.yaml`, sops), and the declaration names
+      // that custody. `where` is the 5.1 spelling and is still read, as a deprecation, so an older tree is told
+      // what to change rather than failing on a rule it predates.
+      const custody=typeof credential?.custody==='string'&&credential.custody.trim()?credential.custody.trim():null;
+      const where=typeof credential?.where==='string'&&credential.where.trim()?credential.where.trim():null;
       if(!name)fault(node.id,id,'credential-missing',`integration ${id} declares no credential name; the exact variable is what the owner is asked for`);
       else if(providedBy!==CREDENTIAL_PROVIDER)fault(node.id,id,'credential-not-owner',`integration ${id} says its credential is provided by ${providedBy??'nobody'}; a credential is the owner's`);
+      if(name&&!custody)fault(node.id,id,'credential-custody-missing',
+        `integration ${id} names no credential custody; declare \`custody: identity:<slug>\` - the encrypted identity resource of this tree that holds ${name}${where?` (it still carries the retired \`where: ${where}\`, which names a place, not a custody)`:''}`);
+      else if(custody&&!IDENTITY_CUSTODY.test(custody))fault(node.id,id,'credential-custody-missing',
+        `integration ${id} declares custody ${custody}; the only custody a credential has is \`identity:<slug>\` of this tree`);
       list.push({id,provider,declaredBy:node.id,
-        credential:{name,providedBy:providedBy??null,where:typeof credential?.where==='string'&&credential.where.trim()?credential.where.trim():null},
+        credential:{name,providedBy:providedBy??null,custody,
+          slug:custody&&IDENTITY_CUSTODY.test(custody)?custody.slice('identity:'.length):null,where},
         ...(typeof entry.sandbox==='string'&&entry.sandbox.trim()?{sandbox:entry.sandbox.trim()}:{})});
     }
   }

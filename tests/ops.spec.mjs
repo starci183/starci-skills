@@ -197,8 +197,14 @@ test('the live integration operator proves through the real provider with the ow
   }
   // The policy block is the machine-readable half of the same six rules.
   assert.deepEqual(contract.integrationPolicy,{proofSurface:'real-provider',fakes:'none',
-    credential:'owner-provided-named-variable',missingCredential:'blocked-environment-with-variable-name',
+    credential:'owner-provided-named-variable-in-identity-custody',
+    credentialCustody:'identity-resource-sops-exec-env',
+    missingCredential:'blocked-environment-with-custody-slug-and-variable-name',
     secretValues:'never-written',evidenceProof:'live'});
+  // Custody, not a place: the value is read through sops at the moment of use and exists in one process only.
+  assert.match(document,/sops exec-env/);
+  assert.match(document,/_resources\/identity\/<slug>\/secrets\.enc\.yaml/);
+  assert.doesNotMatch(document,/named environment variable/,'an environment variable is not custody');
   // It reads the declaration that named the provider and the variable, and the client that actually calls it.
   for(const id of ['target','integration','architecture','repo','credential','effects'])
     assert.ok(contract.reads.some(read=>read.id===id),id);
@@ -212,6 +218,31 @@ test('the live integration operator proves through the real provider with the ow
   assert.deepEqual(contract.blockers.map(blocker=>blocker.code).sort(),
     ['CLIENT_UNAVAILABLE','CREDENTIAL_MISSING','DECLARED_DEPENDENCY_UNMET','INTEGRATION_UNDECLARED','PROVIDER_UNREACHABLE','SCOPE_OUTSIDE_ALLOWLIST']);
   assert.deepEqual(validateCatalog(catalogue,{root,repositoryRoot:repository,documents:outputs()}).errors,[]);
+});
+
+/**
+ * The operator is the half of the owner loop an agent reads before it reads its contract, so the two rules
+ * that keep the owner's time and the owner's secrets have to be in it: the question is put in the op's own
+ * terminal before any report, and a credential is put into the tree's encrypted custody by the owner's own
+ * command - this operation only ever checks that it is there.
+ */
+test('the owner.ask operator asks in its own terminal and never asks for a credential value',()=>{
+  const document=fs.readFileSync(path.join(root,'owner.ask','operator.yaml'),'utf8');
+  const contract=catalogue.ops.find(op=>op.id==='owner.ask').contract;
+  assert.deepEqual(contract.writes.map(write=>write.id),['decision']);
+  // The decision is a policy-decision leaf where the tree already keeps them, never a folder the tree lacks.
+  assert.match(contract.writes[0].path,/business\/srs\/business-rules\/policy-decisions\/<slug>\/index\.yaml$/);
+  for(const text of [document,JSON.stringify(contract)]){
+    assert.match(text,/srs-policy-decision section with decisionStatus\s*\n?\s*open/);
+    assert.match(text,/answer here with the number, or later with workflow-answer/);
+    assert.match(text,/answered-by-owner: <n>/);
+    assert.match(text,/recommended: <n>/);
+    assert.match(text,/identity set <slug>\s*\n?\s*--name <VAR>/);
+    assert.match(text,/never prints it/);
+    assert.match(text,/never asks for the value/);
+  }
+  assert.ok(contract.proofs.some(proof=>proof.id==='asked-in-the-terminal'),'asking in the tab is a proof, not a hope');
+  assert.match(contract.proofs.find(proof=>proof.id==='no-secret').requirement.en,/verifies only that it is present/);
 });
 
 test('an operator cannot write a record its kind never declared',()=>{

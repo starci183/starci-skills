@@ -18,7 +18,7 @@ import {resolveLedgerRoot} from '../kernel/routing.mjs';
 import * as work from '../kernel/ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
 import {machineVerify} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -157,6 +157,12 @@ function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','clau
       if(!free.length)return {ok:false,reason:`no runtime with a free slot for ${kind}`,avoid};
       busy.add(free[0]);
       return {ok:true,runtime:free[0],target:free[0],role,alternatives:free.slice(1)};
+    },
+    // A read-only preview of the same order, which the kernel asks for when it wants to NAME a runtime without
+    // taking a slot (the review escalation records which runtime the group will get next).
+    review(kind,{avoid=[]}={}){
+      const role=roleOf(kind);
+      return {role,ready:(pools[role]??[]).filter(id=>!busy.has(id)&&!avoid.includes(id)).map(id=>({runtime:id,target:id})),blocked:[]};
     },
     release(runtime){busy.delete(runtime);},
     failed(runtime){busy.delete(runtime);},
@@ -454,32 +460,54 @@ test('the four launcher commands drive one workflow directory: goal, approve, st
   }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
 });
 
-test('the review loop is bounded: three rounds of findings end in needUser instead of a fourth review',()=>{
+// Before the 5-plus ruling this test ended with a `review` item on the owner's list after three rounds. The
+// owner could do nothing with it - "decide whether the last findings stand" is not a decision anyone can take
+// from a terminal - so a spent review bound now escalates INSIDE the runtime: one more repair on a runtime that
+// has not worked the group, and, because these findings cite no decided record, the rule they are arguing about
+// is settled as a PROVISIONAL decision the work carries on with. The bound itself is still a bound: the
+// escalations are capped per group per day, and a group that spends them is parked exactly as before.
+test('a spent review bound escalates inside the runtime: one more repair on an unused runtime, and findings that cite no decided record become a provisional decision',()=>{
   const file='apps/agentos-controlplane/src/sales/intake.ts';
   const done=summary=>({outcome:'done',summary,files:[file],checks:[passing('unit','npx vitest run sales')]});
   const finding=round=>({outcome:'partial',summary:`Review round ${round} rejected the work.`,files:[],
     checks:[passing('review','npx vitest run sales')],open:[`${file} still does not persist the receipt (round ${round})`]});
   const harness=setup({plan:salesPlan,dirty:[file],
     scripts:{'op-intake':[done('Intake implemented.')],'verify-1':[finding(1)],'repair-1':[done('Receipt added.')],
-      'verify-2':[finding(2)],'repair-2':[done('Receipt fixed.')],'verify-3':[finding(3)]}});
+      'verify-2':[finding(2)],'repair-2':[done('Receipt fixed.')],'verify-3':[finding(3)],
+      'ask-1':[{outcome:'done',files:[],checks:[passing('work-tree-validates','node starci.mjs validate')],
+        summary:'decision: demo.sales.business.srs.policy-decision.d-receipt\nrecommended: 2\n1. keep the receipt in memory\n2. persist the receipt with the order'}],
+      'repair-3':[done('Receipt persisted with the order, as the ruling says.')],
+      'verify-4':[{outcome:'done',summary:'The receipt is persisted.',files:[],checks:[passing('review','npx vitest run sales')]}]}});
   try{
-    approve(harness.store,harness.state);
+    approve(harness.store,harness.state,{allowDynamic:9});
     harness.state.run='run_wf';harness.state.from='term_kernel';
-    const state=harness.run({maxIterations:20});
-    assert.deepEqual(state.ops.map(op=>op.id),['op-intake','verify-1','repair-1','verify-2','repair-2','verify-3']);
-    assert.deepEqual(state.ops.filter(op=>op.kind==='review.verify').map(op=>op.verdict),['fail','fail','fail']);
+    const state=harness.run({maxIterations:24});
+    assert.deepEqual(state.ops.map(op=>op.id),['op-intake','verify-1','repair-1','verify-2','repair-2','verify-3','repair-3','ask-1','verify-4']);
     // Each repair is scoped to the file the finding named, inside the reviewed group's allowlist.
     assert.deepEqual(state.ops.find(op=>op.id==='repair-1').allowlist,[file]);
-    assert.equal(state.verifyRounds['goal-1'],3);
-    assert.equal(state.ledger[0].status,'review-exhausted','the group is parked, not re-planned every tick');
-    assert.equal(state.finished.outcome,'blocked');
-    assert.match(state.needUser.find(item=>item.kind==='review').detail,/still fails review after 3 rounds/);
     const log=events(harness.store);
+    // The bound fired once, escalated once, and the escalation named the runtime the group had not used.
+    const escalated=log.find(event=>event.event==='verify-escalated');
+    assert.deepEqual([escalated.group,escalated.round,escalated.cap,escalated.hidden,escalated.cited,escalated.op],
+      ['goal-1',1,6,true,[],'repair-3']);
+    assert.ok(escalated.avoid.includes(state.ops.find(op=>op.id==='repair-2').runtime),'the runtimes that already built it are avoided');
+    assert.ok(escalated.runtime&&!escalated.avoid.includes(escalated.runtime),'the escalation names the runtime the group has not had');
     assert.equal(log.filter(event=>event.event==='verify-limit').length,1);
-    assert.equal(log.filter(event=>event.event==='op-created'&&event.kind==='review.verify').length,3);
+    assert.ok(log.some(event=>event.event==='verify-hidden-decision'&&event.group==='goal-1'));
+    // The escalation repair waited for the ruling and carried it; nothing was asked of the owner.
+    assert.deepEqual(state.ops.find(op=>op.id==='repair-3').provisional,['demo.sales.business.srs.policy-decision.d-receipt']);
+    assert.match(String(state.ops.find(op=>op.id==='repair-3').answer),/provisional: option 2 - persist the receipt with the order/);
+    assert.equal(state.needUser.some(item=>item.kind==='review'),false,'a mechanical bound is never the owner\'s item');
+    assert.deepEqual(state.provisional.map(entry=>[entry.decision,entry.op,entry.recommended,entry.answered]),
+      [['demo.sales.business.srs.policy-decision.d-receipt','ask-1',2,null]]);
+    // One escalation bought one repair AND the review that judges it, and that review passed.
+    assert.equal(state.verifyRounds['goal-1'],4);
+    assert.equal(state.ledger[0].status,'verified');
+    assert.equal(state.finished.outcome,'done','a provisional decision does not block the workflow');
     const final=JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8'));
-    assert.equal(final.outcome,'blocked');
-    assert.deepEqual(final.ledger.map(item=>item.status),['review-exhausted']);
+    assert.equal(final.outcome,'done');
+    assert.match(final.provisionalReport,/^## Provisional decisions \(1\)/);
+    assert.match(final.provisionalReport,/workflow-answer --id .* --op ask-1 --choice <n>/);
   }finally{harness.cleanup();}
 });
 
@@ -834,6 +862,37 @@ test('an op the restart limit blocked for a rate limit cools down and is re-admi
   }finally{harness.cleanup();}
 });
 
+// "no runtime could launch op-3 (3 attempts, last chain-exhausted)" was an item on the owner's list, and there
+// was nothing the owner could do with it: a launcher that will not start is time, not a decision. The op cools
+// for the same window a provider limit uses and comes back by itself - capped, because an environment that
+// still refuses it after six re-admissions in one day really is broken, and that IS the owner's.
+test('a spent launch bound cools the op and re-admits it, and only the daily cap reaches the owner',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    const op=state.ops[0];
+    op.status='blocked';op.refusal='launch-cooling';op.coolUntil=0;op.launchFailures=3;op.runtime='gpt-5.6-sol';
+    op.coolReason=`no runtime could launch ${op.id} (3 attempts, last chain-exhausted)`;
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    const before=store.readEvents().length;
+    const after=harness.run({maxIterations:1});
+    const readmitted=store.readEvents().slice(before).filter(event=>event.event==='launch-readmitted');
+    assert.deepEqual(readmitted.map(event=>[event.op,event.readmissions,event.cap]),[[op.id,1,LAUNCH_DAILY_CAP]]);
+    const back=after.ops.find(item=>item.id===op.id);
+    assert.deepEqual([back.refusal,back.launchFailures,back.restarts],[null,0,0]);
+    assert.equal(after.needUser.some(item=>item.kind==='environment'),false,'a mechanical bound is never the owner\'s item');
+    // Past the cap the environment is the owner's after all, and the item says exactly what kept failing.
+    back.status='blocked';back.refusal='launch-cooling';back.coolUntil=0;
+    back.launchReadmissions={day:new Date().toISOString().slice(0,10),count:LAUNCH_DAILY_CAP};
+    const spent=harness.run({maxIterations:1});
+    assert.deepEqual(store.readEvents().filter(event=>event.event==='launch-cap-reached').map(event=>[event.op,event.readmissions]),
+      [[op.id,LAUNCH_DAILY_CAP]]);
+    assert.match(spent.needUser.find(item=>item.kind==='environment').detail,
+      /no runtime could launch .* it was re-admitted 6 times today and the environment still refuses it/);
+  }finally{harness.cleanup();}
+});
+
 test('approving a workflow that finished blocked resumes it, and questions whose reason is gone go with it',()=>{
   const harness=setupWork();
   try{
@@ -1121,7 +1180,9 @@ test('a question only the owner can answer pauses the op and opens an owner.ask 
     let after=harness.run({maxIterations:1});
     const requester=after.ops.find(op=>op.id===nodeId),ask=after.ops.find(op=>op.kind==='owner.ask');
     assert.ok(ask,'an owner.ask op was opened');
-    assert.deepEqual([ask.id,ask.origin,ask.allowlist,ask.requesters,ask.question.kind,ask.question.from],['ask-1','ask',['.starciwork/features/sales/business/srs/decisions/**'],[nodeId],'credential',nodeId]);
+    // The decision lands where the tree keeps its policy decisions, under the feature folder read from the tree.
+    assert.deepEqual([ask.id,ask.origin,ask.allowlist,ask.requesters,ask.question.kind,ask.question.from],['ask-1','ask',['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],[nodeId],'credential',nodeId]);
+    assert.equal(ask.question.stop,'credential','a credential is one of the two stop reasons: the requester waits');
     assert.deepEqual([requester.status,requester.waitingFor],['paused','ask-1']);
     assert.ok(events(store).some(event=>event.event==='owner-ask-opened'&&event.op===nodeId&&event.ask==='ask-1'));
     const contract=renderContract({template,op:ask,state:after,store,launcher:'L.mjs',run:'run_wf'});
@@ -1160,6 +1221,9 @@ test('an environment blocker that names a credential is the question of the owne
   assert.equal(credentialNeed('TELEGRAM_BOT_TOKEN is not set; the delivery worker reads it in delivery.module.ts'),true);
   assert.equal(credentialNeed('the Zalo OA api key the owner has not provided'),true);
   assert.equal(credentialNeed('docker is not installed on this host'),false);
+  // A credential is one member of a class: whatever the runtime cannot obtain for itself stops the requester.
+  assert.deepEqual(ownerProvisionNeed('the e-invoice provider sandbox account the owner must open'),{kind:'account'});
+  assert.deepEqual(ownerProvisionNeed('no real bank statement to reconcile against'),{kind:'dataset'});
   const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
   const harness=setupWork({dirty:[file],scripts:{[nodeId]:[{outcome:'blocked',summary:'Cannot deliver without the bot token.',files:[],checks:[],blocker:{kind:'environment',detail:'TELEGRAM_BOT_TOKEN is not provided; apps/agentos-controlplane/src/chatbot/delivery.module.ts reads it at boot'}}]}});
   try{
@@ -1167,10 +1231,45 @@ test('an environment blocker that names a credential is the question of the owne
     const after=harness.run({maxIterations:1});
     const ask=after.ops.find(op=>op.kind==='owner.ask');
     assert.ok(ask,'the credential need became the question of the owner');
-    assert.deepEqual([ask.question.kind,ask.question.from],['credential',nodeId]);
+    assert.deepEqual([ask.question.kind,ask.question.from,ask.question.stop],['credential',nodeId,'credential']);
     assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused');
     assert.equal(after.needUser.some(item=>item.kind==='environment'),false,'no bare environment line nobody answers');
   }finally{harness.cleanup();}
+  // The second stop reason: an effect nobody can take back. The requester waits, exactly as for a credential.
+  const undoable=setupWork({dirty:[file],scripts:{[nodeId]:[{outcome:'blocked',summary:'This would reach real people.',files:[],checks:[],blocker:{kind:'authority',detail:'completing the slice sends the overdue notice to real customers, which cannot be recalled'}}]}});
+  try{
+    approve(undoable.store,undoable.state);undoable.state.run='run_wf';undoable.state.from='term_kernel';
+    const after=undoable.run({maxIterations:1});
+    const ask=after.ops.find(op=>op.kind==='owner.ask');
+    assert.deepEqual([ask.question.kind,ask.question.stop],['irreversible','irreversible']);
+    assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused','only the owner performs an effect nobody can undo');
+    assert.equal(irreversibleEffect('the run publishes the release to production'),true);
+  }finally{undoable.cleanup();}
+  // An `authority` block that names nothing the owner must provide is a decision, and the work carries on.
+  const open=setupWork({dirty:[file],scripts:{[nodeId]:[{outcome:'blocked',summary:'Two rules are possible here.',files:[],checks:[],blocker:{kind:'authority',detail:'the design does not say whether a supervisor may approve their own request'}}]}});
+  try{
+    approve(open.store,open.state);open.state.run='run_wf';open.state.from='term_kernel';
+    const after=open.run({maxIterations:1});
+    const ask=after.ops.find(op=>op.kind==='owner.ask');
+    assert.deepEqual([ask.question.kind,ask.question.stop],['decision',null]);
+    const requester=after.ops.find(op=>op.id===nodeId);
+    assert.deepEqual([requester.status,requester.waitingFor,requester.dependsOn.includes(ask.id)],['pending',null,true]);
+    assert.equal(after.needUser.some(item=>item.kind==='authority'),false);
+  }finally{open.cleanup();}
+});
+
+// The first owner questions were written under `features/shared/` and `features/workspace/` - folders that do
+// not exist, because the id segment is not a path - and the whole tree went red. The feature FOLDER is read
+// from the node's own path, and the decision is an SRS policy-decision leaf where the tree keeps them.
+test('the decision folder of an owner question comes from the feature folder in the tree, never from the id segment',()=>{
+  const ctx={work:{node:id=>id==='nivo.shared.implementation.backend.platform-isolation'
+    ?{path:'features/shared-lifecycle/implementation/backend/platform-isolation/index.yaml'}:null,loaded:{list:[]}}};
+  assert.deepEqual(decisionAllowlistFor({},{nodeId:'nivo.shared.implementation.backend.platform-isolation',ledgerIds:[],allowlist:['src/x/**']},ctx),
+    ['.starciwork/features/shared-lifecycle/business/srs/business-rules/policy-decisions/**']);
+  assert.deepEqual(decisionAllowlistFor({},{nodeId:null,ledgerIds:[],allowlist:['C:/owner/.starciwork/features/workspace-dashboard/ui/**']},ctx),
+    ['.starciwork/features/workspace-dashboard/business/srs/business-rules/policy-decisions/**']);
+  assert.deepEqual(decisionAllowlistFor({},{nodeId:null,ledgerIds:[],allowlist:['apps/x/**']},ctx),
+    ['.starciwork/decisions/**'],'no feature known: the tree-level folder');
 });
 
 test('a launch Orca refuses because the coordinator pane is gone replaces the kernel tab, re-binds the Run and tries again without counting a runtime failure',()=>{
@@ -2258,12 +2357,15 @@ test('a shared change must name its paths, is deduped by path set, is capped per
       return applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,ctx);
     };
     const op=id=>harness.state.ops.find(item=>item.id===id);
-    // The Work tree is never delegated: a shared change naming a ledger path is refused and reaches the user.
+    // The Work tree is never delegated: a shared change naming ONLY ledger paths is refused in the operation's own
+    // terminal and is never an item on the owner's list - there is nothing for the owner to decide, because the
+    // answer is a rule of the runtime. (Before the 5-plus ruling this blocked the op with a `ledger-path` item.)
     harness.state.ops.push({...structuredClone(harness.state.ops[0]),id:'op-ledger',status:'pending',dispatch:null,terminal:null,runtime:null});
     assert.equal(block('op-ledger','.starciwork/features/sales/migration/index.yaml must drop its source identity'),'shared-change-refused');
-    assert.equal(op('op-ledger').status,'blocked');
-    assert.match(harness.state.needUser.find(item=>item.kind==='ledger-path').detail,/\.starciwork\/features\/sales\/migration\/index\.yaml/);
-    assert.equal(events(harness.store).at(-1).event,'shared-change-refused');
+    assert.equal(op('op-ledger').status,'answering');
+    assert.match(op('op-ledger').answer,/the kernel's own record/);
+    assert.equal(harness.state.needUser.some(item=>item.kind==='ledger-path'),false,'a mechanical refusal is never the owner\'s item');
+    assert.deepEqual(events(harness.store).slice(-2).map(event=>event.event),['ledger-path-refused','shared-change-refused']);
     assert.equal(harness.state.ops.some(item=>item.origin==='shared'),false,'no shared op was created for a ledger path');
     // One concrete path set becomes one shared op, and the requester is paused - never pending, never rescheduled.
     assert.equal(block('op-a','packages/contracts/widget.ts must register the entity'),'shared-change');
@@ -2313,6 +2415,70 @@ test('a shared change must name its paths, is deduped by path set, is capped per
     const log=events(harness.store).map(event=>event.event);
     for(const name of ['shared-change-merged','shared-change-deferred','op-paused','shared-change-unnamed','shared-change-resumed','shared-change-blocked'])
       assert.ok(log.includes(name),`the log records ${name}`);
+  }finally{harness.cleanup();}
+});
+
+// One bad path used to cost an operation its whole request: a shared change that named the Work tree AND the
+// code it actually needed was refused outright and became a `ledger-path` item nobody could answer. The ruling
+// splits it - the record paths are refused with one event, the code paths carry on - and the refusal is
+// mechanical, so it is never on the owner's list either way.
+test('a shared change that asks for record paths and code paths is split: the record paths are refused, the code paths continue',()=>{
+  const harness=setup({plan:sharedPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state,{allowDynamic:9});
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    harness.state.iterations=1;
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,exec:()=>({status:0,stdout:'',stderr:''}),
+      now:()=>0,work:null,wait:noWait,decide:()=>{throw Error('a shared change is not a decision');}};
+    const op=harness.state.ops.find(item=>item.id==='op-a');
+    Object.assign(op,{status:'running',dispatch:'disp_mixed',terminal:'term_mixed',runtime:'qwen3.8-flash'});
+    const report=buildReport({outcome:'blocked',run:'run_wf',task:'task_a',dispatch:'disp_mixed',from:'term_mixed',
+      summary:'op-a cannot make the change alone.',
+      blocker:{kind:'shared-change',detail:'.starciwork/features/sales/index.yaml and packages/contracts/widget.ts must both name the span'}});
+    report.sent={messageId:'msg_a',sentAt:1,type:report.signal.type};
+    assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,ctx),'shared-change');
+    const refused=events(harness.store).find(event=>event.event==='ledger-path-refused');
+    assert.deepEqual([refused.op,refused.paths,refused.continued],
+      ['op-a',['.starciwork/features/sales/index.yaml'],['packages/contracts/widget.ts']]);
+    const shared=harness.state.ops.find(item=>item.id===op.waitingFor);
+    assert.deepEqual(shared.allowlist,['packages/contracts/widget.ts'],'only the code path is delegated');
+    assert.equal(harness.state.needUser.some(item=>item.kind==='ledger-path'),false,'a mechanical refusal is never the owner\'s item');
+  }finally{harness.cleanup();}
+});
+
+// A shared change two levels deep used to be a `shared-depth` item on the owner's list, and there was nothing
+// the owner could do with it: the depth is the runtime's own bound, and the change is work nobody wrote down.
+// It becomes one Work node now, authored by a `work.author` op and scheduled like any other node.
+test('a shared change too deep to delegate again becomes one Work node the kernel authors, not a question for the owner',()=>{
+  const harness=setup({plan:sharedPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state,{allowDynamic:9});
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    harness.state.iterations=1;
+    const node={id:'demo.sales.implementation.backend.intake',path:'features/sales/implementation/backend/intake/index.yaml'};
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,exec:()=>({status:0,stdout:'',stderr:''}),
+      now:()=>0,wait:noWait,decide:()=>{throw Error('a depth bound is not a decision');},
+      work:{at:{repoRoot:cwd,workRoot:`${cwd}/.starciwork`},loaded:{list:[node]},node:id=>id===node.id?node:null}};
+    const deep=harness.state.ops.find(item=>item.id==='op-a');
+    Object.assign(deep,{status:'running',dispatch:'disp_deep',terminal:'term_deep',runtime:'qwen3.8-flash',
+      sharedDepth:2,nodeId:node.id});
+    const report=buildReport({outcome:'blocked',run:'run_wf',task:'task_a',dispatch:'disp_deep',from:'term_deep',
+      summary:'op-a cannot make the change alone.',
+      blocker:{kind:'shared-change',detail:'packages/platform/runtime.ts must expose the span before anything else can'}});
+    report.sent={messageId:'msg_a',sentAt:1,type:report.signal.type};
+    assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,deep,report,ctx),'shared-authored');
+    const authored=events(harness.store).find(event=>event.event==='shared-authored');
+    assert.deepEqual([authored.op,authored.node,authored.depth,authored.paths],
+      ['op-a','.starciwork/features/sales/implementation/shared-op-a/index.yaml',2,['packages/platform/runtime.ts']]);
+    const author=harness.state.ops.find(item=>item.id===authored.author);
+    assert.deepEqual([author.kind,author.origin,author.allowlist],
+      ['work.author','ledger',['.starciwork/features/sales/implementation/shared-op-a/index.yaml','.starciwork/features/sales/implementation/shared-op-a/**']]);
+    assert.deepEqual(author.sharedAuthored,['packages/platform/runtime.ts']);
+    assert.match(author.goal,/do not make the change/);
+    // The requester waits for that node's record exactly as it waits for any shared op, and nothing is asked.
+    assert.deepEqual([deep.status,deep.waitingFor],['paused',author.id]);
+    assert.equal(harness.state.needUser.some(item=>item.kind==='shared-depth'),false,'a mechanical bound is never the owner\'s item');
+    assert.equal(events(harness.store).some(event=>event.event==='shared-change-depth'),false);
   }finally{harness.cleanup();}
 });
 

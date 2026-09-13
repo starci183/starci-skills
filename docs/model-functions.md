@@ -128,8 +128,12 @@ row's decision states both sides, the consequences, the numbered options and one
 another feature this operation edited, and a side of the feature the table leaves out, are defects. The
 **integration** rule is that an external system is proven live or it is not proven: an `integration.verify`
 result whose scenario fakes, stubs, mocks, records, replays or skips the declared provider, or reads the
-credential from anywhere but the environment variable the declaration names, or prints, logs or commits a
-secret value, is a defect - and an `e2e.verify` evidence whose `proof.fakes` omits a provider the diff fakes
+credential from anywhere but the identity custody the declaration names (through `sops exec-env`, at the
+moment of use), or prints, logs or commits a secret value, is a defect. A credential has exactly one custody -
+`.starciwork/_resources/identity/<slug>/secrets.enc.yaml` - so a diff that reads one from a plain environment
+variable, an `.env`, a checked-in file or a variable of its own naming is a defect, and a diff that WRITES a
+credential value anywhere at all is a defect whatever else it gets right. And an `e2e.verify` evidence whose
+`proof.fakes` omits a provider the diff fakes
 is a defect too, because a faked outside system is allowed there but never unnamed. The **render** rules say
 what a drawing is: the markup kept beside each candidate as `<candidate>.html` is what the candidate is
 judged from, a capture with no markup beside it is a defect, and in that markup a list of entities wrapped in

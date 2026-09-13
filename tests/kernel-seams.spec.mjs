@@ -11,7 +11,8 @@ import {applyOpReport,renderContract} from '../kernel/kernel.mjs';
 import {validateAccepted} from '../kernel/verify.mjs';
 import {settleIntake} from '../kernel/intake.mjs';
 import {recordDone,syncLedgerOps} from '../kernel/sync.mjs';
-import {answerOwnerQuestion} from '../kernel/owner.mjs';
+import {STOP_KINDS,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,irreversibleEffect,openOwnerAsk,
+  ownerProvisionNeed,provisionalLines,redactSecrets,settleOwnerAsk,stopReasonFor} from '../kernel/owner.mjs';
 import {ioPayload} from '../kernel/io.mjs';
 
 /**
@@ -310,6 +311,16 @@ test('markDone stores the digest of the declaration the proof was accepted under
     markDone(dir,NODE_REF,{opId:'op-2',head:'b'.repeat(40),inputDigest:'a'.repeat(64),
       checks:[{name:'unit',command:'npx vitest run intake',exitCode:0,assertion:'unit-tests-pass'}]});
     assert.equal(readNode(dir,NODE_REF).extensions.work3.kernel.contractDigest,'c'.repeat(64));
+    // A proof also remembers which decisions it rests on that the owner has not taken yet, so an overturned
+    // one can find every node it was built on instead of guessing from the workflow's own memory.
+    markDone(dir,NODE_REF,{opId:'op-3',head:'b'.repeat(40),inputDigest:'a'.repeat(64),
+      checks:[{name:'unit',command:'npx vitest run intake',exitCode:0,assertion:'unit-tests-pass'}],
+      provisional:['demo.sales.business.srs.policy-decision.d-refund','demo.sales.business.srs.policy-decision.d-refund']});
+    assert.deepEqual(readNode(dir,NODE_REF).extensions.work3.kernel.provisional,['demo.sales.business.srs.policy-decision.d-refund']);
+    markDone(dir,NODE_REF,{opId:'op-4',head:'b'.repeat(40),inputDigest:'a'.repeat(64),
+      checks:[{name:'unit',command:'npx vitest run intake',exitCode:0,assertion:'unit-tests-pass'}]});
+    assert.deepEqual(readNode(dir,NODE_REF).extensions.work3.kernel.provisional,['demo.sales.business.srs.policy-decision.d-refund'],
+      'a proof that names none keeps what the node already carried, exactly as the digest does');
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
@@ -392,5 +403,207 @@ test('a kernel given no digest function reopens nothing',()=>{
       code:{repository:null,repoRoot:dir,origin:null},side:null,shared:false,node:id=>loaded.nodes.get(id)??null}});
     syncLedgerOps(store,state,ctx);
     assert.equal(store.events.some(item=>item.event==='proof-under-old-rule'),false);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+/* ------------------------------------------------------------------ the two stop reasons */
+
+/**
+ * The owner's ruling of 2026-09-14, as data. The two stop reasons are a closed set and everything else is a
+ * decision the runtime takes provisionally, so the whole rule reduces to one question about a sentence: can the
+ * runtime get this, and can the runtime take it back? Both regex families are product-agnostic on purpose - an
+ * accounting product needs a sandbox account on the tax authority and a real bank statement exactly as a chat
+ * product needs a bot token, and neither of them names a vendor here.
+ */
+test('the runtime asks the owner only for what it cannot obtain and for what it cannot undo',()=>{
+  // What only the owner can provide, by kind.
+  const provision=[
+    ['credential','TELEGRAM_BOT_TOKEN is not set; the delivery worker reads it at boot'],
+    ['credential','the payment gateway api key the owner has not provided'],
+    ['credential','the SMTP password of the mail provider is missing'],
+    ['account','the payment gateway sandbox account the owner must open'],
+    ['account','there is no test account on the e-invoice provider; the owner registers one'],
+    ['account','an SMS provider account is needed before any message can be sent'],
+    ['account','we are not registered with the tax authority sandbox'],
+    ['dataset','no real bank statement to reconcile against; the owner provides a sample export'],
+    ['dataset','the accounting import needs a sample of production invoices from the owner'],
+    ['dataset','test data for the identity provider must be supplied by the owner'],
+    ['authority','may we message these users about their overdue invoices?'],
+    ['authority','consent to charge this card is not recorded anywhere'],
+    ['authority','the legal basis to store identity documents of customers is not stated']
+  ];
+  for(const [kind,detail] of provision)assert.deepEqual(ownerProvisionNeed(detail),{kind},detail);
+  // What the runtime can get for itself, or simply cannot: not the owner's to provide.
+  for(const detail of ['docker is not installed on this host','the unit suite is red on node 22',
+    'the account page component has no empty state','the invoice list view needs a loading state',
+    'the production build fails on a type error','the migration must run before the seed'])
+    assert.equal(ownerProvisionNeed(detail),null,detail);
+
+  // What nobody can undo.
+  for(const detail of ['the run would send the reminder e-mail to real customers',
+    'this step charges the customer card for the outstanding balance',
+    'completing it transfers funds to the supplier account',
+    'the fix deletes production customer data from the orders table',
+    'the last step publishes the release to production',
+    'we would deploy to prod to see whether the webhook arrives'])
+    assert.equal(irreversibleEffect(detail),true,detail);
+  for(const detail of ['the seed sends a message to the local fake','the build publishes nothing',
+    'the spec charges a stub gateway'])
+    assert.equal(irreversibleEffect(detail),false,detail);
+
+  // The stop reason of a question is read from what it says, then from an unambiguous kind it declares.
+  // `authority` alone is NOT a stop: it is also the kernel's own generic blocker kind.
+  assert.equal(stopReasonFor({kind:'decision',text:'the run would send the invoice to real customers'}),'irreversible');
+  assert.equal(stopReasonFor({kind:'authority',text:'which of the two retry policies should the intake use?'}),null);
+  assert.equal(stopReasonFor({kind:'dataset',text:'something only the owner has'}),'dataset');
+  assert.equal(stopReasonFor({kind:'decision',text:'should a refund reopen the order or close it?'}),null);
+  assert.deepEqual(STOP_KINDS,['credential','account','dataset','authority','irreversible']);
+});
+
+/**
+ * A question the runtime may take provisionally does NOT stop the requester: it only waits for the ask op, comes
+ * back with the recommendation, carries the decision id into whatever it builds, and the decision is listed for
+ * the owner as something to answer rather than as something the workflow is blocked on.
+ */
+test('a decision the records do not settle is taken provisionally: the requester continues and the owner is told',()=>{
+  const dir=tmp();
+  try{
+    const store=stubStore(dir);
+    const requester=toOp({id:'op-intake',kind:'backend.implement',goal:'Build the intake',allowlist:['src/intake.ts'],
+      nodeId:'demo.sales.implementation.backend.intake'},0);
+    requester.status='running';
+    const state=stubState(store,[requester]);
+    state.provisional=[];
+    assert.equal(openOwnerAsk(store,state,requester,{kind:'decision',
+      text:'Should a refund reopen the order or close it?',options:[]},null),'owner-ask');
+    const ask=state.ops.find(op=>op.kind==='owner.ask');
+    // Not paused: it waits for the ask op alone, so nothing schedules it before the recommendation exists.
+    assert.deepEqual([requester.status,requester.waitingFor,requester.dependsOn],['pending',null,[ask.id]]);
+    const opened=store.events.find(item=>item.event==='owner-ask-opened');
+    assert.deepEqual([opened.kind,opened.stop,opened.provisional],['decision',null,true]);
+
+    settleOwnerAsk(store,state,ask,{summary:'decision: demo.sales.business.srs.policy-decision.d-refund recommended: 2 1. reopen the order 2. close it and issue a credit note'});
+    assert.deepEqual(state.provisional.map(entry=>[entry.decision,entry.op,entry.recommended,entry.options,entry.answered]),
+      [['demo.sales.business.srs.policy-decision.d-refund',ask.id,2,['reopen the order','close it and issue a credit note'],null]]);
+    assert.equal(state.needUser.length,0,'a provisional decision is never a needUser item');
+    assert.deepEqual(requester.provisional,['demo.sales.business.srs.policy-decision.d-refund']);
+    assert.equal(requester.status,'ready');
+    assert.match(requester.answer,/^provisional: option 2 - close it and issue a credit note \(decision demo\.sales\.business\.srs\.policy-decision\.d-refund\)/);
+    assert.ok(store.events.some(item=>item.event==='owner-answer-provisional'&&item.op==='op-intake'&&item.recommended===2));
+    assert.match(provisionalLines(state)[0],/^## Provisional decisions \(1\)$/);
+    assert.match(provisionalLines(state)[1],/workflow-answer --id wf-seam --op ask-1 --choice <n>/);
+
+    // A provisional decision travels to everything built behind it, so an overturn knows what rested on it.
+    const later=toOp({id:'op-review',kind:'review.verify',goal:'Review the intake',allowlist:['src/intake.ts'],
+      nodeId:'demo.sales.implementation.backend.intake'},1);
+    state.ops.push(later);
+    inheritProvisional(state);
+    assert.deepEqual(later.provisional,['demo.sales.business.srs.policy-decision.d-refund']);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+/**
+ * The owner's answer, whenever it comes. The same option confirms what was built; a different one overturns it,
+ * and every done node whose kernel receipt lists that decision goes back to `todo` - because it was built on an
+ * answer the owner has now replaced. That is what makes finishing `done` over a provisional decision honest.
+ */
+test('the same option confirms a provisional decision; a different one overturns it and reopens what rested on it',()=>{
+  const dir=tmp();
+  try{
+    const store=stubStore(dir);
+    const ask=toOp({id:'ask-1',kind:'owner.ask',goal:'Prepare the refund decision',allowlist:['.starciwork/decisions/**'],
+      question:{kind:'decision',text:'Should a refund reopen the order or close it?',options:[]},requesters:['op-intake']},0);
+    const built=toOp({id:'op-intake',kind:'backend.implement',goal:'Build the intake',allowlist:['src/intake.ts'],
+      nodeId:'demo.sales.implementation.backend.intake'},1);
+    built.status='done';built.provisional=['d-refund'];
+    const state=stubState(store,[ask,built]);
+    state.ledger=[{id:'demo.sales.implementation.backend.intake',status:'verified',title:'the intake'}];
+    const pending=()=>[{decision:'d-refund',op:'ask-1',recommended:2,options:['reopen the order','close it'],at:1,answered:null}];
+    state.provisional=pending();
+    const reopened=[];
+    const ctx={work:{api:{markReopened:(at,node,options)=>{reopened.push([node.id,options.reason]);}},
+      at:dir,node:id=>({id,path:'features/sales/implementation/backend/intake/index.yaml'})}};
+
+    // The owner agrees with the runtime: nothing that was built on it moves.
+    answerOwnerQuestion(store,state,{op:'ask-1',choice:2},ctx);
+    assert.deepEqual(store.events.filter(item=>item.event==='decision-confirmed').map(item=>[item.decision,item.choice]),[['d-refund','2']]);
+    assert.deepEqual(reopened,[]);
+    assert.equal(built.status,'done');
+    assert.equal(state.provisional[0].answered.choice,'2');
+
+    // The owner answers differently: what rested on it is reopened, in the tree and in this workflow.
+    state.provisional=pending();
+    built.status='done';
+    answerOwnerQuestion(store,state,{op:'ask-1',choice:1},ctx);
+    const overturned=store.events.find(item=>item.event==='decision-overturned');
+    assert.deepEqual([overturned.decision,overturned.choice,overturned.reopened],
+      ['d-refund','1',['demo.sales.implementation.backend.intake']]);
+    assert.deepEqual(reopened,[['demo.sales.implementation.backend.intake','decision-overturned: d-refund']]);
+    assert.equal(built.status,'ready','the work is planned again against the owner\'s own answer');
+    assert.equal(state.ledger[0].status,'planned');
+    assert.match(built.findings.at(-1),/the owner overturned the provisional decision d-refund/);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+/**
+ * The owner is at a keyboard, in front of the op's own tab. Making them leave it to type a command is how a
+ * one-word answer waited a day, so the ask op asks there - and what comes back is the same ruling by another
+ * door. A provision is never asked for as a value: presence is the only thing that is ever checked, and no
+ * value can travel because the op never reports one.
+ */
+test('the owner answers in the op\'s own terminal, and a credential reports only that it is present',()=>{
+  const dir=tmp();
+  try{
+    const store=stubStore(dir);
+    const requester=toOp({id:'op-intake',kind:'backend.implement',goal:'Build the intake',allowlist:['src/intake.ts']},0);
+    requester.status='paused';
+    const ask=toOp({id:'ask-1',kind:'owner.ask',goal:'Prepare the decision',allowlist:['.starciwork/decisions/**'],
+      question:{kind:'decision',text:'Which retry policy?',options:['retry twice','retry five times']},requesters:['op-intake']},1);
+    const state=stubState(store,[requester,ask]);
+    state.provisional=[];
+    // A number typed in the tab is exactly `workflow-answer --choice n`.
+    settleOwnerAsk(store,state,ask,{summary:'answered-by-owner: 2 the volume justifies it'});
+    const answered=store.events.find(item=>item.event==='owner-answered');
+    assert.deepEqual([answered.choice,answered.via],['2','terminal']);
+    assert.match(requester.answer,/option 2 - retry five times/);
+    assert.equal(state.needUser.length,0);
+
+    // A credential: the op checked presence, and what it reports carries the variable and its custody, never a value.
+    const store2=stubStore(dir);
+    const waiting=toOp({id:'op-send',kind:'integration.verify',goal:'Prove the delivery',allowlist:['src/live.spec.ts']},0);
+    waiting.status='paused';
+    const credentialAsk=toOp({id:'ask-1',kind:'owner.ask',goal:'Prepare the credential question',allowlist:['.starciwork/decisions/**'],
+      question:{kind:'credential',text:'PAY_API_KEY is not provided'},requesters:['op-send']},1);
+    credentialAsk.question.stop='credential';
+    const state2=stubState(store2,[waiting,credentialAsk]);
+    state2.provisional=[];
+    settleOwnerAsk(store2,state2,credentialAsk,{summary:'credential: PAY_API_KEY present in identity:payments'});
+    const present=store2.events.find(item=>item.event==='credential-present');
+    assert.equal(present.provided,'PAY_API_KEY in identity:payments');
+    assert.equal(waiting.status,'ready');
+    assert.match(waiting.answer,/confirmed only that it is present and never read its value/);
+    // Nothing anywhere carries a value, and a value that slipped into a summary never reaches a file or an event.
+    assert.doesNotMatch(JSON.stringify([store2.events,state2,waiting.answer]),/sk_live|BEGIN PRIVATE KEY/);
+    // The synthetic key is assembled at run time so no file of this repository ever carries a string a secret scanner reads as a live key.
+    assert.equal(redactSecrets('the token is '+['sk','live','51NaBcDeFgHiJkLmNoPqRsTuVwXyZ01234'].join('_')),'the token is [redacted]');
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+/** One item per question: a kernel that ran for a day pushed the same line on every iteration. */
+test('the owner\'s list carries one item per question, not one per iteration',()=>{
+  const dir=tmp();
+  try{
+    const store=stubStore(dir),state=stubState(store,[]);
+    const item=(kind,op,detail)=>({kind,op,detail});
+    state.needUser=[
+      item('environment','op-1','no runtime could launch op-1 (3 attempts, last chain-exhausted)'),
+      item('environment','op-1','no runtime could launch op-1 (3 attempts, last chain-exhausted)'),
+      item('environment','op-2','no runtime could launch op-2 (3 attempts, last chain-exhausted)'),
+      {kind:'ledger',node:'n1',detail:'ledger incomplete: n1'},
+      {kind:'ledger',node:'n1',detail:'ledger incomplete: n1'}
+    ];
+    assert.equal(dedupeNeedUser(state),2);
+    assert.deepEqual(state.needUser.map(entry=>[entry.kind,entry.op??entry.node]),
+      [['environment','op-1'],['environment','op-2'],['ledger','n1']]);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

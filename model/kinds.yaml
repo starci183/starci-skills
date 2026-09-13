@@ -72,11 +72,17 @@ predicates:
     chart placeholder that is still missing, so there is no asset left for an asset operation to generate. A
     record that was never drawn has declared nothing, and the step stays.
 kinds:
-  # The runtime never decides for the owner; it prepares the decision. An op that hit a question only the owner
-  # can answer - a business rule, a design choice, an authority, a credential the environment lacks - is paused
-  # and this op writes the owner's decision draft: the question, why it matters, the options with what each
-  # means for architecture, user stories, security and business, and one recommendation. The owner answers with
-  # `workflow-answer`; the answer reaches the paused op in its next contract.
+  # The runtime never decides for the owner; it prepares the decision. This op writes the owner's decision
+  # draft: the question, why it matters, the options with what each means for architecture, user stories,
+  # security and business, and exactly one recommendation.
+  #
+  # What happens to the op that asked depends on the question. Something only the owner can provide (a
+  # credential, an account on an outside system, a real dataset, a legal authority) and an effect nobody can
+  # undo (a message to real customers, a payment, a deletion of real data, a publish) PAUSE it: there is
+  # nothing honest to do until the owner acts. Every other question leaves it running - the kernel takes this
+  # op's own recommendation provisionally so the work continues, and tells the owner it did. The owner answers
+  # in this op's own terminal with the option number, or later with `workflow-answer`; a different answer then
+  # reopens what was built on the recommendation.
   owner.ask:
     family: design
     role: decide

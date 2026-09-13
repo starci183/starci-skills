@@ -315,19 +315,28 @@ $defs:
         required:
           - name
           - providedBy
+          - custody
         properties:
           name:
             $ref: "#/$defs/string"
-            description: The exact environment variable or secret name the code reads. The name only; a
+            description: The exact variable name the code reads at the moment of use. The name only; a
               credential value is never written into a record, a report, a log or a chat.
           providedBy:
             const: owner
             description: A credential is the owner's. The runtime asks for it by name and never invents,
               stubs, defaults or silently skips one.
+          custody:
+            $ref: "#/$defs/string"
+            pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
+            description: "identity:<slug> - the encrypted identity resource of this Work tree that holds the
+              value (see identityResource). That is the only custody a credential has: an environment
+              variable belongs to whichever terminal exported it, is gone on the next machine, and the tree
+              cannot say who set it."
           where:
             $ref: "#/$defs/string"
-            description: Where the owner provides it (the environment, the stack secret store) and where
-              the code reads it back.
+            description: "Retired in 5-plus and kept only so an older tree is told what to change: it named
+              a place, not a custody. Declare custody instead; a declaration with neither is the problem
+              credential-custody-missing."
       sandbox:
         $ref: "#/$defs/string"
         description: The provider's own test or sandbox endpoint the live proof runs against, when it
@@ -336,6 +345,18 @@ $defs:
       extensions.work3.integrations[]. The declaration is what makes the integration a record: the tree
       owes it one integration node, that node walks integration.verify against the real provider, and an
       evidence manifest that only fakes it is read as proven against a fake, not live."
+  identityResource:
+    type: object
+    description: "The custody of a credential, at .starciwork/_resources/identity/<slug>/resource.yaml
+      (schema work/resource@1, kind identity) beside secrets.enc.yaml. The resource record is readable and
+      carries the alias the product calls this identity by, the subject on the provider (the account, the
+      sender, the merchant - the WHO, never the what), the role it is allowed to play, and the variable
+      NAMES it holds. It never carries a value: every value lives in secrets.enc.yaml, encrypted with sops
+      under the host's own age or GPG key (the product repositories already carry a .sops.yaml), and is read
+      only at the moment of use - `sops exec-env <secrets.enc.yaml> '<command>'` - so it exists inside one
+      process and is never copied into a file, a log, a report or a contract. An operation that cannot reach
+      sops, the key or the resource reports blocked environment naming the slug and the variable; it never
+      invents, stubs or defaults a value, and it never prints one."
   sourceRef:
     type: object
     additionalProperties: false

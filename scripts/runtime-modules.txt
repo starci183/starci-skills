@@ -2,6 +2,7 @@
 # Authored sources remain the edit surface; ordinary runtime should import `.dist` copies.
 # Build-only modules (ops/generate.mjs, ops/contracts.mjs, scripts/**) are intentionally omitted.
 
+core/identity.mjs
 core/index.mjs
 core/runtime-root.mjs
 core/yaml.mjs

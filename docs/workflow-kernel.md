@@ -222,7 +222,9 @@ what happens to the reporter (`pause`, `reopen`, `retry`) and with which bound. 
 | review findings | the lane's build kind (so a finding on frontend work comes back as `frontend.implement`), origin `repair` | finished; the repair carries the work | 3 rounds per reviewed node set |
 | `uat.verify` reporting `failed` | the lane's build kind, origin `repair` | reopened behind the repair | the same 3 review rounds |
 | validator reject | retry of the same op | retried | 2 (`validatorRejectLimit()`) |
-| `blocked` `environment` / `authority` | nothing | blocked, `needUser` | - |
+| `blocked` `environment` / `authority` naming something only the owner can provide, or an effect nobody can undo | `owner.ask`, origin `ask` | paused, and a `needUser` `decision` item once the ask has prepared it | - |
+| `blocked` `authority` naming neither | `owner.ask`, origin `ask` | not paused: it depends on the ask and resumes with the runtime's own recommendation, recorded under `state.provisional` | - |
+| `blocked` `environment` naming neither | nothing | blocked, `needUser` | - |
 
 Kinds younger than `ops/registry.yaml` are resolved to a launchable operator id once, at the launch seam:
 `frontend.implement` launches as `interface.implement`, `architecture.revise` as `architecture.decide` and
@@ -573,37 +575,102 @@ the feature declares.
 `kernel/owner.mjs` is the whole loop in one file, because it is one rule: the runtime prepares a decision and
 the owner takes it. The kernel calls it at three seams.
 
-**Open.** A question an operation raises that is not mechanical - a business rule, a design choice, an
-authority, money, customer data - pauses that operation and opens one `owner.ask` op
-(`owner-ask-opened {op, ask, kind, question}`), whose allowlist is the decisions folder of the operation's
-own feature (`decisionAllowlistFor`) and whose references are the operation's own. A second operation asking
-the same question joins that ask as another requester rather than opening a second one. "Mechanical" is the
-closed set `mechanical | runtime | retry | format | tooling` (`MECHANICAL_QUESTION`); only those reach the
-supervisor model's `decide`, and only through the closed options the kernel offered it (`decide` event,
-then `answer` typed into the op's terminal or `escalate-to-user`). A blocker `environment` or `authority`
-whose detail names a variable, a key, a token or a credential is the same owner question (`credentialNeed`:
-an upper-case underscored name, or one of api key / token / secret / credential / password / client id /
-webhook / oauth).
+**What stops the work, and what does not.** The owner is asked only for what the runtime cannot obtain and
+for what it must not do, and there are exactly two of those.
 
-**Prepare.** The ask op first reads the decided records. One that settles the question answers it: the first
-line of the summary is `answered-from: <record id>`, the answer reaches every requester in its next contract
+- **Something only the owner can provide** - `ownerProvisionNeed(detail)` answers
+  `{kind: credential | account | dataset | authority}` or `null`. A credential (an upper-case underscored
+  name, or api key / token / secret / credential / password / client id / webhook / oauth) is one member of
+  that class: a **sandbox or test account** on an outside system (a payment gateway, a bank, an e-invoice
+  provider, a tax authority, an SMS or e-mail provider, an identity provider, storage), a **real dataset** the
+  product must be verified against (statements, invoices, exports), and a **legal or consent authority** (may
+  we message these users, may we charge this card) are as unobtainable by a runtime as a key is.
+- **An effect nobody can undo** - `irreversibleEffect(detail)`: a message or notification to real customers, a
+  payment, charge, transfer or refund of real money, a deletion, drop or purge of production or customer data,
+  a publish, deploy or release to production.
+
+`stopReasonFor(question)` reads the sentence first and an unambiguously declared kind second; `authority`
+alone is never a stop, because it is also the kernel's own generic blocker kind. A stop question pauses the op
+that asked (`owner-ask-opened {op, ask, kind, stop}`) and is listed for the owner once the ask op has prepared
+it (`needUser` kind `decision`, `owner-question`).
+
+**Open.** Every other question - a business rule, a design choice, a reconciliation conflict, a
+`hidden-decision` a review found - opens the same `owner.ask` op and does **not** pause the requester: it only
+`dependsOn` the ask (`owner-ask-opened {provisional: true}`). The ask op's allowlist is the feature's own
+policy-decision folder (`decisionAllowlistFor`, read from the node's path in the tree and never from the id
+segment), and one existing policy decision of the tree travels as a reference to mirror. A second operation
+asking the same question joins that ask as another requester rather than opening a second one. "Mechanical" is
+the closed set `mechanical | runtime | retry | format | tooling` (`MECHANICAL_QUESTION`); only those reach the
+supervisor model's `decide`, and only through the closed options the kernel offered it (`decide` event, then
+`answer` typed into the op's terminal); a mechanical question the model cannot answer becomes a provisional
+decision rather than a stop.
+
+**Prepare.** The ask op first reads the decided records. One that settles the question answers it: the summary
+carries `answered-from: <record id>`, the answer reaches every requester in its next contract
 (`owner-ask-answered-from-record`, then `owner-answer-delivered` per requester) and nothing is written.
-Otherwise it writes one decision record draft - the question, why it matters, numbered options analysed per
-side (architecture, user stories, security and authority, business rules, quality), the decided records each
-option touches, and exactly one recommendation - and the kernel lists it for the owner (`needUser` kind
-`decision`, `owner-question {ask, record, options, requesters}`).
+Otherwise it writes one policy-decision record draft - the question, why it matters, numbered options analysed
+per side (architecture, user stories, security and authority, business rules, quality), the decided records
+each option touches, and exactly one recommendation - and reports `decision: <record id>` with
+`recommended: <n>`.
 
-**Answer.** `workflow-answer --id <wf> --op <op> --choice <n> [--note "..."]`, queued to a live kernel's
-inbox, records the owner's pick and delivers it to every requester (`owner-answered`, then
-`owner-answer-delivered` each), and the question is gone. **The same command answers a reconciliation
-conflict**, and the `--op` there is the intake operation that wrote the decision record rather than an
-`owner.ask`: `answerOwnerQuestion` finds the ask when there is one and otherwise the `decision` item on the
-list, records the answer on that item's own record, and resumes only requesters that are still live - the
-intake itself is already accepted, and re-running it would undo the reconciliation the owner just settled.
+**Take it provisionally.** For a question that is not a stop, that recommendation IS the answer for now:
+requesters resume with `provisional: option <n> - <text> (decision <id>)` in their contract
+(`owner-answer-provisional`), carry `op.provisional = [<decision id>]` into everything they and their
+dependants build (`inheritProvisional`; `markDone` writes the ids into the node's kernel block), and the
+decision is listed under `state.provisional` - never under `needUser`. **A workflow may finish `done` over
+one**: the final report carries `provisional` plus a rendered `## Provisional decisions (n)` block, and
+`workflow-status` prints the same section beside, not inside, `## Needs you`.
 
-Every contract carries the credential rule: a key the environment lacks is reported `blocked` with the exact
-variable name, never invented, stubbed, defaulted or silently skipped, and no secret value is ever written
-into a record, a report, a log or a chat.
+**Answer, in the op or by command.** After writing the record the ask op prints the question and the numbered
+options in its own terminal and says the owner may answer there with the number or later with
+`workflow-answer`. An answer typed there comes back as `answered-by-owner: <n>` and is handled exactly as the
+command (`owner-answered {via: 'terminal'}`). A provision is never asked for as a value: the owner puts a
+credential into custody and replies `set`, the op checks only presence and reports
+`credential: <VAR> present in identity:<slug>` (or `provided: <what>` for an account, a dataset or an
+authority), and `redactSecrets` masks anything key-shaped that reaches an answer, an event or a report.
+
+`workflow-answer --id <wf> --op <op> --choice <n> [--note "..."]`, queued to a live kernel's inbox, records the
+owner's pick and delivers it to every live requester (`owner-answered`, then `owner-answer-delivered` each).
+On a decision the runtime had already taken, the same option is `decision-confirmed` and changes nothing that
+was built; a different option is `decision-overturned {decision, choice, reopened}` and every done node whose
+kernel block lists that decision is `markReopened`, its work planned again with the owner's answer as a
+finding. **The same command answers a reconciliation conflict**, and the `--op` there is the intake operation
+that wrote the decision record rather than an `owner.ask`: `answerOwnerQuestion` finds the ask when there is
+one and otherwise the `decision` item on the list, records the answer on that item's own record, and resumes
+only requesters that are still live - the intake itself is already accepted, and re-running it would undo the
+reconciliation the owner just settled.
+
+**Custody.** A credential is never an environment variable: one belongs to whichever terminal exported it, it
+is gone on the next machine, and the tree cannot say who set it. It lives in an encrypted identity resource of
+the Work tree - `_resources/identity/<slug>/resource.yaml` (alias, provider subject, role, the variable NAMES)
+beside `secrets.enc.yaml` (sops, the host's own age or GPG key) - which the integration declaration names as
+`custody: identity:<slug>`. The owner fills it with `starci identity set <slug> --name <VAR>` (the value on
+stdin, never an argument, never printed), and every operation reads it through `sops exec-env` at the moment
+of use, so the value exists in one process and is copied into no file, log, report or contract. A missing
+sops, a key this host lacks or a custody without that variable is `blocked` `environment` naming the slug and
+the variable - never invented, stubbed, defaulted or silently skipped.
+
+**Mechanical bounds escalate; they never become questions.** A bound the runtime set for itself is not a
+decision anyone can take from a terminal.
+
+- `verify-exhausted`: one more repair round on the strongest implement runtime that has not worked the group
+  (`verify-escalated {group, round, runtime}`), which also buys the review that judges it. Findings that cite
+  no decided record are a hidden decision (`verify-hidden-decision`) and the repair waits for a provisional
+  ruling. Capped at `VERIFY_ROUNDS * 2` escalations per group per day; past that the group is parked
+  (`verify-parked`) and that item is the owner's.
+- `shared-depth`: a shared change too deep to delegate, inside this repository, becomes one Work node authored
+  by a `work.author` op the kernel creates (`shared-authored {node, paths}`). Only paths outside the
+  repository stay refused.
+- `ledger-path`: a request naming record paths AND code paths is split - the record paths refused with one
+  event (`ledger-path-refused {paths, continued}`), the code paths continued as the scoped shared op. Record
+  paths alone are refused in the op's own terminal, never as a `needUser` item.
+- launch exhaustion (`chain-exhausted`, the restart limit for `stalled-idle`): the op cools for
+  `RATE_LIMIT_COOLDOWN_MS` and is re-admitted (`launch-cooling`, `launch-readmitted`), capped at
+  `LAUNCH_DAILY_CAP = 6` re-admissions per op per day; past the cap it is an `environment` item
+  (`launch-cap-reached`), not a decision.
+
+`needUser` is deduplicated every iteration by `(kind, op|node, first 120 characters of detail)`
+(`need-user-deduplicated`), so a kernel that runs for a day leaves one item per question.
 
 ## Render checks
 
@@ -650,8 +717,9 @@ has the record shapes in full.
 
 **Declared.** `declaredIntegrations(ledger)` reads `extensions.work3.integrations[]` from every `business`,
 `business-overview`, `module` and `architecture` node and answers `{list, problems}`. `list` carries
-`{id, provider, credential:{name, providedBy, where}, sandbox?, declaredBy}`; `problems` is what the runtime
-cannot act on - `credential-missing`, `credential-not-owner`, `integration-shape` - as findings rather than
+`{id, provider, credential:{name, providedBy, custody, slug, where}, sandbox?, declaredBy}`; `problems` is
+what the runtime cannot act on - `credential-missing`, `credential-not-owner`, `credential-custody-missing`
+(no `custody: identity:<slug>`, or only the retired 5.1 `where`), `integration-shape` - as findings rather than
 silent skips, because a vague declaration is exactly what a faked proof hides behind. An entry with an id is
 listed even when its credential is a finding, so the tree still owes it a node.
 `missingIntegrationNodes(ledger)` returns the declared ids with no `integration` node, which the kernel
@@ -761,8 +829,15 @@ the validator and writes `validator-skipped` once; tests inject a stub the same 
 | `blocked` `sds-gap` from an **intake** | the 5.1 rule that let an intake report what a decided record must become as `sds-gap` is withdrawn. An intake edits no record of another feature and files no gap against one: a change to what that record decided is a `conflict` row the owner decides, or a `new` row the feature declares. The route still exists for every other kind, and an intake that raises the blocker anyway is answered by the same route - but its contract and the validator rule both say it is a defect of the report | - |
 | `blocked` `interface-gap` | the route's `interface.draw` op on the same node; the reporter is reopened behind it | - |
 | `blocked` `grammar-gap` | the route's `grammar.update` op, allowlisted to the `grammar` repository of the workspace binding plus the canon (`knowledge/grammars/**`, `knowledge/patterns/fe/**`) and to nothing of the product, with the whole canon as its references and the acceptance "the grammar renders `<detail>`", "published at a new version and the consumer imports it", "the canon names the new unit"; the reporter is reopened behind it and reads the canon again. A binding with no `grammar` role creates nothing: one `environment` item naming `role \`grammar\` in .workspaces/projects/<project>/work.json`, a `grammar-unbound` event, and the requester stays `blocked` | 2 rounds per node |
-| `blocked` `environment` / `authority` | `needUser`, op blocked | - |
+| `blocked` `environment` / `authority` naming something only the owner can provide (a credential, an account on an outside system, a real dataset, a legal authority) or an effect nobody can undo | one `owner.ask` op, the requester **paused** (`owner-ask-opened {stop}`); the prepared question is a `needUser` `decision` item | - |
+| `blocked` `authority` naming neither | one `owner.ask` op, the requester **not paused** - it `dependsOn` the ask and resumes with `provisional: option <n> …`; the decision is listed under `state.provisional`, never `needUser` | - |
+| `blocked` `environment` naming neither | `needUser`, op blocked | - |
+| a question the runtime took provisionally, answered later | the same option is `decision-confirmed` and nothing moves; a different one is `decision-overturned` and every done node whose kernel block lists that decision is `markReopened` and planned again | - |
+| an op that asked for Work-tree record paths **and** code paths | split: `ledger-path-refused` for the record paths, the code paths continue as the scoped shared op. Record paths alone are refused in the op's own terminal, never a `needUser` item | - |
+| a shared change already at `SHARED_DEPTH_LIMIT`, inside this repository | one `work.author` op authoring a Work node for exactly those paths (`shared-authored`), scheduled like any node; the requester waits for it as for any shared op | - |
+| an op whose launch attempts (`chain-exhausted`) or `stalled-idle` restarts are spent | `launch-cooling`, then `launch-readmitted` after `RATE_LIMIT_COOLDOWN_MS` with its counters cleared | `LAUNCH_DAILY_CAP` (6) re-admissions per op per day, then one `environment` item |
 | review with findings | one repair op of the lane's build kind on the files the findings name inside the group's allowlists, then a fresh review | 3 rounds per ledger group |
+| review rounds spent | one more repair on the strongest implement runtime the group has not had (`verify-escalated`), plus the review that judges it; findings citing no decided record open a provisional `owner.ask` first (`verify-hidden-decision`) | `VERIFY_ROUNDS * 2` escalations per group per day, then `verify-parked` + one `review` item |
 | a `uat.verify` op reporting `failed` | one repair op of the lane's build kind, and the UAT run itself reopened behind it | the same 3 rounds per node set |
 | failing gate | one repair op whose findings are the tail of the gate output, then the gates again | 3 rounds |
 | `stalled-prompt` / `stalled-silent` / `dead` from the tick | `settleDispatch(close)` and requeue on another runtime | 3 restarts |
@@ -1265,11 +1340,17 @@ findings; `reconciliation-conflict` one conflict row became the owner's question
 `reconciliation-failed` the checker itself threw and the intake settled as before the rule;
 `ledger-sync-failed` the tree could not be re-read and the last loaded one stands.
 
-**The owner loop** (`kernel/owner.mjs`) - `owner-ask-opened` a question only the owner can answer paused its
-op and opened an ask; `owner-ask-answered-from-record` a decided record settled it; `owner-question` the
-drafted decision was listed for the owner; `owner-answered` the owner's pick arrived; `owner-answer-delivered`
-it reached one requester; `decide` the supervisor model answered a mechanical question from the closed
-options.
+**The owner loop** (`kernel/owner.mjs`) - `owner-ask-opened` a question opened an ask, carrying `stop` when it
+is one of the two stop reasons (the requester is paused) and `provisional: true` when it is not (the requester
+only depends on the ask); `owner-ask-answered-from-record` a decided record settled it; `owner-question` a
+stop question's drafted decision was listed for the owner; `owner-question-provisional` /
+`owner-answer-provisional` the runtime took its own recommendation so the work could continue, and one
+requester carries it; `credential-present` the owner provided something and the op confirmed only that it is
+there; `owner-answered` the owner's pick arrived (`via: 'command'` or `'terminal'`); `decision-confirmed` the
+owner chose what the runtime had chosen; `decision-overturned` they chose otherwise and the nodes built on it
+were reopened; `owner-answer-delivered` an answer reached one requester; `need-user-deduplicated` the owner's
+list was collapsed to one item per question; `decide` the supervisor model answered a mechanical question from
+the closed options.
 
 **Scheduling and launching** (`kernel/kernel.mjs`, `schedule.mjs`, `chains.mjs`, `loads.mjs`) - `created` the
 workflow store exists; `host` which host this run is on and whether it is sequential; `tick` one iteration;
@@ -1293,7 +1374,10 @@ moved under a running kernel; `kernel-error` the loop caught something it could 
 
 **Budget, cooldowns and the shared ledger** - `rate-limit-cooling` a provider was parked; `rate-limit-parked`
 an operation was moved off it; `rate-limit-inferred` two silent settlements of one runtime inside thirty
-minutes were read as a quota refusal; `rate-limit-readmitted` the cooldown passed; `avoid-expired` /
+minutes were read as a quota refusal; `rate-limit-readmitted` the cooldown passed; `launch-cooling` /
+`launch-readmitted` / `launch-cap-reached` an op whose launch attempts or `stalled-idle` restarts were spent
+cooled, came back, and - past `LAUNCH_DAILY_CAP` in one day - became the owner's `environment` item;
+`avoid-expired` /
 `avoid-reset` / `avoid-exhausted` an op's learned avoidance of a runtime expired, was cleared, or left it
 with nowhere to go; `runtime-cooling-shared` another kernel's cooldown was adopted; `runtime-loads-swept` this
 workflow's leftovers were dropped from the shared ledger; `inbox-applied` / `inbox-ignored` / `inbox-rejected`
@@ -1310,15 +1394,22 @@ only thing holding the op; `commit-failed` the operation's own commit did not la
 `brand-revised` an accepted `brand.decide` bumped the brand's `rev`.
 
 **Reviews and repairs** - `verify-findings` a review returned findings; `verify-limit` / `verify-exhausted`
-the review rounds of one node set ran out; `uat-findings` a walk reported failures; `uat-limit` its repair
-rounds ran out; `sds-gap` a design gap was routed; `grammar-gap` a grammar gap was routed;
+the review rounds of one node set ran out; `verify-escalated` that bound escalated inside the runtime - one
+more repair on a runtime the group has not had, naming it; `verify-hidden-decision` the findings cited no
+decided record, so the rule they argue about went to the owner as a provisional question;
+`verify-parked` the escalations for the day are spent and the group is the owner's; `uat-findings` a walk
+reported failures; `uat-limit` its repair rounds ran out; `sds-gap` a design gap was routed;
+`grammar-gap` a grammar gap was routed;
 `grammar-unbound` the workspace binding declares no grammar repository, so nothing was created;
 `brand-missing` a tree that knows about brands carries no record; `brand-decide-created` the kernel created
 the `brand.decide` op from the tree's own brand node; `shared-change-blocked` / `shared-change-deferred` /
 `shared-change-merged` / `shared-change-refused` / `shared-change-resumed` / `shared-change-unnamed` /
 `shared-change-depth` the whole life of a shared change: queued past the per-iteration cap, merged into an
 overlapping one, refused, resumed when its op landed, sent back for naming no paths, or refused for nesting
-too deep.
+too deep (which survives only for a change no feature folder can hold); `shared-authored` /
+`shared-node-authored` a change too deep to delegate became one Work node instead, and that node's record
+landed; `ledger-path-refused` an op asked for Work-tree record paths - refused on their own, split from the
+code paths when it asked for both.
 
 **The ledger sync** (`kernel/sync.mjs`) - `ledger-loaded` the tree was read (carrying `ledger-shared` for a
 tree another repository owns); `ledger-invalid` the tree does not validate; `ledger-valid-again` it does
@@ -1385,6 +1476,7 @@ kernel keeps no validator verdicts and no lanes still renders a complete page.
 | `anomalies` | `state.anomalies`: one signature per repeated oddity, its count and the triage option that settled it |
 | `recent` | the last 15 events, one line each: time, seq, event and the fields that matter |
 | `## Reconciliation (n)` | one line per intake of the workflow: the scope, the counts of the three cases the kernel checked in its table (`reconciled`), and every conflict still open for the owner (a `decision` item naming the intake op). Read from the log and the state alone |
+| `## Provisional decisions (n)` | one line per decision the runtime took on its own recommendation and has not been answered on: the record, the option it took, and the `workflow-answer` command that settles it. Deliberately outside `## Needs you` - nothing is blocked on these, and a workflow that finished `done` may still owe the owner every one of them |
 | `## Integrations (n)` | one line per declared integration of the workflow's tree - its id, its provider, the node that owes the proof, and what it is actually proven by: *proven live*, *proven against a fake, not live*, or *not proven*. The tree is read through the bounded `readLedgerTree` so a status page never spawns the validator, and a workflow that names no tree leaves the section out rather than guessing |
 
 **When `kernel.silentMs` grows.** Up to one wait tick (15 min) of silence is normal: the kernel is inside

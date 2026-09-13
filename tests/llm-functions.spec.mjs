@@ -235,7 +235,7 @@ test('validateOp carries the rule that an integration is proven live or it is no
     runHeadless:(provider,prompt)=>{prompts.push(prompt);return JSON.stringify({verdict:'accept',summary:'the run reached the sandbox'});}});
   for(const rule of ['an external integration is proven live or it is not proven',
     'whose scenario fakes, stubs, mocks, records, replays or skips the declared provider',
-    'reads the credential from anywhere but the environment variable the declaration names',
+    'reads the credential from anywhere but the identity custody the declaration names',
     'prints, logs or commits a secret value, is a defect',
     'an `e2e.verify` evidence whose `proof.fakes` omits a provider the diff fakes is a defect'])
     assert.ok(prompts[0].includes(rule),`the rules bind the integration: ${rule}`);

@@ -398,30 +398,138 @@ exact name, and every other operation carries on.
 
 ## 5. The owner loop
 
-`kernel/owner.mjs` owns the whole loop, and the kernel calls it at three seams:
+The owner's ruling of 2026-09-14, in one sentence: **the owner is asked only for what the runtime cannot
+obtain and for what it must not do; every other open question is taken provisionally on the runtime's own
+recommendation and the work continues.** Before it, a workflow could sit blocked all day on a line the owner
+could not act on - "decide whether the last findings stand", "no runtime could launch op-3" - while the one
+question that really was theirs waited in the same list.
+
+`kernel/owner.mjs` owns the whole loop. Three things decide what happens to a question, and they are a closed
+set.
+
+### The two stop reasons
+
+A question stops the op that asked it - `paused`, `waitingFor` the ask op - for exactly two reasons.
+
+**Something only the owner can provide.** `ownerProvisionNeed(detail)` answers
+`{kind: credential | account | dataset | authority}` or `null`. A credential is one member of that class, not
+the class: an accounting product needs a **sandbox account** on the tax authority or the e-invoice provider,
+a **real dataset** to reconcile against (a bank statement export, a sample of production invoices), and the
+owner's **authority** to act (may we message these users, may we charge this card) exactly as a chat product
+needs a bot token. Every one of them is as unobtainable by a runtime as a key is, and a proof taken without
+one is not a proof. The rules are regexes over the sentence and carry no vendor name.
+
+**An effect nobody can undo.** `irreversibleEffect(detail)` is true of a message or notification that reaches
+real customers or users, a payment / charge / transfer / refund of real money, a deletion / drop / purge of
+production or customer data, and a publish / deploy / release to production. The runtime prepares those and
+stops; only the owner performs them, because *undo* is not one of the runtime's verbs.
+
+`stopReasonFor(question)` reads the sentence first and an unambiguously declared kind second. `authority`
+alone is never a stop, because it is also the kernel's own generic blocker kind - the words decide.
+
+### Provisional decisions
+
+Every other question the records do not settle - a real conflict between decided records, money, authority,
+customer data, a `hidden-decision` a review found - opens the **same** `owner.ask` op, and the requester is
+**not** paused. It only `dependsOn` the ask op, so nothing schedules it before a recommendation exists
+(`owner-ask-opened {provisional: true}`).
+
+The ask op's job is then to write the decision record with numbered options and ONE recommendation and report
+`decision: <record id>` plus a line `recommended: <n>`. The kernel resumes every requester with
+
+```
+provisional: option <n> - <text> (decision <id>)
+```
+
+in its contract (`owner-answer-provisional`), records `op.provisional = [<decision id>]` on the requester and
+on every op that later depends on it or works the same node (`inheritProvisional`), and lists the decision
+under **`state.provisional`** - `{decision, op, recommended, options, at, answered}` - and never under
+`needUser`. `markDone` stores those ids in the node's kernel block, so the tree itself remembers which proofs
+rest on an answer the owner has not given yet.
+
+**The workflow may finish `done` with provisional decisions.** The final report carries `provisional` and a
+rendered `## Provisional decisions (n)` block, and `workflow-status` prints the same section - separately from
+`## Needs you`, because nothing is waiting on them.
+
+`workflow-answer --id <wf> --op <ask> --choice <n> [--note "..."]` then settles one, whenever the owner likes:
+
+| the owner's choice | what happens |
+| --- | --- |
+| the same as `recommended` | `decision-confirmed`; nothing that was built on it moves |
+| a different option | `decision-overturned {decision, choice, reopened}`: every done node whose kernel block lists that decision is `markReopened`, its work is planned again with the owner's answer as a finding, and a requester still alive gets the new answer |
+
+A credential or irreversible ask keeps the old behaviour exactly: a `needUser` `decision` item, the requester
+paused, and `workflow-answer` releases it.
+
+### The owner answers in the op
+
+The owner is at a keyboard, in front of the op's own tab; making them leave it to type a command is how a
+one-word answer waited a day. So after writing the decision record the ask op prints the question and the
+numbered options **in its own terminal** and says *the owner may answer here with the number, or later with
+`workflow-answer`*. If the owner answers there first, the op reports `answered-by-owner: <n>`, which
+`settleOwnerAsk` handles exactly as `--choice n` (`owner-answered {via: 'terminal'}`).
+
+A provision is never asked for as a value. For a credential the owner puts it into custody with one command
+and replies `set`; the op then checks **only presence** - `sops exec-env <secrets.enc.yaml> 'node -e
+"process.exit(process.env.<VAR>?0:1)"'` - and reports `credential: <VAR> present in identity:<slug>`
+(`credential-present`). For an account, a dataset or an authority it reports `provided: <what>`. No value ever
+reaches a file, an event or a report, and `redactSecrets` masks anything key-shaped on the way through.
+
+### Custody: a credential is never an environment variable
+
+An environment variable is nobody's: it belongs to whichever terminal exported it, it is gone on the next
+machine, and the tree cannot say who set it or when. A credential lives in an **encrypted identity resource of
+the Work tree**:
+
+```
+.starciwork/_resources/identity/<slug>/resource.yaml   # work/resource@1, kind identity - alias, the subject
+                                                       # on the provider, the role, the variable NAMES
+.starciwork/_resources/identity/<slug>/secrets.enc.yaml # sops, under the host's own age or GPG key
+```
+
+The integration declaration names it (`credential: {name, providedBy: owner, custody: identity:<slug>}`;
+`custody` is required and the 5.1 `where` is read only as the deprecation `credential-custody-missing`), the
+owner fills it with
+
+```
+node <skill root>/bin/starci.mjs identity set <slug> --name <VAR>   # the value on stdin, never an argument
+```
+
+which never echoes it, and every operation that needs it runs its check **inside** `sops exec-env`, so the
+value exists in one process and is copied nowhere. A missing sops, a key this host does not have, or a custody
+without that variable is `blocked` `environment` naming the slug and the variable - which is the stop of §5.
+
+### A mechanical bound never becomes a question
+
+A bound the runtime set for itself is not a decision anyone can take from a terminal, so it escalates inside
+the runtime instead.
+
+| bound | what happens now |
+| --- | --- |
+| `verify-exhausted` (review rounds spent) | one more repair round on the strongest implement runtime that has not worked the group (`verify-escalated {group, round, runtime}`), and the round it buys includes the review that judges it; when the last findings cite no decided record the rule they argue about is a **hidden decision** (`verify-hidden-decision`) and the repair waits for a provisional ruling. Escalations are capped at `VERIFY_ROUNDS * 2` per group per day; past that the group is parked (`verify-parked`) |
+| `shared-depth` | a shared change too deep to delegate, whose paths are inside this repository, becomes one Work node authored by a `work.author` op the kernel creates (`shared-authored {node, paths}`) and scheduled like any other node. Only paths outside the repository stay refused |
+| `ledger-path` | an op that asked for record paths AND code paths is split: the record paths are refused with one event (`ledger-path-refused {paths, continued}`) and the code paths continue as the scoped shared op. Record paths alone are refused in the op's own terminal, and never as a `needUser` item |
+| launch exhaustion (`chain-exhausted`, the restart limit for `stalled-idle`) | the op cools for `RATE_LIMIT_COOLDOWN_MS` and is re-admitted (`launch-cooling`, `launch-readmitted`), capped at `LAUNCH_DAILY_CAP = 6` re-admissions per op per day; past the cap it is an `environment` item, not a decision |
+
+And `needUser` itself is deduplicated by `(kind, op|node, first 120 characters of detail)` every iteration
+(`need-user-deduplicated`), because a kernel that runs for a day used to push the same line every tick.
+
+### The three seams, unchanged
 
 1. **Open.** A report `ask` whose `question.kind` is not mechanical
    (`MECHANICAL_QUESTION = /^(mechanical|runtime|retry|format|tooling)$/i`), or a `blocked`
-   `environment`/`authority` whose detail names a credential (`credentialNeed`: an upper-case underscored
-   variable name, or one of api key / token / secret / credential / password / client id / webhook / oauth),
-   pauses the op and opens one `owner.ask` op (`owner-ask-opened`) with the question, the requester, the
-   feature's own decision folder as its allowlist (`decisionAllowlistFor`) and the decided records as
-   references. A second op asking the same question joins the existing ask as another requester rather than
-   opening a second one. A reconciliation conflict (§4) opens the same question without an op, because the
-   intake already wrote the decision record.
-2. **Prepare.** The ask op answers from a decided record - the first line of its summary is
-   `answered-from: <record id>`, delivered to every requester in its next contract
-   (`owner-ask-answered-from-record`, `owner-answer-delivered`) - or writes one decision record draft: the
-   question, why it matters, numbered options analysed per side, the decided records each touches, one
-   recommendation. The kernel lists it (`needUser` kind `decision`, `owner-question`).
-3. **Answer.** `workflow-answer --id <wf> --op <ask> --choice <n> [--note]` reaches the kernel through its
-   inbox; the answer is recorded, delivered to every requester (`owner-answered`,
-   `owner-answer-delivered`) and the question is gone. The supervisor model's `decide` answers only
-   `question.kind: mechanical`, and only from the closed option set the kernel offered it.
-
-The credential rule is one sentence in every contract and one validator rule: a key the environment lacks is
-reported `blocked` with the exact variable name, never invented, stubbed, defaulted or silently skipped, and
-no secret value is ever written into a record, a report, a log or a chat.
+   `environment`/`authority` the rules above recognise, opens one `owner.ask` op with the question, the
+   requester, the feature's own **policy-decision** folder as its allowlist (`decisionAllowlistFor`, read from
+   the node's path in the tree, never from the id segment) and an existing policy decision of the tree as a
+   reference to mirror. A second op asking the same question joins the existing ask as another requester. A
+   reconciliation conflict (§4) opens the same question without an op, because the intake already wrote the
+   decision record.
+2. **Prepare.** The ask op answers from a decided record (`answered-from: <record id>`,
+   `owner-ask-answered-from-record`) or writes the one decision record draft.
+3. **Answer.** Through the op's own terminal, or through `workflow-answer` and the kernel's inbox. The
+   supervisor model's `decide` still answers only `question.kind: mechanical`, and only from the closed option
+   set the kernel offered it; a mechanical question it cannot answer becomes a provisional decision rather
+   than a stop.
 
 What the owner will have to provide is not discovered one stuck operation at a time. The critic reads the
 whole product for it up front and answers `provisions` - credentials, sandbox or test accounts on external
@@ -513,24 +621,27 @@ invents none; and the four completions were bound to their records, not to the r
 so a rule that arrived later reopened nothing. Three defects of the model, three rules:
 
 **An integration is a record.** A business or design record that names an external system declares it as
-data under `extensions.work3.integrations[]`: `{id, provider, credential: {name, providedBy: owner, where},
+data under `extensions.work3.integrations[]`: `{id, provider, credential: {name, providedBy: owner, custody},
 sandbox?}` - the intake side "external integrations and credentials" is written as this list, not as prose.
 `declaredIntegrations(ledger)` reads every `business`, `business-overview`, `module` and `architecture` node
 and answers **`{list, problems}`**: each listed entry carries `declaredBy`, the record that declared it, and
 `problems` is what the runtime cannot act on - `credential-missing` (no variable to ask the owner for),
-`credential-not-owner` (somebody other than the owner is supposed to provide the key) and
-`integration-shape` (no id, no provider, or not a list at all). They are findings rather than silent skips,
-because a vague declaration is exactly what a faked proof hides behind; an entry with an id is still listed
-even when its credential is a finding, so the tree still owes it a node.
+`credential-not-owner` (somebody other than the owner is supposed to provide the key),
+`credential-custody-missing` (no `custody: identity:<slug>`, or the retired 5.1 `where`, which named a place
+rather than a custody) and `integration-shape` (no id, no provider, or not a list at all). They are findings
+rather than silent skips, because a vague declaration is exactly what a faked proof hides behind; an entry
+with an id is still listed even when its credential is a finding, so the tree still owes it a node.
 
 `integration` is a record kind (§2), one `integration` node per declared id is required at
 `features/<f>/integration/<id>/index.yaml` (`missingIntegrationNodes` lists the ids with none, which the
 kernel reports as `ledger incomplete` and closes with `work.author`), and that node walks the one-step lane
-`integration.verify`: a prove kind that reads `integration`, `sds` and `code`, writes `evidence`, runs the
-live scenario with the credential the owner provides in the named variable, and reports `blocked`
-`environment` with the exact variable name and nothing else when the environment lacks it - which is the
-owner question of §5. A fake, stub, mock, recorded response, local double or skipped scenario standing in for
-the declared provider is the defect the kind exists to catch, and the validator rejects it.
+`integration.verify`: a prove kind that reads `integration`, `sds` and `code`, writes `evidence`, and runs the
+live scenario **inside the custody** - `sops exec-env <slug>/secrets.enc.yaml '<check>'`, so the credential
+exists in one process and is copied into no file, log, report or contract. No sops, no key for this tree, or a
+custody without that variable is `blocked` `environment` naming the slug and the variable and nothing else -
+which is the stop of §5. A fake, stub, mock, recorded response, local double or skipped scenario standing in
+for the declared provider is the defect the kind exists to catch, and the validator rejects it; so is a
+credential read from anywhere but its custody, and a credential value written anywhere at all.
 
 **Evidence says what it proved against.** Every evidence manifest may carry `proof: {boundary: api | live,
 fakes: [provider ids]}`; `boundary` is required once a proof is given at all and `fakes` defaults to the
@@ -735,7 +846,20 @@ last row group.
 | the critic answers the overlaps as the cases, and the formula is gone | `tests/llm-functions.spec.mjs` - "the critic answers the overlaps with the decided records as the three cases, and the formula is gone" |
 | the Work schema documents the reconciliation row | `tests/reconciliation.spec.mjs` - "the Work schema documents the reconciliation row and leaves extensions free-form" |
 | a non-mechanical question opens an `owner.ask`; a mechanical one stays with the kernel | `tests/workflow-kernel.spec.mjs` - "a question only the owner can answer pauses the op and opens an owner.ask op; the drafted decision is listed, the answer is delivered, and a mechanical question stays with the kernel" |
-| a credential the environment lacks is the owner's question | `tests/workflow-kernel.spec.mjs` - "an environment blocker that names a credential is the question of the owner, prepared by an owner.ask op, and credentialNeed reads the detail" |
+| a credential the environment lacks is the owner's question, and so is an effect nobody can undo; an `authority` block that names neither is a provisional decision | `tests/workflow-kernel.spec.mjs` - "an environment blocker that names a credential is the question of the owner, prepared by an owner.ask op, and credentialNeed reads the detail" |
+| the owner is asked only for what the runtime cannot obtain and cannot undo, over product-agnostic sentences | `tests/kernel-seams.spec.mjs` - "the runtime asks the owner only for what it cannot obtain and for what it cannot undo" |
+| every other decision is taken provisionally, the requester continues, and the owner is told | `tests/kernel-seams.spec.mjs` - "a decision the records do not settle is taken provisionally: the requester continues and the owner is told" |
+| the same option confirms; a different one reopens what rested on it | `tests/kernel-seams.spec.mjs` - "the same option confirms a provisional decision; a different one overturns it and reopens what rested on it" |
+| a proof records the decisions it rests on that the owner has not taken | `tests/kernel-seams.spec.mjs` - "markDone stores the digest of the declaration the proof was accepted under" |
+| the owner answers in the op's own terminal, and a credential reports only presence | `tests/kernel-seams.spec.mjs` - "the owner answers in the op's own terminal, and a credential reports only that it is present"; `tests/contract-steps.spec.mjs` - "the owner.ask sequence asks in its own terminal, and a credential is put into custody by the owner, never handed over"; `tests/ops.spec.mjs` - "the owner.ask operator asks in its own terminal and never asks for a credential value" |
+| a credential lives in the tree's encrypted custody, filled from stdin alone and echoed nowhere | `tests/cli.spec.mjs` - "identity set puts a value into the tree's encrypted custody from stdin alone, and echoes it nowhere", "identity set refuses with the exact reason when sops or its key is not there, and writes nothing" |
+| a spent review bound escalates inside the runtime instead of asking | `tests/workflow-kernel.spec.mjs` - "a spent review bound escalates inside the runtime: one more repair on an unused runtime, and findings that cite no decided record become a provisional decision" |
+| a shared change too deep becomes one Work node, never a question | `tests/workflow-kernel.spec.mjs` - "a shared change too deep to delegate again becomes one Work node the kernel authors, not a question for the owner" |
+| a record path an op asked for is refused in its terminal; a mixed request is split | `tests/workflow-kernel.spec.mjs` - "a shared change must name its paths...", "a shared change that asks for record paths and code paths is split: the record paths are refused, the code paths continue" |
+| a spent launch bound cools and is re-admitted, capped per day | `tests/workflow-kernel.spec.mjs` - "a spent launch bound cools the op and re-admits it, and only the daily cap reaches the owner" |
+| the owner's list carries one item per question | `tests/kernel-seams.spec.mjs` - "the owner's list carries one item per question, not one per iteration" |
+| `workflow-status` prints the provisional decisions beside, not inside, `## Needs you` | `tests/workflow-view.spec.mjs` - "the render is a plain terminal page with tables and no control codes" |
+| the decision record lands in the feature folder the tree has, never the id segment | `tests/workflow-kernel.spec.mjs` - "the decision folder of an owner question comes from the feature folder in the tree, never from the id segment" |
 | the host profile validates against the kinds capability vocabulary | `tests/hosts.spec.mjs` - "the shipped host profile validates against the real kinds capability vocabulary" |
 | each adapter describes itself exactly as the profile declares it | `tests/hosts.spec.mjs` - "each adapter describes itself exactly as the profile declares it" |
 | a bad host profile is rejected by code | `tests/hosts.spec.mjs` - "the authored profile is loaded from its directory and a bad profile is rejected by code" |
@@ -747,7 +871,8 @@ last row group.
 | the hook answers null for an operation that drew nothing | `tests/render-checks.spec.mjs` - "the kernel hook finds the ui node the operation wrote, and answers null when it wrote none"; `tests/kernel-seams.spec.mjs` - "a kind that is not a drawing never reaches the render checks" |
 | a failing canon check downgrades the drawing before the validator | `tests/kernel-seams.spec.mjs` - "a drawing that fails a canon check is downgraded before the validator; a passing one is recorded" |
 | the CLI prints one line per check and exits 1 on a failure or a broken input | `tests/render-checks.spec.mjs` - "the CLI prints one line per check and exits 1 when a check fails or the input is broken" |
-| a declared integration is data; a nameless entry or a credential nobody owns is a finding | `tests/work-ledger.spec.mjs` - "a declared integration is data: a credential nobody owns or a nameless entry is a finding, not a silent skip" |
+| a declared integration is data; a nameless entry, a credential nobody owns, or one with no custody is a finding | `tests/work-ledger.spec.mjs` - "a declared integration is data: a credential nobody owns or a nameless entry is a finding, not a silent skip" |
+| the live proof reads its credential through `sops exec-env` from the declared custody, and never writes one | `tests/contract-steps.spec.mjs` - "an integration is proven live or it is not proven..."; `tests/ops.spec.mjs` - "the live integration operator proves through the real provider with the owner's own credential, and refuses without it"; `tests/llm-functions.spec.mjs` - "validateOp carries the rule that an integration is proven live or it is not proven" |
 | every declared integration is live, fake or not proven - no fourth state | `tests/work-ledger.spec.mjs` - "every declared integration is proven live, proven against a fake, or not proven - and there is no fourth state" |
 | `workflow-status` prints what each declared integration is proven by | `tests/workflow-view.spec.mjs` - "workflow-status prints one line per declared integration and what each is actually proven by" |
 | a declared external integration walks a lane of its own | `tests/kind-graph.spec.mjs` - "a declared external integration is proven live on a lane of its own" |

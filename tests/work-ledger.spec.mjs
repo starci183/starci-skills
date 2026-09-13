@@ -552,7 +552,7 @@ extensions:
         credential:
           name: TELEGRAM_BOT_TOKEN
           providedBy: owner
-          where: the workflow environment
+          custody: identity:telegram-delivery
         sandbox: https://sandbox.invalid/telegram
       - id: zalo
         provider: zalo-oa-api
@@ -563,6 +563,7 @@ extensions:
         credential:
           name: VIBER_TOKEN
           providedBy: vendor
+          where: the workflow environment
       - provider: nameless-api
         credential:
           name: NAMELESS_TOKEN
@@ -652,15 +653,21 @@ test('a declared integration is data: a credential nobody owns or a nameless ent
     const at=tree(root);
     const {list,problems}=declaredIntegrations(at);
     assert.deepEqual(list.map(item=>item.id),['telegram','zalo','viber']);
+    // Custody, not a place: the declaration names the encrypted identity resource that holds the value.
     assert.deepEqual(list[0],{id:'telegram',provider:'telegram-bot-api',declaredBy:'demo.sales.business.srs.fr.delivery',
-      credential:{name:'TELEGRAM_BOT_TOKEN',providedBy:'owner',where:'the workflow environment'},sandbox:'https://sandbox.invalid/telegram'});
+      credential:{name:'TELEGRAM_BOT_TOKEN',providedBy:'owner',custody:'identity:telegram-delivery',slug:'telegram-delivery',where:null},
+      sandbox:'https://sandbox.invalid/telegram'});
     assert.equal(list[1].credential.name,null);
     assert.equal(list[1].sandbox,undefined,'a declaration without a sandbox promises none');
+    // `where` is the retired 5.1 spelling: it named a place, not a custody, so a declaration that carries only
+    // `where` is told what to change rather than passing as if it had said where the value lives.
     assert.deepEqual(problems.map(item=>[item.code,item.id]),[
-      ['credential-missing','zalo'],['credential-not-owner','viber'],['integration-shape',null]]);
+      ['credential-missing','zalo'],['credential-not-owner','viber'],['credential-custody-missing','viber'],['integration-shape',null]]);
     assert.ok(problems.every(item=>item.declaredBy==='demo.sales.business.srs.fr.delivery'));
     assert.match(problems[0].detail,/declares no credential name/);
     assert.match(problems[1].detail,/a credential is the owner's/);
+    assert.match(problems[2].detail,/declare `custody: identity:<slug>`.*retired `where: the workflow environment`/);
+    assert.equal(list[2].credential.where,'the workflow environment','the retired spelling is still read, so the tree can be told what to change');
     // Only the business and design sides declare one: an implementation node naming a provider declares nothing.
     assert.deepEqual(declaredIntegrations({at:at.at,list:at.list.map(node=>({...node,kind:'implementation'}))}).list,[]);
     assert.deepEqual(declaredIntegrations({at:at.at,list:[]}),{list:[],problems:[]});

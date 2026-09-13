@@ -33,6 +33,7 @@ Usage:
   starci storage <backend-root>
   starci source-layout <backend-root> <frontend-root>
   starci validate <work-root>
+  starci identity set <slug> --name <VAR> [--work-root <path>]   (the value is read from stdin, never printed)
   starci brand check <work-root> [--source <repository-root>] [--json]
   starci render check <ui-node-dir> --brand <work-root> [--family <id>] [--json]
   starci tree <work-root>
@@ -243,6 +244,34 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const {runRenderChecks,formatRenderChecks}=await import('../checks/render.mjs');
       const result=runRenderChecks({uiDir:directory(rest[0]),brandTree:directory(brand),family});
       emit(json?result:formatRenderChecks(result));
+      return result.ok?0:1;
+    }
+    if(command==='identity'){
+      // The owner's own hands: this is how a credential value gets into the tree's custody, and the only way.
+      // The value comes from stdin - never an argument, because an argument is in the process table, the shell
+      // history and every log of the launch - and nothing here ever prints it back.
+      const [action,...input]=args;
+      if(action!=='set')throw Error('Use starci identity set <slug> --name <VAR> [--work-root <path>]; the value is piped in on stdin.');
+      const rest=[...input];
+      const option=name=>{
+        const at=rest.indexOf(`--${name}`);
+        if(at===-1)return null;
+        const value=rest[at+1];
+        if(!value||value.startsWith('--'))throw Error(`--${name} needs one value.`);
+        rest.splice(at,2);
+        return value;
+      };
+      const name=option('name'),given=option('work-root');
+      if(!name)throw Error('--name needs the exact variable the code reads, for example STRIPE_SECRET_KEY.');
+      // Exactly one positional, and it is the slug: a second word on this command line could only be a value,
+      // and a value on a command line is the thing this whole custody exists to prevent.
+      exactArgs(rest,1);
+      const {findWorkRoot,readStdin,setIdentitySecret}=await import('../core/identity.mjs');
+      const workRoot=findWorkRoot(process.cwd(),given);
+      const value=(await readStdin(io.in??process.stdin)).replace(/\r?\n$/,'');
+      const result=setIdentitySecret({workRoot,slug:rest[0],name,value});
+      // `result` carries paths, variable names and a next step - never the value, and never a part of it.
+      emit(result);
       return result.ok?0:1;
     }
     if(command==='storage'){exactArgs(args,1);const result=inspectStorage(directory(args[0]));emit(result);return result.newWorkAllowed?0:1;}

@@ -281,6 +281,12 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
       findings:Array.isArray(state.reviewFindings)?state.reviewFindings.length:0},
     validator:readValidator(dir,events),
     needUser:Array.isArray(state.needUser)?state.needUser:[],
+    // Decisions the runtime took on its own recommendation so the work could continue. They are not in "needs
+    // you": nothing is blocked on them, and the workflow may have finished done over them - but the owner is
+    // still owed the question, and a different answer reopens what was built on it.
+    provisional:(Array.isArray(state.provisional)?state.provisional:[]).map(entry=>({decision:entry?.decision??null,
+      op:entry?.op??null,recommended:entry?.recommended??null,options:[...(entry?.options??[])],at:entry?.at??null,
+      answered:entry?.answered??null})),
     rate:{windowMs,windowHours:Math.round((windowMs/3600000)*100)/100,
       opsDone:opsDone.length,opsDonePerHour:per(opsDone.length,windowMs),
       nodesDone:nodesDone.length,nodesDonePerHour:per(nodesDone.length,windowMs)},
@@ -360,6 +366,14 @@ export function renderView(view){
 
   lines.push('',`## Needs you (${view.needUser.length})`);
   lines.push(view.needUser.length?view.needUser.map(item=>`- ${item.kind??'item'}${item.node?` ${item.node}`:item.op?` ${item.op}`:''}: ${clip(item.detail??'',200)}`).join('\n'):'nothing is waiting on you');
+  // Separate from "needs you" on purpose: nothing waits on these, and a workflow that finished done may still
+  // owe the owner every one of them.
+  const open=(view.provisional??[]).filter(entry=>!entry.answered);
+  if(open.length)lines.push('',`## Provisional decisions (${open.length})`,
+    ...open.map(entry=>`- ${entry.decision}: the runtime took option ${entry.recommended}`
+      +`${entry.options?.[entry.recommended-1]?` - ${clip(entry.options[entry.recommended-1],120)}`:''}`
+      +` and carried on. Answer with \`starci workflow-answer --id ${view.id} --op ${entry.op} --choice <n> [--note "..."]\`;`
+      +` a different option reopens what was built on it.`));
   if(view.anomalies.signatures.length)lines.push('',`## Anomalies (${view.anomalies.total} in ${view.anomalies.signatures.length} signatures, ${view.anomalies.untriaged} untriaged)`,
     table(['signature','count','triaged'],view.anomalies.signatures.map(entry=>[entry.signature,entry.count,entry.triaged])));
   lines.push('',`## Recent events (${view.recent.length})`,...(view.recent.length?view.recent:['no events']));

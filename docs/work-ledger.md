@@ -236,17 +236,27 @@ extensions:
         credential:
           name: TELEGRAM_BOT_TOKEN     # the exact variable, never the value
           providedBy: owner            # a credential is the owner's; nothing else is a declaration
-          where: the workflow environment
+          custody: identity:telegram   # where the value lives: _resources/identity/telegram/secrets.enc.yaml
         sandbox: https://api.telegram.org
 ```
+
+`custody` is required, and `identity:<slug>` is the only custody a credential has. An environment variable
+is not one: it belongs to whichever terminal exported it, it is gone on the next machine, and the tree
+cannot say who set it or when. The value lives under `_resources/identity/<slug>/` — a readable
+`resource.yaml` (`work/resource@1`, `kind: identity`: the alias, who the identity is on the provider, what
+it may do, and the variable **names** it holds) beside `secrets.enc.yaml`, encrypted with sops under the
+host's own age or GPG key. The owner fills it with `starci identity set <slug> --name <VAR>`, which reads
+the value from stdin and never prints it, and every operation reads it through `sops exec-env` at the moment
+of use, so the value exists in one process and is copied into no file, log or report.
 
 `declaredIntegrations(ledger)` reads those entries from every `business`, `business-overview`, `module`
 and `architecture` node and answers `{list, problems}`. Each listed entry carries `declaredBy` — the
 record that declared it. `problems` is what the runtime cannot act on: `credential-missing` (no variable
-to ask the owner for), `credential-not-owner` (somebody else is supposed to provide the key) and
-`integration-shape` (no id, no provider, or not a list at all). They are findings rather than silent
-skips, because a vague declaration is exactly what a faked proof hides behind. An entry with an id is
-still listed even when its credential is a finding, so the tree still owes it a node.
+to ask the owner for), `credential-not-owner` (somebody else is supposed to provide the key),
+`credential-custody-missing` (no `custody`, or only the retired 5.1 `where`, which named a place rather
+than a custody) and `integration-shape` (no id, no provider, or not a list at all). They are findings
+rather than silent skips, because a vague declaration is exactly what a faked proof hides behind. An entry
+with an id is still listed even when its credential is a finding, so the tree still owes it a node.
 
 The tree owes one node per declared id, at `features/<feature>/integration/<id>/index.yaml` with
 `kind: integration`. `integrationNodes(ledger)` lists them and `missingIntegrationNodes(ledger)` returns

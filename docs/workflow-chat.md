@@ -55,6 +55,22 @@ verification.
    and the intake itself is not re-run, since re-running it would undo the reconciliation the owner just
    settled. The item on the list names its own op either way, so the chat passes on what it reads.
 
+   **`## Provisional decisions (n)` is not a question the workflow is waiting on.** Since 5-plus the owner is
+   stopped for exactly two things - something only they can provide (a credential, an account on an outside
+   system, a real dataset, a legal authority) and an effect nobody can undo (a message to real customers, a
+   payment, a deletion of real data, a publish). Every other open question is taken **provisionally** on the
+   runtime's own recommendation and the work carries on, so a workflow can finish `done` and still owe the
+   owner a page of decisions. Relay that section as what it is: here is what the runtime decided for you, and
+   here is the command that changes it. The same command answers it - `workflow-answer --id <id> --op <ask op>
+   --choice <n>` - and the number matters: **the same option confirms what was built, a different one reopens
+   every node that was built on it.** Say that when you relay one, so an answer is never given carelessly.
+
+   The owner can also answer **in the operation's own terminal**, by typing the option number there while the
+   `owner.ask` op is still open; the kernel treats that exactly as the command. For a credential the op will
+   ask them to run `starci identity set <slug> --name <VAR>` - which reads the value from stdin and never
+   prints it - and to reply `set`; the op then checks only that it is present. Never ask the owner for a
+   credential value in the chat, never accept one if it is pasted, and never write one anywhere.
+
    A `host` item is different again: the operation's kind needs a capability this host does not offer, as
    `model/hosts.yaml` declares it. There is nothing to arrange locally - the same workflow resumes in Orca.
    Every other kind is answered in the world - a Work record, the goal's wording, the machine - and after the

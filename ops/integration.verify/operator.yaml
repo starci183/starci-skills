@@ -1,14 +1,17 @@
 id: integration.verify
 goal:
   en: Prove one declared external integration against the real provider, in its sandbox account, with the
-    credential the owner supplies in the named variable, and keep the live exchange as evidence.
+    credential the owner supplies, read at the moment of use from the tree's own encrypted identity
+    custody, and keep the live exchange as evidence.
 nodeKinds:
   - integration
 completionProfile: integration
 sideEffects:
   - one live exchange with the declared provider's sandbox account, inside the scenario's declared scope
   - scenario-owned data created in that sandbox account and disposed by the same run
-  - reading the owner-provided credential from its named environment variable, never writing its value
+  - reading the owner-provided credential through sops from the declared identity custody
+    (.starciwork/_resources/identity/<slug>/secrets.enc.yaml), inside the checking process only, never
+    writing its value
 graphPolicy:
   mode: read-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
@@ -28,9 +31,10 @@ reads:
     purpose:
       en: "Read the declaration the business or architecture record made: the integration id, the provider,
         the sandbox account to use, and the credential entry - its exact variable name, that the owner
-        provides it, and where it is set. This declaration, not the source, says which provider is under
-        proof and which variable carries the key. A declaration that names no credential variable is a
-        reported gap, never a guessed name and never a key read from somewhere else."
+        provides it, and the custody identity:<slug> that holds it. This declaration, not the source, says
+        which provider is under proof and which variable carries the key. A declaration that names no
+        credential variable, or no custody, is a reported gap, never a guessed name and never a key read
+        from somewhere else."
   - id: architecture
     path: .starciwork/<business>/architecture/**/index.yaml
     purpose:
@@ -47,14 +51,17 @@ reads:
         the credential from. The proof binds the exact tested tree, so a claim without a resolved repository
         and a named client is not a proof.
   - id: credential
-    path: current process environment variable named by the declared integration credential
+    path: .starciwork/_resources/identity/<slug>/secrets.enc.yaml, read with sops at the moment of use
     purpose:
-      en: "Resolve the owner-provided credential by the exact variable name the declaration gives, and
-        nothing else. It is never invented, never defaulted, never read from a second variable that looks
-        similar, and never taken from a checked-in file. An absent or empty variable is reported `blocked`
-        with reason `environment` naming that exact variable, which is the owner's question; it is never a
-        reason to fake the provider, skip the assertion or report a pass. The value itself is used only to
-        authenticate the live call and is written nowhere - not into a record, a report, a log or a chat."
+      en: "Resolve the owner-provided credential by the exact variable name the declaration gives, out of the
+        custody the declaration names, and nothing else: run the check inside `sops exec-env <that file>
+        '<check>'` so the value exists only in that one process. It is never invented, never defaulted, never
+        read from a second variable that looks similar, never exported into a shell or an .env file and never
+        taken from a checked-in file. No sops, no key for this tree, no such custody or no such variable in it
+        is reported `blocked` with reason `environment` naming the slug and that exact variable, which is the
+        owner's question; it is never a reason to fake the provider, skip the assertion or report a pass. The
+        value authenticates the live call and is written nowhere - not into a record, a report, a log or a
+        chat."
   - id: effects
     path: current request authorization + declared sandbox account allowed effects
     purpose:
@@ -152,10 +159,13 @@ steps:
     writes:
       - evidence
     action:
-      en: "Resolve the credential from exactly that variable before anything is sent. If it is absent or
-        empty, stop here and report `blocked` with reason `environment` naming the variable, so the owner can
-        provide it: do not substitute a second variable, do not read a key out of the repository, do not
-        generate one, and do not continue with the provider replaced by a stand-in. Confirm the resolved
+      en: "Run everything that needs the credential inside `sops exec-env
+        .starciwork/_resources/identity/<slug>/secrets.enc.yaml '<command>'`, so the value is resolved from
+        exactly that variable in exactly that process and nowhere else. If sops is not installed, the key for
+        this tree is unavailable, or that custody holds no such variable, stop here and report `blocked` with
+        reason `environment` naming the slug and the variable, so the owner can provide it: do not substitute
+        a second variable, do not export it into the shell or an .env file, do not read a key out of the
+        repository, do not generate one, and do not continue with the provider replaced by a stand-in. Confirm the resolved
         account is the declared sandbox one by observing the provider's own answer rather than by trusting a
         hostname, and confirm the effects this run is authorized to cause."
   - reads:
@@ -231,9 +241,11 @@ proofs:
         spec defect rather than a proof.
   - id: credential
     requirement:
-      en: The credential came from the exact variable the declaration names and from nowhere else; it was
-        never invented, defaulted, substituted or silently skipped, and its value appears in no record,
-        report, asset, log or message. A missing variable is blocked with that variable named.
+      en: The credential came from the exact variable the declaration names, out of the identity custody it
+        names, read through sops at the moment of use and from nowhere else; it was never invented,
+        defaulted, substituted, exported into a shell or an .env file, or silently skipped, and its value
+        appears in no record, report, asset, log or message. A custody that cannot give it is blocked with
+        the slug and that variable named.
   - id: readback
     requirement:
       en: The observed effect was read back through the provider's own surface where one exists, so an
@@ -248,13 +260,16 @@ blockers:
   - code: INTEGRATION_UNDECLARED
     condition:
       en: No business or architecture record declares this integration, or its declaration names no provider,
-        no sandbox account or no credential variable, so what to call and what to authenticate with cannot be
-        stated. Report the gap; never infer the provider or the variable from source.
+        no sandbox account, no credential variable or no credential custody, so what to call and what to
+        authenticate with cannot be stated. Report the gap; never infer the provider, the variable or the
+        custody from source.
   - code: CREDENTIAL_MISSING
     condition:
-      en: The environment has no value in the exact variable the declaration names. Report blocked with
-        reason environment and that variable name so the owner can provide it; never invent, default,
-        substitute or skip a key, and never replace the provider with a stand-in to proceed.
+      en: sops is not installed, the key this tree's custody was encrypted for is not available, or the
+        declared identity custody holds no value under the exact variable the declaration names. Report
+        blocked with reason environment, the slug and that variable name so the owner can provide it with
+        `starci identity set <slug> --name <VAR>`; never invent, default, substitute or skip a key, never
+        fall back to an environment variable, and never replace the provider with a stand-in to proceed.
   - code: PROVIDER_UNREACHABLE
     condition:
       en: The declared provider's sandbox cannot be reached in this environment - no network egress, a
@@ -276,12 +291,14 @@ blockers:
         predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   business: Selected business slug
+  slug: Identity custody slug the integration declaration names (custody identity:<slug>)
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set covering the delivered client of this integration
 integrationPolicy:
   proofSurface: real-provider
   fakes: none
-  credential: owner-provided-named-variable
-  missingCredential: blocked-environment-with-variable-name
+  credential: owner-provided-named-variable-in-identity-custody
+  credentialCustody: identity-resource-sops-exec-env
+  missingCredential: blocked-environment-with-custody-slug-and-variable-name
   secretValues: never-written
   evidenceProof: live

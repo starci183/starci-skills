@@ -143,7 +143,9 @@ export function recordKindOfPath(file,{nodeKind=null,records=null}={}){
   // Evidence before assets: a capture kept inside an evidence bundle is part of that proof, not artwork.
   if(parts[0]==='E'||has('evidence'))return known('evidence');
   if(has('assets'))return known('asset');
-  if(has('decisions'))return known('decision');
+  // `policy-decisions` is the tree's own spelling for the SRS leaf a policy decision lives in; it is a decision
+  // record, not a requirement, and an owner question that lands there must be read as one.
+  if(has('decisions')||has('policy-decisions'))return known('decision');
   if(has('business'))return known('srs');
   if(has('architecture'))return known('sds');
   if(has('integration'))return known('integration');
