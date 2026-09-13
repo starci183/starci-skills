@@ -136,6 +136,55 @@ test('the API end-to-end operator proves through the stack and the API only, and
   assert.deepEqual(codes.sort(),['ASSERTION_REQUEST_INCOMPLETE','CHECK_UNRUNNABLE','DECLARED_DEPENDENCY_UNMET','PROOF_SURFACE_UNAVAILABLE','SCOPE_OUTSIDE_ALLOWLIST','STACK_UNAVAILABLE']);
 });
 
+test('the live integration operator proves through the real provider with the owner\'s own credential, and refuses without it',()=>{
+  const document=fs.readFileSync(path.join(root,'integration.verify','operator.yaml'),'utf8');
+  const summary=catalogue.ops.find(op=>op.id==='integration.verify');
+  assert.ok(summary,'the live proof operator is in the catalogue');
+  assert.deepEqual(summary.nodeKinds,['integration']);
+  assert.equal(summary.completionProfile,'integration');
+  const contract=summary.contract;
+  for(const text of [document,JSON.stringify(contract)]) {
+    // A stand-in for the declared provider is the defect this operation exists to catch, not a fallback.
+    for(const required of [/real provider|the real provider/i,/sandbox/,/No mock, stub, fake, spy/,
+      /blocked` with reason `environment`|`blocked` `environment`|reason `environment`/,/redact/i]) {
+      assert.match(text,required,String(required));
+    }
+    // The credential is the owner's: never invented, and its value never written down anywhere.
+    assert.match(text,/never invented, defaulted, substituted or silently skipped|never invented, never defaulted/);
+  }
+  // The policy block is the machine-readable half of the same six rules.
+  assert.deepEqual(contract.integrationPolicy,{proofSurface:'real-provider',fakes:'none',
+    credential:'owner-provided-named-variable',missingCredential:'blocked-environment-with-variable-name',
+    secretValues:'never-written',evidenceProof:'live'});
+  // It reads the declaration that named the provider and the variable, and the client that actually calls it.
+  for(const id of ['target','integration','architecture','repo','credential','effects'])
+    assert.ok(contract.reads.some(read=>read.id===id),id);
+  // Its whole write ceiling: the node's kernel fields, its own evidence, the workflow handoff. No source.
+  assert.deepEqual(contract.writes.map(write=>write.id),['node','evidence','handoff']);
+  assert.equal(contract.writes.some(write=>String(write.path).startsWith('repository:')),false,'it proves the client, it never repairs it');
+  assert.ok(contract.writes.find(write=>write.id==='evidence').fields.includes('proof'),'the manifest says what it proved against');
+  for(const id of ['binding','declaration','live','credential','readback','cleanup'])
+    assert.ok(contract.proofs.some(proof=>proof.id===id),id);
+  // Its blockers refuse rather than improvise: no key is invented and no provider is replaced to proceed.
+  assert.deepEqual(contract.blockers.map(blocker=>blocker.code).sort(),
+    ['CLIENT_UNAVAILABLE','CREDENTIAL_MISSING','DECLARED_DEPENDENCY_UNMET','INTEGRATION_UNDECLARED','PROVIDER_UNREACHABLE','SCOPE_OUTSIDE_ALLOWLIST']);
+  assert.deepEqual(validateCatalog(catalogue,{root,repositoryRoot:repository,documents:outputs()}).errors,[]);
+});
+
+test('an operator cannot write a record its kind never declared',()=>{
+  // The kind graph says what each operation produces; the operator contract is held to the same declaration,
+  // so a widened write ceiling cannot slip in as a path nobody compared against the catalog.
+  const business=fresh(),node=business.ops.find(op=>op.id==='business.decide').contract.writes.find(w=>w.id==='node');
+  node.path='.starciwork/<business>/architecture/sds/**/index.yaml';
+  assert.ok(errors(business).includes('IO_DRIFT'),'settling a requirement may not rewrite the design it is realised by');
+  const proof=fresh(),source=proof.ops.find(op=>op.id==='integration.verify').contract.writes.find(w=>w.id==='node');
+  source.path='.starciwork/<business>/business/**/index.yaml';
+  source.fields=['acceptance'];
+  assert.ok(errors(proof).includes('IO_DRIFT'),'a live proof may not author the requirement it proved');
+  // The attempt's own report is the kernel's, whatever its kind: every operation writes one.
+  assert.deepEqual(errors(fresh()),[]);
+});
+
 test('the brand operator traces every value to a real source file, writes one record plus its own assets, and refuses instead of choosing',()=>{
   const document=fs.readFileSync(path.join(root,'brand.decide','operator.yaml'),'utf8');
   const summary=catalogue.ops.find(op=>op.id==='brand.decide');

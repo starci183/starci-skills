@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../core/yaml.mjs';
+import { writesOf } from '../kernel/graph.mjs';
+import { recordKindOfPath } from '../kernel/io.mjs';
 
 // Operator validation must run while bootstrapping a source package before .dist exists.
 // Keep these authoring identities explicit here and regression-check them against the
@@ -23,6 +25,48 @@ const AUTHORING_POLICIES=Object.freeze({
 
 /** An operator ID is dotted lowercase; a segment may carry digits after its first letter (`e2e.verify`). */
 const OP_ID=/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+$/;
+
+/**
+ * The two destinations of a contract that belong to the kernel rather than to the operation's kind, and are
+ * therefore outside `IO_DRIFT`. Everything under `E/` is the report of the attempt itself - the manifest,
+ * the run output and the workflow handoffs that `schemas/op-report.schema.yaml` requires of every operation
+ * whatever its kind - and a `node` row that touches only `state`, `blocker`, `completion` and
+ * `extensions.work3.kernel` is the kernel writing its own fields into the node the operation ran on.
+ * Neither is a record the kind authors. The rows that write a Work record or the product are, and those are
+ * exactly what `model/kinds.yaml` declares.
+ */
+const ATTEMPT_BUNDLE=/^E\//;
+const KERNEL_FIELD=/^(?:state|blocker|completion(?:\.|$)|extensions\.work3\.kernel(?:\.|$))/;
+const kernelOnlyNodeRow=row=>row?.id==='node'&&String(row?.path??'').trim()==='N/index.yaml'
+  &&Array.isArray(row.fields)&&row.fields.length>0&&row.fields.every(field=>KERNEL_FIELD.test(String(field)));
+/**
+ * The same attempt report, recognised by what it writes rather than by where it writes it. A frontend build
+ * keeps its capture of the running page under the node's own `assets/` because `schemas/work-layout.yaml`
+ * puts output captures there, but the row is still the `work/evidence@1` manifest of one attempt, and a path
+ * alone cannot tell that capture apart from the artwork a design record declared.
+ */
+const EVIDENCE_MANIFEST=Object.freeze(['id','nodeId','inputDigest','outcome','assertions','assets']);
+const evidenceManifestRow=row=>Array.isArray(row?.fields)&&EVIDENCE_MANIFEST.every(field=>row.fields.includes(field));
+/** A write template may name several destinations in one row (`E/manifest.yaml + repository:<repo>/x`). */
+const destinations=value=>String(value??'').split('+').map(part=>part.trim()).filter(Boolean);
+
+/**
+ * The kinds and records profiles, for a caller that did not pass them. Operator validation runs during the
+ * very build that publishes `.dist`, so the authored YAML is read directly when the compiled copy is not
+ * there yet; a tree with neither simply skips the input/output check rather than failing the build on it.
+ */
+function ioProfiles({kinds,records,repositoryRoot}) {
+  const load=(name)=>{
+    for(const candidate of [path.join(repositoryRoot??'','.dist','model',name+'.json'),path.join(repositoryRoot??'','model',name+'.yaml')]) {
+      if(!repositoryRoot||!fs.existsSync(candidate)) continue;
+      const text=fs.readFileSync(candidate,'utf8');
+      return candidate.endsWith('.json')?JSON.parse(text):parseYaml(text);
+    }
+    return null;
+  };
+  const kindProfile=kinds??load('kinds'), recordProfile=records??load('records');
+  return kindProfile?.kinds&&recordProfile?.records?{kinds:kindProfile,records:recordProfile}:null;
+}
 const nonempty = value=>typeof value==='string'&&value.trim().length>0;
 const safeRelative = value=>nonempty(value)&&!path.posix.isAbsolute(value)&&!path.win32.isAbsolute(value)&&!value.split(/[\\/]/).some(p=>p==='..'||p==='.')&&!value.includes('\\');
 const unique = values=>new Set(values).size===values.length;
@@ -49,8 +93,18 @@ export function domainReferenceExists(repositoryRoot, refPath) {
 
 // Validates authoring/catalogue referential integrity, NOT real-world execution or truth.
 // Never executes an op, resolves a credential, fetches a URL or mutates a workspace.
-export function validateCatalog(catalog,{root,repositoryRoot,profiles,documents=new Map()}={}) {
+export function validateCatalog(catalog,{root,repositoryRoot,profiles,documents=new Map(),kinds=null,records=null}={}) {
   const errors=[];
+  const io=ioProfiles({kinds,records,repositoryRoot});
+  // One operator contract may carry several kinds (`architecture.decide` carries the decision and its
+  // repair), so the records it may produce are what all of them together declare.
+  const writableBy=new Map();
+  if(io) for(const [kind,record] of Object.entries(io.kinds.kinds)) {
+    const operator=record?.operator??kind;
+    const allowed=writableBy.get(operator)??new Set();
+    for(const written of writesOf(kind,{profile:io.kinds})) allowed.add(written);
+    writableBy.set(operator,allowed);
+  }
   if(!catalog||catalog.schema!=='work/ops@1'||!Array.isArray(catalog.ops)) return {ok:false,errors:[{code:'CATALOG_SCHEMA',subject:'catalog',message:'Expected work/ops@1 and ops array'}]};
   if(Object.keys(catalog).some(key=>!['schema','commonDocument','ops'].includes(key))) issue(errors,'CATALOG_FIELDS','catalog','Unknown catalogue root field');
   if(!catalog.ops.length) issue(errors,'CATALOG_EMPTY','catalog','At least one concrete operator is required');
@@ -155,6 +209,20 @@ export function validateCatalog(catalog,{root,repositoryRoot,profiles,documents=
       if(!nonempty(row.id)||!nonempty(row.path)||!pair(row.purpose??row.content)) issue(errors,'BINDING_SHAPE',at,'Every binding needs ID/path and English purpose');
       for(const match of (row.path??'').matchAll(/<([^>]+)>/g)) if(!nonempty(c.placeholders?.[match[1]])) issue(errors,'UNDEFINED_PLACEHOLDER',at,match[1]);
       if(/(?:^|[ /])\.\.(?:[ /]|$)|[A-Za-z]:[\\/]|~[\\/]/.test(row.path??'')) issue(errors,'UNSAFE_TEMPLATE',at,row.path);
+    }
+    // An operator may only write the records its kind declares. An operator that carries no kind at all -
+    // the 4.x jobs the kind graph never adopted - is outside the declaration and is not held to it.
+    if(writableBy.has(at)) {
+      const allowed=writableBy.get(at), nodeKind=Array.isArray(op.nodeKinds)?op.nodeKinds[0]:null;
+      for(const w of c.writes) {
+        if(kernelOnlyNodeRow(w)||evidenceManifestRow(w)) continue;
+        for(const destination of destinations(w.path)) {
+          if(ATTEMPT_BUNDLE.test(destination)) continue;
+          const record=recordKindOfPath(destination,{nodeKind,records:io.records});
+          if(!record||allowed.has(record)) continue;
+          issue(errors,'IO_DRIFT',at,`${w.id} writes a ${record} record, which ${at} does not declare (${[...allowed].join(', ')||'nothing'})`);
+        }
+      }
     }
     for(const w of c.writes) {
       if(!Array.isArray(w.fields)||!w.fields.length||!w.fields.every(nonempty)) issue(errors,'WRITE_FIELDS',at,w.id+' has no field/content matrix');
