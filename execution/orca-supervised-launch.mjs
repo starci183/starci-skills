@@ -38,6 +38,8 @@ function parseArgs(argv){
     const key=flag.slice(2);
     need(!Object.hasOwn(options,key),`Duplicate option: --${key}`);
     if(key==='dry-run'){options[key]=true;continue;}
+    // `--lane` is the one flag whose value is optional: alone it names the lane after the workflow id.
+    if(key==='lane'&&(index+1>=rest.length||rest[index+1].startsWith('--'))){options[key]=true;continue;}
     need(index+1<rest.length&&!rest[index+1].startsWith('--'),`Missing value for --${key}`);
     options[key]=rest[++index];
   }
@@ -469,7 +471,11 @@ function usage(){return `Usage:
   node orca-supervised-launch.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
   node orca-supervised-launch.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
   node orca-supervised-launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
-  node orca-supervised-launch.mjs workflow-goal --job <text> [--id <workflow-id>] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--ledger-root <path>] [--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-goal --job <text> [--id <workflow-id>] [--lane [<name>]] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--ledger-root <path>] [--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2] [--host <path-to-.claude>] [--worktree <relative-path>]
+    --lane gives the workflow a worktree of its own: an Orca worktree of this repository on a new branch cut
+    from the branch you are on, as the top-level row [Workflow] <id> (default name: the workflow id). The
+    kernel and every operation run in it, and its branch is merged back into the base branch when the
+    workflow finishes done. Two workflows never share a worktree.
     turns the job into a goal and prints it for the one user approval. With a Work tree under
     <repo>/.starciwork/features the ledger is that tree (--ledger work, the default): the ops are derived
     from the eligible nodes in --scope and a node without an allowlist or checks is named as needing you.
@@ -495,10 +501,13 @@ function usage(){return `Usage:
   node orca-supervised-launch.mjs workflow-stop --id <workflow-id> [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     approve, status and stop find the workflow directory where the goal put it, so a job whose ledger is
     owned by another repository is reached with the same --host (or --ledger-root) the goal was given.
+  node orca-supervised-launch.mjs workflow-lane-close --id <workflow-id> [--host <path-to-.claude>] [--worktree <relative-path>]
+    removes the merged lane worktree from Orca and from git and keeps its branch. Refused while the kernel is
+    alive (workflow-stop first) and while the lane has not been merged into its base branch.
   node orca-supervised-launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000] [--worktree <repo>]
   node orca-supervised-launch.mjs verify`;}
 
-const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-run','workflow-status','workflow-stop','workflow-supervise'];
+const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-run','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
 const VIEW_COMMANDS=['workflow-list'];
 

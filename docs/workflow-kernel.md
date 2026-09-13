@@ -5,13 +5,14 @@ Coordinator, no per-module Monitor, no provider chain. A **job** is any piece of
 feature A", "backend for three modules with the existing SRS/SDS", "write an SRS"); its **inputs** are typed
 refs (`sds:path`, `srs:path`, `file:path`, `note:...`) of which specifications are one kind among many.
 
-Entry points are the canonical launcher's four commands, which route straight into `kernelMain`:
+Entry points are the canonical launcher's commands, which route straight into `kernelMain`:
 
 ```
-orca-supervised-launch.mjs workflow-goal    --job <text> [--inputs a,b] [--gates name=command,...] [--ledger work|plan] [--scope f1,f2] [--id <id>]
+orca-supervised-launch.mjs workflow-goal    --job <text> [--lane [<name>]] [--inputs a,b] [--gates name=command,...] [--ledger work|plan] [--scope f1,f2] [--id <id>]
 orca-supervised-launch.mjs workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>],...] [--allow-dynamic N]
 orca-supervised-launch.mjs workflow-run     --id <id> [--from <own terminal> --run <run>] [--launch-file <f>] [--max-iterations N]
 orca-supervised-launch.mjs workflow-status  --id <id>
+orca-supervised-launch.mjs workflow-lane-close --id <id>
 ```
 
 `--allow-dynamic N` raises this workflow's run-time operation budget (default `DYNAMIC_OPS_BUDGET` = 64) and
@@ -446,6 +447,57 @@ A shared-ledger run records `ledger-shared {owner,root}` on its `ledger-loaded` 
 all when the owner's tree carries pending changes the kernel does not own (`ledger-shared-dirty`, then
 `blocked` with a `needUser` item naming the files).
 
+## Lanes: one workflow, one worktree
+
+A **lane** is the worktree one workflow owns. This is not the kind lane a node travels ([Lanes and
+routes](#lanes-and-routes)); it is the place the whole workflow happens: the kernel, every operation and every
+commit of that workflow, on a branch of its own, as one top-level Orca row `[Workflow] <id>`. Two workflows
+never share a worktree, because that is what made three workflows' agents hang under a single row with no way
+to tell whose operation was whose.
+
+`workflow-goal --lane [<name>]`, run from the base worktree (repository R on branch B), does four things
+before the goal phase:
+
+1. `orca worktree create --repo path:<R> --name <name> --base-branch <B> --setup skip --no-parent` - the lane
+   is a git worktree of R on a branch Orca names; the receipt's path and branch are recorded, never guessed.
+   The default name is the workflow id. A name Orca already has is Orca's refusal, surfaced as it came.
+2. `orca worktree set --display-name "[Workflow] <id>" --workspace-status in-progress` - the row the owner reads.
+3. the goal phase runs with `worktree = <lane path>` and `branch = <lane branch>`, so every operation, check
+   and commit of this workflow happens in the lane; goal.md names the lane and the base under its title.
+4. `state.lane = {name, worktree, branch, orcaId, base:{worktree,branch}}` is a fact of the workflow from then on.
+
+`--lane` is refused from inside a lane (`state.lane` of another workflow pointing at this worktree): a lane
+never opens a lane of its own.
+
+**Where the store is.** The lane does not move the workflow directory: `createStore({repoRoot})` resolves the
+repository through the git common dir, which a lane shares with its base, so
+`<R>/.starciwork/_local/workflows/<id>` is found from the base worktree and from the lane - the supervisor
+polls either one and starts the kernel with `cwd` = the lane.
+
+**The ledger.** A lane of the repository that OWNS the Work tree has its own `.starciwork` on its branch, and
+that is the point: those records are merged back with the code. A lane of a code repository that routes to a
+shared ledger (a frontend) keeps writing the owner's tree exactly as before - the lane changes the code root,
+not the routing.
+
+**Merge-back.** When the workflow finishes `done`, `finish` runs in the base worktree:
+
+```
+git merge --no-ff --no-edit -m "merge(workflow): <id> - <lane branch> into <B>" <lane branch>
+```
+
+On success: `lane-merged {id,branch,base,commit}`, `orca worktree set --workspace-status completed`, and the
+lane worktree is left in place for the owner to read. On a refusal - a content conflict, a pending change in the
+base that the merge would overwrite, or a base worktree that has since moved to another branch (a merge takes
+whatever is checked out there, so a different branch is not this lane's merge at all) - the merge
+is aborted, `lane-merge-conflict {files}` is recorded, a `needUser` item of kind `merge` names the files, and
+the workflow finishes **blocked** instead of done. Nothing in the base worktree is ever stashed, reset or
+force-merged: it may be somebody's working copy with a kernel of its own. The work is not lost either - it is
+committed on the lane branch, waiting for the merge the owner performs.
+
+`workflow-lane-close --id <w>` removes a merged lane's worktree (`orca worktree rm --force`) and keeps its
+branch (`lane-closed`, with the preserved branch). It refuses while the kernel is alive (`workflow-stop`
+first) and while the lane has not been merged.
+
 ## The single-candidate launch
 
 5.0 allocates one runtime per op, so the launcher must try exactly one candidate.
@@ -511,11 +563,14 @@ the kernel holds in memory and saves over at every tick.
 | ship a new runtime build | `npm run build` | every running kernel notices its module changed (`build-changed`), ends cleanly and is restarted by the supervisor on the new code |
 | pause a workflow | `workflow-stop --id <w>` (writes `stop.flag`) | `stopped: stop flag` at the next tick; the supervisor leaves it while the flag exists; delete the flag to let it start again |
 | read a workflow | `workflow-status --id <w>` | read-only |
+| clean up the worktree of a workflow that merged | `workflow-lane-close --id <w>` | `orca worktree rm --force` on the lane, branch preserved (`lane-closed`); refused while the kernel is alive or the lane is unmerged |
+| merge a lane the kernel could not merge | merge it yourself in the base worktree, then `workflow-approve --id <w>` | the conflict is in `lane-merge-conflict` and in the `merge` needUser item; the kernel never force-merges into a tree it does not own |
 
-Two things that look like defects and are not: Orca groups agent terminals by worktree, so the ops of several
-workflows running in one worktree all hang under the first run's node in the sidebar - each workflow still has
-its own run, kernel and reconcile; and a workflow finishes `blocked` with every gate green when questions for
-the user remain - the gates say the code holds, the questions say what the owner still decides.
+One thing that looks like a defect and is not: a workflow finishes `blocked` with every gate green when
+questions for the user remain - the gates say the code holds, the questions say what the owner still decides.
+And one that was a defect: Orca groups agent terminals by worktree, so the ops of several workflows sharing one
+worktree all hang under the first run's node in the sidebar. That is what `--lane` ends - one workflow, one
+worktree, one row.
 
 ## Reading a workflow
 
@@ -539,6 +594,7 @@ kernel keeps no validator verdicts and no lanes still renders a complete page.
 | section | what the number means |
 | --- | --- |
 | `kernel` | the pid in `kernel.lock` and whether that process exists, plus `silentMs`: how long ago the **last event** was appended |
+| `lane` | the worktree this workflow owns, its branch, the base worktree and branch it goes home to, and the merge that took it there (null for a workflow that runs in whatever worktree it was started from). `workflow-list` carries the same row |
 | `supervisor` | the last `supervisor-round` in `supervisor.log`, and what that round decided for this workflow. There is no pid to probe, so `alive` means only "a round landed in the last 5 minutes" |
 | `runtimes` | `running` is counted from the operations that are actually running (saved loads may belong to a dead kernel), `max` is this workflow's `--allocation` slot count, `cooling` is the allocator's wake time |
 | `ops` | the status histogram, every running op with its age since `launched`, its restarts and the last thing the log said about it (`lastPing`), and every blocked op with its refusal |

@@ -6,9 +6,9 @@ import path from 'node:path';
 import {inspectWorkflow,superviseForever,superviseOnce,supervisorAction} from '../execution/kernel-supervisor.mjs';
 
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-supervisor-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(path.join(dir,'.starciwork','_local','workflows'),{recursive:true});return dir;};
-function workflow(root,id,{approved=true,finished=null,lastAt,pid=null,stop=false}={}){
+function workflow(root,id,{approved=true,finished=null,lastAt,pid=null,stop=false,worktree=root,lane=null}={}){
   const dir=path.join(root,'.starciwork','_local','workflows',id);fs.mkdirSync(dir,{recursive:true});
-  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id,approved,finished,worktree:root,host:'H'}));
+  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id,approved,finished,worktree,lane,host:'H'}));
   fs.writeFileSync(path.join(dir,'events.jsonl'),JSON.stringify({at:lastAt,seq:1,event:'tick'})+'\n');
   if(pid)fs.writeFileSync(path.join(dir,'kernel.lock'),JSON.stringify({pid}));
   if(stop)fs.writeFileSync(path.join(dir,'stop.flag'),'1');
@@ -64,4 +64,26 @@ test('a workflow whose tree was named explicitly is started with the same --ledg
     assert.deepEqual(named.slice(named.indexOf('--ledger-root')),['--ledger-root','X:/tree/.starciwork']);
     assert.ok(!spawned.find(args=>args.includes('beside')).includes('--ledger-root'),'a routed or local tree is resolved by the kernel itself');
   }finally{fs.rmSync(root,{recursive:true,force:true});fs.rmSync(other,{recursive:true,force:true});}
+});
+
+/**
+ * A lane does not move the store: it lives in the repository, so the supervisor lists it once whether it polls
+ * from the base worktree or from the lane, and starts the kernel inside the lane - the tree that workflow owns.
+ */
+test('a workflow that owns a lane is listed once from the repository store and its kernel is started inside the lane',()=>{
+  const root=tmp();const now=()=>10_000_000;
+  const lane=path.join(root,'lanes','laned');
+  try{
+    fs.mkdirSync(lane,{recursive:true});
+    workflow(root,'laned',{lastAt:1,worktree:lane,
+      lane:{name:'laned',worktree:lane,branch:'orca/laned',base:{worktree:root,branch:'main'}}});
+    const spawned=[];
+    const result=superviseOnce({repoRoot:root,roots:[root,lane],launcher:'L.mjs',now,
+      spawnFn:(executable,args,options)=>{spawned.push({args,cwd:options.cwd});return {pid:4242,unref(){}};},
+      killFn:()=>{},log:()=>{}});
+    assert.deepEqual(result.rounds.map(item=>[item.id,item.action]),[['laned','start']],'listed once, not twice');
+    assert.equal(spawned.length,1);
+    assert.deepEqual(spawned[0].args.slice(0,4),['L.mjs','workflow-run','--id','laned']);
+    assert.equal(spawned[0].cwd,lane,'the kernel of a lane runs in the lane, never in the base worktree');
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

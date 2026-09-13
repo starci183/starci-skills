@@ -45,6 +45,20 @@ function processAlive(pid){
   try{process.kill(pid,0);return true;}catch(error){return error?.code==='EPERM';}
 }
 
+/**
+ * The lane of a workflow: the worktree it owns alone, its branch, the base both came from and the merge that
+ * took it home. A workflow without a lane (it runs in whatever worktree it was started from) answers null.
+ */
+function readLane(state){
+  const lane=state?.lane;
+  if(!plain(lane))return null;
+  return {name:lane.name??null,worktree:lane.worktree??null,branch:lane.branch??null,
+    base:{worktree:lane.base?.worktree??null,branch:lane.base?.branch??null},
+    merged:plain(lane.merged)?{commit:lane.merged.commit??null,into:lane.merged.into??lane.base?.branch??null}:null,
+    conflict:plain(lane.conflict)?{files:[...(lane.conflict.files??[])]}:null,
+    closed:Boolean(lane.closed)};
+}
+
 export function workflowDir(repoRoot,id){return path.join(workflowsRoot(repoRoot),required(id,'workflow id'));}
 
 /** The feature a ledger item belongs to: a Work node id is `<product>.<feature>.…`, so the first two segments name it. */
@@ -176,6 +190,7 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
   return {
     schema:WORKFLOW_VIEW,id:state.id??id,dir,at:stamp,
     job:state.job??null,branch:state.branch??null,head:state.head??null,worktree:state.worktree??null,
+    lane:readLane(state),
     ledgerMode:state.ledgerMode??null,iterations:state.iterations??0,approved:Boolean(state.approved),
     phase:state.phase??null,finished:state.finished??null,stopRequested:fs.existsSync(path.join(dir,'stop.flag')),
     kernel:{alive:processAlive(lock?.pid),pid:lock?.pid??null,startedAt:lock?.startedAt??null,
@@ -229,6 +244,11 @@ export function renderView(view){
   lines.push(`ops        ${Object.entries(view.ops.counts).map(([status,n])=>`${status} ${n}`).join(', ')||'none'} (${view.ops.total} total)`);
   lines.push(`rate       ${view.rate.opsDonePerHour??'-'} ops/h, ${view.rate.nodesDonePerHour??'-'} nodes/h over ${view.rate.windowHours}h`);
   lines.push(`iterations ${view.iterations}${view.head?`, head ${String(view.head).slice(0,12)}`:''}${view.branch?` on ${view.branch}`:''}`);
+  if(view.lane)lines.push(`lane       ${view.lane.name} - ${view.lane.worktree??'?'} on ${view.lane.branch??'?'}`
+    +`, base ${view.lane.base.branch??'?'} in ${view.lane.base.worktree??'?'}`
+    +(view.lane.merged?`, merged ${String(view.lane.merged.commit??'').slice(0,12)} into ${view.lane.merged.into}`
+      :view.lane.conflict?`, NOT merged: conflicts in ${view.lane.conflict.files.join(', ')}`:', not merged yet')
+    +(view.lane.closed?', worktree closed':''));
 
   if(view.runtimes.length){
     lines.push('','## Runtimes',table(['runtime','running','max','used today','cooling'],
@@ -272,8 +292,10 @@ export function buildList({repoRoot,now=Date.now()}){
     const parsed=(()=>{try{return JSON.parse(lastEvent??'');}catch{return null;}})();
     const lastEventAt=at(parsed);
     const lock=readJson(path.join(entry.dir,'kernel.lock'));
+    const lane=readLane(state);
     return {id:entry.id,phase:state?.finished?'finished':state?.phase??'unknown',
       approved:Boolean(state?.approved),finished:state?.finished?.outcome??null,
+      lane:lane?{name:lane.name,branch:lane.branch,base:lane.base.branch,merged:lane.merged?.commit??null,closed:lane.closed}:null,
       opsDone:ops.filter(op=>op.status==='done').length,opsTotal:ops.length,
       kernelAlive:processAlive(lock?.pid),pid:lock?.pid??null,
       stopRequested:fs.existsSync(path.join(entry.dir,'stop.flag')),
@@ -283,7 +305,8 @@ export function buildList({repoRoot,now=Date.now()}){
 
 export function renderList(list){
   if(!list.length)return 'no workflows in this repository\n';
-  return `${table(['workflow','phase','ops','kernel','last event'],list.map(entry=>[entry.id,
+  return `${table(['workflow','phase','lane','ops','kernel','last event'],list.map(entry=>[entry.id,
     entry.finished?`finished ${entry.finished}`:entry.stopRequested?`${entry.phase} (stop)`:entry.approved?entry.phase:`${entry.phase} (not approved)`,
+    entry.lane?`${entry.lane.name} -> ${entry.lane.base??'?'}${entry.lane.merged?' merged':''}${entry.lane.closed?' closed':''}`:null,
     `${entry.opsDone}/${entry.opsTotal}`,entry.kernelAlive?`alive ${entry.pid}`:'-',age(entry.lastEventAgeMs)]))}\n`;
 }

@@ -209,12 +209,34 @@ calls:
     flags: [id, body, run, from]
     required: [id, body]
     receipt: [result]
+  worktree-create:
+    command: worktree create
+    kind: mutation
+    replay: none
+    timeoutMs: 180000
+    note: |-
+      The lane of one workflow: a git worktree of the named repository on a branch Orca creates, as a top-level
+      row (--no-parent) so the workflow is its own row instead of a child of whoever created it. --setup skip
+      keeps the creation a git operation only. result.worktree carries the Orca id (<repo-id>::<path>), the path
+      and the branch ref the lane actually got, which is what the kernel records - it never guesses either.
+    flags: [repo, name, base-branch, setup, no-parent, parent-worktree]
+    required: [repo, name]
+    receipt: [result.worktree]
+  worktree-rm:
+    command: worktree rm
+    kind: mutation
+    replay: none
+    timeoutMs: 60000
+    note: Removes the worktree from Orca and from git and preserves its branch (result.preservedBranch); the kernel closes a lane only after that lane is merged.
+    flags: [worktree, force]
+    required: [worktree]
+    receipt: [result]
   worktree-set:
     command: worktree set
     kind: mutation
     replay: none
     note: Metadata write without retry-request support; it is naturally idempotent, so an unknown result is re-read with worktree-show.
-    flags: [worktree, parent-worktree, display-name]
+    flags: [worktree, parent-worktree, display-name, workspace-status, no-parent]
     required: [worktree]
     receipt: [result]
   worktree-show:

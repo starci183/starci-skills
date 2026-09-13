@@ -16,6 +16,7 @@ import {fakeAllocator,passing,scriptedOrca} from './helpers/kernel-harness.mjs';
  */
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
 const noWait=()=>{};
+const acceptAll=()=>({ok:true,verdict:'accept',summary:'stub validator: accepted',findings:[],dropped:[],provider:'stub',usage:null});
 const RECEIPT='demo.sales.implementation.frontend.receipt';
 const INTAKE='demo.sales.implementation.backend.intake';
 const PAGE='app/receipt/page.tsx';
@@ -295,6 +296,9 @@ test('the accepted slice is recorded and committed in the owner, names the front
     // The launcher resolves a worktree relative to the process; this workflow is on another drive, so the
     // launch itself is stood in for and everything after it is the kernel's own path.
     launch:(_orca,{operation,scope})=>orca.register(scope??operation),
+    // The validator is a runtime like any other here: left real it reaches for a provider that is not in this
+    // test, and the walk then stops mid-lane on a `validator-unavailable` that proves nothing about the ledger.
+    validateOp:acceptAll,
     decide:()=>{throw Error('decide must not be called on a policy-covered path');},
     waitTimeoutMs:2000,tickMs:1000,maxIterations:10});
 

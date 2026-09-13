@@ -19,9 +19,11 @@ const flag=(args,name)=>{const index=args.indexOf(`--${name}`);return index<0?nu
  * (claude, codex) operations through the real launcher, and the blocking wait "finishes" each live
  * operation by writing the next report scripted for its operation id.
  */
-export function scriptedOrca({reportsDir,scripts,worktree,run='run_wf'}){
+export function scriptedOrca({reportsDir,scripts,worktree,run='run_wf',worktrees=null}){
   const terminals=new Map(),dispatches=new Map(),tasks=new Map(),live=new Map();
   const taken=new Map();let counter=0;const sends=[];
+  // Every `worktree …` call the kernel makes, in order: a lane is created, named, status-set and removed through these.
+  const worktreeCalls=[];
   const opOf=spec=>(String(spec??'').match(/op `([^`]+)`/)??[null,'unknown'])[1];
   const newHandle=()=>`term_${++counter}`;
   const screenOf=handle=>{
@@ -107,10 +109,36 @@ export function scriptedOrca({reportsDir,scripts,worktree,run='run_wf'}){
       }
       return json(0,{ok:true,result:{deliveryId:`delivery_${counter}`,messages:[]}});
     },
-    send:args=>{sends.push(args);return json(0,{ok:true,result:{message:{id:`msg_${++counter}`}}});}
+    send:args=>{sends.push(args);return json(0,{ok:true,result:{message:{id:`msg_${++counter}`}}});},
+    /**
+     * The lane of a workflow. `worktrees.create({name,repo,baseBranch})` is the test's own factory - it answers
+     * `{path,branch}` after really running `git worktree add`, or `{error}` for the Orca refusal a taken name gives -
+     * so the lane under test is a real worktree and the receipt has the shape Orca prints.
+     */
+    'worktree-create':args=>{
+      const name=flag(args,'name'),repo=flag(args,'repo'),baseBranch=flag(args,'base-branch');
+      worktreeCalls.push({call:'create',name,repo,baseBranch,setup:flag(args,'setup'),noParent:args.includes('--no-parent')});
+      if(typeof worktrees?.create!=='function')return json(1,{ok:false,error:{message:'this fake Orca was given no lane factory'}});
+      const row=worktrees.create({name,repo,baseBranch});
+      if(row?.error)return json(1,{ok:false,error:{message:row.error}});
+      return json(0,{ok:true,result:{worktree:{id:`${repo}::${String(row.path).replaceAll('\\','/')}`,path:row.path,branch:`refs/heads/${row.branch}`,
+        displayName:name,workspaceStatus:'todo',parentWorktreeId:null}}});
+    },
+    'worktree-set':args=>{
+      worktreeCalls.push({call:'set',worktree:flag(args,'worktree'),displayName:flag(args,'display-name'),
+        workspaceStatus:flag(args,'workspace-status'),noParent:args.includes('--no-parent')});
+      return json(0,{ok:true,result:{worktree:{id:flag(args,'worktree'),displayName:flag(args,'display-name'),
+        workspaceStatus:flag(args,'workspace-status')}}});
+    },
+    'worktree-rm':args=>{
+      worktreeCalls.push({call:'rm',worktree:flag(args,'worktree'),force:args.includes('--force')});
+      const removed=typeof worktrees?.remove==='function'?worktrees.remove(flag(args,'worktree')):{};
+      if(removed?.error)return json(1,{ok:false,error:{message:removed.error}});
+      return json(0,{ok:true,result:{removed:true,preservedBranch:removed?.preservedBranch??null}});
+    }
   };
   const spawn=(executable,args)=>{
-    const key=args[0]==='terminal'?`terminal-${args[1]}`:args[0]==='agent-context'?'agent-context':args[1];
+    const key=['terminal','worktree'].includes(args[0])?`${args[0]}-${args[1]}`:args[0]==='agent-context'?'agent-context':args[1];
     const handler=handlers[key];
     if(!handler)throw Error(`Unexpected fake Orca call: ${args.join(' ')}`);
     return handler(args);
@@ -128,7 +156,7 @@ export function scriptedOrca({reportsDir,scripts,worktree,run='run_wf'}){
     live.set(dispatch,dispatches.get(dispatch));
     return {ok:true,task:{id:task},dispatchId:dispatch,terminal:handle,selection:{target:'qwen3.8-flash'}};
   };
-  return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),terminals,dispatches,live,sends,register};
+  return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),terminals,dispatches,live,sends,worktreeCalls,register};
 }
 
 /** Pools instead of a chain: least-index-free runtime per role, honouring `avoid`. */

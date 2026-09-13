@@ -243,33 +243,67 @@ test('workflow-list is one row per workflow of the repository, newest first',t=>
   fs.mkdirSync(finishedDir,{recursive:true});
   fs.writeFileSync(path.join(finishedDir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',
     kernel:'starci/workflow-kernel@1',id:'20250101-000000-finished',phase:'run',approved:true,
+    // This one owned a lane and it went home: the row says so without anybody opening the workflow.
+    lane:{name:'20250101-000000-finished',worktree:'W:/workspaces/demo/20250101-000000-finished',branch:'orca/finished',
+      base:{worktree:'W:/demo',branch:'main'},merged:{commit:'feed1234feed',into:'main',at:ago(600)}},
     finished:{outcome:'done',reason:'every item verified'},ops:[op('a','done'),op('b','done')],ledger:[]}));
   writeLines(path.join(finishedDir,'events.jsonl'),[{at:ago(600),seq:1,event:'final'}]);
 
   const list=buildList({repoRoot,now:NOW});
   assert.deepEqual(list.map(entry=>entry.id),['20260101-000000-rich','20250101-000000-finished']);
   assert.deepEqual({...list[0],lastEventAt:undefined,pid:undefined},{id:'20260101-000000-rich',phase:'run',
-    approved:true,finished:null,opsDone:1,opsTotal:6,kernelAlive:true,stopRequested:false,
+    approved:true,finished:null,lane:null,opsDone:1,opsTotal:6,kernelAlive:true,stopRequested:false,
     lastEventAgeMs:90_000,lastEventAt:undefined,pid:undefined});
   assert.deepEqual([list[1].phase,list[1].finished,list[1].opsDone,list[1].opsTotal,list[1].kernelAlive],
     ['finished','done',2,2,false]);
+  assert.deepEqual(list[1].lane,{name:'20250101-000000-finished',branch:'orca/finished',base:'main',
+    merged:'feed1234feed',closed:false});
 
   const page=renderList(list);
-  assert.match(page,/\| workflow \| phase \| ops \| kernel \| last event \|/);
-  assert.match(page,/\| 20260101-000000-rich \| run \| 1\/6 \| alive \d+ \| 2m \|/);
-  assert.match(page,/\| 20250101-000000-finished \| finished done \| 2\/2 \| - \| 10h \|/);
+  assert.match(page,/\| workflow \| phase \| lane \| ops \| kernel \| last event \|/);
+  assert.match(page,/\| 20260101-000000-rich \| run \| - \| 1\/6 \| alive \d+ \| 2m \|/);
+  assert.match(page,/\| 20250101-000000-finished \| finished done \| 20250101-000000-finished -> main merged \| 2\/2 \| - \| 10h \|/);
   assert.equal(renderList([]),'no workflows in this repository\n');
 
   // The CLI prints the page itself: a text view must never reach a terminal as an escaped JSON string.
   const cli=spawnSync(process.execPath,[path.join(root,'execution','orca-supervised-launch.mjs'),'workflow-list'],
     {cwd:repoRoot,encoding:'utf8'});
   assert.equal(cli.status,0,cli.stderr);
-  assert.match(cli.stdout,/\| 20260101-000000-rich \| run \| 1\/6 \|/);
+  assert.match(cli.stdout,/\| 20260101-000000-rich \| run \| - \| 1\/6 \|/);
   assert.equal(cli.stdout.includes('\\n'),false);
   const json=spawnSync(process.execPath,[path.join(root,'execution','orca-supervised-launch.mjs'),'workflow-list','--json','true'],
     {cwd:repoRoot,encoding:'utf8'});
   assert.equal(json.status,0,json.stderr);
   assert.equal(JSON.parse(json.stdout).workflows.length,2);
+});
+
+/**
+ * A workflow that owns a lane says so on its page: which worktree it runs in, which branch, and whether that
+ * branch went home. A reader never has to open state.json to learn where the workflow actually is.
+ */
+test('the view prints the lane of a workflow: its worktree, its branch and the base it merged into',t=>{
+  const repoRoot=tmp(t);
+  const dir=path.join(workflows(repoRoot),'20260101-000000-laned');
+  fs.mkdirSync(dir,{recursive:true});
+  const lane={name:'nivo-setup',worktree:'W:/workspaces/demo/nivo-setup',branch:'orca/nivo-setup',
+    base:{worktree:'W:/demo',branch:'main'}};
+  const write=value=>fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',
+    kernel:'starci/workflow-kernel@1',id:'20260101-000000-laned',job:'Walk the setup flow',branch:'orca/nivo-setup',
+    worktree:lane.worktree,phase:'run',approved:true,iterations:3,ops:[],ledger:[],needUser:[],lane:value}));
+  write(lane);
+  writeLines(path.join(dir,'events.jsonl'),[{at:ago(1),seq:1,event:'tick'}]);
+  const running=buildView({repoRoot,id:'20260101-000000-laned',now:NOW});
+  assert.deepEqual(running.lane,{name:'nivo-setup',worktree:'W:/workspaces/demo/nivo-setup',branch:'orca/nivo-setup',
+    base:{worktree:'W:/demo',branch:'main'},merged:null,conflict:null,closed:false});
+  assert.match(renderView(running),/lane {7}nivo-setup - W:\/workspaces\/demo\/nivo-setup on orca\/nivo-setup, base main in W:\/demo, not merged yet/);
+  write({...lane,merged:{commit:'abcdef0123456789',into:'main',at:ago(2)}});
+  assert.match(renderView(buildView({repoRoot,id:'20260101-000000-laned',now:NOW})),/merged abcdef012345 into main/);
+  write({...lane,conflict:{files:['src/sales/intake.ts'],at:ago(2),reason:'local changes'}});
+  const conflicted=buildView({repoRoot,id:'20260101-000000-laned',now:NOW});
+  assert.deepEqual(conflicted.lane.conflict,{files:['src/sales/intake.ts']});
+  assert.match(renderView(conflicted),/NOT merged: conflicts in src\/sales\/intake\.ts/);
+  // A workflow without a lane renders no lane line at all, and says null in the record.
+  assert.equal(buildView({repoRoot,id:'20260101-000000-rich',now:NOW,dir:richStore(repoRoot).dir})?.lane??null,null);
 });
 
 test('a feature is the first two segments of a Work node id, and nothing is invented without one',()=>{
