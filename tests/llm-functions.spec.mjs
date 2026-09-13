@@ -242,6 +242,9 @@ test('validateOp carries the brand record into the prompt, with the rules that m
     assert.ok(prompt.includes(needle),`the prompt carries ${needle}`);
   for(const rule of ['when a `brand` record is given it is binding',
     'outside the brand colour tokens (each with the role the record gives it) and the installed grammar is a defect',
+    'the markup kept beside each candidate as `<candidate>.html` is the render\'s source and is what the candidate is judged from',
+    'a list of entities wrapped in a card surface is a defect (a collection is a page section with a heading, a card is one item)',
+    'as is a palette outside the brand colour tokens and the grammar\'s own',
     'an interface.asset result is the artwork of the slots the design record declared',
     'artwork that ignores the brand mascot and logo references the record names, is a defect',
     'a frontend.implement result that substitutes its own image for a declared artwork slot, or omits a declared slot altogether, is a defect'])
