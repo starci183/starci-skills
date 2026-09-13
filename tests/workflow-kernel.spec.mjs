@@ -756,13 +756,13 @@ const receiptAuthor=()=>({'demo.sales.implementation.frontend.receipt-author':[{
  */
 const bindingRoles=roles=>input=>({...resolveLedgerRoot(input),roles});
 
-function setupWork({nodes=WORK_NODES,scope=[],reintake=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal,
+function setupWork({nodes=WORK_NODES,scope=[],reintake=[],migrate=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal,
   critiqueGoal,ledgerApi,validateOp=acceptAll,binding=null}={}){
   const tree=workRepo(nodes);
   activeRepo=tree.repo;
   const store=createStore({repoRoot:tree.repo,id:'20260912-110000-work-ledger'});
   const state=createWorkflowState({job:'Finish the sales slice',worktree:cwd,branch:'starci183/sales',
-    gates,store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'work',scope,reintake,repoRoot:tree.repo});
+    gates,store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'work',scope,reintake,migrate,repoRoot:tree.repo});
   const api=ledgerApi?ledgerApi(tree):undefined;
   const goal=goalPhase(store,state,{validate:tree.validate,cwd,...(api?{ledgerApi:api}:{}),
     critiqueGoal:critiqueGoal??soundCritique,
@@ -829,6 +829,121 @@ test('a scope entry that names nothing in the tree begins with an intake operati
     assert.match(op.goal,/Reconcile and re-author the existing drafts of the feature payments/);
     assert.deepEqual(events(again.store).filter(event=>event.event==='intake-planned').map(event=>event.mode),['reconcile']);
   }finally{again.cleanup();}
+});
+
+/**
+ * A rule that turns a bound into an escalation applies to what an older rule already parked for the owner. The
+ * kernel judges those items again once, on start, under the current rule: a spent review is escalated, a deep
+ * shared change is authored as a node, a refused record path is refused again and the code paths carry on, a
+ * spent launch cools and comes back, a requester blocked behind a blocked shared change waits instead. What the
+ * current rule still parks stays parked - and the pass runs once per rule, never once per start.
+ */
+test('the items an older rule parked for the owner are judged again under the current rule, once, on kernel start',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    const base=state.ops[0];
+    const clone=(id,extra)=>{const copy=structuredClone(base);Object.assign(copy,{id,nodeId:null,ledgerIds:[],origin:'repair',status:'blocked',refusal:null,dispatch:null,terminal:null,reports:[],dependsOn:[],requesters:[],findings:[],priorOpen:[]},extra);return copy;};
+    // 1. a launch the old rule gave up on
+    state.ops.push(clone('env-1',{restarts:4}));
+    state.needUser.push({op:'env-1',kind:'environment',detail:'env-1 was restarted 4 times (stalled-idle)'});
+    // 2. a requester blocked behind a shared change that is blocked but alive
+    state.ops.push(clone('shared-9',{origin:'shared',requesters:['req-1'],allowlist:['src/shared/nine.ts']}));
+    state.ops.push(clone('req-1',{dependsOn:['shared-9']}));
+    state.needUser.push({op:'req-1',kind:'shared-change',detail:'req-1 waits for the shared change shared-9, which is blocked'});
+    // 3. a record path refused outright although code paths were asked for beside it
+    state.ops.push(clone('repair-x',{allowlist:['src/mine.ts'],reports:[{attempt:1,outcome:'blocked',summary:'needs more',blocker:{kind:'shared-change',detail:'.starciwork/features/payments/index.yaml and src/other/file.ts must change'},open:[]}]}));
+    state.needUser.push({op:'repair-x',kind:'ledger-path',detail:'repair-x asked for a change the kernel will not delegate: .starciwork/features/payments/index.yaml'});
+    // 4. a record path alone: the op is told the rule and runs again
+    state.ops.push(clone('shared-y',{origin:'shared',allowlist:['src/y.ts'],reports:[{attempt:1,outcome:'blocked',summary:'assets missing',blocker:{kind:'shared-change',detail:'.starciwork/features/payments/ui/assets/a.png'},open:[]}]}));
+    state.needUser.push({op:'shared-y',kind:'ledger-path',detail:'shared-y asked for a change the kernel will not delegate: .starciwork/features/payments/ui/assets/a.png'});
+    // 5. a review the old rule parked after its rounds, and its companion line
+    const node=state.ledger[0];node.status='review-exhausted';
+    base.status='done';
+    state.ops.push(clone('verify-x',{kind:'review.verify',origin:'verify',status:'done',ledgerIds:[node.id],allowlist:[...base.allowlist],reports:[{attempt:1,outcome:'partial',summary:'review',open:['P1 src/a.ts:1 breaks a rule nobody decided']}]}));
+    state.verifyRounds[node.id]=3;
+    state.needUser.push({op:'verify-x',kind:'review',detail:`${node.id} still fails review after 3 rounds: P1 src/a.ts:1 breaks a rule nobody decided`});
+    state.needUser.push({kind:'review',detail:`${node.id} used its 3 review rounds and is implemented again; decide whether the last findings stand`});
+    // 6. the list the finish recomputes anyway
+    state.needUser.push({kind:'ledger',detail:`never verified: ${node.id} (review-exhausted)`});
+    // 7. a genuine owner item: a provision. It stays.
+    state.needUser.push({op:'req-1',kind:'credential',detail:'TELEGRAM_BOT_TOKEN'});
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    const before=store.readEvents().length;
+    const state2=harness.run({maxIterations:1});
+    const log=store.readEvents().slice(before);
+    const rejudged=log.filter(event=>event.event==='parked-rejudged');
+    assert.equal(rejudged.length,1);
+    assert.equal(rejudged[0].rule,'5.0.0-plus');
+    const routes=Object.fromEntries(rejudged[0].routed.map(entry=>[`${entry.kind}:${entry.op??'-'}`,entry.route]));
+    assert.equal(routes['environment:env-1'],'launch-cooling');
+    assert.equal(routes['shared-change:req-1'],'waits-for:shared-9');
+    assert.equal(routes['ledger-path:shared-y'],'readmitted');
+    assert.ok(routes['ledger-path:repair-x'],'the code paths of a split request carry on');
+    assert.equal(routes['review:verify-x'],'verify-escalated');
+    assert.equal(routes['review:-'],'companion-line');
+    assert.equal(routes['ledger:-'],'recomputed-at-finish');
+    const byId=id=>state2.ops.find(item=>item.id===id);
+    // The launch cooled and came back at once; the requester waits; the record-only request runs again with the rule in hand.
+    assert.ok(log.some(event=>event.event==='launch-cooling'&&event.op==='env-1'));
+    assert.ok(log.some(event=>event.event==='launch-readmitted'&&event.op==='env-1'));
+    assert.notEqual(byId('env-1').status,'blocked');
+    assert.equal(byId('req-1').waitingFor,'shared-9');
+    assert.notEqual(byId('shared-y').status,'blocked');
+    assert.match(byId('shared-y').findings.at(-1),/not a change any operation may ask for/);
+    // The record path is refused with the same event the live rule uses, and the code path became a shared change.
+    const refused=log.find(event=>event.event==='ledger-path-refused'&&event.op==='repair-x');
+    assert.deepEqual([refused.paths,refused.continued,refused.rejudged],[['.starciwork/features/payments/index.yaml'],['src/other/file.ts'],true]);
+    assert.notEqual(byId('repair-x').status,'blocked');
+    // The spent review is escalated inside the runtime: one repair, and a provisional question because the finding cites no decided record.
+    assert.ok(log.some(event=>event.event==='verify-escalated'&&event.component===node.id&&event.hidden===true));
+    assert.ok(state2.ops.some(item=>item.origin==='repair'&&item.ledgerIds.includes(node.id)&&item.id!==base.id),'the escalation is a repair op');
+    // What is genuinely the owner's stays; everything mechanical is gone from the list.
+    const kinds=state2.needUser.map(item=>item.kind);
+    assert.ok(kinds.includes('credential'),'a provision stays the owner\'s');
+    for(const gone of ['environment','shared-change','ledger-path','review','ledger'])assert.equal(kinds.includes(gone),false,`${gone} is no longer on the owner's list`);
+    assert.equal(state2.parkRule,'5.0.0-plus');
+    // Once per rule: the next start finds the stamp and judges nothing again.
+    const again=store.readEvents().length;
+    harness.run({maxIterations:1});
+    assert.equal(store.readEvents().slice(again).some(event=>event.event==='parked-rejudged'),false);
+  }finally{harness.cleanup();}
+});
+
+/**
+ * `--migrate` is the one workflow that executes no node: one intake per feature, in migrate mode, over allowlists
+ * that never meet, bringing the decided records under the current model without re-deciding them.
+ */
+test('workflow-goal --migrate plans one migrate-mode intake per feature and no node: the decided records are brought under the model in parallel',()=>{
+  const one=setupWork({migrate:['payments']});
+  try{
+    assert.equal(one.goal.ok,true);
+    assert.deepEqual(one.state.ledger,[],'a migration executes no node');
+    assert.deepEqual(one.state.decisions,[],'a migration decides nothing');
+    const op=one.state.ops.find(item=>item.intake);
+    assert.deepEqual(one.state.ops.map(item=>item.id),['payments-intake']);
+    assert.deepEqual([op.kind,op.intake.scope,op.intake.mode],['work.author','payments','migrate']);
+    assert.deepEqual(op.allowlist,['.starciwork/features/payments/index.yaml','.starciwork/features/payments/business/**','.starciwork/features/payments/architecture/**','.starciwork/features/payments/integration/**'],
+      'the implementation and ui records are never in a migration\'s reach');
+    assert.match(op.goal,/Bring the decided records of the feature payments under the current Work model without re-deciding any of them/);
+    assert.match(op.goal,/extensions\.work3\.integrations/);
+    assert.match(op.goal,/custody: identity:<slug>/);
+    assert.match(op.goal,/never write a secret value anywhere/);
+    assert.ok(op.acceptance.some(line=>/no decided record of payments changed its state, its rev or its substance/.test(line)));
+    assert.ok(op.acceptance.some(line=>/one todo integration node features\/payments\/integration\/<id>\/index\.yaml exists per entry/.test(line)));
+    assert.deepEqual(events(one.store).filter(event=>event.event==='intake-planned').map(event=>event.mode),['migrate']);
+  }finally{one.cleanup();}
+  // `all` is every feature of the tree, each its own op with its own allowlist, so they run side by side.
+  const all=setupWork({migrate:['all']});
+  try{
+    const intakes=all.state.ops.filter(item=>item.intake);
+    assert.ok(intakes.length>=1);
+    assert.equal(intakes.length,all.state.ops.length);
+    assert.ok(intakes.every(item=>item.intake.mode==='migrate'));
+    const seen=new Set();
+    for(const item of intakes)for(const entry of item.allowlist){assert.equal(seen.has(entry),false,`${entry} belongs to one intake`);seen.add(entry);}
+  }finally{all.cleanup();}
 });
 
 test('an op the restart limit blocked for a rate limit cools down and is re-admitted on another runtime, and an older block is migrated',()=>{
@@ -2407,8 +2522,12 @@ test('a shared change must name its paths, is deduped by path set, is capped per
     assert.equal(op('op-a').status,'ready');
     assert.equal(op('op-a').attempt,2);
     assert.deepEqual(op('op-a').priorOpen,['shared change shared-1 done at def5678']);
-    // A shared op that ends blocked blocks its requesters instead of leaving them paused forever.
+    // A shared op blocked without a refusal is still alive - the kernel cools, re-admits or authors it - so its
+    // requester keeps waiting; one the kernel refused for good blocks its requesters instead of leaving them paused forever.
     op('shared-2').status='blocked';
+    resumePaused(harness.store,harness.state);
+    assert.equal(op('op-c').status,'paused','a blocked shared op the kernel will re-admit keeps its requester waiting');
+    op('shared-2').refusal='launch-exhausted';
     resumePaused(harness.store,harness.state);
     assert.equal(op('op-c').status,'blocked');
     assert.match(harness.state.needUser.find(item=>item.op==='op-c').detail,/waits for the shared change shared-2, which is blocked/);

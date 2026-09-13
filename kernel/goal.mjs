@@ -458,7 +458,18 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   const repository=ledgerApi.repositoryName?.(repoRoot)??null;
   const loaded=ledgerApi.loadLedger({...at,validate});
   const scope=state.scope.length?state.scope:null;
-  const executables=ledgerApi.executableCandidates(loaded,{scope,repository,side:binding.side});
+  // `--migrate <feature,...|all>` is the one workflow that executes no node: it brings the decided records of
+  // those features under the current model - the typed reconciliation, the declared integrations with their
+  // custody, the integration nodes the tree then owes - through one intake per feature, in migrate mode, over
+  // allowlists that never meet, so every feature migrates at once. The decided statements are not re-decided.
+  const featuresOfTree=unique(loaded.list.map(node=>(slash(node.path??'').match(/^features\/([^/]+)\//)??[])[1]).filter(Boolean)).sort();
+  const migrate=(state.migrate??[]).map(entry=>slash(String(entry??'')).replace(/^features\//,'').replace(/\/+$/,'')).filter(Boolean);
+  const migrating=migrate.length>0;
+  const unknownFeatures=migrate.filter(entry=>entry!=='all'&&!featuresOfTree.includes(entry));
+  need(!unknownFeatures.length,`--migrate names no feature of the tree: ${unknownFeatures.join(', ')} (the tree has ${featuresOfTree.join(', ')||'none'})`);
+  const migrated=migrating?(migrate.includes('all')?featuresOfTree:unique(migrate)):[];
+  need(!migrating||migrated.length,'--migrate names no feature and the tree has none to migrate');
+  const executables=migrating?[]:ledgerApi.executableCandidates(loaded,{scope,repository,side:binding.side});
   const ready=executables.filter(node=>node.schedulable),incomplete=executables.filter(node=>!node.schedulable);
   // A scope entry that names nothing in the tree is a feature - or the brand - still to be authored. The workflow
   // then begins with one intake operation that writes those records from the job, and the tree, once it has them,
@@ -466,14 +477,15 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   // `--reintake <feature>` re-authors drafts the tree already holds under the reconciliation rule: the same intake
   // op, in reconcile mode, over the same allowlist - the way a feature authored before that rule is brought under it.
   const reintake=(state.reintake??[]).map(entry=>slash(String(entry??'')).replace(/\/+$/,'')).filter(Boolean);
-  const absent=unique([...(scope??[]).filter(entry=>!loaded.list.some(node=>scopeNames(node,entry))),...reintake]);
+  const absent=migrating?migrated:unique([...(scope??[]).filter(entry=>!loaded.list.some(node=>scopeNames(node,entry))),...reintake]);
   const repositories=(()=>{try{return Object.fromEntries(bindingRoutes(binding.binding,{source:path.dirname(path.resolve(state.host??''))}).map(route=>[route.role,route.directory]));}catch{return {};}})();
   // The folders of the other bound repositories, and the folder they all live in, so a path naming one of them
   // is never mistaken for a path of this worktree.
   state.otherRepositories=unique(Object.values(repositories).map(root=>path.basename(String(root))).filter(name=>name&&name!==path.basename(repoRoot)));
   state.repositoriesRoot=state.host?path.basename(path.dirname(path.dirname(path.resolve(state.host)))):null;
-  const intake=absent.map((entry,index)=>intakeOp(state,{workRoot:binding.ledgerRoot,loaded,index,entry,repositories,mode:reintake.includes(slash(String(entry)).replace(/\/+$/,''))?'reconcile':'author'}));
-  state.decisions=ledgerApi.decisionCandidates(loaded,{scope}).map(node=>({id:node.id,kind:node.kind,path:node.path,
+  const modeOf=entry=>migrating?'migrate':reintake.includes(slash(String(entry)).replace(/\/+$/,''))?'reconcile':'author';
+  const intake=absent.map((entry,index)=>intakeOp(state,{workRoot:binding.ledgerRoot,loaded,index,entry,repositories,mode:modeOf(entry)}));
+  state.decisions=(migrating?[]:ledgerApi.decisionCandidates(loaded,{scope})).map(node=>({id:node.id,kind:node.kind,path:node.path,
     operation:decisionKindFor(node.kind)??'business.decide',title:describeNode(ledgerApi,at,node)}));
   state.ledgerSummary=ledgerApi.ledgerSummary(loaded,{scope});
   // The brand is part of what the user approves: goal.md and goal.json name the record every design step reads.

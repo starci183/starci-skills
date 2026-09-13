@@ -477,6 +477,29 @@ report as the owner's, and nothing asks the user.
 holds (`intake-planned {mode: reconcile}`), which is how a feature authored before this rule is brought under
 it.
 
+`workflow-goal --migrate <feature,...|all>` is the one workflow that executes no node. It plans one intake per
+feature in migrate mode (`intake-planned {mode: migrate}`) over an allowlist of the module record, `business/**`,
+`architecture/**` and `integration/**` - never `implementation/` or `ui/` - so the intakes of every feature run
+side by side and never meet a kernel write. A migration brings the decided records under the current model:
+the typed reconciliation on the module record, every outside system declared at `extensions.work3.integrations`
+with its credential's name and `custody: identity:<slug>`, and one todo integration node per declaration.
+No decided record changes its state, its rev or its substance; a contradiction is a `conflict` row and a
+decision record, never an edit. `all` names every feature the tree has; a feature the tree lacks is refused.
+
+### What an older rule already parked
+
+A rule that turns a bound into an escalation applies to what an older rule already parked for the owner. On
+kernel start, once per rule (`PARK_RULE`, stamped on `state.parkRule`), `rejudgeParked` judges every item of
+the owner's list again under the current rule and routes it where the rule routes it today: a parked review is
+escalated (`verify-escalated`, a provisional question when its findings cite no decided record), a shared change
+called too deep is authored as a node (`shared-authored`), a request that named record paths is refused again
+(`ledger-path-refused {rejudged: true}`) and its code paths carry on as a shared change - or, when it named
+record paths alone, the op runs again with the rule in its findings - a spent launch cools and comes back
+(`launch-cooling`, `launch-readmitted`), a requester blocked behind a blocked-but-alive shared change waits
+for it instead (`resumePaused` blocks a requester only behind a refused or failed shared change), and the
+"never verified" line is dropped because the finish recomputes it. A provision, an irreversible effect, a
+decision - what is genuinely the owner's - stays. The pass writes one `parked-rejudged {rule, routed, left}`.
+
 ## Reconciliation: three cases, as data
 
 ### The principle
@@ -1375,6 +1398,7 @@ moved under a running kernel; `kernel-error` the loop caught something it could 
 **Budget, cooldowns and the shared ledger** - `rate-limit-cooling` a provider was parked; `rate-limit-parked`
 an operation was moved off it; `rate-limit-inferred` two silent settlements of one runtime inside thirty
 minutes were read as a quota refusal; `rate-limit-readmitted` the cooldown passed; `launch-cooling` /
+`parked-rejudged` the owner's list was judged again under the current rule on kernel start, once per rule (its `routed` names every item and where it went);
 `launch-readmitted` / `launch-cap-reached` an op whose launch attempts or `stalled-idle` restarts were spent
 cooled, came back, and - past `LAUNCH_DAILY_CAP` in one day - became the owner's `environment` item;
 `avoid-expired` /
