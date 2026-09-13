@@ -256,7 +256,8 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     cook,``,
     `## Checks to run`,...(op.checks.length?op.checks.map(check=>`- ${check.name}: \`${check.command}\``):['- none were declared: run the checks this code already has and record them']),
     `Record every command with its exit code in \`${checksFile}\` as a JSON array \`[{"name","command","exitCode","evidence"}]\`.`,
-    `The kernel re-runs these exact commands itself after your report and computes your changed files from git: a \`done\` the machine cannot reproduce is downgraded to \`failed\` and comes back to you.`,``,
+    `The kernel re-runs these exact commands itself after your report and computes your changed files from git: a \`done\` the machine cannot reproduce is downgraded to \`failed\` and comes back to you.`,
+    `An error the whole-tree validator reports under a path outside your allowlist is not yours: name it in your summary and report as if that check passed for your files. The kernel judges the tree by what you could have caused, never by a red corner another workflow owns.`,``,
     `## Report (exactly once, at the end)`,
     `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" --files <comma-separated changed paths> --checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|srs-gap|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority:<detail>]\``,
     `- \`done\` needs every check exiting 0 and no open item; otherwise report \`partial\` (with \`--open\`) or \`failed\`.`,
@@ -1156,8 +1157,10 @@ function settleAuthoredRecord(store,state,op,ctx){
 /** One accepted report, one deterministic action. `done` passes through machine verification and a commit. */
 export function applyOpReport(orca,store,state,op,report,ctx){
   if(validatorOnlyBlock(report)){
-    store.appendEvent({event:'validator-only-block',op:op.id,note:'treated as partial: the kernel owns work-valid'});
-    report={...report,outcome:'partial',open:[...(report.open??[]),'previous attempt was blocked only by the whole-tree validator while a sibling wrote the ledger; the kernel validates at acceptance'],blocker:null,signal:{type:'worker_done',orcaOutcome:'succeeded'}};
+    const outcome=(report.open??[]).length?'partial':'done';
+    store.appendEvent({event:'validator-only-block',op:op.id,from:report.outcome,to:outcome,note:'the kernel owns the whole-tree validator and judges it by what this operation could have caused'});
+    // The failing tree check leaves the report: the kernel adds its own, scoped, at acceptance.
+    report={...report,outcome,blocker:undefined,checks:(report.checks??[]).filter(check=>!(check.exitCode!==0&&/work-valid|work-tree-validates/i.test(check.name??''))),...(outcome==='partial'?{open:[...(report.open??[]),'previous attempt was blocked only by the whole-tree validator; the kernel validates at acceptance, scoped to this operation']}:{}),blocker:null,signal:{type:'worker_done',orcaOutcome:'succeeded'}};
   }
   const checked=validateReport(report,{allowlist:reportAllowlist(op,ctx)});
   op.reports.push({attempt:op.attempt,runtime:op.runtime,outcome:report.outcome,summary:report.summary,
@@ -1485,11 +1488,18 @@ function repairFromUat(store,state,op,findings,ctx){
 
 /* ------------------------------------------------------------------ accept, verify, gates */
 
-/** The validator is the kernel's gate; an operation blocked only by it is resumed, never escalated as a shared change. */
+/**
+ * The whole-tree validator is the kernel's gate, and the kernel judges it by what the op could have caused. An
+ * operation that ran the raw command, saw a red corner another workflow owns (a frontend design whose assets
+ * have not landed yet) and reported `blocked` or `failed` over it has done its work: the report is read as
+ * `done` when it carries no open item (`partial` when it does), and the kernel's scoped verdict decides.
+ */
 function validatorOnlyBlock(report){
-  if(report?.outcome!=='blocked'||report?.blocker?.kind!=='shared-change')return false;
+  if(!['blocked','failed'].includes(report?.outcome))return false;
   const failing=(report.checks??[]).filter(check=>check.exitCode!==0);
-  return failing.length>0&&failing.every(check=>/work-valid|work-tree-validates/i.test(check.name??''))&&/\.starciwork|work-valid|validator/i.test(report.blocker.detail??'');
+  if(!failing.length||!failing.every(check=>/work-valid|work-tree-validates/i.test(check.name??'')))return false;
+  const blocker=report.blocker;
+  return !plain(blocker)||/\.starciwork|work-valid|validat|asset/i.test(`${blocker.kind??''} ${blocker.detail??''}`);
 }
 
 function acceptReports(orca,store,state,ctx){
@@ -1953,7 +1963,7 @@ export function rejudgeParked(store,state,ctx){
 
 function readmitCooled(store,state,ctx){
   const now=typeof ctx?.now==='function'?ctx.now():Date.now();
-  for(const item of state.needUser.filter(entry=>entry.kind==='environment'&&entry.op)){
+  for(const item of state.needUser.filter(entry=>['environment','authority'].includes(entry.kind)&&entry.op)){
     const op=state.ops.find(candidate=>candidate.id===item.op);
     if(!op||op.status!=='blocked'||op.refusal)continue;
     const detail=String(item.detail??'');
@@ -1961,6 +1971,15 @@ function readmitCooled(store,state,ctx){
       op.refusal='rate-limited';op.coolUntil=now;
       state.needUser=state.needUser.filter(entry=>entry!==item);
       store.appendEvent({event:'rate-limit-cooling',op:op.id,runtime:op.runtime,until:op.coolUntil,restarts:op.restarts,migrated:true});
+      continue;
+    }
+    // Retries spent on the whole-tree validator are a mechanical bound too: the op comes back with its retries
+    // cleared and the current rule (the kernel judges the tree scoped to it) in force.
+    if(item.kind==='authority'&&/exhausted its retries|never finishes/.test(detail)&&/work-tree-validates|work-valid|validat|asset/i.test(detail)){
+      state.needUser=state.needUser.filter(entry=>entry!==item);
+      op.repairs=0;op.resumes=0;
+      coolOp(store,state,op,ctx,detail,{migrated:true});
+      op.coolUntil=now;
       continue;
     }
     // A lost agent, an idle restart, a launch nobody could take: mechanical bounds, wherever they were parked from
