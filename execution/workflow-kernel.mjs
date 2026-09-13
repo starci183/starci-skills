@@ -1162,8 +1162,6 @@ export function syncLedgerOps(store,state,ctx){
       state.ledgerInvalid=signature;
       store.appendEvent({event:'ledger-invalid',errors:loaded.errors.slice(0,8).map(error=>({code:error.code,path:error.path??null,message:String(error.message??'').slice(0,160)}))});
     }
-    return [];
-  }
   // A tree still red only outside an op's reach is green for that op: the ops the validator exhausted on the
   // whole-tree check are judged again when every remaining error is foreign to them.
   if(!loaded.ok&&ctx.work){
@@ -1174,6 +1172,8 @@ export function syncLedgerOps(store,state,ctx){
       state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&entry.kind==='validator'));
       store.appendEvent({event:'op-readmitted',op:op.id,reason:`the ${verdict.foreign.length} error(s) of the tree are outside this operation`});
     }
+  }
+    return [];
   }
   if(state.ledgerInvalid||quarantined){
     state.ledgerInvalid=null;store.appendEvent({event:'ledger-valid-again',...(quarantined?{after:'quarantine'}:{})});
