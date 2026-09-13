@@ -965,6 +965,31 @@ test('workflow-goal --migrate plans one migrate-mode intake per feature and no n
  * line with no cooldown of its own, and the kernel migrates that line to a cooldown every tick - the op comes back
  * with its counters cleared, and the owner is never asked to fix a terminal.
  */
+/**
+ * A mechanical line about an op that has since moved on is stale and would finish the workflow blocked over
+ * nothing: the kernel drops it every tick. A line about an op still blocked without a refusal stays.
+ */
+test('a mechanical line about an op that moved on is dropped from the owner\'s list every tick',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    const op=state.ops[0];
+    op.status='running';op.dispatch='ctx_live';op.terminal='term_live';op.runtime='gpt-6-astra';
+    state.needUser.push({op:op.id,kind:'triage',detail:`settled:${op.id}:stalled-idle`});
+    state.needUser.push({op:'nobody',kind:'credential',detail:'TELEGRAM_BOT_TOKEN'});
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    const before=store.readEvents().length;
+    const state2=harness.run({maxIterations:1});
+    const log=store.readEvents().slice(before);
+    // Whichever pass met the line first - the once-per-rule judgement on start or the per-tick sweep - names it as stale.
+    const stale=[...log.filter(event=>event.event==='need-user-stale-dropped').flatMap(event=>event.dropped.map(entry=>[entry.kind,entry.op])),
+      ...log.filter(event=>event.event==='parked-rejudged').flatMap(event=>event.routed.filter(entry=>/^stale:/.test(entry.route)).map(entry=>[entry.kind,entry.op]))];
+    assert.deepEqual(stale,[['triage',op.id]]);
+    assert.deepEqual(state2.needUser.map(item=>item.kind),['credential'],'the provision stays; the stale mechanical line is gone');
+  }finally{harness.cleanup();}
+});
+
 test('an op that lost its agent past the restart limit cools down and comes back, and the owner is not asked',()=>{
   const harness=setupWork();
   try{

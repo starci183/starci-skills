@@ -270,6 +270,12 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
   // content: the typed reconciliation rows and the integrations a feature declares. A migration that adds them
   // to a decided module record must not turn every completion beneath that record stale, so they are left out
   // of the semantic digest; everything else under extensions stays in, conservatively, as before.
+  // An OPEN policy decision - a question put to the owner, not yet answered - stands beside the requirement it
+  // will one day change: it binds nothing and derives nothing until it is decided. Otherwise the first conflict a
+  // migration records would turn a whole decided feature stale and not-done, and everything built on it with it.
+  // Once decided (`state: done`) it is part of the requirement, its ancestors' inputs change, and every completion
+  // that rested on them is re-verified - which is exactly what a new decision must cause.
+  const openDecision=n=>n?.meta?.kind==='business'&&n.meta.state==='todo'&&/srs-policy-decision/.test(String(n.meta.extensions?.work3?.srs?.schema??''));
   const DECLARATIONS=['reconciliation','integrations'];
   const semanticMetadata=meta=>{
     const out=Object.fromEntries(Object.entries(meta).filter(([k])=>!operational.has(k)&&!(meta.schema==='work/node@2'&&k==='description')));
@@ -556,7 +562,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     n.brandBinding=brand;
     const context={...semanticBase(n,x=>x.specDigest,input),...(specificationLinks.length?{specificationLinks}:{}),...(brand?{brand:{id:brand.id,digest:brand.digest}}:{})};
     n.contextDigest=digest(canonicalJSON(context));
-    n.inputDigest=digest(canonicalJSON({...context,children:n.children.map(c=>({id:c.meta.id,digest:input(c)})).sort((a,b)=>a.id.localeCompare(b.id))}));
+    n.inputDigest=digest(canonicalJSON({...context,children:n.children.filter(c=>!openDecision(c)).map(c=>({id:c.meta.id,digest:input(c)})).sort((a,b)=>a.id.localeCompare(b.id))}));
     visiting.delete(n);return n.inputDigest;
   }
   nodes.forEach(input);
@@ -727,7 +733,9 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     if(n.stale)n.suspensionReasons.push({code:'INPUT_CHANGED',ids:[n.meta.id]});
     if(n.meta.state==='suspended')n.suspensionReasons.push({code:'DECLARED_SUSPENSION',ids:[n.meta.id]});
     if(n.children.length){
-      n.children.forEach(roll);const required=n.children.filter(c=>c.meta.required).map(c=>c.effectiveState);
+      n.children.forEach(roll);
+      for(const c of n.children.filter(openDecision))warn('OPEN_DECISION',c.path,'An open policy decision waits for the owner; it binds nothing and derives nothing until it is decided.');
+      const required=n.children.filter(c=>c.meta.required&&!openDecision(c)).map(c=>c.effectiveState);
       n.effectiveState=localInvalid?'invalid':!required.length?'na':required.every(s=>s==='na')?'na':required.every(s=>['done','na'].includes(s))?'done':required.includes('invalid')?'invalid':required.includes('blocked')?'blocked':required.includes('suspended')?'suspended':required.some(s=>['doing','done'].includes(s))?'doing':'todo';
       if(n.effectiveState==='suspended')n.suspensionReasons.push({code:'CHILD_SUSPENDED',ids:n.children.filter(c=>c.meta.required&&c.effectiveState==='suspended').map(c=>c.meta.id)});
       if(n.children.some(c=>!c.meta.required&&!['done','na'].includes(c.effectiveState)))warn('OPTIONAL_UNMET',n.path,'Optional unfinished children remain visible but do not block parent rollup.');
@@ -752,7 +760,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       if(unreviewedAncestor)n.suspensionReasons.push({code:'ANCESTOR_NOT_INVESTIGATED',ids:unreviewedAncestors.map(a=>a.meta.id)});
       if(unreviewedReference)n.suspensionReasons.push({code:'REFERENCE_NOT_INVESTIGATED',ids:n.effectiveRefs.filter(r=>r.type==='node'&&r.effectiveState==='uninvestigate').map(r=>r.meta.id)});
       if(unreviewedDependency)n.suspensionReasons.push({code:'DEPENDENCY_NOT_INVESTIGATED',ids:n.effectiveDeps.filter(r=>r.effectiveState==='uninvestigate').map(r=>r.meta.id)});
-      if(!localInvalid){const required=n.children.filter(c=>c.meta.required);n.effectiveState=uninvestigate?'uninvestigate':n.children.length?(required.length&&required.every(c=>c.effectiveState==='done')?'done':required.some(c=>c.effectiveState==='uninvestigate')?'uninvestigate':'todo'):n.meta.state;}
+      if(!localInvalid){const required=n.children.filter(c=>c.meta.required&&!openDecision(c));n.effectiveState=uninvestigate?'uninvestigate':n.children.length?(required.length&&required.every(c=>c.effectiveState==='done')?'done':required.some(c=>c.effectiveState==='uninvestigate')?'uninvestigate':'todo'):n.meta.state;}
       n.eligible=!localInvalid&&!uninvestigate&&n.effectiveState!=='uninvestigate'&&n.blockedBy.length===0&&!(n.meta.blockers?.length);
     }
     rolling.delete(n);return n.effectiveState;
