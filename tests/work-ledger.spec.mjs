@@ -7,7 +7,9 @@ import {parseYaml} from '../core/yaml.mjs';
 import {
   DECISION_KINDS,EXECUTABLE_KINDS,decisionCandidates,disjoint,executableCandidates,layoutOf,layoutSide,ledgerSummary,nodeRepository,
   brandReferences,buildSourceIdentity,checkAssertions,loadLedger,markDecided,markDone,markInProgress,markReopened,
-  nodeFile,readNode,writeEvidence
+  nodeFile,readNode,writeEvidence,
+  contractDigestOf,declaredIntegrations,integrationIdOf,integrationNodes,integrationProofStatus,missingIntegrationNodes,
+  readLedgerTree,staleProofs
 } from '../kernel/ledger.mjs';
 
 const DIGEST='a'.repeat(64);
@@ -144,7 +146,7 @@ test('the ledger is the Work tree: candidates split by kind and a node without a
   const root=fakeRepo();
   try{
     assert.deepEqual(DECISION_KINDS,['business','business-overview','architecture','brand']);
-    assert.deepEqual(EXECUTABLE_KINDS,['implementation','uat','e2e','operations','ui']);
+    assert.deepEqual(EXECUTABLE_KINDS,['implementation','uat','e2e','operations','ui','integration']);
     const ledger=open(root);
     assert.equal(ledger.ok,true);
     assert.equal(ledger.nodes.get('demo.billing.implementation.backend.ledger').kind,'implementation');
@@ -527,6 +529,260 @@ test('markDecided settles the brand through a review that records the rev it dec
     assert.equal(parsed.brand.rev,'2');
     assert.equal(parsed.brand.sources[0].path,'src/app/globals.css');
     assert.throws(()=>markDecided(root,BRAND_NODE,{rev:'3',review:{reviewer:'x',authority:'y',observations:[{id:'invented',observation:'Not an authored assertion.'}]},inputDigest:FRESH}),/invented/);
+  }finally{cleanup(root);}
+});
+
+// ----------------------------------------------------------------- external integrations
+// An integration is a record, its node is required, every proof says what it proved against, and a proof
+// remembers the rules it was taken under. Synthetic fixture values only: no real endpoint, no real secret.
+
+const DELIVERY=`schema: work/node@2
+id: demo.sales.business.srs.fr.delivery
+kind: business
+required: true
+state: done
+description: An order is delivered to the customer's own chat channel.
+extensions:
+  work3:
+    integrations:
+      - id: telegram
+        provider: telegram-bot-api
+        credential:
+          name: TELEGRAM_BOT_TOKEN
+          providedBy: owner
+          where: the workflow environment
+        sandbox: https://sandbox.invalid/telegram
+      - id: zalo
+        provider: zalo-oa-api
+        credential:
+          providedBy: owner
+      - id: viber
+        provider: viber-bot-api
+        credential:
+          name: VIBER_TOKEN
+          providedBy: vendor
+      - provider: nameless-api
+        credential:
+          name: NAMELESS_TOKEN
+          providedBy: owner
+`;
+const TELEGRAM=`schema: work/node@2
+id: demo.sales.integration.telegram
+kind: integration
+required: true
+state: todo
+description: Prove the Telegram delivery against the provider's own sandbox.
+assertions:
+  - telegram-live
+extensions:
+  work3:
+    allowlist:
+      - src/tests/integration/telegram.live-spec.ts
+    checks:
+      - assertion: telegram-live
+        command: npm run test:integration -- telegram
+`;
+const CHECKOUT=`schema: work/node@2
+id: demo.sales.e2e.checkout
+kind: e2e
+required: true
+state: todo
+description: Prove checkout through the API on the real stack.
+assertions:
+  - order-persisted
+extensions:
+  work3:
+    allowlist:
+      - src/tests/e2e/checkout.e2e-spec.ts
+    checks:
+      - assertion: order-persisted
+        command: npm run test:e2e -- checkout
+`;
+const liveCheck={name:'integration',command:'npm run test:integration -- telegram',exitCode:0,assertion:'telegram-live'};
+const e2eCheck={name:'e2e',command:'npm run test:e2e -- checkout',exitCode:0,assertion:'order-persisted'};
+const DECLARATION_DIGEST='9'.repeat(64);
+
+function integrationRepo(){
+  const root=path.join(os.tmpdir(),'starci-work-ledger-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  fs.mkdirSync(root,{recursive:true});
+  fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({name:'@demo/backend'}));
+  const write=(relative,content)=>{
+    const file=path.join(root,'.starciwork',relative);
+    fs.mkdirSync(path.dirname(file),{recursive:true});
+    fs.writeFileSync(file,content);
+  };
+  write('features/sales/business/srs/delivery/index.yaml',DELIVERY);
+  write('features/sales/integration/telegram/index.yaml',TELEGRAM);
+  write('features/sales/e2e/checkout/index.yaml',CHECKOUT);
+  // Neither of these is a Work node: `assets/**` is payload and `_local` is execution state.
+  write('features/sales/business/srs/delivery/assets/sample/index.yaml','id: demo.sales.sample\nkind: business\n');
+  write('_local/plans/p1/index.yaml','id: demo.plan\nkind: business\n');
+  return root;
+}
+const tree=root=>readLedgerTree(path.join(root,'.starciwork'));
+const nodeOf=(at,id)=>at.nodes.get(id);
+
+test('the tree can be read without the validator, bounded, skipping payload and execution state',()=>{
+  const root=integrationRepo();
+  try{
+    const at=tree(root);
+    assert.equal(at.workRoot,path.join(root,'.starciwork'));
+    assert.equal(at.repoRoot,root);
+    assert.deepEqual(at.list.map(node=>[node.id,node.kind,node.state]),[
+      ['demo.sales.business.srs.fr.delivery','business','done'],
+      ['demo.sales.e2e.checkout','e2e','todo'],
+      ['demo.sales.integration.telegram','integration','todo']
+    ]);
+    assert.equal(at.list[0].path,'features/sales/business/srs/delivery/index.yaml');
+    assert.equal(readNode(at.at,at.list[0]).kind,'business','a scanned node carries its own file, so the reader needs no projection');
+    assert.equal(at.bounded,false);
+    const clipped=readLedgerTree(path.join(root,'.starciwork'),{limit:2});
+    assert.equal(clipped.list.length,2);
+    assert.equal(clipped.bounded,true,'a pathological tree cannot hang a reader that bounds itself');
+    assert.equal(readLedgerTree(path.join(root,'nothing-here')),null);
+    assert.equal(readLedgerTree(path.join(root,'package.json')),null);
+  }finally{cleanup(root);}
+});
+
+test('a declared integration is data: a credential nobody owns or a nameless entry is a finding, not a silent skip',()=>{
+  const root=integrationRepo();
+  try{
+    const at=tree(root);
+    const {list,problems}=declaredIntegrations(at);
+    assert.deepEqual(list.map(item=>item.id),['telegram','zalo','viber']);
+    assert.deepEqual(list[0],{id:'telegram',provider:'telegram-bot-api',declaredBy:'demo.sales.business.srs.fr.delivery',
+      credential:{name:'TELEGRAM_BOT_TOKEN',providedBy:'owner',where:'the workflow environment'},sandbox:'https://sandbox.invalid/telegram'});
+    assert.equal(list[1].credential.name,null);
+    assert.equal(list[1].sandbox,undefined,'a declaration without a sandbox promises none');
+    assert.deepEqual(problems.map(item=>[item.code,item.id]),[
+      ['credential-missing','zalo'],['credential-not-owner','viber'],['integration-shape',null]]);
+    assert.ok(problems.every(item=>item.declaredBy==='demo.sales.business.srs.fr.delivery'));
+    assert.match(problems[0].detail,/declares no credential name/);
+    assert.match(problems[1].detail,/a credential is the owner's/);
+    // Only the business and design sides declare one: an implementation node naming a provider declares nothing.
+    assert.deepEqual(declaredIntegrations({at:at.at,list:at.list.map(node=>({...node,kind:'implementation'}))}).list,[]);
+    assert.deepEqual(declaredIntegrations({at:at.at,list:[]}),{list:[],problems:[]});
+
+    // The tree owes one node per declared id; the two that have none are what makes it incomplete.
+    assert.deepEqual(integrationNodes(at).map(node=>node.id),['demo.sales.integration.telegram']);
+    assert.equal(integrationIdOf(at.list[2]),'telegram');
+    assert.equal(integrationIdOf(at.list[1]),null);
+    assert.deepEqual(missingIntegrationNodes(at),['zalo','viber']);
+
+    // `integration` is executable work the kernel may schedule, with its own allowlist and check.
+    assert.ok(EXECUTABLE_KINDS.includes('integration'));
+    const eligible={...at,list:at.list.map(node=>({...node,eligible:true}))};
+    const candidate=executableCandidates(eligible).find(node=>node.kind==='integration');
+    assert.equal(candidate.schedulable,true);
+    assert.deepEqual(candidate.allowlist,['src/tests/integration/telegram.live-spec.ts']);
+    assert.deepEqual(candidate.assertions,['telegram-live']);
+  }finally{cleanup(root);}
+});
+
+test('an evidence manifest says what it was proven against, and refuses a boundary nobody published',()=>{
+  const root=integrationRepo();
+  try{
+    const at=tree(root);
+    const telegram=nodeOf(at,'demo.sales.integration.telegram'),checkout=nodeOf(at,'demo.sales.e2e.checkout');
+    const live=parseYaml(fs.readFileSync(writeEvidence(root,telegram,{...bound,opId:'op-live',checks:[liveCheck],proof:{boundary:'live'}}),'utf8'));
+    assert.deepEqual(live.proof,{boundary:'live',fakes:[]},'a proof that names no fake still says so, rather than staying silent');
+    const api=parseYaml(fs.readFileSync(writeEvidence(root,checkout,{...bound,opId:'op-api',checks:[e2eCheck],proof:{boundary:'api',fakes:['zalo','zalo','telegram']}}),'utf8'));
+    assert.deepEqual(api.proof,{boundary:'api',fakes:['zalo','telegram']});
+    // Evidence written without a proof block makes no claim about a boundary; it does not invent one.
+    assert.equal(parseYaml(fs.readFileSync(writeEvidence(root,checkout,{...bound,opId:'op-silent',checks:[e2eCheck]}),'utf8')).proof,undefined);
+    assert.throws(()=>writeEvidence(root,telegram,{...bound,opId:'op-x',checks:[liveCheck],proof:{boundary:'recorded'}}),/boundary is api or live/);
+    assert.throws(()=>writeEvidence(root,telegram,{...bound,opId:'op-y',checks:[liveCheck],proof:{fakes:['zalo']}}),/Missing evidence proof boundary/);
+    assert.throws(()=>writeEvidence(root,telegram,{...bound,opId:'op-z',checks:[liveCheck],proof:{boundary:'live',fakes:'zalo'}}),/lists its fakes as provider ids/);
+  }finally{cleanup(root);}
+});
+
+test('a proof remembers the rules it was taken under: markDone stores the contract digest and hands the proof to the evidence',()=>{
+  const root=integrationRepo();
+  try{
+    const telegram=nodeOf(tree(root),'demo.sales.integration.telegram');
+    const receipt=markDone(root,telegram,{...bound,opId:'op-telegram-1',checks:[liveCheck],
+      contractDigest:DECLARATION_DIGEST,proof:{boundary:'live',fakes:[]},evidence:{environment:'worktree-local'}});
+    const done=parseYaml(fs.readFileSync(nodeFile(root,telegram),'utf8'));
+    assert.equal(done.state,'done');
+    assert.equal(done.extensions.work3.kernel.contractDigest,DECLARATION_DIGEST);
+    assert.equal(done.extensions.work3.allowlist[0],'src/tests/integration/telegram.live-spec.ts','the authored record survives the receipt');
+    assert.deepEqual(parseYaml(fs.readFileSync(receipt.evidence,'utf8')).proof,{boundary:'live',fakes:[]});
+    assert.throws(()=>markDone(root,telegram,{...bound,opId:'op-2',checks:[liveCheck],contractDigest:'not-a-digest'}),/lowercase sha-256/);
+    // A node the kernel completed without naming its rules keeps no digest at all rather than a placeholder.
+    const checkout=nodeOf(tree(root),'demo.sales.e2e.checkout');
+    markDone(root,checkout,{...bound,opId:'op-checkout-1',checks:[e2eCheck]});
+    assert.equal(parseYaml(fs.readFileSync(nodeFile(root,checkout),'utf8')).extensions.work3.kernel.contractDigest,undefined);
+  }finally{cleanup(root);}
+});
+
+test('the contract digest is the declaration itself, in a stable order, and a moved rule reopens the proof',()=>{
+  const declaration={kind:'integration.verify',kindRecord:{family:'prove',reads:['integration','sds','code'],writes:['evidence']},
+    operator:'steps:\n  - call the provider\n',rules:['a fake of the declared provider is a defect']};
+  const digest=contractDigestOf(declaration);
+  assert.match(digest,/^[a-f0-9]{64}$/);
+  assert.equal(digest,contractDigestOf({rules:declaration.rules,operator:declaration.operator,
+    kindRecord:{writes:['evidence'],reads:['integration','sds','code'],family:'prove'},kind:'integration.verify'}),'key order is not part of the declaration');
+  assert.notEqual(digest,contractDigestOf({...declaration,kindRecord:{...declaration.kindRecord,reads:['sds','integration','code']}}),'list order is');
+  assert.notEqual(digest,contractDigestOf({...declaration,rules:[...declaration.rules,'and no recorded response']}));
+  assert.notEqual(digest,contractDigestOf({...declaration,operator:`${declaration.operator}  - and keep the output\n`}));
+  assert.equal(contractDigestOf({kind:'e2e.verify'}),contractDigestOf({kind:'e2e.verify',kindRecord:null,operator:null,rules:[]}));
+  assert.throws(()=>contractDigestOf({}),/Missing operation kind/);
+
+  const root=integrationRepo();
+  try{
+    const telegram=nodeOf(tree(root),'demo.sales.integration.telegram');
+    markDone(root,telegram,{...bound,opId:'op-telegram-1',checks:[liveCheck],contractDigest:digest,evidence:{environment:'worktree-local'}});
+    assert.deepEqual(staleProofs(tree(root),{digestOf:()=>digest}),[],'a proof taken under the current declaration stands');
+    const moved=staleProofs(tree(root),{digestOf:()=>'a'.repeat(64)});
+    assert.deepEqual(moved.map(entry=>[entry.node.id,entry.stored,entry.current]),[['demo.sales.integration.telegram',digest,'a'.repeat(64)]]);
+    // A done record the kernel never completed (the business record, settled elsewhere) is never dragged in.
+    assert.ok(!moved.some(entry=>entry.node.id==='demo.sales.business.srs.fr.delivery'));
+
+    // A node completed with no digest at all is a proof that does not remember its rules: it is stale too.
+    const checkout=nodeOf(tree(root),'demo.sales.e2e.checkout');
+    markDone(root,checkout,{...bound,opId:'op-checkout-1',checks:[e2eCheck]});
+    assert.deepEqual(staleProofs(tree(root),{digestOf:kind=>kind==='integration'?digest:'c'.repeat(64)})
+      .map(entry=>[entry.node.id,entry.stored]),[['demo.sales.e2e.checkout',null]]);
+    // The kernel names the kind and owns the comparison; answering nothing to either leaves the node alone.
+    assert.deepEqual(staleProofs(tree(root),{digestOf:()=>null}),[]);
+    assert.deepEqual(staleProofs(tree(root),{kindOf:()=>null,digestOf:()=>'c'.repeat(64)}),[]);
+    assert.deepEqual(staleProofs(tree(root),{kindOf:(node,{kernel})=>kernel.opId==='op-checkout-1'?'e2e.verify':null,
+      digestOf:kind=>kind==='e2e.verify'?'c'.repeat(64):null}).map(entry=>entry.node.id),['demo.sales.e2e.checkout']);
+    assert.throws(()=>staleProofs(tree(root),{}),/digestOf/);
+  }finally{cleanup(root);}
+});
+
+test('every declared integration is proven live, proven against a fake, or not proven - and there is no fourth state',()=>{
+  const root=integrationRepo();
+  try{
+    const at=tree(root);
+    assert.deepEqual(integrationProofStatus(at).map(entry=>[entry.id,entry.node,entry.proven,entry.evidence.length]),[
+      ['telegram','demo.sales.integration.telegram','none',0],['zalo',null,'none',0],['viber',null,'none',0]
+    ],'a tree that has proven nothing claims nothing');
+
+    // The e2e run proves the product's API and fakes the Zalo channel; it names it, and Zalo reads as faked.
+    markDone(root,nodeOf(at,'demo.sales.e2e.checkout'),{...bound,opId:'op-checkout-1',checks:[e2eCheck],
+      proof:{boundary:'api',fakes:['zalo']},evidence:{environment:'worktree-local'}});
+    // The integration run reaches the provider itself, so Telegram - and only Telegram - reads as live.
+    markDone(root,nodeOf(at,'demo.sales.integration.telegram'),{...bound,opId:'op-telegram-1',checks:[liveCheck],
+      contractDigest:DECLARATION_DIGEST,proof:{boundary:'live',fakes:[]},evidence:{environment:'worktree-local'}});
+    const status=integrationProofStatus(tree(root));
+    assert.deepEqual(status.map(entry=>[entry.id,entry.node,entry.proven]),[
+      ['telegram','demo.sales.integration.telegram','live'],['zalo',null,'fake'],['viber',null,'none']]);
+    assert.deepEqual(status[0].evidence.map(item=>[item.node,item.boundary,item.outcome]),[['demo.sales.integration.telegram','live','pass']]);
+    assert.deepEqual(status[1].evidence.map(item=>[item.node,item.boundary,item.fakes]),[['demo.sales.e2e.checkout','api',['zalo']]]);
+    assert.equal(status[0].provider,'telegram-bot-api');
+
+    // A live run that failed is not a live proof: it ran, it did not prove.
+    const red=integrationRepo();
+    try{
+      const other=tree(red);
+      writeEvidence(red,nodeOf(other,'demo.sales.integration.telegram'),{...bound,opId:'op-red',
+        checks:[{...liveCheck,exitCode:1}],proof:{boundary:'live',fakes:[]}});
+      const failing=integrationProofStatus(tree(red)).find(entry=>entry.id==='telegram');
+      assert.equal(failing.proven,'none');
+      assert.equal(failing.evidence.length,1,'the run is still on record, it simply proves nothing');
+    }finally{cleanup(red);}
   }finally{cleanup(root);}
 });
 

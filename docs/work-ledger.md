@@ -14,7 +14,7 @@ decision is settled by a collocated `completion.review`: a reviewer, actual auth
 one passing observation per authored assertion. Nothing is launched into a worktree and no agent
 writes code. `decisionCandidates(ledger,{scope})` returns the todo, eligible ones.
 
-`EXECUTABLE_KINDS` (`implementation`, `uat`, `operations`, `ui`) are done by an operation agent in a
+`EXECUTABLE_KINDS` (`implementation`, `uat`, `e2e`, `operations`, `ui`, `integration`) are done by an operation agent in a
 worktree. `executableCandidates(ledger,{scope})` returns the todo, eligible ones enriched with the
 two things an operation contract cannot be written without:
 
@@ -195,7 +195,7 @@ completion:
 | --- | --- | --- |
 | `state` | `markDone`, `markReopened`, `markDecided` | operational; excluded from the semantic digest |
 | `completion` | `markDone` (evidence), `markDecided` (review) | operational proof binding |
-| `extensions.work3.kernel` | every transition | the kernel's own receipt: opId, dispatch, head, checks, verifiedBy, at, reopened[] |
+| `extensions.work3.kernel` | every transition | the kernel's own receipt: opId, dispatch, head, checks, verifiedBy, at, reopened[], contractDigest |
 | `<node>/evidence/<opId>/manifest.yaml` | `writeEvidence` | the `work/evidence@1` record `completion.evidence` names |
 
 Nothing else. There is no kernel-owned prose, no status sentence appended to a description, no
@@ -221,6 +221,71 @@ validator would reject is never the thing the kernel leaves behind.
 
 `ledgerSummary(ledger,{scope})` is the status view: counts per kind and state, what is eligible, and
 the ids a run could pick up.
+
+## External integrations: proven live, or not proven
+
+An external system is a record, not a remark in a description. A business (SRS) or design (SDS) record
+that talks to one declares it as data:
+
+```yaml
+extensions:
+  work3:
+    integrations:
+      - id: telegram
+        provider: telegram-bot-api
+        credential:
+          name: TELEGRAM_BOT_TOKEN     # the exact variable, never the value
+          providedBy: owner            # a credential is the owner's; nothing else is a declaration
+          where: the workflow environment
+        sandbox: https://api.telegram.org
+```
+
+`declaredIntegrations(ledger)` reads those entries from every `business`, `business-overview`, `module`
+and `architecture` node and answers `{list, problems}`. Each listed entry carries `declaredBy` — the
+record that declared it. `problems` is what the runtime cannot act on: `credential-missing` (no variable
+to ask the owner for), `credential-not-owner` (somebody else is supposed to provide the key) and
+`integration-shape` (no id, no provider, or not a list at all). They are findings rather than silent
+skips, because a vague declaration is exactly what a faked proof hides behind. An entry with an id is
+still listed even when its credential is a finding, so the tree still owes it a node.
+
+The tree owes one node per declared id, at `features/<feature>/integration/<id>/index.yaml` with
+`kind: integration`. `integrationNodes(ledger)` lists them and `missingIntegrationNodes(ledger)` returns
+the declared ids with none — which the kernel lists as *ledger incomplete* and closes with `work.author`.
+An `integration` node is executable work with its own lane, `integration.verify`, whose sequence lives in
+[contract.mjs](../kernel/contract.mjs): read the declaration, take the credential from the named
+environment variable and nowhere else (a missing one is `blocked` `environment` with that variable and
+nothing else), run the scenario against the real provider's sandbox with no fake, stub, recording or skip,
+keep the output with the secret masked, and report `done` only on a green live run.
+
+**Evidence says what it proved against.** `writeEvidence` accepts `proof: {boundary: 'api'|'live', fakes:
+[ids]}` and writes it into the manifest; `boundary` is required once a proof is given at all and `fakes`
+defaults to the empty list. `e2e.verify` writes `boundary: api` and names every provider it faked;
+`integration.verify` writes `boundary: live` and names none. `integrationProofStatus(ledger)` turns that
+into the one answer the status page prints, per declared integration:
+
+| `proven` | when | `workflow-status` prints |
+| --- | --- | --- |
+| `live` | a passing manifest on its own integration node carries `boundary: live` | proven live |
+| `fake` | it appears only in some other run's `proof.fakes` | proven against a fake, not live |
+| `none` | nothing proved it, or the only live run failed | not proven |
+
+There is no fourth state. A failed live run is `none`: it ran, it did not prove.
+
+**A proof remembers the rules it was proven under.** `markDone` accepts `contractDigest` and stores it in
+`extensions.work3.kernel`; `contractDigestOf({kind, kindRecord, operator, rules})` is its canonical
+sha-256, with stable key order at every depth (list order is part of the declaration, key order is not).
+The kernel supplies the three inputs — the `model/kinds.yaml` entry, the operator contract and the
+validator rules of that kind. `staleProofs(ledger,{digestOf,kindOf})` then answers `[{node, stored,
+current}]` for every done node the kernel itself completed (its kernel block names an `opId`) whose stored
+digest differs from `digestOf(kind)`. A node the kernel completed and that stored no digest reads as
+`stored: null` — a proof that does not remember its rules is exactly the one to reopen. `kindOf(node,
+{raw,kernel})` is how the kernel names the operation kind that ran; either callback answering nothing
+leaves the node alone.
+
+`readLedgerTree(workRoot,{limit})` is the bounded filesystem read of the tree — `index.yaml` records only,
+`_local` and `assets/**` skipped, stopping at `limit` nodes — for a reader that must not spawn the
+validator. `workflow-status` uses it against `state.ledgerRoot` to print `## Integrations`, and leaves the
+section out rather than guessing when the workflow names no tree.
 
 ## Repository rule
 
