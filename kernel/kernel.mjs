@@ -16,7 +16,7 @@ import * as work from './ledger.mjs';
 import * as llm from '../models/functions.mjs';
 import * as graph from './graph.mjs';
 
-import {AUTHOR_KIND,BRAND_DECIDE,BRAND_KIND,CHECK_TIMEOUT_MS,DYNAMIC_OPS_BUDGET,FINAL_REPORT,GATE_ROUNDS,GOAL_RECORD,
+import {AUTHOR_KIND,PLAN_KIND,AUTHORS_RECORD,authorsRecord,BRAND_DECIDE,BRAND_KIND,CHECK_TIMEOUT_MS,DYNAMIC_OPS_BUDGET,FINAL_REPORT,GATE_ROUNDS,GOAL_RECORD,
   KERNEL_CHECK,LAUNCH_LIMIT,LAUNCH_OPERATOR,LAUNCH_WAIT_MS,LEDGER_MODES,POLL_MS,RATE_LIMIT_WINDOW_MS,RECORD_OWNED,
   RESTART_LIMIT,RESUME_LIMIT,RETRY_LIMIT,SHARED_OPS_PER_ITERATION,SILENCE_LIMIT,STALL_MS,VALIDATOR_REJECT_LIMIT,
   VALIDATOR_UNAVAILABLE_LIMIT,VERIFY_ROUNDS,WORKFLOW_KERNEL,WORK_LEDGER,WORK_OPERATION,DECISION_OPERATION,
@@ -37,11 +37,12 @@ import {MECHANICAL_QUESTION,OWNER_ASK,answerOrEscalate,answerOwnerQuestion,crede
 import {BRAND_PAYLOAD,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
   rereadBrand,sharedCheckCommand,treeForVerdict,validateAccepted,validatorRejectLimit} from './verify.mjs';
-import {KERNEL_PLANNED_KINDS,LANE_LAYOUTS,advanceLanes,authorRecordOp,commitLedgerWrite,deriveWorkOp,designGate,
-  designNodeOf,designRecord,guardKernelPaths,guardRecordBlocks,kernelOwnedPaths,laneNext,laneOf,lanePredicates,
+import {KERNEL_PLANNED_KINDS,LANE_LAYOUTS,advanceLanes,authorRecordOp,commitLedgerWrite,cutParentOf,deriveWorkOp,designGate,
+  designNodeOf,designRecord,fanOutDeferral,groupIncomplete,groupVerifyKind,guardKernelPaths,guardRecordBlocks,kernelOwnedPaths,
+  laneNext,laneOf,lanePredicates,
   laneProgress,laneSkip,laneText,laneWalked,ledgerWrite,markLedger,nodeLayout,protectedFingerprint,pruneAnsweredQuestions,
-  quarantineStrays,recordBlocks,recordDone,recordPath,repairKernelRecords,retemplateLanes,sweepTreeStrays,
-  syncLedgerOps} from './sync.mjs';
+  CUT_OWNED,quarantineStrays,recordBlocks,recordDone,recordPath,repairKernelRecords,repairTarget,retemplateLanes,settleCut,
+  sweepTreeStrays,syncLedgerOps} from './sync.mjs';
 import {intakeOp,retemplateIntakeOps,scopeNames,settleIntake} from './intake.mjs';
 import {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,fallbackGoalMarkdown,
   goalPhase,laneHeaderLines,noteCritiqueInGoal,noteLaneInGoal,planCritiquePrerequisites,planGoalPhase,proposeQuota,
@@ -67,7 +68,7 @@ import {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntime
  */
 
 export {WORKFLOW_KERNEL,FINAL_REPORT,GOAL_RECORD,LEDGER_MODES,WORK_LEDGER,WORK_OPERATION,DECISION_OPERATION,
-  BRAND_KIND,BRAND_DECIDE,LAUNCH_OPERATOR,launchOperator,kindRole,AUTHOR_KIND,RECORD_OWNED,STALL_MS,
+  BRAND_KIND,BRAND_DECIDE,LAUNCH_OPERATOR,launchOperator,kindRole,AUTHOR_KIND,PLAN_KIND,AUTHORS_RECORD,authorsRecord,RECORD_OWNED,STALL_MS,
   DYNAMIC_OPS_BUDGET,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,allowlistsOverlap,kernelGuards,
   currentBranch,detectLedgerMode,ledgerBinding,dynamicBudget,hostDescriptorOf,hostMissing,parseQuota,
   reportAllowlist,workOpId,workModule,grammarReferences};
@@ -79,6 +80,8 @@ export {BRAND_PAYLOAD,brandFields,brandPayload,brandSummary,changedFiles,machine
   renderValidatorMemory,sharedCheckCommand,treeForVerdict,validatorRejectLimit} from './verify.mjs';
 export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,designRecord,deriveWorkOp,syncLedgerOps,
   kernelOwnedPaths,protectedFingerprint} from './sync.mjs';
+export {CUT_ASSERTIONS,CUT_COMPONENTS,CUT_FILES,FAN_OUT,childOwning,cutGroup,cutOp,cutParentOf,cutReason,fanOutDeferral,
+  groupIncomplete,groupVerifyKind,repairTarget,sdsComponents,settleCut} from './sync.mjs';
 export {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,goalPhase,
   laneHeaderLines,planGoalPhase,proposeQuota,recordStatements,validateWorkTree,workGoalPhase} from './goal.mjs';
 export {ioBlock,ioPayload,kindsReadingBrand,intakeKindFor,decisionKindFor,recordKindOfPath,undeclaredWrites} from './io.mjs';
@@ -146,6 +149,7 @@ export function laneLine(state,op){
   if(!entry?.lane?.length)return null;
   // An author op is no step of the lane: it is what makes the lane launchable, so it is named as preceding it.
   const walked=laneWalked(entry);
+  if(op?.kind===PLAN_KIND)return `Lane: this op precedes ${laneText(walked)}; the kernel launches the children it writes itself - the seam first, then the rest at once - and proves the whole group once`;
   if(op?.kind===AUTHOR_KIND)return `Lane: this op precedes ${laneText(walked)}, which the kernel launches itself once this record is complete`;
   const at=walked.indexOf(op.kind);
   return `Lane: ${laneText(walked)} (this op: step ${at<0?(entry.done??[]).length+1:at+1} of ${walked.length})`;
@@ -215,8 +219,10 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     // What this kind is derived from and what it may produce, from the record catalog: an operation reads its
     // declaration before it reads its allowlist, so a record it may not write is refused before it writes one.
     ...ioLines(op.kind),
-    ...(op.nodeId?(op.kind===AUTHOR_KIND
-      ?[`## Work node you author`,`- \`${op.nodeId}\` - you complete this record so the kernel can launch the node's own work; you do not do that work. Its \`index.yaml\` is in your allowlist, and inside that file \`${RECORD_OWNED.join('`, `')}\` stay the kernel's: it reads them back, reverts the file if they moved and downgrades your report to \`failed\`. Never edit another node's \`index.yaml\`.`,``]
+    ...(op.nodeId?(authorsRecord(op.kind)
+      ?(plain(op.cut)
+        ?[`## Work node you cut`,`- \`${op.nodeId}\` - you split this node into child nodes with disjoint write scopes and turn it into a derived parent; you build none of them. Its whole folder is in your allowlist: removing its \`state\` is the job (a parent authors no state), and \`${CUT_OWNED.join('`, `')}\` and its evidence folder stay the kernel's - it reads them back, reverts the file if they moved and downgrades your report to \`failed\`. Never edit a node outside this folder.`,``]
+        :[`## Work node you author`,`- \`${op.nodeId}\` - you complete this record so the kernel can launch the node's own work; you do not do that work. Its \`index.yaml\` is in your allowlist, and inside that file \`${RECORD_OWNED.join('`, `')}\` stay the kernel's: it reads them back, reverts the file if they moved and downgrades your report to \`failed\`. Never edit another node's \`index.yaml\`.`,``])
       :[`## Work node you close`,`- \`${op.nodeId}\` - the kernel writes its \`state\`, \`completion\` and evidence itself after it has reproduced your checks. Never edit a Work \`index.yaml\` unless it is in your allowlist.`,``]):[]),
     ...(items.length?[`## Goal items you close`,...items,``]:[]),
     `## Allowlist`,...op.allowlist.map(entry=>`- \`${entry}\``),
@@ -344,7 +350,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
   op.kernelOwnedAt=op.kernelOwned.length?protectedFingerprint(ctx.work?.ledger?.repoRoot??ctx.work?.repoRoot??state.worktree,op.kernelOwned):null;
   // An author op holds the whole record, so the file cannot be fingerprinted as a unit: the blocks inside it
   // that stay the kernel's are snapshotted instead, after the same in-progress write.
-  if(op.kind===AUTHOR_KIND)op.recordBlocks=recordBlocks(ctx,op.nodeId);
+  if(authorsRecord(op.kind))op.recordBlocks=recordBlocks(ctx,op.nodeId);
   return {ok:true};
 }
 
@@ -473,6 +479,12 @@ function scheduleOps(orca,store,state,ctx){
     if(clashing.length){
       store.appendEvent({event:'schedule-deferred',op:op.id,reason:'resource lock clashes a running operation',
         resources:ctx.guards.resourceLocks(op),clashes:clashing.map(other=>other.id)});
+      continue;
+    }
+    // Fan-out: the children of one cut parent are bounded per group, and while the seam is unbuilt it runs alone.
+    const fanOut=fanOutDeferral(state,op,busy,ctx);
+    if(fanOut){
+      store.appendEvent({event:'schedule-deferred',op:op.id,reason:fanOut.reason,parent:fanOut.parent,running:fanOut.running});
       continue;
     }
     const avoid=unique([...op.avoidRuntimes,...avoidForVerify(state,op)]);
@@ -981,6 +993,8 @@ function settleAuthoredRecord(store,state,op,ctx){
     if(plain(settled)&&settled.retry)return retryOp(store,state,op,settled.findings,ctx,settled.reason);
     return settled;
   }
+  // A cut authored the node's children, not the node's own record: it is settled by what now sits under its folder.
+  if(plain(op.cut))return settleCut(store,state,op,ctx);
   const nodeId=op.nodeId;
   let candidate=null;
   try{
@@ -1029,13 +1043,13 @@ export function applyOpReport(orca,store,state,op,report,ctx){
   const blocks=guardRecordBlocks(store,state,op,ctx);
   if(blocks.length){
     op.reports.at(-1).downgradedTo='failed';
-    return retryOp(store,state,op,[`operation modified kernel-owned fields (${RECORD_OWNED.join(', ')}) of the Work record it authors: ${blocks.join(', ')}`],ctx,'record-blocks-modified');
+    return retryOp(store,state,op,[`operation modified kernel-owned fields (${(plain(op.cut)?CUT_OWNED:RECORD_OWNED).join(', ')}) of the Work record it authors: ${blocks.join(', ')}`],ctx,'record-blocks-modified');
   }
   if(report.outcome==='done'){
     const verified=machineVerify(state,op,ctx);
     // `work-valid` is the kernel's own check and is stripped from every operation's list, so an op that edits the
     // tree is held to it here: the record it wrote must leave a tree that still validates, before anything is committed.
-    if(op.kind===AUTHOR_KIND){
+    if(authorsRecord(op.kind)){
       const command=workValidateCommand(ctx);
       const tree=(()=>{try{return {ok:Boolean(ctx.work.validate({repoRoot:ctx.work.ledger?.repoRoot??ctx.work.repoRoot,workRoot:ctx.work.ledger?.workRoot??null}).ok),reason:null};}
         catch(error){return {ok:false,reason:error.message};}})();
@@ -1115,7 +1129,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     op.status='done';op.files=files;op.head=commit.head??state.head;op.verifiedChecks=verified.checks;
     // An author op closes no node: it completed a record, so what follows is the ledger's answer, not a completion.
     // An owner.ask op closes no node either: it prepared or answered a question.
-    if(op.kind===AUTHOR_KIND||op.kind===OWNER_ASK){
+    if(authorsRecord(op.kind)||op.kind===OWNER_ASK){
       const settled=settleAuthoredRecord(store,state,op,ctx);
       store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
         checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
@@ -1182,12 +1196,19 @@ function repairFromVerify(store,state,op,findings,ctx){
     return 'verify-without-findings';
   }
   const named=unique(findings.flatMap(pathsIn)).filter(file=>inside(file,op.allowlist));
+  // After a cut the group's proof judges many pieces at once, so a finding is repaired where it lives: the child
+  // whose write scope holds every file it names. Findings spread over several children stay the group's.
+  const target=repairTarget(state,op,findings);
+  const scoped=target?named.filter(file=>inside(file,target.allowlist)):named;
   // The repair is the lane's build step, so a finding on frontend work comes back as frontend work.
   const repair=addOp(store,state,{kind:routeKind(route,state,op)??'backend.implement',
-    goal:`Resolve the review findings of ${op.id}`,ledgerIds:op.ledgerIds,
-    allowlist:named.length?named:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,
+    goal:`Resolve the review findings of ${op.id}`,
+    ...(target?{nodeId:target.nodeId,ledgerIds:target.ledgerIds}:{ledgerIds:op.ledgerIds}),
+    allowlist:scoped.length?scoped:(target?target.allowlist:op.allowlist),
+    references:op.references,checks:target?target.checks:op.checks,acceptance:op.acceptance,
     findings,origin:route.origin??'repair'},`review findings of ${op.id}`);
-  store.appendEvent({event:'verify-findings',op:op.id,component:key,findings:findings.length,allowlist:named});
+  store.appendEvent({event:'verify-findings',op:op.id,component:key,findings:findings.length,allowlist:named,
+    ...(target?{child:target.nodeId}:{})});
   routed(store,op,'review-findings',repair.id,repair.origin,{kind:repair.kind,limit:rounds,then:route.then});
   return 'repair-from-findings';
 }
@@ -1210,12 +1231,18 @@ function repairFromUat(store,state,op,findings,ctx){
   }
   state.verifyRounds[key]=(state.verifyRounds[key]??0)+1;
   const named=unique(findings.flatMap(pathsIn)).filter(file=>inside(file,op.allowlist));
-  const repair=addOp(store,state,{kind:routeKind(route,state,op)??'frontend.implement',nodeId:op.nodeId,
+  // A frontend group is walked once at the parent, so a red step is repaired where it lives: the child whose
+  // write scope holds every file the findings name. A step that names files of several children stays the group's.
+  const target=repairTarget(state,op,findings);
+  const scoped=target?named.filter(file=>inside(file,target.allowlist)):named;
+  const repair=addOp(store,state,{kind:routeKind(route,state,op)??'frontend.implement',nodeId:target?.nodeId??op.nodeId,
     goal:`Fix what the UAT run ${op.id} found red: ${firstLine(findings[0]??'the flow does not pass')}`,
-    ledgerIds:op.ledgerIds,allowlist:named.length?named:op.allowlist,references:op.references,
-    checks:op.checks,acceptance:op.acceptance,findings,origin:route.origin??'repair'},`uat findings of ${op.id}`);
+    ledgerIds:target?target.ledgerIds:op.ledgerIds,
+    allowlist:scoped.length?scoped:(target?target.allowlist:op.allowlist),references:op.references,
+    checks:target?target.checks:op.checks,acceptance:op.acceptance,findings,origin:route.origin??'repair'},`uat findings of ${op.id}`);
   reopenRequester(store,state,op,findings,repair,`the UAT repair ${repair.id} lands first; then run the flow again`);
-  store.appendEvent({event:'uat-findings',op:op.id,component:key,round:state.verifyRounds[key],findings:findings.length});
+  store.appendEvent({event:'uat-findings',op:op.id,component:key,round:state.verifyRounds[key],findings:findings.length,
+    ...(target?{child:target.nodeId}:{})});
   routed(store,op,'uat-failed',repair.id,repair.origin,{kind:repair.kind,limit:rounds,then:route.then});
   return 'repair-from-uat';
 }
@@ -1250,14 +1277,16 @@ function acceptReports(orca,store,state,ctx){
 }
 
 /**
- * What one review covers. On the Work ledger a review is per module, because that is the unit a reviewer can
- * judge as a whole; on a plan ledger it is the connected component of items an operation joined together.
+ * What one proof covers. On the Work ledger it is the cut parent when the node was cut - the group is the unit
+ * the heavy work was fanned out from, and its proof runs once for the whole group - and otherwise the module,
+ * because that is the unit a reviewer can judge as a whole. On a plan ledger it is the connected component of
+ * items an operation joined together.
  */
 function verifyComponents(state,ready){
   if(state.ledgerMode===WORK_LEDGER){
     const groups=new Map();
     for(const id of ready){
-      const key=ledgerItem(state,id)?.module??id;
+      const key=cutParentOf(state,id)??ledgerItem(state,id)?.module??id;
       groups.set(key,(groups.get(key)??new Set()).add(id));
     }
     return [...groups.values()];
@@ -1283,44 +1312,65 @@ function verifyComponents(state,ready){
 const laneWantsReview=(state,id,ctx=null)=>{
   const entry=state?.lanes?.[id];
   if(!entry?.lane?.length)return true;
-  return entry.lane.includes('review.verify')&&laneNext(entry,lanePredicates(ctx,ctx?.work?.node?.(id)??null))==='review.verify';
+  const next=laneNext(entry,lanePredicates(ctx,ctx?.work?.node?.(id)??null));
+  // A cut child proves nothing on its own: every prove step of its lane is planned once, for its parent's group.
+  if(cutParentOf(state,id))return Boolean(next)&&kindRole(next)==='verify';
+  return entry.lane.includes('review.verify')&&next==='review.verify';
 };
 
-/** A ledger group whose implementing operations are all done gets one independent review. */
+/**
+ * A ledger group whose implementing operations are all done gets one independent proof. For a node that was cut
+ * the group is the parent: its children build in parallel, and `e2e.verify` and then `review.verify` are planned
+ * ONCE for the whole group - never once per piece - when every child's build step is accepted, on a runtime none
+ * of the children used. The parent's group acceptance is that proof's acceptance.
+ */
 function planVerifyOps(store,state,ctx){
   const ready=state.ledger.filter(item=>item.status==='implemented').map(item=>item.id)
     .filter(id=>laneWantsReview(state,id,ctx))
     .filter(id=>{
       const ops=state.ops.filter(op=>op.ledgerIds.includes(id));
       return ops.some(implementsLedger)&&ops.filter(implementsLedger).every(op=>op.status==='done')
-        &&!ops.some(op=>op.kind==='review.verify'&&liveStatus.includes(op.status));
+        &&!ops.some(op=>kindRole(op.kind)==='verify'&&op.origin==='verify'&&liveStatus.includes(op.status));
     });
   if(!ready.length)return [];
   const created=[];
   for(const component of verifyComponents(state,ready)){
     const ledgerIds=[...component].sort();
     const key=groupKey(state,ledgerIds);
+    // One proof per group: a cut parent whose children are not all implemented yet waits for the rest of them.
+    if(groupIncomplete(state,ledgerIds))continue;
+    const kind=groupVerifyKind(state,ledgerIds);
+    const review=kind==='review.verify';
     // The review of one group is bounded: past the last round the group waits for the user, it is not reviewed again.
-    if((state.verifyRounds[key]??0)>=reviewRounds()){
+    if(review&&(state.verifyRounds[key]??0)>=reviewRounds()){
       for(const id of ledgerIds){const item=ledgerItem(state,id);if(item)item.status='review-exhausted';}
       state.needUser.push({kind:'review',detail:`${key} used its ${reviewRounds()} review rounds and is implemented again; decide whether the last findings stand`});
       store.appendEvent({event:'verify-exhausted',component:key,rounds:state.verifyRounds[key]});
       continue;
     }
     const implementers=state.ops.filter(op=>implementsLedger(op)&&op.ledgerIds.some(id=>ledgerIds.includes(id)));
-    state.verifyRounds[key]=(state.verifyRounds[key]??0)+1;
-    const op=addOp(store,state,{kind:'review.verify',
-      goal:`Verify, without repairing anything, that ${ledgerIds.map(id=>ledgerItem(state,id)?.title??id).join('; ')} is implemented as the goal requires. Report every finding in open[]; an empty open[] means you accept the work.`,
+    const titles=ledgerIds.map(id=>ledgerItem(state,id)?.title??id).join('; ');
+    if(review)state.verifyRounds[key]=(state.verifyRounds[key]??0)+1;
+    const op=addOp(store,state,{kind,
+      goal:review
+        ?`Verify, without repairing anything, that ${titles} is implemented as the goal requires. Report every finding in open[]; an empty open[] means you accept the work.`
+        :kind==='uat.verify'
+          ?`Walk every flow of ${titles} on the rendered surface, as a person does, with a screenshot per step. This is the group's one walk: the screens were built in parallel and are walked together, never one at a time.`
+          :`Prove ${titles} end to end through the public API on the real stack, one scenario per assertion of the group. This is the group's one proof: the pieces were built in parallel and are judged together, never one at a time.`,
       ledgerIds,allowlist:unique(implementers.flatMap(item=>item.allowlist)),
       references:unique(implementers.flatMap(item=>item.references)),
       checks:dedupeChecks(implementers.flatMap(item=>item.checks)),
-      acceptance:unique(implementers.flatMap(item=>item.acceptance)),
+      acceptance:unique([...(cutGroupAcceptance(state,ledgerIds)),...implementers.flatMap(item=>item.acceptance)]),
+      resources:unique(implementers.flatMap(item=>item.resources??[])),
       avoidRuntimes:unique(implementers.map(item=>item.runtime).filter(Boolean)),origin:'verify'},
-      `round ${state.verifyRounds[key]} of ${key}`);
+      `${review?`round ${state.verifyRounds[key]}`:kind} of ${key}`);
     created.push(op.id);
   }
   return created;
 }
+/** The group acceptance a cut parent kept when it became derived (`extensions.work3.groupAssertions`). */
+const cutGroupAcceptance=(state,ledgerIds)=>unique(ledgerIds.map(id=>cutParentOf(state,id)).filter(Boolean)
+  .flatMap(parent=>state.cuts?.[parent]?.assertions??[]));
 const dedupeChecks=checks=>{const seen=new Map();for(const check of checks)if(!seen.has(check.command))seen.set(check.command,check);return [...seen.values()];};
 
 /** The job gates are the kernel's own commands, never an operation's claim. A failing gate becomes one repair. */
