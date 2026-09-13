@@ -71,7 +71,7 @@ export const AUTHOR_KIND='work.author';
 export const RECORD_OWNED=['state','completion','extensions.work3.kernel'];
 const RESUME_LIMIT=5,RETRY_LIMIT=3,RESTART_LIMIT=3,VERIFY_ROUNDS=3,GATE_ROUNDS=3,LAUNCH_LIMIT=3,STALL_LIMIT=3;
 /** Run-time growth is bounded too: ops nobody approved, shared changes per iteration, inferred rate limits. */
-export const DYNAMIC_OPS_BUDGET=6;
+export const DYNAMIC_OPS_BUDGET=64;
 const SHARED_OPS_PER_ITERATION=3,SILENCE_LIMIT=2,RATE_LIMIT_WINDOW_MS=30*60*1000;
 const CHECK_TIMEOUT_MS=30*60*1000,LAUNCH_WAIT_MS=180000,POLL_MS=5000;
 /** The validator: two rejects of one op stop it at the user, three unavailable verdicts in a row name the outage; memory and diff are bounded in bytes. */
@@ -1121,6 +1121,13 @@ export function approve(store,state,{allocation=null,allowDynamic=null}={}){
       state.needUser=state.needUser.filter(item=>item.kind!=='dynamic-op');
     }
   }
+  // A workflow that finished `blocked` stopped for the user's decision; the user approving it again IS that
+  // decision, so the finish is cleared and the supervisor starts a kernel that carries on from where it stopped.
+  if(state.finished&&state.finished.outcome==='blocked'&&state.approved){
+    const before=state.finished;
+    state.finished=null;state.phase='run';state.stalls=0;state.kernelErrors=0;
+    store.appendEvent({event:'resumed-after-block',reason:before.reason??null,budget:dynamicBudget(state)});
+  }
   // The user sets the runtime allocation at approval; without --allocation the proposal from goal.md is used and recorded.
   if(!state.quota){const proposal=state.quotaProposal??proposeQuota(state);state.quota=parseQuota(proposal.text);state.quotaSource='proposal';}else state.quotaSource=allocation?'user':state.quotaSource??'user';
   // On the Work ledger a plan may legitimately start with no operation: every candidate in scope declares an
@@ -1878,6 +1885,14 @@ function pruneAnsweredQuestions(store,state,loaded){
   if(!Array.isArray(state.needUser)||!loaded?.nodes)return;
   const kept=[];
   for(const item of state.needUser){
+    const keyed=item?.op?state.ops.find(candidate=>candidate.id===item.op):null;
+    // A question about an op that was since superseded, or about a shared change that is no longer blocked, has no reason left.
+    if(keyed&&keyed.refusal==='superseded'){store.appendEvent({event:'need-user-answered',op:item.op,kind:item.kind,reason:'superseded'});continue;}
+    if(item?.kind==='shared-change'){
+      const named=(String(item.detail??'').match(/waits for the shared change (\S+), which is blocked/)??[])[1];
+      const shared=named?state.ops.find(candidate=>candidate.id===named):null;
+      if(shared&&shared.status!=='blocked'){store.appendEvent({event:'need-user-answered',op:item.op??null,kind:item.kind,reason:`${named} is ${shared.status}`});continue;}
+    }
     if(item?.kind!=='ledger'){kept.push(item);continue;}
     // Keyed by node, or by the op whose write was refused: the nodes that op closes (its own, or the set a review names).
     const op=item.op?state.ops.find(candidate=>candidate.id===item.op):null;
@@ -2726,8 +2741,10 @@ export function runGates(store,state,ctx){
     state.needUser.push({kind:'gate',detail:`${failed.map(result=>result.name).join(', ')} still fail after ${GATE_ROUNDS} repair rounds`});
     return {ok:false,repaired:false,results};
   }
+  // The repair scope is the code every op touched - never the Work tree: a gate repair once carried `.starciwork`
+  // paths from a design op's allowlist and committed a kernel block into a frontend record.
   addOp(store,state,{kind:'backend.implement',goal:`Make the job gates pass: ${failed.map(result=>result.name).join(', ')}`,
-    ledgerIds:[],allowlist:unique(state.ops.flatMap(op=>op.allowlist)),references:[],
+    ledgerIds:[],allowlist:unique(state.ops.flatMap(op=>op.allowlist)).filter(entry=>!/(^|\/)\.starciwork(\/|$)/.test(slash(entry))),references:[],
     checks:failed.map(result=>({name:result.name,command:result.command})),
     acceptance:failed.map(result=>`${result.name} exits 0`),
     findings:failed.map(result=>`${result.name} failed (exit ${result.exitCode}): ${result.evidence}`),origin:'gate'},

@@ -14,7 +14,7 @@ orca-supervised-launch.mjs workflow-run     --id <id> [--from <own terminal> --r
 orca-supervised-launch.mjs workflow-status  --id <id>
 ```
 
-`--allow-dynamic N` raises this workflow's run-time operation budget (default `DYNAMIC_OPS_BUDGET` = 6) and
+`--allow-dynamic N` raises this workflow's run-time operation budget (default `DYNAMIC_OPS_BUDGET` = 64) and
 reinstates the operations the dynamic-op gate refused. Re-approving is how a user answers that gate.
 
 All runtime state of one workflow lives in one directory (`execution/workflow-store.mjs`):
@@ -376,7 +376,7 @@ tree shipped without the module falls back to a minimal implementation of the sa
 
 The kernel creates ops at run time (reviews, repairs, shared changes, design decisions, gate repairs, newly
 schedulable Work nodes). Two bounds keep that from drifting away from what the user approved:
-`state.dynamicOpsBudget` (6) caps how many run-time ops a workflow may create, and an op whose whole
+`state.dynamicOpsBudget` (64) caps how many run-time ops a workflow may create, and an op whose whole
 allowlist falls outside the approved `scope` is refused the same way - matched against the scope entries that
 name a path or a feature folder, since a scope given as a Work node id constrains the ledger and not a file
 path, and never against an op derived from a node the ledger already scoped. A refused op is still

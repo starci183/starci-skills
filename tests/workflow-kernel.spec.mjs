@@ -785,6 +785,28 @@ test('an op the restart limit blocked for a rate limit cools down and is re-admi
   }finally{harness.cleanup();}
 });
 
+test('approving a workflow that finished blocked resumes it, and questions whose reason is gone go with it',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    approve(store,state);
+    state.finished={outcome:'blocked',reason:'the policy could not settle every goal item',report:null};state.phase='finished';
+    const gone=state.ops[0];gone.status='blocked';gone.refusal='superseded';
+    state.needUser.push({op:gone.id,kind:'ledger-path',detail:`${gone.id} asked for a change the kernel will not delegate`});
+    state.ops.push({...gone,id:'shared-1',refusal:null,status:'pending',requesters:['x']});
+    state.needUser.push({op:'x',kind:'shared-change',detail:'x waits for the shared change shared-1, which is blocked'});
+    approve(store,state,{allowDynamic:'64'});
+    assert.equal(state.finished,null,'the user answering is the resume');
+    assert.equal(state.phase,'run');
+    assert.equal(state.dynamicOpsBudget,64);
+    assert.deepEqual(events(store).filter(event=>event.event==='resumed-after-block').map(event=>event.budget),[64]);
+    // The pruning runs with the tree at the next sync; here it is exercised through one loop tick.
+    state.run='run_wf';state.from='term_kernel';
+    const after=harness.run({maxIterations:1});
+    assert.deepEqual(after.needUser.filter(item=>['ledger-path','shared-change'].includes(item.kind)),[],'a superseded op and an unblocked shared change ask nothing');
+  }finally{harness.cleanup();}
+});
+
 test('a contract longer than a task can carry is handed over as its head plus the file it lives in',()=>{
   const short='## Goal\nshort';
   assert.equal(operationSpec({contractFile:'D:/w/contracts/op.md'},short),short);
