@@ -1,12 +1,14 @@
 id: interface.draw
 goal:
-  en: Produce and inspect one business-grounded visual direction by default; create multiple
-    alternatives only when the user explicitly requests a comparison or choice.
+  en: "Draw one screen set by rendering the installed grammar itself in a browser: freeze the screens and
+    their states, compose each main state from the grammar's own renderers and the brand tokens, capture
+    one image per screen and viewport with the markup kept beside it, and declare every artwork slot the
+    render reserves. Produce alternatives only when the user explicitly requests a comparison."
 nodeKinds:
   - ui
 completionProfile: ui
 sideEffects:
-  - requested local/generated design assets
+  - captured renders and the rendered markup kept beside them under the owning node assets
 graphPolicy:
   mode: read-only
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
@@ -31,8 +33,12 @@ reads:
   - id: design
     path: N/index.yaml + N/assets/*
     purpose:
-      en: Read exact brand/source assets, surface anatomy, current design system, imagery
-        rights/provenance and accepted references; consult available image/design skill when used.
+      en: "Read the decided brand record and the masters it names, the existing captures and the markup
+        kept beside them, and the surface anatomy this node already records. The brand record is the law
+        for every colour, font, icon and mascot placement in the render: each one comes from a declared
+        token or a declared master, never from taste and never from a value read off an earlier picture.
+        Imagery rights and provenance travel with the masters; an artwork this render only reserves a slot
+        for is declared here, not drawn here."
   - id: workflow
     path: selected workflow request + workflows/contracts.json + this op authority.json
     purpose:
@@ -58,26 +64,28 @@ reads:
     path: knowledge/INDEX.json + applicable UI composition/presentation and actual installed family
       topics
     purpose:
-      en: "Before drawing, read applicable composition, presentation and family knowledge together with
-        the resolved package described by the grammar input. Neither knowledge snapshots nor npm
-        source alone is sufficient for a Grammar-bound design: knowledge explains
-        composition/ownership; the actual package and active family determine available anatomy and
-        styling. Accepted appearance cannot invent API behavior, bypass security or contradict
-        business."
+      en: "Read the applicable composition, presentation, proof and family topics before composing, together
+        with the resolved package the grammar input describes. Two canon rules are checked against this
+        render afterwards and are therefore read before it: a list of entities is a page section with a
+        heading and never a card, one card is one item; and the render's primary and danger colours are the
+        brand record's own tokens, with the mascot exactly where the record allows it. Knowledge explains
+        composition and ownership while the package and active family determine the anatomy that exists;
+        neither alone is sufficient. Accepted appearance cannot invent API behavior, bypass security or
+        contradict business."
   - id: grammar
     path: consuming app manifest/lockfile + resolved component package exports/types/renderers/CSS + app
       family root/style imports
     purpose:
-      en: Resolve the UI package from the actual consuming app/importer, honoring workspace aliases and
-        bundler resolution; do not assume a monorepo-root node_modules copy is the same version.
-        Record package identity, version, resolved path and inspected file hashes/anchors. Inspect
-        public exports, prop types, renderer anatomy and shipped CSS, then the app's active family
-        root, imported styles and overrides. Trace each used semantic token to the
-        selector/variable/fallback the renderer actually consumes; a similarly named family variable
-        is not proof it is wired. Common component imports do not imply the Core palette or family.
-        No install, upgrade or package edit is authorized by inspection. For a genuinely unbound
-        greenfield design, record not applicable/proposed; unavailable required package or family
-        remains an explicit gap, never a fabricated npm match.
+      en: "Resolve the UI package from the actual consuming app/importer, honoring workspace aliases and
+        bundler resolution; do not assume a monorepo-root node_modules copy is the same version. Record
+        package identity, version, resolved path and inspected file hashes/anchors. Inspect public exports,
+        prop types, renderer anatomy and shipped CSS, then the app's active family root, imported styles
+        and overrides, because these renderers and this stylesheet are what composes the capture: the
+        picture is this package rendering, not a likeness of it. Trace each used semantic token to the
+        selector/variable/fallback the renderer actually consumes; a similarly named family variable is not
+        proof it is wired. Common component imports do not imply the Core palette or family. No install,
+        upgrade or package edit is authorized by inspection. A region the grammar has no renderer for is a
+        recorded gap, never an improvised substitute."
   - id: matrix
     path: selected complete-job matrix request + workflows/jobs.json
     purpose:
@@ -87,28 +95,32 @@ reads:
   - id: profile
     path: model/registry.json + selected runtime execution profile + actual host tools/model
     purpose:
-      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
-        profiles. Use current host model configuration; historical model names are not availability
-        proof. Capabilities are the intersection of actual tools, selected profile policy, op
-        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
-        or extra-agent permissions.
+      en: Resolve this operator's request-bound external-agent chain and, before any capture is planned,
+        whether this host can actually run a headless browser. Use current host model configuration;
+        historical model names are not availability proof. Capabilities are the intersection of actual
+        tools, selected profile policy, op permissions and existing task authority. An image generator is
+        not a substitute capability here; it belongs to the artwork operator.
 writes:
   - id: node
     path: N/index.yaml
     fields:
-      - "ui: {status,intent,surfaces,states,accessibility,responsive,assets,observations,gaps}"
+      - "ui: {status,intent,surfaces,states,accessibility,responsive,assets,artworkSlots,observations,gaps}"
       - assets:[{path}]
       - assertions
     content:
       en: "Write the selected UI direction to one or more approved UI scope nodes at module/ui/index.yaml
         or recursively below ui/, following schemas/work-layout.json. Each node may cover multiple
-        screens, states, steps and viewports; split only when useful. Record a compact
-        region-to-component map in existing ui.observations or namespaced extensions:
-        screen/state/region, exported component and props, label/body/band anatomy, geometry/paint
-        owner, effective tokens/fallbacks, applicable knowledge rules, source references and
-        unresolved gaps. App-owned regions remain explicit; do not wrap every region in a card. All
-        design files belong under their owning node assets/** and every ui.assets path is also
-        declared in top-level assets for byte binding."
+        screens, states, steps and viewports; split only when useful. Enumerate every state each screen can
+        be in and describe what it shows and which grammar state contract renders it; only the main state
+        is captured, because the other states are the grammar's own contracts and the build renders them
+        from code rather than from a picture. Record a compact region-to-component map in existing
+        ui.observations or namespaced extensions: screen/state/region, exported component and props,
+        label/body/band anatomy, geometry/paint owner, effective tokens/fallbacks, applicable knowledge
+        rules, source references and unresolved gaps. Declare every artwork the render reserves as an
+        artworkSlots entry. App-owned regions remain explicit; a collection of entities is a page section
+        with a heading, not a card, and a card presents one item. All design files belong under their
+        owning node assets/** and every ui.assets path is also declared in top-level assets for byte
+        binding."
   - id: evidence
     path: E/manifest.yaml + E/direction.png or actual requested format + E/prompt.txt +
       E/visual-review.md
@@ -123,11 +135,14 @@ writes:
       - codeRefs
       - extensions
     content:
-      en: Retain actual generated/drawn image and tool provenance, the full prompt including mapped
-        component anatomy and effective family constraints, inspected fidelity findings and separate
-        asset identities. Review against the region-to-component map, not generic attractiveness
-        alone. Distinguish a generated preview from a screenshot of actual components; a generated
-        drawing proves neither exact CSS/token fidelity nor product behavior.
+      en: "Retain the captured images, the markup each one was captured from, and the provenance of the
+        capture itself: the browser and version, the viewport, the grammar package identity and version,
+        the brand record and rev, and the scratch composition the capture was taken of. Provenance here is
+        a capture, not a generation - there is no image-model prompt to retain for a surface, and a
+        recorded prompt in place of a capture is a failed result. Record the inspected fidelity findings
+        and separate asset identities, and review against the region-to-component map rather than generic
+        attractiveness. A picture that is not this grammar rendering this screen proves nothing about the
+        product, whatever it looks like."
   - id: handoff
     path: E/response.yaml
     fields:
@@ -145,8 +160,8 @@ writes:
       - artifacts
     content:
       en: Only for the selected named workflow, emit the response defined by workflows/contracts.json.
-        Return outputs.draws as the full reviewed image array with artifact IDs and
-        screen/state/viewport mapping. A failed/blocked response preserves evidence with
+        Return outputs.draws as the full reviewed capture array with artifact IDs, the kept markup beside
+        each one and screen/state/viewport mapping. A failed/blocked response preserves evidence with
         outputs:null.
   - id: designSource
     path: N/assets/**/<asset>
@@ -154,19 +169,23 @@ writes:
       - ui.assets:[{path,role,provenance}]
       - assets:[{path}]
     content:
-      en: Store any number of generated or accepted design files under each selected UI node assets/** in
-        their actual formats. Names and grouping follow the represented experience, not fixed
-        desktop.png/mobile.png slots. Describe each file role/provenance and its
-        screen/state/viewport coverage in index.yaml. Asset folders need no index.yaml. Keep one
-        shared owner instead of duplicate copies; consumer nodes use refs to that owner. Do not
-        place design files under frontend implementation or UAT; those own running-page captures.
+      en: "Store one PNG per screen and per viewport of that screen's main state under the owning UI node
+        assets/**, and keep the exact markup it was captured from beside it as <candidate>.html. The pair
+        is the deliverable: the picture is what a reader sees and the markup is what it was rendered from,
+        so the render can be checked from its source instead of from an opinion about it. Names and
+        grouping follow the represented screen and viewport, not fixed desktop.png/mobile.png slots.
+        Describe each file's role and its provenance - the capture, its browser, its viewport - in
+        index.yaml. Asset folders need no index.yaml. Keep one shared owner instead of duplicate copies;
+        consumer nodes use refs to that owner. Do not place design files under frontend implementation or
+        UAT; those own running-page captures of the built product."
   - id: draws
     path: E/draws.yaml
     fields:
       - draws
     content:
-      en: Emit the reviewed draw mapping as readable YAML beside the UI node; image bytes remain in
-        N/assets.
+      en: "Emit the reviewed draw mapping as readable YAML beside the UI node: each screen, state and
+        viewport with the capture and the markup kept beside it. Image bytes and markup remain in
+        N/assets."
   - id: matrixHandoff
     path: E/job-result.yaml
     fields:
@@ -188,76 +207,64 @@ steps:
   - reads:
       - target
       - business
-      - design
-      - repo
       - architecture
+      - repo
       - knowledge
       - grammar
       - profile
     writes:
       - node
     action:
-      en: "Freeze the selected brief and content/region mapping, labelling placeholder/example copy.
-        Choose a code-native/vector or raster medium matching the request; do not force ImageGen
-        where not appropriate. Map the canonical accepted journeys and required
-        screens/states/viewports to the complete planned draws array. Ground existing components in
-        source; greenfield surfaces remain proposed. Check architecture service/API boundaries
-        before representing actions. Own the screen/content plan inside this draw job: specify
-        shell, responsive states, truthful landing-page claims, region and asset ownership,
-        motion/accessibility constraints and transitions before producing images. Resolve the
-        execution profile and actual tool availability before selecting instruments; this does not
-        switch the model/runtime or spawn workers. Identify reusable and missing visual assets in
-        the direction. Codex working profiles may use an actually available image generator. Claude
-        may render code-native layouts and reserve blank decorative artwork slots with briefs for
-        later drawing; never claim missing raster artwork was generated. Actual reviewed layout
-        images are still required by the draw output contract."
+      en: "Freeze the screens and the states before anything is rendered. Name every screen this operation
+        draws and, for each, enumerate every state it can be in - at least loading, empty, error,
+        interaction, populated and permission-denied where the requirement allows it - and describe each
+        one in the record with the grammar state contract that renders it. Only the main state of each
+        screen is captured; the rest are described, because a picture of a spinner proves nothing the
+        state contract does not already own. Map the accepted journeys and the required
+        screens/states/viewports to the complete planned capture list. Check the architecture's service and
+        API boundaries before representing any action, and confirm the host can actually run a headless
+        browser before planning captures at all."
   - reads:
-      - business
-      - design
-      - target
-      - grammar
-    writes:
-      - evidence
-      - designSource
-    action:
-      en: Create one recommended visual direction by default, not an unsolicited A/B/C set. Only an
-        explicit user request for alternatives, comparison or choice permits multiple directions;
-        honor the requested count (for example two or three), and clarify the count before
-        generation if unspecified. A generic design/improvement request or approval of an
-        assistant-invented alternatives plan does not by itself request extra directions. Required
-        screens, states and desktop/mobile views of the same direction are coverage, not competing
-        alternatives; produce only the images needed for that coverage. Freeze the
-        region-to-component map before image production and carry its actual anatomy, geometry,
-        typography, state and family constraints into the drawing prompt or code-native preview. Do
-        not draw a generic concept first and leave FE to retrofit Grammar afterward. Use the
-        available appropriate tool/skill and retain actual output and provenance. When exact
-        component fidelity is requested, render the actual installed components in an authorized
-        isolated preview; if unavailable, report the limitation instead of certifying a generated
-        approximation. Missing tool means blocked output, never a claimed generated image.
-  - reads:
-      - target
       - design
       - business
+      - target
       - knowledge
       - grammar
     writes:
       - node
-      - evidence
       - designSource
     action:
-      en: "Open and inspect actual output for business contradictions, hierarchy, component ownership,
-        legibility, responsive feasibility and each independent asset. Compare each mapped region
-        against the resolved renderer: label inside/outside the body as actually styled, joined
-        bands versus inset content, separators versus outlines/shadows, typography, status treatment
-        and active family tokens. Distinguish subjective judgement from measured geometry. Review
-        every image against applicable knowledge and mapped journey states; record actual coverage
-        and unresolved conflicts. A material Grammar mismatch must be revised or reported as a gap,
-        not passed as an implementation detail for FE to fix. A user's visual acceptance does not
-        prove npm/CSS conformance or permit package overrides to match the image. Never pass a
-        mandatory state using an unrelated representative image."
+      en: "Compose each screen's main state from the installed grammar's own renderers and the brand
+        tokens, in a scratch folder outside the product: its contract components, its shipped stylesheet,
+        the brand record's token values, as static markup or a server-side render. Never product code,
+        never a story committed to the app, never a hand-written approximation of a component. Real,
+        product-shaped content in every region - names, amounts, dates, statuses - never placeholder bars.
+        A collection of entities is composed as a page section with its own heading, never wrapped in a
+        card, and each card presents one item. A region the grammar has no renderer for is a recorded gap,
+        not an improvisation."
+  - reads:
+      - design
+      - target
+      - grammar
+      - profile
+    writes:
+      - designSource
+      - evidence
+      - node
+    action:
+      en: "Open the composition in headless Chrome and capture one image per screen and per viewport of the
+        main state into the node's own assets/, keeping beside each image the exact markup it was rendered
+        from as <candidate>.html. Produce one direction by default: required screens, states and viewports
+        of the same direction are coverage, not competing alternatives. Only an explicit user request for
+        alternatives permits more than one, and the requested count is honored rather than invented. Then
+        declare every artwork the capture reserves - an illustration, an appearance of the brand mascot, a
+        decorative image, a chart or media placeholder - as an artworkSlots entry with its region, purpose,
+        brief, size, format, brand references and the crop of the capture it sits in. The image model draws
+        artwork and is the next operation's business; here the slot is a reserved region in the render."
   - reads:
       - target
       - design
+      - knowledge
       - workflow
       - matrix
     writes:
@@ -267,43 +274,58 @@ steps:
       - draws
       - matrixHandoff
     action:
-      en: Present the single recommended direction and its rationale by default; do not add an
-        alternatives vote or generate extra options for the user to eliminate. Reuse an accepted
-        choice. Ask for selection only when the user explicitly requested multiple alternatives and
-        selection remains open; ordinary goal/result acceptance still applies. Stop without frontend
-        code. For workflow execution, return outputs.draws as the full reviewed image array with
-        artifact IDs and screen/state/viewport mapping. Submit the exact response to the coordinator
-        gate; never self-advance. Write E/draws.yaml as declared by this operator's writes and
-        authority for FE delivery in standalone and workflow modes; include every required reviewed
-        image and retain its real artifact bytes in the owning Work assets. When selected in a job
-        matrix, produce E/job-result.yaml bound to the exact request, its output schema and every
-        required criterion. These readable YAML artifacts do not change the named workflow's
-        response object or its local session serializer; use that workflow's existing wire contract,
-        not a second invented canonical JSON copy.
+      en: "Self-check the captures against the record and the canon before reporting: every enumerated
+        state is described with its contract, every screen has its main-state capture at each viewport with
+        its markup beside it, no capture places a list of entities inside a card, every colour the capture
+        is largely made of is a brand token or scale step and the brand's primary is present, the mascot
+        appears only where the brand allows it and each appearance has its slot, and every component
+        visible is a grammar contract. Run the machine check over the node and the brand tree and record
+        its result. Present the single recommended direction and its rationale; reuse an accepted choice
+        and ask for a selection only where the user requested alternatives and one is still open. Stop
+        without frontend code. Return outputs.draws and E/draws.yaml with every capture and its markup,
+        and, when selected in a job matrix, E/job-result.yaml bound to the exact request. Submit to the
+        coordinator gate; never self-advance. These readable YAML artifacts do not replace the named
+        workflow's wire contract."
 proofs:
+  - id: render-truth
+    requirement:
+      en: "Every candidate is a browser capture of the installed grammar rendering the screen, with the
+        markup it was rendered from kept beside it as <candidate>.html and the capture's provenance
+        recorded: browser, viewport, package identity and version, brand record and rev. An image-model
+        painting, a script that paints boxes, a mockup-tool export, a screenshot of unstyled markup or a
+        capture with no markup beside it is not a candidate, whatever it looks like."
+  - id: canon
+    requirement:
+      en: "`starci render check <ui node dir> --brand <work root>` passes over the node: no list of entities
+        sits inside a card surface, no dominant colour of a capture falls outside the brand's tokens and
+        scale steps, the brand's primary is present, and every surface the brand allows the mascot on
+        declares a slot for it. A check that could not run is reported with its reason and leaves the claim
+        unproven; it is never read as a pass."
   - id: binding
     requirement:
       en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
         done.
-  - id: visual
+  - id: coverage
     requirement:
-      en: Actual visual bytes opened and reviewed against the brief; dimensions/tool provenance recorded;
-        no UI/UAT pass assigned from the drawing.
-  - id: draws-knowledge-coverage
-    requirement:
-      en: Every required journey screen/state has a reviewed image and applicable knowledge review. For a
-        Grammar-bound design, retain the app-resolved package/family evidence, region-to-component
-        map and explicit image comparison against it; package name/version alone or a generic visual
-        pass is insufficient. Unresolved mandatory conflicts block handoff. Generated previews
-        remain previews, not measured component conformance.
+      en: Every required journey screen has its main-state capture at every required viewport, every other
+        enumerated state is described with the grammar contract that renders it, and every artwork the
+        captures embed is declared as an artworkSlots entry. A mandatory state passed with an unrelated
+        image, or a capture whose embedded artwork the record does not list, is incomplete.
 blockers:
+  - code: RENDER_TOOL_UNAVAILABLE
+    condition:
+      en: No headless browser can be run on this host, so the grammar cannot be rendered and captured. The
+        result is blocked with the missing capability named. It is never replaced by an image-model
+        painting, a hand-drawn approximation or a description of what the screen would have looked like.
   - code: DESIGN_INPUT_UNKNOWN
     condition:
       en: Required business content, identity asset rights or material direction choice is missing.
-  - code: VISUAL_TOOL_UNAVAILABLE
+  - code: GRAMMAR_REGION_UNRENDERABLE
     condition:
-      en: Requested visual output cannot be produced with available permitted tools.
+      en: The installed grammar publishes no renderer for a region the screen needs. Name the region and
+        the screen and report the gap; do not compose a substitute out of raw elements and do not capture a
+        screen the grammar cannot render.
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
@@ -318,7 +340,7 @@ placeholders:
   identity: Selected actor label
   fixture: Selected fixture path
   resource: Selected owned asset name
-  asset: Actual selected source asset filename/format
+  asset: Actual capture or kept-markup filename under the owning node assets
   piece: Stable selected piece slug
   flow: Selected UAT journey slug
   screen: Selected surface/state slug
