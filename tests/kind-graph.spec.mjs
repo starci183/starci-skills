@@ -48,7 +48,7 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.equal(familyOf('work.author',{profile}),'design');
   assert.equal(roleOf('work.author',{profile}),'plan');
   assert.equal(operatorOf('work.author',{profile}),'work.author');
-  assert.deepEqual(reportsOf('work.author',{profile}),{outcomes:['done','partial','failed','ask'],blockers:[]});
+  assert.deepEqual(reportsOf('work.author',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['sds-gap','shared-change','authority']},'an intake reports what a decided record must become as sds-gap');
   // The identity kind is the other one that writes an authored record, because that record IS its decision, and
   // the only kind that may produce asset bytes: a placeholder mascot the product does not have yet.
   assert.equal(familyOf('brand.decide',{profile}),'design');

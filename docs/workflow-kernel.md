@@ -287,6 +287,15 @@ That is all it does: the Work validator binds a completion to the digest of what
 frontend-facing nodes that were built against the old brand are reopened in the tree itself, and `syncLedgerOps`
 picks them up on the next iteration like any other newly schedulable node.
 
+**Intake is a reconciliation.** A new feature C is never appended beside the decided features A and B: the intake
+reads every decided SRS/SDS record C touches, writes a reconciliation table into C's module record (fit,
+change or conflict per record), references what C shares by record id, reports as `sds-gap` what A or B must
+become (the kernel opens `architecture.revise` on that record - the intake never edits another feature), and
+raises a real conflict as an open decision record of C for the owner. The result is one consistent A', B', C'.
+`workflow-goal --reintake <feature>` runs the same intake op in reconcile mode over drafts the tree already
+holds (`intake-planned {mode: reconcile}`), which is how a feature authored before this rule is brought under it.
+The validator judges an intake by that rule, and the goal critique treats a goal that only appends as `revise`.
+
 **Intake.** A `--scope` entry the tree does not know is not an error: the goal phase plans one intake operation
 for it (`intake-planned`) and the tree, once it has the records, says what follows. `brand` becomes one
 `brand.decide` op on `.starciwork/brand/**` that authors and decides the one brand record; a feature becomes one

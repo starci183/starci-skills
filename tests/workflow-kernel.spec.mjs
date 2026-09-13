@@ -725,13 +725,13 @@ const receiptAuthor=()=>({'demo.sales.implementation.frontend.receipt-author':[{
  */
 const bindingRoles=roles=>input=>({...resolveLedgerRoot(input),roles});
 
-function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal,
+function setupWork({nodes=WORK_NODES,scope=[],reintake=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal,
   critiqueGoal,ledgerApi,validateOp=acceptAll,binding=null}={}){
   const tree=workRepo(nodes);
   activeRepo=tree.repo;
   const store=createStore({repoRoot:tree.repo,id:'20260912-110000-work-ledger'});
   const state=createWorkflowState({job:'Finish the sales slice',worktree:cwd,branch:'starci183/sales',
-    gates,store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'work',scope,repoRoot:tree.repo});
+    gates,store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'work',scope,reintake,repoRoot:tree.repo});
   const api=ledgerApi?ledgerApi(tree):undefined;
   const goal=goalPhase(store,state,{validate:tree.validate,cwd,...(api?{ledgerApi:api}:{}),
     critiqueGoal:critiqueGoal??soundCritique,
@@ -759,7 +759,7 @@ test('a scope entry that names nothing in the tree begins with an intake operati
   try{
     assert.equal(collab.goal.ok,true);
     assert.deepEqual(collab.state.ops.map(op=>[op.id,op.kind,op.nodeId,op.origin,op.intake]),
-      [['collab-intake','work.author',null,'ledger',{scope:'collab',example:'features/payments'}]]);
+      [['collab-intake','work.author',null,'ledger',{scope:'collab',example:'features/payments',mode:'author'}]]);
     const op=collab.state.ops[0];
     assert.deepEqual(op.allowlist,['.starciwork/features/collab/**']);
     assert.deepEqual(op.ledgerIds,[],'an intake closes no node: the records it writes are the nodes');
@@ -767,7 +767,11 @@ test('a scope entry that names nothing in the tree begins with an intake operati
     assert.ok(op.references.includes('workspace.yaml')&&op.references.includes('features/payments/business/overview/index.yaml'),'the example feature is a reference');
     assert.deepEqual(op.checks.map(check=>check.name),['work-tree-validates']);
     assert.match(op.goal,/Author the Work records of the feature collab from the job: Finish the sales slice/);
-    assert.deepEqual(events(collab.store).filter(event=>event.event==='intake-planned').map(event=>[event.op,event.scope,event.kind]),[['collab-intake','collab','work.author']]);
+    assert.match(op.goal,/A new feature is not appended beside the decided ones/);
+    assert.ok(op.acceptance.some(line=>/reconciliation table/.test(line)),'the acceptance demands the reconciliation');
+    assert.ok(op.references.includes('features/sales/architecture/sds/intake/index.yaml'),'the decided records of the other features are references');
+    assert.equal(op.intake.mode,'author');
+    assert.deepEqual(events(collab.store).filter(event=>event.event==='intake-planned').map(event=>[event.op,event.scope,event.kind,event.mode]),[['collab-intake','collab','work.author','author']]);
     assert.deepEqual(collab.state.ledger,[],'nothing is a goal item until the tree has it');
     // The contract renders the intake sequence, not a record completion.
     const contract=renderContract({template,op,state:collab.state,store:collab.store,launcher:'L.mjs',run:'run_wf'});
@@ -782,9 +786,17 @@ test('a scope entry that names nothing in the tree begins with an intake operati
     assert.ok(brand.state.ops[0].references.some(entry=>/knowledge\/grammars\//.test(entry)),'the brand is decided inside the installed grammar');
     assert.match(brand.state.ops[0].goal,/Author and decide the brand record/);
   }finally{brand.cleanup();}
-  // A scope the tree does know plans no intake.
+  // A scope the tree does know plans no intake - unless the owner asks for its drafts to be reconciled again.
   const known=setupWork({scope:['payments']});
   try{assert.equal(known.state.ops.some(op=>op.intake),false);}finally{known.cleanup();}
+  const again=setupWork({scope:['payments'],reintake:['payments']});
+  try{
+    const op=again.state.ops.find(item=>item.intake);
+    assert.ok(op,'a reintake plans the intake op over the existing drafts');
+    assert.deepEqual([op.id,op.intake.scope,op.intake.mode,op.allowlist],['payments-intake','payments','reconcile',['.starciwork/features/payments/**']]);
+    assert.match(op.goal,/Reconcile and re-author the existing drafts of the feature payments/);
+    assert.deepEqual(events(again.store).filter(event=>event.event==='intake-planned').map(event=>event.mode),['reconcile']);
+  }finally{again.cleanup();}
 });
 
 test('an op the restart limit blocked for a rate limit cools down and is re-admitted on another runtime, and an older block is migrated',()=>{

@@ -341,7 +341,7 @@ export function ledgerBinding(state,{repoRoot,host=null,ledgerRoot=null,git=spaw
 
 /** The whole mutable state of one workflow. `schema` is the store's, so state.json is written atomically by it. */
 export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],store,host=null,launcher=null,
-  ledgerMode='plan',scope=[],repoRoot=null,ledgerRoot=null,ledgerOwner=null,ledgerSource=null,ledgerShared=false,
+  ledgerMode='plan',scope=[],reintake=[],repoRoot=null,ledgerRoot=null,ledgerOwner=null,ledgerSource=null,ledgerShared=false,
   codeRole=null,codeSide=null,lane=null}){
   need(plain(store)&&typeof store.id==='string','A workflow store is required');
   need(LEDGER_MODES.includes(ledgerMode),`Unsupported ledger mode ${ledgerMode}; use ${LEDGER_MODES.join(' or ')}`);
@@ -351,7 +351,7 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     // The worktree above is this workflow's lane when it owns one: the tree it runs in, and the branch that is
     // merged back into `lane.base.branch` when the workflow finishes done.
     lane:plain(lane)?{...lane}:null,
-    ledgerMode,scope:[...scope],repoRoot:repoRoot?path.resolve(repoRoot):null,
+    ledgerMode,scope:[...scope],reintake:[...reintake],repoRoot:repoRoot?path.resolve(repoRoot):null,
     // The code root is the worktree above; these name the tree the Work itself lives in, which may belong to
     // another repository of the same product.
     ledgerRoot:ledgerRoot?path.resolve(ledgerRoot):null,ledgerOwner:plain(ledgerOwner)?{...ledgerOwner}:null,
@@ -1101,7 +1101,7 @@ function retemplateIntakeOps(store,state,ctx,loaded){
   if(!workRoot)return;
   for(const op of state.ops.filter(item=>item.intake?.scope&&!['done','blocked'].includes(item.status)||item.intake?.scope&&item.status==='blocked'&&!item.refusal)){
     let fresh=null;
-    try{fresh=intakeOp(state,{workRoot,loaded,index:0,entry:op.intake.scope,repositories:{}});}catch{continue;}
+    try{fresh=intakeOp(state,{workRoot,loaded,index:0,entry:op.intake.scope,repositories:{},mode:op.intake.mode??'author'});}catch{continue;}
     const changed=['goal','acceptance'].filter(key=>JSON.stringify(op[key])!==JSON.stringify(fresh[key]));
     if(!changed.length)continue;
     for(const key of changed)op[key]=fresh[key];
@@ -1319,7 +1319,7 @@ function scopeNames(node,entry){
  * `todo`, so the owner reads drafts and the decisions stay the owner's. Neither op closes a Work node: the records
  * it writes are the nodes the tree has afterwards.
  */
-function intakeOp(state,{workRoot,loaded,index,entry=null,repositories={}}){
+function intakeOp(state,{workRoot,loaded,index,entry=null,repositories={},mode='author'}){
   const name=slash(String(entry??'')).replace(/\/+$/,'');
   const check={name:'work-tree-validates',command:validateCommandAt(workRoot)};
   if(name==='brand'){
@@ -1338,11 +1338,16 @@ function intakeOp(state,{workRoot,loaded,index,entry=null,repositories={}}){
   const found=paths.filter(where=>roots.includes(where));
   // Always a real record to mirror: the module roots when the tree has them, else the first record under the example.
   const exampleRefs=found.length?found:paths.filter(where=>example&&where.startsWith(`${example}/`)).sort().slice(0,1);
-  return {id:`${name.replace(/[^A-Za-z0-9._-]+/g,'-')}-intake`,kind:AUTHOR_KIND,nodeId:null,intake:{scope:name,example},
-    goal:`Author the Work records of the feature ${name} from the job: ${state.job}. Mirror the shape of the existing feature ${example??'(none yet)'}: the module record, the business overview and SRS as full drafts, the architecture as a skeleton; every leaf record todo (the module, business, srs, architecture and sds roots carry no state, exactly as the example), every open question an open decision.`,
+  // The decided records of every other feature: the reconciliation reads them, references them, never restates them.
+  const decided=loaded.list.filter(node=>node.state==='done'&&['business','business-overview','architecture'].includes(node.kind)&&!scopeNames(node,name)).map(node=>slash(node.path)).slice(0,60);
+  const reconcile=mode==='reconcile';
+  return {id:`${name.replace(/[^A-Za-z0-9._-]+/g,'-')}-intake`,kind:AUTHOR_KIND,nodeId:null,intake:{scope:name,example,mode},
+    goal:`${reconcile?`Reconcile and re-author the existing drafts of the feature ${name}`:`Author the Work records of the feature ${name}`} from the job: ${state.job}. A new feature is not appended beside the decided ones: read the decided SRS/SDS records it touches, reference what it shares, report as sds-gap what they must become, raise a real conflict as an open decision - so the tree reads as one consistent whole. Mirror the shape of the existing feature ${example??'(none yet)'}: the module record, the business overview and SRS as full drafts, the architecture as a skeleton; every leaf record todo (the module, business, srs, architecture and sds roots carry no state, exactly as the example), every open question an open decision.`,
     ledgerIds:[],allowlist:[`.starciwork/features/${name}/**`],
-    references:unique(['workspace.yaml',...exampleRefs]),checks:[check],
-    acceptance:[`features/${name} has a module record, a business overview, SRS records and an architecture skeleton, every leaf record todo and the whole feature valid - the roots (module, business, srs, architecture, sds) carry no state, as in the example feature`,'no existing feature changed','the Work tree still validates'],origin:'ledger'};
+    references:unique(['workspace.yaml',...exampleRefs,...decided]),checks:[check],
+    acceptance:[`features/${name} has a module record, a business overview, SRS records and an architecture skeleton, every leaf record todo and the whole feature valid - the roots (module, business, srs, architecture, sds) carry no state, as in the example feature`,
+      `the module record of ${name} carries a reconciliation table over the decided records it touches (fit, change or conflict); what it shares is referenced by record id, never restated or redefined; a change a decided record needs was reported as sds-gap, never edited; a real conflict is an open decision record`,
+      'no other feature\'s record changed by hand','the Work tree still validates'],origin:'ledger'};
 }
 export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless,
   ledgerRoot=null,git=spawnSync,resolveLedger=resolveLedgerRoot}={}){
@@ -1361,13 +1366,16 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   // A scope entry that names nothing in the tree is a feature - or the brand - still to be authored. The workflow
   // then begins with one intake operation that writes those records from the job, and the tree, once it has them,
   // says what follows: decisions the owner takes, lanes the kernel walks. Nothing is invented by the kernel itself.
-  const absent=(scope??[]).filter(entry=>!loaded.list.some(node=>scopeNames(node,entry)));
+  // `--reintake <feature>` re-authors drafts the tree already holds under the reconciliation rule: the same intake
+  // op, in reconcile mode, over the same allowlist - the way a feature authored before that rule is brought under it.
+  const reintake=(state.reintake??[]).map(entry=>slash(String(entry??'')).replace(/\/+$/,'')).filter(Boolean);
+  const absent=unique([...(scope??[]).filter(entry=>!loaded.list.some(node=>scopeNames(node,entry))),...reintake]);
   const repositories=(()=>{try{return Object.fromEntries(bindingRoutes(binding.binding,{source:path.dirname(path.resolve(state.host??''))}).map(route=>[route.role,route.directory]));}catch{return {};}})();
   // The folders of the other bound repositories, and the folder they all live in, so a path naming one of them
   // is never mistaken for a path of this worktree.
   state.otherRepositories=unique(Object.values(repositories).map(root=>path.basename(String(root))).filter(name=>name&&name!==path.basename(repoRoot)));
   state.repositoriesRoot=state.host?path.basename(path.dirname(path.dirname(path.resolve(state.host)))):null;
-  const intake=absent.map((entry,index)=>intakeOp(state,{workRoot:binding.ledgerRoot,loaded,index,entry,repositories}));
+  const intake=absent.map((entry,index)=>intakeOp(state,{workRoot:binding.ledgerRoot,loaded,index,entry,repositories,mode:reintake.includes(slash(String(entry)).replace(/\/+$/,''))?'reconcile':'author'}));
   state.decisions=ledgerApi.decisionCandidates(loaded,{scope}).map(node=>({id:node.id,kind:node.kind,path:node.path,
     operation:DECISION_OPERATION[node.kind]??'business.decide',title:describeNode(ledgerApi,at,node)}));
   state.ledgerSummary=ledgerApi.ledgerSummary(loaded,{scope});
@@ -1392,7 +1400,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   state.ops=[...launchable.map((node,index)=>deriveWorkOp(ledgerApi,at,node,
     {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[],loaded})),
     ...intake.map((raw,index)=>{const op=toOp(raw,launchable.length+index);op.intake=raw.intake;op.difficulty='hard';return op;})];
-  for(const op of state.ops.filter(item=>item.intake))store.appendEvent({event:'intake-planned',op:op.id,scope:op.intake.scope,kind:op.kind,allowlist:op.allowlist});
+  for(const op of state.ops.filter(item=>item.intake))store.appendEvent({event:'intake-planned',op:op.id,scope:op.intake.scope,kind:op.kind,allowlist:op.allowlist,mode:op.intake.mode??'author'});
   for(const op of state.ops)locateSharedTreePaths(op,{work:{shared:binding.sharedLedger,ledger:{repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot}}});
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
   const assessed=typeof assessGoal==='function'?assessGoal({job:state.job,inputs:state.inputs,
@@ -4199,7 +4207,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const store=createStore({repoRoot:ledger.sharedLedger?ledger.ownerRepoRoot:repoRoot,id});
     const ledgerMode=detectLedgerMode(code,options.ledger??null,ledger.exists?ledger.ledgerRoot:null);
     const state=createWorkflowState({job,inputs:csv(options.inputs),worktree:code,branch:lane?lane.branch:currentBranch(code),
-      gates:csv(options.gates),store,host,launcher:launcherOf(host),ledgerMode,scope:csv(options.scope),repoRoot:code,lane,
+      gates:csv(options.gates),store,host,launcher:launcherOf(host),ledgerMode,scope:csv(options.scope),reintake:csv(options.reintake),repoRoot:code,lane,
       ledgerRoot:ledger.exists?ledger.ledgerRoot:null,ledgerShared:ledger.sharedLedger,ledgerSource:ledger.source,
       codeRole:ledger.role,codeSide:ledger.side,
       ledgerOwner:ledger.exists?{repoRoot:ledger.ownerRepoRoot,repository:ledger.ownerRepository,role:ledger.ownerRole,project:ledger.project}:null});
