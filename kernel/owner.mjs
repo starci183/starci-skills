@@ -196,6 +196,34 @@ export function openOwnerAsk(store,state,op,question,ctx,report=null){
 }
 
 /**
+ * A conflict an intake recorded - a decided record of another feature that cannot hold together with this feature,
+ * written as an open decision record with both sides, the numbered options and one recommendation - is taken the
+ * way every other decision is: provisionally, on the recommendation, with the owner overturning it later. One
+ * detached `decision.prepare` reads the record the intake wrote and reports the recommendation; nothing waits
+ * for it, and the intake that raised it is finished already. The workflow never finishes `blocked` over a
+ * conflict the runtime could take a side on and say so.
+ */
+export function openConflictDecision(store,state,intake,conflict,ctx){
+  const record=typeof conflict?.decision==='string'&&conflict.decision.trim()?conflict.decision.trim():null;
+  if(!record)return null;
+  const same=state.ops.find(item=>isAsk(item.kind)&&item.question?.record===record&&!['failed'].includes(item.status));
+  if(same)return same;
+  let recordPath=null;
+  try{recordPath=slash(ctx?.work?.node?.(record)?.path??'')||null;}catch{recordPath=null;}
+  const folder=recordPath?recordPath.replace(/\/index\.yaml$/,''):null;
+  const ask=addOp(store,state,{kind:DECISION_PREPARE,nodeId:null,
+    goal:`Take the conflict ${intake.id} recorded provisionally: ${firstLine(conflict.detail??`${conflict.record} conflicts with what ${intake.intake?.scope??intake.id} needs`)}`,
+    question:{kind:'decision',prepared:true,stop:null,record,from:intake.id,options:[...(conflict.options??[])],
+      text:`${conflict.detail??`${conflict.record} conflicts with what ${intake.intake?.scope??intake.id} needs`} The decision record ${record} is already written with both sides, the numbered options and one recommendation: read it, print the question and the options in this terminal, and report \`decision: ${record}\` with \`recommended: <n>\` - the runtime takes it provisionally and the owner overturns it later with workflow-answer. Write nothing.`},
+    // The record's own folder when the tree knows it; the feature's policy-decisions folder otherwise. The op writes nothing either way.
+    ledgerIds:[],allowlist:folder?[`.starciwork/${folder}/**`]:decisionAllowlistFor(state,intake,ctx),references:unique([...(recordPath?[recordPath]:[]),...(intake.references??[]).slice(0,8)]),
+    checks:[],acceptance:[`the summary begins \`decision: ${record}\` with \`recommended: <n>\` and the numbered options, and no file changed`],
+    origin:'ask',requesters:[]},`conflict of ${intake.id} taken provisionally`);
+  if(ask)store.appendEvent({event:'owner-ask-opened',op:intake.id,ask:ask.id,kind:'decision',stop:null,provisional:true,record,question:firstLine(conflict.detail??record)});
+  return ask;
+}
+
+/**
  * A report's summary reaches the kernel with its newlines collapsed into spaces (`buildReport` normalizes
  * whitespace), so every marker the ask op writes is read out of one line: `<key>: <value>` anywhere in it, and
  * the numbered options as a run that starts at 1 and counts up. Reading them per line worked only for questions

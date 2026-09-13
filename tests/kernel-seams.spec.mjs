@@ -212,7 +212,7 @@ test('a reconciliation the kernel refuses comes back as findings and the intake 
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
-test('a valid table is counted, and every conflict row is the owner\'s question - answered by workflow-answer',()=>{
+test('a valid table is counted, and every conflict row is taken provisionally through one detached decision.prepare that reads the record the intake wrote',()=>{
   const dir=tmp();
   try{
     const store=stubStore(dir);
@@ -230,25 +230,20 @@ test('a valid table is counted, and every conflict row is the owner\'s question 
     const raised=store.events.find(item=>item.event==='reconciliation-conflict');
     assert.equal(raised.record,'demo.sales.architecture.sds.contract.intake-command');
     assert.equal(raised.decision,'demo.collab.business.srs.decision.d-intake-contract');
-    const item=state.needUser.find(entry=>entry.kind==='decision');
-    assert.equal(item.op,'collab-intake');
-    assert.equal(item.record,'demo.collab.business.srs.decision.d-intake-contract');
-    assert.equal(item.options.length,2);
-    assert.match(item.detail,/workflow-answer --id wf-seam --op collab-intake --choice <n>/);
-    // A second settle of the same intake raises the same conflict once, never twice on the owner's list.
+    // Not the owner's list: one detached decision.prepare reads the decision record the intake wrote and reports
+    // the recommendation, which the runtime takes provisionally. Nothing waits for it, and the intake is done.
+    assert.equal(state.needUser.some(entry=>entry.kind==='decision'),false,'a conflict is never a line on the owner\'s list');
+    assert.equal(raised.provisional,true);
+    const ask=state.ops.find(item=>item.kind==='decision.prepare');
+    assert.ok(ask,'a decision.prepare was opened for the conflict');
+    assert.equal(raised.ask,ask.id);
+    assert.deepEqual([ask.question.record,ask.question.prepared,ask.question.from,ask.requesters,ask.question.options.length],
+      ['demo.collab.business.srs.decision.d-intake-contract',true,'collab-intake',[],2]);
+    assert.match(ask.question.text,/report `decision: demo\.collab\.business\.srs\.decision\.d-intake-contract` with `recommended: <n>`/);
+    assert.match(ask.goal,/Take the conflict collab-intake recorded provisionally/);
+    // A second settle of the same intake opens the same decision once, never twice.
     settleIntake(store,state,op,ctx);
-    assert.equal(state.needUser.filter(entry=>entry.kind==='decision').length,1);
-
-    // `workflow-answer` settles it even though the op that raised it is not an owner.ask.
-    const answered=answerOwnerQuestion(store,state,{op:'collab-intake',choice:2,note:'both paths stay'});
-    assert.equal(answered.ask,'collab-intake');
-    assert.match(answered.answer,/option 2 - add an asynchronous intake beside it; both paths stay/);
-    assert.equal(state.needUser.some(entry=>entry.kind==='decision'),false);
-    assert.deepEqual(op.decisions,[{record:'demo.collab.business.srs.decision.d-intake-contract',choice:'2',
-      note:'both paths stay',at:op.decisions[0].at,answer:answered.answer}]);
-    const event=store.events.at(-1);
-    assert.equal(event.event,'owner-answered');
-    assert.equal(event.record,'demo.collab.business.srs.decision.d-intake-contract');
+    assert.equal(state.ops.filter(item=>item.kind==='decision.prepare').length,1);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 

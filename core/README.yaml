@@ -71,7 +71,8 @@ sections:
         policy decision (kind business, `starci/srs-policy-decision@1`, `state: todo`) stands beside the
         requirement: it is left out of its ancestors' children digests and of their state rollup (warning
         `OPEN_DECISION`), so recording a question for the owner under a decided feature stales nothing and
-        blocks nothing; once decided it joins both, and what rested on the requirement is re-verified. `naReason` is semantic: changing an
+        blocks nothing; once decided it joins both, and what rested on the requirement is re-verified. The
+        `policy-decisions` aggregate that holds only open decisions (or none yet) is open with them. `naReason` is semantic: changing an
         applicability justification invalidates consumers of that scope. Unknown extension fields
         are included conservatively. `inputDigest` additionally binds workspace metadata, ancestor
         specifications and their referenced inputs, recursively referenced
