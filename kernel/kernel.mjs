@@ -1036,7 +1036,9 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     const files=changedFiles(state,op,ctx,op.allowlist,{exclude:op.kernelOwned??[]});
     // Every changed file is mapped to a record kind, and a file whose kind this op does not declare in `writes`
     // is a defect the machine can name on its own: no model is asked, and the report goes back with the finding.
-    const undeclared=(()=>{try{return undeclaredWrites(op.kind,files,{nodeKind:ctx.work?.node?.(op.nodeId)?.kind??null});}catch{return [];}})();
+    // `ctx.kindsProfile` is the profile to read it against: null is the compiled one, and a caller that runs the
+    // kernel against an authored or a fixture profile hands that one in instead of rebuilding `.dist` for it.
+    const undeclared=(()=>{try{return undeclaredWrites(op.kind,files,{profile:ctx.kindsProfile??null,nodeKind:ctx.work?.node?.(op.nodeId)?.kind??null});}catch{return [];}})();
     if(undeclared.length){
       op.reports.at(-1).downgradedTo='failed';
       store.appendEvent({event:'io-undeclared-write',op:op.id,files:undeclared.map(item=>item.file)});
@@ -1580,7 +1582,7 @@ export function triageAnomaly(store,state,signature,ctx){
 export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,validateOp=llm.validateOp,template,supervisor=null,validator=null,
   wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
   ledgerApi=work,validate=validateWorkTree,ledgerRoot=null,resolveLedger=resolveLedgerRoot,
-  reconcile=null,renderChecks=null,contractDigest=null,
+  reconcile=null,renderChecks=null,contractDigest=null,kindsProfile=null,
   waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now,host=hostDescriptorOf(orca)}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   need(plain(allocator),'A runtime allocator is required');
@@ -1588,7 +1590,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   required(state.run,'Orca run id');required(state.from,'own terminal handle');
   // `validateOp:null` is an explicit choice to run without the validator; it is recorded once as `validator-skipped`.
   const ctx={cwd,allocator,planOp,decide,validateOp,template,wait,exec,git,launch,now,guards,work:null,orca,host:hostDescriptorOf({host}),
-    reconcile,renderChecks,contractDigest,
+    reconcile,renderChecks,contractDigest,kindsProfile,
     supervisor:supervisor??supervisorRuntimes(state.host??''),validator:validator??validatorRuntimes(state.host??'')};
   // Which host runs this workflow is a fact of the run: a sequential host names itself so the log says why one op ran at a time.
   store.appendEvent({event:'host',name:ctx.host.name,capabilities:ctx.host.capabilities,sequential:ctx.host.sequential,maxParallelOps:allocator.maxParallelOps??null});
