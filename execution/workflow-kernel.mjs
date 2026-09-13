@@ -2010,6 +2010,17 @@ function launchOp(orca,store,state,op,allocated,ctx){
   }
   op.launch={ok:Boolean(launched?.ok),target:launched?.selection?.target??allocated.target,
     task:launched?.task?.id??null,dispatch:launched?.dispatchId??null,stopReason:launched?.stopReason??null};
+  // Orca refuses every launch from a coordinator tab whose pane is gone ("no stable pane identity"): that is the
+  // kernel's tab to replace, not the runtime's failure to count - a new tab is opened, the Run re-bound, the op
+  // stays ready for the next tick. Once per attempt, so a tab Orca keeps refusing does not loop for ever.
+  if(!launched?.ok&&/no stable pane identity/i.test(String(launched?.stopReason??''))&&!op.coordinatorRecovered){
+    op.coordinatorRecovered=true;
+    if(recoverCoordinatorTab(orca,store,state,{cwd:state.worktree})){
+      // The slot the allocation took is given back without a failure: the runtime did nothing wrong.
+      try{ctx.allocator.release?.(allocated.runtime,{op:op.id});}catch{}
+      op.status='ready';op.launch=null;return {ok:false,reason:'the coordinator tab was replaced; the launch is tried again',recovered:true};
+    }
+  }
   if(!launched?.ok){
     op.launchFailures+=1;
     ctx.allocator.failed(allocated.runtime,{reason:launched?.stopReason??'launch failed',op:op.id});
@@ -2023,7 +2034,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
     }
     return {ok:false,reason:launched?.stopReason??'launch failed'};
   }
-  op.status='running';op.runtime=allocated.runtime;op.target=allocated.target;
+  op.status='running';op.runtime=allocated.runtime;op.target=allocated.target;op.coordinatorRecovered=false;
   // The launch is what the other kernels of this repository must see: the allocation alone could still fail.
   ctx.allocator.launched?.(allocated.runtime,{op:op.id});
   if(!op.baseHead){const shown=ctx.git('git',['rev-parse','HEAD'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});op.baseHead=shown.status===0?(shown.stdout??'').trim():null;}
@@ -3721,6 +3732,24 @@ const closeTerminal=(orca,cwd,handle)=>{try{const closed=orca.invoke('terminal-c
  * previous start of this workflow) is reused and any duplicate is closed; none exists, one is created. A
  * process restart therefore never adds a tab.
  */
+/**
+ * The kernel's coordinator tab lost its pane (Orca: "The coordinator terminal has no stable pane identity"):
+ * the old handle is closed, a fresh `[Kernel] <id>` tab is opened and the Run is re-bound to it, so the next
+ * launch is accepted. The event names both handles.
+ */
+export function recoverCoordinatorTab(orca,store,state,{cwd=state.worktree}={}){
+  const lost=state.from??null;
+  if(lost){try{orca.invoke('terminal-close',{terminal:lost},{cwd});}catch{}}
+  state.from=null;
+  try{state.from=ownKernelTerminal(orca,store,state,cwd);}
+  catch(error){store.appendEvent({event:'coordinator-tab-lost',terminal:lost,reason:String(error?.message??error)});state.from=lost;return false;}
+  state.kernelTerminalOwned=true;
+  let rebound=false;
+  try{rebound=rebindRunIfNeeded(orca,store,state,{cwd});}catch{rebound=false;}
+  store.appendEvent({event:'coordinator-tab-recovered',was:lost,terminal:state.from,rebound});
+  store.saveState(state);
+  return true;
+}
 function ownKernelTerminal(orca,store,state,worktree){
   const title=`[Kernel] ${state.id}`;
   const mine=listTerminals(orca,worktree).filter(item=>item.title===title&&item.handle);

@@ -686,6 +686,13 @@ whose detail names a variable, a key, a token or a credential is the same owner 
 Every contract carries the credential rule: a key the environment lacks is reported `blocked` with the exact
 variable name, never invented, stubbed or silently skipped, and no secret value is ever written anywhere.
 
+## A coordinator tab whose pane is gone is replaced
+
+Orca refuses every launch from a coordinator tab whose pane died ("The coordinator terminal has no stable pane
+identity"). The kernel treats that as its own tab to replace, never as the runtime's failure: the old handle is
+closed, a fresh `[Kernel] <id>` tab is opened, the Run is re-bound to it (`coordinator-tab-recovered`), and the
+op stays ready for the next tick - once per attempt.
+
 ## A tab exists only while its op runs
 
 Every five minutes (and at every reconcile) the kernel closes every tab of this workflow that nobody reads:

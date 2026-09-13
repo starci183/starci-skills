@@ -49,10 +49,12 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
       ?['∵ Thinking… 1s','⠼ working (12s · esc to cancel)','qwen3.8-flash (Token Plan Singapore)']
       :['>_ Qwen Code (v0.23.3)','>   Type your message or @path/to/file','qwen3.8-flash (Token Plan Singapore)'];
   };
+  let coordinator='term_kernel';
   const handlers={
-    'run-show':()=>json(0,{ok:true,result:{run:{id:run,coordinator_handle:'term_kernel'}}}),
+    // The Run's coordinator is a fact of the fake: `run-use` moves it, the way Orca re-binds a Run to a new tab.
+    'run-show':()=>json(0,{ok:true,result:{run:{id:run,coordinator_handle:coordinator}}}),
     'run-create':()=>json(0,{ok:true,result:{run:{id:run}}}),
-    'run-use':()=>json(0,{ok:true,result:{run:{id:run}}}),
+    'run-use':args=>{coordinator=flag(args,'from')??coordinator;return json(0,{ok:true,result:{run:{id:run}}});},
     'task-create':args=>{
       const id=`task_${++counter}`;
       tasks.set(id,{id,display_name:flag(args,'display-name'),op:opOf(flag(args,'spec'))});
@@ -1167,6 +1169,29 @@ test('an environment blocker that names a credential is the question of the owne
     assert.deepEqual([ask.question.kind,ask.question.from],['credential',nodeId]);
     assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused');
     assert.equal(after.needUser.some(item=>item.kind==='environment'),false,'no bare environment line nobody answers');
+  }finally{harness.cleanup();}
+});
+
+test('a launch Orca refuses because the coordinator pane is gone replaces the kernel tab, re-binds the Run and tries again without counting a runtime failure',()=>{
+  const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
+  const harness=setupWork({dirty:[file],scripts:{[nodeId]:[{outcome:'done',summary:'Intake implemented.',files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]}]}});
+  try{
+    const {store,state}=harness;
+    approve(store,state);state.run='run_wf';state.from='term_dead';state.kernelTerminalOwned=true;
+    let refused=0;
+    const launch=(orca,params)=>{
+      if(refused===0){refused+=1;return {ok:false,stopReason:'Operation Task creation failed (none): The coordinator terminal has no stable pane identity.',attempts:[{target:'gpt-5.6-sol',stage:'task-create',effectState:'none',reason:'no stable pane identity'}]};}
+      return launchWithCandidate(orca,params);
+    };
+    const after=harness.run({maxIterations:6,launch});
+    const op=after.ops.find(item=>item.id===nodeId);
+    assert.equal(op.status,'done','the op launched on the second try and finished');
+    assert.equal(op.launchFailures,0,'a lost pane is not a launch failure of the runtime');
+    assert.notEqual(after.from,'term_dead');
+    assert.ok(after.from,'the kernel has a tab again');
+    const log=events(store);
+    assert.deepEqual(log.filter(event=>event.event==='coordinator-tab-recovered').map(event=>[event.was,event.terminal===after.from]),[['term_dead',true]]);
+    assert.equal(log.some(event=>event.event==='launch-failed'),false);
   }finally{harness.cleanup();}
 });
 
