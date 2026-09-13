@@ -9,6 +9,9 @@ so every terminal of one product writes into the same workflows root.
 ## Layout
 
 ```text
+.starciwork/_local/workflows/
+  runtime-loads.json  the shared runtime ledger of the repository (every kernel reads and writes it)
+  supervisor.log      one line per supervision round
 .starciwork/_local/workflows/<workflowId>/
   events.jsonl        append-only audit trail, one JSON object per line
   state.json          derived snapshot, schema starci/workflow-state@1
@@ -20,6 +23,14 @@ so every terminal of one product writes into the same workflows root.
   checks/<opId>.json        the checks a worker actually ran
   inbox/                    messages and hand-offs addressed to the workflow
 ```
+
+The two files in the workflows root itself belong to the repository, not to one
+workflow: `runtime-loads.json` is the shared runtime ledger every kernel reads
+before it allocates and writes when it launches, releases or runs into a
+provider limit (see
+[workflow-kernel.md](workflow-kernel.md#runtimes-are-shared-across-workflows)
+and [runtime-allocation.md](runtime-allocation.md#one-ledger-per-repository)),
+and `supervisor.log` is the supervisor's round log.
 
 `createStore({repoRoot, id})` creates the directory and the four
 subdirectories, then exposes those paths plus `appendEvent`, `readEvents`,

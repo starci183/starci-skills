@@ -1,11 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,classifyFailure,createAllocator} from '../execution/runtime-allocator.mjs';
+import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../execution/runtime-loads.mjs';
 
 const profile=parseYaml(fs.readFileSync(new URL('../profiles/runtimes.yaml',import.meta.url),'utf8'));
 const clock=start=>{const box={at:start};return {now:()=>box.at,advance:ms=>{box.at+=ms;}};};
+/**
+ * A throwaway workflows root: the shared runtime ledger beside the workflow directories, each of which may hold
+ * a `kernel.lock` - the one thing that says whether the workflow that wrote an entry is still alive.
+ */
+function sharedRoot(t){
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-runtime-loads-'));
+  t.after(()=>{fs.rmSync(root,{recursive:true,force:true});});
+  return {
+    root,file:loadsFile(root),
+    /** A workflow whose kernel is this very process is alive; one with a dead pid or no lock at all is not. */
+    kernel:(workflow,pid=process.pid)=>{
+      fs.mkdirSync(path.join(root,workflow),{recursive:true});
+      if(pid!==null)fs.writeFileSync(path.join(root,workflow,'kernel.lock'),JSON.stringify({pid,startedAt:1}));
+    },
+    write:runtimes=>fs.writeFileSync(loadsFile(root),JSON.stringify({schema:RUNTIME_LOADS,runtimes})),
+    read:()=>JSON.parse(fs.readFileSync(loadsFile(root),'utf8'))
+  };
+}
+const liveOn=(workflow,op,since=1)=>({live:[{workflow,op,since}],cooling:null,usedToday:1,day:'2026-09-12'});
 const fixture=runtimes=>({
   maxParallelOps:10,
   allocation:{policy:LEAST_LOADED,verifyAvoidsImplementRuntime:true,cooldownMs:DEFAULT_COOLDOWN_MS,backoffFactor:2,maxCooldownMs:3600000},
@@ -260,4 +282,99 @@ test('a tagged quota fills a difficulty tier by ratio (4:1) and sends easy work 
   assert.deepEqual(tally(hard),{'gpt-5.6-sol':4,'claude-opus':1});
   assert.equal(allocator.allocate('backend.implement',{difficulty:'easy'}).runtime,'qwen3.8-flash');
   assert.equal(allocator.allocate('backend.implement',{difficulty:'hard'}).ok,false);
+});
+
+test('a runtime another kernel is already on is not the first choice: the next capable runtime of the chain takes the operation',t=>{
+  const shared=sharedRoot(t),other='20260912-100000-other',mine='20260912-104251-mine';
+  shared.kernel(other);
+  shared.write({'claude-fable-5.1':liveOn(other,'op-decide')});
+  assert.equal(loadsFileFor(path.join(shared.root,other)),shared.file);
+  const allocator=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow:mine}});
+  // Left to itself this kernel would take fable first: the role's preference is [fable, astra, opus], and of
+  // those only fable and astra carry the decide role at all.
+  assert.deepEqual(allocator.review('architecture.decide').localRanked,['claude-fable-5.1','gpt-6-astra']);
+  // Fable carries the other workflow's op, so astra - equally capable and free - takes this one.
+  const decided=allocator.allocate('architecture.decide');
+  assert.equal(decided.runtime,'gpt-6-astra');
+  assert.deepEqual(decided.preferredOver,['claude-fable-5.1']);
+  assert.deepEqual(decided.sharedLoad,{'claude-fable-5.1':1});
+  assert.deepEqual(allocator.sharedView().loads,{'claude-fable-5.1':1});
+  // Nothing shared changes a role no other kernel touches, and an allocation the shared view did not move names
+  // nothing it passed over.
+  const implemented=allocator.allocate('backend.implement');
+  assert.equal(implemented.runtime,'gpt-5.6-sol');
+  assert.deepEqual(implemented.preferredOver,[]);
+  // maxParallel is the runtime's cap across the repository: astra has one slot and another kernel holds it.
+  shared.write({'gpt-6-astra':liveOn(other,'op-other')});
+  const full=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow:mine}});
+  const back=full.allocate('architecture.decide');
+  assert.equal(back.runtime,'claude-fable-5.1');
+  assert.deepEqual(back.blocked.find(item=>item.runtime==='gpt-6-astra'),{runtime:'gpt-6-astra',reason:'no free slot',sharedLoad:1});
+});
+
+test('a cooldown one kernel ran into parks the runtime for every kernel of the repository, and is learned once',t=>{
+  const time=clock(Date.UTC(2026,8,12,9));
+  const shared=sharedRoot(t),other='20260912-100000-other',mine='20260912-104251-mine';
+  shared.kernel(other);
+  shared.write({'claude-fable-5.1':{live:[],cooling:{until:time.now()+600000,reason:'HTTP 429 Too Many Requests',kind:'rate-limited',workflow:other},usedToday:3,day:'2026-09-12'}});
+  const allocator=createAllocator({runtimes:profile,now:time.now,shared:{path:shared.file,workflow:mine}});
+  const decided=allocator.allocate('architecture.decide');
+  assert.equal(decided.runtime,'gpt-6-astra');
+  const parked=decided.blocked.find(item=>item.runtime==='claude-fable-5.1');
+  assert.match(parked.reason,/cooling after a shared rate-limited until 2026-09-12T09:10:00\.000Z, seen by 20260912-100000-other/);
+  assert.deepEqual([parked.shared,parked.from],[true,other]);
+  // The kernel records a learned cooldown once: the notices are drained, not repeated every tick.
+  assert.deepEqual(allocator.takeSharedNotices().map(item=>[item.runtime,item.until,item.from]),[['claude-fable-5.1',time.now()+600000,other]]);
+  allocator.allocate('architecture.decide');
+  assert.deepEqual(allocator.takeSharedNotices(),[]);
+  // A provider limit this kernel runs into is published for the others; a local failure class is not.
+  assert.equal(allocator.failed('gpt-6-astra',{reason:'429 slow down',op:'op-decide'}).shared,true);
+  assert.equal(shared.read().runtimes['gpt-6-astra'].cooling.workflow,mine);
+  allocator.allocate('review.verify');
+  assert.equal(allocator.failed('gpt-5.6-sol',{reason:'terminal never rendered a prompt'}).shared,false);
+  assert.equal(shared.read().runtimes['gpt-5.6-sol']?.cooling??null,null);
+  // The ledger is read through, so the wait ends for this kernel exactly when it ends in the file.
+  time.advance(600001);
+  assert.equal(createAllocator({runtimes:profile,now:time.now,shared:{path:shared.file,workflow:mine}}).allocate('architecture.decide').runtime,'claude-fable-5.1');
+});
+
+test('entries of a dead kernel are ignored and dropped, and an unreadable ledger degrades to local allocation',t=>{
+  const shared=sharedRoot(t),dead='20260912-090000-dead',gone='20260912-091000-gone',mine='20260912-104251-mine';
+  // 2147483647 is no pid Windows or POSIX hands out: the kernel that wrote this entry is gone.
+  shared.kernel(dead,2147483647);
+  shared.kernel(gone,null);
+  shared.write({'claude-fable-5.1':{live:[{workflow:dead,op:'op-dead',since:1},{workflow:gone,op:'op-gone',since:2}],cooling:null,usedToday:4,day:'2026-09-12'}});
+  assert.deepEqual(readLoads({path:shared.file,workflow:mine,now:()=>Date.UTC(2026,8,12,9)}).loads,{});
+  const allocator=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow:mine}});
+  assert.equal(allocator.allocate('architecture.decide').runtime,'claude-fable-5.1');
+  // The next write drops them, so the file keeps no dead kernel's claim on an expensive runtime.
+  allocator.launched('claude-fable-5.1',{op:'op-mine'});
+  assert.deepEqual(shared.read().runtimes['claude-fable-5.1'].live.map(item=>[item.workflow,item.op]),[[mine,'op-mine']]);
+  // An unreadable ledger is not a blocked launch: allocation is exactly the local one.
+  fs.writeFileSync(shared.file,'{ this is not a ledger');
+  const local=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow:mine}});
+  assert.equal(local.sharedView().ok,false);
+  assert.equal(local.allocate('architecture.decide').runtime,'claude-fable-5.1');
+  assert.deepEqual(local.allocate('backend.implement').preferredOver,[]);
+});
+
+test('two kernels write the one ledger under a lock and both their launches survive',t=>{
+  const shared=sharedRoot(t),first='20260912-100000-first',second='20260912-104251-second';
+  shared.kernel(first);shared.kernel(second);
+  const open=workflow=>createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow}});
+  const one=open(first),two=open(second);
+  one.allocate('architecture.decide');one.launched('claude-fable-5.1',{op:'op-first'});
+  two.allocate('architecture.decide');two.launched('claude-fable-5.1',{op:'op-second'});
+  const entry=shared.read().runtimes['claude-fable-5.1'];
+  assert.deepEqual(entry.live.map(item=>[item.workflow,item.op]),[[first,'op-first'],[second,'op-second']]);
+  assert.equal(entry.usedToday,2);
+  assert.equal(shared.read().schema,RUNTIME_LOADS);
+  // Each writer released the lock, and each kernel counts only the other one's operation as shared load.
+  assert.equal(fs.existsSync(`${shared.file}.lock`),false);
+  assert.deepEqual(one.sharedView().loads,{'claude-fable-5.1':1});
+  assert.deepEqual(two.sharedView().ops['claude-fable-5.1'].map(item=>item.op),['op-first']);
+  // Both slots of fable are taken across the two kernels, so the next operation of either goes on to astra.
+  assert.equal(open(second).allocate('architecture.decide').runtime,'gpt-6-astra');
+  one.release('claude-fable-5.1',{op:'op-first'});
+  assert.deepEqual(shared.read().runtimes['claude-fable-5.1'].live.map(item=>item.op),['op-second']);
 });

@@ -81,6 +81,25 @@ clears the streak. A cooling pool is simply not a candidate, and `snapshot()`
 lists it with its `wakeAt`, so a 429 parks one provider for ten minutes while
 the other pools keep working.
 
+## One ledger per repository
+
+A workflow is not alone on its runtimes. Every kernel of a repository shares one
+file beside the workflow directories - `.starciwork/_local/workflows/runtime-loads.json`,
+schema `starci/runtime-loads@1`, written by `execution/runtime-loads.mjs` - and
+`createAllocator({shared:{path, workflow}})` reads it before it chooses. Another
+kernel's live operations on a runtime are load here too, so `maxParallel` holds
+across kernels; a rate limit or an exhausted quota one kernel ran into cools the
+runtime down for all of them; and among candidates that all qualify the one no
+other kernel is using wins, ties going to the local order. That is the whole
+difference: `preferredOver` and `sharedLoad` on the receipt name what the shared
+view passed over, `launched(runtime, {op})`, `release(runtime, {op})` and
+`failed(runtime, {op, reason})` keep the file current, `sharedSync(ops)` drops
+this workflow's leftovers at start, and `takeSharedNotices()` hands the kernel
+the cooldowns it learned from somebody else. A workflow's quota is untouched by
+all of it, and an unreadable ledger is not an error: the allocator falls back to
+the local view. See
+[workflow-kernel.md](workflow-kernel.md#runtimes-are-shared-across-workflows).
+
 ## Why there is no chain
 
 A chain made every operation start at the same provider, so one runtime was
