@@ -1,0 +1,287 @@
+id: integration.verify
+goal:
+  en: Prove one declared external integration against the real provider, in its sandbox account, with the
+    credential the owner supplies in the named variable, and keep the live exchange as evidence.
+nodeKinds:
+  - integration
+completionProfile: integration
+sideEffects:
+  - one live exchange with the declared provider's sandbox account, inside the scenario's declared scope
+  - scenario-owned data created in that sandbox account and disposed by the same run
+  - reading the owner-provided credential from its named environment variable, never writing its value
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the existing selected integration node: which declared integration it proves, its assertions,
+        its declared refs and dependencies and its validator freshness. This consumer op requires its target
+        node to exist. An absent target is a scope/graph gap; report it and propose a separately selected
+        scope op. Never create the node, never invent its assertions, and never re-word one so a scenario
+        that already ran can be called a pass."
+  - id: integration
+    path: .starciwork/<business>/**/index.yaml extensions.work3.integrations[]
+    purpose:
+      en: "Read the declaration the business or architecture record made: the integration id, the provider,
+        the sandbox account to use, and the credential entry - its exact variable name, that the owner
+        provides it, and where it is set. This declaration, not the source, says which provider is under
+        proof and which variable carries the key. A declaration that names no credential variable is a
+        reported gap, never a guessed name and never a key read from somewhere else."
+  - id: architecture
+    path: .starciwork/<business>/architecture/**/index.yaml
+    purpose:
+      en: Read the declared contract with the external system - the request the product sends, the response
+        and error identities it expects, the retry, idempotency and timeout boundaries, and what the product
+        must do when the provider refuses. These define, per assertion, the exchange the scenario performs
+        and the effect the provider must show. Where the design is silent about the observable effect,
+        report the gap instead of inventing an expectation.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Resolve the repository resource, actual checkout/root/HEAD and dirty state, and read the delivered
+        client of this integration - its entry point, its configuration and the variable it actually reads
+        the credential from. The proof binds the exact tested tree, so a claim without a resolved repository
+        and a named client is not a proof.
+  - id: credential
+    path: current process environment variable named by the declared integration credential
+    purpose:
+      en: "Resolve the owner-provided credential by the exact variable name the declaration gives, and
+        nothing else. It is never invented, never defaulted, never read from a second variable that looks
+        similar, and never taken from a checked-in file. An absent or empty variable is reported `blocked`
+        with reason `environment` naming that exact variable, which is the owner's question; it is never a
+        reason to fake the provider, skip the assertion or report a pass. The value itself is used only to
+        authenticate the live call and is written nowhere - not into a record, a report, a log or a chat."
+  - id: effects
+    path: current request authorization + declared sandbox account allowed effects
+    purpose:
+      en: Bind the live exchange and the scenario-owned data it creates to the selected assertions and to the
+        sandbox account the declaration names. A production account, a real customer's channel or an
+        unbounded retry is outside this op; discover an unknown external outcome by read-only correlation
+        before repeating an attempt.
+  - id: profile
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
+        profiles, and the actual host network and tool availability the live call needs. Capabilities are the
+        intersection of actual tools, selected profile policy, op permissions and existing task authority.
+  - id: workflow
+    path: selected workflow request + workflows/contracts.json + this op authority.json
+    purpose:
+      en: When selected inside the named workflow, read the exact request, strict response contract and
+        primary/secondary authority JSON. Standalone op execution does not invent a workflow request.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - state
+      - blocker
+      - completion.inputDigest
+      - completion.evidence
+      - completion.codeRefs
+    content:
+      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write only
+        state/blocker/completion here; the exchange itself, the observed responses and the findings belong to
+        the evidence result. Missing refs/dependencies/assertions require a reported gap or a separately
+        selected scope update; never add or remove them to obtain pass.
+  - id: evidence
+    path: E/manifest.yaml + E/scenario.yaml + E/exchange.json + E/run-output.txt + E/readback.json +
+      E/result.md
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - codeRefs
+      - proof
+      - extensions
+    content:
+      en: "Keep the original assertion IDs and map each one to the exchange it performed: the request the
+        product sent to the provider, the expected observable effect, and the response the provider actually
+        returned, read back through the provider's own surface where one exists. Record the provider, the
+        sandbox account identity as observed rather than as configured, the credential variable name with no
+        value, the exact commands, cwd, tested tree/commit, exit codes and sanitized output, including every
+        attempt when something was retried. The manifest carries `proof: {boundary: live, fakes: []}`; a run
+        that stood in for the provider is not this proof and is recorded as a spec defect. Every credential,
+        token, personal identifier and provider secret is redacted before the assets are hashed."
+  - id: handoff
+    path: E/response.json
+    fields:
+      - schema
+      - requestId
+      - requestDigest
+      - op
+      - step
+      - slot
+      - runId
+      - workflow
+      - status
+      - criteria
+      - outputs
+      - artifacts
+    content:
+      en: Only for the selected named workflow, emit the response defined by workflows/contracts.json. Return
+        outputs.results for every input assertion with the provider it reached, the observed response
+        identity and the run output reference. A failed or blocked response preserves evidence with outputs
+        null, and a blocked one names the exact missing credential variable.
+steps:
+  - reads:
+      - target
+      - integration
+      - architecture
+      - profile
+    writes:
+      - evidence
+    action:
+      en: Freeze the assertion set before any effect and restate every assertion as one exchange with the
+        declared provider plus the observable effect it must show - the accepted response and its identity,
+        the declared refusal, the invalid-input case and the applicable retry or idempotency case. One
+        assertion is one exchange; no assertion is merged, dropped or re-worded, and no expectation is
+        inferred from how the client currently behaves. Record the provider, the sandbox account and the
+        exact credential variable name the declaration gives.
+  - reads:
+      - credential
+      - effects
+      - integration
+    writes:
+      - evidence
+    action:
+      en: "Resolve the credential from exactly that variable before anything is sent. If it is absent or
+        empty, stop here and report `blocked` with reason `environment` naming the variable, so the owner can
+        provide it: do not substitute a second variable, do not read a key out of the repository, do not
+        generate one, and do not continue with the provider replaced by a stand-in. Confirm the resolved
+        account is the declared sandbox one by observing the provider's own answer rather than by trusting a
+        hostname, and confirm the effects this run is authorized to cause."
+  - reads:
+      - repo
+      - architecture
+      - integration
+    writes:
+      - evidence
+    action:
+      en: Write the scenario beside its evidence and drive it through the delivered client - the same entry
+        point the product uses, reading the same variable - so what is proven is the product's own path to
+        the provider. No mock, stub, fake, spy, recorded cassette or in-process shortcut may stand in for the
+        declared provider anywhere in this scenario; a stand-in is the defect this operation exists to catch,
+        not a fallback when the provider is awkward. Create only the preconditions the exchange needs, inside
+        the sandbox account.
+  - reads:
+      - effects
+      - repo
+      - credential
+    writes:
+      - evidence
+    action:
+      en: Run the scenario against the live provider and keep what happened - the request as sent with every
+        secret redacted, the response as received with its status and error identity, timings, exit codes and
+        every attempt when something was retried. Then read the effect back through the provider's own
+        surface where one exists, so a send that the provider accepted but never delivered is visible. A
+        scenario that stays green with the credential removed is a defect of the scenario, not a pass.
+  - reads:
+      - effects
+      - integration
+      - target
+    writes:
+      - evidence
+    action:
+      en: Dispose the scenario-owned data this run created in the sandbox account and confirm it is gone, and
+        confirm no authorized external effect is left open. A leftover remote resource is recorded with its
+        exact identity and a resumable disposal command; unresolved effects cannot be presented as a clean
+        run. Nothing that could carry the credential value leaves this step.
+  - reads:
+      - target
+      - repo
+      - workflow
+      - integration
+    writes:
+      - node
+      - evidence
+      - handoff
+    action:
+      en: "Report done exactly once, and only with a live green run - every assertion covered by an exchange
+        that actually reached the declared provider, with the manifest's `proof.boundary` set to `live` and
+        `proof.fakes` empty, bound to the exact tested tree. A refused or wrong response is failed, naming
+        the assertion and what the provider returned; a missing credential is blocked with reason
+        `environment` and the exact variable name; an unreachable provider is blocked with reason
+        `environment` and the observed failure. Never report done on an unrun, skipped or faked exchange, and
+        never claim a proof from an earlier run. Keep the repair of any defect found here as a separate
+        operation, and stop; never self-advance. For workflow execution submit the exact response to the
+        coordinator gate."
+proofs:
+  - id: binding
+    requirement:
+      en: Workspace validation ran; every cited ID and path exists or is explicitly proposed, the input
+        bindings are current, and an honest not-run or fail cannot earn done.
+  - id: declaration
+    requirement:
+      en: The integration under proof is the one a business or architecture record declared, with its
+        provider, its sandbox account and its credential variable named in that declaration. An integration
+        the tree does not declare is not proven here and is reported as a gap.
+  - id: live
+    requirement:
+      en: Every assertion was proven by an exchange that reached the declared provider itself, through the
+        delivered client, with no mock, stub, fake, spy or recorded response standing in for it anywhere in
+        the scenario. The manifest records proof.boundary live with no fakes, and a stand-in makes the run a
+        spec defect rather than a proof.
+  - id: credential
+    requirement:
+      en: The credential came from the exact variable the declaration names and from nowhere else; it was
+        never invented, defaulted, substituted or silently skipped, and its value appears in no record,
+        report, asset, log or message. A missing variable is blocked with that variable named.
+  - id: readback
+    requirement:
+      en: The observed effect was read back through the provider's own surface where one exists, so an
+        accepted request that produced no effect is visible. Every attempt is retained with its request
+        redacted and its response as received.
+  - id: cleanup
+    requirement:
+      en: The scenario-owned data created in the sandbox account is disposed and verified absent, no
+        production or shared account was touched, and any remaining remote resource is recorded with its
+        identity and a resumable disposal command.
+blockers:
+  - code: INTEGRATION_UNDECLARED
+    condition:
+      en: No business or architecture record declares this integration, or its declaration names no provider,
+        no sandbox account or no credential variable, so what to call and what to authenticate with cannot be
+        stated. Report the gap; never infer the provider or the variable from source.
+  - code: CREDENTIAL_MISSING
+    condition:
+      en: The environment has no value in the exact variable the declaration names. Report blocked with
+        reason environment and that variable name so the owner can provide it; never invent, default,
+        substitute or skip a key, and never replace the provider with a stand-in to proceed.
+  - code: PROVIDER_UNREACHABLE
+    condition:
+      en: The declared provider's sandbox cannot be reached in this environment - no network egress, a
+        refused host, an unavailable endpoint or an exhausted quota - and the cause is provably unfixable
+        from the allowlist.
+  - code: CLIENT_UNAVAILABLE
+    condition:
+      en: The delivered client of this integration does not exist, exposes no entry point a scenario can
+        drive, or reads its credential from somewhere the declaration does not name; report the finding
+        instead of writing a second client beside it.
+  - code: SCOPE_OUTSIDE_ALLOWLIST
+    condition:
+      en: Proving an assertion would require changing product code, configuration or a declared expectation
+        outside the allowlisted paths; report the finding and never widen the ceiling.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
+        Report node/resource IDs and propose a separately selected graph update when needed; never run
+        predecessors or weaken dependsOn/refs/required to proceed.
+placeholders:
+  business: Selected business slug
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set covering the delivered client of this integration
+integrationPolicy:
+  proofSurface: real-provider
+  fakes: none
+  credential: owner-provided-named-variable
+  missingCredential: blocked-environment-with-variable-name
+  secretValues: never-written
+  evidenceProof: live

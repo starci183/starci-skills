@@ -221,6 +221,15 @@ operators:
       - {environment: codex, profiles: [gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: qwen, profiles: [qwen3.8-flash]}
+  integration.verify:
+    skill: starci
+    # A live call to a real provider is the same kind of work as the API proof: run code, read the response
+    # back, keep the output. So it carries the same verify-role chain e2e.verify does.
+    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+    environments:
+      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: claude, profiles: [claude-opus]}
+      - {environment: qwen, profiles: [qwen3.8-flash]}
   grammar.update:
     skill: starci
     # Growing the installed grammar is code, stories, tests, a published version and a canon entry, so it runs on

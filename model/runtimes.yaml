@@ -68,6 +68,7 @@ roleOfKind:
   runtime.operate: implement
   review.verify: verify
   e2e.verify: verify
+  integration.verify: verify
   uat.verify: verify
   architecture.decide: decide
   business.decide: decide
