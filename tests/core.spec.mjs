@@ -25,6 +25,26 @@ function fixture(t) {
 }
 const codes=r=>r.errors.map(e=>e.code);
 
+/**
+ * A migration writes the typed reconciliation and the declared integrations onto a decided module record. Those
+ * two are the kernel's reading of the record's relations, not decided content, so the digest leaves them out:
+ * every completion beneath the module stays bound. Any other change to the module still stales its children.
+ */
+test('the reconciliation and integration declarations of a module record are outside the semantic digest, so a migration stales nothing beneath it',t=>{
+  const f=fixture(t);
+  f.node('feat',{state:'todo'});
+  f.node('feat/leaf',{state:'todo'});
+  f.done('feat/leaf');
+  assert.equal(codes(f.run()).includes('STALE_COMPLETION'),false,'the leaf is bound to its inputs');
+  const module=f.metas.get('feat');
+  f.node('feat',{...module,extensions:{work3:{reconciliation:[{case:'reference',record:'other.business.overview',decision:null,reads:[],hands:[],detail:'cited'}],
+    integrations:[{id:'telegram',provider:'telegram-bot-api',credential:{name:'TELEGRAM_BOT_TOKEN',providedBy:'owner',custody:'identity:telegram'}}]}}});
+  assert.equal(codes(f.run()).includes('STALE_COMPLETION'),false,'declaring the relations of the module changes no completion beneath it');
+  // A decided statement of the module is still semantic: changing it stales the leaf.
+  f.node('feat',{...f.metas.get('feat'),assertions:['synthetic-check','one-more']});
+  assert.ok(codes(f.run()).includes('STALE_COMPLETION'),'a real change to the module stales its children');
+});
+
 test('canonical hashes are order independent, array order sensitive and SHA-256 exact',()=>{
   assert.equal(canonicalJSON({z:2,a:{b:1}}),canonicalJSON({a:{b:1},z:2}));
   assert.notEqual(sha256(canonicalJSON([1,2])),sha256(canonicalJSON([2,1])));

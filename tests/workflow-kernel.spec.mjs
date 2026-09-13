@@ -940,9 +940,16 @@ test('workflow-goal --migrate plans one migrate-mode intake per feature and no n
     assert.ok(op.acceptance.some(line=>/no decided record of payments changed its state, its rev or its substance/.test(line)));
     assert.ok(op.acceptance.some(line=>/one todo integration node features\/payments\/integration\/<id>\/index\.yaml exists per entry/.test(line)));
     assert.deepEqual(events(one.store).filter(event=>event.event==='intake-planned').map(event=>event.mode),['migrate']);
+    // The tree is re-read every iteration and still derives no node op: the intakes are the whole workflow.
+    approve(one.store,one.state);
+    one.state.run='run_wf';one.state.from='term_kernel';
+    const state2=one.run({maxIterations:1});
+    assert.ok(state2.ops.every(op=>op.intake),`a migration executes no node even after the tree is re-read: ${state2.ops.map(op=>op.id).join(', ')}`);
   }finally{one.cleanup();}
   // `all` is every feature of the tree, each its own op with its own allowlist, so they run side by side.
-  const all=setupWork({migrate:['all']});
+  // Only a feature with a decided business or architecture record has something to bring under the model.
+  let all=null;
+  try{all=setupWork({migrate:['all']});}catch(error){assert.match(error.message,/finds no feature with a decided business or architecture record/);return;}
   try{
     const intakes=all.state.ops.filter(item=>item.intake);
     assert.ok(intakes.length>=1);

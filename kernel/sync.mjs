@@ -312,7 +312,8 @@ export function syncLedgerOps(store,state,ctx){
   const opOfNode=new Map(state.ops.filter(op=>op.nodeId).map(op=>[op.nodeId,op.id]));
   const added=[];
   pruneAnsweredQuestions(store,state,loaded);
-  const candidates=ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.code.repository,side:ctx.work.side});
+  // A migration (`--migrate`) executes no node: its intakes are the whole workflow, at goal time and on every re-read.
+  const candidates=(state.migrate??[]).length?[]:ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.code.repository,side:ctx.work.side});
   // A "ledger incomplete" item is only as current as the tree: once its node is schedulable, done, or no longer
   // a candidate at all (foreign, ineligible), the item is stale and goes.
   const incomplete=new Set(candidates.filter(node=>!node.schedulable).map(node=>node.id));

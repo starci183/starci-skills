@@ -484,7 +484,10 @@ side by side and never meet a kernel write. A migration brings the decided recor
 the typed reconciliation on the module record, every outside system declared at `extensions.work3.integrations`
 with its credential's name and `custody: identity:<slug>`, and one todo integration node per declaration.
 No decided record changes its state, its rev or its substance; a contradiction is a `conflict` row and a
-decision record, never an edit. `all` names every feature the tree has; a feature the tree lacks is refused.
+decision record, never an edit. `all` names every feature with a decided business or architecture record
+(one without is skipped, `migrate-skipped`); a feature the tree lacks is refused. The intake runs the
+`work.migrate` sequence, which declares and never re-decides, and the validator leaves the two declarations
+out of the semantic digest, so a migrated module record stales nothing beneath it.
 
 ### What an older rule already parked
 

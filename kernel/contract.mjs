@@ -28,7 +28,7 @@
 
 export const STEPS_HEADING='## Working order (mandatory, in this order)';
 export const DONE_HEADING='## Definition of done for this kind';
-export const SEQUENCES=['work.author','work.intake','work.cut','owner.ask','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','integration.verify','uat','uat.verify','operations','migration','architecture.revise','business.revise','grammar.update','decide','brand.decide','generic'];
+export const SEQUENCES=['work.author','work.intake','work.migrate','work.cut','owner.ask','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','integration.verify','uat','uat.verify','operations','migration','architecture.revise','business.revise','grammar.update','decide','brand.decide','generic'];
 
 const IMPLEMENT_KINDS=['backend.implement','interface.implement','frontend.implement'];
 const IMPLEMENT_NODES=['implementation','ui'];
@@ -67,7 +67,7 @@ export function sequenceFor(op,{node=null}={}){
   // authors a feature the tree does not hold, `implementation.plan` (an op carrying a `cut` node) splits one
   // too-big node into children, and neither may be rerouted by a node kind, an origin or an allowlist.
   if(kind==='implementation.plan'||(kind==='work.author'&&plain(op?.cut)))return 'work.cut';
-  if(kind==='work.author')return plain(op?.intake)?'work.intake':'work.author';
+  if(kind==='work.author')return plain(op?.intake)?(op.intake.mode==='migrate'?'work.migrate':'work.intake'):'work.author';
   if(kind==='review.verify')return 'review.verify';
   if(kind==='owner.ask')return 'owner.ask';
   if(kind==='interface.draw')return 'interface.draw';
@@ -242,6 +242,28 @@ const SEQUENCE_STEPS={
       `every \`reference\` row cites a decided record by id and no record of this feature restates it; every \`conflict\` row names a \`todo\` decision record of this feature that states both sides, the consequences, the numbered options and one recommendation; every \`new\` row names a record authored under this feature and declares the \`reads\` it rests on and the \`hands\` it passes work to`,
       `every requirement is a claim the owner can read and test, and every open question is an open decision record, never a guess`,
       `no record of another feature changed by a single byte - a conflict is put to the owner, never overwritten and never averaged - no product code changed, and the validator check exits 0: ${v.declared}`
+    ]
+  }),
+  // A migration brings a feature the tree already decided under the current model. It declares - the typed
+  // reconciliation on the module record, the integrations with their custody, one integration node per
+  // declaration - and re-decides nothing: no decided record changes its state, its rev or a word, nothing is
+  // rewritten as a draft, and nothing under implementation/ or ui/ is touched. What contradicts a decided
+  // record is a conflict row and a decision record, never an edit.
+  'work.migrate':v=>({
+    steps:[
+      `Read the module record of this feature and every decided record beneath it under the allowlist (${v.allowlist}), then the decided records of the other features the references name (${v.references}); restate in three lines what this feature decided and where its boundary against the other features runs. Change nothing yet - this operation adds declarations beside decided content and re-decides none of it.`,
+      `Reconcile against the other features: for every decided business (SRS) or architecture (SDS) record of ANOTHER feature this feature touches, write one typed row into the module record under \`extensions.work3.reconciliation\`, each row \`{case, record, decision, reads, hands, detail}\`, and nothing but the three cases. \`case: reference\` - this feature rests on what that record holds: cite it by its \`record\` id, restate nothing. \`case: conflict\` - this feature's decided records cannot hold together with it: write a decision record \`state: todo\` under this feature's business/srs/decisions stating both sides, the consequences, the numbered options and exactly one recommendation, name it in \`decision\`, and leave both decided records byte for byte as you found them. \`case: new\` - this feature settles what no other record covers: name the record of this feature in the row and declare in \`reads\` the decided records it rests on and in \`hands\` the records it hands on to. No case is left as prose beside the table.`,
+      `Declare the integrations: for every outside system the architecture of this feature talks to with a credential the owner holds (a messaging provider, a payment gateway, a mail or storage service, an identity provider) write one entry into the module record under \`extensions.work3.integrations\`: \`{id, provider, credential: {name, providedBy: owner, custody: identity:<slug>}}\`, the \`name\` being the exact variable the code or the configuration records read, the custody the encrypted identity resource of this tree that holds it. Never a value, never a placeholder value, never a file nobody was asked to fill. An integration node that already exists keeps its id; a system that needs nothing from the owner is not declared here.`,
+      `Author one integration node per declaration that has none yet, at \`features/<feature>/integration/<id>/index.yaml\` inside the allowlist: schema \`work/node@2\`, \`kind: integration\`, \`state: todo\`, \`required: true\`, a description naming the outside system and the credential by name, and one assertion per behaviour a live proof must show. It is the node the tree owes for the declaration; its proof is another operation's.`,
+      `Leave every decided record exactly as it was: no \`state\`, no \`rev\`, no wording changes, nothing rewritten as a draft, nothing set to todo, nothing under implementation/ or ui/ touched, no record of another feature changed by a single byte, no \`completion\`, evidence or kernel extension block written. A contradiction you find is a \`conflict\` row and a decision record, never an edit.`,
+      `Run the listed validator check verbatim: ${v.declared}; the tree must still validate, and \`git status\` must show only the module record, the decision records and the integration nodes you wrote - all inside the allowlist. An error the validator reports under a path outside your allowlist is not yours: name it in the summary and carry on.`,
+      `Report \`done\` exactly once with the count of rows per case, the integrations declared with their credential names, and the nodes you authored. Report \`ask\` only for a provision the owner alone holds (a credential name no code or record settles), never for a question the records answer.`
+    ],
+    done:[
+      `the module record carries \`extensions.work3.reconciliation\`: one row \`{case, record, decision, reads, hands, detail}\` per decided record of another feature this feature touches, its \`case\` one of \`reference\`, \`conflict\` or \`new\` and nothing else; every \`reference\` row cites by id, every \`conflict\` row names a \`todo\` decision record of this feature with both sides, the consequences, the numbered options and one recommendation, every \`new\` row names a record of this feature and declares its \`reads\` and \`hands\``,
+      `every outside system the architecture talks to with a credential the owner holds is declared under \`extensions.work3.integrations\` with its id, its provider and a credential {name, providedBy: owner, custody: identity:<slug>}, one \`todo\` integration node exists per declaration, and no secret value appears in any record`,
+      `no decided record of this feature changed its state, its rev or its substance; nothing was rewritten as a draft or set to todo; nothing under implementation/ or ui/ changed; no record of another feature changed by a single byte; no product code changed`,
+      `the validator check exits 0 for this feature: ${v.declared}`
     ]
   }),
   // Heavy work runs in parallel, and this operation is what makes that possible: a node too big to be one
