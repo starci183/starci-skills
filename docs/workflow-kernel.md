@@ -551,6 +551,14 @@ node .claude/.dist/execution/orca-supervised-launch.mjs workflow-supervise --hos
 
 A review round is counted per reviewed node set (`verifyRounds[<ids joined by +>]`), never per feature: counting per module burned a feature's three rounds on three different nodes. After the last round the group is parked as `review-exhausted` with one needUser item instead of being re-planned every tick. Ops the kernel derives itself (origins `ledger`, `verify`, `gate`, `architecture`) never count against `--allow-dynamic`; only `shared` and `repair` ops do, and `--allow-dynamic 0` forbids them.
 
+## Terminals
+
+The kernel is one Orca tab, `[Kernel] <id>`, in its worktree: a start reuses the tab a previous start left
+(and closes a duplicate), and a pause, a restart or a finish closes it (`kernel-terminal-closed`). An op's tab
+is closed when its report is accepted (`op-terminal-closed`); a blocked or failed op keeps its tab, which is
+where its last words are. Every reconcile also sweeps what an older build left behind - stale `[Kernel]` tabs
+and done-op tabs of this workflow (`terminals-swept`) - and never touches another workflow's tabs.
+
 ## Operating a running workflow
 
 Everything an operator does is a command or a file the kernel reads; nothing is a write to `state.json`, which

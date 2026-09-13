@@ -2807,6 +2807,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
         checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
       ctx.guards.gitQueue(()=>cleanStrayFiles(store,state,op,ctx));
+      if(ctx.orca)closeOpTerminal(ctx.orca,store,state,op);
       return settled;
     }
     if(op.kind==='review.verify'){
@@ -2823,6 +2824,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     markLedger(state,op,op.head);
     store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
       checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
+    if(ctx.orca)closeOpTerminal(ctx.orca,store,state,op);
     ctx.guards.gitQueue(()=>cleanStrayFiles(store,state,op,ctx));
     return 'done';
   }
@@ -3163,6 +3165,54 @@ function answerQuestions(orca,store,state,ctx){
  * (a launch the kernel lost) and is settled; the check is cheap and runs at start and every RECONCILE_EVERY ticks.
  */
 export const RECONCILE_EVERY=10;
+/** The terminals Orca lists for a worktree, as `{handle,title}`; an unreachable Orca lists none. */
+function listTerminals(orca,cwd){
+  try{const listed=orca.invoke('terminal-list',{},{cwd});return listed.outcome==='ok'?(getPath(listed.receipt,'result.terminals')??[]).filter(plain):[];}catch{return [];}
+}
+const closeTerminal=(orca,cwd,handle)=>{try{const closed=orca.invoke('terminal-close',{terminal:handle},{cwd});return closed.outcome==='ok';}catch{return false;}};
+/**
+ * The kernel's own Orca terminal: the tab titled `[Kernel] <id>` in the worktree. One that already exists (a
+ * previous start of this workflow) is reused and any duplicate is closed; none exists, one is created. A
+ * process restart therefore never adds a tab.
+ */
+function ownKernelTerminal(orca,store,state,worktree){
+  const title=`[Kernel] ${state.id}`;
+  const mine=listTerminals(orca,worktree).filter(item=>item.title===title&&item.handle);
+  for(const extra of mine.slice(1)){closeTerminal(orca,worktree,extra.handle);store.appendEvent({event:'kernel-terminal-closed',terminal:extra.handle,reason:'duplicate'});}
+  if(mine[0]){store.appendEvent({event:'kernel-terminal',terminal:mine[0].handle,reused:true});return mine[0].handle;}
+  const shell=process.platform==='win32'?'powershell -NoLogo':'bash';
+  const created=orca.invoke('terminal-create',{worktree:`path:${path.resolve(worktree)}`,title,command:shell},{cwd:worktree});
+  const handle=getPath(created.receipt,'result.terminal.handle')??null;
+  need(handle,`The kernel could not open its own Orca terminal: ${created.reason??'terminal-create failed'}; pass --from <own terminal>`);
+  store.appendEvent({event:'kernel-terminal',terminal:handle});
+  return handle;
+}
+/**
+ * An operation's terminal has no reader once its report is accepted: it is closed with the acceptance. A
+ * blocked or failed op keeps its terminal, which is where its last words are. `sweepStaleTerminals` closes
+ * what an older build or a lost kernel left behind: `[Op]` tabs of this workflow's done ops, and `[Kernel]` tabs
+ * of this workflow that are not the one the kernel is in. Tabs of other workflows are never touched.
+ */
+function closeOpTerminal(orca,store,state,op){
+  if(!op?.terminal)return;
+  const handle=op.terminal;
+  if(closeTerminal(orca,state.worktree,handle))store.appendEvent({event:'op-terminal-closed',op:op.id,terminal:handle});
+  op.terminal=null;
+}
+export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree}={}){
+  const closed=[];
+  const doneIds=new Set(state.ops.filter(op=>op.status==='done'||op.refusal==='superseded').map(op=>op.id));
+  for(const item of listTerminals(orca,cwd)){
+    const title=String(item.title??'');
+    if(title===`[Kernel] ${state.id}`&&item.handle!==state.from){if(closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,reason:'stale kernel tab'});continue;}
+    const op=title.startsWith('[Op] ')?title.slice(title.lastIndexOf(' - ')+3).trim():null;
+    if(op&&doneIds.has(op)&&!state.ops.some(candidate=>candidate.terminal===item.handle&&liveStatus.includes(candidate.status))){
+      if(closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,op,reason:'op done'});
+    }
+  }
+  if(closed.length)store.appendEvent({event:'terminals-swept',closed});
+  return closed;
+}
 export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync,allocator=null}={}){
   const listed=orca.invoke('worker-list',{run:state.run},{cwd});
   if(listed.outcome!=='ok')return {orphans:[],dead:[],reason:listed.reason};
@@ -3408,9 +3458,10 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
   reconcileWithOrca(orca,store,state,{cwd,wait,allocator});
   sweepTreeStrays(store,state,ctx);
+  sweepStaleTerminals(orca,store,state,{cwd});
   state.buildStamp=buildStamp();
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
-    if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});sweepTreeStrays(store,state,ctx);}
+    if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});sweepTreeStrays(store,state,ctx);sweepStaleTerminals(orca,store,state,{cwd});}
     if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});store.saveState(state);return state;}
     applyInbox(store,state,ctx);
     if(state.restartRequested){const reason=state.restartRequested;state.restartRequested=null;store.appendEvent({event:'stopped',reason:`restart: ${reason}`});store.saveState(state);return state;}
@@ -3700,13 +3751,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     let from=options.from??state.from,run=options.run??state.run;
     if(!from&&fs.existsSync(launchFile)){const launch=awaitLaunch(launchFile,{wait});from=launch.from;run=run??launch.run??null;state.workflowTask=launch.task??state.workflowTask;}
     if(!from){
-      // No coordinator terminal handed this kernel a handle (the supervisor started it): the kernel opens its own
-      // Orca terminal in the worktree and is that terminal for the whole workflow.
-      const shell=process.platform==='win32'?'powershell -NoLogo':'bash';
-      const created=orca.invoke('terminal-create',{worktree:`path:${path.resolve(worktree)}`,title:`[Kernel] ${state.id}`,command:shell},{cwd:worktree});
-      from=getPath(created.receipt,'result.terminal.handle')??null;
-      need(from,`The kernel could not open its own Orca terminal: ${created.reason??'terminal-create failed'}; pass --from <own terminal>`);
-      store.appendEvent({event:'kernel-terminal',terminal:from});
+      // No coordinator terminal handed this kernel a handle (the supervisor started it): the kernel is its own
+      // Orca terminal in the worktree - the one titled after it, reused across restarts, never a new tab per start.
+      from=ownKernelTerminal(orca,store,state,worktree);
+      state.kernelTerminalOwned=true;
     }
     state.from=required(from,'own terminal handle');
     // `run-bound` is the one-time hand-off this kernel performed; joining a run it already has is `run-resumed`.
@@ -3721,6 +3769,9 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null}),template:templateOf(state.host),
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
+    // The kernel's own tab has no reader once the kernel has left: a pause, a restart or a finish closes it, and
+    // the next start reuses or recreates one. Stale tabs were the owner's first complaint after a day of restarts.
+    if(state.kernelTerminalOwned&&state.from){try{orca.invoke('terminal-close',{terminal:state.from},{cwd:worktree});}catch{}store.appendEvent({event:'kernel-terminal-closed',terminal:state.from});state.from=null;state.kernelTerminalOwned=false;store.saveState(state);}
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:finished.phase,ledgerMode:finished.ledgerMode,
       finished:finished.finished,lane:laneView(finished),ledger:finished.ledger.map(item=>`${item.id}=${item.status}`),
       ledgerSummary:finished.ledgerSummary,needUser:finished.needUser,head:finished.head,iterations:finished.iterations,

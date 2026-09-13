@@ -866,6 +866,30 @@ test('a command for a running kernel is an inbox file the loop applies at its ne
   }finally{harness.cleanup();}
 });
 
+test('an accepted op closes its terminal, and the reconcile sweep closes stale kernel and done-op tabs of this workflow only',()=>{
+  const nodeId='demo.sales.implementation.backend.intake';
+  const done=summary=>({outcome:'done',summary,files:['apps/agentos-controlplane/src/sales/intake.ts'],checks:[passing('unit-tests-pass','npx vitest run intake')]});
+  const harness=setupWork({dirty:['apps/agentos-controlplane/src/sales/intake.ts'],scripts:{[nodeId]:[done('Intake implemented.')]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    // Tabs an older build left behind: a stale kernel tab of this workflow, a done-op tab of this workflow, and a tab of another workflow.
+    harness.fake.terminals.set('term_stale_kernel',{handle:'term_stale_kernel',title:`[Kernel] ${harness.state.id}`,status:'running',sent:false,worktreePath:cwd});
+    harness.fake.terminals.set('term_other',{handle:'term_other',title:'[Kernel] some-other-workflow',status:'running',sent:false,worktreePath:cwd});
+    harness.fake.terminals.set('term_foreign_op',{handle:'term_foreign_op',title:'[Op] backend.implement - other.workflow.op',status:'running',sent:true,worktreePath:cwd});
+    const state=harness.run({maxIterations:8});
+    const op=state.ops.find(item=>item.id===nodeId);
+    assert.equal(op.status,'done');
+    assert.equal(op.terminal,null,'the accepted op has no terminal any more');
+    const log=events(harness.store);
+    assert.deepEqual(log.filter(event=>event.event==='op-terminal-closed').map(event=>event.op),[nodeId]);
+    assert.ok(log.some(event=>event.event==='terminals-swept'&&event.closed.some(item=>item.terminal==='term_stale_kernel'&&item.reason==='stale kernel tab')),'the stale kernel tab of this workflow was swept');
+    assert.ok(harness.fake.terminals.has('term_other'),'another workflow\'s kernel tab is never touched');
+    assert.ok(harness.fake.terminals.has('term_foreign_op'),'another workflow\'s op tab is never touched');
+    assert.equal(harness.fake.terminals.has('term_stale_kernel'),false);
+  }finally{harness.cleanup();}
+});
+
 test('a contract longer than a task can carry is handed over as its head plus the file it lives in',()=>{
   const short='## Goal\nshort';
   assert.equal(operationSpec({contractFile:'D:/w/contracts/op.md'},short),short);
