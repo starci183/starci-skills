@@ -1005,6 +1005,46 @@ $defs:
           present a gap as already implemented.
     description: One executable UAT flow with direct environment details, collocated fixture paths,
       steps, evidence and observed result.
+  reconciliationRow:
+    type: object
+    additionalProperties: false
+    required:
+      - case
+      - record
+    properties:
+      case:
+        enum:
+          - reference
+          - conflict
+          - new
+        description: "Which of the three reconciliation cases this row is. reference: the decided record
+          already holds what this feature repeats, so it is cited by id and never restated. conflict: this
+          feature cannot hold together with what that record decided, so it is neither overwritten nor
+          averaged - a decision record under this feature states both sides and the owner answers it. new:
+          no decided record covers it, so it is authored under this feature."
+      record:
+        $ref: "#/$defs/id"
+        description: The record this row is about - the decided record of another feature for reference and
+          conflict, and the newly authored record of this feature for new.
+      decision:
+        $ref: "#/$defs/id"
+        description: Required by a conflict row - the todo decision record authored under this feature that
+          states both sides, the consequences, the numbered options and one recommendation. The kernel puts
+          it to the owner and the workflow does not finish over an unanswered one.
+      reads:
+        $ref: "#/$defs/ids"
+        description: Declared by a new row - the decided records it rests on, each of a record kind its own
+          record kind is derived from.
+      hands:
+        $ref: "#/$defs/ids"
+        description: Declared by a new row - the records of this feature it hands work on to.
+      detail:
+        $ref: "#/$defs/string"
+        description: One line saying what this feature shares with, conflicts with, or adds beyond the
+          named record; it is the claim the validator judges the row against.
+    description: One typed row of a feature's reconciliation against the records the product already decided.
+      The list of these rows lives at extensions.work3.reconciliation of the feature's module record; the
+      kernel checks it mechanically when an intake reports done and before the validator reads it.
   node:
     type: object
     additionalProperties: false
@@ -1076,6 +1116,12 @@ $defs:
         x-operational: true
       extensions:
         type: object
+        description: Namespaced extension payloads, deliberately free-form so a runtime adds keys here without
+          a schema change. One of them is fixed by the kernel rather than by this file -
+          extensions.work3.reconciliation is the list of reconciliationRow entries a feature's module record
+          carries after an intake, one row per decided record the feature touches. $defs/reconciliationRow
+          documents the row shape; the kernel checks those rows itself, so a row this file cannot reject by
+          construction is still refused there.
       description:
         type: string
         description: Concise specification prose for a small unstructured node; module SRS/SDS nodes use

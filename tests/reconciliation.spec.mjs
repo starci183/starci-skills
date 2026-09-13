@@ -66,6 +66,24 @@ test('the three cases are the closed set and the seven findings are the mechanic
 });
 
 /**
+ * The Work schema documents the row a table carries, so a person reading the record format finds the shape
+ * without reading the kernel. `extensions` stays free-form - a runtime adds keys there without a schema
+ * change - which is exactly why the kernel checks the rows itself.
+ */
+test('the Work schema documents the reconciliation row and leaves extensions free-form',()=>{
+  const schema=parseYaml(fs.readFileSync(new URL('../schemas/work.schema.yaml',import.meta.url),'utf8'));
+  const row=schema.$defs.reconciliationRow;
+  assert.deepEqual(row.properties.case.enum,RECONCILIATION_CASES);
+  assert.deepEqual(Object.keys(row.properties),['case','record','decision','reads','hands','detail']);
+  assert.deepEqual(row.required,['case','record']);
+  assert.equal(row.additionalProperties,false);
+  const extensions=schema.$defs.node.properties.extensions;
+  assert.equal(extensions.type,'object');
+  assert.equal(extensions.additionalProperties,undefined,'extensions stays free-form: no runtime key needs a schema change');
+  assert.match(extensions.description,/extensions\.work3\.reconciliation is the list of reconciliationRow entries/);
+});
+
+/**
  * The reader never throws: an intake that wrote a broken table gets its rows back as findings and is retried,
  * because a malformed row is the operation's defect and a crash in the loop would be the kernel's.
  */
