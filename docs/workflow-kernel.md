@@ -288,13 +288,25 @@ frontend-facing nodes that were built against the old brand are reopened in the 
 picks them up on the next iteration like any other newly schedulable node.
 
 **Intake is a reconciliation.** A new feature C is never appended beside the decided features A and B: the intake
-reads every decided SRS/SDS record C touches, writes a reconciliation table into C's module record (fit,
-change or conflict per record), references what C shares by record id, reports as `sds-gap` what A or B must
-become (the kernel opens `architecture.revise` on that record - the intake never edits another feature), and
-raises a real conflict as an open decision record of C for the owner. The result is one consistent A', B', C'.
+reads every decided SRS/SDS record C touches and writes one typed row per record into C's module record at
+`extensions.work3.reconciliation`, each row `{case, record, decision, reads, hands, detail}`. There are three
+cases and no fourth. `reference` - C repeats what that record already holds, so C cites it by id and restates
+nothing of it. `conflict` - C cannot hold together with what that record decided, so the intake writes a `todo`
+decision record under C stating both sides, the consequences, the numbered options and one recommendation,
+never an overwrite and never an average, and the kernel puts it to the owner as a `needUser` decision
+(`reconciliation-conflict`); the workflow finishes `blocked` on an unanswered one. `new` - no decided record
+covers it, so C authors it and declares what it `reads` from the decided records and what it `hands` on. An
+intake edits no record of another feature and files no gap against one: what a decided record must become is
+either the owner's decision or new work C declares. `kernel/reconciliation.mjs` checks the table mechanically
+when the intake reports `done`, before the validator - `reconciliation-missing`, `reference-unknown`,
+`reference-restated`, `conflict-without-decision`, `conflict-edited`, `new-unknown`, `new-reads-blind` - and a
+failing check downgrades the report to `failed` with its findings while a passing one emits
+`reconciled {op, scope, reference, conflict, new}`.
 `workflow-goal --reintake <feature>` runs the same intake op in reconcile mode over drafts the tree already
 holds (`intake-planned {mode: reconcile}`), which is how a feature authored before this rule is brought under it.
-The validator judges an intake by that rule, and the goal critique treats a goal that only appends as `revise`.
+The validator judges what only a reader can - whether a reference really covers its claim, whether a `new`
+record restates a decided one in other words, whether a conflict decision states both sides - and the goal
+critique answers `overlaps` with the same cases.
 
 **Intake.** A `--scope` entry the tree does not know is not an error: the goal phase plans one intake operation
 for it (`intake-planned`) and the tree, once it has the records, says what follows. `brand` becomes one
