@@ -126,6 +126,23 @@ function readIntegrations(state){
   }catch{return [];}
 }
 
+/**
+ * The reconciliation of every intake this workflow ran: the last `reconciled` event per op carries the counts of
+ * the three cases, and a `decision` item that names the intake op is a conflict still waiting for the owner. It is
+ * derived from the log and the state alone, so a page can say "one conflict open" without opening the tree.
+ */
+function readReconciliation(state,events){
+  const ops=Array.isArray(state?.ops)?state.ops:[];
+  const last=new Map();
+  for(const event of events)if(event?.event==='reconciled'&&event.op)last.set(event.op,event);
+  const open=Array.isArray(state?.needUser)?state.needUser.filter(item=>item?.kind==='decision'&&item.op):[];
+  return ops.filter(op=>op?.intake?.scope).map(op=>{
+    const event=last.get(op.id);
+    return {op:op.id,scope:op.intake.scope,checked:Boolean(event),reference:event?.reference??0,conflict:event?.conflict??0,new:event?.new??0,
+      open:open.filter(item=>item.op===op.id).map(item=>item.record??'(decision without a record)')};
+  });
+}
+
 /** Lanes are the kernel's optional grouping of nodes; both shapes it may take are read, neither is required. */
 function readLanes(state,statusOf){
   const lanes=state?.lanes;
@@ -227,6 +244,7 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
       byFeature:[...features.values()].sort((a,b)=>a.feature.localeCompare(b.feature))},
     lanes:readLanes(state,statusOf),
     integrations:readIntegrations(state),
+    reconciliation:readReconciliation(state,events),
     reviews:{rounds:plain(state.verifyRounds)?{...state.verifyRounds}:{},
       exhausted:unique(events.filter(event=>event.event==='verify-exhausted').map(event=>event.component).filter(Boolean)),
       findings:Array.isArray(state.reviewFindings)?state.reviewFindings.length:0},
@@ -291,6 +309,11 @@ export function renderView(view){
   if(view.integrations?.length)lines.push('',`## Integrations (${view.integrations.length})`,
     ...view.integrations.map(entry=>`- ${entry.id}${entry.provider&&entry.provider!==entry.id?` (${entry.provider})`:''}: `
       +`${PROOF_WORDS[entry.proven]??entry.proven}${entry.node?'':' - no integration node in the tree'}`));
+
+  // One line per intake: what the kernel counted in its table, and every conflict the owner has not answered.
+  if(view.reconciliation?.length)lines.push('',`## Reconciliation (${view.reconciliation.length})`,
+    ...view.reconciliation.map(entry=>`- ${entry.scope} (${entry.op}): ${entry.checked?`reference ${entry.reference}, conflict ${entry.conflict}, new ${entry.new}`:'not checked yet'}`
+      +(entry.open.length?`; open for the owner: ${entry.open.join(', ')}`:'')));
 
   const rounds=Object.entries(view.reviews.rounds);
   if(rounds.length||view.reviews.exhausted.length)lines.push('','## Reviews',

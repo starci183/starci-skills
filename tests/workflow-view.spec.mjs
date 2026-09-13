@@ -384,6 +384,30 @@ test('workflow-list is one row per workflow of the repository, newest first',t=>
  * A workflow that owns a lane says so on its page: which worktree it runs in, which branch, and whether that
  * branch went home. A reader never has to open state.json to learn where the workflow actually is.
  */
+/**
+ * The reconciliation of an intake is read from the log and the state, so the page says what the kernel counted
+ * and which conflict still waits for the owner without opening the tree - the same page the owner answers from.
+ */
+test('workflow-status prints the reconciliation of every intake: the counts the kernel checked and the conflicts still open',t=>{
+  const repoRoot=tmp(t);
+  const id='20260101-000006-reconciliation';
+  const dir=path.join(workflows(repoRoot),id);
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id,job:'Add collab',phase:'run',approved:true,ledger:[],
+    ops:[{id:'collab-intake',kind:'work.author',status:'done',intake:{scope:'collab',mode:'author'}},{id:'brand-1',kind:'brand.decide',status:'ready',intake:{scope:'brand'}},{id:'x',kind:'backend.implement',status:'ready'}],
+    needUser:[{op:'collab-intake',kind:'decision',record:'demo.collab.business.srs.decision.d-intake-contract',options:['keep the synchronous contract','make it asynchronous'],detail:'sales decided a synchronous contract'}]}));
+  writeLines(path.join(dir,'events.jsonl'),[
+    {at:ago(9),seq:1,event:'reconciled',op:'collab-intake',scope:'collab',reference:1,conflict:0,new:2},
+    // The last event per op is the one that counts: the intake ran again after a rejected table.
+    {at:ago(8),seq:2,event:'reconciled',op:'collab-intake',scope:'collab',reference:2,conflict:1,new:3}]);
+  const view=buildView({repoRoot,id,now:NOW});
+  assert.deepEqual(view.reconciliation,[
+    {op:'collab-intake',scope:'collab',checked:true,reference:2,conflict:1,new:3,open:['demo.collab.business.srs.decision.d-intake-contract']},
+    {op:'brand-1',scope:'brand',checked:false,reference:0,conflict:0,new:0,open:[]}]);
+  const page=renderView(view);
+  assert.match(page,/## Reconciliation \(2\)\n- collab \(collab-intake\): reference 2, conflict 1, new 3; open for the owner: demo\.collab\.business\.srs\.decision\.d-intake-contract\n- brand \(brand-1\): not checked yet/);
+});
+
 test('the view prints the lane of a workflow: its worktree, its branch and the base it merged into',t=>{
   const repoRoot=tmp(t);
   const dir=path.join(workflows(repoRoot),'20260101-000000-laned');

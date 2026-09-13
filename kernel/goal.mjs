@@ -136,7 +136,7 @@ export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,pro
   const critiqued=typeof critiqueGoal==='function'?critiqueGoal({job:state.job,scope:state.scope??[],ledger,decisions,
     records,material,brand:state.brand??null,constraints,providers:chain,cwd,runHeadless}):null;
   if(!critiqued?.ok){
-    state.critique={verdict:'unavailable',objections:[],required:[],alternatives:[],question:null,prerequisites:[],provider:null,
+    state.critique={verdict:'unavailable',objections:[],required:[],alternatives:[],question:null,prerequisites:[],overlaps:[],provider:null,
       at:Date.now(),reason:critiqued?.reason??'critiqueGoal was not available'};
     // The form errors of the attempts travel with the event: an unavailable critique is only diagnosable from them.
     store.appendEvent({event:'goal-critique-unavailable',reason:state.critique.reason,
@@ -146,10 +146,16 @@ export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,pro
   state.critique={verdict:critiqued.verdict,objections:(critiqued.objections??[]).map(item=>({...item})),
     required:[...(critiqued.required??[])],alternatives:[...(critiqued.alternatives??[])],
     question:critiqued.question??null,prerequisites:(critiqued.prerequisites??[]).filter(plain).map(item=>({...item})),
+    // The overlaps with the decided records are the three cases seen from the critic's side: a `reference` is a
+    // record the intake must cite, a `conflict` is a decision the owner takes. They reach the goal page and the
+    // intake's contract; anything else the critic called an overlap is not a case and is dropped here.
+    overlaps:(critiqued.overlaps??[]).filter(plain).map(item=>({record:String(item.record??'').trim(),case:String(item.case??'').trim(),evidence:String(item.evidence??'').trim()}))
+      .filter(item=>item.record&&['reference','conflict'].includes(item.case)),
     provider:critiqued.provider??null,at:Date.now(),
     ...((critiqued.dropped??[]).length?{dropped:critiqued.dropped.length}:{})};
   store.appendEvent({event:'goal-critiqued',verdict:state.critique.verdict,objections:state.critique.objections.length,
     provider:state.critique.provider,...(state.critique.prerequisites.length?{prerequisites:state.critique.prerequisites.length}:{}),
+    ...(state.critique.overlaps.length?{overlaps:state.critique.overlaps.length}:{}),
     ...(state.critique.dropped?{dropped:state.critique.dropped}:{})});
   return state.critique;
 }
@@ -187,6 +193,7 @@ export function planCritiquePrerequisites(store,state,{loaded,workRoot,repositor
 export const critiqueView=state=>({verdict:state.critique?.verdict??null,objections:(state.critique?.objections??[]).length,
   required:(state.critique?.required??[]).length,provider:state.critique?.provider??null,
   ...((state.critique?.prerequisites??[]).length?{prerequisites:state.critique.prerequisites.length}:{}),
+  ...((state.critique?.overlaps??[]).length?{overlaps:state.critique.overlaps.length}:{}),
   ...(plain(state.critiqueOverride)?{overridden:state.critiqueOverride.reason}:{})});
 
 export const CRITIQUE_HEADING='## Phản biện (critique)';
@@ -223,6 +230,13 @@ export function critiqueLines(state){
       return `- **${item.kind}**${item.feature?` of \`${item.feature}\``:''} - ${sentence(item.why)}${item.kind==='decision'?' The owner decides it.':op?` Planned first as \`${op}\`; every other operation waits for it.`:' The tree already holds it.'}`;
     }));
   }
+  // The critic's overlaps are the owner's reading of the three cases before any intake runs: a conflict is a
+  // decision only they take, a reference is a record the intake will cite and never restate.
+  const conflicts=(critique.overlaps??[]).filter(item=>item.case==='conflict'),cites=(critique.overlaps??[]).filter(item=>item.case==='reference');
+  if(conflicts.length)lines.push(``,`### Conflicts for the owner`,``,...conflicts.map(item=>
+    `- \`${item.record}\` - ${sentence(item.evidence)} The intake writes this as a \`conflict\` row with a decision record under the feature; the owner decides it with \`workflow-answer\`.`));
+  if(cites.length)lines.push(``,`### Records to cite`,``,...cites.map(item=>
+    `- \`${item.record}\` - ${sentence(item.evidence)} The intake cites it by id as a \`reference\` row and never restates it.`));
   if(plain(state.critiqueOverride))lines.push(``,
     `Override: the owner accepted this critique - "${firstLine(state.critiqueOverride.reason)}". An override is the owner's decision, so the kernel does not ask again.`);
   return [...lines,``];

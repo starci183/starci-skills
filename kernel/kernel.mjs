@@ -176,6 +176,19 @@ function critiqueBlock(critique){
   return [`## Goal critique - required`,...required.map(item=>`- ${item}`),
     `The critique of this workflow's goal returned \`revise\`: these changes are part of the goal the user approved and bind this operation exactly as the goal above does.`,``];
 }
+/**
+ * What the critic found among the decided records, in the contract of the intake that reconciles the feature: a
+ * `conflict` overlap is a row the intake must write with its decision record, a `reference` overlap a record it
+ * must cite by id. Only an intake gets the block; it is the one operation whose job the overlaps describe.
+ */
+function overlapBlock(critique,op){
+  const overlaps=op?.intake?(critique?.overlaps??[]).filter(item=>plain(item)&&item.record):[];
+  if(!overlaps.length)return [];
+  return [`## Reconciliation the critic found`,...overlaps.map(item=>item.case==='conflict'
+    ?`- \`${item.record}\` conflicts with this feature - ${firstLine(item.evidence)||'as the critic read it'}: write a \`conflict\` row naming it and a todo decision record under \`${op.intake.scope}\` with both sides, the options and one recommendation; never edit it.`
+    :`- \`${item.record}\` already holds part of this feature - ${firstLine(item.evidence)||'as the critic read it'}: write a \`reference\` row citing it by id and restate nothing of it.`),
+    `The kernel checks the table you write against these records by id; the owner decides every conflict.`,``];
+}
 /** A kind the kinds profile does not carry (a plan-ledger kind) declares no input and no output; it prints none. */
 const ioLines=kind=>{try{const block=ioBlock(kind);return block?[...String(block).split(String.fromCharCode(10)),'']:[];}catch{return [];}};
 
@@ -198,6 +211,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     ...(laneLine(state,op)?[laneLine(state,op),``]:[]),
     `## Goal`,op.goal,``,
     ...critiqueBlock(critique),
+    ...overlapBlock(critique,op),
     // What this kind is derived from and what it may produce, from the record catalog: an operation reads its
     // declaration before it reads its allowlist, so a record it may not write is refused before it writes one.
     ...ioLines(op.kind),
@@ -1581,8 +1595,9 @@ export function triageAnomaly(store,state,signature,ctx){
  * reviews and repairs the results imply, and - when nothing is left to run - run the job gates and finish.
  * Every iteration appends a `tick` event and saves state, so re-running `workflow-run` continues.
  *
- * `reconcile`, `renderChecks` and `contractDigest` are the three seams other modules plug into and each is
- * `null` by default: a kernel that was given none behaves exactly as it did before the rule they carry existed.
+ * `reconcile`, `renderChecks` and `contractDigest` are the three seams other modules plug into. Their defaults
+ * are the shipped modules (the typed reconciliation, the render checks, the contract digest); a caller that hands
+ * in `null` runs without that rule, exactly as a kernel did before the rule existed, which is what the tests use.
  */
 /**
  * The reconciliation seam, as the kernel runs it: the typed rows the intake wrote are checked against the tree

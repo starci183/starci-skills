@@ -771,7 +771,8 @@ test('a scope entry that names nothing in the tree begins with an intake operati
     assert.deepEqual(op.checks.map(check=>check.name),['work-tree-validates']);
     assert.match(op.goal,/Author the Work records of the feature collab from the job: Finish the sales slice/);
     assert.match(op.goal,/A new feature is not appended beside the decided ones/);
-    assert.ok(op.acceptance.some(line=>/reconciliation table/.test(line)),'the acceptance demands the reconciliation');
+    assert.ok(op.acceptance.some(line=>line.includes('extensions.work3.reconciliation: one row {case, record, decision, reads, hands, detail}')),'the acceptance demands the typed reconciliation');
+    assert.doesNotMatch(op.goal+op.acceptance.join(' '),/sds-gap/,'an intake never reports a gap against another feature');
     assert.ok(op.references.includes('features/sales/architecture/sds/intake/index.yaml'),'the decided records of the other features are references');
     assert.equal(op.intake.mode,'author');
     assert.deepEqual(events(collab.store).filter(event=>event.event==='intake-planned').map(event=>[event.op,event.scope,event.kind,event.mode]),[['collab-intake','collab','work.author','author']]);
@@ -2769,6 +2770,31 @@ test('a revise verdict lists what it requires on the goal page and in the contra
       assert.ok(contract.indexOf('## Goal critique - required')<contract.indexOf('## Allowlist'));
     }
     assert.equal(approve(harness.store,harness.state).approved,true);
+  }finally{harness.cleanup();}
+});
+
+test('the overlaps the critic finds are the three cases: a conflict is listed for the owner on the goal page, a reference is a record to cite, and the intake contract carries both',()=>{
+  const overlaps=[
+    {record:'demo.sales.architecture.sds.intake',case:'conflict',evidence:'sales decided a synchronous intake contract; collab needs an asynchronous one'},
+    {record:'demo.sales.business.overview',case:'reference',evidence:'the refund window collab follows is already decided there'},
+    // A case outside the closed two is not a case: the kernel drops it instead of inventing a fourth.
+    {record:'demo.sales.business.overview',case:'change',evidence:'x'}];
+  const harness=setupWork({scope:['collab'],critiqueGoal:critique({verdict:'revise',objections:[objection()],required:['reconcile against the sales records'],overlaps})});
+  try{
+    assert.deepEqual(harness.state.critique.overlaps.map(item=>[item.record,item.case]),
+      [['demo.sales.architecture.sds.intake','conflict'],['demo.sales.business.overview','reference']]);
+    assert.deepEqual(events(harness.store).filter(event=>event.event==='goal-critiqued').map(event=>event.overlaps),[2]);
+    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    assert.match(page,/### Conflicts for the owner\n\n- `demo\.sales\.architecture\.sds\.intake` - sales decided a synchronous intake contract/);
+    assert.match(page,/the owner decides it with `workflow-answer`/);
+    assert.match(page,/### Records to cite\n\n- `demo\.sales\.business\.overview` - the refund window/);
+    // The intake is the one operation whose job the overlaps describe, so its contract carries them as rows to write.
+    const intake=harness.state.ops.find(op=>op.intake);
+    const contract=renderContract({template,op:intake,state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
+    assert.match(contract,/## Reconciliation the critic found\n- `demo\.sales\.architecture\.sds\.intake` conflicts with this feature[^\n]*write a `conflict` row naming it and a todo decision record under `collab`/);
+    assert.match(contract,/- `demo\.sales\.business\.overview` already holds part of this feature[^\n]*`reference` row citing it by id/);
+    // The dropped 'change' overlap produced no row: the overview is named exactly once, as the reference it is.
+    assert.equal((contract.match(/^- `demo.sales.business.overview`/gm)??[]).length,1);
   }finally{harness.cleanup();}
 });
 

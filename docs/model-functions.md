@@ -41,9 +41,9 @@ no record, or a case outside the two, is dropped and counted in the result's rea
 goes uncritiqued costs more than an overlap the kernel could not shape. The rule that actually binds is the
 verdict: a goal that would only be added beside the decided records, naming none of them, is `revise` with
 the reconciliation in `required`, and a `revise` reaches the approval page and every operation's contract.
-The `overlaps` list itself is returned by this function and, as the kernel is built today, goes no further —
-`critiqueGoalPhase` stores the verdict without it — so the intake reconciles from the decided records rather
-than from the critic's reading of them.
+The `overlaps` list is kept by the kernel (`state.critique.overlaps`), printed on the goal page (`### Conflicts
+for the owner`, `### Records to cite`) and handed to the intake in its contract (`## Reconciliation the critic
+found`); the intake still reconciles from the decided records themselves, and the kernel checks its table by id.
 
 It also names the `prerequisites` the goal rests on and the tree lacks (`srs | sds | brand | decision`, with the
 feature and why), which the kernel plans as intake first. Default providers are the host's `critique.runtimes`,

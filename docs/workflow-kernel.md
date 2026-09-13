@@ -488,11 +488,12 @@ The **critic** answers `overlaps: [{record, case, evidence}]` beside its verdict
 from the goal text and the decided records (`reference`, `conflict`); the third is not an overlap with
 anything and is not the critic's to name. Its binding move is the verdict: a goal that would only be added
 beside the decided records, naming none of them, is `revise` with the reconciliation in `required`, and a
-`revise` reaches the owner's approval page and the contract of every operation. The overlaps themselves,
-as built, do not travel - `critiqueGoalPhase` records the verdict, objections, required changes,
-alternatives, question and prerequisites in `state.critique` and drops `overlaps`, so no section of the goal
-page and no block of the intake contract carries them. The intake reconciles from the decided records
-themselves, which is where the checkable answer is; the critic's head start is simply not used.
+`revise` reaches the owner's approval page and the contract of every operation. The overlaps travel too:
+`critiqueGoalPhase` keeps the two closed cases in `state.critique.overlaps` and counts them on `goal-critiqued`;
+the goal page prints every `conflict` under `### Conflicts for the owner` and every `reference` under
+`### Records to cite`; and the intake's contract carries `## Reconciliation the critic found`, one row to
+write per overlap. The kernel still checks the table the intake writes against the tree by id, so the
+critic's reading is a head start for the intake and a preview for the owner, never the verdict.
 The **validator** is told which case each row claims and which ids the kernel already
 checked, and judges only what a reader can. The **intake contract** (`work.intake`) is written around the
 sides and the three cases and names the table shape verbatim. An intake edits no record of another feature
@@ -1302,6 +1303,7 @@ kernel keeps no validator verdicts and no lanes still renders a complete page.
 | `rate` | `op-done` events per hour and distinct nodes finished per hour over the last 3 hours - or over the workflow's whole life when it is younger than that, so a 20 minute old run never reads as idle |
 | `anomalies` | `state.anomalies`: one signature per repeated oddity, its count and the triage option that settled it |
 | `recent` | the last 15 events, one line each: time, seq, event and the fields that matter |
+| `## Reconciliation (n)` | one line per intake of the workflow: the scope, the counts of the three cases the kernel checked in its table (`reconciled`), and every conflict still open for the owner (a `decision` item naming the intake op). Read from the log and the state alone |
 | `## Integrations (n)` | one line per declared integration of the workflow's tree - its id, its provider, the node that owes the proof, and what it is actually proven by: *proven live*, *proven against a fake, not live*, or *not proven*. The tree is read through the bounded `readLedgerTree` so a status page never spawns the validator, and a workflow that names no tree leaves the section out rather than guessing |
 
 **When `kernel.silentMs` grows.** Up to one wait tick (15 min) of silence is normal: the kernel is inside
