@@ -2829,6 +2829,29 @@ test('a kernel that already has its run records run-resumed; only a real bind re
   }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
 });
 
+/**
+ * An ask op holding a provision waits for the owner in its tab by design, so its idleness is the wait and the
+ * stall detector leaves it alone; an ask op on any other question is provisional, never waits, and an idle one
+ * is nudged like any other op.
+ */
+test('an ask op waiting for a provision is not a stalled op; one on a provisional question is nudged like any other',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>0,work:null};
+    const ask=running(harness.state,'op-intake','ctx_ask');
+    ask.kind='owner.ask';ask.origin='ask';ask.question={kind:'credential',text:'TELEGRAM_BOT_TOKEN',options:[],from:'op-x'};
+    const before=events(harness.store).length;
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_ask',liveness:'stalled-idle'}]});
+    assert.equal(ask.status,'running');
+    assert.deepEqual(events(harness.store).slice(before).filter(event=>['nudged','settled'].includes(event.event)),[],'the wait for the owner is not a stall');
+    ask.question={kind:'decision',text:'Which window?',options:[],from:'op-x'};
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_ask',liveness:'stalled-idle'}]});
+    assert.deepEqual(events(harness.store).slice(before).map(event=>event.event).filter(name=>['nudged','settled'].includes(name)),['nudged']);
+  }finally{harness.cleanup();}
+});
+
 test('two silent stalls of one runtime inside half an hour are inferred as a rate limit and reported to the allocator',()=>{
   const harness=setup({plan:salesPlan,scripts:{}});
   try{
