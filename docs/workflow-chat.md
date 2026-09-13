@@ -14,9 +14,9 @@ workflow**, and the chat is the workflow's monitor, not another agent layer:
 
 | in a chat | in Orca |
 | --- | --- |
-| every command of the launcher: `workflow-goal`, `workflow-approve`, `workflow-run`, `workflow-status`, `workflow-list`, `workflow-stop`, `workflow-supervise` | the same commands |
+| every command of the entry: `workflow-goal`, `workflow-approve`, `workflow-answer`, `workflow-run`, `workflow-status`, `workflow-list`, `workflow-stop`, `workflow-supervise` | the same commands |
 | operations run one after another as headless model processes; the kernel still verifies, commits and gates each slice itself | up to ten operations at once, each in an attested Orca terminal |
-| an operation kind the headless host cannot serve (the ones that draw or need a browser the adapter does not drive, `interface.draw` among them) is reported `host-unsupported`; the chat relays it as "this needs the Orca host" and the workflow carries on with everything else | every kind the profiles declare |
+| an operation kind the headless host cannot serve is reported `host-unsupported`; its `host` needUser item names the capability the kind needs and this host does not offer, as `model/hosts.yaml` declares it, so the chat relays it as "this needs the Orca host" and the workflow carries on with everything else | every kind the profiles declare |
 | `--lane` asks the host adapter for a worktree of its own; what the adapter cannot create it refuses, and the refusal is printed as it came | an Orca worktree row `[Workflow] <id>` |
 | no `[Kernel]` tab: the kernel's last words are `<dir>/kernel.log` | the `[Kernel] <id>` tab |
 | the chat polls; nothing is pushed to it | the same: a workflow has no monitor agent in either host |
@@ -35,9 +35,13 @@ verification.
    operations, the ledger by feature, the validator, `## Needs you (n)`, the rate and the last events,
    all derived from the store's own files (see [Reading a workflow](workflow-kernel.md#reading-a-workflow)).
 3. **Questions.** An operation that reports `ask` is first offered to the kernel's `decide` function;
-   what it cannot answer becomes a `needUser` item of kind `authority` with the question text, and the
-   operation is `blocked` until the owner decides. The chat relays the item verbatim and says what
-   answering it takes; after the owner acted, `workflow-approve --id <id>` re-admits the operation.
+   what it cannot answer becomes a `needUser` item with the question text, and the operation is `blocked`
+   until the owner decides. The chat relays the item verbatim and says what answering it takes. A
+   `decision` item is the one the kernel prepared options for, and the owner's pick reaches the paused
+   operation in its next contract through
+   `workflow-answer --id <id> --op <ask op> --choice <n> [--note "..."]`; every other kind is answered in
+   the world - a Work record, the goal's wording, the machine - and after the owner acted,
+   `workflow-approve --id <id>` re-admits the operation.
 4. **The end.** `state.finished` carries the outcome and the path of `<dir>/final-report.json`. A
    `blocked` finish with every gate green means questions for the owner remain; that is the report's
    `needUser[]`, not a defect.
@@ -49,16 +53,25 @@ verification.
 its base worktree through the git common dir; a repository that shares another repository's Work tree
 keeps it in the owner repository).
 
+`bin/starci.mjs` is the one command entry: it forwards a workflow command to the kernel launcher with its
+argv untouched, so no command line a person types names a module path inside the runtime.
+
 ```
 node <skill root>/scripts/ensure-build.mjs
-node <skill root>/.dist/hosts/orca/launch.mjs workflow-goal    --host <skill root> --job "<the owner's prompt>" [--scope f1,f2] [--lane [<name>]]
-node <skill root>/.dist/hosts/orca/launch.mjs workflow-approve --host <skill root> --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
-node <skill root>/.dist/hosts/orca/launch.mjs workflow-run     --host <skill root> --id <id> --host-adapter headless   # detached, output appended to <dir>/kernel.log
-node <skill root>/.dist/hosts/orca/launch.mjs workflow-status  --host <skill root> --id <id> [--json true]
-node <skill root>/.dist/hosts/orca/launch.mjs workflow-stop    --host <skill root> --id <id>
-node <skill root>/.dist/hosts/orca/launch.mjs workflow-list
-STARCI_HOST=headless node <skill root>/.dist/hosts/orca/launch.mjs workflow-supervise --host <skill root>   # detached; starts and restarts every approved, unfinished workflow of the repository
+node <skill root>/bin/starci.mjs workflow-goal    --host <skill root> --job "<the owner's prompt>" [--scope f1,f2] [--lane [<name>]]
+node <skill root>/bin/starci.mjs workflow-approve --host <skill root> --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
+node <skill root>/bin/starci.mjs workflow-answer  --host <skill root> --id <id> --op <ask op> --choice <n> [--note "<the owner's words>"]
+node <skill root>/bin/starci.mjs workflow-run     --host <skill root> --id <id> --host-adapter headless   # detached, output appended to <dir>/kernel.log
+node <skill root>/bin/starci.mjs workflow-status  --host <skill root> --id <id> [--json true]
+node <skill root>/bin/starci.mjs workflow-stop    --host <skill root> --id <id>
+node <skill root>/bin/starci.mjs workflow-list
+STARCI_HOST=headless node <skill root>/bin/starci.mjs workflow-supervise --host <skill root>   # detached; starts and restarts every approved, unfinished workflow of the repository
 ```
+
+`--host` stays on every command that reaches a ledger. Without it the kernel looks for the Work tree under
+`<repo>/.claude`, which is right for a repository that owns its own tree and wrong for one that shares
+another repository's - a frontend working its backend's Work - so the flag is what makes such a job
+resolvable at all. It is not read from the entry's own location.
 
 `workflow-run` and `workflow-supervise` are started detached and never in the chat's foreground: a chat
 that blocks on the kernel cannot relay a question, and an operation runs for minutes. The chat drives a
