@@ -1172,6 +1172,17 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     op.reports.at(-1).downgradedTo='failed';
     return retryOp(store,state,op,[`operation modified kernel-owned fields (${(plain(op.cut)?CUT_OWNED:RECORD_OWNED).join(', ')}) of the Work record it authors: ${blocks.join(', ')}`],ctx,'record-blocks-modified');
   }
+  // An ask op that found the answer - in a decided record, from the owner in its tab, or as a provision present -
+  // has done its job whatever outcome it wrote: the marker is the ruling, and a `blocked` beside it is noise
+  // (one ask answered from a record, then asked for a Work path it had no business with, and died four times
+  // being told so). No check of its own is owed: the answer is the record's, and the requester carries it.
+  const askMarker=op.kind===OWNER_ASK&&report.outcome!=='done'?(String(report.summary??'').match(/^\s*(answered-from|answered-by-owner|credential|provided):/i)??[])[1]??null:null;
+  if(askMarker){
+    op.status='done';op.dispatch=null;op.terminal=null;op.nudged=false;
+    store.appendEvent({event:'owner-ask-marker-honoured',op:op.id,outcome:report.outcome,marker:askMarker.toLowerCase()});
+    settleOwnerAsk(store,state,op,report);
+    return 'owner-ask-settled';
+  }
   if(report.outcome==='done'){
     const verified=machineVerify(state,op,ctx);
     // `work-valid` is the kernel's own check and is stripped from every operation's list, so an op that edits the
@@ -1789,13 +1800,13 @@ export const LAUNCH_DAILY_CAP=6;
  * `readmitCooled`, with its launch and restart counters cleared. `detail` is the line the owner would have been
  * given; it is carried on the op so the item past the cap says exactly what kept failing.
  */
-function coolOp(store,state,op,ctx,detail){
+function coolOp(store,state,op,ctx,detail,{migrated=false}={}){
   const now=clockOf(ctx);
   op.status='blocked';op.refusal='launch-cooling';op.coolUntil=now+RATE_LIMIT_COOLDOWN_MS;
   op.coolReason=String(detail).slice(0,240);
   op.dispatch=null;op.terminal=null;op.nudged=false;
   store.appendEvent({event:'launch-cooling',op:op.id,until:op.coolUntil,
-    launchFailures:op.launchFailures??0,restarts:op.restarts??0,detail:op.coolReason});
+    launchFailures:op.launchFailures??0,restarts:op.restarts??0,detail:op.coolReason,...(migrated?{migrated:true}:{})});
   return 'launch-cooling';
 }
 /**
@@ -1877,7 +1888,7 @@ export function rejudgeParked(store,state,ctx){
       // A rate limit is migrated by `readmitCooled` itself, which also avoids the limited runtime; every other spent
       // launch is a mechanical bound: it cools and comes back with its counters cleared.
       drop(item);
-      coolOp(store,state,op,ctx,String(item.detail??''));
+      coolOp(store,state,op,ctx,String(item.detail??''),{migrated:true});
       op.coolUntil=clockOf(ctx);
       route='launch-cooling';
     }
@@ -1907,12 +1918,24 @@ export function rejudgeParked(store,state,ctx){
 
 function readmitCooled(store,state,ctx){
   const now=typeof ctx?.now==='function'?ctx.now():Date.now();
-  for(const item of state.needUser.filter(entry=>entry.kind==='environment'&&/\(rate-limited\)$/.test(String(entry.detail??'')))){
+  for(const item of state.needUser.filter(entry=>entry.kind==='environment'&&entry.op)){
     const op=state.ops.find(candidate=>candidate.id===item.op);
     if(!op||op.status!=='blocked'||op.refusal)continue;
-    op.refusal='rate-limited';op.coolUntil=now;
-    state.needUser=state.needUser.filter(entry=>entry!==item);
-    store.appendEvent({event:'rate-limit-cooling',op:op.id,runtime:op.runtime,until:op.coolUntil,restarts:op.restarts,migrated:true});
+    const detail=String(item.detail??'');
+    if(/\(rate-limited\)$/.test(detail)){
+      op.refusal='rate-limited';op.coolUntil=now;
+      state.needUser=state.needUser.filter(entry=>entry!==item);
+      store.appendEvent({event:'rate-limit-cooling',op:op.id,runtime:op.runtime,until:op.coolUntil,restarts:op.restarts,migrated:true});
+      continue;
+    }
+    // A lost agent, an idle restart, a launch nobody could take: mechanical bounds, wherever they were parked from
+    // (an older build, or the terminal reconciliation that has no cooldown of its own). They cool and come back,
+    // up to the daily cap; only past the cap is the environment the owner's after all.
+    if(/lost its agent|\(stalled-idle\)|could not be launched|no runtime could launch|failed on every runtime/.test(detail)){
+      state.needUser=state.needUser.filter(entry=>entry!==item);
+      coolOp(store,state,op,ctx,detail,{migrated:true});
+      op.coolUntil=now;
+    }
   }
   for(const op of state.ops.filter(candidate=>candidate.status==='blocked'&&candidate.refusal==='rate-limited')){
     if(!(Number(op.coolUntil??0)<=now))continue;

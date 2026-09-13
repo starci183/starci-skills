@@ -960,6 +960,68 @@ test('workflow-goal --migrate plans one migrate-mode intake per feature and no n
   }finally{all.cleanup();}
 });
 
+/**
+ * A lost agent is a mechanical bound like an idle restart: the terminal reconciliation parks it as an environment
+ * line with no cooldown of its own, and the kernel migrates that line to a cooldown every tick - the op comes back
+ * with its counters cleared, and the owner is never asked to fix a terminal.
+ */
+test('an op that lost its agent past the restart limit cools down and comes back, and the owner is not asked',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    const op=state.ops[0];
+    op.status='blocked';op.runtime='gpt-6-astra';op.restarts=4;
+    state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} lost its agent 4 times; the last terminal term_x no longer exists`});
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    const before=store.readEvents().length;
+    const state2=harness.run({maxIterations:1});
+    const log=store.readEvents().slice(before);
+    assert.deepEqual(log.filter(event=>event.event==='launch-cooling').map(event=>[event.op,event.migrated]),[[op.id,true]]);
+    assert.ok(log.some(event=>event.event==='launch-readmitted'&&event.op===op.id),'the cooldown is already due: the op is re-admitted at once');
+    const readmitted=state2.ops.find(item=>item.id===op.id);
+    assert.notEqual(readmitted.status,'blocked');
+    assert.equal(readmitted.restarts,0);
+    assert.equal(state2.needUser.some(item=>item.kind==='environment'),false,'a lost agent is time, not the owner\'s');
+  }finally{harness.cleanup();}
+});
+
+/**
+ * The marker is the ruling. An ask op that answered from a decided record and still wrote `blocked` beside it
+ * (asking for a Work path it had no business with) is settled on the marker: the requester carries the answer,
+ * the ask is done, and nothing is sent to a terminal that may already be gone.
+ */
+test('an ask op that found the answer is settled on its marker whatever outcome it wrote, and the requester carries the answer',()=>{
+  const harness=setup({plan:sharedPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state,{allowDynamic:9});
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const guards=stubGuards();
+    const ctx={cwd,allocator:harness.allocator,guards,git:harness.git.git,exec:()=>({status:0,stdout:'',stderr:''}),
+      now:()=>0,work:null,wait:noWait,decide:()=>{throw Error('an answered question is not a decision');}};
+    const op=id=>harness.state.ops.find(item=>item.id===id);
+    const requester=op('op-a');
+    requester.status='paused';requester.waitingFor='ask-9';requester.dependsOn=[...(requester.dependsOn??[]),'ask-9'];
+    const ask={...structuredClone(requester),id:'ask-9',kind:'owner.ask',origin:'ask',status:'running',dispatch:'ctx_ask-9',terminal:'term_ask-9',
+      requesters:['op-a'],dependsOn:[],waitingFor:null,ledgerIds:[],reports:[],attempt:1,runtime:'gpt-6-astra',
+      question:{kind:'decision',text:'Which refund window holds?',options:[],from:'op-a'},
+      allowlist:['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],checks:[],acceptance:['the question is answered from a decided record or drafted as one decision record']};
+    harness.state.ops.push(ask);
+    const report=buildReport({outcome:'blocked',run:'run_wf',task:'task_ask-9',dispatch:'ctx_ask-9',from:'term_ask-9',
+      summary:'answered-from: demo.sales.business.overview the refund window is 14 days, decided there',
+      blocker:{kind:'shared-change',detail:'.starciwork/features/sales/ui/index.yaml must change'}});
+    report.sent={messageId:'msg_ask-9',sentAt:1,type:report.signal.type};
+    assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,ask,report,ctx),'owner-ask-settled');
+    assert.equal(op('ask-9').status,'done');
+    const log=events(harness.store);
+    assert.deepEqual(log.filter(event=>event.event==='owner-ask-marker-honoured').map(event=>[event.op,event.outcome,event.marker]),[['ask-9','blocked','answered-from']]);
+    assert.ok(log.some(event=>event.event==='owner-ask-answered-from-record'&&event.record==='demo.sales.business.overview'));
+    assert.equal(log.some(event=>event.event==='shared-change-refused'&&event.op==='ask-9'),false,'the blocked line beside the marker is noise');
+    assert.notEqual(op('op-a').status,'paused','the requester carries the answer');
+    assert.match(JSON.stringify(op('op-a')),/Answered from the decided record demo\.sales\.business\.overview/);
+  }finally{harness.cleanup();}
+});
+
 test('an op the restart limit blocked for a rate limit cools down and is re-admitted on another runtime, and an older block is migrated',()=>{
   const harness=setupWork();
   try{
