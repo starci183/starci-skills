@@ -145,6 +145,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const maxCooldownMs=finite(allocation.maxCooldownMs,DEFAULT_MAX_COOLDOWN_MS);
   const maxParallelOps=finite(runtimes.maxParallelOps,DEFAULT_MAX_PARALLEL_OPS);
   const policy=typeof allocation.policy==='string'?allocation.policy:LEAST_LOADED;
+  const fanOut=plain(allocation.fanOut)?allocation.fanOut:{};
   const preference=plain(allocation.preference)?allocation.preference:{};
   const live=adoptState(state,utcDay(now()));
   const ledger=sharedLedgerOf(shared,now);
@@ -248,6 +249,10 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     schema:ALLOCATION,
     policy,
     maxParallelOps,
+    // How wide one cut group may fan out (`allocation.fanOut`): the seam of a group runs alone, and at most
+    // `maxPerGroup` of its children run at once, so ten slots are never all spent on one parent.
+    fanOut:{seamFirst:fanOut.seamFirst!==false,
+      maxPerGroup:finite(fanOut.maxPerGroup,Math.max(1,maxParallelOps-1))},
     sequential:Boolean(sequential),
     runtimeIds:[...ids],
     roleFor,

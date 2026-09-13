@@ -1,7 +1,8 @@
 id: work.author
 goal:
-  en: Complete the authored fields of one canonical Work node - its write scope, its testable assertions and
-    one runnable check per assertion - so the node becomes launchable without anyone inventing its scope.
+  en: Author the canonical Work records one node needs before it can be launched - in record mode its own write
+    scope, testable assertions and one runnable check per assertion; in cut mode the child nodes a node too big
+    for one operation is split into, seam first - without anyone inventing a scope.
 nodeKinds:
   - implementation
   - uat
@@ -63,6 +64,28 @@ writes:
         runtime resources those checks need. Preserve every other authored line, including the node's
         description, refs, dependsOn, required flag and state. Never write completion, never write the kernel's
         own extension block, never write anything under the node's evidence folder, and never edit another node."
+  - id: parts
+    path: .starciwork/<node-dir>/<part>/index.yaml
+    fields:
+      - schema
+      - id
+      - kind
+      - required
+      - state
+      - description
+      - assertions
+      - dependsOn
+      - implementation.changes
+      - extensions.work3.allowlist
+      - extensions.work3.checks
+    content:
+      en: "Cut mode only. One child node per observable behaviour, written as work/node@2 with kind
+        implementation, state todo and required true: its description, its assertions, its write scope of at most
+        twelve inspected files disjoint from every sibling and from the seam, and one runnable check per
+        assertion. Exactly one child is the seam - the one that owns the module wiring, dependency registration,
+        migrations, shared contracts and shared types every other child would otherwise touch - and every other
+        child names the seam in dependsOn, so it is built first and alone and the rest fan out behind it. Never
+        author a child outside the parent's own folder and never write product code."
   - id: evidence
     path: E/manifest.yaml + E/result.json
     fields:
@@ -126,6 +149,35 @@ steps:
       en: Run the workspace validator over the edited tree and confirm the record still validates and now
         declares both a write scope and checks. Record the assertion-to-check mapping and any open question.
         Build nothing and change no product source; the kernel launches the node's own work afterwards.
+  - reads:
+      - target
+      - specification
+      - source
+    writes:
+      - parts
+    action:
+      en: "Cut mode. When the kernel selected this node as too big for one operation - its write scope names more
+        than twelve files, it states more than eight assertions, or the design it references names three or more
+        components - read the node, its assertions and the referenced design, open the code its write scope
+        names, and NAME THE SEAM FIRST: the one child that owns the module wiring, dependency registration,
+        migrations, shared contracts and shared types every other child would otherwise touch. Then cut the rest
+        by acceptance, one observable behaviour each, every child disjoint from every sibling and from the seam,
+        every child assertion traced to the same requirement and design ids the parent traced to, and every
+        non-seam child naming the seam in dependsOn. A node that really is one observable behaviour is not split:
+        report done with cut: none and the reason."
+  - reads:
+      - target
+      - scripts
+    writes:
+      - node
+      - evidence
+    action:
+      en: "Cut mode. Turn the cut node into a derived parent: remove its state, its completion and its write
+        scope and keep its assertions as the group's acceptance under extensions.work3.groupAssertions, because
+        a parent with children authors no state and derives one from them. Then run the workspace validator over
+        the edited tree and confirm the parent is derived and every child is launchable on its own. Record the
+        seam, the children and the write scope of each. Build nothing and change no product source; the kernel
+        launches the seam first, fans the rest out behind it and proves the whole group once."
 proofs:
   - id: launchable
     requirement:
@@ -139,9 +191,20 @@ proofs:
         unrunnable. A fabricated path or command is a failure, not a draft.
   - id: preserved-record
     requirement:
-      en: The node's description, refs, dependsOn, required flag and state are byte-identical to what was
-        authored, no completion or kernel extension block was written, nothing under the evidence folder of
-        the record was edited, and no other node changed.
+      en: "In record mode the node's description, refs, dependsOn, required flag and state are byte-identical to
+        what was authored. In cut mode the node keeps its description and refs and loses exactly its state, its
+        completion and its write scope, which is what makes it a derived parent. In both modes no completion or
+        kernel extension block was written, nothing under the evidence folder of the record was edited, and no
+        node outside the cut node's own folder changed."
+  - id: seam-first-disjoint-parts
+    requirement:
+      en: "Cut mode: exactly one child is named the seam, every other child names it in dependsOn, and no two
+        children share a path - each write scope is at most twelve inspected files and is disjoint from every
+        sibling and from the seam. Every child is one observable behaviour with one runnable check per assertion
+        and every assertion traced to the same requirement and design ids the parent traced to, and the parent
+        keeps its assertions as extensions.work3.groupAssertions with no state, completion or write scope of its
+        own. A node reported as cut: none left the tree byte-identical. Overlapping children are a failure, not a
+        draft: two operations that write the same file are one merge conflict with two authors, never parallel work."
 blockers:
   - code: SCOPE_UNDETERMINED
     condition:
@@ -156,3 +219,12 @@ blockers:
       en: A referenced requirement or design record is missing or not effectively done, so the assertions would
         rest on material that was never accepted. Report the node/resource IDs; never weaken refs or dependsOn
         and never author the missing record here.
+  - code: SEAM_UNDETERMINED
+    condition:
+      en: "Cut mode: the accepted records and the actual source do not determine which shared ground the children
+        would contend for, so either the seam or the boundary between two children would be invented. Report the
+        exact question - which module wiring, which contract, which migration is shared - never a cut that leaves
+        two children writing the same file."
+placeholders:
+  node-dir: Tree-relative directory of the cut Work node, inside the operation allowlist
+  part: Stable slug of one child node under that directory

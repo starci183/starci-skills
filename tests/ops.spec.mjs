@@ -16,6 +16,36 @@ const fresh=()=>structuredClone(catalogue);
 const errors=cat=>validateCatalog(cat,{root,repositoryRoot:repository,documents:outputs()}).errors.map(e=>e.code);
 const resolvePublicKnowledge=rel=>[path.join(repository,rel),path.join(repository,'.dist',rel)].find(candidate=>fs.existsSync(candidate));
 
+test('the record-authoring operator carries the cut mode: it writes child nodes, names the seam and builds nothing',()=>{
+  const contract=catalogue.ops.find(op=>op.id==='work.author').contract;
+  // One operator contract, three modes - a node's own record, a feature intake, and the cut - so
+  // `implementation.plan` needs no second operator and the catalogue stays the closed list it was.
+  assert.equal(catalogue.ops.some(op=>op.id==='implementation.plan'),false,'the cut is a kind, never a second operator');
+  assert.match(contract.goal.en,/in cut mode the child nodes a node too big for one operation is split into, seam first/);
+  const parts=contract.writes.find(row=>row.id==='parts');
+  assert.ok(parts,'the cut writes child records of its own');
+  assert.equal(parts.path,'.starciwork/<node-dir>/<part>/index.yaml');
+  assert.ok(['node-dir','part'].every(name=>String(contract.placeholders?.[name]??'').trim()),'both placeholders are declared');
+  for(const field of ['schema','id','kind','required','state','assertions','dependsOn','extensions.work3.allowlist','extensions.work3.checks'])
+    assert.ok(parts.fields.includes(field),field);
+  assert.match(parts.content.en,/Exactly one child is the seam/);
+  assert.match(parts.content.en,/every other child names the seam in dependsOn/);
+  assert.match(parts.content.en,/never write product code/);
+  // Its steps are reachable and its proof is the one thing a cut can get wrong twice: overlap.
+  const writing=contract.steps.filter(step=>step.writes.includes('parts'));
+  assert.equal(writing.length,1,'one step authors the children');
+  assert.match(writing[0].action.en,/NAME THE SEAM FIRST/);
+  const derived=contract.steps.find(step=>/derived parent/.test(step.action.en));
+  assert.match(derived.action.en,/groupAssertions/);
+  const proof=contract.proofs.find(item=>item.id==='seam-first-disjoint-parts');
+  assert.ok(proof,'the cut declares its own proof');
+  assert.match(proof.requirement.en,/disjoint from every sibling and from the seam/);
+  assert.match(proof.requirement.en,/cut: none left the tree byte-identical/);
+  assert.ok(contract.blockers.some(item=>item.code==='SEAM_UNDETERMINED'),'an undeterminable seam is refused, never invented');
+  // And the whole catalogue still validates with the mode in it.
+  assert.deepEqual(errors(fresh()),[]);
+});
+
 test('implementation and code review route to the same resolvable coding convention contract',()=>{
   const generated=JSON.parse(outputs().get('catalog.json'));
   for(const id of ['backend.implement','interface.implement','review.verify']) {

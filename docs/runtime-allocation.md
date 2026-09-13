@@ -9,6 +9,20 @@ cooldown — plus the role the worker will play. `maxParallelOps: 10` caps the
 whole workflow, so ten ready operations can be in flight across Codex, Claude
 and Qwen at the same time instead of queueing behind one provider.
 
+`allocation.fanOut` is the one bound the allocator answers but does not apply
+itself: `{seamFirst: true, maxPerGroup: 9}`. When a heavy node has been cut into
+children with disjoint write scopes, the scheduler reads that policy from
+`allocator.fanOut` and holds the group to it — the **seam** (the one child that
+owns the module wiring, the migrations and the shared contracts every other
+child would otherwise touch) runs alone in its group, and at most nine of one
+parent's children run at once. Against `maxParallelOps: 10` that means eight or
+nine builds of a single heavy node in flight while the rest of the tree still has
+a slot to run in: one parent can never take the whole pool and leave everything
+else queueing behind it. The rule itself lives in `fanOutDeferral`
+(`kernel/sync.mjs`), because it is a fact of the cut group rather than of the
+pools, and a profile that declares no `fanOut` still gets it with
+`maxPerGroup` defaulting to one below `maxParallelOps`.
+
 The role of an operation kind comes from the kind graph (`model/kinds.yaml`
 through `kernel/graph.mjs`), which is the one place a kind is defined;
 `roleOfKind` in `model/runtimes.yaml` stays the fallback for a kind the graph

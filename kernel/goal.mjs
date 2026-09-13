@@ -15,7 +15,7 @@ import {decisionKindFor} from './io.mjs';
 import {OWNER_ASK,openOwnerAsk} from './owner.mjs';
 import {laneView} from './lanes.mjs';
 import {intakeOp,scopeNames} from './intake.mjs';
-import {deriveWorkOp,designGate,laneOf,laneText,laneWalked} from './sync.mjs';
+import {cutOpFor,cutPlanned,cutReason,deriveWorkOp,designGate,laneOf,laneText,laneWalked} from './sync.mjs';
 import {noteBrand} from './verify.mjs';
 
 /**
@@ -491,11 +491,22 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   state.ledger=ready.map(node=>({id:node.id,title:describeNode(ledgerApi,repoRoot,node),inputRef:node.path,
     kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[],
     lane:[...(state.lanes[node.id]?.lane??[])]}));
+  // A node too big for one operation is never approved as one long build: what the user reads is the cut that
+  // precedes it (`implementation.plan`), and the children it writes are the nodes the lanes are walked for. The
+  // measurement is the same one `syncLedgerOps` applies, so the goal page and the run never disagree about it.
+  const measured=new Map(launchable.map(node=>[node.id,cutReason({work:{api:ledgerApi,at,loaded}},node,loaded)])
+    .filter(([,found])=>Boolean(found)));
+  const built=launchable.filter(node=>!measured.has(node.id));
   const taken=new Set(),opOfNode=new Map();
-  for(const node of launchable)opOfNode.set(node.id,workOpId(node.id,taken));
-  state.ops=[...launchable.map((node,index)=>deriveWorkOp(ledgerApi,at,node,
+  for(const node of built)opOfNode.set(node.id,workOpId(node.id,taken));
+  const cuts=launchable.filter(node=>measured.has(node.id))
+    .map(node=>cutOpFor(node,{workRoot:binding.ledgerRoot,found:measured.get(node.id),id:workOpId(`${node.id}-cut`,taken)}));
+  state.ops=[...built.map((node,index)=>deriveWorkOp(ledgerApi,at,node,
     {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[],loaded})),
-    ...intake.map((raw,index)=>{const op=toOp(raw,launchable.length+index);op.intake=raw.intake;op.difficulty='hard';return op;})];
+    ...cuts.map((raw,index)=>{const op=toOp(raw,built.length+index);op.cut=raw.cut;op.difficulty='hard';
+      state.lanes[op.nodeId].cut=op.id;return op;}),
+    ...intake.map((raw,index)=>{const op=toOp(raw,built.length+cuts.length+index);op.intake=raw.intake;op.difficulty='hard';return op;})];
+  for(const op of state.ops.filter(item=>item.cut))cutPlanned(store,op,measured.get(op.nodeId));
   for(const op of state.ops.filter(item=>item.intake))store.appendEvent({event:'intake-planned',op:op.id,scope:op.intake.scope,kind:op.kind,allowlist:op.allowlist,mode:op.intake.mode??'author'});
   for(const op of state.ops)locateSharedTreePaths(op,{work:{shared:binding.sharedLedger,ledger:{repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot}}});
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');

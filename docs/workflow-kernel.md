@@ -125,6 +125,54 @@ not a defect - it is a product whose grammar this workflow may not change - so t
 reopens nothing and leaves the requester `blocked` with one `environment` item naming the file that would answer
 it. Inventing a repository root for a language is exactly the guess the routing contract forbids.
 
+### Too big for one operation -> implementation.plan
+
+The sibling case. A node whose record *is* complete can still be more than one operation can deliver, and the
+kernel decides that from the record rather than from an opinion. `cutReason` in `kernel/sync.mjs` measures every
+schedulable `implementation` node three ways — a write scope naming more than `CUT_FILES` (12) files, more than
+`CUT_ASSERTIONS` (8) assertions, or `refs`/`dependsOn` naming SDS records carrying `CUT_COMPONENTS` (3) or more
+components — and one bound passed makes the node a cut:
+
+| | |
+| --- | --- |
+| kind / origin | `implementation.plan` / `ledger` (the `work.author` operator contract, sequence `work.cut`) |
+| id | `<node>-cut`, recorded as `state.lanes[<node>].cut` |
+| goal | `Cut the Work node <node> into child nodes that can be built in parallel: <reason>` |
+| allowlist | the node's own folder in the tree: `.starciwork/<node dir>/**` |
+| checks | one: `work-tree-validates`, the whole-tree validator (named as the intake's is, because the kernel strips its own `work-valid` from every op it loads and validates the tree itself at acceptance) |
+| references | the node, its `refs` and `dependsOn`, and the code its own allowlist names |
+| ledger items | none — the children it writes are the nodes the tree has afterwards |
+
+It is planned **before the lane and instead of the node's first step**, once per node, in both places a first
+step is created: `workGoalPhase` (so the page the owner approves reads `1 implementation.plan -> seam ->
+N backend.implement -> 1 e2e.verify -> 1 review.verify`) and `syncLedgerOps` (for a node that becomes
+schedulable mid-run). The design gate runs first, because a frontend node is cut by screen and region and there
+is nothing to cut it by until the feature's `ui` node is done. Event: `cut-planned {op, node, reason, files,
+assertions, components}`.
+
+The folder glob grants the node's own `index.yaml`, so `kernelOwnedPaths` keeps only that node's `evidence/**`
+protected. Inside the record the guard is narrower than for an author op and deliberately so: a derived parent
+authors no state, so removing `state` is the job here and `CUT_OWNED` is just `completion` —
+`guardRecordBlocks` compares the named blocks field by field rather than the whole triple as one string.
+
+On acceptance the kernel asks the tree, never the report (`settleCut`):
+
+- **Children under the node's folder** — event `cut-authored {node, op, children, seam, groupAssertions}`, the
+  group is recorded as `state.cuts[<parent>] = {children, seam, assertions}`, and the parent's ledger item is
+  dropped because the parent closes nothing of its own any more. The seam is read from the records: the one
+  child every other child names in `dependsOn`. On the next read the children are schedulable nodes and the
+  parent, now a branch with no `state`, is no candidate at all.
+- **No children** — event `cut-none`, `state.lanes[<node>].cutNone`, and the node starts its own lane with its
+  own id exactly as it would have without the cut. No second cut is ever planned for it.
+
+Afterwards the group is the unit of everything that judges: `cutParentOf` answers which group a node belongs
+to, `cutChildDefers` keeps a child from ever planning its own prove step, `groupIncomplete` holds a proof until
+every child of the parent is implemented, `groupVerifyKind` names the one proof the group still owes
+(`e2e.verify` before `review.verify` on a backend lane, `uat.verify` on a frontend one), and `childOwning`
+maps a finding's file back to the child whose write scope holds it. `fanOutDeferral` is the scheduler's side:
+the seam of a group runs alone and at most `allocation.fanOut.maxPerGroup` of its children run at once
+(`schedule-deferred {op, reason, parent, running}`). See [op-granularity.md](op-granularity.md) §1 and §4.
+
 ## Lanes and routes
 
 One Work node is not one operation. It is a **lane**: the ordered kinds it travels before its ledger entry may

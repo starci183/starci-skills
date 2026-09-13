@@ -567,6 +567,51 @@ reopened only when the owner asks. `staleProofs(ledger,{digestOf,kindOf})` is th
 tree rather than of a run, and it considers only nodes the kernel itself completed (their kernel block names
 an `opId`), so a decided record settled by review is never dragged in.
 
+## 8b. Heavy work is cut and fanned out
+
+> "Heavy work runs in parallel: a big node is cut by a planning operation into many small nodes with disjoint
+> write scopes, the seam that everyone shares (module wiring, migrations, contracts) is built first and alone,
+> then the rest fan out — eight or nine builds at once on ten slots — and the proof (API end-to-end, review)
+> runs once for the whole group, on another runtime, not once per piece. The implementer runs its own
+> end-to-end suite as a check; it never grades itself." — the owner, 2026-09-14
+
+A node the tree already holds can be bigger than one operation, and the kernel says so from the record rather
+than from an opinion. Three measures, applied identically in the goal phase and in the run (`cutReason` in
+`kernel/sync.mjs`): a write scope naming more than **`CUT_FILES` = 12** files, more than **`CUT_ASSERTIONS` =
+8** assertions, or `refs`/`dependsOn` naming SDS records that carry **`CUT_COMPONENTS` = 3** or more
+components. One of them over its bound and the node is planned as one **`implementation.plan`** operation
+before its lane and instead of its first step (`cut-planned`), once per node — so what the owner approves reads
+`1 implementation.plan -> seam -> N backend.implement -> 1 e2e.verify -> 1 review.verify` rather than one long
+slice nobody can parallelise.
+
+`implementation.plan` is a kind of its own carrying the `work.author` operator contract under the `work.cut`
+sequence, so there is no second operator and no second registry entry. It writes records and builds nothing.
+Its order is the point: the **seam** is named first — the one child that owns the module wiring, the DI
+registration, the migrations and the shared contracts and types every other child would otherwise touch (on the
+frontend: the app shell and routing, the theme and grammar version, the shared store, the API client) — and it
+is built first and alone, because two builds that both edit the module wiring are not parallel work, they are
+one merge conflict with two authors. The rest is cut by acceptance: one observable behaviour per child, at most
+12 files, disjoint from every sibling and from the seam, one runnable check per assertion, every assertion
+traced to the same SRS/SDS ids the parent traced to, and every non-seam child `dependsOn` the seam. The node
+itself becomes a **derived parent** — no `state`, no `completion`, no write scope — keeping its assertions as
+the group's acceptance under `extensions.work3.groupAssertions`, which is why removing `state` there is the
+cut's job rather than a forgery and only `completion` stays the kernel's inside that record. A node that really
+is one behaviour reports `done` with `cut: none` and the kernel runs it exactly as it is.
+
+Afterwards the tree is re-read: the children are the schedulable nodes (`cut-authored {node, children, seam}`),
+the parent is no candidate at all, and each child is **ordinary build work** — `backend.implement` or
+`frontend.implement` with a small allowlist, never a new kind. `allocation.fanOut {seamFirst: true,
+maxPerGroup: 9}` in `model/runtimes.yaml` keeps the seam alone in its group and bounds one parent to nine of
+the ten slots. And the proof is the group's, once: `e2e.verify` then `review.verify` are planned for the parent
+when every child's build step is accepted, on a runtime none of the children used, judged against the parent's
+group acceptance; a frontend group gets one `uat.verify` at the parent — every flow walked on the rendered
+surface — and no review. Accepting that proof records one `lane-step` for every child, so no child ever proves
+itself. Findings come back to where they live: `childOwning(file)` maps a finding to the child whose write
+scope holds it, and a finding that names one child repairs that child alone.
+
+The bounds, the child shape and the `ui`-node case this build does not yet cover are in
+[op-granularity.md](op-granularity.md) §1 and §4.
+
 ## 9. The tree
 
 One concept, one folder, a name that says what it holds:
@@ -668,6 +713,14 @@ last row group.
 | every kind declares `reads`/`writes` over the one record catalog | `tests/kind-graph.spec.mjs` - "every kind declares what it reads and what it produces, over the one record catalog" |
 | `unknown-record`, `writer-blind`, `lane-proof-blind`, `route-target-blind` | `tests/kind-graph.spec.mjs` - "a declaration the records catalog cannot support is rejected with its named error" |
 | `IO_DRIFT`: an operator may not write a record its kind never declared | `tests/ops.spec.mjs` - "an operator cannot write a record its kind never declared" |
+| `implementation.plan` is a kind carried by the `work.author` operator, named by no lane and created by no route | `tests/kind-graph.spec.mjs` - "the shipped catalog validates against the allocator profile and the operator catalog" |
+| a node past the bounds gets a cut op before its lane; its children fan out behind the seam and are proven once at the parent | `tests/workflow-kernel.spec.mjs` - "a node too big for one operation gets a cut op before its lane, and its children fan out behind the seam" |
+| a group proof's findings repair the child whose write scope holds the file | `tests/workflow-kernel.spec.mjs` - "a group proof that found something repairs the child whose write scope holds the file, not the whole group" |
+| a node that is one behaviour reports `cut: none` and runs as it is | `tests/workflow-kernel.spec.mjs` - "a node the planning operation did not split reports cut: none and the kernel runs it as it is" |
+| the fan-out cap and the seam rule come from `allocation.fanOut` | `tests/workflow-kernel.spec.mjs` - "the fan-out cap and the seam rule are read from the allocation profile, never guessed"; `tests/runtime-allocator.spec.mjs` - "fan-out is bounded per cut group: the seam runs alone and one parent never takes every slot" |
+| the cut sequence names the seam first and states the bounds the kernel measured | `tests/contract-steps.spec.mjs` - "work.cut names the seam first, cuts the rest by acceptance into disjoint children, and leaves a derived parent" |
+| the operator carries the cut mode without a second operator | `tests/ops.spec.mjs` - "the record-authoring operator carries the cut mode: it writes child nodes, names the seam and builds nothing" |
+| a derived parent with children validates and keeps its assertions as `groupAssertions` | `tests/work-ledger.spec.mjs` - "a cut leaves a derived parent whose assertions are the group acceptance, and children the kernel can launch"; "a cut that left the parent its own state is refused: a branch may not author one" |
 | the three cases are the closed set; the seven findings are the mechanical half | `tests/reconciliation.spec.mjs` - "the three cases are the closed set and the seven findings are the mechanical half of the rule" |
 | `readReconciliation` reports the rows it cannot shape instead of throwing | `tests/reconciliation.spec.mjs` - "readReconciliation normalizes the rows it can shape and reports the ones it cannot, instead of throwing" |
 | each of the seven findings | `tests/reconciliation.spec.mjs` - one test per finding, named after it |

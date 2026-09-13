@@ -19,6 +19,10 @@ allocation:
     decide: [claude-fable-5.1, gpt-6-astra, claude-opus]
     plan: [claude-opus, claude-fable-5.1]
     write: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+  # Heavy work fans out: a big node is cut into children with disjoint write scopes, the seam every other child
+  # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
+  # every slot of the pool and leaves the rest of the tree waiting behind it.
+  fanOut: {seamFirst: true, maxPerGroup: 9}
   verifyAvoidsImplementRuntime: true
   onLaunchFailure: next-available-runtime
   tieBreak: round-robin
@@ -78,4 +82,5 @@ roleOfKind:
   interface.draw: write
   interface.asset: write
   work.author: plan
+  implementation.plan: plan
   task.execute: implement

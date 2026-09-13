@@ -3128,3 +3128,261 @@ test('the answer the kernel gave to an op\'s question travels in the contract of
     assert.match(after,/## Answer to the question you asked earlier\nUse the existing intake table; do not add a migration\.\nAct on it; do not ask the same question again\.\n\n## Acceptance/);
   }finally{harness.cleanup();}
 });
+
+/* ------------------------------------------------------------------ heavy work is cut and fanned out */
+
+/**
+ * The owner's ruling, as one workflow: a big node is cut by a planning operation into many small nodes with
+ * disjoint write scopes, the seam everyone shares is built first and alone, the rest fan out, and the proof runs
+ * once for the whole group on another runtime - never once per piece.
+ */
+const CHECKOUT='demo.sales.implementation.backend.checkout';
+const CHECKOUT_DIR='features/sales/implementation/backend/checkout';
+const CHECKOUT_RECORD=`.starciwork/${CHECKOUT_DIR}/index.yaml`;
+const CHECKOUT_CUT=`${CHECKOUT}-cut`;
+const SEAM=`${CHECKOUT}.wiring`,PAY=`${CHECKOUT}.payment`,SHIP=`${CHECKOUT}.shipping`;
+const childRecord=id=>`.starciwork/${CHECKOUT_DIR}/${id.split('.').at(-1)}/index.yaml`;
+const codeOf=id=>`apps/agentos-controlplane/src/sales/checkout/${id.split('.').at(-1)}.ts`;
+/** Thirteen files is one past CUT_FILES, which is the whole reason this node is not one operation. */
+const BIG_FILES=Array.from({length:13},(_,index)=>`apps/agentos-controlplane/src/sales/checkout/part-${index+1}.ts`);
+const BIG=`schema: work/node@2
+id: ${CHECKOUT}
+kind: implementation
+required: true
+state: todo
+description: Check a cart out end to end.
+assertions:
+  - checkout-completes
+implementation:
+  status: mixed
+  changes:
+    - what: Build checkout.
+      why: The flow does not exist.
+      repository: demo-backend
+      directory: .
+      files:
+${BIG_FILES.map(file=>`        - ${file}`).join('\n')}
+extensions:
+  work3:
+    checks:
+      - assertion: checkout-completes
+        command: npx vitest run checkout
+`;
+/** What the cut leaves behind on the parent: a derived parent, its assertions kept as the group's acceptance. */
+const DERIVED=`schema: work/node@2
+id: ${CHECKOUT}
+kind: implementation
+required: true
+description: Check a cart out end to end.
+extensions:
+  work3:
+    groupAssertions:
+      - checkout-completes
+`;
+/** One child the cut wrote: one observable behaviour, its own small write scope, one check per assertion. */
+const childText=(id,dependsOn=[])=>{
+  const part=id.split('.').at(-1);
+  return `schema: work/node@2
+id: ${id}
+kind: implementation
+required: true
+state: todo
+description: The ${part} part of checkout.
+assertions:
+  - ${part}-works
+${dependsOn.length?`dependsOn:\n${dependsOn.map(entry=>`  - ${entry}`).join('\n')}\n`:''}implementation:
+  status: mixed
+  changes:
+    - what: Build ${part}.
+      why: It does not exist.
+      repository: demo-backend
+      directory: .
+      files:
+        - ${codeOf(id)}
+extensions:
+  work3:
+    checks:
+      - assertion: ${part}-works
+        command: npx vitest run ${part}
+`;
+};
+const BIG_NODE={id:CHECKOUT,path:`${CHECKOUT_DIR}/index.yaml`,kind:'implementation',state:'todo',eligible:true,
+  inputDigest:DIGEST('k'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null,authored:BIG};
+const childNode=(id,dependsOn=[])=>({id,path:`${CHECKOUT_DIR}/${id.split('.').at(-1)}/index.yaml`,kind:'implementation',
+  state:'todo',eligible:dependsOn.length===0,inputDigest:DIGEST('k'),dependsOn:[...dependsOn],refs:[],blockedBy:[],
+  children:[],completion:null,authored:childText(id,dependsOn)});
+const CHILDREN=[SEAM,PAY,SHIP];
+const cutReport=summary=>({outcome:'done',summary,files:[CHECKOUT_RECORD,...CHILDREN.map(childRecord)],
+  checks:[passing('work-tree-validates','node starci.mjs validate .starciwork')]});
+const buildReportOf=id=>({outcome:'done',summary:`${id} is built.`,files:[codeOf(id)],
+  checks:[passing(`${id.split('.').at(-1)}-works`,`npx vitest run ${id.split('.').at(-1)}`)]});
+
+/**
+ * One workflow over the too-big node. The projection array is mutable on purpose: the injected validator is read
+ * again on every tick, so the test makes the children appear exactly as the operation would - the parent derived
+ * (no state, so it is no candidate at all), the seam schedulable, the rest waiting behind it.
+ */
+function runCut({scripts,cut=true,maxIterations=24,allocator=fakeAllocator({maxParallelOps:10}),exec}={}){
+  const nodes=[{...BIG_NODE}];
+  const harness=setupWork({nodes,scripts,allocator,exec,
+    dirty:[CHECKOUT_RECORD,...CHILDREN.map(childRecord),...CHILDREN.map(codeOf)]});
+  approve(harness.store,harness.state);
+  harness.state.run='run_wf';harness.state.from='term_kernel';
+  const write=(where,text)=>{const file=path.join(harness.repo,where);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
+  const tick=()=>{
+    // While the cut runs: the children are written and the parent becomes derived.
+    if(cut&&!fs.existsSync(path.join(harness.repo,childRecord(SEAM)))&&harness.state.ops.some(op=>op.id===CHECKOUT_CUT&&op.status==='running')){
+      write(CHECKOUT_RECORD,DERIVED);
+      for(const id of CHILDREN)write(childRecord(id),childText(id,id===SEAM?[]:[SEAM]));
+      nodes[0]={...nodes[0],state:null,children:[...CHILDREN]};
+      nodes.push(...CHILDREN.map(id=>childNode(id,id===SEAM?[]:[SEAM])));
+    }
+    // Once the seam's build is accepted its siblings become eligible, exactly as the validator would report.
+    if(harness.state.ops.some(op=>op.id===SEAM&&op.status==='done'))
+      for(const node of nodes)if(node.dependsOn?.includes(SEAM))node.eligible=true;
+  };
+  const orca={...harness.fake.orca,invoke:(name,params,options)=>{
+    const result=harness.fake.orca.invoke(name,params,options);
+    if(name==='check')tick();
+    return result;
+  }};
+  const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:noWait,
+    // The projection is answered from the array as it stands: every re-read of the tree sees what the operations
+    // have written by then, which is what makes a child authored mid-run a schedulable node on the next tick.
+    validateOp:acceptAll,validate:(...args)=>{tick();return harness.validate(...args);},
+    exec:exec??(command=>({status:0,stdout:`${command} ok`,stderr:''})),
+    git:harness.git.git,waitTimeoutMs:2000,tickMs:1000,maxIterations});
+  return {harness,state,nodes,log:events(harness.store)};
+}
+const cutScripts=(extra={})=>({[CHECKOUT_CUT]:[cutReport('Cut into a seam and two parts.')],
+  ...Object.fromEntries(CHILDREN.map(id=>[id,[buildReportOf(id)]])),...extra});
+
+test('a node too big for one operation gets a cut op before its lane, and its children fan out behind the seam',()=>{
+  const {harness,state,log}=runCut({scripts:cutScripts({
+    'verify-1':[{outcome:'done',summary:'Every scenario of the group is green.',files:[],
+      checks:[passing('payment-works','npx vitest run payment')]}],
+    'verify-2':[{outcome:'done',summary:'The group holds together.',files:[],open:[],
+      checks:[passing('payment-works','npx vitest run payment')]}]})});
+  try{
+    // The cut precedes the lane: no build op of the parent was ever created.
+    const planned=log.find(event=>event.event==='cut-planned');
+    assert.equal(planned.node,CHECKOUT);
+    assert.equal(planned.files,13);
+    assert.equal(planned.assertions,1);
+    assert.equal(planned.reason,'its write scope names 13 files, past the 12 one operation may hold');
+    const cut=state.ops.find(op=>op.id===CHECKOUT_CUT);
+    assert.equal(cut.kind,'implementation.plan','the cut is a kind of its own, carried by the work.author contract');
+    assert.equal(cut.nodeId,CHECKOUT);
+    assert.deepEqual(cut.ledgerIds,[],'a cut closes no node: the children it writes are the nodes');
+    assert.deepEqual(cut.allowlist,[`.starciwork/${CHECKOUT_DIR}/**`],'its write scope is the node\'s own folder');
+    assert.deepEqual(cut.checks.map(check=>check.name),['work-tree-validates']);
+    assert.deepEqual(cut.cut,{node:CHECKOUT,reason:planned.reason});
+    assert.ok(cut.references.includes(`${CHECKOUT_DIR}/index.yaml`)&&cut.references.includes(BIG_FILES[0]),
+      'the node, its design and the code its allowlist names are the references');
+    assert.equal(state.ops.some(op=>op.nodeId===CHECKOUT&&op.kind==='backend.implement'),false,
+      'the parent never walked a lane step of its own');
+    // Its contract is the cut sequence, and it says the parent loses its state on purpose.
+    const contract=fs.readFileSync(harness.store.contractPath(CHECKOUT_CUT),'utf8');
+    assert.match(contract,/Sequence `work\.cut`/);
+    assert.match(contract,/## Work node you cut/);
+    assert.match(contract,/removing its `state` is the job \(a parent authors no state\)/);
+    assert.match(contract,/Name the SEAM first/);
+    // On acceptance the tree is re-read: the children are the nodes now, and the seam is named from the records.
+    const authored=log.find(event=>event.event==='cut-authored');
+    assert.equal(authored.node,CHECKOUT);
+    assert.deepEqual([...authored.children].sort(),[...CHILDREN].sort());
+    assert.equal(authored.seam,SEAM);
+    assert.equal(authored.groupAssertions,1);
+    assert.deepEqual([...state.cuts[CHECKOUT].children].sort(),[...CHILDREN].sort());
+    assert.deepEqual(state.cuts[CHECKOUT].assertions,['checkout-completes'],'the parent\'s assertions are the group\'s acceptance');
+    // Seam first: its build is accepted before either sibling is even launched.
+    const launched=log.filter(event=>event.event==='launched').map(event=>event.op);
+    assert.ok(launched.indexOf(SEAM)>=0&&launched.indexOf(SEAM)<launched.indexOf(PAY)&&launched.indexOf(SEAM)<launched.indexOf(SHIP),'the seam is built first');
+    for(const id of CHILDREN){
+      const build=state.ops.find(op=>op.id===id);
+      assert.equal(build.kind,'backend.implement','a child is ordinary build work, never a new kind');
+      assert.deepEqual(build.allowlist,[codeOf(id)]);
+      assert.equal(build.status,'done');
+    }
+    // One proof per parent, in order, and neither is a step any child planned for itself.
+    const proofs=state.ops.filter(op=>op.origin==='verify');
+    assert.deepEqual(proofs.map(op=>op.kind),['e2e.verify','review.verify'],
+      'one API proof and one review for the whole group, never one per piece');
+    for(const proof of proofs){
+      assert.deepEqual([...proof.ledgerIds].sort(),[...CHILDREN].sort(),'the group is the unit that is proven');
+      assert.equal(proof.nodeId,null);
+      assert.ok(proof.acceptance.includes('checkout-completes'),'the parent\'s group acceptance is the proof\'s acceptance');
+      assert.deepEqual([...proof.allowlist].sort(),CHILDREN.map(codeOf).sort());
+      assert.equal(CHILDREN.map(id=>state.ops.find(op=>op.id===id).runtime).includes(proof.runtime),false,
+        'the proof runs on a runtime none of the children used');
+    }
+    assert.equal(state.ops.filter(op=>op.kind==='e2e.verify').length,1);
+    assert.equal(state.ops.filter(op=>op.kind==='review.verify').length,1);
+    // Each child's prove steps were recorded when the parent's proof was accepted.
+    for(const id of CHILDREN){
+      assert.deepEqual(state.lanes[id].lane,['backend.implement','e2e.verify','review.verify']);
+      assert.deepEqual(state.lanes[id].done,['backend.implement','e2e.verify','review.verify']);
+      assert.equal(harness.read(id).state,'done');
+      assert.equal(state.ledger.find(item=>item.id===id).status,'verified');
+    }
+    for(const kind of ['e2e.verify','review.verify'])
+      assert.deepEqual(log.filter(event=>event.event==='lane-step'&&event.kind===kind).map(event=>event.node).sort(),
+        [...CHILDREN].sort(),'one group proof is one lane step of every child');
+    assert.equal(state.ledger.some(item=>item.id===CHECKOUT),false,'the derived parent is no goal item of its own');
+  }finally{harness.cleanup();}
+});
+
+test('a group proof that found something repairs the child whose write scope holds the file, not the whole group',()=>{
+  const {harness,state,log}=runCut({scripts:cutScripts({
+    'verify-1':[{outcome:'done',summary:'green',files:[],checks:[passing('payment-works','npx vitest run payment')]}],
+    'verify-2':[{outcome:'partial',summary:'One finding.',files:[],
+      open:[`${codeOf(PAY)}:31 the refund path never rolls the authorisation back, which breaks payment-works`],
+      checks:[passing('payment-works','npx vitest run payment')]}],
+    'repair-1':[buildReportOf(PAY)],
+    'verify-3':[{outcome:'done',summary:'The finding is fixed.',files:[],open:[],
+      checks:[passing('payment-works','npx vitest run payment')]}]})});
+  try{
+    const findings=log.find(event=>event.event==='verify-findings');
+    assert.equal(findings.child,PAY,'the finding named a file of exactly one child');
+    const repair=state.ops.find(op=>op.origin==='repair');
+    assert.equal(repair.kind,'backend.implement','the repair is the lane\'s build step');
+    assert.equal(repair.nodeId,PAY);
+    assert.deepEqual(repair.ledgerIds,[PAY],'the other children are not reopened by a finding that is not theirs');
+    assert.deepEqual(repair.allowlist,[codeOf(PAY)]);
+  }finally{harness.cleanup();}
+});
+
+test('a node the planning operation did not split reports cut: none and the kernel runs it as it is',()=>{
+  const {harness,state,log}=runCut({cut:false,maxIterations:3,
+    scripts:{[CHECKOUT_CUT]:[{outcome:'done',summary:'cut: none - checkout is one observable behaviour.',
+      files:[],checks:[passing('work-tree-validates','node starci.mjs validate .starciwork')]}]}});
+  try{
+    const none=log.find(event=>event.event==='cut-none');
+    assert.equal(none.node,CHECKOUT);
+    assert.equal(none.op,CHECKOUT_CUT);
+    assert.equal(log.some(event=>event.event==='cut-authored'),false);
+    assert.equal(state.lanes[CHECKOUT].cutNone,true);
+    // The node starts its own lane, with its own id, and no second cut is ever planned for it.
+    assert.deepEqual(state.ops.filter(op=>op.kind==='implementation.plan').map(op=>op.id),[CHECKOUT_CUT]);
+    const build=state.ops.find(op=>op.id===CHECKOUT);
+    assert.equal(build.kind,'backend.implement');
+    assert.deepEqual(build.allowlist,BIG_FILES);
+    assert.deepEqual(state.lanes[CHECKOUT].lane,['backend.implement','e2e.verify','review.verify']);
+    assert.deepEqual(state.lanes[CHECKOUT].done,[],'the cut walked no step of the lane');
+  }finally{harness.cleanup();}
+});
+
+test('the fan-out cap and the seam rule are read from the allocation profile, never guessed',()=>{
+  const allocator={...fakeAllocator({maxParallelOps:10}),fanOut:{seamFirst:true,maxPerGroup:1}};
+  const {harness,state,log}=runCut({allocator,scripts:cutScripts({
+    'verify-1':[{outcome:'done',summary:'green',files:[],checks:[passing('payment-works','npx vitest run payment')]}],
+    'verify-2':[{outcome:'done',summary:'green',files:[],open:[],checks:[passing('payment-works','npx vitest run payment')]}]})});
+  try{
+    const deferred=log.filter(event=>event.event==='schedule-deferred'&&event.parent===CHECKOUT);
+    assert.ok(deferred.length,'a child past the cap waits instead of taking a free slot');
+    assert.ok(deferred.every(event=>/already run \(allocation\.fanOut\.maxPerGroup\)|runs alone/.test(event.reason)));
+    // Capped at one, the two siblings still finish - one after the other, never at the same time.
+    for(const id of CHILDREN)assert.equal(state.ops.find(op=>op.id===id).status,'done',id);
+    assert.deepEqual(state.ops.filter(op=>op.origin==='verify').map(op=>op.kind),['e2e.verify','review.verify']);
+  }finally{harness.cleanup();}
+});
