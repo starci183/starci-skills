@@ -434,6 +434,8 @@ export const VALIDATOR_RULES=[
   'an interface.asset result is the artwork of the slots the design record declared: a slot whose file is missing, or artwork that ignores the brand mascot and logo references the record names, is a defect',
   'a frontend.implement result that substitutes its own image for a declared artwork slot, or omits a declared slot altogether, is a defect - the slot files the asset step produced are what the surface must use',
   'an external integration is proven live or it is not proven: an `integration.verify` result whose scenario fakes, stubs, mocks, records, replays or skips the declared provider, or that reads the credential from anywhere but the environment variable the declaration names, or that prints, logs or commits a secret value, is a defect; and an `e2e.verify` evidence whose `proof.fakes` omits a provider the diff fakes is a defect - a faked outside system is allowed there, unnamed it is not',
+  'a record repair (`architecture.revise`, `business.revise`) that changed the record leaves three things together: the changed passage, a `rev` higher than it was, and EXACTLY ONE new `extensions.work3.decisionLog` entry `{rev, at, gap, chosen, why, alternatives}` naming the gap it answered. A changed record with no entry, a bumped rev with no changed passage, a second entry, or an earlier entry rewritten or deleted is a defect - the log is how the owner sees what the runtime decided for them',
+  'the runtime may settle an unclear record, it may not settle one about money, authority or customer data silently: a revision whose chosen reading changes an observable outcome about what is charged, paid, refunded, taxed or owed and to whom, about who may do or see a thing, or about what is stored, shown, shared or deleted about a person, and that names no decision record with numbered options and one recommendation, is a defect whatever else the diff gets right',
   'an assertion listed under node.deferred is proven by the kernel itself or by a later step of the node lane (an end-to-end run, a review): never reject this operation for it, and never ask this operation to prove it',
   'the process (retry, commit, ledger) is the kernel\'s; you answer accept or reject and one line of summary'
 ];
@@ -511,6 +513,12 @@ export const OBJECTION_KINDS=['premise','scope','testability','hidden-decision',
  * authors it and declares what it reads and what it hands on.
  */
 export const OVERLAP_CASES=['reference','conflict'];
+/**
+ * What only the OWNER can provide for this goal's proofs to be real, named up front from the whole product
+ * rather than discovered one stuck operation at a time: a credential or token, a sandbox or test account on an
+ * external system, a real dataset or sample, or the legal/consent authority to act on real people or money.
+ */
+export const PROVISION_KINDS=['credential','account','dataset','authority'];
 /** Fable first, Astra as the fallback: the host's supervisor runtimes, overridable by `supervisor.runtimes` in config.json. */
 /** Astra first: the critique is one call per goal and Fable's own weekly window is the scarcer one. `critique.runtimes` in config.json overrides it. */
 export const DEFAULT_CRITIC_RUNTIMES=['gpt-6-astra','claude-fable-5.1'];
@@ -520,8 +528,14 @@ export const CRITIQUE_FORM={
   verdict:{type:'string',enum:CRITIQUE_VERDICTS},
   // Objections are read leniently: a model that answers them as sentences, or with a kind outside the closed
   // list, is not sent back for it - the kernel shapes what it can and drops what names no evidence. Two
-  // providers in a row failed the strict form on a real goal and the goal went uncritiqued.
+  // providers in a row failed the strict form on a real goal and the goal went uncritiqued. An objection may
+  // carry `decisive`, which only a `hidden-decision` uses: true when the decision the goal takes silently is
+  // about money, authority or customer data, and the kernel then plans an owner.ask before the work that
+  // touches its feature; false (or absent) when the record repair will settle it when an operation hits it.
   objections:{type:'list',optional:true},
+  // What the owner must provide, read as leniently as the objections are: an entry with no known kind or no
+  // name is dropped and counted, never a reason to send a whole critique back.
+  provisions:{type:'list',optional:true},
   // The overlaps with the decided records, read as leniently as the objections are: an entry that names no
   // record, or a case outside `reference`/`conflict`, is dropped and counted - never a reason to send a whole
   // critique back, because a goal that goes uncritiqued costs more than an overlap the kernel could not shape.
@@ -536,7 +550,8 @@ const CRITIC_RULES=[
   'challenge the premises: what the goal assumes about the product that the accepted records contradict or do not support',
   'challenge the scope: too wide to finish, too narrow to matter, or one goal that mixes a decision with a build',
   'challenge the testability: what in the goal no check could ever prove, and what would make it provable',
-  'name the hidden decisions: what the goal silently decides that the owner should decide as a record',
+  'name the hidden decisions: what the goal silently decides that the owner should decide as a record. Mark each one `decisive: true` when the decision changes an observable outcome about MONEY (what is charged, paid, refunded, taxed or owed, and to whom), AUTHORITY (who may do or see a thing) or CUSTOMER DATA (what is stored, shown, shared or deleted about a person), and `decisive: false` otherwise - a naming, a shape, an ordering, a default the product can live either way with. A non-decisive hidden decision costs nobody an owner question: the record repair settles it when an operation hits it. A decisive one is put to the owner before the work that touches its feature starts',
+  'name the provisions: everything only the OWNER can provide for the proofs of this goal to be real, one entry per thing in `provisions` as `{kind: credential | account | dataset | authority, name, feature, why}`. `credential` is a key, token or secret; `account` is a sandbox or test account on an external system (a payment gateway, a bank, e-invoice, tax, SMS or email, identity, storage); `dataset` is a real sample or export the work must run against (transaction statements, invoices, a customer export); `authority` is legal or consent permission to act for real (messaging real users, charging real cards, touching production data). Read the WHOLE product for these, not the job text alone: name every one the scope of this goal implies from the decided records - an accounting feature that settles transactions implies the gateway sandbox and the statement samples even when the job text never mentions either. A provision you cannot name precisely is still named, with what it is for',
   'offer the alternatives: a cheaper or a safer way to the same outcome, one sentence each',
   'check the consistency with the accepted records and name the record you checked against',
   'the verdict is closed: `sound` proceeds as written, `revise` proceeds only under the changes you list in `required`, `refuse` is for a goal that contradicts an accepted record or that cannot be verified at all - and then `question` is the one question whose answer would unblock it',
@@ -553,6 +568,8 @@ export const CRITIQUE_CONSTRAINTS=[
   'the kernel cannot verify taste, desirability, market fit, or anything a person has to look at and judge: a goal that rests on one of those is untestable by this runtime unless it names who judges it and on what evidence'
 ];
 const strings=value=>(Array.isArray(value)?value:[]).map(item=>String(item??'').trim()).filter(Boolean);
+/** `decisive` read leniently: a boolean, or any of the words a model reaches for when it means "yes, this one". */
+const decisiveFlag=value=>value===true||/^(true|yes|y|1|decisive|material|money|authority|customer|customer[- ]?data|owner)$/i.test(String(value??'').trim());
 const summarize=list=>(Array.isArray(list)?list:[]).filter(plain).map(item=>({id:item.id??null,kind:item.kind??null,title:item.title??null}));
 /**
  * A verdict that costs work must carry something to act on: `revise` and `refuse` need at least one evidenced
@@ -594,7 +611,7 @@ export function critiqueGoal({job,scope=[],ledger=[],decisions=[],records=[],mat
   need(String(job??'').trim(),'critiqueGoal needs the job text: the goal it is asked to critique');
   const chain=(Array.isArray(providers)?providers:[providers]).filter(item=>typeof item==='string'&&item.trim());
   if(!chain.length)return {ok:false,verdict:'unavailable',reason:'no critic provider was given',attempts:[],usage:null,
-    objections:[],dropped:[],overlaps:[],required:[],alternatives:[],question:null,prerequisites:[]};
+    objections:[],dropped:[],overlaps:[],provisions:[],required:[],alternatives:[],question:null,prerequisites:[]};
   const bounded=boundRecords(records);
   const payload={
     job:String(job),
@@ -611,7 +628,7 @@ export function critiqueGoal({job,scope=[],ledger=[],decisions=[],records=[],mat
   const result=callFunction({kind:'critiqueGoal',payload,form:CRITIQUE_FORM,providers:chain,cwd,runHeadless:run,
     extra:critiqueRules,role:CRITIC_ROLE});
   if(!result.ok)return {ok:false,verdict:'unavailable',reason:result.reason??'no provider produced a valid critique',
-    attempts:result.attempts??[],usage:result.usage??null,objections:[],dropped:[],overlaps:[],required:[],alternatives:[],question:null,prerequisites:[]};
+    attempts:result.attempts??[],usage:result.usage??null,objections:[],dropped:[],overlaps:[],provisions:[],required:[],alternatives:[],question:null,prerequisites:[]};
   const answer=result.value;
   const objections=[],dropped=[];
   for(const raw of (Array.isArray(answer.objections)?answer.objections:[])){
@@ -619,9 +636,22 @@ export function critiqueGoal({job,scope=[],ledger=[],decisions=[],records=[],mat
     if(!given)continue;
     const kind=String(given.kind??'').trim().toLowerCase();
     const item={kind:OBJECTION_KINDS.includes(kind)?kind:'consistency',claim:String(given.claim??given.text??given.objection??'').trim(),
-      evidence:String(given.evidence??'').trim(),consequence:String(given.consequence??given.impact??'').trim()};
+      evidence:String(given.evidence??'').trim(),consequence:String(given.consequence??given.impact??'').trim(),
+      // `decisive` is the one thing that turns an objection into an operation: a hidden decision about money,
+      // authority or customer data becomes an owner question before the work, anything else is settled by the
+      // record repair when an operation hits it. Read leniently - a model that answers "yes" or "money" means true.
+      decisive:decisiveFlag(given.decisive??given.material??given.owner)};
     if(!item.claim)continue;
     (item.evidence?objections:dropped).push(item);
+  }
+  // What only the owner can provide, shaped the way the goal page and `workflow-status` will read it back.
+  const provisions=[];let provisionsDropped=0;
+  for(const raw of (Array.isArray(answer.provisions)?answer.provisions:[])){
+    const given=plain(raw)?raw:null;
+    const kind=String(given?.kind??'').trim().toLowerCase();
+    const name=String(given?.name??given?.variable??given?.what??'').trim();
+    if(!given||!PROVISION_KINDS.includes(kind)||!name){provisionsDropped+=1;continue;}
+    provisions.push({kind,name,feature:String(given.feature??given.scope??'').trim()||null,why:String(given.why??given.reason??'').trim()});
   }
   // The overlaps with the decided records, as the three cases the intake will then write as data. An entry
   // that names no record, or a case the runtime does not know, is dropped and counted rather than argued with:
@@ -636,9 +666,10 @@ export function critiqueGoal({job,scope=[],ledger=[],decisions=[],records=[],mat
     overlaps.push({record,case:kind,evidence:String(given.evidence??given.statement??'').trim()});
   }
   const reasons=[...(dropped.length?[`${dropped.length} objection(s) named no evidence and were dropped by the kernel`]:[]),
-    ...(overlapsDropped?[`${overlapsDropped} overlap(s) named no decided record or no known case and were dropped by the kernel`]:[])];
-  return {ok:true,schema:CRITIQUE,verdict:answer.verdict,objections,dropped,overlaps,
-    ...(overlapsDropped?{overlapsDropped}:{}),
+    ...(overlapsDropped?[`${overlapsDropped} overlap(s) named no decided record or no known case and were dropped by the kernel`]:[]),
+    ...(provisionsDropped?[`${provisionsDropped} provision(s) named no known kind or no name and were dropped by the kernel`]:[])];
+  return {ok:true,schema:CRITIQUE,verdict:answer.verdict,objections,dropped,overlaps,provisions,
+    ...(overlapsDropped?{overlapsDropped}:{}),...(provisionsDropped?{provisionsDropped}:{}),
     required:strings(answer.required),alternatives:strings(answer.alternatives),
     question:String(answer.question??'').trim()||null,
     prerequisites:(Array.isArray(answer.prerequisites)?answer.prerequisites:[]).filter(plain).map(raw=>({kind:String(raw.kind??'').trim(),

@@ -143,6 +143,36 @@ function readReconciliation(state,events){
   });
 }
 
+/** An owner answer that says the thing is now there: `credential: <X> present`, or `provided: <what>`. */
+const PROVIDED_ANSWER=/(?:^|[\n;.])\s*provided:\s*\S/i;
+const escapeRegExp=value=>String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+/**
+ * What only the owner can provide, and how far each one has got. The list itself is the critique's, read once
+ * from the whole product before anything was planned (`state.provisions`); the status is read back off the
+ * `owner.ask` operations the kernel opened - `asked` once one names it, `provided` once its answer says
+ * `credential: <name> present` or `provided: <what>`, `open` until then. Nothing here writes or asks anything:
+ * the operation that needs a provision asks for it in its own tab at the moment it needs it, and nothing else
+ * in the workflow waits for that answer.
+ */
+function readProvisions(state){
+  const provisions=(Array.isArray(state?.provisions)?state.provisions:[]).filter(plain);
+  if(!provisions.length)return [];
+  const asks=(Array.isArray(state?.ops)?state.ops:[]).filter(op=>op?.kind==='owner.ask');
+  const answersOf=op=>[typeof op.answer==='string'?op.answer:op.answer?.note??'',
+    ...(Array.isArray(op.reports)?op.reports.map(report=>String(report?.summary??'')):[])].filter(Boolean);
+  const textsOf=op=>[String(op.question?.text??''),String(op.goal??''),...answersOf(op)];
+  return provisions.map(item=>{
+    const name=String(item.name??'');
+    const named=name?asks.filter(op=>textsOf(op).some(text=>text.includes(name))):[];
+    const answers=named.flatMap(answersOf);
+    const present=new RegExp(`credential:\\s*${escapeRegExp(name)}\\s+present`,'i');
+    const provided=answers.some(text=>present.test(text)||PROVIDED_ANSWER.test(text));
+    return {kind:item.kind??null,name,feature:item.feature??null,why:String(item.why??''),
+      status:provided?'provided':named.length?'asked':'open',
+      asks:named.map(op=>op.id),questionKinds:unique(named.map(op=>op.question?.kind).filter(Boolean))};
+  });
+}
+
 /** Lanes are the kernel's optional grouping of nodes; both shapes it may take are read, neither is required. */
 function readLanes(state,statusOf){
   const lanes=state?.lanes;
@@ -245,6 +275,7 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
     lanes:readLanes(state,statusOf),
     integrations:readIntegrations(state),
     reconciliation:readReconciliation(state,events),
+    provisions:readProvisions(state),
     reviews:{rounds:plain(state.verifyRounds)?{...state.verifyRounds}:{},
       exhausted:unique(events.filter(event=>event.event==='verify-exhausted').map(event=>event.component).filter(Boolean)),
       findings:Array.isArray(state.reviewFindings)?state.reviewFindings.length:0},
@@ -314,6 +345,12 @@ export function renderView(view){
   if(view.reconciliation?.length)lines.push('',`## Reconciliation (${view.reconciliation.length})`,
     ...view.reconciliation.map(entry=>`- ${entry.scope} (${entry.op}): ${entry.checked?`reference ${entry.reference}, conflict ${entry.conflict}, new ${entry.new}`:'not checked yet'}`
       +(entry.open.length?`; open for the owner: ${entry.open.join(', ')}`:'')));
+
+  // What the owner and nobody else can provide, read once from the whole product and tracked here. Read-only:
+  // the op that needs one asks for it in its own tab when it gets there, and nothing else waits for the answer.
+  if(view.provisions?.length)lines.push('',`## The owner provides (${view.provisions.length})`,
+    table(['kind','name','feature','status','why'],view.provisions.map(entry=>[entry.kind,entry.name,entry.feature,
+      entry.status+(entry.asks.length?` (${entry.asks.join(', ')})`:''),clip(entry.why,80)])));
 
   const rounds=Object.entries(view.reviews.rounds);
   if(rounds.length||view.reviews.exhausted.length)lines.push('','## Reviews',
