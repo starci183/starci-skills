@@ -4,11 +4,57 @@ An operation does exactly one thing: one implementation slice, one UAT flow, one
 node, one gate. The power of a workflow comes from many small operations running at once, not from
 one large agent. Four guardrails keep small operations from costing more than they return.
 
-## 1. Cut by acceptance, never by file
+## 1. Seam first, then fan out — cut by acceptance, never by file
 An operation is one observable behavior (one acceptance group), with the files that behavior needs.
 Two operations that would both touch a shared interface are wrong cuts: the interface becomes its own
-operation, scheduled first (a decision or a contract node), and the two depend on it.
-Size limits the planner enforces: allowlist ≤ 10 files, one acceptance group, one session budget.
+operation, scheduled first, and the two depend on it.
+
+A node the tree already holds that is bigger than that is not built as one long slice and is not left for a
+person to split. The kernel measures every launchable `implementation` node against three facts of its own
+record — all three in `kernel/sync.mjs` (`cutReason`), applied identically at goal time and in the run, so the
+page the user approves and the run they get never disagree:
+
+| Measure | Bound | Constant |
+| --- | --- | --- |
+| files its write scope names | more than 12 | `CUT_FILES` |
+| assertions it states | more than 8 | `CUT_ASSERTIONS` |
+| components the SDS records in its `refs`/`dependsOn` carry | 3 or more | `CUT_COMPONENTS` |
+
+One of them over its bound and the node gets exactly one **`implementation.plan`** operation — before its lane
+and instead of its first step, once per node (`cut-planned {node, reason, files, assertions}`). It is a kind of
+its own, because that is what the goal page, the status view and the events show; it carries the `work.author`
+operator contract under the `work.cut` sequence, so there is no second operator. Its write scope is the node's
+own folder in the tree, its check the whole-tree validator, its references the node, the design it rests on and
+the code its own allowlist names.
+
+What it does, in this order:
+
+1. **Name the seam.** The one child that owns what every other child would otherwise touch: module wiring and
+   registration, dependency-injection setup, database migrations, shared contracts, shared types and shared
+   fixtures. On a frontend node the seam is the app shell and routing, the theme and grammar version bump, the
+   shared store and the API client. It is built **first and alone**. Two builds that both edit the module wiring
+   are not parallel work; they are one merge conflict with two authors.
+2. **Cut the rest by acceptance.** One observable behaviour per child, a write scope of at most `CUT_FILES`
+   files that is disjoint from every sibling *and* from the seam, one runnable check per assertion, every
+   assertion traced to the same SRS/SDS ids the parent traced to. A frontend node is cut by screen and region —
+   one screen, one folder — which is why the design gate runs before the cut: there is nothing to cut a
+   frontend node by until the feature's `ui` node is done.
+3. **Declare the order.** Every non-seam child names the seam in `dependsOn` and depends on no other sibling.
+4. **Write the children** at `<node dir>/<part>/index.yaml` (work/node@2, `kind: implementation`,
+   `state: todo`, `required: true`) and turn the node into a **derived parent**: no `state`, no `completion`, no
+   write scope, its assertions kept as the group's acceptance under `extensions.work3.groupAssertions`. A parent
+   with children authors no state and derives one from them, so removing `state` here is the job rather than a
+   forgery — only `completion` stays the kernel's inside that record.
+
+A node that really is one observable behaviour is not split: the operation reports `done` with `cut: none`
+(`cut-none`) and the kernel runs the node exactly as it is.
+
+On acceptance the tree is re-read and the children are the schedulable nodes (`cut-authored {node, children,
+seam}`); the parent is derived and is no longer a candidate at all. Each child is **ordinary build work** —
+`backend.implement` or `frontend.implement` with a small allowlist — never a new kind. Fan-out is bounded by
+`allocation.fanOut` in `model/runtimes.yaml`: `seamFirst: true` keeps the seam alone in its group, and
+`maxPerGroup: 9` against `maxParallelOps: 10` means eight or nine builds of one parent at once while the rest
+of the tree still has a slot.
 
 ## 2. Context pack, prepared by the kernel
 The kernel, not the operation, assembles what the operation reads: the exact SRS/SDS sections of its
@@ -24,12 +70,26 @@ only by the kernel between rounds; unit checks inside an operation are scoped to
 pattern. UAT operations declare `e2e-runtime` and therefore run one at a time; each flow keeps its own
 seed/cleanup so a flow never depends on another flow's state.
 
-## 4. Two-tier verification
-- Node tier: every implementation node gets its own `review.verify` operation on a runtime that did
-  not implement it; it verifies the node's acceptance statements one by one.
-- Module tier: when all nodes of a module are done, one `review.verify` operation checks consistency
-  across them (naming, error unions, contracts between nodes, dead code) without re-verifying each
-  acceptance. Findings become small repair operations.
+## 4. One proof per group, never one per piece
+The proof runs once for the whole group, on another runtime — not once per piece. The implementer runs its own
+end-to-end suite as a check; it never grades itself.
+
+- **A node that was cut** is one group: its children build in parallel, and `e2e.verify` and then
+  `review.verify` are planned **once for the parent** when every child's build step is accepted, on a runtime
+  none of the children used (`avoidRuntimes` is the union). A frontend group gets **one `uat.verify` at the
+  parent** — every flow of the feature walked on the rendered surface — and no `review.verify`. The parent's
+  group acceptance (`extensions.work3.groupAssertions`) is what that proof is judged against, and accepting it
+  records one `lane-step` for every child, which is what lets each child's lane finish without its own prove
+  operation. `verifyComponents` groups by the cut parent and `planVerifyOps` waits until the whole group is
+  implemented, so no subset of a group is ever proven on its own.
+- **A node that was not cut** keeps the module tier: when all nodes of a module are implemented, one
+  `review.verify` checks consistency across them (naming, error unions, contracts between nodes, dead code)
+  without re-verifying each acceptance, on a runtime that did not implement them.
+- **Findings land where they live.** `childOwning(file)` answers which child's write scope holds a file a
+  finding names; a set of findings that names exactly one child becomes a repair of that child alone
+  (`verify-findings {child}`), and the other children are not reopened. Findings spread over several children,
+  or over none, stay the group's, exactly as before the cut. Review rounds are counted per group, and only a
+  `review.verify` spends one.
 
 ## Working order per kind
 An operation is cut small, but the agent still needs the order of work inside it: without one, some
@@ -43,6 +103,7 @@ the Work node kind and layout it closes, then from its allowlist; an unknown kin
 | Sequence | Chosen when | Order |
 | --- | --- | --- |
 | `work.author` | kind `work.author`: the node's record declares no write scope or no check, so nothing of its lane may start | read the record, its parent and sibling records and the requirement/design it references -> open the actual code an implementation would change and list those files -> state the claims as testable assertions -> write the write scope and one runnable check per assertion into the record -> leave `completion`, the kernel block, the evidence folder, `required`, `state` and `dependsOn` untouched -> run the validator -> report the assertions and checks added; an undeterminable scope is `ask`, never a guessed path |
+| `work.cut` | kind `implementation.plan`: the kernel measured the node as too big for one operation (write scope past 12 files, more than 8 assertions, or a design of 3 or more components) | read the node, its assertions and the design it references -> open the code its write scope names -> NAME THE SEAM first: the one child that owns the module wiring, DI registration, migrations, shared contracts and types every other child would touch (on the frontend: app shell and routing, theme and grammar version, shared store, API client) -> cut the rest by acceptance, one observable behaviour each, allowlist ≤ 12 files, disjoint from every sibling and from the seam, one runnable check per assertion, every assertion traced to the same SRS/SDS ids the parent traced to, every non-seam child `dependsOn` the seam -> write the children at `<node dir>/<part>/index.yaml` (work/node@2, `kind: implementation`, `state: todo`, `required: true`) -> turn the node into a derived parent: no `state`, no `completion`, no write scope, its assertions kept as `extensions.work3.groupAssertions` -> run the validator -> report the seam and the children. A node that is one behaviour is `done` with `cut: none`; a seam the material does not determine is `ask`, never a cut that leaves two children writing the same file |
 | `work.intake` | kind `work.author` carrying an `intake` scope: the tree does not hold the feature at all, so this operation authors its records rather than completing a node | restate what the feature must let the business do -> DETERMINE every side as checkable claims (architecture, user stories per actor, security and authority, business rules and states, quality with numbers, external integrations with the exact credential variable the OWNER provides, open decisions) -> RECONCILE every side against the decided records as one typed row per touched record under `extensions.work3.reconciliation`, in exactly three cases and no fourth: `reference` cites the decided record by id and restates nothing of it, `conflict` writes a `todo` decision record under THIS feature with both sides, the consequences, numbered options and one recommendation and leaves the decided record byte for byte (the kernel puts it to the owner), `new` is authored here declaring the `reads` it rests on and the `hands` it passes on -> mirror the example feature's shape under the allowlist -> full business drafts, architecture skeleton, every leaf `todo` -> run the validator verbatim -> report the records, the count per case and the decisions left for the owner. No other feature's record changes by a byte, and no gap is filed against one |
 | `implement.ledger` | `backend.implement` / `interface.implement` from a ledger `implementation` or `ui` node | read SDS/SRS + assertions -> spec red -> smallest change -> checks -> self-audit -> report once |
 | `implement.shared` | origin `shared` | read the requester's paths -> minimal change, no refactor -> requester's checks -> report |
@@ -132,8 +193,21 @@ Why the order matters:
 - Verify is read-only: a reviewer that fixes what it reviews leaves nothing for the repair operation and
   hides the finding from the ledger.
 
+### Not yet: cutting a `ui` node
+A `ui` node can be as big as an implementation one — a feature with eight screens is one drawing operation
+today. The same `implementation.plan` shape applies to it: children at `ui/<screen>`, each one
+`interface.draw` of a single screen (one grammar render, checked by the render checks), with the artwork slots
+gathered back at the parent so `interface.asset` still runs **once per parent** rather than once per screen.
+That is not in this build: `cutReason` measures `implementation` nodes only, so a `ui` node is never cut and
+walks its lane whole. It is the next step, and it needs one thing this build does not have — a rule for where a
+slot declared by a child is read from when the parent's asset operation generates it.
+
 ## Consequences for the planner and the kernel
-- The goal planner emits operations that satisfy §1 or splits the node into child nodes.
+- The goal planner emits operations that satisfy §1: a node past the bounds is planned as one
+  `implementation.plan` instead of its first lane step, so the page the user approves reads
+  `1 implementation.plan -> seam -> N backend.implement -> 1 e2e.verify -> 1 review.verify`.
 - `renderContract` embeds the context pack (§2), the resource list (§3) and the working order of the kind (`stepsFor`).
-- The scheduler checks allowlist disjointness and resource disjointness before launching.
-- `planVerifyOps` creates node-tier reviews per node and one module-tier review per module.
+- The scheduler checks allowlist disjointness and resource disjointness before launching, then the fan-out rule:
+  the seam of a cut group runs alone and at most `allocation.fanOut.maxPerGroup` children of one parent run at once.
+- `planVerifyOps` creates one proof per cut parent (`e2e.verify` then `review.verify`, or one `uat.verify` on a
+  frontend group) and one module-tier review per module for everything that was not cut.

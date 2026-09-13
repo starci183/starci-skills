@@ -74,6 +74,7 @@ that carries it.
 | `integration.verify` | prove | verify | integration, sds, code | evidence | `integration.verify` | Prove one declared external integration against the real provider, with the credential the owner supplies in the named variable, and keep the live exchange as evidence. |
 | `review.verify` | prove | verify | srs, sds, code, evidence, runtime | - (read-only) | `review.verify` | Read the slice against its acceptance and report findings, repairing nothing. |
 | `work.author` | design | plan | srs, sds, decision, code, record | record, srs, sds, decision | `work.author` | Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it; as an intake, author a feature's records against the decided ones. |
+| `implementation.plan` | design | plan | srs, sds, code, record | record | `work.author` | Cut one Work node too big for a single operation into child nodes with disjoint write scopes - the seam first, then one observable behaviour per child - and leave the node a derived parent whose assertions are the group's acceptance. |
 
 Each kind also declares `reports`: the outcomes it may end with and the blocker kinds it may raise. That is
 what makes a route reachable or not - `review.verify` may not raise `shared-change`, because a kind that
@@ -110,18 +111,38 @@ are not chosen: every token is read out of the real style and token files of the
 `sources` names them, which is why an untraceable value is a question rather than a record entry. And it
 produces bytes - a placeholder mascot for a product that has none - so `asset` is in its `writes` beside the
 `brand` record itself. It is the only kind that writes `brand`, because there is one identity and one record
-that holds it; `work.author` is the only kind that writes the authored `record` of a node.
+that holds it; `work.author` and `implementation.plan` are the two kinds that write the authored `record` of a node.
 
-`work.author` is the one kind that stands outside the lanes and the routes. A node whose record declares no
+`work.author` and `implementation.plan` are the kinds that stand outside the lanes and the routes. A node whose record declares no
 write scope (`implementation.changes[].files` or `extensions.work3.allowlist`) and no check
 (`extensions.work3.checks`) cannot be launched at all, so nothing of its lane may start; completing that
 record is the `work.author` operation, and it therefore **precedes** the node's lane rather than being a step
 of it. No lane names it and no route creates it: the kernel creates exactly one per node, itself, the moment
 the Work ledger reports that node incomplete - see **Ledger incomplete -> work.author** in
-[workflow-kernel.md](workflow-kernel.md). It is also the only kind whose `writes` carries `record`, and the
-only one permitted to author its own node's `index.yaml`; `state`, `completion` and `extensions.work3.kernel`
-stay the kernel's inside that file, which is why an operator row that touches only those fields is outside
-`IO_DRIFT`.
+[workflow-kernel.md](workflow-kernel.md). It is permitted to author its own node's `index.yaml`; `state`,
+`completion` and `extensions.work3.kernel` stay the kernel's inside that file, which is why an operator row
+that touches only those fields is outside `IO_DRIFT`.
+
+### The three modes of the record-authoring contract
+
+One operator contract (`ops/work.author/operator.yaml`) carries all three, and the operation itself says which
+mode it is in - a node kind, an origin or an allowlist may never reroute it:
+
+| Mode | Kind | The op carries | Sequence | What it writes |
+| --- | --- | --- | --- | --- |
+| record | `work.author` | a `nodeId` | `work.author` | the node's own `index.yaml`: its write scope, its assertions, one check per assertion |
+| intake | `work.author` | `op.intake = {scope, example, mode}` | `work.intake` | a whole feature the tree does not hold, reconciled against the decided records as three typed cases |
+| cut | `implementation.plan` | `op.cut = {node, reason}` | `work.cut` | the node's child records, and the node itself turned into a derived parent |
+
+The cut is a **kind** rather than a third flag because that is what the goal page, the status view and the
+events show: a heavy node reads `1 implementation.plan -> seam -> N backend.implement -> 1 e2e.verify ->
+1 review.verify`, and every one of those is a word the user can look up. It needs no operator of its own -
+`operatorOf('implementation.plan')` is `work.author` - and it takes the same standing: before the lane, once
+per node, planned by the kernel itself, named by no lane and created by no route. What it writes is only
+`record`, because a cut builds nothing. The one place it differs from its sibling is what stays the kernel's
+inside the record it holds: a derived parent authors no state, so removing `state` is the cut's job and only
+`completion` is protected there. The bounds it is selected by, and what the children have to look like, are in
+[op-granularity.md](op-granularity.md) §1.
 
 ## The lanes
 
