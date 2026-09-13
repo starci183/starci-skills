@@ -286,7 +286,7 @@ kinds:
     # makes the three reconciliation cases checkable against ids rather than against wording.
     reads: [srs, sds, decision, code, record]
     writes: [record, srs, sds, decision]
-    purpose: Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it; an intake authors a feature's records and reports as sds-gap what a decided record must become.
+    purpose: Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it; an intake authors a feature's records and reconciles them against the decided ones as three typed cases (reference, conflict, new), editing no record of another feature and reporting no gap against one.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [sds-gap, shared-change, authority]
