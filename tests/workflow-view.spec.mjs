@@ -234,6 +234,109 @@ test('a store with no validator, no lanes, no supervisor log and no events still
   assert.match(page,/## Recent events \(0\)\nno events/);
   assert.throws(()=>buildView({repoRoot,id:'20260101-000003-absent',now:NOW}),/No workflow state/);
   assert.throws(()=>buildView({repoRoot,id:'nested/id',now:NOW}),/./);
+  assert.deepEqual(view.integrations,[],'a workflow that names no tree simply has no integrations section');
+  assert.doesNotMatch(page,/## Integrations/);
+});
+
+/**
+ * The status page tells the truth about every external system the tree declares. A page that prints an
+ * integration proven only by a faked run as anything but that is the page that let four chatbot channels
+ * read as verified; here it is one line each, and the section is skipped rather than guessed when the
+ * workflow names no tree or the tree is gone.
+ */
+test('workflow-status prints one line per declared integration and what each is actually proven by',t=>{
+  const repoRoot=tmp(t);
+  const id='20260101-000004-integrations';
+  const dir=path.join(workflows(repoRoot),id);
+  const ledgerRoot=path.join(repoRoot,'.starciwork');
+  const write=(relative,body)=>{const file=path.join(ledgerRoot,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,body);};
+  write('features/sales/business/srs/delivery/index.yaml',`schema: work/node@2
+id: demo.sales.business.srs.fr.delivery
+kind: business
+required: true
+state: done
+extensions:
+  work3:
+    integrations:
+      - id: telegram
+        provider: telegram-bot-api
+        credential:
+          name: TELEGRAM_BOT_TOKEN
+          providedBy: owner
+          where: the workflow environment
+        sandbox: https://api.telegram.org/bot<token>/getMe
+      - id: zalo
+        provider: zalo-oa-api
+        credential:
+          name: ZALO_OA_TOKEN
+          providedBy: owner
+      - id: viber
+        provider: viber-bot-api
+        credential:
+          name: VIBER_TOKEN
+          providedBy: owner
+`);
+  write('features/sales/integration/telegram/index.yaml',`schema: work/node@2
+id: demo.sales.integration.telegram
+kind: integration
+required: true
+state: done
+`);
+  write('features/sales/integration/telegram/evidence/op-telegram-evidence/manifest.yaml',`schema: work/evidence@1
+id: op-telegram-evidence
+nodeId: demo.sales.integration.telegram
+inputDigest: ${'a'.repeat(64)}
+outcome: pass
+assertions: []
+assets: []
+proof:
+  boundary: live
+  fakes: []
+`);
+  write('features/sales/e2e/checkout/index.yaml',`schema: work/node@2
+id: demo.sales.e2e.checkout
+kind: e2e
+required: true
+state: done
+`);
+  write('features/sales/e2e/checkout/evidence/op-checkout-evidence/manifest.yaml',`schema: work/evidence@1
+id: op-checkout-evidence
+nodeId: demo.sales.e2e.checkout
+inputDigest: ${'b'.repeat(64)}
+outcome: pass
+assertions: []
+assets: []
+proof:
+  boundary: api
+  fakes:
+    - zalo
+`);
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',
+    kernel:'starci/workflow-kernel@1',id,job:'Deliver the chatbot',phase:'run',approved:true,ops:[],ledger:[],ledgerRoot}));
+
+  const view=buildView({repoRoot,id,now:NOW});
+  assert.deepEqual(view.integrations.map(entry=>[entry.id,entry.node,entry.proven,entry.evidence]),[
+    ['telegram','demo.sales.integration.telegram','live',1],
+    ['zalo',null,'fake',1],
+    ['viber',null,'none',0]
+  ]);
+  const page=renderView(view);
+  assert.match(page,/## Integrations \(3\)/);
+  assert.match(page,/- telegram \(telegram-bot-api\): proven live/);
+  assert.match(page,/- zalo \(zalo-oa-api\): proven against a fake, not live - no integration node in the tree/);
+  assert.match(page,/- viber \(viber-bot-api\): not proven - no integration node in the tree/);
+
+  // A tree that is not there leaves the page complete and the section out, rather than failing the view.
+  const absent='20260101-000005-no-tree';
+  const absentDir=path.join(workflows(repoRoot),absent);
+  fs.mkdirSync(absentDir,{recursive:true});
+  fs.writeFileSync(path.join(absentDir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',
+    kernel:'starci/workflow-kernel@1',id:absent,phase:'run',approved:true,ops:[],ledger:[],
+    ledgerRoot:path.join(repoRoot,'gone','.starciwork')}));
+  const gone=buildView({repoRoot,id:absent,now:NOW});
+  assert.deepEqual(gone.integrations,[]);
+  assert.doesNotMatch(renderView(gone),/## Integrations/);
 });
 
 test('workflow-list is one row per workflow of the repository, newest first',t=>{
