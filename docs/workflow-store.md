@@ -12,7 +12,9 @@ so every terminal of one product writes into the same workflows root.
 .starciwork/_local/workflows/<workflowId>/
   events.jsonl        append-only audit trail, one JSON object per line
   state.json          derived snapshot, schema starci/workflow-state@1
-  goal.md, goal.json  the confirmed goal, readable and machine form
+  goal.md, goal.json  the confirmed goal, readable and machine form; both carry the mandatory
+                      critique of that goal (`## Phản biện (critique)`, `critique`) above its
+                      definition of done - see docs/workflow-kernel.md, Phases
   launch.json         how the workflow was launched
   final-report.json   the workflow report that ends the run
   reports/<dispatch>.json   one typed op report per dispatch

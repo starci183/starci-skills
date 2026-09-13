@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {DECISION_FORM,GOAL_FORM,GOAL_PLAN,assessGoal,callFunction,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
+import {CRITIQUE,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
   references:['.starciwork/features/sales/sds.md#3'],checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:[`${id} works`],dependsOn:[],...extra});
@@ -251,4 +251,107 @@ test('validateOp carries the brand record into the prompt, with the rules that m
   call();
   assert.doesNotMatch(prompts[0],/"brand"/);
   assert.match(prompts[0],/when a `brand` record is given it is binding/,'the rule still says what happens when there is one');
+});
+
+/**
+ * The critique of a goal is a function like any other: a fixed frame, a closed verdict, a bounded retry. What is
+ * particular to it is the price of an objection - it can cost the owner a re-write of the goal - so an objection
+ * that names no evidence is dropped, and a verdict that costs work with nothing to act on is not a valid form.
+ */
+const critiqueCall=(answers,extra={})=>{
+  const seen=[];
+  const result=critiqueGoal({job:'Make the receipt feel fast.',scope:['sales'],
+    ledger:[{id:'demo.sales.implementation.backend.intake',kind:'implementation',title:'Persist an order'}],
+    decisions:[{id:'demo.sales.business.srs.policy.refund',kind:'business',title:'Refund window'}],
+    records:[{id:'demo.sales.architecture.sds.ledger',kind:'architecture',title:'Ledger component map',
+      statements:['Every write to an order goes through the ledger writer.']}],
+    constraints:['the ledger is the authored Work tree and is not yours to change'],
+    providers:['claude-fable-5.1','gpt-6-astra'],
+    runHeadless:(provider,prompt)=>{seen.push([provider,prompt]);const next=answers.shift();if(next instanceof Error)throw next;return next;},
+    ...extra});
+  return {result,seen};
+};
+
+test('critiqueGoal frames the goal against the accepted records, carries its rules and answers one closed verdict',()=>{
+  const {result,seen}=critiqueCall([JSON.stringify({verdict:'sound',objections:[],alternatives:[]})]);
+  assert.equal(result.ok,true);
+  assert.equal(result.schema,CRITIQUE);
+  assert.equal(result.verdict,'sound');
+  assert.equal(result.provider,'claude-fable-5.1');
+  assert.deepEqual([result.objections,result.dropped,result.required,result.alternatives],[[],[],[],[]]);
+  assert.equal(result.question,null);
+  const prompt=seen[0][1];
+  assert.match(prompt,/^You are the critic of one workflow goal: your job is to find what is wrong with the goal before anyone works from it - never to restate it, never to praise it\./);
+  assert.match(prompt,/Function: critiqueGoal\. Required keys and types: .*"verdict":"string in sound\|revise\|refuse"/);
+  for(const needle of ['Make the receipt feel fast.','"sales"','demo.sales.implementation.backend.intake',
+    'demo.sales.business.srs.policy.refund','demo.sales.architecture.sds.ledger',
+    'Every write to an order goes through the ledger writer.',
+    'the ledger is the authored Work tree and is not yours to change'])
+    assert.ok(prompt.includes(needle),`the critique reads ${needle}`);
+  for(const rule of ['every objection names its evidence','challenge the premises','challenge the scope',
+    'challenge the testability','name the hidden decisions','offer the alternatives',
+    'check the consistency with the accepted records and name the record you checked against',
+    'never restate the goal and never praise it','the kernel verifies by command only',
+    'the kernel cannot verify taste, desirability, market fit'])
+    assert.ok(prompt.includes(rule),`the critique is held to: ${rule}`);
+  // The verdict is closed: anything outside sound|revise|refuse is an invalid form, not a third answer.
+  const open=critiqueCall([JSON.stringify({verdict:'looks-fine',objections:[]}),JSON.stringify({verdict:'sound',objections:[]})]);
+  assert.equal(open.result.verdict,'sound');
+  assert.equal(open.result.attempt,1);
+  assert.match(open.result.attempts[0].errors.join(';'),/verdict must be one of sound, revise, refuse/);
+  assert.match(open.seen[1][1],/Your previous answer was invalid: verdict must be one of sound, revise, refuse/);
+  // The decided records are bounded before they are framed: 40 records and 12k characters of statements.
+  const many=boundRecords(Array.from({length:50},(_,index)=>({id:`r-${index}`,statements:['x'.repeat(400)]})));
+  assert.equal(many.records.length,40);
+  assert.equal(many.truncated,true);
+  assert.equal(many.records.reduce((total,record)=>total+record.statements.join('').length,0)<=12000,true);
+  assert.deepEqual(boundRecords([{id:'r',statements:['  one  ','','two']}]),{records:[{id:'r',kind:null,title:'',statements:['one','two']}],truncated:false});
+});
+
+test('a critique that costs work must carry something to act on: evidence, required changes, or the one question',()=>{
+  const objection=(extra={})=>({kind:'consistency',claim:'The goal writes the order outside the ledger writer',
+    evidence:'demo.sales.architecture.sds.ledger',consequence:'Two components would own one write path.',...extra});
+  // An objection with no evidence is dropped on the record; the evidenced ones stand and the verdict with them.
+  const revised=critiqueCall([JSON.stringify({verdict:'revise',objections:[objection(),
+    {kind:'premise',claim:'I would not build it this way',consequence:'none'}],
+    required:['name the component that owns the order write'],alternatives:['extend the ledger writer instead']})]);
+  assert.equal(revised.result.verdict,'revise');
+  assert.deepEqual(revised.result.objections,[{kind:'consistency',claim:'The goal writes the order outside the ledger writer',
+    evidence:'demo.sales.architecture.sds.ledger',consequence:'Two components would own one write path.'}]);
+  assert.deepEqual(revised.result.dropped,[{kind:'premise',claim:'I would not build it this way',evidence:'',consequence:'none'}]);
+  assert.match(revised.result.reason,/1 objection\(s\) named no evidence and were dropped/);
+  assert.deepEqual(revised.result.required,['name the component that owns the order write']);
+  // A revise or a refuse with no objection at all, or with no evidenced one, is sent back to the model.
+  const empty=critiqueCall([JSON.stringify({verdict:'revise',objections:[],required:['x']}),
+    JSON.stringify({verdict:'revise',objections:[objection()],required:['x']})]);
+  assert.equal(empty.result.verdict,'revise');
+  assert.match(empty.result.attempts[0].errors.join(';'),/a revise must carry at least one objection, and every objection must name its evidence/);
+  const unevidenced=critiqueCall([JSON.stringify({verdict:'refuse',objections:[{kind:'scope',claim:'too wide',consequence:'it never finishes'}],question:'which one?'}),
+    JSON.stringify({verdict:'sound',objections:[]})]);
+  assert.equal(unevidenced.result.verdict,'sound');
+  assert.match(unevidenced.result.attempts[0].errors.join(';'),/a refuse must carry at least one objection/);
+  // A revise must say what the operations have to honour; a refuse must name the question that would unblock it.
+  const silent=critiqueCall([JSON.stringify({verdict:'revise',objections:[objection()]}),JSON.stringify({verdict:'sound',objections:[]})]);
+  assert.match(silent.result.attempts[0].errors.join(';'),/a revise must list in `required` the changes every operation of this goal has to honour/);
+  const questionless=critiqueCall([JSON.stringify({verdict:'refuse',objections:[objection()]}),JSON.stringify({verdict:'sound',objections:[]})]);
+  assert.match(questionless.result.attempts[0].errors.join(';'),/a refuse must state in `question` the one question whose answer would unblock the goal/);
+  const refused=critiqueCall([JSON.stringify({verdict:'refuse',objections:[objection()],question:'Which component owns the order write?'})]);
+  assert.equal(refused.result.verdict,'refuse');
+  assert.equal(refused.result.question,'Which component owns the order write?');
+  // The chain is walked in the order the caller gave: one retry per provider, then the next one.
+  const fallback=critiqueCall(['nonsense','still nonsense',JSON.stringify({verdict:'sound',objections:[]})]);
+  assert.equal(fallback.result.verdict,'sound');
+  assert.equal(fallback.result.provider,'gpt-6-astra');
+  assert.deepEqual(fallback.seen.map(item=>item[0]),['claude-fable-5.1','claude-fable-5.1','gpt-6-astra']);
+  // An exhausted chain is `unavailable` with its attempts on record, exactly as the validator is.
+  const exhausted=critiqueCall(['nonsense','nonsense again',Error('gpt-6-astra headless exited 1: boom')]);
+  assert.equal(exhausted.result.ok,false);
+  assert.equal(exhausted.result.verdict,'unavailable');
+  assert.deepEqual(exhausted.result.objections,[]);
+  assert.deepEqual(exhausted.result.attempts.map(item=>[item.provider,item.attempt]),
+    [['claude-fable-5.1',0],['claude-fable-5.1',1],['gpt-6-astra',0]]);
+  // The supervisor runtimes are the default chain, and a goal with no job text is not a goal to critique.
+  assert.deepEqual(DEFAULT_CRITIC_RUNTIMES,['claude-fable-5.1','gpt-6-astra']);
+  assert.throws(()=>critiqueGoal({job:'  ',runHeadless:()=>'{}'}),/critiqueGoal needs the job text/);
+  assert.equal(critiqueGoal({job:'x',providers:[],runHeadless:()=>'{}'}).verdict,'unavailable');
 });
