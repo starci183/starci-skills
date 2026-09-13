@@ -115,7 +115,7 @@ kinds:
       blockers: [shared-change, authority]
   # The identity every drawing and every build reads: one record, one spec, done with a `rev`. It is a decision
   # kind and not a build one - it settles what the product looks like, it never renders a product screen - and it
-  # is the only kind besides `work.author` that writes an authored record, because that record IS its decision.
+  # is the only kind that writes the `brand` record, because that record IS its decision.
   brand.decide:
     family: design
     role: write  # it generates the placeholder mascot with the image model, so it runs where image generation is: the Codex working profile
