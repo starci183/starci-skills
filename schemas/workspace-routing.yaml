@@ -43,4 +43,10 @@ bindingShape:
   schema: starci/workspace-binding@1
   project: project identifier
   repositories: role -> {pathFromSource, gitRepository}
+  optionalRoles:
+    grammar: "{pathFromSource, gitRepository, package?: @scope/grammar} - the repository that owns the installed
+      design grammar: the published package the frontend imports and the canon that names its units. It delivers
+      no side of the product, takes no Work node and owns no .starciwork; it exists so a reported grammar-gap has
+      a repository to be grown in. A binding that declares no grammar role is a product whose grammar this
+      workflow may not change: the gap becomes a question for the user, never a guessed repository root."
   work: "{ownerRole: be, pathFromRepository: .starciwork}"

@@ -10,6 +10,7 @@ import {buildReport} from '../execution/reports.mjs';
 import {spawnSync} from 'node:child_process';
 import {validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
 import {createStore} from '../execution/workflow-store.mjs';
+import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
 import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,operationSpec,queueInbox,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
@@ -701,8 +702,16 @@ const receiptAuthor=()=>({'demo.sales.implementation.frontend.receipt-author':[{
   summary:'I described the receipt but could not settle which files render it.',
   files:[],checks:[passing('work-valid','node starci.mjs validate .starciwork')]}]});
 
+/**
+ * The repositories a workspace binding declares beyond the ledger owner, as `resolveLedgerRoot` carries them:
+ * `setupWork({binding})` hands the kernel exactly that map, which is how a test gives this workflow a `grammar`
+ * repository without a second git fixture. Without it the resolution is local and the map is null - a product
+ * whose grammar this workflow may not change.
+ */
+const bindingRoles=roles=>input=>({...resolveLedgerRoot(input),roles});
+
 function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal,
-  ledgerApi,validateOp=acceptAll}={}){
+  ledgerApi,validateOp=acceptAll,binding=null}={}){
   const tree=workRepo(nodes);
   activeRepo=tree.repo;
   const store=createStore({repoRoot:tree.repo,id:'20260912-110000-work-ledger'});
@@ -720,6 +729,7 @@ function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator
     git:(executable,args)=>{if(args[0]==='commit')commits.push(args[args.indexOf('-m')+1]);return git.git(executable,args);},
     decide:()=>{throw Error('decide must not be called on a policy-covered path');},
     validateOp,
+    ...(binding?{resolveLedger:bindingRoles(binding)}:{}),
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
   return {...tree,api,store,state,goal,fake,git,run,commits,allocator,cleanup:()=>fs.rmSync(path.dirname(tree.repo),{recursive:true,force:true})};
 }
@@ -1264,7 +1274,10 @@ test('a design operation carries the brand record and its assets, prints the Bra
     assert.ok(contract.indexOf('## References')<contract.indexOf('## Brand'),'the block is under the references it summarises');
     // A kind that draws nothing gets no brand block: the brand is the design family's material, not everyone's.
     assert.doesNotMatch(renderContract({template,op:{...op,kind:'backend.implement'},state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'}),/## Brand/);
-    assert.deepEqual(DESIGN_KINDS,['interface.draw','interface.asset','frontend.implement','uat.verify']);
+    // `grammar.update` is in the list from the other end: it grows the language every drawing reads, so it gets
+    // the whole canon and the identity the new unit has to live inside before it adds a word to either.
+    assert.deepEqual(DESIGN_KINDS,['interface.draw','interface.asset','frontend.implement','uat.verify','grammar.update']);
+    assert.match(renderContract({template,op:{...op,kind:'grammar.update'},state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'}),/## Brand/);
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
     const state=harness.run({maxIterations:20});
@@ -1470,6 +1483,87 @@ test('a frontend implementation that reports an interface gap routes to interfac
     assert.deepEqual(state.lanes[CART].done,['frontend.implement','uat.verify']);
     assert.equal(harness.read(CART).state,'done');
     assert.equal(state.finished.outcome,'done');
+  }finally{harness.cleanup();}
+});
+
+/* ------------------------------------------------------------------ the grammar gap */
+
+const slash=value=>String(value).replaceAll('\\','/');
+const GRAMMAR_ROOT=path.resolve(os.tmpdir(),'starci-grammar-spec','starci-grammar');
+/** The binding a product with its own grammar repository declares: `grammar`, beside `be` and `fe`. */
+const grammarBinding={grammar:{role:'grammar',directory:GRAMMAR_ROOT,origin:'https://github.com/demo/starci-grammar.git',
+  declared:'https://github.com/demo/starci-grammar.git',package:'@starci/grammar'}};
+/** The grammar op's chain is Opus then Sol, so the implement pool must lead with a runtime that can launch it. */
+const grammarAllocator=()=>fakeAllocator({pools:{implement:['claude-opus','gpt-5.6-sol','qwen3.8-flash'],
+  verify:['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol'],decide:['claude-fable-5.1','gpt-6-astra'],
+  write:['gpt-5.6-sol','claude-opus','qwen3.8-flash'],plan:['claude-opus','claude-fable-5.1']}});
+const grammarGap={outcome:'blocked',summary:'The accepted design needs a stepped progress rail the grammar has no contract for.',
+  files:[],checks:[],blocker:{kind:'grammar-gap',detail:'no contract renders a stepped progress rail for the cart checkout'}};
+
+test('a frontend build that reports a grammar gap routes to grammar.update in the bound grammar repository and reopens the requester',()=>{
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
+    allocator:grammarAllocator(),binding:grammarBinding,
+    scripts:{[UI]:[drawn(uiDone('Drawn.'))],
+      [CART]:[grammarGap,cartDone('Built with the grown grammar unit.')],
+      'grammar-1':[{outcome:'done',summary:'ProgressRail published at 0.5.0; the canon names it.',files:[],
+        checks:[passing('cart-renders','npx vitest run cart')]}],
+      [`${CART}-verify`]:[cartDone('The flow passes.')]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:24});
+    const grow=state.ops.find(op=>op.id==='grammar-1');
+    assert.ok(grow,'the gap created one grammar operation');
+    assert.equal(grow.kind,'grammar.update');
+    assert.equal(grow.origin,'architecture');
+    // It writes the grammar repository and the canon, and nothing of the product: the build's code paths are gone.
+    assert.deepEqual(grow.allowlist,[`${slash(GRAMMAR_ROOT)}/**`,
+      `${slash(path.join(path.resolve('.'),'knowledge','grammars'))}/**`,
+      `${slash(path.join(path.resolve('.'),'knowledge','patterns','fe'))}/**`]);
+    assert.equal(grow.allowlist.some(entry=>entry.includes('apps/web')),false);
+    assert.ok(grow.references.some(entry=>/knowledge\/grammars\//.test(entry)),'the whole canon is its material');
+    assert.deepEqual(grow.acceptance,['the grammar renders: no contract renders a stepped progress rail for the cart checkout',
+      'the grammar package is published at a new version and the consumer imports it',
+      'the canon names the new unit']);
+    assert.match(grow.goal,/Grow the installed grammar \(`@starci\/grammar`\)/);
+    assert.match(grow.goal,/composition of existing contracts first/);
+    assert.equal(grow.status,'done');
+    const route=events(harness.store).find(event=>event.event==='routed'&&event.on==='grammar-gap');
+    assert.deepEqual([route.op,route.to,route.origin,route.kind,route.then],
+      [CART,'grammar-1','architecture','grammar.update','reopen']);
+    assert.deepEqual(events(harness.store).filter(event=>event.event==='grammar-gap').map(event=>[event.op,event.grow,event.package]),
+      [[CART,'grammar-1','@starci/grammar']]);
+    // The build waits behind it, reads the canon again, and the node still completes through its own lane.
+    const build=state.ops.find(op=>op.id===CART);
+    assert.ok(build.dependsOn.includes('grammar-1'));
+    assert.equal(build.attempt,2);
+    assert.equal(build.status,'done');
+    assert.match(build.priorOpen.at(-1),/the grammar is grown by grammar-1; read the canon again first/);
+    assert.ok(state.lanes[CART].done.includes('frontend.implement')&&state.lanes[CART].done.includes('uat.verify'));
+    assert.equal(harness.read(CART).state,'done');
+    assert.equal(state.finished.outcome,'done');
+  }finally{harness.cleanup();}
+});
+
+test('without a grammar role in the workspace binding the kernel creates no grammar operation and asks the user',()=>{
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
+    scripts:{[UI]:[drawn(uiDone('Drawn.'))],[CART]:[grammarGap]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:12});
+    // Where a language lives is the one thing the kernel will not guess: no op, no reopen, the requester blocked.
+    assert.equal(state.ops.some(op=>op.kind==='grammar.update'),false);
+    assert.equal(events(harness.store).some(event=>event.event==='routed'&&event.on==='grammar-gap'),false);
+    const build=state.ops.find(op=>op.id===CART);
+    assert.equal(build.status,'blocked');
+    assert.equal(build.attempt,1,'nothing was reopened behind a repository that does not exist');
+    const asked=state.needUser.filter(item=>item.op===CART&&item.kind==='environment');
+    assert.equal(asked.length,1);
+    assert.match(asked[0].detail,/grammar-gap from demo\.sales\.implementation\.frontend\.cart but the workspace binds no grammar repository/);
+    assert.match(asked[0].detail,/role `grammar` in \.workspaces\/projects\/<project>\/work\.json/);
+    assert.deepEqual(events(harness.store).filter(event=>event.event==='grammar-unbound').map(event=>event.op),[CART]);
+    assert.equal(state.finished.outcome,'blocked');
   }finally{harness.cleanup();}
 });
 

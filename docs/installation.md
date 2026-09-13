@@ -31,11 +31,21 @@ Create or approve a registry entry at `<host>/.workspaces/projects/demo/work.jso
     "fe": {
       "pathFromSource": "../demo-frontend",
       "gitRepository": "https://github.com/example/demo-frontend.git"
+    },
+    "grammar": {
+      "pathFromSource": "../demo-grammar",
+      "gitRepository": "https://github.com/example/demo-grammar.git",
+      "package": "@example/grammar"
     }
   },
   "work": { "ownerRole": "be", "pathFromRepository": ".starciwork" }
 }
 ```
+
+`be` and `fe` deliver the product; `grammar` is optional and delivers the language the interface is drawn in - the
+published package the frontend imports and the canon that names its units. It owns no `.starciwork` and takes no
+Work node; it is what a reported `grammar-gap` is grown in. Omit it and the grammar of this product is out of the
+workflow's reach: a gap becomes a question for the user instead of a guessed repository.
 
 All relative repository paths resolve from the host. The authoritative contract is [workspace routing](../schemas/workspace-routing.json). Existing different registry layouts need inspection and explicit mapping, not blind replacement with this example.
 

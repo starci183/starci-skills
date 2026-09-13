@@ -29,7 +29,7 @@ limits:
 counts:
   skills: 1
   publicWorkflows: 16
-  operators: 15
+  operators: 16
 gates: workflows/gates.json
 work:
   format: yaml-1.2

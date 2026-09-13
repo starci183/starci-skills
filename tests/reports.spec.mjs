@@ -32,8 +32,10 @@ test('every outcome maps to exactly one Orca signal and done is earned, not clai
   assert.throws(()=>buildReport({...base,outcome:'blocked',blocker:{kind:'weather',detail:'x'}}),/blocker kind/);
   assert.equal(buildReport({...base,outcome:'blocked',blocker:{kind:'shared-change',detail:'Core must register the entity'}}).signal.type,'escalation');
   // The blocker vocabulary is the kind graph's: a gap the graph routes must be a blocker a report may carry.
-  assert.deepEqual(BLOCKER_KINDS,['shared-change','sds-gap','interface-gap','brand-gap','environment','authority']);
+  assert.deepEqual(BLOCKER_KINDS,['shared-change','sds-gap','interface-gap','brand-gap','grammar-gap','environment','authority']);
   assert.equal(buildReport({...base,outcome:'blocked',blocker:{kind:'brand-gap',detail:'No brand record states the primary token'}}).signal.type,'escalation');
+  // The third gap: the language itself lacks the word, which the graph routes to `grammar.update`.
+  assert.equal(buildReport({...base,outcome:'blocked',blocker:{kind:'grammar-gap',detail:'no contract renders a stepped progress rail'}}).signal.type,'escalation');
   assert.equal(buildReport({...base,outcome:'ask',question:{text:'Which order?',options:['a','b']}}).signal.type,'question');
   assert.equal(buildReport({...base,outcome:'failed',checks:[{...check,exitCode:2}]}).signal.orcaOutcome,'failed');
   const outside=validateReport(done,{allowlist:['apps/accounting']});

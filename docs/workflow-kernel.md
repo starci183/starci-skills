@@ -85,6 +85,13 @@ Two cases keep the 5.0 behaviour of a bare `needUser` item, because no operation
 scope: a Work tree another repository owns (the record is not in this worktree at all, the same reason
 `requestSharedChange` refuses ledger paths), and a node whose `index.yaml` the guard cannot name.
 
+A third case is the same rule one layer out. A reported `grammar-gap` is grown in the repository that owns the
+installed grammar, and the workspace binding is what names it: an optional `grammar` role beside `be` and `fe`
+(`{pathFromSource, gitRepository, package?}`), carried onto `ctx.work.grammar`. A binding that declares none is
+not a defect - it is a product whose grammar this workflow may not change - so the kernel creates no operation,
+reopens nothing and leaves the requester `blocked` with one `environment` item naming the file that would answer
+it. Inventing a repository root for a language is exactly the guess the routing contract forbids.
+
 ## Lanes and routes
 
 One Work node is not one operation. It is a **lane**: the ordered kinds it travels before its ledger entry may
@@ -126,6 +133,7 @@ what happens to the reporter (`pause`, `reopen`, `retry`) and with which bound. 
 | --- | --- | --- | --- |
 | `blocked` `sds-gap` | `architecture.revise` on the architecture node (its `index.yaml` plus its SDS folder), origin `architecture`, whose own check is that the Work tree still validates; `markDecided` bumps the node's `rev` | reopened behind it | - |
 | `blocked` `interface-gap` | `interface.draw` on the same node, origin `architecture` | reopened behind it | - |
+| `blocked` `grammar-gap` | `grammar.update` in the repository the binding's `grammar` role names, origin `architecture`, allowlisted to that repository and the canon | reopened behind it | 2 rounds; no `grammar` role means no op at all |
 | `blocked` `shared-change` | the reporter's own kind, origin `shared` | paused | 3 new shared ops per iteration |
 | review findings | the lane's build kind (so a finding on frontend work comes back as `frontend.implement`), origin `repair` | finished; the repair carries the work | 3 rounds per reviewed node set |
 | `uat.verify` reporting `failed` | the lane's build kind, origin `repair` | reopened behind the repair | the same 3 review rounds |
@@ -347,6 +355,7 @@ the validator and writes `validator-skipped` once; tests inject a stub the same 
 | two `stalled-silent` settlements of one runtime within 30 minutes | `allocator.failed(runtime,{reason:'rate-limited (inferred from repeated silence)'})` and a `rate-limit-inferred` event | the window is cleared after it fires |
 | `blocked` `sds-gap` | on the Work ledger: `markReopened` the architecture node the report names (or the one in the op's module) and create the route's `architecture.revise` op on that node's `index.yaml` and SDS folder, whose own check is that the Work tree still validates; `markDecided` settles it with a bumped `rev` when the op is accepted. On a plan ledger: an `architecture.decide` op on the design inputs, re-planned with `planOp` afterwards. Either way the blocked op depends on it and resumes afterwards | - |
 | `blocked` `interface-gap` | the route's `interface.draw` op on the same node; the reporter is reopened behind it | - |
+| `blocked` `grammar-gap` | the route's `grammar.update` op, allowlisted to the `grammar` repository of the workspace binding plus the canon (`knowledge/grammars/**`, `knowledge/patterns/fe/**`) and to nothing of the product, with the whole canon as its references and the acceptance "the grammar renders `<detail>`", "published at a new version and the consumer imports it", "the canon names the new unit"; the reporter is reopened behind it and reads the canon again. A binding with no `grammar` role creates nothing: one `environment` item naming `role \`grammar\` in .workspaces/projects/<project>/work.json`, a `grammar-unbound` event, and the requester stays `blocked` | 2 rounds per node |
 | `blocked` `environment` / `authority` | `needUser`, op blocked | - |
 | review with findings | one repair op of the lane's build kind on the files the findings name inside the group's allowlists, then a fresh review | 3 rounds per ledger group |
 | a `uat.verify` op reporting `failed` | one repair op of the lane's build kind, and the UAT run itself reopened behind it | the same 3 rounds per node set |

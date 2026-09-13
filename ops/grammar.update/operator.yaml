@@ -1,0 +1,245 @@
+id: grammar.update
+goal:
+  en: Grow the installed design grammar by one semantic unit the product needs and no composition of
+    existing contracts renders, publish it from the grammar's own repository and record it in the canon.
+nodeKinds:
+  - implementation
+completionProfile: implementation
+sideEffects:
+  - exact authorized edits inside the bound grammar repository and the canon paths it owns
+  - scoped local commits when authorized
+  - one published package version of the grammar when every gate of that repository is green
+  - stories and tests executed in the grammar repository's declared sandbox
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
+        and validator freshness: the node whose drawing or build found the grammar short a word. This
+        consumer op requires its target node to exist. An absent target is a scope/graph gap: report it
+        and propose a separately selected scope op; do not create a target or invent its acceptance here."
+  - id: gap
+    path: selected grammar-gap report + the accepted requirement/design and interface design record it names
+    purpose:
+      en: Read the reported gap exactly as it was raised - the shape the requester could not render, the
+        screen, state and region it belongs to, and the accepted requirement and design that oblige it.
+        The gap is the whole authority for what is grown; a unit nobody asked for is outside this job, and
+        a gap that turns out to be a missing business rule or a missing screen is reported back rather than
+        answered with a new component.
+  - id: canon
+    path: knowledge/grammars/**/INDEX.json + knowledge/patterns/fe/INDEX.json + knowledge/ui/**/INDEX.json
+    purpose:
+      en: "Read the WHOLE installed canon before deciding anything - every grammar family file (DNA, family,
+        idioms, playbook), every frontend pattern and every UI composition, presentation and proof rule -
+        plus the brand record the product is drawn inside. This is what determines whether the shape is
+        already expressible: the existing contracts, their slots, their anatomy and the token, typography,
+        spacing and icon vocabulary a new unit must reuse rather than extend."
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Resolve the bound grammar repository, its actual checkout, root, HEAD and dirty state, and read its
+        own conventions - how a contract component is declared, how slots and states are typed, where stories
+        and tests live, which gates the repository runs and how it is versioned and published. The grammar is
+        a separate repository with its own rules; this operation follows them instead of importing another
+        repository's habits.
+  - id: consumer
+    path: repository:<consumer-id>/<consumer-manifest>
+    purpose:
+      en: Read the consuming frontend repository's declared dependency on the grammar package - the exact
+        package name and the version it currently resolves - so the published version can actually be bound
+        after it exists. Reading the consumer is for the version binding and the import surface only; product
+        screens are not this operation's to change.
+  - id: profile
+    path: profiles/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
+        profiles, and confirm the actual host can run the grammar repository's gates and reach its package
+        registry before anything is published. Historical model names are not availability proof, and a host
+        that cannot run a gate reports that limitation instead of publishing an unproven version.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - state
+      - blocker
+      - completion.inputDigest
+      - completion.evidence
+      - completion.codeRefs
+    content:
+      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
+        only state/blocker/completion here; the unit, its anatomy, the composition attempt, the published
+        version and the canon entries belong to the evidence result, not to semantic node prose. Missing
+        refs/dependencies/acceptance require a reported gap or separately selected scope update; never
+        add/remove them to obtain pass.
+  - id: source
+    path: repository:<repo-id>/<write-ceiling>
+    fields:
+      - grammar package source for the one new unit
+      - its stories and tests
+      - its version and changelog entry
+      - the canon files the allowlist names
+    content:
+      en: "Write only the exact owned paths the allowlist names: the one new semantic unit in the grammar
+        package with its stories and tests, the version bump that publishes it, and the canon entry that
+        names it for every later drawing. Nothing else moves - no product page, no unrelated contract, no
+        widened token set - and a destination outside the allowlist is a reported scope blocker rather than a
+        wider write. The consumer's version binding is either inside this allowlist or a reported shared
+        change; it is never edited silently."
+  - id: evidence
+    path: E/manifest.yaml + E/composition-attempt.md + E/unit.json + E/gates.json + E/publish.json + E/result.md
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - codeRefs
+      - extensions
+    content:
+      en: "Retain the composition attempt in full - which existing contracts and blueprint regions were tried
+        and exactly why the shape does not compose - because that is what makes a new unit justified rather
+        than convenient. Then the unit itself (primitive or block, its anatomy, slots, states and the tokens
+        it reuses), the stories and tests with the command, exit code and counts that show them red before and
+        green after, every gate of the grammar repository with its real output, the exact published version
+        with the registry read-back that proves it is visible, and the canon entries that now name the unit.
+        Operator-specific observed result in E/result.md: the gap, the attempt, the unit, the version and the
+        consumer binding. An unpublished version, an unread registry or an unrecorded canon entry is
+        blocked or not-run, never pass."
+steps:
+  - reads:
+      - target
+      - gap
+      - canon
+      - repo
+      - profile
+    writes:
+      - evidence
+    action:
+      en: "Freeze the work before touching the grammar: restate the reported gap, the requirement and design
+        that oblige it and the screen, state and region it belongs to, then read the whole canon and the brand
+        and enumerate the existing contracts, slots and tokens that could carry it. Confirm the bound grammar
+        repository is resolvable and clean and that the host can run its gates and reach its registry. A gap
+        that is really a missing business rule or a missing screen is reported back to the record that owns it
+        instead of being answered here."
+  - reads:
+      - canon
+      - gap
+    writes:
+      - evidence
+    action:
+      en: "Try the composition FIRST and write the attempt down: express the shape as existing contracts inside
+        existing blueprint regions, naming each contract, each slot and each constraint. If it composes, the
+        grammar is not short a word - report that composition as the answer and change nothing in the grammar,
+        because the requester will draw it that way. Only a shape that demonstrably does not compose continues,
+        and an ambiguity about whether it is really new is a question with the attempt attached, never a guess."
+  - reads:
+      - canon
+      - repo
+    writes:
+      - source
+      - evidence
+    action:
+      en: Name the one new semantic unit and implement it inside the allowlist, following the grammar
+        repository's own conventions. A primitive is a fixed semantic unit and a block carries feature
+        meaning; declare its anatomy, its named slots, every state it can be in and the tokens, typography,
+        spacing and icons it reuses - none invented. Write its stories and its tests first and show them
+        failing on the revision you started from; one unit per operation, never a family of them.
+  - reads:
+      - repo
+      - profile
+    writes:
+      - source
+      - evidence
+    action:
+      en: Run every gate the grammar repository declares, verbatim and on the same revision, and retain each
+        command, exit code, counts and sanitized output. Only after every gate is green, publish one new
+        version of the package and read it back from the registry until it is actually served - a registry may
+        serve a new version minutes after it is accepted, and an unread version is not a published one. The
+        publish is irreversible, so a red or unavailable gate is blocked or failed, never a publish.
+  - reads:
+      - consumer
+      - canon
+      - target
+    writes:
+      - source
+      - node
+      - evidence
+    action:
+      en: Bind the published version in the consuming repository when that repository is inside the allowlist,
+        and report it as a shared change with the exact paths when it is not; never edit a consumer silently
+        and never leave the version unbound. Then record the unit in the canon - the grammar family files and
+        the frontend pattern it belongs to - so a later drawing finds the word instead of asking for it again.
+        Report once with the unit, the exact version, the canon entries and the consumer binding; no product
+        page changed.
+proofs:
+  - id: composition-attempt
+    requirement:
+      en: The attempt to express the shape as a composition of existing contracts and blueprint regions is
+        recorded in full, names the contracts and slots it tried, and says exactly why it fails. A new unit
+        without that record is unjustified, and a shape that composes cannot earn a grammar change at all.
+  - id: one-semantic-unit
+    requirement:
+      en: Exactly one semantic unit was added, classified as a primitive (a fixed semantic unit) or a block
+        (it carries feature meaning), with its anatomy, slots, states and reused tokens declared. A second
+        unit, a widened token set or an invented colour, font or icon is a defect, not a larger delivery.
+  - id: stories-and-tests
+    requirement:
+      en: The unit's stories and tests exist at the repository's own locations, were red on the revision this
+        operation started from and are green after it, with command, exit code and counts retained. A test
+        that was already green proves nothing about the new unit.
+  - id: gates-and-publish
+    requirement:
+      en: Every gate the grammar repository declares passed on the published revision, and the published
+        version was read back from the registry and found served. An inferred publish, a skipped gate or a
+        version nobody could resolve cannot certify this operation.
+  - id: consumer-and-canon
+    requirement:
+      en: The consuming repository resolves the published version - bound inside the allowlist or raised as a
+        shared change with exact paths - and the canon names the new unit in the grammar family files and the
+        frontend pattern it belongs to. No product page or screen changed.
+blockers:
+  - code: SHAPE_COMPOSES
+    condition:
+      en: The reported shape is expressible as a composition of existing contracts and blueprint regions, so
+        the grammar is not short a word. Report the composition and change nothing; the drawing or build that
+        raised the gap renders it that way.
+  - code: UNIT_IDENTITY_UNSETTLED
+    condition:
+      en: Whether the shape is genuinely a new semantic unit, or which of primitive and block it is, cannot be
+        settled from the canon, the gap and the accepted records. Report the question with the composition
+        attempt attached; never guess an identity into the grammar.
+  - code: GATE_OR_REGISTRY_UNAVAILABLE
+    condition:
+      en: A gate the grammar repository declares cannot run, fails, or the package registry cannot be reached
+        or does not serve the version after publication. Report it; a published version without green gates
+        and a registry read-back is never a delivered unit.
+  - code: SCOPE_OUTSIDE_ALLOWLIST
+    condition:
+      en: A required change - a consumer manifest, a second repository, a canon file the allowlist omits -
+        lies outside the paths this operation may write. Report the exact paths and wait; never widen the
+        write ceiling and never touch a product page to close the gap.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: The grammar repository, the canon, the brand record or the accepted requirement this operation
+        depends on is missing or not effectively done. Report node/resource IDs; never author the missing
+        record or run a predecessor here.
+placeholders:
+  repo-id: Resolved direct repository name or path of the bound grammar repository
+  bound-paths: Inspected source read set
+  write-ceiling: Explicit owned source paths of the grammar repository and the canon
+  consumer-id: Resolved repository name or path of the consuming frontend
+  consumer-manifest: Declared dependency manifest and lockfile of the consumer
+commitPolicy:
+  mode: scoped-local-commit
+  ownership: exact-selected-paths
+  verify: git-readback-full-sha-and-diff
+  push: false
+  reuseAuthorization: true
+  noChange: return-existing-verified-commit-no-empty-commit

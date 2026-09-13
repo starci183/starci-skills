@@ -213,6 +213,14 @@ operators:
       - {environment: codex, profiles: [gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: qwen, profiles: [qwen3.8-flash]}
+  grammar.update:
+    skill: starci
+    # Growing the installed grammar is code, stories, tests, a published version and a canon entry, so it runs on
+    # the strongest coding runtimes first and never on the image model: nothing here is drawn.
+    chain: [claude-opus, gpt-5.6-sol]
+    environments:
+      - {environment: claude, profiles: [claude-opus]}
+      - {environment: codex, profiles: [gpt-5.6-sol]}
   interface.asset:
     skill: starci
     # Generating the artwork a candidate embeds needs the same image model the drawing used, so the chain is
@@ -338,8 +346,12 @@ costPolicy: |-
   interface.draw keeps Codex gpt-5.6-sol first for image generation, then Claude
   Opus with deferred artwork, then Qwen 3.8 Flash; interface.asset re-renders the artwork that drawing
   approved and therefore carries the same single image-capable link, with no deferral fallback - a deferred
-  slot is exactly what this operation exists to close. knowledge.repair edits this runtime and therefore
-  leads with Claude Opus. Plan Coordinator and Workflow Monitor supervisors lead with Claude Opus and
+  slot is exactly what this operation exists to close. grammar.update is the opposite case: it grows the
+  installed grammar as code - a typed unit with its stories, its tests, its published version and its canon
+  entry - so it carries the execution `implement` role but drops the image model entirely and leads with
+  Claude Opus, then Codex gpt-5.6-sol; nothing in it is drawn, and a publish is irreversible, so the chain is
+  the two runtimes that read a whole repository's conventions before they change one. knowledge.repair edits
+  this runtime and therefore leads with Claude Opus. Plan Coordinator and Workflow Monitor supervisors lead with Claude Opus and
   fall back to Codex Sol. Every automatic chain contains only native managed-agent candidates and
   advances only after a verified no-effect failure. DeepSeek V4 Pro and Qwen 3.8 Max remain installed
   explicit or user-approved exception targets but are excluded from automatic chains; Orca

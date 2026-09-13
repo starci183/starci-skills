@@ -30,6 +30,8 @@ test('every sequence renders a numbered working order and a definition of done, 
     operations:[op({kind:'runtime.operate',allowlist:['ops/rotate.sh'],resources:['postgres']}),{kind:'operations'}],
     migration:[op({allowlist:['src/migrations/0007-orders.ts'],resources:['postgres']}),{kind:'implementation'}],
     'architecture.revise':[op({kind:'architecture.revise',origin:'sds-gap',allowlist:['features/sales/architecture/sds/intake/index.yaml'],findings:['intake has no rule for an expired cart']}),null],
+    'grammar.update':[op({kind:'grammar.update',origin:'architecture',allowlist:['/grammars/starci/**'],
+      findings:['no contract renders a stepped progress rail'],acceptance:['the grammar renders a stepped progress rail']}),{kind:'implementation'}],
     decide:[op({kind:'architecture.decide',origin:'architecture',allowlist:['features/sales/architecture/sds/intake/index.yaml'],checks:[]}),null],
     'brand.decide':[op({kind:'brand.decide',origin:'architecture',allowlist:['brand/index.yaml'],
       acceptance:['every colour token names its source file'],checks:[{name:'unit-tests-pass',command:'npx vitest run intake'}]}),{kind:'brand'}],
@@ -234,6 +236,47 @@ test('architecture.revise edits one SDS section, bumps rev, keeps the decision l
   assert.doesNotMatch(text,/MUST fail now/);
   assert.doesNotMatch(text,/Lane: the feature's `ui` node/);
   assert.match(text,/no product code changed and no other design section moved/);
+});
+
+test('grammar.update tries the composition of existing contracts first and publishes only behind green gates',()=>{
+  const operation=op({kind:'grammar.update',origin:'architecture',allowlist:['/grammars/starci/**','/knowledge/grammars/**'],
+    references:['features/sales/ui/index.yaml','knowledge/grammars/starci/family.yaml'],
+    findings:['no contract renders a stepped progress rail'],acceptance:['the grammar renders a stepped progress rail'],
+    checks:[{name:'grammar-gates',command:'npm run gate:grammar'}]});
+  const text=stepsFor(operation,{node:{kind:'implementation'}});
+  const grown=steps(text);
+  assert.match(text,/Sequence `grammar\.update`/);
+  // Whatever the origin or the node it came from, growing the language is its own sequence, never a product build.
+  assert.equal(sequenceFor(operation,{node:{kind:'implementation'}}),'grammar.update');
+  assert.equal(sequenceFor({...operation,origin:'repair'},{node:{kind:'ui'}}),'grammar.update');
+  assert.equal(sequenceFor({...operation,origin:'shared'},{node:null}),'grammar.update');
+  // Read the gap and the WHOLE canon first; a gap that is really a missing rule or screen goes back, not forward.
+  assert.match(grown[0],/gap report that opened this operation \(1 finding\)/);
+  assert.match(grown[0],/WHOLE installed canon/);
+  assert.match(grown[0],/`blocked` `sds-gap` or `interface-gap`/);
+  // The compose-first rule: a shape that composes is reported as the composition and the grammar is left alone.
+  assert.match(grown[1],/FIRST try to express the shape as a composition of existing contracts/);
+  assert.match(grown[1],/write that attempt down/);
+  assert.match(grown[1],/report `done` with the composition, change nothing in the grammar/);
+  assert.match(grown[2],/Only when it does not compose/);
+  assert.match(grown[2],/primitive \(a fixed semantic unit\) or a block \(it carries feature meaning\)/);
+  assert.match(grown[2],/`ask` with the composition attempt attached, never a guess/);
+  assert.match(grown[3],/inside the allowlist \(`\/grammars\/starci\/\*\*`, `\/knowledge\/grammars\/\*\*`\)/);
+  assert.match(grown[3],/failing on the revision you started from/);
+  // The publish gate: every gate green first, the publish is irreversible, and the version is read back.
+  assert.match(grown[4],/grammar-gates: `npm run gate:grammar`/);
+  assert.match(grown[4],/only when every one is green publish a new version/);
+  assert.match(grown[4],/The publish is irreversible/);
+  assert.match(grown[4],/npm view <pkg>@<version>/);
+  assert.match(grown[5],/`blocked` with `shared-change` and the exact manifest paths/);
+  assert.match(grown[6],/Record the unit in the canon/);
+  assert.match(grown[7],/report `done` exactly once with the unit, the exact published version and the canon entries/);
+  const done=text.split('## Definition of done for this kind')[1];
+  assert.match(done,/composition of existing contracts was tried first/);
+  assert.match(done,/exactly one semantic unit/);
+  assert.match(done,/red on the revision you started from and green after your change/);
+  assert.match(done,/read back from the registry as actually served/);
+  assert.match(done,/no product page, no screen and no second unit/);
 });
 
 test('the frontend lane resolves from the kind, from the node layout and from a legacy implementing kind',()=>{

@@ -24,8 +24,8 @@ that skipping it is not available.
 
 ## The catalog
 
-Twelve kinds, and the list is closed in both directions: `validateGraph` reports `catalog-drift` when the
-profile and the `KINDS` constant of `execution/kind-graph.mjs` disagree, so a thirteenth kind cannot appear by
+Fourteen kinds, and the list is closed in both directions: `validateGraph` reports `catalog-drift` when the
+profile and the `KINDS` constant of `execution/kind-graph.mjs` disagree, so a fifteenth kind cannot appear by
 accident. `family` says what an operation is for, `role` is the allocator role of
 [`profiles/runtimes.yaml`](runtime-allocation.md) (and must equal its `roleOfKind` entry), `mutates` is what it
 may change, and `operator` is the launchable operator contract in `ops/` that carries it.
@@ -41,6 +41,7 @@ may change, and `operator` is the launchable operator contract in `ops/` that ca
 | `frontend.implement` | build | implement | no | code | `interface.implement` | Build the interface the drawing settled. |
 | `backend.implement` | build | implement | no | code | `backend.implement` | Build one slice of behind-the-interface behaviour. |
 | `runtime.operate` | build | implement | no | runtime, code | `runtime.operate` | Migrations, environment, deployment, infrastructure. |
+| `grammar.update` | build | implement | no | code, grammar | `grammar.update` | Grow the installed grammar by one semantic unit no composition of existing contracts renders: implement it with its stories and tests, publish it, bump the consumer, record it in the canon. |
 | `e2e.verify` | prove | verify | no | code | `e2e.verify` | Prove one delivered slice through its public API on the real stack, never a screen, and leave the scenario spec with its run output. |
 | `uat.verify` | prove | verify | no | code | `uat.verify` | Walk one end-to-end scenario on the rendered surface and leave it with its evidence. |
 | `review.verify` | prove | verify | **yes** | - | `review.verify` | Read the slice against its acceptance and report findings, repairing nothing. |
@@ -134,6 +135,7 @@ walk repairs what that lane builds). Both need the reporter's context; an unreso
 | blocker `sds-gap` | any | `architecture.revise` | architecture | 2 | reopen |
 | blocker `interface-gap` | any | `interface.draw` | architecture | 2 | reopen |
 | blocker `brand-gap` | any | `brand.decide` | architecture | 2 | reopen |
+| blocker `grammar-gap` | any | `grammar.update` | architecture | 2 | reopen |
 | blocker `shared-change` | any | `same` | shared | 3 | pause |
 | blocker `environment` | any | *the user* | - | 1 | needUser |
 | blocker `authority` | any | *the user* | - | 1 | needUser |
@@ -151,6 +153,18 @@ contradicts - both mean the brand record is missing or silent, so the route sett
 and the reporting operation reads it again. Neither the drawing, the asset operation nor the build may close the
 gap themselves: one would invent an identity, one would generate outside it, one would invent the picture. Past
 the bound of two the workflow asks the user, which is where a brand the product has not settled belongs.
+
+`grammar-gap` is the third gap, and the three are not the same question: `interface-gap` means the drawing is
+silent, `brand-gap` means the identity is unsettled, `grammar-gap` means the language itself lacks the word.
+Each routes to the record that owns it - the drawing, the brand record, the grammar package - so nothing is
+answered in the place that merely discovered it. The grammar one is the deepest and the most bounded: only the
+two kinds that render a surface (`interface.draw`, `frontend.implement`) may raise it, and only after writing
+down an attempt to express the shape as a composition of existing contracts, because a grammar that gains a
+unit per screen is no longer a grammar. `grammar.update` then grows it once, in the grammar's own repository,
+publishes a version, bumps the consumer and records the unit in the canon; the requester reads that canon
+again behind it. Two rounds for one node, then the user decides. A workspace whose binding declares no
+`grammar` repository cannot take this route at all: the kernel says so and stops, because where a language
+lives is not something to guess.
 
 The first matching route wins, so the ordered list is the specificity order, and `validateGraph` refuses a
 route an earlier one already shadows (`route-shadowed`), a blocker no route answers (`unrouted-blocker`), a

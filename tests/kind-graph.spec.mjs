@@ -61,6 +61,21 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('record')),['brand.decide','work.author']);
   // A drawing that finds no settled identity says so with its own blocker; it never invents a colour instead.
   assert.ok(reportsOf('interface.draw',{profile}).blockers.includes('brand-gap'));
+  // The language itself is grown by one kind, which belongs to no lane and is the only one that may change it.
+  assert.equal(familyOf('grammar.update',{profile}),'build');
+  assert.equal(roleOf('grammar.update',{profile}),'implement');
+  assert.equal(isReadOnly('grammar.update',{profile}),false);
+  assert.equal(operatorOf('grammar.update',{profile}),'grammar.update');
+  assert.ok(operators.includes('grammar.update'));
+  assert.equal(runtimes.roleOfKind['grammar.update'],'implement');
+  assert.deepEqual(mutationsOf('grammar.update',{profile}),['code','grammar']);
+  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('grammar')),['grammar.update'],'only one kind may grow the installed grammar');
+  assert.deepEqual(reportsOf('grammar.update',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['shared-change','environment','authority']});
+  // It never raises the gap it answers, and it is not part of any lane - like `architecture.revise`, a report creates it.
+  assert.equal(reportsOf('grammar.update',{profile}).blockers.includes('grammar-gap'),false);
+  for(const entry of profile.lanes)assert.equal(entry.steps.some(step=>step.kind==='grammar.update'),false,entry.id);
+  // Exactly the two kinds that render a surface may say the language lacks the word.
+  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>reportsOf(kind,{profile}).blockers.includes('grammar-gap')),['interface.draw','frontend.implement']);
   for(const entry of profile.lanes)assert.equal(entry.steps.some(step=>step.kind==='work.author'),false,entry.id);
   // And no route creates it: the kernel starts it itself when the ledger reports a node incomplete.
   for(const route of profile.routes)assert.notEqual(route.to?.kind,'work.author');
@@ -207,6 +222,17 @@ test('every declared route resolves, carries a limit and says what happens to th
   // It is declared from `any`, so whichever operation discovers the gap waits for the same one record.
   assert.equal(routeFor({outcome:'blocked',blocker:'brand-gap',kind:'backend.implement',lane:lane('backend')},{profile}).kind,'brand.decide');
   assert.equal(routeFor({outcome:'blocked',blocker:'brand-gap',kind:'interface.draw'},{profile}).unresolved,null,'a named target needs no lane context');
+  // A shape the grammar cannot render is grown into the grammar once, bounded at two rounds, and the two kinds
+  // that render a surface are the only ones that can reach this route at all.
+  for(const kind of ['interface.draw','frontend.implement']){
+    const grammarGap=routeFor({outcome:'blocked',blocker:'grammar-gap',kind,lane:lane('frontend')},{profile});
+    assert.deepEqual({kind:grammarGap.kind,origin:grammarGap.origin,then:grammarGap.then,limit:grammarGap.limit},
+      {kind:'grammar.update',origin:'architecture',then:'reopen',limit:2},kind);
+    assert.equal(grammarGap.unresolved,null,'a named target needs no lane context');
+  }
+  assert.equal(reportsOf('uat.verify',{profile}).blockers.includes('grammar-gap'),false);
+  assert.equal(routeFor({outcome:'blocked',blocker:'grammar-gap',kind:'uat.verify',lane:lane('frontend')},{profile})?.kind,'grammar.update',
+    'the route is declared from any, so it resolves; what stops a walk from taking it is its own report vocabulary');
   // A shared change is the requester's own kind, scoped, and the requester waits for it.
   const sharedFrontend=routeFor({outcome:'blocked',blocker:'shared-change',kind:'frontend.implement',lane:lane('frontend')},{profile});
   assert.deepEqual({kind:sharedFrontend.kind,origin:sharedFrontend.origin,then:sharedFrontend.then},
