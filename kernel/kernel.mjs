@@ -1026,6 +1026,14 @@ export function resumePaused(store,state){
 function handleBlocked(store,state,op,report,ctx){
   const blocker=report.blocker??{kind:'environment',detail:report.summary};
   if(blocker.kind==='shared-change'){
+    // A record-authoring op (an intake, a migration, a node author) writes records under its allowlist and nothing
+    // else: it has no code to change and nobody to delegate one to. One migration asked for the identity resource
+    // it was only meant to declare and for the code that reads the variable, and the kernel dutifully opened a
+    // shared op on product code. The answer is the rule, in the op's next attempt.
+    if(authorsRecord(op.kind)&&!plain(op.cut)){
+      store.appendEvent({event:'shared-change-refused',op:op.id,kind:op.kind,paths:ctx.guards.parseSharedChangePaths?.(String(blocker.detail??''))??[],reason:'record-authoring op'});
+      return retryOp(store,state,op,[`A ${op.kind} operation writes records under its allowlist and asks for no shared change: a credential's custody (\`identity:<slug>\`) is declared, never created - the owner creates it when the integration is proven - and the code that reads a variable is never yours to change. Write the declarations, leave everything else, and report done.`],ctx,'record-authoring-shared-change');
+    }
     const named=ctx.guards.parseSharedChangePaths(`${blocker.detail} ${(report.open??[]).join(' ')}`)??[];
     const paths=unique(named.map(normalize)).filter(file=>!inside(file,op.allowlist));
     if(!paths.length){
@@ -2073,6 +2081,18 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   // never reinstated by --allow-dynamic, and its needUser item goes with it.
   state.dynamicOps=state.ops.filter(item=>countsAgainstBudget(item)).length;
   for(const op of state.ops)if(!countsAgainstBudget(op)&&op.refusal==='dynamic-op'){op.refusal='superseded';state.needUser=state.needUser.filter(item=>item.op!==op.id||item.kind!=='dynamic-op');}
+  // A shared op an older rule opened on behalf of a record-authoring op (an intake asking for the code that reads a
+  // variable) is withdrawn: a record author never delegates a code change, and its requester runs again with the rule.
+  for(const shared of state.ops.filter(item=>item.origin==='shared'&&authorsRecord(item.kind)&&['pending','ready','running','paused'].includes(item.status))){
+    if(shared.status==='running'&&shared.dispatch)try{settleDispatch(orca,shared.dispatch,{cwd,reason:'withdrawn: a record author delegates no code change',terminalHandle:shared.terminal,closeTerminal:true,wait});}catch{/* the terminal may already be gone */}
+    shared.status='blocked';shared.refusal='superseded';shared.dispatch=null;shared.terminal=null;
+    store.appendEvent({event:'shared-op-withdrawn',op:shared.id,kind:shared.kind,requesters:shared.requesters??[],reason:'a record-authoring op asks for no shared change'});
+    for(const requester of (shared.requesters??[]).map(id=>byId(state,id)).filter(Boolean)){
+      requester.status='ready';requester.attempt+=1;requester.waitingFor=null;requester.dispatch=null;requester.terminal=null;requester.nudged=false;
+      requester.findings=unique([...(requester.findings??[]),`A ${requester.kind} operation writes records under its allowlist and asks for no shared change: a credential's custody (\`identity:<slug>\`) is declared, never created, and the code that reads a variable is never yours to change. Write the declarations, leave everything else, and report done.`]);
+      requester.dependsOn=(requester.dependsOn??[]).filter(id=>id!==shared.id);
+    }
+  }
   // An op the validator exhausted gets one more round on a fresh kernel start: the validator's rules may have changed.
   for(const op of state.ops)if(op.status==='blocked'&&!op.refusal&&(op.validatorRejects??0)>=validatorRejectLimit()&&!op.validatorReset){op.status='ready';op.validatorRejects=0;op.validatorReset=true;op.dispatch=null;op.terminal=null;state.needUser=state.needUser.filter(item=>!(item.op===op.id&&item.kind==='validator'));}
   state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
