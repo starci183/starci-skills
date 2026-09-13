@@ -529,6 +529,7 @@ function scheduleOps(orca,store,state,ctx){
         store.appendEvent({event:'avoid-reset',op:op.id,avoid:op.avoidRuntimes,restarts:op.restarts});
         op.avoidRuntimes=[];
       }
+      op.deferral={reason,at:clockOf(ctx)};
       store.appendEvent({event:'allocation-deferred',op:op.id,reason,avoid});continue;
     }
     // The shared view changed the choice: an equally capable runtime no other kernel is on took the operation.
@@ -2151,6 +2152,13 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     store.appendEvent({event:'kind-renamed',op:op.id,from:op.kind,to:kind,...(hidden?{hidden:true}:{})});
     op.kind=kind;
   }
+  // A finish an older rule declared over a stall that time lifts (the daily op budget) is withdrawn: the workflow
+  // is what it was, and its runtimes come back with the UTC day.
+  if(state.finished?.reason==='no runtime accepted an operation'){
+    store.appendEvent({event:'finish-withdrawn',outcome:state.finished.outcome,reason:state.finished.reason});
+    state.finished=null;state.phase='run';state.stalls=0;state.stalledSince=null;
+    state.needUser=state.needUser.filter(item=>!(item.kind==='environment'&&!item.op&&/^no runtime accepted an operation/.test(String(item.detail??''))));
+  }
   // Split children an older rule made of a record author are withdrawn: half an intake is not an operation.
   for(const op of state.ops.filter(item=>item.origin==='repair'&&authorsRecord(item.kind)&&!item.nodeId&&/ - only \`/.test(String(item.goal??''))&&['pending','ready','blocked'].includes(item.status)&&item.refusal!=='superseded')){
     op.status='blocked';op.refusal='superseded';op.dispatch=null;op.terminal=null;
@@ -2294,7 +2302,18 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
       state.stalls+=1;
       state.stalledSince=state.stalledSince??now();
       store.appendEvent({event:'stalled',stalls:state.stalls,since:state.stalledSince,allocation:state.allocation});
-      if(now()-state.stalledSince>=STALL_MS){
+      // A stall over a bound that time lifts - a daily op budget spent, a cooldown, every slot taken - is a wait,
+      // never a finish: the budget rolls with the UTC day and the cooldown ends, and the work is exactly what it was.
+      // Only a stall nobody can name a reason for reaches the owner as an environment item.
+      const waiting=state.ops.filter(op=>op.status==='ready');
+      const timeBound=waiting.length>0&&waiting.every(op=>/budget exhausted|cooling|no free slot|rate-limit/i.test(String(op.deferral?.reason??'')));
+      if(timeBound){
+        if(now()-(state.budgetWaitAt??0)>=30*60*1000){
+          state.budgetWaitAt=now();
+          store.appendEvent({event:'budget-wait',ops:waiting.map(op=>op.id),since:state.stalledSince,reason:waiting[0].deferral.reason});
+        }
+        state.stalledSince=now();
+      }else if(now()-state.stalledSince>=STALL_MS){
         state.needUser.push({kind:'environment',detail:`no runtime accepted an operation for ${Math.round((now()-state.stalledSince)/60000)} minutes (${state.stalls} attempts)`});
         finish(store,state,'blocked','no runtime accepted an operation',ctx);
         break;
