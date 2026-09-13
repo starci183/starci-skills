@@ -2,12 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {readDistJson} from '../core/runtime-root.mjs';
 import {parseYaml} from '../core/yaml.mjs';
+// The record catalog is `kernel/io.mjs`'s to load; this module only needs the closed list and the profile to
+// hold `reads`/`writes` to. The two modules import each other and neither calls the other while it is being
+// evaluated, so the cycle resolves the way the interface contract expects it to.
+import {RECORD_KINDS, loadRecords, recordReads} from './io.mjs';
 
 /**
  * The workflow brain as data. `model/kinds.yaml` declares three things and this module is the only code
- * that reads them: the complete catalog of operation kinds (family, allocator role, what each may change,
- * what each may report), the mandatory lane every ledger node walks, and the bounded routes an outcome may
- * take. Everything here is a pure function of that profile; the only I/O is `loadKinds`.
+ * that reads them: the complete catalog of operation kinds (family, allocator role, the records each reads
+ * and produces, what each may report), the mandatory lane every ledger node walks, and the bounded routes an
+ * outcome may take. Everything here is a pure function of that profile; the only I/O is `loadKinds`.
  *
  * The division of labour is the point. A model fills the content of one operation and answers the closed
  * options that operation offers. It never chooses the next step, never chooses which kind repairs what, and
@@ -22,10 +26,15 @@ import {parseYaml} from '../core/yaml.mjs';
 export const KIND_GRAPH='starci/kind-graph@1';
 /** The closed catalog. `validateGraph` refuses a profile that adds to it or drops from it. */
 export const KINDS=Object.freeze(['owner.ask','business.decide','architecture.decide','architecture.revise','brand.decide','interface.draw','interface.asset','e2e.verify',
-  'frontend.implement','backend.implement','runtime.operate','grammar.update','uat.verify','review.verify','work.author']);
+  'frontend.implement','backend.implement','runtime.operate','grammar.update','uat.verify','integration.verify','review.verify','work.author']);
 export const FAMILIES=Object.freeze(['design','build','prove','repair']);
 export const ROLES=Object.freeze(['decide','plan','implement','verify','write']);
-export const MUTATIONS=Object.freeze(['code','sds','srs','decision','design','asset','runtime','record','grammar']);
+/**
+ * What a kind may read and what it may produce are both record kinds, and `kernel/io.mjs` owns that list.
+ * This is the 5-plus replacement for the single `MUTATIONS` vocabulary of 5.1: one list, two directions. It
+ * is re-exported rather than copied, so a caller that has the graph never needs a second name for it.
+ */
+export {RECORD_KINDS as RECORDS} from './io.mjs';
 export const ORIGINS=Object.freeze(['ledger','shared','repair','gate','verify','architecture']);
 export const OUTCOMES=Object.freeze(['done','partial','failed','ask','blocked']);
 export const BLOCKERS=Object.freeze(['shared-change','sds-gap','interface-gap','brand-gap','grammar-gap','environment','authority']);
@@ -97,7 +106,18 @@ export function kindRecord(kind,{profile=null}={}){
 export function familyOf(kind,{profile=null}={}){return kindRecord(kind,{profile}).family;}
 export function roleOf(kind,{profile=null}={}){return kindRecord(kind,{profile}).role;}
 export function isReadOnly(kind,{profile=null}={}){return kindRecord(kind,{profile}).readOnly===true;}
-export function mutationsOf(kind,{profile=null}={}){return listOf(kindRecord(kind,{profile}).mutates);}
+/** The record kinds one operation may cite: everything it is allowed to read before it does anything. */
+export function readsOf(kind,{profile=null}={}){return listOf(kindRecord(kind,{profile}).reads);}
+/** The record kinds one operation may produce; `[]` for a read-only kind, which changes nothing at all. */
+export function writesOf(kind,{profile=null}={}){return listOf(kindRecord(kind,{profile}).writes);}
+/** Every kind that reads one record kind, in catalog order - the kernel's answer to "who gets the brand?". */
+export function kindsReading(record,{profile=null}={}){
+  return kindList({profile}).filter(kind=>readsOf(kind,{profile}).includes(record));
+}
+/** Every kind that may produce one record kind, in catalog order - who a gap in that record is routed to. */
+export function kindsWriting(record,{profile=null}={}){
+  return kindList({profile}).filter(kind=>writesOf(kind,{profile}).includes(record));
+}
 /** The launchable operator contract behind a kind: `frontend.implement` is carried by `interface.implement`. */
 export function operatorOf(kind,{profile=null}={}){return kindRecord(kind,{profile}).operator??kind;}
 /** The host capabilities a kind needs before it may be launched; `[]` for every kind that runs anywhere. */
@@ -278,20 +298,40 @@ const subsetOn=(a,b)=>Object.entries(a).every(([key,value])=>b[key]===value);
  * authored mistake here is a process mistake: an unknown kind in a lane or a route, a lane that builds
  * without proving, a design step after a build step, a prove kind allowed to redesign, a route without a
  * limit, a route no query can reach because an earlier one shadows it, a cycle between two named kinds, a
- * blocker no route answers. `runtimes` cross-checks the allocator profile, `operators` the op catalog.
+ * blocker no route answers. `runtimes` cross-checks the allocator profile, `operators` the op catalog, and
+ * `records` the record catalog every `reads`/`writes` entry is named in.
+ *
+ * Four of the errors are about the declaration of 5-plus rather than about the shape of the process, and
+ * they are what makes that declaration worth having. A kind that writes a record it shares no derivation
+ * source with is authoring it blind (`writer-blind`). A lane whose prove step cannot read what its build
+ * step wrote is proving something it never saw (`lane-proof-blind`). A route that sends a blocker to a kind
+ * writing nothing its requesters read would answer the gap somewhere the requester cannot look
+ * (`route-target-blind`). And a record kind nobody declares is a typo that would silently widen or narrow
+ * what an operation may touch (`unknown-record`).
  */
-export function validateGraph(given=null,{runtimes=null,operators=null}={}){
+export function validateGraph(given=null,{runtimes=null,operators=null,records=null}={}){
   const errors=[];
   const profile=given??loadKinds();
   if(!plain(profile)||!plain(profile.kinds)){fail(errors,'profile-shape','A kinds profile needs a kinds catalog');return errors;}
-  if(profile.schema!=='starci/kinds@1')fail(errors,'profile-schema',`Unexpected kinds profile schema ${profile.schema}`,{schema:profile.schema??null});
+  if(profile.schema!=='starci/kinds@2')fail(errors,'profile-schema',`Unexpected kinds profile schema ${profile.schema}`,{schema:profile.schema??null});
   const families=vocabulary(profile,'families',FAMILIES),roles=vocabulary(profile,'roles',ROLES);
-  const mutations=vocabulary(profile,'mutates',MUTATIONS),origins=vocabulary(profile,'origins',ORIGINS);
+  const origins=vocabulary(profile,'origins',ORIGINS);
   const outcomes=vocabulary(profile,'outcomes',OUTCOMES),blockers=vocabulary(profile,'blockers',BLOCKERS);
   const verdicts=vocabulary(profile,'verdicts',VERDICTS),thens=vocabulary(profile,'then',THEN);
   const capabilities=vocabulary(profile,'capabilities',CAPABILITIES);
   const catalogue=Object.keys(profile.kinds);
   const predicates=plain(profile.predicates)?Object.keys(profile.predicates):[];
+  // The record catalog is the vocabulary for reads and writes. A caller that has it already passes it; the
+  // default loads it, and a tree without one is held to the closed constant so validation still runs.
+  let recordProfile=records;
+  if(!plain(recordProfile))try{recordProfile=loadRecords();}catch{recordProfile=null;}
+  const recordKinds=plain(recordProfile?.records)?Object.keys(recordProfile.records):[...RECORD_KINDS];
+  const sourcesOf=record=>{
+    if(!plain(recordProfile?.records))return [];
+    try{return recordReads(record,{records:recordProfile});}catch{return [];}
+  };
+  const declaredReads=kind=>listOf(profile.kinds[kind]?.reads);
+  const declaredWrites=kind=>listOf(profile.kinds[kind]?.writes);
 
   // The catalog is closed in both directions: the compiled KINDS list and the profile must agree.
   for(const kind of KINDS)if(!catalogue.includes(kind))fail(errors,'catalog-drift',`The catalog is missing the required kind ${kind}`,{kind});
@@ -303,10 +343,22 @@ export function validateGraph(given=null,{runtimes=null,operators=null}={}){
     if(!roles.includes(record.role))fail(errors,'unknown-role',`Kind ${kind} declares the unknown role ${record.role}`,{kind,role:record.role??null});
     if(typeof record.readOnly!=='boolean')fail(errors,'missing-read-only',`Kind ${kind} must declare readOnly`,{kind});
     if(typeof record.purpose!=='string'||!record.purpose.trim())fail(errors,'missing-purpose',`Kind ${kind} must declare a one-line purpose`,{kind});
-    const mutates=listOf(record.mutates);
-    for(const entry of mutates)if(!mutations.includes(entry))fail(errors,'unknown-mutation',`Kind ${kind} may not mutate the unknown thing ${entry}`,{kind,mutates:entry});
-    if(record.readOnly===true&&mutates.length)fail(errors,'readonly-mutates',`Kind ${kind} is readOnly and may not declare mutates`,{kind,mutates});
-    if(record.readOnly===false&&!mutates.length)fail(errors,'mutates-nothing',`Kind ${kind} is not readOnly but changes nothing; declare what it mutates`,{kind});
+    if(!Array.isArray(record.reads))fail(errors,'kind-shape',`Kind ${kind} must declare reads as a list of record kinds`,{kind});
+    if(!Array.isArray(record.writes))fail(errors,'kind-shape',`Kind ${kind} must declare writes as a list of record kinds`,{kind});
+    const reads=listOf(record.reads),writes=listOf(record.writes);
+    for(const entry of [...reads,...writes])
+      if(!recordKinds.includes(entry))fail(errors,'unknown-record',`Kind ${kind} names the record kind ${entry}, which the record catalog does not declare`,{kind,record:entry});
+    if(record.readOnly===true&&writes.length)fail(errors,'readonly-writes',`Kind ${kind} is readOnly and may not declare writes`,{kind,writes});
+    if(record.readOnly===false&&!writes.length)fail(errors,'writes-nothing',`Kind ${kind} is not readOnly but produces nothing; declare what it writes`,{kind});
+    // A writer must have at least one of the record's own derivation sources in view - reading it, or
+    // authoring it in the same operation. A kind that shares none of them is writing a record it cannot
+    // check against anything it saw, which is exactly the blind restatement the record catalog exists to stop.
+    for(const written of writes){
+      const sources=sourcesOf(written);
+      if(!sources.length)continue;
+      if(sources.some(source=>reads.includes(source)||writes.includes(source)))continue;
+      fail(errors,'writer-blind',`Kind ${kind} writes ${written} without reading anything it is derived from (${sources.join(', ')})`,{kind,record:written,sources});
+    }
     // A need the vocabulary does not know is a typo no host could ever satisfy: the kind would be refused everywhere.
     if(record.needs!==undefined&&!Array.isArray(record.needs))fail(errors,'needs-shape',`Kind ${kind} must declare needs as a list of capabilities`,{kind});
     for(const entry of listOf(record.needs))if(!capabilities.includes(entry))fail(errors,'unknown-capability',`Kind ${kind} needs the unknown capability ${entry}`,{kind,capability:entry});
@@ -341,7 +393,7 @@ export function validateGraph(given=null,{runtimes=null,operators=null}={}){
     const steps=stepsOf(lane);
     if(!steps.length){fail(errors,'lane-no-steps',`Lane ${id} declares no step`,{lane:id});continue;}
     const seenSteps=new Set();
-    let builtAt=-1,provenAfterBuild=false;
+    let builtAt=-1,provenAfterBuild=false,buildKind=null;
     steps.forEach((step,index)=>{
       if(typeof step.kind!=='string'||!plain(profile.kinds[step.kind])){
         fail(errors,'lane-unknown-kind',`Lane ${id} step ${index+1} names ${step.kind}, which the catalog does not contain`,{lane:id,kind:step.kind??null});
@@ -352,9 +404,18 @@ export function validateGraph(given=null,{runtimes=null,operators=null}={}){
       if(typeof step.optionalWhen==='string'&&!predicates.includes(step.optionalWhen))
         fail(errors,'lane-unknown-predicate',`Lane ${id} step ${step.kind} is optional when ${step.optionalWhen}, which the profile does not declare`,{lane:id,kind:step.kind,predicate:step.optionalWhen});
       const family=profile.kinds[step.kind].family;
-      if(family==='build')builtAt=index;
+      if(family==='build'){builtAt=index;buildKind=step.kind;}
       if(family==='design'&&builtAt>=0)fail(errors,'lane-design-after-build',`Lane ${id} draws ${step.kind} after it already built; design comes first`,{lane:id,kind:step.kind});
-      if(family==='prove'&&builtAt>=0&&index>builtAt)provenAfterBuild=true;
+      if(family==='prove'&&builtAt>=0&&index>builtAt){
+        provenAfterBuild=true;
+        // Proving a build means reading what that build produced. A prove step blind to one of the record
+        // kinds its lane's build step writes would be signing off on something it never had in front of it -
+        // which is how four delivery nodes were verified in 2026-09 without their channel ever being read.
+        const produced=declaredWrites(buildKind),seen=declaredReads(step.kind);
+        const blind=produced.filter(record=>!seen.includes(record));
+        if(produced.length&&blind.length)
+          fail(errors,'lane-proof-blind',`Lane ${id} proves ${buildKind} with ${step.kind}, which does not read ${blind.join(', ')}`,{lane:id,kind:step.kind,build:buildKind,records:blind});
+      }
     });
     if(builtAt>=0&&!provenAfterBuild)fail(errors,'lane-build-without-proof',`Lane ${id} builds without proving it afterwards`,{lane:id});
   }
@@ -384,6 +445,18 @@ export function validateGraph(given=null,{runtimes=null,operators=null}={}){
     if(to.origin!==undefined&&!origins.includes(to.origin))fail(errors,'route-unknown-origin',`Route ${id} creates an operation with the unknown origin ${to.origin}`,{route:id,origin:to.origin});
     if(target&&![SAME,LANE_BUILD].includes(target)&&!plain(profile.kinds[target]))
       fail(errors,'route-unknown-kind',`Route ${id} routes to ${target}, which the catalog does not contain`,{route:id,kind:target});
+    // A blocker is routed to the record that owns it, and the requester reads that record afterwards. So the
+    // target must produce something every kind able to raise this blocker actually reads: `brand-gap` goes to
+    // `brand.decide` because it writes `brand` and every raiser reads `brand`. The symbolic targets are
+    // exempt - `same` is the requester itself, and `lane.build` is held by `lane-proof-blind` instead.
+    if(on.blocker&&target&&![SAME,LANE_BUILD].includes(target)&&plain(profile.kinds[target])){
+      const produced=declaredWrites(target);
+      const raisers=catalogue.filter(kind=>(from==='any'||from===kind)&&listOf(profile.kinds[kind]?.reports?.blockers).includes(on.blocker));
+      const shared=produced.filter(record=>raisers.every(kind=>declaredReads(kind).includes(record)));
+      if(raisers.length&&!shared.length)
+        fail(errors,'route-target-blind',`Route ${id} answers ${on.blocker} with ${target}, which writes nothing every kind that may raise it reads`,
+          {route:id,kind:target,blocker:on.blocker,writes:produced,raisers});
+    }
     if(target&&plain(profile.kinds[target])){
       const targetFamily=profile.kinds[target].family;
       if(from!=='any'&&profile.kinds[from]?.family==='prove'&&targetFamily==='design')
@@ -430,9 +503,9 @@ export function validateGraph(given=null,{runtimes=null,operators=null}={}){
 }
 
 /** Convenience for a caller that only wants a verdict: the loaded profile, validated. */
-export function assertGraph(profile=null,{runtimes=null,operators=null}={}){
+export function assertGraph(profile=null,{runtimes=null,operators=null,records=null}={}){
   const resolved=profile??loadKinds();
-  const errors=validateGraph(resolved,{runtimes,operators});
+  const errors=validateGraph(resolved,{runtimes,operators,records});
   need(!errors.length,`The kind graph does not validate: ${errors.map(error=>`${error.code}: ${error.message}`).join('; ')}`);
   return resolved;
 }

@@ -1,0 +1,94 @@
+schema: starci/records@1
+purpose: |-
+  What a thing in the Work tree or in the product IS, independent of the operation that wrote it. This is
+  the closed catalog of record kinds; `kernel/io.mjs` is the only module that reads it, and every operation
+  kind in `model/kinds.yaml` declares its inputs and its outputs over exactly these names.
+
+  `reads` is the derivation, not the file dependency: a business record is derived from the owner's
+  decisions, code from the design, evidence from the code it proved. That is what makes "C repeats A" and
+  "C conflicts with A" a matter of ids rather than of judgement - a record of kind K may cite another
+  record only through the kinds K reads, and a record that restates one of them is a duplicate by
+  declaration.
+
+  `layout` is where a record of this kind lives, as the path patterns `recordKindOfPath` matches. The
+  patterns are relative to the Work tree root, or carry the `repository:` prefix for the bound source
+  repository and the `grammar:` prefix for the installed grammar. They are read most-specific-first: a
+  decision lives under the business tree, so `decision` is matched before `srs`, and the bytes beside a
+  record are `asset` before the folder they sit in decides anything else.
+
+  `nodeKinds` is which Work node kinds carry a record of this kind. It is not the same question as which
+  file the node's own `index.yaml` is: an `implementation` node carries the `code` record by binding a
+  repository, while the node's own `index.yaml` stays the authored `record`.
+records:
+  record:
+    purpose: The authored fields of one Work node - its assertions, its write scope and its checks - which the kernel needs before it can launch that node at all.
+    layout: ['**/index.yaml']
+    nodeKinds: [implementation, uat, e2e, operations]
+    # Derived from nothing: it is the node's own declaration, completed by `work.author` from the tree
+    # around it, not from another record.
+    reads: []
+  srs:
+    purpose: What the product must do - the requirements, rules, data definitions and journeys of one feature.
+    layout: ['features/*/business/**']
+    nodeKinds: [business, business-overview, module]
+    # The owner's decisions are what a requirement is settled from; nothing else may change one.
+    reads: [decision]
+  sds:
+    purpose: How the product realises a requirement - flows, components, contracts, data, quality, deployment.
+    layout: ['features/*/architecture/**']
+    nodeKinds: [architecture]
+    reads: [srs, decision]
+  decision:
+    purpose: One question the owner answered, with the options analysed per side and the one recommendation that was put to them.
+    layout: ['features/*/business/srs/decisions/**']
+    nodeKinds: [decision]
+    # The owner's own. A decision is derived from the question, never from another record.
+    reads: []
+  brand:
+    purpose: The product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one record every drawing and every build reads.
+    layout: [brand/index.yaml, 'brand/**']
+    nodeKinds: [brand]
+    # Every token is read out of the real style and token files of the interface, which is why an
+    # untraceable value is a question for the owner rather than a record entry.
+    reads: [code]
+  design:
+    purpose: The interface design of one feature - its screens, their states, their contracts and the artwork they embed.
+    layout: ['features/*/ui/**']
+    nodeKinds: [ui]
+    reads: [srs, sds, brand, grammar]
+  asset:
+    purpose: The bytes beside a record - the artwork a design record declares, the mascot or logo master under the brand record.
+    layout: ['**/assets/**']
+    nodeKinds: []
+    reads: [design, brand]
+  code:
+    purpose: The product itself, in a bound source repository.
+    layout: ['repository:**']
+    nodeKinds: [implementation]
+    # Deviation from the 5-plus design table, which names `sds` alone: product code is also derived from
+    # the interface design it realises and from the installed grammar it is written in. `grammar.update`
+    # and `uat.verify` both write code while reading the design and the grammar and never the sds, so a
+    # catalog with `sds` alone makes `writer-blind` refuse the shipped kind table.
+    reads: [sds, design, grammar]
+  grammar:
+    purpose: The installed design language itself - the published grammar package and the canon that names its units.
+    layout: ['grammar:**', 'knowledge/grammars/**']
+    nodeKinds: []
+    reads: [design]
+  evidence:
+    purpose: What one operation observed when it proved something - the scenario, the run and its output.
+    layout: ['**/evidence/**']
+    nodeKinds: [uat, e2e]
+    reads: [code, design, srs]
+  runtime:
+    purpose: An environment the product runs in and the migrations applied to it.
+    # Declared, never written as a file: a runtime is a fact about a machine, recorded in the node that
+    # operates it, so no path in the tree maps to this kind.
+    layout: []
+    nodeKinds: [operations]
+    reads: [code]
+  integration:
+    purpose: An external system a business or design record declares, with the credential the owner provides in a named variable.
+    layout: ['features/*/integration/**']
+    nodeKinds: [integration]
+    reads: [srs, sds]

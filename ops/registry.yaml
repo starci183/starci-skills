@@ -7,6 +7,7 @@ ops:
   - content.generate
   - e2e.verify
   - grammar.update
+  - integration.verify
   - interface.asset
   - interface.draw
   - interface.implement
@@ -32,6 +33,7 @@ consolidation:
     - uat.verify
   supporting:
     - e2e.verify
+    - integration.verify
     - brand.decide
     - owner.ask
     - interface.asset
@@ -179,6 +181,7 @@ consolidation:
   added:
     - task.execute
     - e2e.verify
+    - integration.verify
     - brand.decide
     - grammar.update
     - owner.ask

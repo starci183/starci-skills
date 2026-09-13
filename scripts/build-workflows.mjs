@@ -61,7 +61,12 @@ export function buildFiles(skillRoot = root) {
 
   const generated = generatedOpsOutputs();
   const catalogue = JSON.parse(generated.get('catalog.json'));
-  const checked = validateCatalog(catalogue, { root: path.join(skillRoot, 'ops'), repositoryRoot: skillRoot, documents: generated });
+  // The operator catalog is held to the kinds and records profiles of THIS build, read from the authored
+  // tree; a published `.dist` from the previous build would answer for a declaration that no longer exists.
+  const checked = validateCatalog(catalogue, {
+    root: path.join(skillRoot, 'ops'), repositoryRoot: skillRoot, documents: generated,
+    kinds: loadDeclarative(skillRoot, 'model/kinds.json'), records: loadDeclarative(skillRoot, 'model/records.json')
+  });
   if (!checked.ok) throw Error('Invalid operator catalog: ' + JSON.stringify(checked.errors));
 
   const jobs = loadDeclarative(skillRoot, 'workflows/jobs.json');
