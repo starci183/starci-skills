@@ -686,6 +686,10 @@ whose detail names a variable, a key, a token or a credential is the same owner 
 Every contract carries the credential rule: a key the environment lacks is reported `blocked` with the exact
 variable name, never invented, stubbed or silently skipped, and no secret value is ever written anywhere.
 
+A triage `restart-kernel` is a restart request of the loop (`stopped: restart: triage restart`), never a stop
+flag. An `owner.ask` op that itself blocks is listed for the owner as it is; no second ask op is opened for it.
+On a shared ledger every contract says where the one tree lives (`## Where the Work tree lives`).
+
 ## A coordinator tab whose pane is gone is replaced
 
 Orca refuses every launch from a coordinator tab whose pane died ("The coordinator terminal has no stable pane
@@ -733,6 +737,13 @@ with its counters at zero, the runtimes it had learned to avoid open to it again
 (`op-readmitted`). An op the kernel refused on principle
 (superseded, out of the repository, a dynamic op over budget) stays refused: approving again changes nothing
 it was refused for. The supervisor then starts the kernel, which carries on from where it stopped.
+
+## A red tree counts against an op only where the op could have caused it
+
+The whole-tree check the kernel proves for an op (`work-valid`) is scoped: an error under the op's allowlist,
+in the files it reported or on the node it closes is the op's; every other error is foreign - reported as
+`ledger-invalid`, listed in the evidence, never the reason the op is rejected. Ops the validator exhausted on the
+whole-tree check are judged again as soon as every remaining error is foreign to them (`op-readmitted`).
 
 ## Strays that break the tree are quarantined
 

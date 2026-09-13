@@ -31,13 +31,14 @@ reads:
         variable or secret name - and what the owner has to provide and where. Never the value itself.
 writes:
   - id: decision
-    path: .starciwork/<feature>/business/srs/decisions/<slug>/index.yaml
+    path: .starciwork/<feature>/business/srs/business-rules/policy-decisions/<slug>/index.yaml
     fields:
       - description
       - extensions.work3.decision
       - refs
     content:
-      en: One decision record draft, state todo, carrying in order the question in one sentence; why it
+      en: One policy-decision record draft (kind business, an srs-policy-decision section with decisionStatus
+        open, the shape of the existing policy decisions of the tree), state todo, carrying in order the question in one sentence; why it
         matters and what stays blocked until it is answered; the options, numbered, each with what it means
         for the architecture, the user stories, the security and authority, the business rules and the
         quality limits, and what it costs; the decided records each option agrees or conflicts with, by id;

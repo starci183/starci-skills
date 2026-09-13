@@ -1164,6 +1164,17 @@ export function syncLedgerOps(store,state,ctx){
     }
     return [];
   }
+  // A tree still red only outside an op's reach is green for that op: the ops the validator exhausted on the
+  // whole-tree check are judged again when every remaining error is foreign to them.
+  if(!loaded.ok&&ctx.work){
+    for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&state.needUser.some(entry=>entry.op===item.id&&entry.kind==='validator'&&/work-valid/.test(String(entry.detail??''))))){
+      const verdict=treeVerdictFor(ctx,op);
+      if(!verdict.ok)continue;
+      op.status='ready';op.validatorRejects=0;op.dispatch=null;op.terminal=null;
+      state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&entry.kind==='validator'));
+      store.appendEvent({event:'op-readmitted',op:op.id,reason:`the ${verdict.foreign.length} error(s) of the tree are outside this operation`});
+    }
+  }
   if(state.ledgerInvalid||quarantined){
     state.ledgerInvalid=null;store.appendEvent({event:'ledger-valid-again',...(quarantined?{after:'quarantine'}:{})});
     // Ops the validator exhausted only because the whole-tree check was red are judged again now that it is green.
@@ -1745,6 +1756,8 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
       `The kernel owns the node's \`state\`, \`completion\`, \`extensions.work3.kernel\` and its evidence. It reverts anything you write here and downgrades your report to \`failed\`.`,``]:[]),
     `## Resources`,...(locks.length?locks.map(entry=>`- \`${entry}\``):['- none: this operation claims no shared resource']),
     `Two operations that share a resource never run at the same time; never start, stop or reset one you did not declare.`,``,
+    ...(state.ledgerShared&&(state.ledgerRoot||state.ledgerOwner?.repoRoot)?[`## Where the Work tree lives`,
+      `This repository shares the Work tree of ${state.ledgerOwner?.repository??'its backend'}: the one tree is \`${slash(state.ledgerRoot??path.join(state.ledgerOwner.repoRoot,'.starciwork'))}\`. Every record, candidate and asset goes there, at the absolute paths the allowlist names; a \`.starciwork\` folder created in this worktree is the wrong tree and is a defect.`,``]:[]),
     `## Credentials and configuration`,
     `A key, token, credential or configuration the environment does not provide is never invented, stubbed, defaulted or silently skipped. Report \`blocked\` with blocker \`environment\` naming the exact variable or secret name and where the code reads it; the owner provides the value out of band. Never write a secret value into a record, a report, a chat or a file the owner did not name.`,``,
     `## References`,...(op.references.length?op.references.map(entry=>`- ${entry}`):['- the goal and the allowlist above']),``,
@@ -1863,9 +1876,10 @@ function quarantineStrays(store,state,ctx,loaded){
   const treePaths=loaded.errors.map(error=>normalize(`.starciwork/${String(error.path??'')}`));
   const owns=(stray,file)=>file===stray||file.startsWith(stray.endsWith('/')?stray:`${stray}/`);
   // Every error must sit under a stray nobody owns; one error on a tracked or owned path and nothing moves.
-  const culprits=unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))).filter(Boolean));
-  if(!culprits.length||culprits.length!==unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))??'∅')).length)return [];
-  if(culprits.some(stray=>inside(stray,live)))return [];
+  // Every untracked stray that carries an error and that no live op owns is moved, whether or not other errors
+  // sit on tracked paths: what the kernel can clean it cleans, and the rest is reported as it is.
+  const culprits=unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))).filter(Boolean)).filter(stray=>!inside(stray,live));
+  if(!culprits.length)return [];
   const stamp=new Date().toISOString().replace(/[:.]/g,'-');
   const moved=[];
   for(const stray of culprits){
@@ -2342,22 +2356,49 @@ const provenChecks=checks=>checks.map(check=>({name:check.name,command:check.com
  * proves them itself when it records a node done: it validates the tree now and adds one passing check per
  * kernel-owned assertion the node declares. A tree that does not validate proves nothing and the write is refused.
  */
-function kernelProof(ctx,nodeId){
+function kernelProof(ctx,nodeId,op=null){
   if(!ctx.work||typeof ctx.work.api.readNode!=='function')return [];
   const node=ctx.work.node(nodeId);
   if(!node)return [];
   let owned=[];
   try{owned=ctx.work.api.nodeChecks(ctx.work.api.readNode(ctx.work.at,node)).filter(check=>KERNEL_CHECK.test(check.assertion??''));}catch{owned=[];}
   if(!owned.length)return [];
-  let ok=false;
-  try{ok=Boolean(ctx.work.validate({repoRoot:ctx.work.ledger?.repoRoot??ctx.work.repoRoot,workRoot:ctx.work.ledger?.workRoot??null}).ok);}catch{ok=false;}
-  return owned.map(check=>({name:check.assertion,command:workValidateCommand(ctx),exitCode:ok?0:1,assertion:check.assertion}));
+  // A red tree fails the op only where the op could have caused it: an error under a path another workflow
+  // owns (a drawing's missing assets, a decision another lane wrote in the wrong folder) is foreign, reported
+  // as `ledger-invalid`, and never the reason a backend slice is rejected twice and blocked.
+  const verdict=treeVerdictFor(ctx,op??null);
+  return owned.map(check=>({name:check.assertion,command:workValidateCommand(ctx),exitCode:verdict.ok?0:1,assertion:check.assertion,
+    evidence:verdict.ok?(verdict.foreign.length?`${verdict.foreign.length} error(s) elsewhere in the tree are outside this operation`:''):verdict.own.map(error=>`${error.code} ${error.path??''}`).join('; ')}));
+}
+/**
+ * The errors of the whole tree split by whether this op could have caused them: under its allowlist, in the
+ * files it reported, or on the node it closes. Only its own errors count against it.
+ */
+export function treeVerdictFor(ctx,op){
+  let result=null;
+  try{result=ctx.work.validate({repoRoot:ctx.work.ledger?.repoRoot??ctx.work.repoRoot,workRoot:ctx.work.ledger?.workRoot??null});}catch(error){return {ok:false,own:[{code:'VALIDATOR',path:'',message:String(error?.message??error)}],foreign:[]};}
+  const errors=Array.isArray(result?.errors)?result.errors:[];
+  if(result?.ok||!errors.length)return {ok:true,own:[],foreign:[]};
+  if(!op)return {ok:false,own:errors,foreign:[]};
+  const owned=unique([...(op.allowlist??[]),...(op.files??[]),...(op.kernelOwned??[])].map(entry=>slash(String(entry))));
+  const root=slash(ctx.work.ledger?.workRoot??'');
+  const treePath=file=>{const value=slash(String(file??''));return root&&value.startsWith(`${root}/`)?`.starciwork/${value.slice(root.length+1)}`:value;};
+  const inside=(file,entry)=>{const e=treePath(entry).replace(/\/?\*+$/,'').replace(/\/+$/,'');return file===e||file.startsWith(`${e}/`);};
+  const node=op.nodeId?ctx.work.node?.(op.nodeId):null;
+  const nodePath=node?.path?`.starciwork/${slash(node.path)}`:null;
+  const own=[],foreign=[];
+  for(const error of errors){
+    const file=`.starciwork/${slash(String(error.path??''))}`;
+    const mine=owned.some(entry=>inside(file,entry))||(nodePath&&(file===nodePath||file.startsWith(path.posix.dirname(nodePath)+'/')));
+    (mine?own:foreign).push(error);
+  }
+  return {ok:own.length===0,own,foreign};
 }
 
 function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op.head}={}){
   if(ctx.work&&!nodeId&&op.kind===BRAND_DECIDE){rereadBrand(store,state,op,ctx);return;}
   if(!ctx.work||!nodeId)return;
-  verified={...verified,checks:[...(verified?.checks??[]),...kernelProof(ctx,nodeId)]};
+  verified={...verified,checks:[...(verified?.checks??[]),...kernelProof(ctx,nodeId,op)]};
   const decision=['architecture.decide','architecture.revise','business.decide',BRAND_DECIDE].includes(op.kind)||kindRole(op.kind)==='decide';
   if(decision){
     ledgerWrite(store,state,op,ctx,'decided',node=>ctx.work.api.markDecided(ctx.work.at,node,{
@@ -2806,7 +2847,7 @@ function validateAccepted(store,state,op,ctx,{files,verified}){
   let result;
   // The kernel's own check (`work-valid`) is proven by the kernel, not by the agent: it goes to the validator with the
   // re-run checks, so an acceptance statement naming it is never rejected as unproven (repair-5 was, four times).
-  const proven=[...verified.checks,...kernelProof(ctx,op.nodeId??op.ledgerIds?.[0]??null)];
+  const proven=[...verified.checks,...kernelProof(ctx,op.nodeId??op.ledgerIds?.[0]??null,op)];
   try{result=ctx.validateOp({op,node:validatorNode(ctx,op),diff,checks:proven,references:op.references,
     // The brand travels with every verdict: a colour, a font, an icon or an artwork slot outside it is a defect,
     // and the validator can only say so if it was given the record the operation was supposed to read.
@@ -3148,15 +3189,28 @@ export function credentialNeed(detail){
   const text=String(detail??'');
   return /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+){1,}\b/.test(text)||/\b(api[ -]?key|token|secret|credential|password|client[ -]?id|webhook|oauth)\b/i.test(text);
 }
-/** The decision folder of the feature an op belongs to, in the tree's own spelling. */
-function decisionAllowlistFor(state,op){
-  const paths=[...(op.ledgerIds??[]),op.nodeId??''].map(id=>String(id)).filter(Boolean);
-  const feature=(()=>{
-    for(const id of paths){const m=id.match(/^[^.]+\.([^.]+)\./);if(m)return m[1];}
-    for(const entry of op.allowlist??[]){const m=slash(entry).match(/features\/([^/]+)\//);if(m)return m[1];}
-    return null;
-  })();
-  return feature?[`.starciwork/features/${feature}/business/srs/decisions/**`]:['.starciwork/decisions/**'];
+/**
+ * The policy-decision folder of the feature an op belongs to, in the tree's own spelling: the feature FOLDER is
+ * read from the node's path (`features/shared-lifecycle/...`), never from the id segment (`nivo.shared.`) - the
+ * first owner questions were written under `features/shared/` and `features/workspace/`, folders that do not
+ * exist, and the whole tree went red. A decision is an SRS policy-decision leaf, where the tree keeps them.
+ */
+export function decisionAllowlistFor(state,op,ctx=null){
+  const folderOf=where=>{const m=slash(String(where??'')).match(/features\/([^/]+)\//);return m?m[1]:null;};
+  const fromTree=id=>{try{return folderOf(ctx?.work?.node?.(id)?.path);}catch{return null;}};
+  const feature=[op.nodeId,...(op.ledgerIds??[])].map(fromTree).find(Boolean)
+    ??(op.allowlist??[]).map(folderOf).find(Boolean)
+    ??(op.references??[]).map(folderOf).find(Boolean)
+    ??null;
+  return feature?[`.starciwork/features/${feature}/business/srs/business-rules/policy-decisions/**`]:['.starciwork/decisions/**'];
+}
+/** One existing policy-decision record of the tree, for the ask op to mirror; none when the tree has none yet. */
+function decisionExampleFor(ctx,feature){
+  const list=ctx?.work?.loaded?.list??[];
+  const under=list.filter(node=>/\/policy-decisions\/[^/]+\/index\.yaml$/.test(slash(node.path??'')));
+  const same=feature?under.find(node=>slash(node.path).startsWith(`features/${feature}/`)):null;
+  const chosen=same??under[0];
+  return chosen?[slash(chosen.path)]:[];
 }
 /**
  * A question only the owner can answer pauses the op that asked and opens one `owner.ask` op that prepares the
@@ -3165,11 +3219,18 @@ function decisionAllowlistFor(state,op){
  * itself: the supervisor model used to, and the owner was never asked for a Zalo or Telegram key all day.
  */
 export function openOwnerAsk(store,state,op,question,ctx,report=null){
+  // The op that prepares the owner's question cannot itself be prepared for: its block is the owner's item as it is.
+  if(op.kind===OWNER_ASK){
+    op.status='blocked';
+    state.needUser.push({op:op.id,kind:'decision',detail:`${op.id} could not prepare the question of ${(op.requesters??[]).join(', ')||'the workflow'}: ${firstLine(question.text)} - answer with workflow-answer --id ${state.id} --op ${op.id} --note "..."`,record:null,options:[],requesters:[...(op.requesters??[])]});
+    store.appendEvent({event:'owner-question',ask:op.id,record:null,options:0,requesters:[...(op.requesters??[])],reason:'the ask op itself blocked'});
+    return 'owner-question';
+  }
   const same=state.ops.find(item=>item.kind===OWNER_ASK&&liveStatus.includes(item.status)&&item.question?.text===question.text);
   const ask=same??addOp(store,state,{kind:OWNER_ASK,nodeId:null,
     goal:`Prepare the owner's decision on the question ${op.id} asked: ${firstLine(question.text)}`,
-    question:{...question,from:op.id},ledgerIds:[],allowlist:decisionAllowlistFor(state,op),
-    references:unique([...(op.references??[])]),checks:ctx?.work?.at?.workRoot?[{name:'work-tree-validates',command:validateCommandAt(ctx.work.at.workRoot)}]:[],
+    question:{...question,from:op.id},ledgerIds:[],allowlist:decisionAllowlistFor(state,op,ctx),
+    references:unique([...(op.references??[]),...decisionExampleFor(ctx,(decisionAllowlistFor(state,op,ctx)[0].match(/features\/([^/]+)\//)??[])[1]??null)]),checks:ctx?.work?.at?.workRoot?[{name:'work-tree-validates',command:validateCommandAt(ctx.work.at.workRoot)}]:[],
     acceptance:[`the question is either answered from a decided record (\`answered-from: <id>\`) or drafted as one decision record with numbered options and one recommendation`],
     origin:'ask',requesters:[op.id]},`question of ${op.id} for the owner`);
   if(!same&&ctx?.work)locateSharedTreePaths(ask,ctx);
@@ -4009,7 +4070,9 @@ export function triageAnomaly(store,state,signature,ctx){
   if(option==='resume-ops'){for(const op of state.ops)if(op.status==='blocked'&&!op.refusal){op.status='ready';op.dispatch=null;op.terminal=null;}}
   else if(option==='park-runtime'){const runtime=entry.detail?.runtime;if(runtime)ctx.allocator.failed(runtime,{reason:`triage: ${signature}`});}
   else if(option==='settle-op'){const op=state.ops.find(item=>item.id===entry.detail?.op&&item.status==='running');if(op){settleDispatch(ctx.orca,op.dispatch,{cwd:state.worktree,reason:'triage',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});op.status='ready';op.dispatch=null;op.terminal=null;}}
-  else if(option==='restart-kernel'){fs.writeFileSync(path.join(store.dir,'stop.flag'),'triage restart');}
+  // A restart is asked of the loop, never written as a stop flag: a stop flag is a pause the supervisor honours until
+  // someone removes it, and a triage restart of the sales drawing sat paused for an hour that way.
+  else if(option==='restart-kernel'){state.restartRequested='triage restart';}
   else state.needUser.push({kind:'triage',detail:`${signature}: ${JSON.stringify(entry.detail).slice(0,300)}`});
   return option;
 }

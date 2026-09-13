@@ -164,6 +164,11 @@ test('preflight reports a directory that is not a repository instead of throwing
   assert.equal(result.facts.secretsGuard,false);
 });
 
+test('a shared-change path with a Windows drive keeps its drive, so the allowlist it becomes is a real path',()=>{
+  assert.deepEqual(parseSharedChangePaths('the workspace record C:/Users/Hi/orca/workspaces/nivo-fe/agentos-admin/.starciwork/workspace.yaml must change'),['C:/Users/Hi/orca/workspaces/nivo-fe/agentos-admin/.starciwork/workspace.yaml']);
+  assert.deepEqual(parseSharedChangePaths('the file apps/web/src/a.ts and docs'),['apps/web/src/a.ts'],'a relative path is unchanged');
+});
+
 test('shared-change paths are read out of prose, and a link is not a write scope', () => {
   assert.deepEqual(parseSharedChangePaths('Required typecheck and scoped lint failures are confined to the exact out-of-allowlist paths: apps/agentos-controlplane/src/instance-db/instance-data-source.ts and src/modules/shared/x.ts'),
     ['apps/agentos-controlplane/src/instance-db/instance-data-source.ts','src/modules/shared/x.ts']);

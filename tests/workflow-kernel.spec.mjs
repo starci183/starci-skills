@@ -18,7 +18,7 @@ import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
 import {machineVerify} from '../execution/workflow-kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,decisionAllowlistFor,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -1120,7 +1120,7 @@ test('a question only the owner can answer pauses the op and opens an owner.ask 
     let after=harness.run({maxIterations:1});
     const requester=after.ops.find(op=>op.id===nodeId),ask=after.ops.find(op=>op.kind==='owner.ask');
     assert.ok(ask,'an owner.ask op was opened');
-    assert.deepEqual([ask.id,ask.origin,ask.allowlist,ask.requesters,ask.question.kind,ask.question.from],['ask-1','ask',['.starciwork/features/sales/business/srs/decisions/**'],[nodeId],'credential',nodeId]);
+    assert.deepEqual([ask.id,ask.origin,ask.allowlist,ask.requesters,ask.question.kind,ask.question.from],['ask-1','ask',['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],[nodeId],'credential',nodeId]);
     assert.deepEqual([requester.status,requester.waitingFor],['paused','ask-1']);
     assert.ok(events(store).some(event=>event.event==='owner-ask-opened'&&event.op===nodeId&&event.ask==='ask-1'));
     const contract=renderContract({template,op:ask,state:after,store,launcher:'L.mjs',run:'run_wf'});
@@ -1193,6 +1193,25 @@ test('a launch Orca refuses because the coordinator pane is gone replaces the ke
     assert.deepEqual(log.filter(event=>event.event==='coordinator-tab-recovered').map(event=>[event.was,event.terminal===after.from]),[['term_dead',true]]);
     assert.equal(log.some(event=>event.event==='launch-failed'),false);
   }finally{harness.cleanup();}
+});
+
+test('a red tree counts against an op only where the op could have caused it: foreign errors are evidence, not a rejection',()=>{
+  const errors=[{code:'NODE_ASSET_UNREADABLE',path:'features/sales/ui/index.yaml',message:'asset missing'},{code:'SRS_LAYOUT',path:'features/shared/business/srs/decisions/x/index.yaml',message:'layout'}];
+  const ctx={work:{ledger:{repoRoot:'C:/owner',workRoot:'C:/owner/.starciwork'},validate:()=>({ok:false,errors}),node:()=>({path:'features/sales/implementation/backend/intake/index.yaml'})}};
+  const backend={nodeId:'demo.sales.implementation.backend.intake',allowlist:['apps/agentos-controlplane/src/sales/**'],files:['apps/agentos-controlplane/src/sales/intake.ts']};
+  const verdict=treeVerdictFor(ctx,backend);
+  assert.deepEqual([verdict.ok,verdict.own.length,verdict.foreign.length],[true,0,2],'a backend slice is not failed by a drawing\'s missing assets');
+  const drawing={nodeId:null,allowlist:['C:/owner/.starciwork/features/sales/ui/**'],files:[]};
+  const judged=treeVerdictFor(ctx,drawing);
+  assert.deepEqual([judged.ok,judged.own.map(e=>e.code),judged.foreign.length],[false,['NODE_ASSET_UNREADABLE'],1],'the op that wrote the ui record owns its error');
+  assert.equal(treeVerdictFor({work:{...ctx.work,validate:()=>({ok:true,errors:[]})}},backend).ok,true);
+});
+
+test('the decision folder of an owner question comes from the feature folder in the tree, never from the id segment',()=>{
+  const ctx={work:{node:id=>id==='nivo.shared.implementation.backend.platform-isolation'?{path:'features/shared-lifecycle/implementation/backend/platform-isolation/index.yaml'}:null,loaded:{list:[]}}};
+  assert.deepEqual(decisionAllowlistFor({},{nodeId:'nivo.shared.implementation.backend.platform-isolation',ledgerIds:[],allowlist:['src/x/**']},ctx),['.starciwork/features/shared-lifecycle/business/srs/business-rules/policy-decisions/**']);
+  assert.deepEqual(decisionAllowlistFor({},{nodeId:null,ledgerIds:[],allowlist:['C:/owner/.starciwork/features/workspace-dashboard/ui/**']},ctx),['.starciwork/features/workspace-dashboard/business/srs/business-rules/policy-decisions/**']);
+  assert.deepEqual(decisionAllowlistFor({},{nodeId:null,ledgerIds:[],allowlist:['apps/x/**']},ctx),['.starciwork/decisions/**'],'no feature known: the tree-level folder');
 });
 
 test('a contract longer than a task can carry is handed over as its head plus the file it lives in',()=>{
