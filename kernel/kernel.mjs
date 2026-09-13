@@ -1,23 +1,48 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
-import {ORCA_HOST,getPath} from '../hosts/orca/calls.mjs';
+import {getPath} from '../hosts/orca/calls.mjs';
 import {waitTick} from '../hosts/orca/protocol.mjs';
 import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from '../hosts/orca/launch.mjs';
 import {validateReport} from './reports.mjs';
-import {WORKFLOW_STATE,createStore,listWorkflows,newWorkflowId,repositoryRoot,workflowsRoot} from './store.mjs';
-import {grammarRepository,resolveLedgerRoot,samePath,sharedLedgerStatus} from './routing.mjs';
+import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} from './store.mjs';
+import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './routing.mjs';
 import {createAllocator,loadRuntimes} from './schedule.mjs';
-import {loadsFileFor,readLoads} from './loads.mjs';
-import {resolveExecutionChain} from './chains.mjs';
+import {loadsFileFor} from './loads.mjs';
 import {proofFinding,proofPlan,runAtBase} from '../checks/proof.mjs';
 import {stepsFor} from './contract.mjs';
-import {parseYaml} from '../core/yaml.mjs';
 import * as work from './ledger.mjs';
 import * as llm from '../models/functions.mjs';
 import * as graph from './graph.mjs';
+
+import {AUTHOR_KIND,BRAND_DECIDE,BRAND_KIND,CHECK_TIMEOUT_MS,DYNAMIC_OPS_BUDGET,FINAL_REPORT,GATE_ROUNDS,GOAL_RECORD,
+  KERNEL_CHECK,LAUNCH_LIMIT,LAUNCH_OPERATOR,LAUNCH_WAIT_MS,LEDGER_MODES,POLL_MS,RATE_LIMIT_WINDOW_MS,RECORD_OWNED,
+  RESTART_LIMIT,RESUME_LIMIT,RETRY_LIMIT,SHARED_OPS_PER_ITERATION,SILENCE_LIMIT,STALL_MS,VALIDATOR_REJECT_LIMIT,
+  VALIDATOR_UNAVAILABLE_LIMIT,VERIFY_ROUNDS,WORKFLOW_KERNEL,WORK_LEDGER,WORK_OPERATION,DECISION_OPERATION,
+  addOp,allowlistsOverlap,byId,clockOf,covers,csv,currentBranch,describeNode,detectLedgerMode,dynamicBudget,firstLine,
+  countsAgainstBudget,grammarReferences,hostDescriptorOf,hostMissing,inScopePath,inside,jobRulings,kernelGuards,kindRole,
+  launchOperator,ledgerBinding,ledgerItem,liveStatus,locateSharedTreePaths,need,nextId,normalize,parseGate,parseQuota,
+  parseRef,pathsIn,plain,readJson,reportAllowlist,required,routeKind,routeOf,routed,rulingsText,slash,sleepSync,runCommand,
+  tail,toOp,unique,validateCommandAt,workModule,workOpId,workValidateCommand,writeJson} from './common.mjs';
+import {ioBlock,kindsReadingBrand,undeclaredWrites} from './io.mjs';
+import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
+import {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
+  recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
+import {MECHANICAL_QUESTION,OWNER_ASK,answerOrEscalate,answerOwnerQuestion,credentialNeed,decisionAllowlistFor,
+  openOwnerAsk,resumeWithAnswer,settleOwnerAsk} from './owner.mjs';
+import {BRAND_PAYLOAD,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
+  kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
+  rereadBrand,sharedCheckCommand,treeForVerdict,validateAccepted,validatorRejectLimit} from './verify.mjs';
+import {KERNEL_PLANNED_KINDS,LANE_LAYOUTS,advanceLanes,authorRecordOp,commitLedgerWrite,deriveWorkOp,designGate,
+  designNodeOf,designRecord,guardKernelPaths,guardRecordBlocks,kernelOwnedPaths,laneNext,laneOf,lanePredicates,
+  laneProgress,laneSkip,laneText,laneWalked,ledgerWrite,markLedger,nodeLayout,protectedFingerprint,pruneAnsweredQuestions,
+  quarantineStrays,recordBlocks,recordDone,recordPath,repairKernelRecords,retemplateLanes,sweepTreeStrays,
+  syncLedgerOps} from './sync.mjs';
+import {intakeOp,retemplateIntakeOps,scopeNames,settleIntake} from './intake.mjs';
+import {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,fallbackGoalMarkdown,
+  goalPhase,laneHeaderLines,noteCritiqueInGoal,noteLaneInGoal,planCritiquePrerequisites,planGoalPhase,proposeQuota,
+  recordStatements,validateWorkTree,workGoalMarkdown,workGoalPhase} from './goal.mjs';
 
 /**
  * The StarCi 5.0 workflow kernel: one process per job. It assesses the goal into a ledger and a dynamic
@@ -27,317 +52,39 @@ import * as graph from './graph.mjs';
  * There is no Coordinator, no per-module Monitor and no provider chain: a runtime comes from the allocator,
  * every transition is an event in the workflow store, and `done` is never taken on trust - the kernel
  * re-runs the operation's own checks itself and commits only what it could reproduce.
- */
-export const WORKFLOW_KERNEL='starci/workflow-kernel@1';
-export const FINAL_REPORT='starci/workflow-final-report@1';
-export const GOAL_RECORD='starci/workflow-goal@1';
-/**
- * Two ledgers, one loop. `work` is the product ledger: the canonical Work tree is the TODO list, so the
- * goal phase derives the operations from authored nodes and every accepted slice is written back into the
- * node that asked for it. `plan` is the model-assessed ledger, for a job in a repository that has no Work
- * tree: `assessGoal` invents the ledger and nothing is written outside the workflow directory.
- */
-export const LEDGER_MODES=['work','plan'];
-export const WORK_LEDGER='work';
-/**
- * Work kind -> the operation kind that executes it. This is the fallback only: the lane of the node
- * (`model/kinds.yaml` through `kernel/graph.mjs`) decides the kind of every step, and this map is
- * what a tree whose kind graph cannot be read falls back to. Decision kinds are answered, never launched.
- */
-export const WORK_OPERATION={implementation:'backend.implement',ui:'interface.implement',uat:'uat.verify',e2e:'e2e.verify',operations:'runtime.operate'};
-export const DECISION_OPERATION={architecture:'architecture.decide',business:'business.decide','business-overview':'business.decide',brand:'brand.decide'};
-/**
- * The brand is a decision like any other, and the one every design-family operation reads: the node kind
- * `brand` is answered by `brand.decide`, which authors the brand record (name, family, colour tokens and their
- * roles, the mascot and logo assets, what is forbidden, the imagery prompt rules) and bumps its `rev`.
- */
-export const BRAND_KIND='brand';
-export const BRAND_DECIDE='brand.decide';
-/**
- * Kinds the graph names that the operator registry still launches under their 4.x operator id. The graph is
- * the kernel's vocabulary (roles, lanes, routes); `ops/registry.yaml` is the launchable operator set, and the
- * two are allowed to differ - a lane step is resolved to a launchable operator here, once, at the launch seam.
- */
-export const LAUNCH_OPERATOR={'frontend.implement':'interface.implement','architecture.revise':'architecture.decide'};
-/** The operator contract a kind launches with: the catalog's `operator` first, then the alias map, then the kind itself. */
-export const launchOperator=kind=>{let fromGraph=null;try{fromGraph=graph.operatorOf(kind);}catch{fromGraph=null;}return (fromGraph&&fromGraph!==kind?fromGraph:null)??LAUNCH_OPERATOR[kind]??kind;};
-/** The graph's role for a kind; the runtimes profile keeps its own `roleOfKind` map as the fallback. */
-export const kindRole=kind=>{try{return graph.roleOf(kind);}catch{return null;}};
-/**
- * The one kind that authors a Work record instead of working from one, and the only kind whose write scope is
- * its own node's `index.yaml`. It runs before the node's lane, never inside it: no lane names it, no route
- * creates it, and the kernel creates exactly one per node when the ledger reports that node incomplete.
- */
-export const AUTHOR_KIND='work.author';
-/** What stays the kernel's inside a record an author op may otherwise write. Compared before and after, never reverted field by field. */
-export const RECORD_OWNED=['state','completion','extensions.work3.kernel'];
-const RESUME_LIMIT=5,RETRY_LIMIT=3,RESTART_LIMIT=3,VERIFY_ROUNDS=3,GATE_ROUNDS=3,LAUNCH_LIMIT=3;
-/** A workflow with nothing running and nothing launchable waits this long before it stops for the user: a runtime that is cooling for five minutes is not a dead environment. */
-export const STALL_MS=30*60*1000;
-/** Run-time growth is bounded too: ops nobody approved, shared changes per iteration, inferred rate limits. */
-export const DYNAMIC_OPS_BUDGET=64;
-const SHARED_OPS_PER_ITERATION=3,SILENCE_LIMIT=2,RATE_LIMIT_WINDOW_MS=30*60*1000;
-const CHECK_TIMEOUT_MS=30*60*1000,LAUNCH_WAIT_MS=180000,POLL_MS=5000;
-/** The validator: two rejects of one op stop it at the user, three unavailable verdicts in a row name the outage; memory and diff are bounded in bytes. */
-export const VALIDATOR_REJECT_LIMIT=2,VALIDATOR_UNAVAILABLE_LIMIT=3;
-const VALIDATOR_MEMORY_LINES=40,VALIDATOR_MEMORY_BYTES=12*1024,VALIDATOR_DIFF_BYTES=120*1024;
-const REF_KINDS=['srs','sds','plan','brief','note','design','uat','file','dir','url'];
-
-const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
-const need=(condition,message)=>{if(!condition)throw Error(message);};
-const required=(value,label)=>{need(typeof value==='string'&&value.trim(),`Missing ${label}`);return value.trim();};
-const csv=value=>String(value??'').split(',').map(item=>item.trim()).filter(Boolean);
-const unique=list=>[...new Set(list)];
-const slash=value=>String(value??'').replaceAll('\\','/');
-const normalize=value=>slash(value).replace(/^\.\//,'');
-const tail=(text,max=400)=>String(text??'').replace(/\s+$/,'').slice(-max);
-const firstLine=value=>String(value??'').split('\n').map(line=>line.trim()).find(Boolean)??'';
-const readJson=(file,fallback)=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}};
-const writeJson=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`${JSON.stringify(value,null,2)}\n`);};
-const sleepSync=ms=>{if(ms>0)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);};
-const runCommand=(command,{cwd,timeoutMs=CHECK_TIMEOUT_MS}={})=>spawnSync(command,{cwd,shell:true,encoding:'utf8',windowsHide:true,timeout:timeoutMs,maxBuffer:64*1024*1024});
-
-/** Allowlist entries are paths or `dir/**` globs; two operations may run together only when no root contains the other. */
-const allowRoot=entry=>normalize(entry).replace(/\/?\*+$/,'').replace(/\/+$/,'');
-const covers=(a,b)=>{const x=allowRoot(a),y=allowRoot(b);return x===y||y.startsWith(`${x}/`)||x.startsWith(`${y}/`);};
-export const allowlistsOverlap=(a=[],b=[])=>a.some(one=>b.some(other=>covers(one,other)));
-const inside=(file,allowlist=[])=>allowlist.some(entry=>{const root=allowRoot(entry);return file===root||file.startsWith(`${root}/`);});
-/** Paths named inside free text (a blocker detail, a review finding): only tokens that carry a directory separator. */
-const pathsIn=text=>unique(String(text??'').match(/[A-Za-z0-9_@.][A-Za-z0-9_@./-]*\/[A-Za-z0-9_@./-]+/g)??[]).map(normalize);
-/**
- * A dynamic op stays inside the approved scope, matched against the scope entries that name a path or a
- * feature folder: an entry by prefix, or as a path segment. A scope given as a Work node id (`demo.sales`)
- * constrains the ledger, not a file path, so it never refuses an op's allowlist here.
- */
-const pathScopes=scope=>(scope??[]).map(entry=>normalize(entry).replace(/^features\//,'').replace(/\/+$/,''))
-  .filter(key=>key&&!(key.includes('.')&&!key.includes('/')));
-const inScopePath=(file,scope=[])=>{
-  const keys=pathScopes(scope);
-  return !keys.length||keys.some(key=>covers(key,file)||`/${normalize(file)}/`.includes(`/${key}/`));
-};
-
-/**
- * The guard surface (`kernel/guards.mjs`): path protection, resource locks, git serialization and
- * the worktree preflight. It is loaded optionally, because a tree that ships without it must still run the
- * kernel - the fallbacks below are the same contract, implemented minimally, and every call goes through
- * `ctx.guards`, so a test or a host can inject its own.
- */
-const FALLBACK_GUARDS={
-  protectedPaths:(node,repoRoot)=>{
-    const relative=slash(node?.path??'');
-    if(!relative)return [];
-    return [`.starciwork/${relative}`,`.starciwork/${slash(path.dirname(relative))}/evidence/**`];
-  },
-  revertProtected:(git,{cwd,paths=[]}={})=>{
-    const shown=git('git',['status','--porcelain','--',...paths.map(allowRoot)],{cwd,encoding:'utf8',windowsHide:true});
-    const changed=shown.status===0?unique((shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
-      .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,'')))):[];
-    if(changed.length)git('git',['checkout','--',...changed],{cwd,encoding:'utf8',windowsHide:true});
-    return {reverted:changed,removed:[]};
-  },
-  parseSharedChangePaths:detail=>pathsIn(detail),
-  resourceLocks:op=>unique([...(op?.resources??[]),...(op?.checks??[]).flatMap(check=>{
-    const command=String(check?.command??'');
-    return [/localhost:5432|127\.0\.0\.1:5432|localhost:8089|start:dev|docker compose/i.test(command)?'local-stack':null,
-      /playwright|uat\.verify/i.test(command)?'e2e-runtime':null,/kubectl|helm/i.test(command)?'cluster':null].filter(Boolean);
-  })]),
-  resourcesClash:(a,b)=>FALLBACK_GUARDS.resourceLocks(a).some(lock=>FALLBACK_GUARDS.resourceLocks(b).includes(lock)),
-  gitQueue:fn=>fn(),
-  preflight:()=>({ok:true,fixes:[],problems:[]})
-};
-const loadedGuards=await import('./guards.mjs').then(module=>module,()=>null);
-export const kernelGuards=Object.fromEntries(Object.entries(FALLBACK_GUARDS)
-  .map(([name,fallback])=>[name,typeof loadedGuards?.[name]==='function'?loadedGuards[name]:fallback]));
-
-function parseRef(ref){
-  if(plain(ref))return {kind:ref.kind??'file',ref:required(ref.ref??ref.path,'input ref')};
-  const value=required(ref,'input ref');
-  const [head,...rest]=value.split(':');
-  return REF_KINDS.includes(head)&&rest.length?{kind:head,ref:rest.join(':').trim()}:{kind:'file',ref:value};
-}
-function parseGate(gate){
-  if(plain(gate))return {name:required(gate.name,'gate name'),command:required(gate.command,'gate command'),timeoutMs:gate.timeoutMs??null};
-  const value=required(gate,'gate');
-  const index=value.indexOf('=');
-  need(index>0,`A gate must be "name=command": ${value}`);
-  return {name:value.slice(0,index).trim(),command:value.slice(index+1).trim(),timeoutMs:null};
-}
-
-export function currentBranch(cwd,git=spawnSync){
-  const shown=git('git',['rev-parse','--abbrev-ref','HEAD'],{cwd,encoding:'utf8',windowsHide:true});
-  return shown.status===0?(shown.stdout??'').trim():'unknown';
-}
-
-/* ------------------------------------------------------------------ the lane: one workflow, one worktree */
-
-/**
- * A **lane** is the worktree one workflow owns: the kernel, every operation of that workflow and nothing else
- * live in it, on its own branch, and Orca shows it as one top-level row `[Workflow] <id>`. This is not the
- * kind lane a node travels (`state.lanes`, `laneOf`); it is the place the whole workflow happens.
  *
- * Two workflows never share a worktree, because sharing one is what made three workflows' agents hang under a
- * single Orca row with no way to tell whose operation is whose. The branch is merged back into the branch the
- * lane was cut from when, and only when, the workflow finishes `done`.
+ * What is left in this file is the loop and nothing else: schedule, launch, accept a report, route what it
+ * implies, run the gates, finish. Each of the concerns it calls is a file of its own and says in its own head
+ * why it is one - `common.mjs` (what they all share), `io.mjs` (what a kind reads and produces), `goal.mjs`
+ * (everything before the one human gate), `intake.mjs` (records the tree does not hold yet), `sync.mjs` (the
+ * Work tree read and written), `owner.mjs` (the owner decides, the runtime prepares), `verify.mjs` (a `done`
+ * is never taken on trust), `lanes.mjs` (the worktree a workflow owns) and `terminals.mjs` (a tab exists only
+ * while somebody reads it). Every name they export is re-exported here, so a caller that knows the kernel as
+ * one module keeps working.
  */
-export const laneRowTitle=id=>`[Workflow] ${required(id,'workflow id')}`;
-export const LANE_NAME=/^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-/** `--lane` alone takes the workflow id as the name; `--lane <name>` takes that name, validated as one segment. */
-export function laneNameOf(value,id){
-  const named=typeof value==='string'&&value.trim()&&value.trim()!=='true'?value.trim():String(id);
-  need(LANE_NAME.test(named),`A lane name is one path segment of letters, digits, dot, dash or underscore: ${named}`);
-  return named;
-}
-const laneBranchRef=value=>String(value??'').replace(/^refs\/heads\//,'').trim();
-/** The lane row Orca just created, read from its receipt - never guessed, because the branch is Orca's to name. */
-function laneReceipt(receipt){
-  const row=getPath(receipt,'result.worktree');
-  const worktree=[row?.path,row?.worktreePath,row?.root,row?.directory].find(value=>typeof value==='string'&&value.trim());
-  const branch=[row?.branch,row?.branchRef,row?.ref].map(laneBranchRef).find(Boolean);
-  return {worktree:worktree?path.resolve(worktree):null,branch:branch??null,orcaId:row?.id??null};
-}
-/**
- * The workflow whose lane is this worktree, if any. A lane never opens a lane of its own: the rows would nest
- * and the owner would be back to guessing whose operation is whose.
- */
-export function laneOwnerOf(roots,worktree){
-  const target=path.resolve(worktree);
-  for(const root of unique((roots??[]).filter(Boolean).map(item=>path.resolve(item)))){
-    let entries=[];
-    try{entries=listWorkflows(root);}catch{entries=[];}
-    for(const entry of entries){
-      const lane=entry.state?.lane;
-      if(plain(lane)&&lane.worktree&&samePath(lane.worktree,target))return {id:entry.id,dir:entry.dir,lane};
-    }
-  }
-  return null;
-}
-/**
- * Create the lane of one workflow: an Orca worktree of this repository, on a new branch cut from the branch the
- * caller is on, as a top-level row named `[Workflow] <id>` and marked in progress. Every failure is Orca's own
- * reason - a name that already exists is surfaced, never worked around.
- */
-export function openLane(orca,{id,name,repoRoot,base,baseBranch,cwd=base,git=spawnSync}){
-  need(plain(orca)&&typeof orca.invoke==='function','--lane needs an Orca runner: the lane is an Orca worktree');
-  const created=orca.invoke('worktree-create',{repo:`path:${slash(path.resolve(repoRoot))}`,name,
-    'base-branch':required(baseBranch,'base branch'),setup:'skip','no-parent':true},{cwd});
-  need(created.outcome==='ok',`orca worktree create --name ${name} failed (${created.effectState??'unknown'}): ${created.reason??'no reason'}`);
-  const row=laneReceipt(created.receipt);
-  need(row.worktree&&fs.existsSync(row.worktree),`orca worktree create --name ${name} reported no worktree on disk: ${slash(row.worktree??'')}`);
-  const branch=(()=>{const here=currentBranch(row.worktree,git);return here&&here!=='unknown'&&here!=='HEAD'?here:row.branch;})();
-  need(branch,`The lane ${name} has no branch: neither the receipt nor ${slash(row.worktree)} names one`);
-  const titled=orca.invoke('worktree-set',{worktree:`path:${slash(row.worktree)}`,'display-name':laneRowTitle(id),
-    'workspace-status':'in-progress'},{cwd});
-  need(titled.outcome==='ok',`orca worktree set --display-name "${laneRowTitle(id)}" failed: ${titled.reason??'no reason'}`);
-  return {name,worktree:row.worktree,branch,orcaId:row.orcaId,
-    base:{worktree:path.resolve(base),branch:baseBranch}};
-}
-/** The lane as a reader sees it: both trees, both branches, and the merge that took it home. */
-export function laneView(state){
-  const lane=state?.lane;
-  if(!plain(lane))return null;
-  return {name:lane.name??null,worktree:lane.worktree?slash(lane.worktree):null,branch:lane.branch??null,
-    base:{worktree:lane.base?.worktree?slash(lane.base.worktree):null,branch:lane.base?.branch??null},
-    orcaId:lane.orcaId??null,
-    merged:plain(lane.merged)?{commit:lane.merged.commit??null,into:lane.merged.into??lane.base?.branch??null,at:lane.merged.at??null}:null,
-    conflict:plain(lane.conflict)?{files:[...(lane.conflict.files??[])]}:null,
-    closed:plain(lane.closed)?{at:lane.closed.at??null,preservedBranch:lane.closed.preservedBranch??lane.branch??null}:null};
-}
-/** Tell Orca what the row is now; the workflow's outcome never depends on the sidebar, so a refusal is recorded, not thrown. */
-function setLaneStatus(orca,store,state,status){
-  if(!plain(orca)||typeof orca.invoke!=='function'||!plain(state.lane))return null;
-  const result=orca.invoke('worktree-set',{worktree:`path:${slash(state.lane.worktree)}`,'workspace-status':status},
-    {cwd:fs.existsSync(state.lane.base?.worktree??'')?state.lane.base.worktree:state.lane.worktree});
-  if(result.outcome!=='ok')store.appendEvent({event:'lane-status-failed',status,reason:result.reason??null});
-  return result;
-}
-/** The files a refused merge names: the unmerged paths, or - when git refused before starting - the ones it listed. */
-function mergeConflictFiles(run,result){
-  const unmerged=run(['diff','--name-only','--diff-filter=U']);
-  const listed=unmerged.status===0?(unmerged.stdout??'').split('\n').map(line=>line.trim()).filter(Boolean):[];
-  if(listed.length)return unique(listed.map(normalize));
-  return unique(`${result.stdout??''}\n${result.stderr??''}`.split('\n')
-    .filter(line=>/^\s+\S/.test(line)).map(line=>normalize(line.trim())).filter(Boolean)).slice(0,20);
-}
-/**
- * The lane goes home: `git merge --no-ff` of the lane branch into the base branch, run in the base worktree.
- *
- * A conflict is not a merge the kernel may force. The base worktree is somebody's working copy - it may carry
- * uncommitted changes and a kernel of its own - so git refusing to overwrite a pending file is treated exactly
- * like a content conflict: the merge is aborted, nothing in the base is stashed or reset, and the workflow
- * finishes `blocked` with the conflicting files in a `merge` needUser item for the owner to settle by hand.
- */
-function mergeLane(store,state,ctx){
-  const lane=state.lane;
-  const base=lane.base?.worktree;
-  const git=ctx?.git??spawnSync;
-  const run=args=>git('git',args,{cwd:base,encoding:'utf8',windowsHide:true,env:{...process.env,ALLOW_SECRET_SCAN:'1'}});
-  // The base worktree may have moved on. A merge goes into whatever branch is checked out there, so a different
-  // branch is not this lane's merge at all: it is refused like a conflict and the owner settles it.
-  const on=currentBranch(base,git);
-  if(on!==lane.base.branch){
-    const reason=`the base worktree ${slash(base)} is on ${on}, not ${lane.base.branch}`;
-    lane.conflict={files:[],at:Date.now(),reason};
-    store.appendEvent({event:'lane-merge-conflict',id:state.id,branch:lane.branch,base:lane.base.branch,files:[],reason});
-    return {ok:false,files:[]};
-  }
-  const message=`merge(workflow): ${state.id} - ${lane.branch} into ${lane.base.branch}`;
-  const merged=run(['merge','--no-ff','--no-edit','-m',message,lane.branch]);
-  if(merged.status===0){
-    const shown=run(['rev-parse','HEAD']);
-    const commit=shown.status===0?(shown.stdout??'').trim():null;
-    lane.merged={commit,into:lane.base.branch,at:Date.now()};
-    delete lane.conflict;
-    // The item asked for exactly this merge; a workflow resumed after a conflict is no longer waiting on it.
-    state.needUser=state.needUser.filter(item=>item.kind!=='merge');
-    store.appendEvent({event:'lane-merged',id:state.id,branch:lane.branch,base:lane.base.branch,commit});
-    setLaneStatus(ctx?.orca,store,state,'completed');
-    return {ok:true,commit};
-  }
-  const files=mergeConflictFiles(run,merged);
-  // Abort whatever git did start; with nothing started there is nothing to abort and the refusal says so.
-  run(['merge','--abort']);
-  lane.conflict={files,at:Date.now(),reason:tail(merged.stderr,400)||tail(merged.stdout,400)};
-  store.appendEvent({event:'lane-merge-conflict',id:state.id,branch:lane.branch,base:lane.base.branch,files,
-    reason:lane.conflict.reason});
-  return {ok:false,files};
-}
 
+export {WORKFLOW_KERNEL,FINAL_REPORT,GOAL_RECORD,LEDGER_MODES,WORK_LEDGER,WORK_OPERATION,DECISION_OPERATION,
+  BRAND_KIND,BRAND_DECIDE,LAUNCH_OPERATOR,launchOperator,kindRole,AUTHOR_KIND,RECORD_OWNED,STALL_MS,
+  DYNAMIC_OPS_BUDGET,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,allowlistsOverlap,kernelGuards,
+  currentBranch,detectLedgerMode,ledgerBinding,dynamicBudget,hostDescriptorOf,hostMissing,parseQuota,
+  reportAllowlist,workOpId,workModule,grammarReferences};
+export {laneRowTitle,LANE_NAME,laneNameOf,laneOwnerOf,openLane,laneView} from './lanes.mjs';
+export {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,recoverCoordinatorTab,reconcileWithOrca,rebindRunIfNeeded,
+  sweepStaleTerminals} from './terminals.mjs';
+export {OWNER_ASK,credentialNeed,openOwnerAsk,answerOwnerQuestion} from './owner.mjs';
+export {BRAND_PAYLOAD,brandFields,brandPayload,brandSummary,changedFiles,machineVerify,opDiff,readValidatorMemory,
+  renderValidatorMemory,sharedCheckCommand,treeForVerdict,validatorRejectLimit} from './verify.mjs';
+export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,designRecord,deriveWorkOp,syncLedgerOps,
+  kernelOwnedPaths,protectedFingerprint} from './sync.mjs';
+export {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,goalPhase,
+  laneHeaderLines,planGoalPhase,proposeQuota,recordStatements,validateWorkTree,workGoalPhase} from './goal.mjs';
+export {ioBlock,ioPayload,kindsReadingBrand,intakeKindFor,decisionKindFor,recordKindOfPath,undeclaredWrites} from './io.mjs';
 /**
- * A resolved Work tree decides the mode: a repository driven by one, whether it owns that tree or shares the
- * tree another repository of the same product owns (`ledgerRoot`), is driven by it.
+ * The design grammar and the brand record are read by exactly these kinds. The list is no longer written here:
+ * `kindsReadingBrand()` derives it from the kinds profile, and this constant is the snapshot the docs and the
+ * tests still name. Every call site asks the function, so a profile that adds a kind is followed without an edit.
  */
-export function detectLedgerMode(repoRoot,requested=null,ledgerRoot=null){
-  if(requested){need(LEDGER_MODES.includes(requested),`Unsupported ledger mode ${requested}; use ${LEDGER_MODES.join(' or ')}`);return requested;}
-  const root=ledgerRoot?String(ledgerRoot):path.join(String(repoRoot??''),'.starciwork');
-  return fs.existsSync(path.join(root,'features'))?WORK_LEDGER:'plan';
-}
-
-/**
- * The ledger this workflow works, resolved once and then a fact of the workflow: `state.ledgerRoot` and
- * `state.ledgerOwner` are written at goal time and reused on every resume, so a long job can never drift onto
- * another tree because a route file changed underneath it. An explicit `--ledger-root` always re-resolves.
- */
-export function ledgerBinding(state,{repoRoot,host=null,ledgerRoot=null,git=spawnSync,resolve=resolveLedgerRoot}={}){
-  // Only a tree the user named (--ledger-root) is remembered as given; a routed or local one is resolved again on
-  // every start, so a binding recorded by an older rule never outlives the rule.
-  if(!ledgerRoot&&state.ledgerSource==='option'&&state.ledgerRoot&&plain(state.ledgerOwner)&&state.ledgerOwner.repoRoot)
-    return {source:state.ledgerSource??'state',ledgerRoot:state.ledgerRoot,ownerRepoRoot:state.ledgerOwner.repoRoot,
-      ownerRepository:state.ledgerOwner.repository??null,ownerRole:state.ledgerOwner.role??null,
-      project:state.ledgerOwner.project??null,role:state.codeRole??null,side:state.codeSide??null,
-      roles:plain(state.ledgerRoles)?state.ledgerRoles:null,
-      sharedLedger:Boolean(state.ledgerShared),exists:true};
-  const resolved=resolve({repoRoot,host,options:ledgerRoot?{'ledger-root':ledgerRoot}:{},git});
-  state.ledgerRoot=resolved.ledgerRoot;
-  state.ledgerOwner={repoRoot:resolved.ownerRepoRoot,repository:resolved.ownerRepository,role:resolved.ownerRole,project:resolved.project};
-  state.ledgerSource=resolved.source;
-  state.ledgerShared=Boolean(resolved.sharedLedger);
-  state.codeRole=resolved.role??null;
-  state.codeSide=resolved.side??null;
-  // Every role the binding declares, kept so a resumed run still knows the repositories that are neither the
-  // code nor the ledger owner - the optional `grammar` one a reported `grammar-gap` is grown in.
-  state.ledgerRoles=plain(resolved.roles)?resolved.roles:null;
-  return resolved;
-}
+export const DESIGN_KINDS=kindsReadingBrand();
 
 /** The whole mutable state of one workflow. `schema` is the store's, so state.json is written atomically by it. */
 export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],store,host=null,launcher=null,
@@ -369,11 +116,6 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     head:null,iterations:0,counters:{},stalls:0,allocation:null,finished:null,createdAt:Date.now()};
 }
 
-const byId=(state,id)=>state.ops.find(op=>op.id===id)??null;
-const ledgerItem=(state,id)=>state.ledger.find(item=>item.id===id)??null;
-/** `paused` is live too: an op waiting for its shared change is not finished and never lets the job finish. */
-const liveStatus=['pending','ready','running','answering','paused'];
-const nextId=(state,prefix)=>`${prefix}-${state.counters[prefix]=(state.counters[prefix]??0)+1}`;
 const componentKey=ledgerIds=>[...ledgerIds].sort().join('+')||'-';
 /**
  * The key a review round is counted against: the reviewed item set. Counting per module burned a feature's
@@ -384,1280 +126,6 @@ const groupKey=(state,ledgerIds)=>{
 };
 const implementsLedger=op=>op.kind!=='review.verify'&&(op.ledgerIds??[]).length>0;
 
-/* ------------------------------------------------------------------ lanes */
-
-/**
- * A lane is the template a Work node travels: the ordered kinds that must each be accepted before the node's
- * ledger entry may be called done. `state.lanes[nodeId] = {lane:[kind,...], done:[kind,...], checks, head}`
- * is the whole bookkeeping - the graph owns the template, the kernel owns the progress.
- *
- * Backend work is built and then reviewed; frontend work is drawn, built and then proved by a UAT run. The
- * node is one ledger item either way, so the user approves a template, not a pile of operations.
- */
-export const LANE_LAYOUTS=['backend','frontend'];
-/** The layout a node path declares: `features/x/implementation/frontend/**` is frontend work. */
-export function nodeLayout(node){
-  const where=slash(node?.path??'');
-  for(const layout of LANE_LAYOUTS)if(new RegExp(`(^|/)implementation/${layout}(/|$)`).test(where))return layout;
-  return null;
-}
-/** Kinds the kernel plans itself (`planVerifyOps`), so a node never derives one as its own next step. */
-export const KERNEL_PLANNED_KINDS=['review.verify'];
-/** The lane record of one node, created the first time the node is seen and never re-templated after that. */
-export function laneOf(state,node){
-  state.lanes=plain(state.lanes)?state.lanes:{};
-  const id=String(node?.id??'');
-  const existing=state.lanes[id];
-  if(existing?.lane?.length)return existing;
-  const lane=(()=>{try{return graph.laneFor({kind:node?.kind??null,layout:nodeLayout(node),repositoryRole:node?.repository??null});}catch{return [];}})();
-  // A node that already has accepted ops (a state from before lanes existed) starts its lane where those ops left it.
-  // An accepted author op is not one of them: it completed the record the lane is templated from, it walked no step.
-  const accepted=state.ops.filter(op=>op.nodeId===id&&op.status==='done'&&op.kind!==AUTHOR_KIND).map(op=>op.kind);
-  return state.lanes[id]={lane:[...lane],done:unique([...(existing?.done??[]),...accepted]),checks:[...(existing?.checks??[])],
-    // `authored` is the bound on record authoring, not lane progress: it survives a re-template of the lane.
-    ...(existing?.authored?{authored:existing.authored}:{}),
-    head:existing?.head??state.ops.find(op=>op.nodeId===id&&op.status==='done'&&op.head&&op.kind!==AUTHOR_KIND)?.head??null};
-}
-/**
- * How the kernel reads a Work tree from anywhere that is not the run context: `deriveWorkOp` has the api and
- * the location, the run loop has `ctx.work`. Both answer the same three things, so one reader serves both.
- */
-const ledgerAccess=ctx=>{
-  if(!plain(ctx))return null;
-  if(plain(ctx.work))return {api:ctx.work.api??null,at:ctx.work.at??{repoRoot:ctx.work.repoRoot,workRoot:ctx.work.workRoot},loaded:ctx.work.loaded??null};
-  if(ctx.api)return {api:ctx.api,at:ctx.at??null,loaded:ctx.loaded??null};
-  return null;
-};
-const workRootOf=at=>typeof at==='string'?path.join(at,'.starciwork')
-  :plain(at)?(at.workRoot?String(at.workRoot):at.repoRoot?path.join(String(at.repoRoot),'.starciwork'):null):null;
-const UI_KIND='ui';
-/**
- * The `ui` node that is a node's interface design record: itself when it is one, else the ui node it references,
- * else the one beside it under its feature (`features/<feature>/ui/index.yaml`). The projection is asked first;
- * a record written after the tree was read is still found on disk, because the record, not the projection, is
- * the authority for what the interface lane still has to do.
- */
-function designNodeOf(access,node){
-  if(!plain(node))return null;
-  if(node.kind===UI_KIND)return node;
-  const nodes=access?.loaded?.nodes;
-  const byRef=(Array.isArray(node.refs)?node.refs:[]).map(id=>typeof nodes?.get==='function'?nodes.get(id):null).find(item=>item?.kind===UI_KIND);
-  if(byRef)return byRef;
-  const module=workModule(node);
-  const beside=(access?.loaded?.list??[]).find(item=>item?.kind===UI_KIND&&slash(item.path??'')===`${module}/ui/index.yaml`);
-  if(beside)return beside;
-  const root=workRootOf(access?.at);
-  if(!root||!module.startsWith('features/'))return null;
-  const file=path.join(root,module,'ui','index.yaml');
-  return fs.existsSync(file)?{id:null,path:`${module}/ui/index.yaml`,kind:UI_KIND,state:null}:null;
-}
-/**
- * The interface design record a node reads: the `ui:` spec of its ui node - surfaces, states, the candidate
- * images under the node's own assets and the `artworkSlots` the drawing declared - with the record's own state
- * and file. It is read from disk, never inferred: a feature whose ui node was never drawn has surfaces without
- * candidates, and a feature with no ui node at all has no record.
- */
-export function designRecord(ctx,node){
-  const access=ledgerAccess(ctx);
-  if(!access||!plain(node))return null;
-  const design=designNodeOf(access,node);
-  const root=workRootOf(access.at);
-  if(!design||!root||!design.path)return null;
-  const file=path.join(root,String(design.path));
-  let raw;
-  try{raw=parseYaml(fs.readFileSync(file,'utf8'));}catch{return null;}
-  if(!plain(raw)||raw.kind!==UI_KIND)return null;
-  const spec=plain(raw.ui)?raw.ui:{};
-  return {...spec,node:raw.id??design.id??null,state:raw.state??design.state??null,file:slash(file)};
-}
-const declared=value=>Array.isArray(value)?value.length>0:plain(value)?Object.keys(value).length>0:false;
-const slotGenerated=slot=>plain(slot)&&typeof slot.file==='string'&&slot.file.trim()!=='';
-/**
- * Predicates an `optionalWhen` lane step reads. Both are facts of the node's design record, never a judgement:
- * `node.hasInterfaceDesign` is true when that record names its surfaces and the candidate images that drew them
- * (so there is nothing left to draw), and `node.hasNoArtworkSlots` is true when it declares no artwork slot or
- * every slot already names its generated file (so there is no artwork left to produce). A node with no record
- * satisfies neither: the step runs until the record says otherwise.
- */
-export function lanePredicates(ctx=null,node=null){
-  const record=designRecord(ctx,node);
-  const drawn=Boolean(record)&&declared(record.surfaces)&&declared(record.assets);
-  const slots=Array.isArray(record?.artworkSlots)?record.artworkSlots:[];
-  return {
-    'node.hasInterfaceDesign':drawn,
-    // A record that was never drawn has declared nothing yet: the artwork step stays until the drawing says otherwise.
-    'node.hasNoArtworkSlots':drawn&&(!slots.length||slots.every(slotGenerated))
-  };
-}
-const laneNext=(entry,predicates=null)=>{
-  try{return graph.nextKind(entry?.lane??[],entry?.done??[],{predicates:predicates??{}});}catch{return null;}
-};
-const laneText=lane=>(lane??[]).join(' -> ');
-/**
- * The optional steps the node's own design record retires right now, kept on the lane entry so every line the
- * user reads - the contract, the status view, the goal table - prints the lane as it is walked, not the template.
- */
-const laneSkip=(entry,predicates=null)=>{
-  if(!entry?.lane?.length)return [];
-  try{entry.skipped=graph.skippedKinds(entry.lane,entry.done??[],{predicates:predicates??{}});}catch{entry.skipped=Array.isArray(entry.skipped)?entry.skipped:[];}
-  return entry.skipped;
-};
-/** The lane as the node walks it: every mandatory step and every optional step its record did not retire. */
-const laneWalked=entry=>(entry?.lane??[]).filter(kind=>!(entry?.skipped??[]).includes(kind));
-/** `2/3`: how much of a node's walked lane is accepted. What `workflow-status` prints per node. */
-const laneProgress=entry=>{const walked=laneWalked(entry);return walked.length?`${(entry.done??[]).filter(kind=>walked.includes(kind)).length}/${walked.length}`:null;};
-/** The build step of a lane: its one implement-role kind, which is what a repair of that node must be. */
-const laneBuildKind=entry=>(entry?.lane??[]).find(kind=>kindRole(kind)==='implement')??null;
-/** The lane an operation belongs to: its own node, or - for a kernel review - the node set it judges. */
-const laneEntryOf=(state,op)=>state?.lanes?.[op?.nodeId??'']??state?.lanes?.[(op?.ledgerIds??[])[0]??'']??null;
-/** The id of one lane step: the node id for the first step, then the node id plus the step's action word. */
-const laneOpId=(nodeId,kind,first,taken)=>workOpId(first?nodeId:`${nodeId}-${String(kind).split('.').at(-1)}`,taken);
-/** Every route the kernel applies is logged the same way, so the log names the rule that moved an operation. */
-const routed=(store,op,on,to,origin=null,extra={})=>store.appendEvent({event:'routed',op:op.id,on,to,origin,...extra});
-/** The route for one situation, or null; a graph that knows no rule leaves the caller its own default. */
-// The kernel's verdict words (`fail` on a review, `reject` from the validator) map onto the graph's route vocabulary.
-const ROUTE_VERDICTS={fail:'findings',reject:'rejected'};
-const routeOf=query=>{try{return graph.routeFor({...query,...(query?.verdict?{verdict:ROUTE_VERDICTS[query.verdict]??query.verdict}:{})});}catch{return null;}};
-/**
- * A route may name the kind literally, the reporter's own kind (`same`, resolved by the graph) or the lane's
- * build step (`lane-build`), which only the kernel can resolve. Anything else yields null and the caller
- * keeps its own default, so an unknown sentinel never launches an operation of an invented kind.
- */
-function routeKind(route,state,op){
-  // The graph resolves `same`/`lane.build` itself when it has the context; without it, it hands the symbol back
-  // as `unresolved` and the kernel, which knows the op and its lane, resolves it here.
-  const named=route?.kind??route?.unresolved??null;
-  if(!named)return null;
-  if(graph.KINDS.includes(named))return named;
-  if(named==='same')return op?.kind??null;
-  if(/build|lane/.test(named))return laneBuildKind(laneEntryOf(state,op));
-  return null;
-}
-
-function toOp(raw,index){
-  const id=typeof raw?.id==='string'&&raw.id.trim()?raw.id.trim():`op-${index+1}`;
-  return {id,kind:required(raw?.kind,`kind of operation ${id}`),goal:required(raw?.goal,`goal of operation ${id}`),
-    nodeId:typeof raw?.nodeId==='string'&&raw.nodeId.trim()?raw.nodeId.trim():null,
-    ledgerIds:[...(raw.ledgerIds??[])],allowlist:[...(raw.allowlist??[])],references:[...(raw.references??[])],
-    checks:(raw.checks??[]).map(check=>({name:required(check?.name,'check name'),command:required(check?.command,'check command')})),
-    acceptance:[...(raw.acceptance??[])],dependsOn:[...(raw.dependsOn??[])],timeoutMs:raw.timeoutMs??null,
-    resources:[...(raw.resources??[])],requesters:[...(raw.requesters??[])],
-    status:'pending',origin:raw.origin??'plan',attempt:1,resumes:0,repairs:0,restarts:0,launchFailures:0,
-    priorOpen:[...(raw.priorOpen??[])],findings:[...(raw.findings??[])],avoidRuntimes:[...(raw.avoidRuntimes??[])],
-    runtime:null,target:null,task:null,dispatch:null,terminal:null,contractFile:null,nudged:false,
-    kernelOwned:[],kernelOwnedAt:null,waitingFor:null,refusal:null,createdIteration:0,question:plain(raw.question)?{...raw.question}:null,
-    reports:[],files:[],head:null,verdict:null,validation:null,validatorRejects:0,needsReplan:Boolean(raw.needsReplan)};
-}
-function addOp(store,state,raw,reason){
-  const op=toOp({...raw,id:raw.id??nextId(state,raw.origin??'op')},state.ops.length);
-  need(op.allowlist.length,`Operation ${op.id} has an empty allowlist`);
-  op.createdIteration=state.iterations;
-  state.ops.push(op);
-  store.appendEvent({event:'op-created',op:op.id,kind:op.kind,origin:op.origin,reason,allowlist:op.allowlist,ledgerIds:op.ledgerIds});
-  gateDynamicOp(store,state,op);
-  return op;
-}
-
-/* ------------------------------------------------------------------ the dynamic-op gate */
-
-export const dynamicBudget=state=>Number.isFinite(state?.dynamicOpsBudget)?state.dynamicOpsBudget:DYNAMIC_OPS_BUDGET;
-/**
- * An op nobody approved is bounded twice. Past `state.dynamicOpsBudget` ops created at run time, and for an
- * op whose whole allowlist falls outside the approved `scope`, the kernel refuses to run it: the op exists
- * (so the graph and the final report still name it) but it is `blocked` and becomes a `needUser` item. A node
- * derived op is scope-checked by the Work ledger itself, so only its budget is counted here.
- */
-const KERNEL_ORIGINS=['ledger','verify','gate','architecture'];
-/** Ops the kernel itself derives from the ledger or its own rules: counted against nothing but their own bounds. */
-const countsAgainstBudget=op=>!KERNEL_ORIGINS.includes(op.origin);
-function gateDynamicOp(store,state,op){
-  if(!countsAgainstBudget(op))return true;
-  state.dynamicOps=state.ops.filter(item=>countsAgainstBudget(item)).length;
-  // A kernel-origin op an older build refused under the budget is superseded, never reinstated by --allow-dynamic.
-  for(const op of state.ops)if(!countsAgainstBudget(op)&&op.refusal==='dynamic-op'){op.refusal='superseded';state.needUser=state.needUser.filter(item=>item.op!==op.id||item.kind!=='dynamic-op');}
-  const budget=dynamicBudget(state);
-  // In Work-ledger mode the scope names features (ledger ids), not file paths: the ledger itself bounds the
-  // work, so only the budget gates a dynamic op there.
-  const outside=op.nodeId||state.ledgerMode==='work'||!state.scope?.length?[]:op.allowlist.filter(entry=>!inScopePath(entry,state.scope));
-  const reason=state.dynamicOps>budget?`beyond the dynamic-op budget of ${budget} for this workflow`
-    :outside.length===op.allowlist.length&&outside.length?`outside the approved scope ${state.scope.join(', ')}: ${outside.join(', ')}`:null;
-  if(!reason)return true;
-  op.status='blocked';op.refusal='dynamic-op';
-  state.needUser.push({op:op.id,kind:'dynamic-op',
-    detail:`${op.id} (${op.kind}) was created at run time ${reason}; raise it with workflow-approve --id ${state.id} --allow-dynamic <n>`});
-  store.appendEvent({event:'dynamic-op-refused',op:op.id,kind:op.kind,origin:op.origin,reason,
-    dynamicOps:state.dynamicOps,budget,allowlist:op.allowlist});
-  return false;
-}
-
-/* ------------------------------------------------------------------ phase: goal */
-
-/**
- * Phase `goal`. The Work ledger mode derives the TODO list from the authored tree; the plan mode asks a
- * model to assess one. Either way the kernel writes goal.md and goal.json and stops for the one approval.
- */
-export function goalPhase(store,state,options={}){
-  const phased=state.ledgerMode===WORK_LEDGER?workGoalPhase(store,state,options):planGoalPhase(store,state,options);
-  // goal.md is written by the phase (a model renders the plan one), so the critique section and the lane header
-  // are spliced in afterwards: whatever else the page says, a reader sees the objections to the goal before the
-  // definition of done, and the worktree this workflow owns before anything else.
-  if(phased?.ok&&plain(state.critique))noteCritiqueInGoal(store,state);
-  if(phased?.ok&&plain(state.lane))noteLaneInGoal(store,state);
-  return {...phased,...(plain(state.lane)?{lane:laneView(state)}:{}),...(plain(state.critique)?{critique:critiqueView(state)}:{})};
-}
-
-/** The two lines of goal.md that name the lane and the base it goes home to, under the title. */
-export function laneHeaderLines(state){
-  const lane=state.lane;
-  return [`Lane \`${lane.name}\` - worktree \`${slash(lane.worktree)}\` on branch \`${lane.branch}\`: this workflow`,
-    `owns that tree alone. Its branch is merged into \`${lane.base?.branch}\` in \`${slash(lane.base?.worktree??'')}\` when the workflow finishes done.`];
-}
-function noteLaneInGoal(store,state){
-  let page='';
-  try{page=fs.readFileSync(store.paths.goal,'utf8');}catch{page='';}
-  if(page.includes(`Lane \`${state.lane.name}\``))return;
-  const lines=page.split('\n');
-  const title=lines.findIndex(line=>line.startsWith('# '));
-  const header=['',...laneHeaderLines(state)];
-  lines.splice(title<0?0:title+1,0,...header);
-  fs.writeFileSync(store.paths.goal,lines.join('\n'));
-}
-
-/* ------------------------------------------------------------------ the critique of the goal */
-
-/**
- * Every goal a person writes is critiqued by the runtime before anything is planned from it. The critique is a
- * phase of the kernel, not a helper session: `critiqueGoal` is called in both ledger modes after the assessment
- * and before the approval page is written, its verdict is recorded in `state.critique`, in goal.json and in
- * goal.md above the definition of done, and the verdict has consequences - `revise` binds every operation
- * through its contract, `refuse` refuses the approval until the question is answered or the owner overrides it.
- * A provider that cannot answer never blocks a workflow: that is one event and one line on the page.
- */
-/** Decision kinds whose accepted record is the product's own law: what a goal is critiqued against. */
-const DECIDED_KINDS=['business','business-overview','architecture'];
-/** Keys of an srs/sds payload that carry what the record states and what it was accepted against. */
-const STATEMENT_KEYS=['statements','acceptanceCriteria','acceptance','criteria','closureCriteria','invariants','requirement','goal','question'];
-/**
- * The statements of one decided record: the strings under a statement key of its `extensions.work3.srs` or
- * `.sds` payload, flattened, trimmed and capped, so the critic reads what the record states and not its tree.
- */
-export function recordStatements(payload,{max=12,maxChars=300}={}){
-  const found=[];
-  const collect=(value,depth)=>{
-    if(found.length>=max||depth>6)return;
-    if(typeof value==='string'){const line=String(value).replace(/\s+/g,' ').trim();if(line)found.push(line.slice(0,maxChars));return;}
-    if(Array.isArray(value)){for(const item of value)collect(item,depth+1);return;}
-    if(plain(value))for(const item of Object.values(value))collect(item,depth+1);
-  };
-  const walk=(value,depth)=>{
-    if(found.length>=max||depth>6)return;
-    if(Array.isArray(value)){for(const item of value)walk(item,depth+1);return;}
-    if(!plain(value))return;
-    for(const [key,item] of Object.entries(value))STATEMENT_KEYS.includes(key)?collect(item,depth+1):walk(item,depth+1);
-  };
-  walk(payload,0);
-  return unique(found).slice(0,max);
-}
-/**
- * The records the product has already accepted in scope: every decided business or architecture node with the
- * statements and acceptance criteria of its authored payload. This is the evidence the critic names, so an
- * objection that contradicts one of them is actionable and one that names none is dropped.
- */
-export function decidedRecords(api,at,loaded,{scope=[],max=40}={}){
-  const list=Array.isArray(loaded?.list)?loaded.list:[];
-  const chosen=scope.length?list.filter(node=>scope.some(entry=>scopeNames(node,entry))):list;
-  const records=[];
-  for(const node of chosen){
-    if(records.length>=max)break;
-    if(!DECIDED_KINDS.includes(node.kind)||node.state!=='done')continue;
-    let raw=null;
-    try{raw=typeof api?.readNode==='function'?api.readNode(at,node):null;}catch{raw=null;}
-    const work3=raw?.extensions?.work3??null;
-    records.push({id:node.id,kind:node.kind,
-      title:[raw?.description,raw?.title,raw?.name].map(value=>String(value??'').trim()).find(Boolean)||String(node.id),
-      statements:recordStatements(work3?.srs??work3?.sds??work3??null)});
-  }
-  return records;
-}
-
-/**
- * Run the critique and record it. The providers are the host's supervisor runtimes (`supervisor.runtimes` in
- * config.json, astra then fable) unless the caller names its own chain. An unanswered critique is
- * `goal-critique-unavailable` and the workflow carries on: a dead provider is not a veto over the owner's job.
- */
-export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,providers=null,cwd=state.worktree,runHeadless,
-  ledger=[],decisions=[],records=[],material=[],constraints=[]}={}){
-  const chain=providers??critiqueRuntimes(state.host??'');
-  const critiqued=typeof critiqueGoal==='function'?critiqueGoal({job:state.job,scope:state.scope??[],ledger,decisions,
-    records,material,brand:state.brand??null,constraints,providers:chain,cwd,runHeadless}):null;
-  if(!critiqued?.ok){
-    state.critique={verdict:'unavailable',objections:[],required:[],alternatives:[],question:null,prerequisites:[],provider:null,
-      at:Date.now(),reason:critiqued?.reason??'critiqueGoal was not available'};
-    // The form errors of the attempts travel with the event: an unavailable critique is only diagnosable from them.
-    store.appendEvent({event:'goal-critique-unavailable',reason:state.critique.reason,
-      attempts:critiqued?.attempts?.length??0,providers:chain,errors:(critiqued?.attempts??[]).slice(-2).map(item=>({provider:item.provider,errors:(item.errors??[]).slice(0,3)}))});
-    return state.critique;
-  }
-  state.critique={verdict:critiqued.verdict,objections:(critiqued.objections??[]).map(item=>({...item})),
-    required:[...(critiqued.required??[])],alternatives:[...(critiqued.alternatives??[])],
-    question:critiqued.question??null,prerequisites:(critiqued.prerequisites??[]).filter(plain).map(item=>({...item})),
-    provider:critiqued.provider??null,at:Date.now(),
-    ...((critiqued.dropped??[]).length?{dropped:critiqued.dropped.length}:{})};
-  store.appendEvent({event:'goal-critiqued',verdict:state.critique.verdict,objections:state.critique.objections.length,
-    provider:state.critique.provider,...(state.critique.prerequisites.length?{prerequisites:state.critique.prerequisites.length}:{}),
-    ...(state.critique.dropped?{dropped:state.critique.dropped}:{})});
-  return state.critique;
-}
-/**
- * A prerequisite the critique names is acted on, not only printed. "Add X to the backend" with no record of X
- * is the common case: the goal phase plans the intake that authors X's records first (`work.author` for a
- * feature, `brand.decide` for the brand) and holds every other operation of the goal behind it, so the build
- * starts from a record and never from the prompt. A prerequisite the tree already holds changes nothing; a
- * `decision` is the owner's and stays on the page (`prerequisite-owner`).
- */
-function planCritiquePrerequisites(store,state,{loaded,workRoot,repositories={},ctx=null}){
-  const listed=(state.critique?.prerequisites??[]).filter(plain);
-  const planned=[];
-  for(const item of listed){
-    const entry=item.kind==='brand'?'brand':slash(String(item.feature??'')).replace(/\/+$/,'');
-    if(!entry)continue;
-    // A prerequisite that names a record or a contract rather than a feature ("module command contract") is not a
-    // feature to author: it is reported for the owner, never turned into an intake of a folder that cannot exist.
-    if(item.kind!=='decision'&&entry!=='brand'&&!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(entry)){store.appendEvent({event:'prerequisite-unresolved',kind:item.kind,feature:item.feature??null,why:item.why});continue;}
-    if(item.kind==='decision'){store.appendEvent({event:'prerequisite-owner',kind:item.kind,feature:item.feature??null,why:item.why});continue;}
-    const held=entry==='brand'?Boolean(state.brand):loaded.list.some(node=>scopeNames(node,entry));
-    if(held){store.appendEvent({event:'prerequisite-held',kind:item.kind,feature:entry,why:item.why});continue;}
-    const existing=state.ops.find(op=>op.intake?.scope===entry);
-    if(existing){planned.push(existing);continue;}
-    const raw=intakeOp(state,{workRoot,loaded,index:state.ops.filter(op=>op.intake?.scope==='brand').length,entry,repositories});
-    const op=toOp(raw,state.ops.length);op.intake=raw.intake;op.difficulty='hard';op.prerequisite={kind:item.kind,why:item.why};
-    if(ctx)locateSharedTreePaths(op,ctx);
-    state.ops.push(op);planned.push(op);
-    store.appendEvent({event:'intake-planned',op:op.id,scope:op.intake.scope,kind:op.kind,allowlist:op.allowlist,prerequisite:item.kind,why:item.why});
-  }
-  const ids=unique(planned.map(op=>op.id));
-  if(ids.length)for(const op of state.ops){if(!ids.includes(op.id))op.dependsOn=unique([...(op.dependsOn??[]),...ids]);}
-  return planned;
-}
-const critiqueView=state=>({verdict:state.critique?.verdict??null,objections:(state.critique?.objections??[]).length,
-  required:(state.critique?.required??[]).length,provider:state.critique?.provider??null,
-  ...((state.critique?.prerequisites??[]).length?{prerequisites:state.critique.prerequisites.length}:{}),
-  ...(plain(state.critiqueOverride)?{overridden:state.critiqueOverride.reason}:{})});
-
-export const CRITIQUE_HEADING='## Phản biện (critique)';
-const sentence=value=>{const line=firstLine(value);return !line?'(not stated)':/[.!?]$/.test(line)?line:`${line}.`;};
-/** The critique as the user reads it on the approval page: the verdict, the objections with their evidence, then what it demands. */
-export function critiqueLines(state){
-  const critique=plain(state.critique)?state.critique:{verdict:'unavailable'};
-  const by=critique.provider?` (critic \`${critique.provider}\`)`:'';
-  const lines=[CRITIQUE_HEADING,``];
-  if(critique.verdict==='unavailable'){
-    lines.push(`Phản biện: chưa chạy được - no critic runtime answered (${critique.reason??'unavailable'}), so this goal`,
-      `was never challenged. The approval is not blocked by that, and nothing here binds an operation.`);
-    return [...lines,``];
-  }
-  lines.push({
-    sound:`Verdict: \`sound\`${by} - the critique found nothing that blocks this goal; proceed as written.`,
-    revise:`Verdict: \`revise\`${by} - proceed only under the required changes below. They are part of the goal you approve here, and every operation of this workflow carries them in its contract.`,
-    refuse:`Verdict: \`refuse\`${by} - this goal contradicts an accepted record or cannot be verified at all, so the approval is refused. Answer the question below and run the goal again, or accept the critique with \`workflow-approve --id ${state.id} --accept-critique "<reason>"\`.`
-  }[critique.verdict]??`Verdict: \`${critique.verdict}\`${by}.`);
-  if((critique.objections??[]).length){
-    lines.push(``);
-    for(const objection of critique.objections)
-      lines.push(`- **${objection.kind}** - ${sentence(objection.claim)} Evidence: ${sentence(objection.evidence)} Consequence: ${sentence(objection.consequence)}`);
-  }
-  if(critique.dropped)lines.push(``,`${critique.dropped} objection(s) named no evidence and were dropped by the kernel.`);
-  if(['revise','refuse'].includes(critique.verdict)&&(critique.required??[]).length)
-    lines.push(``,`### Required changes`,``,...critique.required.map((item,index)=>`${index+1}. ${firstLine(item)}`));
-  if((critique.alternatives??[]).length)lines.push(``,`### Alternatives`,``,...critique.alternatives.map(item=>`- ${firstLine(item)}`));
-  if(critique.verdict==='refuse'&&critique.question)lines.push(``,`### Question`,``,firstLine(critique.question));
-  if((critique.prerequisites??[]).length){
-    const opOf=item=>state.ops?.find(op=>op.intake?.scope===(item.kind==='brand'?'brand':slash(String(item.feature??'')).replace(/\/+$/,'')))?.id??null;
-    lines.push(``,`### Prerequisites`,``,...critique.prerequisites.map(item=>{
-      const op=opOf(item);
-      return `- **${item.kind}**${item.feature?` of \`${item.feature}\``:''} - ${sentence(item.why)}${item.kind==='decision'?' The owner decides it.':op?` Planned first as \`${op}\`; every other operation waits for it.`:' The tree already holds it.'}`;
-    }));
-  }
-  if(plain(state.critiqueOverride))lines.push(``,
-    `Override: the owner accepted this critique - "${firstLine(state.critiqueOverride.reason)}". An override is the owner's decision, so the kernel does not ask again.`);
-  return [...lines,``];
-}
-/** Write the section into goal.md above the definition of done, replacing the one that is already there. */
-function noteCritiqueInGoal(store,state){
-  let page='';
-  try{page=fs.readFileSync(store.paths.goal,'utf8');}catch{page='';}
-  const lines=page.split('\n');
-  const section=critiqueLines(state);
-  const at=lines.findIndex(line=>line.trim()===CRITIQUE_HEADING);
-  if(at>=0){
-    let end=at+1;
-    while(end<lines.length&&!lines[end].startsWith('## '))end+=1;
-    lines.splice(at,end-at,...section);
-  }else{
-    const heading=lines.findIndex(line=>line.startsWith('## '));
-    const title=lines.findIndex(line=>line.startsWith('# '));
-    lines.splice(heading>=0?heading:title<0?lines.length:title+1,0,...section);
-  }
-  const text=lines.join('\n');
-  fs.writeFileSync(store.paths.goal,text.endsWith('\n')?text:`${text}\n`);
-}
-
-/**
- * Plan ledger: one model call fills the whole plan form (definition of done, ledger, operations), the
- * kernel writes goal.md and goal.json and stops. Nothing is launched before the user approves.
- */
-export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,renderGoalMarkdown=llm.renderGoalMarkdown,extractMaterial=llm.extractMaterial,cwd=state.worktree,providers,runHeadless}={}){
-  need(!state.approved,`Workflow ${state.id} is already approved; run workflow-run`);
-  need(typeof assessGoal==='function','assessGoal is not available yet in models/functions.mjs');
-  const material=typeof extractMaterial==='function'?extractMaterial(state.inputs.map(item=>item.ref),{cwd}):[];
-  const assessed=assessGoal({job:state.job,inputs:state.inputs,material,constraints:[
-    `every op runs in the one worktree ${slash(state.worktree)} on branch ${state.branch}: allowlists of ops that may run in parallel must be disjoint`,
-    `at most ${state.maxParallelOps??10} ops run at a time, and the kernel re-runs every declared check itself before it accepts a done`,
-    ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers,cwd,runHeadless});
-  if(!assessed?.ok){
-    store.appendEvent({event:'goal-failed',attempts:assessed?.attempts??null});
-    store.saveState(state);
-    return {ok:false,id:state.id,reason:assessed?.reason??'assessGoal produced no valid plan',attempts:assessed?.attempts??[]};
-  }
-  const plan=assessed.value;
-  need(Array.isArray(plan.ledger)&&plan.ledger.length,'The plan has no ledger');
-  need(Array.isArray(plan.ops)&&plan.ops.length,'The plan has no operations');
-  state.definitionOfDone=[...(plan.definitionOfDone??[])];
-  state.risks=[...(plan.risks??[])];state.questions=[...(plan.questions??[])];
-  // `assessed` is what the plan claims the item already is; `status` is the kernel's own lifecycle. An item
-  // the plan calls done has no op building it, so it is carried as `preexisting`: approved by the user, not
-  // verified by the kernel, and named as such in the final report.
-  state.ledger=plan.ledger.map((item,index)=>({id:item.id??`goal-${index+1}`,title:required(item.title,'ledger title'),
-    inputRef:item.inputRef??null,assessed:item.status??'unknown',status:item.status==='done'?'preexisting':'planned',evidence:[]}));
-  need(new Set(state.ledger.map(item=>item.id)).size===state.ledger.length,'Ledger ids are not unique');
-  state.ops=plan.ops.map(toOp);
-  need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Operation ids are not unique');
-  for(const op of state.ops){
-    need(op.allowlist.length,`Operation ${op.id} has an empty allowlist`);
-    for(const dependency of op.dependsOn)need(byId(state,dependency),`Operation ${op.id} depends on the unknown ${dependency}`);
-    for(const id of op.ledgerIds)need(ledgerItem(state,id),`Operation ${op.id} claims the unknown ledger item ${id}`);
-  }
-  if(plan.gates&&!state.gates.length)state.gates=plan.gates.map(parseGate);
-  // Overlapping allowlists are not fatal: the scheduler never runs two overlapping operations at once.
-  const overlaps=[];
-  for(const [index,op] of state.ops.entries())for(const other of state.ops.slice(index+1)){
-    if(allowlistsOverlap(op.allowlist,other.allowlist)&&!other.dependsOn.includes(op.id)&&!op.dependsOn.includes(other.id))overlaps.push([op.id,other.id]);
-  }
-  // The goal is critiqued before the page that asks for the approval is written: the plan the model assessed is
-  // exactly what the critic reads, so an objection to it is an objection to what the user is about to approve.
-  critiqueGoalPhase(store,state,{critiqueGoal,providers,cwd,runHeadless,material,
-    ledger:state.ledger.map(item=>({id:item.id,kind:null,title:item.title})),
-    constraints:[`the ledger of this goal was assessed by a model, not authored: a ledger item the plan calls done is approved by the user and never verified by the kernel`,
-      ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)]});
-  writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,job:state.job,inputs:state.inputs,ledgerMode:state.ledgerMode,
-    definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,critique:state.critique??null,
-    ledger:state.ledger,ops:state.ops.map(op=>({id:op.id,kind:op.kind,goal:op.goal,
-      ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
-    gates:state.gates,serializedOverlaps:overlaps,assessedBy:assessed.provider??null});
-  const markdown=typeof renderGoalMarkdown==='function'?renderGoalMarkdown(plan,{job:state.job}):null;
-  fs.writeFileSync(store.paths.goal,markdown??fallbackGoalMarkdown(state));
-  state.phase='awaiting-approval';
-  store.appendEvent({event:'goal',ops:state.ops.length,ledger:state.ledger.length,gates:state.gates.length,overlaps});
-  store.saveState(state);
-  return {ok:true,id:state.id,goal:store.paths.goal,goalJson:store.paths.goalJson,
-    ops:state.ops.length,ledger:state.ledger.length,gates:state.gates.length,overlaps,
-    next:`review ${slash(store.paths.goal)} and approve with workflow-approve --id ${state.id}`};
-}
-
-function fallbackGoalMarkdown(state){
-  return [`# ${state.job}`,``,`Workflow \`${state.id}\` - branch \`${state.branch}\``,``,`## Definition of done`,
-    ...state.definitionOfDone.map(item=>`- ${item}`),``,`## Goal ledger`,
-    ...state.ledger.map(item=>`- \`${item.id}\` ${item.title}${item.inputRef?` (${item.inputRef})`:''}`),``,`## Operations`,
-    ...state.ops.map(op=>`- \`${op.id}\` ${op.kind}: ${firstLine(op.goal)} - allowlist ${op.allowlist.join(', ')}${op.dependsOn.length?` - after ${op.dependsOn.join(', ')}`:''}`),
-    ...(state.gates.length?[``,`## Job gates`,...state.gates.map(gate=>`- ${gate.name}: \`${gate.command}\``)]:[])].join('\n')+'\n';
-}
-
-/* ------------------------------------------------------------------ phase: goal on the Work ledger */
-
-/**
- * Run the shipped Work validator and return its projection. The binary is resolved from the skill root, so
- * the same call works whether the kernel runs from the authored tree or from its `.dist` copy; `work-ledger`
- * takes this as its injected `validate` instead of guessing the host layout.
- */
-export function validateWorkTree({repoRoot,workRoot=null}={}){
-  const root=path.resolve(required(repoRoot,'repository root'));
-  const tree=workRoot?path.resolve(workRoot):path.join(root,'.starciwork');
-  const bin=path.join(skillRoot,'bin','starci.mjs');
-  const shown=spawnSync(process.execPath,[bin,'validate',tree],{encoding:'utf8',windowsHide:true,maxBuffer:96*1024*1024});
-  const output=(shown.stdout??'').trim();
-  need(output,`The Work validator produced no output for ${slash(tree)}: ${tail(shown.stderr,300)||`exit ${shown.status}`}`);
-  try{return JSON.parse(output);}catch{throw Error(`The Work validator did not print JSON for ${slash(tree)}`);}
-}
-
-/** An operation id that is also a safe file name: the Work id with every other character folded to `-`. */
-/** One Work node -> one operation form; the goal phase and the run-time ledger sync both use it. */
-/** Checks the kernel runs itself as gates (whole-tree validator, end-to-end suites): never per operation, never in parallel. */
-// Only the whole-tree validator is the kernel's own check. End-to-end checks belong to the op that owns them: the
-// product's e2e suite starts its own throwaway stack (Testcontainers), so ops may run it in parallel and a slice
-// is not accepted until its e2e scenarios are green.
-export const KERNEL_CHECK=/^work-valid$/i;
-/**
- * The design grammar the host installs (knowledge/grammars/<family>/{DNA,family,idioms}.yaml and the UI composition
- * state canon) is a reference of every design-family operation: a drawing, a frontend build or a walk without it
- * invents its own look. Product-agnostic: every grammar family the host carries is listed.
- *
- * The brand record is the second half of that material and it is the product's own: these kinds are what
- * `brand.decide` exists for, so each of them references the brand file and every asset beside it, and each of
- * them refuses to run on a tree that has no brand record at all. `grammar.update` is in the list for the same
- * reason from the other end: it grows the language every drawing reads, so it reads the whole canon and the
- * identity the new unit has to live inside before it adds a word to either.
- */
-export const DESIGN_KINDS=['interface.draw','interface.asset','frontend.implement','uat.verify','grammar.update'];
-/** The repository a node is delivered in when it is not this kernel's own; null when it is ours or unknown. */
-function foreignNodeOf(ctx,op){
-  if(!ctx?.work||!op?.nodeId||!ctx.work.code?.repository||typeof ctx.work.api?.nodeRepository!=='function')return null;
-  const node=ctx.work.node(op.nodeId);
-  if(!node)return null;
-  try{const declared=ctx.work.api.nodeRepository(ctx.work.api.readNode(ctx.work.at??ctx.work.repoRoot,node));return declared&&declared!==ctx.work.code.repository?declared:null;}catch{return null;}
-}
-export function grammarReferences(root=skillRoot){
-  // The whole canon, not a shortlist: every grammar family file, every frontend pattern, every UI rule the host carries.
-  const found=[];
-  const walk=dir=>{try{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())walk(file);else if(/\.ya?ml$/i.test(entry.name))found.push(slash(file));}}catch{}};
-  for(const relative of [['knowledge','grammars'],['knowledge','patterns','fe'],['knowledge','ui']])walk(path.join(root,...relative));
-  return unique(found).sort();
-}
-/**
- * The brand record as the Work ledger answers it. A ledger build that knows about brands always carries the
- * field - `{node, rev, file, spec}` or `null` - and one that does not carries none, which is the only way the
- * kernel tells "this product has no brand yet" from "this tree was never asked about brands".
- */
-const brandAware=ctx=>{const access=ledgerAccess(ctx);return Boolean(access?.loaded)&&Object.hasOwn(access.loaded,'brand');};
-/** A brand the kernel can hand to an operation: the node exists and its record carries a spec or a rev. A brand node with nothing authored yet is a brand still to decide, not one to read. */
-const brandOf=ctx=>{const brand=ledgerAccess(ctx)?.loaded?.brand;return plain(brand)&&(plain(brand.spec)||(brand.rev!==null&&brand.rev!==undefined))?brand:null;};
-/**
- * The brand spec in the fields the kernel reads. The authored shape is the Work schema's (`identity.name`,
- * `color.tokens[]`, `mascot.assets[]`, `imagery.promptRules`); a spec that already names these fields flat is
- * read as it is, so an injected ledger and a real record answer the same. Asset paths are made tree-relative.
- */
-export function brandFields(brand){
-  const spec=plain(brand?.spec)?brand.spec:{};
-  const treePath=entry=>{const p=slash(String(entry??'')).replace(/^\.\//,'');return !p?'':p.startsWith(`${BRAND_DIRECTORY}/`)?p:`${BRAND_DIRECTORY}/${p}`;};
-  const tokenMap=Array.isArray(spec.color?.tokens)
-    ?Object.fromEntries(spec.color.tokens.filter(plain).filter(item=>typeof item.token==='string'&&item.token).map(item=>[item.token,{value:item.value??null,role:item.role??null}]))
-    :null;
-  const mascot=Array.isArray(spec.mascot?.assets)?spec.mascot.assets.filter(plain).map(item=>treePath(item.path)).filter(Boolean):null;
-  const rev=spec.rev??brand?.rev??null;
-  return {
-    name:spec.identity?.name??spec.name??brand?.name??null,
-    family:spec.identity?.family??spec.family??brand?.family??null,
-    rev:rev===undefined?null:rev,
-    colorTokens:plain(spec.colorTokens)?spec.colorTokens:tokenMap,
-    mascotAssets:unique((Array.isArray(spec.mascotAssets)?spec.mascotAssets.map(entry=>slash(String(entry??''))):mascot??[]).filter(Boolean)),
-    forbidden:Array.isArray(spec.forbidden)?spec.forbidden:Array.isArray(spec.imagery?.forbidden)?spec.imagery.forbidden:null,
-    imageryPromptRules:Array.isArray(spec.imageryPromptRules)?spec.imageryPromptRules:Array.isArray(spec.imagery?.promptRules)?spec.imagery.promptRules:null
-  };
-}
-const BRAND_DIRECTORY='brand';
-/** The brand file and every asset beside it, as the ledger names them; a ledger that names none adds nothing. */
-const brandReferencesOf=(api,loaded)=>{
-  if(typeof api?.brandReferences!=='function'||!loaded?.brand)return [];
-  try{return unique((api.brandReferences(loaded)??[]).map(entry=>slash(String(entry??''))).filter(Boolean));}catch{return [];}
-};
-/** What a contract prints and the status records: the brand's identity and its artwork, never the whole spec. */
-export function brandSummary(loaded){
-  const brand=loaded?.brand;
-  if(!plain(brand)||!(plain(brand.spec)||(brand.rev!==null&&brand.rev!==undefined)))return null;
-  const fields=brandFields(brand);
-  return {node:brand.node??null,file:brand.file?slash(String(brand.file)):null,name:fields.name,family:fields.family,rev:fields.rev,mascotAssets:fields.mascotAssets};
-}
-/** What the validator is given: the brand as rules, trimmed to the fields a verdict may be founded on. */
-export const BRAND_PAYLOAD=['name','family','rev','colorTokens','mascotAssets','forbidden','imageryPromptRules'];
-export function brandPayload(loaded){
-  const brand=loaded?.brand;
-  if(!plain(brand))return null;
-  const fields=brandFields(brand);
-  const value={};
-  for(const field of BRAND_PAYLOAD){
-    const given=fields[field];
-    if(given!==undefined&&given!==null&&!(Array.isArray(given)&&!given.length))value[field]=given;
-  }
-  return Object.keys(value).length?value:null;
-}
-/**
- * The brand summary on the state, and the one event a changed `rev` owes every operation that already read it.
- * A new rev is not the kernel's to act on beyond this: the Work validator binds a completion to the digest of
- * what it was built from, so a frontend-facing node whose brand moved is reopened in the tree itself and
- * `syncLedgerOps` picks it up on the next iteration like any other newly schedulable node.
- */
-function noteBrand(store,state,loaded,{op=null,silent=false}={}){
-  if(!loaded||!Object.hasOwn(loaded,'brand'))return state.brand??null;
-  const summary=brandSummary(loaded);
-  const changed=String(state.brand?.rev??'')!==String(summary?.rev??'');
-  state.brand=summary;
-  if(changed&&!silent&&summary?.rev!==null&&summary?.rev!==undefined)
-    store.appendEvent({event:'brand-revised',rev:summary.rev,node:summary.node??null,...(op?{op:op.id}:{})});
-  return summary;
-}
-/**
- * On a shared ledger the Work tree is in the owner repository, not in this worktree: an allowlist entry under
- * `.starciwork/` and a reference that names a tree file are rewritten to the owner's absolute path, so the
- * operation writes and reads the one tree there is. A ledger that is here is left alone.
- */
-/**
- * The allowlist a report is checked against names the shared tree both ways: the agent writes at the owner's
- * absolute path and reports the file the way the tree names it (`.starciwork/...`). The first grammar drawing
- * was rejected for `.starciwork/features/sales/ui/index.yaml` while its allowlist held only the absolute form.
- */
-export function reportAllowlist(op,ctx){
-  const owner=ctx?.work?.shared?ctx.work.ledger?.repoRoot:null;
-  const entries=(op?.allowlist??[]).map(slash);
-  if(!owner)return entries;
-  const prefix=`${slash(owner)}/`;
-  return unique(entries.flatMap(entry=>entry.startsWith(`${prefix}.starciwork/`)?[entry,entry.slice(prefix.length)]:[entry]));
-}
-function locateSharedTreePaths(op,ctx){
-  const owner=ctx?.work?.shared?ctx.work.ledger?.repoRoot:null;
-  if(!owner)return op;
-  const root=slash(owner),workRoot=slash(ctx.work.ledger?.workRoot??path.join(owner,'.starciwork'));
-  op.allowlist=unique((op.allowlist??[]).map(entry=>/^\.starciwork\//.test(slash(entry))?`${root}/${slash(entry)}`:entry));
-  op.references=unique((op.references??[]).map(entry=>{
-    const relative=slash(entry);
-    if(/^[A-Za-z]:\//.test(relative)||relative.startsWith('/'))return relative;
-    try{return fs.existsSync(path.join(workRoot,relative))?`${workRoot}/${relative}`:relative;}catch{return relative;}
-  }));
-  return op;
-}
-/**
- * A frontend implementation is built against the drawing of its feature. While the `ui` node that is that
- * drawing is not done the build waits (`lane-waits-design`, recorded once per drawing), and a feature with no ui
- * node at all is the user's: a build that invents its own screen leaves nothing for the walk to compare
- * against. True when the node must not start its lane now; the same answer in the goal phase and in the run.
- */
-function designGate(store,state,access,node,entry){
-  if(!plain(node)||node.kind===UI_KIND||!(entry?.lane??[]).includes('frontend.implement'))return false;
-  const design=designRecord(access,node);
-  if(!design){
-    if(!state.needUser.some(item=>item.node===node.id&&item.kind==='design'))
-      state.needUser.push({node:node.id,kind:'design',detail:`no interface design record: the feature of ${node.id} has no ui node for the build to be drawn against; author one (features/<feature>/ui/index.yaml) or reference one`});
-    return true;
-  }
-  if(design.state!=='done'){
-    const waiting=design.node??design.file;
-    if(entry.waitsDesign!==waiting){entry.waitsDesign=waiting;store.appendEvent({event:'lane-waits-design',node:node.id,design:design.node??null,file:design.file});}
-    return true;
-  }
-  state.needUser=state.needUser.filter(item=>!(item.kind==='design'&&item.node===node.id));
-  delete entry.waitsDesign;
-  return false;
-}
-/**
- * The candidate images a ui node's record names, as the hashed evidence assets of its completion: the `ui`
- * completion profile requires a hashed local capture, and the drawing's candidates under the node's own `assets/`
- * are exactly that. Read and hashed here, so the evidence binds the bytes the record was accepted with.
- */
-function designEvidenceAssets(access,node){
-  if(!plain(node)||node.kind!==UI_KIND)return [];
-  const record=designRecord(access,node);
-  const root=workRootOf(access?.at);
-  if(!record||!root)return [];
-  const directory=path.join(root,path.dirname(String(node.path??'')));
-  const assets=[];
-  for(const entry of Array.isArray(record.assets)?record.assets:[]){
-    const relative=slash(String(entry?.path??'')).replace(/^\.\//,'');
-    if(!relative.startsWith('assets/')||relative.split('/').some(part=>part===''||part==='..'))continue;
-    try{
-      const bytes=fs.readFileSync(path.join(directory,relative));
-      assets.push({path:relative,scope:'node',sha256:crypto.createHash('sha256').update(bytes).digest('hex')});
-    }catch{/* a declared candidate that is not on disk is the validator's finding, not a kernel guess */}
-  }
-  return assets;
-}
-/** The design record of a node other than itself, tree-relative, as one reference of every op built or walked against it. */
-function designReferenceOf(access,node){
-  if(!plain(node)||node.kind===UI_KIND)return [];
-  const record=designRecord(access,node);
-  const root=workRootOf(access?.at);
-  if(!record?.file||!root)return [];
-  const relative=slash(path.relative(root,record.file));
-  return relative&&!relative.startsWith('..')?[relative]:[];
-}
-export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,lane=null,done=[],loaded=null}){
-  // Lane-aware: the kind of this operation is the node's next lane step, not a fixed map of the node kind.
-  const template=lane?.length?lane:(()=>{try{return graph.laneFor({kind:node.kind,layout:nodeLayout(node),repositoryRole:node.repository??null});}catch{return [];}})();
-  const access={api,at:repoRoot,loaded};
-  const step=(()=>{try{return graph.nextKind(template,done,{predicates:lanePredicates(access,node)});}catch{return null;}})();
-  const design=DESIGN_KINDS.includes(step??'');
-  // A ui node's drawing and artwork steps author the design body of the node's own record - the `ui:` spec
-  // and the candidates and artwork under its assets - so the exact record path is granted, the way a decision
-  // is granted its own record; every other kind is kept off the record the kernel owns.
-  const ownRecord=node.kind===UI_KIND&&design?[`.starciwork/${slash(node.path)}`]:[];
-  return toOp({id,nodeId:node.id,
-    kind:step??WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),
-    ledgerIds:[node.id],allowlist:unique([...node.allowlist,...ownRecord]),
-    // A design-family step reads two bodies of material it may never invent: the installed grammar and the
-    // product's own brand record with its assets.
-    references:unique([node.path,...(node.refs??[]),...(design?grammarReferences():[]),...(design?brandReferencesOf(api,loaded):[]),...designReferenceOf(access,node)]),
-    // The whole-tree validator is the kernel's own gate at acceptance: parallel operations must not fail on a sibling's in-progress ledger write.
-    checks:node.checks.filter(check=>!KERNEL_CHECK.test(check.assertion??'')).map(check=>({name:check.assertion??check.command,command:check.command})),
-    acceptance:node.assertions.length?node.assertions:[`${node.id} satisfies the Work contract it authored`],
-    resources:[...(node.resources??[])],
-    // An eligible node has no unsettled dependency, so a dependency inside this set is already done; the
-    // mapping is kept so a tree that validates differently still schedules in dependency order.
-    dependsOn:(node.dependsOn??[]).map(dep=>opOfNode.get(dep)).filter(Boolean),origin:'ledger'},index);
-}
-
-/**
- * Dynamic operations: the Work tree is re-read every iteration and every newly schedulable node (a node the
- * user added, or one whose dependencies just became done) becomes an operation of this workflow.
- */
-/**
- * An intake op's goal and acceptance are the current build's words, not the ones frozen at goal time: the
- * validator reads the acceptance literally, so a wording the build has since corrected ("all todo" against a
- * tree whose roots carry no state) kept rejecting an op planned before the correction. Only the text moves;
- * the allowlist and the references the op was granted stay what the owner approved.
- */
-function retemplateIntakeOps(store,state,ctx,loaded){
-  const workRoot=ctx.work?.at?.workRoot??null;
-  if(!workRoot)return;
-  for(const op of state.ops.filter(item=>item.intake?.scope&&!['done','blocked'].includes(item.status)||item.intake?.scope&&item.status==='blocked'&&!item.refusal)){
-    let fresh=null;
-    try{fresh=intakeOp(state,{workRoot,loaded,index:0,entry:op.intake.scope,repositories:{},mode:op.intake.mode??'author'});}catch{continue;}
-    const changed=['goal','acceptance'].filter(key=>JSON.stringify(op[key])!==JSON.stringify(fresh[key]));
-    if(!changed.length)continue;
-    for(const key of changed)op[key]=fresh[key];
-    store.appendEvent({event:'intake-retemplated',op:op.id,changed});
-  }
-}
-export function syncLedgerOps(store,state,ctx){
-  if(!ctx.work)return [];
-  let loaded;
-  try{loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});}
-  catch(error){store.appendEvent({event:'ledger-sync-failed',reason:error.message});return [];}
-  ctx.work.loaded=loaded;
-  // A brand that moved since the last read is named here too: the re-read is what makes the new rev current.
-  noteBrand(store,state,loaded);
-  retemplateIntakeOps(store,state,ctx,loaded);
-  // An operation created before the repository rule for a node another repository delivers is settled and blocked.
-  for(const op of state.ops){
-    if(!op.nodeId||op.refusal==='out-of-repository'||!ctx.work.code.repository||typeof ctx.work.api.nodeRepository!=='function')continue;
-    const node=loaded.nodes.get(op.nodeId);
-    if(!node)continue;
-    let foreign=null;try{foreign=ctx.work.api.nodeRepository(ctx.work.api.readNode(ctx.work.at,node));}catch{foreign=null;}
-    if(!foreign||foreign===ctx.work.code.repository)continue;
-    if(liveStatus.includes(op.status)&&op.dispatch&&ctx.orca){
-      settleDispatch(ctx.orca,op.dispatch,{cwd:state.worktree,reason:'out-of-repository',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
-      if(op.runtime)ctx.allocator.release(op.runtime,{op:op.id});
-    }
-    op.status='blocked';op.refusal='out-of-repository';op.dispatch=null;op.terminal=null;
-    for(const item of state.ledger)if(item.id===op.nodeId)item.status='out-of-repository';
-    store.appendEvent({event:'op-out-of-repository',op:op.id,node:op.nodeId,repository:foreign,own:ctx.work.code.repository});
-  }
-  let quarantined=false;
-  if(!loaded.ok&&quarantineStrays(store,state,ctx,loaded).length){
-    // Strays an abandoned operation left in the tree were moved aside: the tree is read again before anything
-    // is concluded from its errors.
-    try{loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});ctx.work.loaded=loaded;quarantined=loaded.ok;}catch{/* the invalid branch below says what it sees */}
-  }
-  if(!loaded.ok){
-    // No node of an invalid tree is a trustworthy TODO, so nothing is derived from it - and that is said once per
-    // distinct set of errors, never silently and never on every tick.
-    const signature=unique(loaded.errors.map(error=>`${error.code}:${error.path??''}`)).sort().join('|');
-    if(state.ledgerInvalid!==signature){
-      state.ledgerInvalid=signature;
-      store.appendEvent({event:'ledger-invalid',errors:loaded.errors.slice(0,8).map(error=>({code:error.code,path:error.path??null,message:String(error.message??'').slice(0,160)}))});
-    }
-    return [];
-  }
-  if(state.ledgerInvalid||quarantined){
-    state.ledgerInvalid=null;store.appendEvent({event:'ledger-valid-again',...(quarantined?{after:'quarantine'}:{})});
-    // Ops the validator exhausted only because the whole-tree check was red are judged again now that it is green.
-    for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&state.needUser.some(entry=>entry.op===item.id&&entry.kind==='validator'&&/work-valid/.test(String(entry.detail??''))))){
-      op.status='ready';op.validatorRejects=0;op.dispatch=null;op.terminal=null;
-      state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&entry.kind==='validator'));
-      store.appendEvent({event:'op-readmitted',op:op.id,reason:'the tree is valid again; the validator rejected only its whole-tree check'});
-    }
-  }
-  const scope=state.scope.length?state.scope:null;
-  const taken=new Set(state.ops.map(op=>op.id));
-  const opOfNode=new Map(state.ops.filter(op=>op.nodeId).map(op=>[op.nodeId,op.id]));
-  const added=[];
-  pruneAnsweredQuestions(store,state,loaded);
-  const candidates=ctx.work.api.executableCandidates(loaded,{scope,repository:ctx.work.code.repository,side:ctx.work.side});
-  // A "ledger incomplete" item is only as current as the tree: once its node is schedulable, done, or no longer
-  // a candidate at all (foreign, ineligible), the item is stale and goes.
-  const incomplete=new Set(candidates.filter(node=>!node.schedulable).map(node=>node.id));
-  const doneNow=new Set(loaded.list.filter(node=>node.state==='done').map(node=>node.id));
-  state.needUser=state.needUser.filter(item=>{
-    if(item.kind!=='ledger')return true;
-    if(item.node)return incomplete.has(item.node);
-    // An op-keyed item (a refused write) is stale once that op is done and its node is back in the tree, or the node is done.
-    const op=state.ops.find(candidate=>candidate.id===item.op);
-    if(!op)return true;
-    if(doneNow.has(op.nodeId??''))return false;
-    return !(op.status==='done'&&op.nodeId&&loaded.nodes.has(op.nodeId));
-  });
-  for(const node of candidates){
-    if(!node.schedulable){
-      const authored=authorRecordOp(store,state,ctx,node,taken);
-      if(authored)added.push(authored.id);
-      continue;
-    }
-    const entry=laneOf(state,node);
-    const mine=state.ops.filter(op=>op.nodeId===node.id);
-    // The op that completed this node's record is not a step of its lane: it precedes the lane, so the lane's
-    // first step is still the first step and still carries the node's own id.
-    const laneOps=mine.filter(op=>op.kind!==AUTHOR_KIND);
-    // One step at a time: a node yields its next lane step only when nothing of it is still in flight.
-    if(mine.some(op=>op.status!=='done'))continue;
-    if(!laneOps.length&&designGate(store,state,{api:ctx.work.api,at:ctx.work.at,loaded},node,entry))continue;
-    const predicates=lanePredicates({api:ctx.work.api,at:ctx.work.at,loaded},node);
-    laneSkip(entry,predicates);
-    const next=laneNext(entry,predicates);
-    // No next step means the lane is walked; `review.verify` is the kernel's own (planVerifyOps), not the node's.
-    const onDisk=(()=>{try{return ctx.work.api.readNode(ctx.work.at,node)?.state??node.state;}catch{return node.state;}})();
-    if(!next&&laneOps.length&&onDisk==='todo'&&!entry.recordedAttempt){
-      // The lane is walked but the tree still says todo: an earlier done write was refused (a rule since fixed).
-      // Record it once more from the lane's merged checks; a second refusal stays in needUser.
-      const last=[...laneOps].reverse().find(op=>op.status==='done')??laneOps.at(-1);
-      entry.recordedAttempt=state.iterations;
-      store.appendEvent({event:'lane-record-retry',node:node.id,op:last.id});
-      recordDone(store,state,last,ctx,{checks:entry.checks??[]},{nodeId:node.id,head:entry.head??last.head});
-      ctx.guards.gitQueue(()=>commitLedgerWrite(store,state,last,ctx,node.id));
-      continue;
-    }
-    if(!next||KERNEL_PLANNED_KINDS.includes(next)||mine.some(op=>op.kind===next))continue;
-    const id=laneOpId(node.id,next,!laneOps.length,taken);opOfNode.set(node.id,id);
-    const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done,loaded});
-    locateSharedTreePaths(op,ctx);
-    op.difficulty=op.difficulty??'medium';
-    op.createdIteration=state.iterations;
-    state.ops.push(op);
-    if(!ledgerItem(state,node.id))
-      state.ledger.push({id:node.id,title:describeNode(ctx.work.api,ctx.work.at,node),inputRef:node.path,kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[],lane:[...entry.lane]});
-    added.push(op.id);
-    store.appendEvent({event:'op-added',op:op.id,node:node.id,kind:op.kind,
-      reason:laneOps.length?`lane step ${entry.done.length+1} of ${laneWalked(entry).length} (${laneText(laneWalked(entry))})`:'newly schedulable Work node'});
-    gateDynamicOp(store,state,op);
-  }
-  return added;
-}
-
-/** The one path an operation may be given inside the ledger: the node's own `index.yaml`, exactly as the guard names it. */
-function recordPath(state,ctx,node){
-  const root=ctx.work.ledger?.repoRoot??ctx.work.repoRoot??state.worktree;
-  const owned=(ctx.guards??kernelGuards).protectedPaths(node,root)??[];
-  return owned.find(entry=>/index\.ya?ml$/.test(entry))??null;
-}
-
-/**
- * An incomplete record is an operation's job, not the user's. A candidate the ledger reports `schedulable:false`
- * (it declares no write scope, or no check) gets exactly one `work.author` op whose allowlist is that node's own
- * `index.yaml` and whose only check is the kernel's own whole-tree validator. The bound is the point: one author
- * op per node per workflow, and a record that is still incomplete after that op was accepted is the question the
- * user has to answer - `settleAuthoredRecord` raises it and no second author op is ever created.
- *
- * Two cases keep today's behaviour instead. A tree another repository owns is not in this worktree, so no
- * operation here can be given a path inside it; and a node whose `index.yaml` the guard cannot name has no
- * write scope to grant. Both stay a `needUser` item, because inventing one is exactly what the ledger prevents.
- */
-function authorRecordOp(store,state,ctx,node,taken){
-  const lane=laneOf(state,node);
-  const record=ctx.work.shared?null:recordPath(state,ctx,node);
-  const stop=detail=>{
-    if(!state.needUser.some(item=>item.node===node.id&&item.kind==='ledger'))state.needUser.push({node:node.id,kind:'ledger',detail});
-    return null;
-  };
-  if(lane.authored){
-    const op=byId(state,lane.authored);
-    // Still in flight: the record is being completed and there is nothing to tell the user yet. Finished any
-    // other way - accepted, refused, blocked - the node is the user's, because its one author op is spent.
-    if(op&&liveStatus.includes(op.status))return null;
-    return stop(`ledger incomplete: ${node.reason}`);
-  }
-  if(!record)return stop(`ledger incomplete: ${node.reason}`);
-  const id=workOpId(`${node.id}-author`,taken);
-  const op=toOp({id,nodeId:node.id,kind:AUTHOR_KIND,
-    goal:`Complete the Work record of ${node.id} so the kernel can launch it: ${node.reason}`,
-    // No ledger item: the node enters the workflow's ledger when its own lane starts, not when its record is written.
-    ledgerIds:[],allowlist:[record],references:unique([node.path,...(node.refs??[])]),
-    checks:[{name:'work-valid',command:workValidateCommand(ctx)}],
-    acceptance:['the node declares an allowlist and checks that name its assertions','the tree validates'],
-    origin:'ledger'},state.ops.length);
-  op.difficulty='hard';
-  op.createdIteration=state.iterations;
-  lane.authored=op.id;
-  state.ops.push(op);
-  // The record is being completed now, so it is no longer a question for the user.
-  state.needUser=state.needUser.filter(item=>!(item.kind==='ledger'&&item.node===node.id));
-  store.appendEvent({event:'op-added',op:op.id,node:node.id,kind:op.kind,reason:`ledger incomplete: ${node.reason}`});
-  gateDynamicOp(store,state,op);
-  return op;
-}
-
-export function workOpId(nodeId,taken=new Set()){
-  const base=String(nodeId??'').replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^[-._]+/,'').replace(/[-._]+$/,'')||'node';
-  let id=base;
-  for(let suffix=2;taken.has(id);suffix+=1)id=`${base}-${suffix}`;
-  taken.add(id);
-  return id;
-}
-/** The module a node belongs to: its feature directory, falling back to the first two id segments. */
-export function workModule(node){
-  const parts=slash(node?.path??'').split('/').filter(Boolean);
-  if(parts[0]==='features'&&parts[1])return `features/${parts[1]}`;
-  const id=String(node?.id??'');
-  return id.split('.').slice(0,2).join('.')||id||'-';
-}
-/** The authored node is the record: its description is the operation goal, never a model's paraphrase. */
-function describeNode(api,repoRoot,node){
-  try{
-    const raw=api.readNode(repoRoot,node);
-    const text=[raw?.description,raw?.title,raw?.name].map(value=>String(value??'').trim()).find(Boolean);
-    return text||String(node.id);
-  }catch{return String(node.id);}
-}
-const ledgerErrorText=errors=>errors.slice(0,3).map(error=>typeof error==='string'?error:JSON.stringify(error)).join('; ');
-
-/**
- * Work ledger: the TODO list already exists, so the kernel never asks a model to invent one. It loads the
- * tree through the shipped validator, lists the decision candidates and the schedulable executable
- * candidates in scope, and derives every operation from its node - goal from `description`, allowlist from
- * `implementation.changes[].files`, checks from `extensions.work3.checks`, acceptance from `assertions`.
- * A node that declares no allowlist or no checks cannot be launched: it becomes a `needUser` item named
- * "ledger incomplete" in goal.md, because guessing a scope for authored work is not the kernel's to do.
- * The model is asked for one thing only: the definition of done and the risks and questions around it.
- */
-/** Whether a scope entry names this node: by id prefix or by tree path, the way the ledger's own scope filter reads it. */
-function scopeNames(node,entry){
-  const key=slash(String(entry??'')).replace(/\/+$/,''),id=String(node?.id??''),where=slash(node?.path??'');
-  return Boolean(key)&&(id===key||id.startsWith(`${key}.`)||where===key||where.startsWith(`${key}/`)||where.startsWith(`features/${key}/`));
-}
-/**
- * The intake operation of a scope entry the tree does not know. `brand` is authored and decided by one
- * `brand.decide` op on the one brand record; a feature is authored by one `work.author` op that mirrors the shape
- * of an existing feature - module record, business overview and SRS drafts, architecture skeleton - every record
- * `todo`, so the owner reads drafts and the decisions stay the owner's. Neither op closes a Work node: the records
- * it writes are the nodes the tree has afterwards.
- */
-function intakeOp(state,{workRoot,loaded,index,entry=null,repositories={},mode='author'}){
-  const name=slash(String(entry??'')).replace(/\/+$/,'');
-  const check={name:'work-tree-validates',command:validateCommandAt(workRoot)};
-  if(name==='brand'){
-    return {id:`brand-${index+1}`,kind:BRAND_DECIDE,nodeId:null,intake:{scope:'brand'},
-      goal:`Author and decide the brand record .starciwork/brand/index.yaml of this product from the job: ${state.job}. The name, the design family, every colour token with the role it plays and the source file it is traced to, the fonts, the mascot and logo assets (generate a placeholder mascot with the image model when the product has none), what is forbidden and the rules every imagery prompt must carry.`,
-      ledgerIds:[],allowlist:['.starciwork/brand/index.yaml','.starciwork/brand/**'],
-      // The frontend repository the tokens are traced to is a read-only reference here, never a place to write.
-      references:unique(['workspace.yaml',...Object.entries(repositories).filter(([role])=>role!=='be').map(([,root])=>slash(root)),...grammarReferences()]),checks:[check],
-      acceptance:['.starciwork/brand/index.yaml is a valid brand node: name, family, colour tokens with their roles and sources, the mascot and logo assets, the forbidden list and the imagery prompt rules','the Work tree still validates'],origin:'ledger'};
-  }
-  // The example the drafts mirror: the first feature module the tree already has, with its business and architecture roots.
-  const paths=loaded.list.map(node=>slash(node.path??''));
-  const features=unique(paths.map(where=>(where.match(/^features\/([^/]+)\//)??[])[1]).filter(Boolean)).sort();
-  const example=features[0]?`features/${features[0]}`:null;
-  const roots=example?[`${example}/index.yaml`,`${example}/business/index.yaml`,`${example}/business/overview/index.yaml`,`${example}/architecture/index.yaml`,`${example}/architecture/overview/index.yaml`]:[];
-  const found=paths.filter(where=>roots.includes(where));
-  // Always a real record to mirror: the module roots when the tree has them, else the first record under the example.
-  const exampleRefs=found.length?found:paths.filter(where=>example&&where.startsWith(`${example}/`)).sort().slice(0,1);
-  // The decided records of every other feature: the reconciliation reads them, references them, never restates them.
-  const decided=loaded.list.filter(node=>node.state==='done'&&['business','business-overview','architecture'].includes(node.kind)&&!scopeNames(node,name)).map(node=>slash(node.path)).slice(0,60);
-  const reconcile=mode==='reconcile';
-  return {id:`${name.replace(/[^A-Za-z0-9._-]+/g,'-')}-intake`,kind:AUTHOR_KIND,nodeId:null,intake:{scope:name,example,mode},
-    goal:`${reconcile?`Reconcile and re-author the existing drafts of the feature ${name}`:`Author the Work records of the feature ${name}`} from the job: ${state.job}. A new feature is not appended beside the decided ones: read the decided SRS/SDS records it touches, reference what it shares, report as sds-gap what they must become, raise a real conflict as an open decision - so the tree reads as one consistent whole. Mirror the shape of the existing feature ${example??'(none yet)'}: the module record, the business overview and SRS as full drafts, the architecture as a skeleton; every leaf record todo (the module, business, srs, architecture and sds roots carry no state, exactly as the example), every open question an open decision.`,
-    ledgerIds:[],allowlist:[`.starciwork/features/${name}/**`],
-    references:unique(['workspace.yaml',...exampleRefs,...decided]),checks:[check],
-    acceptance:[`features/${name} has a module record, a business overview, SRS records and an architecture skeleton, every leaf record todo and the whole feature valid - the roots (module, business, srs, architecture, sds) carry no state, as in the example feature`,
-      `the module record of ${name} carries a reconciliation table over the decided records it touches (fit, change or conflict); what it shares is referenced by record id, never restated or redefined; a change a decided record needs was reported as sds-gap, never edited; a real conflict is an open decision record`,
-      'no other feature\'s record changed by hand','the Work tree still validates'],origin:'ledger'};
-}
-export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless,
-  ledgerRoot=null,git=spawnSync,resolveLedger=resolveLedgerRoot}={}){
-  need(!state.approved,`Workflow ${state.id} is already approved; run workflow-run`);
-  // The Work ledger is the branch content of the worktree; only the workflow history lives in the main repository.
-  const repoRoot=state.repoRoot??path.resolve(state.worktree);
-  state.repoRoot=repoRoot;
-  // ... unless another repository of the same product owns the tree: then the code is here and the Work is there.
-  const binding=ledgerBinding(state,{repoRoot,host:state.host,ledgerRoot,git,resolve:resolveLedger});
-  const at={repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot};
-  const repository=ledgerApi.repositoryName?.(repoRoot)??null;
-  const loaded=ledgerApi.loadLedger({...at,validate});
-  const scope=state.scope.length?state.scope:null;
-  const executables=ledgerApi.executableCandidates(loaded,{scope,repository,side:binding.side});
-  const ready=executables.filter(node=>node.schedulable),incomplete=executables.filter(node=>!node.schedulable);
-  // A scope entry that names nothing in the tree is a feature - or the brand - still to be authored. The workflow
-  // then begins with one intake operation that writes those records from the job, and the tree, once it has them,
-  // says what follows: decisions the owner takes, lanes the kernel walks. Nothing is invented by the kernel itself.
-  // `--reintake <feature>` re-authors drafts the tree already holds under the reconciliation rule: the same intake
-  // op, in reconcile mode, over the same allowlist - the way a feature authored before that rule is brought under it.
-  const reintake=(state.reintake??[]).map(entry=>slash(String(entry??'')).replace(/\/+$/,'')).filter(Boolean);
-  const absent=unique([...(scope??[]).filter(entry=>!loaded.list.some(node=>scopeNames(node,entry))),...reintake]);
-  const repositories=(()=>{try{return Object.fromEntries(bindingRoutes(binding.binding,{source:path.dirname(path.resolve(state.host??''))}).map(route=>[route.role,route.directory]));}catch{return {};}})();
-  // The folders of the other bound repositories, and the folder they all live in, so a path naming one of them
-  // is never mistaken for a path of this worktree.
-  state.otherRepositories=unique(Object.values(repositories).map(root=>path.basename(String(root))).filter(name=>name&&name!==path.basename(repoRoot)));
-  state.repositoriesRoot=state.host?path.basename(path.dirname(path.dirname(path.resolve(state.host)))):null;
-  const intake=absent.map((entry,index)=>intakeOp(state,{workRoot:binding.ledgerRoot,loaded,index,entry,repositories,mode:reintake.includes(slash(String(entry)).replace(/\/+$/,''))?'reconcile':'author'}));
-  state.decisions=ledgerApi.decisionCandidates(loaded,{scope}).map(node=>({id:node.id,kind:node.kind,path:node.path,
-    operation:DECISION_OPERATION[node.kind]??'business.decide',title:describeNode(ledgerApi,at,node)}));
-  state.ledgerSummary=ledgerApi.ledgerSummary(loaded,{scope});
-  // The brand is part of what the user approves: goal.md and goal.json name the record every design step reads.
-  noteBrand(store,state,loaded,{silent:true});
-  if(!loaded.ok)state.needUser.push({kind:'ledger',detail:`the Work tree does not validate, so no node in it is a trustworthy TODO: ${ledgerErrorText(loaded.errors)}`});
-  for(const node of incomplete)state.needUser.push({node:node.id,kind:'ledger',detail:`ledger incomplete: ${node.reason}`});
-  need(ready.length||incomplete.length||state.decisions.length||intake.length,
-    `No eligible Work node in scope ${scope?scope.join(', '):'(the whole tree)'}: there is nothing for this workflow to do`);
-  // The lane is the template the user approves: every node gets its record here, before any op exists. A
-  // frontend build whose drawing is not done yet keeps its lane and waits; it enters the ops once the ui node is.
-  state.lanes={};
-  for(const node of ready)laneOf(state,node);
-  // A held node is still a goal item: it stays `planned` in the ledger with no op, so the workflow cannot finish
-  // around it, and its first op is created by `syncLedgerOps` once the drawing it waits for is done.
-  const launchable=ready.filter(node=>!designGate(store,state,{api:ledgerApi,at,loaded},node,state.lanes[node.id]));
-  state.ledger=ready.map(node=>({id:node.id,title:describeNode(ledgerApi,repoRoot,node),inputRef:node.path,
-    kind:node.kind,nodeId:node.id,module:workModule(node),assessed:node.state,status:'planned',evidence:[],
-    lane:[...(state.lanes[node.id]?.lane??[])]}));
-  const taken=new Set(),opOfNode=new Map();
-  for(const node of launchable)opOfNode.set(node.id,workOpId(node.id,taken));
-  state.ops=[...launchable.map((node,index)=>deriveWorkOp(ledgerApi,at,node,
-    {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[],loaded})),
-    ...intake.map((raw,index)=>{const op=toOp(raw,launchable.length+index);op.intake=raw.intake;op.difficulty='hard';return op;})];
-  for(const op of state.ops.filter(item=>item.intake))store.appendEvent({event:'intake-planned',op:op.id,scope:op.intake.scope,kind:op.kind,allowlist:op.allowlist,mode:op.intake.mode??'author'});
-  for(const op of state.ops)locateSharedTreePaths(op,{work:{shared:binding.sharedLedger,ledger:{repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot}}});
-  need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
-  const assessed=typeof assessGoal==='function'?assessGoal({job:state.job,inputs:state.inputs,
-    ledger:state.ledger.map(item=>({id:item.id,kind:item.kind,title:item.title,module:item.module})),
-    constraints:[
-      `the ledger is the authored Work tree under ${slash(binding.ledgerRoot)} and is not yours to change`,
-      ...(binding.sharedLedger?[`that tree is owned by ${binding.ownerRepository??slash(binding.ownerRepoRoot)}, not by this repository: the code is written here and the Work is recorded there`]:[]),
-      `every op runs in the one worktree ${slash(state.worktree)} on branch ${state.branch} under the node's own allowlist`,
-      ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers,cwd,runHeadless}):null;
-  if(assessed?.ok){
-    state.definitionOfDone=[...(assessed.value.definitionOfDone??[])];
-    // Difficulty x model capability: the assessment rates every node; the allocator routes by tier inside the quota.
-    const rated=new Map((assessed.value.difficulty??[]).map(item=>[item.op,item.level]));
-    for(const op of state.ops){op.difficulty=rated.get(op.id)??rated.get(op.nodeId)??op.difficulty??'medium';}
-    state.risks=[...(assessed.value.risks??[])];
-    state.questions=[...(assessed.value.questions??[])];
-  }else{
-    // The TODO list is a fact of the tree, so a model that cannot answer does not block the goal: the
-    // definition of done falls back to the ledger itself and the failure is recorded as such.
-    state.definitionOfDone=state.ledger.map(item=>`\`${item.id}\` is done with checks the kernel re-ran itself`);
-    state.questions=incomplete.map(node=>`${node.id}: ${node.reason}`);
-    store.appendEvent({event:'goal-assessment-failed',reason:assessed?.reason??'assessGoal was not available',attempts:assessed?.attempts?.length??0});
-  }
-  // The critique runs whether or not the assessment answered: the job text is the goal, and the records the
-  // product already accepted are what it is challenged against. An unanswered critique is an event, never a stop.
-  critiqueGoalPhase(store,state,{critiqueGoal,providers,cwd,runHeadless,
-    ledger:state.ledger.map(item=>({id:item.id,kind:item.kind,title:item.title})),
-    decisions:state.decisions.map(item=>({id:item.id,kind:item.kind,title:item.title})),
-    // A feature being authored is reconciled against what the whole product decided, not against its own scope.
-    records:decidedRecords(ledgerApi,at,loaded,{scope:intake.length?[]:state.scope}),
-    constraints:[
-      `the ledger is the authored Work tree under ${slash(binding.ledgerRoot)}: the goal may not add, drop or rewrite a node, so an objection to the ledger is an objection to the scope of this goal`,
-      `the Work tree ${loaded.ok?'validates':'does NOT validate'}, and ${state.ledgerSummary?.eligible??0} of ${state.ledgerSummary?.total??0} nodes in scope are eligible`,
-      ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)]});
-  planCritiquePrerequisites(store,state,{loaded,workRoot:binding.ledgerRoot,repositories,
-    ctx:{work:{shared:binding.sharedLedger,ledger:{repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot}}}});
-  need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
-  writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,job:state.job,inputs:state.inputs,
-    ledgerMode:state.ledgerMode,scope:state.scope,workRoot:slash(loaded.workRoot),ledgerValid:loaded.ok,
-    ledgerSource:binding.source,ledgerShared:binding.sharedLedger,ledgerOwner:state.ledgerOwner,codeRepository:repository,codeSide:binding.side??null,
-    definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,critique:state.critique??null,
-    ledger:state.ledger,decisions:state.decisions,ledgerSummary:state.ledgerSummary,brand:state.brand??null,
-    lanes:Object.fromEntries(Object.entries(state.lanes??{}).map(([node,entry])=>[node,[...entry.lane]])),
-    ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
-      allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
-    gates:state.gates,needUser:state.needUser,assessedBy:assessed?.provider??null});
-  fs.writeFileSync(store.paths.goal,workGoalMarkdown(state,loaded));
-  state.phase='awaiting-approval';
-  store.appendEvent({event:'goal',ledgerMode:state.ledgerMode,scope:state.scope,ops:state.ops.length,
-    ledger:state.ledger.length,decisions:state.decisions.length,incomplete:incomplete.length,gates:state.gates.length});
-  store.saveState(state);
-  return {ok:true,id:state.id,ledgerMode:state.ledgerMode,goal:store.paths.goal,goalJson:store.paths.goalJson,
-    ops:state.ops.length,ledger:state.ledger.length,decisions:state.decisions.length,
-    incomplete:incomplete.map(node=>node.id),needUser:state.needUser,gates:state.gates.length,
-    ledgerRoot:slash(binding.ledgerRoot),ledgerSource:binding.source,ledgerShared:binding.sharedLedger,
-    ledgerOwner:binding.sharedLedger?(binding.ownerRepository??slash(binding.ownerRepoRoot)):null,
-    next:`review ${slash(store.paths.goal)} and approve with workflow-approve --id ${state.id}`};
-}
-
-/** goal.md in ledger mode: the nodes the kernel will execute, as the TODO the user approves. */
-function workGoalMarkdown(state,loaded){
-  const overlaps=[];
-  for(const [index,op] of state.ops.entries())for(const other of state.ops.slice(index+1))
-    if(!work.disjoint(op.allowlist,other.allowlist))overlaps.push(`\`${op.id}\` and \`${other.id}\` share paths, so they never run at the same time`);
-  const lines=[`# ${state.job}`,``,
-    `Workflow \`${state.id}\` - branch \`${state.branch}\` - ledger \`work\` (${slash(loaded.workRoot)})`,
-    ...(state.ledgerShared?[``,`The Work tree is owned by \`${state.ledgerOwner?.repository??slash(state.ledgerOwner?.repoRoot??'')}\`, not by this repository: code is written and committed in \`${slash(state.worktree)}\`, and every Work record is written and committed in the owner.`]:[]),
-    `Scope: ${state.scope.length?state.scope.map(item=>`\`${item}\``).join(', '):'the whole Work tree'}. `+
-    `The Work tree ${loaded.ok?'validates':'does NOT validate'}; ${state.ledgerSummary?.eligible??0} of ${state.ledgerSummary?.total??0} nodes in scope are eligible.`,``,
-    `## Definition of done`,``,...state.definitionOfDone.map((item,index)=>`${index+1}. ${item}`),``,
-    `## Work nodes this workflow executes`,``,
-    `Each node travels its lane: every step is one operation, and the node is recorded done only when the last`,
-    `step is accepted. The lane is the template you approve here.`,``,
-    `| op | node | kind | lane | module | checks | allowlist |`,`| --- | --- | --- | --- | --- | --- | --- |`];
-  for(const op of state.ops){
-    const item=ledgerItem(state,op.ledgerIds[0]);
-    const entry=state.lanes?.[op.nodeId??''];
-    const walked=laneWalked(entry);
-    const lane=walked.length?`${laneText(walked)} (this op: step ${walked.indexOf(op.kind)+1} of ${walked.length})`:op.kind;
-    lines.push(`| \`${op.id}\` | ${op.nodeId?`\`${op.nodeId}\``:op.intake?`intake of \`${op.intake.scope}\``:'-'} | ${item?.kind??'-'} | ${lane} | ${item?.module??'-'} | ${op.checks.length} | ${op.allowlist.map(entry=>`\`${entry}\``).join(', ')||'-'} |`);
-  }
-  if(state.decisions.length){
-    lines.push(``,`## Decisions still open in scope`,``,`These are answered by a decision, not by an operation in a worktree.`,``);
-    for(const decision of state.decisions)lines.push(`- \`${decision.id}\` (${decision.kind}) ${firstLine(decision.title)}`);
-  }
-  const incomplete=state.needUser.filter(item=>item.kind==='ledger');
-  if(incomplete.length){
-    lines.push(``,`## Needs you first`,``,
-      `A node whose record declares no write scope or no check cannot be launched. The kernel creates one`,
-      `\`work.author\` operation per such node - whose only write scope is that node's own \`index.yaml\` - and`,
-      `comes back to you only if the record is still incomplete after that operation was accepted. Anything`,
-      `listed here without a node id is yours from the start.`,``);
-    for(const item of incomplete)lines.push(`- ${item.node?`\`${item.node}\` `:''}${item.detail}`);
-  }
-  if(overlaps.length)lines.push(``,`## Serialized by a shared allowlist`,``,...overlaps.map(item=>`- ${item}`));
-  const proposal=state.quotaProposal??proposeQuota(state);
-  lines.push(``,`## Runtime allocation (the user sets this at approval)`,``,`Proposed from the difficulty of the operations (${proposal.summary}). Approve with \`workflow-approve --id ${state.id} --allocation ${proposal.text}\` or pass your own order and slots.`,``,`| runtime | slots (ratio) | difficulty | why |`,`| --- | --- | --- | --- |`,...proposal.rows.map(row=>`| \`${row.runtime}\` | ${row.slots} | ${row.tags} | ${row.why} |`),``,`Slots are both the parallel cap and the fill ratio inside a difficulty tier (4:1 means four operations on the first runtime for one on the second); a runtime without a tag takes every difficulty.`);
-  if(state.gates.length)lines.push(``,`## Job gates`,``,...state.gates.map(gate=>`- ${gate.name}: \`${gate.command}\``));
-  for(const [heading,items] of [['Risks',state.risks],['Questions',state.questions]]){
-    if(!items.length)continue;
-    lines.push(``,`## ${heading}`,``,...items.map(item=>`- ${item}`));
-  }
-  return `${lines.join('\n')}\n`;
-}
-
-/** The one human gate of the runtime: nothing is launched until the plan is approved. */
-/** The launch chain of one operation kind, in order, or nothing when the registry cannot resolve it. */
-function chainTargets(kind){
-  try{return resolveExecutionChain({skill:'starci',op:launchOperator(kind)}).candidates.map(candidate=>candidate.target);}catch{return [];}
-}
-/** The repository's shared runtime ledger as this workflow sees it; an unreadable one is simply nothing shared. */
-function sharedLoadsOf(state){
-  try{return readLoads({path:loadsFileFor(state.dir),workflow:state.id});}catch{return null;}
-}
-/** A quota proposal from the difficulty mix: hard/medium operations lean on the strongest runtimes, easy ones on the cheapest. The user always sets the final numbers. */
-export function proposeQuota(state,{runtimes=null,shared=undefined}={}){
-  const profile=runtimes??(()=>{try{return loadRuntimes();}catch{return null;}})();
-  const ops=state.ops.filter(op=>op.status!=='done');
-  const hard=ops.filter(op=>op.difficulty==='hard').length,easy=ops.filter(op=>op.difficulty==='easy').length,medium=ops.length-hard-easy;
-  const total=Math.min(ops.length||1,profile?.maxParallelOps??10);
-  const order=(profile?.allocation?.preference?.implement??['gpt-5.6-sol','claude-opus','qwen3.8-flash']).filter(id=>profile?.runtimes?.[id]);
-  const weights=order.map((id,index)=>index===0?hard+medium*0.6+easy*0.2:index===1?hard*0.4+medium*0.4+easy*0.3:medium*0.2+easy*0.8);
-  const sum=weights.reduce((a,b)=>a+b,0)||1;
-  let rows=order.map((id,index)=>({runtime:id,slots:Math.max(index===0?1:0,Math.round(total*weights[index]/sum)),tags:index===0?'hard+medium':index===1?'hard+medium':'easy+medium',why:index===0?'strongest tier: hard and most medium operations':index===1?'second tier: medium operations and overflow':'cheapest tier: easy operations and overflow'}));
-  const cap=id=>profile?.runtimes?.[id]?.maxParallel;
-  rows=rows.map(row=>({...row,slots:Number.isFinite(cap(row.runtime))&&cap(row.runtime)>0?Math.min(row.slots,cap(row.runtime)):row.slots}));
-  // Every role the plan needs has a runtime with a slot: a `work.author` op needs the plan role, and a proposal
-  // that gave its only slot to a runtime without it left a workflow stalled at its first tick.
-  const rolesOf=id=>Array.isArray(profile?.runtimes?.[id]?.roles)?profile.runtimes[id].roles:[];
-  for(const role of unique(ops.map(op=>kindRole(op.kind)).filter(Boolean))){
-    if(rows.some(row=>row.slots>0&&rolesOf(row.runtime).includes(role)))continue;
-    const able=rows.find(row=>rolesOf(row.runtime).includes(role));
-    if(able){able.slots=Math.max(1,able.slots);able.why=`${able.why}; the only proposed runtime with the ${role} role`;continue;}
-    const id=Object.keys(profile?.runtimes??{}).find(candidate=>rolesOf(candidate).includes(role));
-    if(id)rows.push({runtime:id,slots:1,tags:'hard+medium',why:`the ${role} role: no runtime in the preference order has it`});
-  }
-  // ... and every kind's launch chain: a kind whose chain is [fable, astra] cannot run on a quota that names
-  // only Sol, Opus and Qwen, whatever their roles. The first runtime of the chain gets a slot.
-  for(const kind of unique(ops.map(op=>op.kind).filter(Boolean))){
-    const targets=chainTargets(kind);
-    if(!targets.length||rows.some(row=>row.slots>0&&targets.includes(row.runtime)))continue;
-    const row=rows.find(item=>targets.includes(item.runtime));
-    if(row){row.slots=Math.max(1,row.slots);row.why=`${row.why}; in the launch chain of ${kind}`;continue;}
-    rows.push({runtime:targets[0],slots:1,tags:'hard+medium',why:`first of the launch chain of ${kind}`});
-  }
-  // ... and what the other workflows of this repository are already on: when the first runtime of a kind's chain
-  // carries another kernel's operations, the next chain runtime that has the role is proposed a slot as well, so a
-  // lane opened while another lane is on Fable proposes Astra without the owner having to say it.
-  const outside=shared===undefined?sharedLoadsOf(state):plain(shared)?shared:null;
-  for(const kind of unique(ops.map(op=>op.kind).filter(Boolean))){
-    const targets=chainTargets(kind);
-    const first=targets[0];
-    const holder=first?(outside?.ops?.[first]??[])[0]?.workflow??null:null;
-    if(!holder)continue;
-    const role=kindRole(kind);
-    const next=targets.slice(1).find(id=>profile?.runtimes?.[id]&&(!role||rolesOf(id).includes(role)));
-    if(!next)continue;
-    const row=rows.find(item=>item.runtime===next);
-    if(row){row.slots=Math.max(1,row.slots);row.why=`${row.why}; ${first} is busy with ${holder}`;continue;}
-    rows.push({runtime:next,slots:1,tags:'hard+medium',why:`next in the launch chain of ${kind}: ${first} is busy with ${holder}`});
-  }
-  const text=rows.map(row=>`${row.runtime}=${row.slots}:${row.tags}`).join(',');
-  const proposal={rows,text,summary:`${hard} hard, ${medium} medium, ${easy} easy of ${ops.length} operations; up to ${total} in parallel`};
-  state.quotaProposal=proposal;
-  return proposal;
-}
-
-export function approve(store,state,{allocation=null,allowDynamic=null,acceptCritique=null,host=null}={}){
-  // A goal the critique refused is not approvable as it stands: either the question is answered and the goal is
-  // written again, or the owner overrides the critique on the record. An override is the owner's own decision, so
-  // it is taken once and never asked for again.
-  const refused=state.critique?.verdict==='refuse'&&!plain(state.critiqueOverride);
-  const accepted=String(acceptCritique??'').trim();
-  if(refused){
-    need(accepted,`The critique of goal ${state.id} returned \`refuse\`: ${state.critique.question??'it named no question'} `+
-      `Answer that and run workflow-goal again, or accept the critique with workflow-approve --id ${state.id} --accept-critique "<reason>".`);
-    state.critiqueOverride={reason:accepted,at:Date.now()};
-    store.appendEvent({event:'critique-overridden',reason:accepted,question:state.critique.question??null,
-      objections:(state.critique.objections??[]).length});
-    noteCritiqueInGoal(store,state);
-  }
-  if(allocation)state.quota=parseQuota(allocation);
-  // `--allow-dynamic N` is the user raising the run-time op budget; ops the gate refused are reinstated with it.
-  if(allowDynamic!==null&&allowDynamic!==undefined&&String(allowDynamic).trim()){
-    const budget=Number(allowDynamic);
-    need(Number.isInteger(budget)&&budget>=0,`--allow-dynamic takes a non-negative integer (0 forbids run-time ops): ${allowDynamic}`);
-    const raised=budget>dynamicBudget(state);
-    state.dynamicOpsBudget=budget;
-    if(raised){
-      for(const op of state.ops.filter(item=>item.status==='blocked'&&item.refusal==='dynamic-op')){op.status='pending';op.refusal=null;}
-      state.needUser=state.needUser.filter(item=>item.kind!=='dynamic-op');
-    }
-  }
-  // An op a host refused for a capability it lacked is re-admitted the moment the approval comes from a host that
-  // has it: the refusal was the host's, not the op's, and this approval is on the record of which host gave it.
-  // Without a host descriptor (an approval that names none) nothing is assumed and the refusal stands.
-  if(plain(host)){
-    for(const op of state.ops.filter(item=>item.status==='blocked'&&item.refusal==='host-unsupported')){
-      if(hostMissing(host,op.kind).length)continue;
-      op.status='ready';op.refusal=null;op.dispatch=null;op.terminal=null;op.nudged=false;
-      state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&entry.kind==='host'));
-      store.appendEvent({event:'op-readmitted',op:op.id,reason:`the ${host.name} host has what ${op.kind} needs`,host:host.name});
-    }
-  }
-  // A workflow that finished `blocked` stopped for the user's decision; the user approving it again IS that
-  // decision, so the finish is cleared and the supervisor starts a kernel that carries on from where it stopped.
-  if(state.finished&&state.finished.outcome==='blocked'&&state.approved){
-    const before=state.finished;
-    state.finished=null;state.phase='run';state.stalls=0;state.stalledSince=null;state.kernelErrors=0;
-    // The ops a limit exhausted - the validator's rejections, the launch attempts, the restarts, a stall - are the
-    // items the policy could not settle, and the owner approving again says: try them again. Their counters start
-    // over and their questions go; an op the kernel refused on principle (superseded, out of the repository, a
-    // dynamic op over budget) stays refused, because approving again does not change what it was refused for.
-    const readmitted=[];
-    for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal)){
-      // A clean slate: the runtimes a rate limit or a restart taught the op to avoid are open to it again, else an op
-      // only one of them can run (a mascot needs Sol) would wait for a slot it may never get.
-      op.status='ready';op.validatorRejects=0;op.launchFailures=0;op.restarts=0;op.dispatch=null;op.terminal=null;op.nudged=false;op.avoidRuntimes=[];op.avoidedAt={};
-      state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&['validator','environment','restart','stall'].includes(entry.kind)));
-      readmitted.push(op.id);
-    }
-    store.appendEvent({event:'resumed-after-block',reason:before.reason??null,budget:dynamicBudget(state),readmitted});
-    for(const id of readmitted)store.appendEvent({event:'op-readmitted',op:id,reason:'the owner approved the workflow again after it finished blocked'});
-  }
-  // The user sets the runtime allocation at approval; without --allocation the proposal from goal.md is used and recorded.
-  if(!state.quota){const proposal=state.quotaProposal??proposeQuota(state);state.quota=parseQuota(proposal.text);state.quotaSource='proposal';}else state.quotaSource=allocation?'user':state.quotaSource??'user';
-  // On the Work ledger a plan may legitimately start with no operation: every candidate in scope declares an
-  // incomplete record, and the first ledger sync turns each of those into one `work.author` op. Anything else
-  // with no operation is an empty plan and stays unapprovable.
-  const toAuthor=state.ledgerMode===WORK_LEDGER?state.needUser.filter(item=>item.kind==='ledger'&&item.node).length:0;
-  need(state.ops.length||toAuthor,`Workflow ${state.id} has no plan to approve; run workflow-goal first`);
-  state.approved=true;
-  if(state.phase!=='finished')state.phase='run';
-  store.appendEvent({event:'approved',ops:state.ops.length,toAuthor,quota:state.quota,dynamicOpsBudget:dynamicBudget(state),
-    critique:state.critique?.verdict??null});
-  store.saveState(state);
-  return {ok:true,id:state.id,phase:state.phase,approved:true,ops:state.ops.length,ledger:state.ledger.length,
-    quota:state.quota,dynamicOpsBudget:dynamicBudget(state),
-    ...(plain(state.critique)?{critique:critiqueView(state)}:{})};
-}
-
 /* ------------------------------------------------------------------ contract */
 
 /**
@@ -1665,23 +133,13 @@ export function approve(store,state,{allocation=null,allowDynamic=null,acceptCri
  * checks, report command); the process prose - cook until done, the mandatory ping, the never list - is
  * reused from docs/supervision-templates/op.md so one template serves every operation kind.
  */
-/** Job-wide rulings the user gave at approval time (`<store>/rulings.md`) travel inside every contract and in the validator memory. */
-function rulingsText(store){
-  const file=path.join(store.dir,'rulings.md');
-  if(!fs.existsSync(file))return '';
-  return fs.readFileSync(file,'utf8').trim();
-}
-function jobRulings(store){
-  const body=rulingsText(store);
-  return body?[`## Job rulings (apply to every operation)`,body,``]:[];
-}
 
 /**
  * The lane line of a contract: the template this operation's node travels and which step this operation is.
  * An operation that belongs to no lane (a plan-ledger op, a shared change, a gate repair) gets no line.
  */
 export function laneLine(state,op){
-  const entry=laneEntryOf(state,op);
+  const entry=state?.lanes?.[op?.nodeId??'']??state?.lanes?.[(op?.ledgerIds??[])[0]??'']??null;
   if(!entry?.lane?.length)return null;
   // An author op is no step of the lane: it is what makes the lane launchable, so it is named as preceding it.
   const walked=laneWalked(entry);
@@ -1696,7 +154,7 @@ export function laneLine(state,op){
  * right above it: the block exists so no design operation can claim it did not know the brand was there.
  */
 function brandBlock(op,brand){
-  if(!plain(brand)||!DESIGN_KINDS.includes(op.kind))return [];
+  if(!plain(brand)||!kindsReadingBrand().includes(op.kind))return [];
   return [`## Brand`,
     `- name: ${brand.name??'(unnamed)'} - family: ${brand.family??'-'} - rev: ${brand.rev??'-'}`,
     ...(brand.file?[`- record: \`${brand.file}\``]:[]),
@@ -1715,6 +173,8 @@ function critiqueBlock(critique){
   return [`## Goal critique - required`,...required.map(item=>`- ${item}`),
     `The critique of this workflow's goal returned \`revise\`: these changes are part of the goal the user approved and bind this operation exactly as the goal above does.`,``];
 }
+/** A kind the kinds profile does not carry (a plan-ledger kind) declares no input and no output; it prints none. */
+const ioLines=kind=>{try{const block=ioBlock(kind);return block?[...String(block).split(String.fromCharCode(10)),'']:[];}catch{return [];}};
 
 export function renderContract({template,op,state,store,launcher=state.launcher,run=state.run,
   guards=kernelGuards,protectedPaths=null,brand=state.brand??null,critique=state.critique??null}){
@@ -1735,6 +195,9 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     ...(laneLine(state,op)?[laneLine(state,op),``]:[]),
     `## Goal`,op.goal,``,
     ...critiqueBlock(critique),
+    // What this kind is derived from and what it may produce, from the record catalog: an operation reads its
+    // declaration before it reads its allowlist, so a record it may not write is refused before it writes one.
+    ...ioLines(op.kind),
     ...(op.nodeId?(op.kind===AUTHOR_KIND
       ?[`## Work node you author`,`- \`${op.nodeId}\` - you complete this record so the kernel can launch the node's own work; you do not do that work. Its \`index.yaml\` is in your allowlist, and inside that file \`${RECORD_OWNED.join('`, `')}\` stay the kernel's: it reads them back, reverts the file if they moved and downgrades your report to \`failed\`. Never edit another node's \`index.yaml\`.`,``]
       :[`## Work node you close`,`- \`${op.nodeId}\` - the kernel writes its \`state\`, \`completion\` and evidence itself after it has reproduced your checks. Never edit a Work \`index.yaml\` unless it is in your allowlist.`,``]):[]),
@@ -1774,176 +237,6 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
   return contract;
 }
 
-/* ------------------------------------------------------------------ kernel-owned paths */
-
-/**
- * The ledger paths this kernel owns for an operation's node - its `index.yaml` (where `state`, `completion`
- * and `extensions.work3.kernel` live) and its `evidence/**`. An operation is granted one only when its own
- * allowlist names that exact file (an `architecture.decide` op authors the design body of its node), never
- * through a directory glob.
- */
-export function kernelOwnedPaths(state,op,ctx){
-  if(!ctx?.work||!op.nodeId)return [];
-  // A ledger another repository owns is not in this worktree at all: an operation cannot write it here, so
-  // there is no path here to protect and no fingerprint to take.
-  if(ctx.work.shared)return [];
-  const node=ctx.work.node(op.nodeId);
-  if(!node)return [];
-  const granted=(op.allowlist??[]).map(normalize);
-  return unique(((ctx.guards??kernelGuards).protectedPaths(node,ctx.work.ledger?.repoRoot??ctx.work.repoRoot)??[]).map(normalize))
-    .filter(file=>!granted.includes(file));
-}
-
-/** Content fingerprint of those paths: at acceptance the only pending change there must be the kernel's own. */
-export function protectedFingerprint(root,paths=[]){
-  const files=[];
-  const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true}))
-    entry.isDirectory()?walk(path.join(dir,entry.name)):files.push(path.join(dir,entry.name));};
-  for(const entry of paths){
-    const target=path.join(root,allowRoot(entry));
-    try{if(fs.statSync(target).isDirectory())walk(target);else files.push(target);}catch{files.push(target);}
-  }
-  return unique(files).sort().map(file=>{
-    const name=normalize(path.relative(root,file));
-    try{return `${name}:${crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex')}`;}catch{return `${name}:absent`;}
-  }).join('\n');
-}
-
-/**
- * Before any machine verification: revert what the operation wrote into the kernel's own ledger paths and
- * report it. A report that touched them is never accepted - it is downgraded to `failed` and comes back.
- */
-/**
- * After an accepted done, files the operation left dirty outside every live allowlist are stray: they belong
- * to no running or paused operation, so they are reverted (tracked) or removed (untracked) and recorded as a
- * finding for the module review. Kernel-owned ledger paths are handled by guardKernelPaths, never here.
- */
-function cleanStrayFiles(store,state,op,ctx){
-  if(typeof ctx.git!=='function')return [];
-  const shown=ctx.git('git',['status','--porcelain'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
-  if(shown.status!==0)return [];
-  const live=state.ops.filter(item=>['running','paused','answering','ready'].includes(item.status)&&item.id!==op.id).flatMap(item=>item.allowlist??[]);
-  const ledger=/^\.starciwork\//;
-  const entries=(shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
-    .map(line=>({code:line.slice(0,2),file:normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))}))
-    .filter(entry=>!inside(entry.file,live)&&!inside(entry.file,op.kernelOwned??[])&&!ledger.test(entry.file)&&!entry.file.startsWith('.gitmounts/'));
-  if(!entries.length)return [];
-  const tracked=entries.filter(entry=>!entry.code.startsWith('??')).map(entry=>entry.file);
-  const untracked=entries.filter(entry=>entry.code.startsWith('??')).map(entry=>entry.file);
-  if(tracked.length)ctx.git('git',['checkout','--',...tracked],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
-  for(const file of untracked){try{fs.rmSync(path.join(state.worktree,file),{recursive:true,force:true});}catch{}}
-  const finding=`operation ${op.id} left changes outside every live allowlist; the kernel reverted ${tracked.length} tracked and removed ${untracked.length} untracked path(s): ${[...tracked,...untracked].slice(0,12).join(', ')}`;
-  op.strayFiles=[...tracked,...untracked];
-  state.reviewFindings=[...(state.reviewFindings??[]),{op:op.id,finding}];
-  store.appendEvent({event:'stray-files-reverted',op:op.id,tracked,untracked});
-  return op.strayFiles;
-}
-
-/**
- * Untracked paths under the Work tree that no live operation's allowlist covers were left by an operation that
- * was never accepted (settled, blocked, out of repository): the owner kernel removes them, so a kernel sharing
- * the tree never has to step around them. Tracked changes and kernel-owned records are never touched here.
- */
-/**
- * An invalid tree whose every error sits under an untracked path that no live operation owns is not the
- * owner's problem to untangle: an abandoned operation left those files (a settled intake once left half a
- * feature in the base worktree and every backend op failed `work-valid` for an hour). They are moved, whole,
- * to `<store>/strays/<timestamp>/` - kept for the owner, out of the tree - and the tree is read again.
- * Tracked files are never touched; a stray inside a live op's allowlist is that op's, and stays.
- */
-function quarantineStrays(store,state,ctx,loaded){
-  if(!ctx.work||ctx.work.shared||typeof ctx.git!=='function'||!Array.isArray(loaded?.errors)||!loaded.errors.length)return [];
-  const root=ctx.work.ledger?.repoRoot??ctx.work.repoRoot??state.worktree;
-  const shown=ctx.git('git',['status','--porcelain','--','.starciwork'],{cwd:root,encoding:'utf8',windowsHide:true});
-  if(shown.status!==0)return [];
-  const untracked=(shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(line=>line.startsWith('??'))
-    .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))).filter(file=>file.startsWith('.starciwork/')&&!/(^|\/)_local\//.test(file));
-  if(!untracked.length)return [];
-  const live=state.ops.filter(item=>liveStatus.includes(item.status)).flatMap(item=>item.allowlist??[]).map(normalize);
-  const treePaths=loaded.errors.map(error=>normalize(`.starciwork/${String(error.path??'')}`));
-  const owns=(stray,file)=>file===stray||file.startsWith(stray.endsWith('/')?stray:`${stray}/`);
-  // Every error must sit under a stray nobody owns; one error on a tracked or owned path and nothing moves.
-  const culprits=unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))).filter(Boolean));
-  if(!culprits.length||culprits.length!==unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))??'∅')).length)return [];
-  if(culprits.some(stray=>inside(stray,live)))return [];
-  const stamp=new Date().toISOString().replace(/[:.]/g,'-');
-  const moved=[];
-  for(const stray of culprits){
-    const from=path.join(root,stray),to=path.join(store.dir,'strays',stamp,stray);
-    try{
-      fs.mkdirSync(path.dirname(to),{recursive:true});
-      // The store may live on another drive than the worktree (an Orca worktree on C:, the repository on D:):
-      // a rename cannot cross drives, a copy followed by the removal can.
-      try{fs.renameSync(from,to);}catch(error){if(error?.code!=='EXDEV')throw error;fs.cpSync(from,to,{recursive:true});fs.rmSync(from,{recursive:true,force:true});}
-      moved.push({from:stray,to:slash(to)});
-    }catch(error){store.appendEvent({event:'stray-quarantine-failed',path:stray,reason:String(error?.message??error)});}
-  }
-  if(moved.length)store.appendEvent({event:'stray-quarantined',strays:moved,errors:loaded.errors.slice(0,5).map(error=>`${error.code} ${error.path??''}`)});
-  return moved;
-}
-function sweepTreeStrays(store,state,ctx){
-  if(!ctx.work||ctx.work.shared||typeof ctx.git!=='function')return [];
-  const shown=ctx.git('git',['status','--porcelain','--','.starciwork'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
-  if(shown.status!==0)return [];
-  // Only what a known, no-longer-live operation could have left is swept: an untracked path inside the allowlist of
-  // a blocked or settled op. A path no op ever owned may be a person's draft and is left where it is.
-  const live=state.ops.filter(item=>['running','paused','answering','ready','pending'].includes(item.status)).flatMap(item=>item.allowlist??[]);
-  const abandoned=state.ops.filter(item=>['blocked','ready','pending'].includes(item.status)&&!item.dispatch).flatMap(item=>item.allowlist??[]);
-  const owned=/(?:^|\/)(?:evidence|_local)\/|(?:^|\/)index\.ya?ml$/;
-  const strays=(shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(line=>line.startsWith('??'))
-    .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,'')))
-    .filter(file=>file.startsWith('.starciwork/')&&!owned.test(file)&&!inside(file,live)&&inside(file,abandoned));
-  for(const file of strays){try{fs.rmSync(path.join(state.worktree,file),{recursive:true,force:true});}catch{}}
-  if(strays.length)store.appendEvent({event:'tree-strays-removed',strays});
-  return strays;
-}
-
-function guardKernelPaths(store,state,op,ctx){
-  const paths=op.kernelOwned??[];
-  if(!paths.length)return [];
-  const root=ctx.work?.ledger?.repoRoot??ctx.work?.repoRoot??state.worktree;
-  if(protectedFingerprint(root,paths)===(op.kernelOwnedAt??''))return [];
-  const result=ctx.guards.gitQueue(()=>ctx.guards.revertProtected(ctx.git,{cwd:state.worktree,paths}))??{};
-  const reverted=unique([...(result.reverted??[]),...(result.removed??[])]).map(normalize);
-  op.kernelOwnedAt=protectedFingerprint(root,paths);
-  const touched=reverted.length?reverted:paths;
-  store.appendEvent({event:'kernel-paths-modified',op:op.id,node:op.nodeId,paths:touched,reverted,protected:paths});
-  return touched;
-}
-
-/** The kernel-owned blocks of one node's record, as one comparable string; `null` when the record cannot be read. */
-function recordBlocks(ctx,nodeId){
-  if(!ctx?.work||!nodeId||typeof ctx.work.api.readNode!=='function')return null;
-  const node=ctx.work.node(nodeId);
-  if(!node)return null;
-  try{
-    const raw=ctx.work.api.readNode(ctx.work.at,node);
-    return JSON.stringify({state:raw?.state??null,completion:raw?.completion??null,
-      kernel:raw?.extensions?.work3?.kernel??null});
-  }catch{return null;}
-}
-
-/**
- * `work.author` is the one kind whose allowlist names its own node's `index.yaml`, so that file cannot be
- * protected as a whole - the op exists to write it. What stays the kernel's is protected inside it instead:
- * `state`, `completion` and `extensions.work3.kernel` are read back and compared with the snapshot taken at
- * launch. A changed block is reverted with the rest of the file and the report is not accepted, exactly as a
- * written kernel path is for any other op: a completion an agent writes itself is a claim, not a record.
- */
-function guardRecordBlocks(store,state,op,ctx){
-  if(op.kind!==AUTHOR_KIND||typeof op.recordBlocks!=='string')return [];
-  const now=recordBlocks(ctx,op.nodeId);
-  if(now===null||now===op.recordBlocks)return [];
-  const paths=op.allowlist??[];
-  const cwd=ctx.work?.ledger?.repoRoot??ctx.work?.repoRoot??state.worktree;
-  const result=ctx.guards.gitQueue(()=>ctx.guards.revertProtected(ctx.git,{cwd,paths}))??{};
-  op.recordBlocks=recordBlocks(ctx,op.nodeId)??op.recordBlocks;
-  const reverted=unique([...(result.reverted??[]),...(result.removed??[])]).map(normalize);
-  const touched=reverted.length?reverted:paths;
-  store.appendEvent({event:'record-blocks-modified',op:op.id,node:op.nodeId,blocks:RECORD_OWNED,paths:touched,reverted});
-  return touched;
-}
-
 /* ------------------------------------------------------------------ launch */
 
 /**
@@ -1969,28 +262,11 @@ export function launchWithCandidate(orca,{cwd,run,workflowTask,from,worktree,ope
     reason:'the runtime allocator assigned this operation to one runtime; the launcher was handed that candidate alone'}};
 }
 
-/**
- * The host the kernel runs on, as the runner describes itself: Orca (`ORCA_HOST`) or the headless host. A runner
- * that says nothing is Orca, which is what every runner before hosts existed was.
- */
-export function hostDescriptorOf(orca){
-  const host=orca?.host;
-  if(!plain(host)||typeof host.name!=='string')return ORCA_HOST;
-  return {name:host.name,capabilities:Array.isArray(host.capabilities)?[...host.capabilities]:[],sequential:host.sequential===true};
-}
-/** The capabilities a kind needs that this host lacks; `[]` when the kind may run here (or the graph does not know it). */
-export function hostMissing(host,kind){
-  let needs=[];
-  try{needs=graph.needsOf(kind);}catch{needs=[];}
-  const offered=Array.isArray(host?.capabilities)?host.capabilities:[];
-  return needs.filter(capability=>!offered.includes(capability));
-}
-
 function launchOp(orca,store,state,op,allocated,ctx){
   if(op.needsReplan)replanOp(store,state,op,ctx);
   // A design operation derived before the brand was decided gets the record now: its references are the material
   // it must read, and by launch time that material exists.
-  if(DESIGN_KINDS.includes(op.kind)){
+  if(kindsReadingBrand().includes(op.kind)){
     const brand=brandReferencesOf(ctx.work?.api,ctx.work?.loaded);
     if(brand.length)op.references=unique([...op.references,...brand]);
   }
@@ -2078,12 +354,20 @@ function launchableFor(allocator,kind){
   try{return allocator.launchableTargets(kind);}catch{return null;}
 }
 
+/** The repository a node is delivered in when it is not this kernel's own; null when it is ours or unknown. */
+function foreignNodeOf(ctx,op){
+  if(!ctx?.work||!op?.nodeId||!ctx.work.code?.repository||typeof ctx.work.api?.nodeRepository!=='function')return null;
+  const node=ctx.work.node(op.nodeId);
+  if(!node)return null;
+  try{const declared=ctx.work.api.nodeRepository(ctx.work.api.readNode(ctx.work.at??ctx.work.repoRoot,node));return declared&&declared!==ctx.work.code.repository?declared:null;}catch{return null;}
+}
+
 /**
  * The brand node of the tree: the one the brand record names, or the `brand` node the tree carries. A node
  * still `todo` is preferred, because that is the one a decision is owed.
  */
 function brandNode(ctx){
-  const loaded=ledgerAccess(ctx)?.loaded;
+  const loaded=ctx?.work?.loaded??null;
   if(!loaded)return null;
   const named=loaded.brand?.node?loaded.nodes?.get?.(loaded.brand.node)??null:null;
   if(named)return named;
@@ -2131,7 +415,7 @@ function ensureBrandDecide(store,state,ctx){
  * the user) instead of being launched with nothing to read.
  */
 function deferForBrand(store,state,op,ctx){
-  if(!DESIGN_KINDS.includes(op.kind)||!brandAware(ctx)||brandOf(ctx))return false;
+  if(!kindsReadingBrand().includes(op.kind)||!brandAware(ctx)||brandOf(ctx))return false;
   const decide=ensureBrandDecide(store,state,ctx);
   if(decide&&decide.id!==op.id&&!op.dependsOn.includes(decide.id)){
     op.dependsOn=unique([...op.dependsOn,decide.id]);
@@ -2235,41 +519,7 @@ function avoidForVerify(state,op){
     .map(other=>other.runtime).filter(Boolean));
 }
 
-/* ------------------------------------------------------------------ machine verification */
-
-/** Re-run the operation's own checks. A `done` the kernel cannot reproduce is not a `done`. */
-/**
- * A check a Work node declares names the tree the way the tree names itself (`... validate .starciwork`); on a
- * shared ledger that tree is in the owner repository, not in this worktree, so the bare `.starciwork` argument
- * is the owner's absolute path when the kernel re-runs it here (the sales drawing was retried for `ENOENT`).
- */
-export function sharedCheckCommand(command,ctx){
-  const workRoot=ctx?.work?.shared?slash(ctx.work.ledger?.workRoot??''):'';
-  if(!workRoot)return command;
-  return String(command??'').replace(/(^|\s)\.starciwork(?=\s|$|\/)/g,`$1${workRoot}`);
-}
-export function machineVerify(state,op,{exec,cwd=state.worktree,work=null}={}){
-  const checks=[];
-  // The whole-tree validator is the kernel's own gate at acceptance, never an operation check.
-  for(const check of (op.checks??[]).filter(check=>!KERNEL_CHECK.test(check.name??''))){
-    const result=exec(sharedCheckCommand(check.command,{work}),{cwd,timeoutMs:op.timeoutMs??CHECK_TIMEOUT_MS});
-    const exitCode=Number.isInteger(result?.status)?result.status:1;
-    checks.push({name:check.name,command:check.command,exitCode,evidence:tail(`${result?.stdout??''}${result?.stderr??''}`)});
-  }
-  return {ok:checks.every(check=>check.exitCode===0),checks,failed:checks.filter(check=>check.exitCode!==0)};
-}
-
-/**
- * The changed files of this worktree, filtered to the operation's allowlist: the kernel never trusts
- * report.files. `exclude` is the kernel-owned ledger set, which no operation commit may ever carry.
- */
-export function changedFiles(state,op,{git},allowlist=op.allowlist,{exclude=[]}={}){
-  const shown=git('git',['status','--porcelain'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
-  if(shown.status!==0)return [];
-  return unique((shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
-    .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))))
-    .filter(file=>inside(file,allowlist)&&!inside(file,exclude));
-}
+/* ------------------------------------------------------------------ committing what was verified */
 
 function commitOp(state,op,files,{git}){
   const run=args=>git('git',args,{cwd:state.worktree,encoding:'utf8',windowsHide:true});
@@ -2284,373 +534,33 @@ function commitOp(state,op,files,{git}){
   return {committed:true,head:head(),files};
 }
 
-function markLedger(state,op,head){
-  for(const id of op.ledgerIds){
-    const item=ledgerItem(state,id);
-    if(!item)continue;
-    item.evidence=[...(item.evidence??[]),{opId:op.id,kind:op.kind,head:head??null}];
-    // Only the LAST step of a node's lane proves it (`review.verify` on a backend lane, `uat.verify` on a frontend
-    // one); an earlier prove step such as `e2e.verify` leaves the item implemented so the review is still planned.
-    const lane=op.nodeId?state.lanes?.[op.nodeId]?.lane:null;
-    // A lane that ends on a design step - a ui node, drawn then its artwork generated - is complete when that
-    // step is accepted: no review is planned for it, so its last step is the one that settles the item.
-    const entry=op.nodeId?state.lanes?.[op.nodeId]:null;
-    const walked=laneWalked(entry);
-    const proves=Array.isArray(lane)&&lane.length
-      ?lane.at(-1)===op.kind||(!lane.includes('review.verify')&&walked.length>0&&walked.every(kind=>kind===op.kind||(entry.done??[]).includes(kind)))
-      :(op.kind==='review.verify'||kindRole(op.kind)==='verify');
-    item.status=proves?'verified':'implemented';
-  }
-}
-
-/* ------------------------------------------------------------------ writing the Work ledger back */
-
 /**
- * Every ledger write goes through here. A refused write is never silent and never fatal: the node keeps its
- * original bytes (work-ledger restores them itself), the refusal is an event, and the workflow carries it to
- * the user instead of reporting a green slice over a ledger that does not say so.
+ * After an accepted done, files the operation left dirty outside every live allowlist are stray: they belong
+ * to no running or paused operation, so they are reverted (tracked) or removed (untracked) and recorded as a
+ * finding for the module review. Kernel-owned ledger paths are handled by guardKernelPaths, never here.
  */
-function ledgerWrite(store,state,op,ctx,step,action,nodeId=op.nodeId){
-  if(!ctx.work||!nodeId)return null;
-  const node=ctx.work.node(nodeId);
-  if(!node){
-    store.appendEvent({event:'ledger-node-missing',op:op.id,node:nodeId,step});
-    state.needUser.push({op:op.id,kind:'ledger',detail:`the Work node ${nodeId} is no longer in the validated tree, so ${step} could not be recorded`});
-    return null;
-  }
-  try{
-    const result=action(node);
-    store.appendEvent({event:'ledger-write',op:op.id,node:nodeId,step});
-    return result;
-  }catch(error){
-    store.appendEvent({event:'ledger-write-failed',op:op.id,node:nodeId,step,reason:error.message});
-    state.needUser.push({op:op.id,kind:'ledger',detail:`the Work node ${nodeId} refused ${step}: ${error.message}`});
-    return null;
-  }
-}
-
-/** The checks the kernel itself re-ran, carrying the assertion each one proves (the check name is that id). */
-const provenChecks=checks=>checks.map(check=>({name:check.name,command:check.command,exitCode:check.exitCode,assertion:check.name}));
-
-/**
- * An accepted slice becomes `done` plus one evidence manifest on the node that asked for the work. On a lane
- * this is the LAST step only: `nodeId`, `checks` and `head` are passed in, because the step that completes a
- * lane may be a kernel review that names several nodes and proves them with the checks every step ran.
- */
-/**
- * The checks the kernel owns (`work-valid`: the whole-tree validator) are stripped from every op, so the kernel
- * proves them itself when it records a node done: it validates the tree now and adds one passing check per
- * kernel-owned assertion the node declares. A tree that does not validate proves nothing and the write is refused.
- */
-function kernelProof(ctx,nodeId){
-  if(!ctx.work||typeof ctx.work.api.readNode!=='function')return [];
-  const node=ctx.work.node(nodeId);
-  if(!node)return [];
-  let owned=[];
-  try{owned=ctx.work.api.nodeChecks(ctx.work.api.readNode(ctx.work.at,node)).filter(check=>KERNEL_CHECK.test(check.assertion??''));}catch{owned=[];}
-  if(!owned.length)return [];
-  let ok=false;
-  try{ok=Boolean(ctx.work.validate({repoRoot:ctx.work.ledger?.repoRoot??ctx.work.repoRoot,workRoot:ctx.work.ledger?.workRoot??null}).ok);}catch{ok=false;}
-  return owned.map(check=>({name:check.assertion,command:workValidateCommand(ctx),exitCode:ok?0:1,assertion:check.assertion}));
-}
-
-function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op.head}={}){
-  if(ctx.work&&!nodeId&&op.kind===BRAND_DECIDE){rereadBrand(store,state,op,ctx);return;}
-  if(!ctx.work||!nodeId)return;
-  verified={...verified,checks:[...(verified?.checks??[]),...kernelProof(ctx,nodeId)]};
-  const decision=['architecture.decide','architecture.revise','business.decide',BRAND_DECIDE].includes(op.kind)||kindRole(op.kind)==='decide';
-  if(decision){
-    ledgerWrite(store,state,op,ctx,'decided',node=>ctx.work.api.markDecided(ctx.work.at,node,{
-      by:'starci-kernel',
-      // A revision of an accepted design bumps its rev, so a reopened decision is not read as the first one.
-      // A brand decision always does: every surface already built from the old brand is bound to that rev.
-      rev:['architecture.revise',BRAND_DECIDE].includes(op.kind)?nextRev(ctx,node):null,
-      digest:ctx.work.digest,
-      review:{reviewer:op.runtime??'starci-kernel',
-        authority:`the kernel accepted ${op.id} after re-running its checks itself`,
-        observations:decisionObservations(ctx,node,op),
-        limitations:['Only the operation allowlist was reviewed.']}}),nodeId);
-    if(op.kind===BRAND_DECIDE)rereadBrand(store,state,op,ctx);
-    return;
-  }
-  // A completion binds its source directly (starci/source-identity@1) so the tree needs no repository resource record;
-  // the identity is scoped to the operation allowlist, which is exactly what the kernel verified.
-  // Source identity names the repository the slice is IN, which is the worktree this kernel commits in - never
-  // the repository that happens to own the ledger the record is written to.
-  const repository=ctx.work.code.repository??path.basename(ctx.work.code.repoRoot);
-  // Only a code-bearing node (implementation, release) binds its source; the validator refuses a source identity or
-  // code refs on any other kind, and that is what a review found and an agent "fixed" by hand once.
-  const bindsCode=node=>['implementation','release'].includes(String(node?.kind??''));
-  const identity=ctx.work.code.origin&&/^[a-f0-9]{40,64}$/.test(String(head??''))&&typeof ctx.work.api.buildSourceIdentity==='function'
-    ?ctx.work.api.buildSourceIdentity({repository,origin:ctx.work.code.origin,commit:head,paths:op.allowlist??[],
-      dependencyCoverage:'Dependencies were not re-verified by this operation.',limitations:['Only the operation allowlist was verified by the kernel.']})
-    :null;
-  ledgerWrite(store,state,op,ctx,'done',node=>ctx.work.api.markDone(ctx.work.at,node,{
-    opId:op.id,head:head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,repository,bindSource:bindsCode(node),...(identity&&bindsCode(node)?{sourceIdentity:identity}:{}),
-    evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',
-      // A ui node's completion carries its candidates as hashed captures: what the drawing produced is what is proven.
-      assets:designEvidenceAssets({api:ctx.work.api,at:ctx.work.at,loaded:ctx.work.loaded},node),
-      servedVersionEvidence:`Checks re-run by the StarCi kernel in workflow ${state.id} on branch ${state.branch}`}}),nodeId);
-}
-
-/**
- * An accepted brand decision is read back from the tree at once, and that is all the kernel does about it: the
- * new record and its rev become the material of every operation launched from here on, and the Work validator -
- * which binds a completion to the digest of what it was built from - is what reopens the frontend-facing nodes
- * that were built against the old brand. `syncLedgerOps` then picks them up as newly schedulable nodes.
- */
-function rereadBrand(store,state,op,ctx){
-  try{
-    const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});
-    if(loaded.ok)ctx.work.loaded=loaded;
-    noteBrand(store,state,loaded,{op});
-  }catch(error){store.appendEvent({event:'ledger-sync-failed',op:op.id,reason:error.message});}
-}
-
-/** The rev a revision writes: one past whatever the node's kernel block carries, and 1 when it carries none. */
-function nextRev(ctx,node){
-  try{
-    const raw=ctx.work.api.readNode(ctx.work.repoRoot,node);
-    const rev=Number(raw?.extensions?.work3?.kernel?.rev);
-    return Number.isFinite(rev)?rev+1:1;
-  }catch{return 1;}
-}
-
-/**
- * One accepted operation is one lane step. The node keeps `todo` with the kernel's `in-progress` block until
- * the LAST step of its lane is accepted; only then is `done` written, and with the checks every step of the
- * lane proved - the implement step's checks are what cover the node's authored assertions, and the prove step
- * (a kernel `review.verify`, or the lane's own `uat.verify`) is what allows the write at all.
- */
-function laneNodesOf(state,op){
-  if(op.nodeId)return state?.lanes?.[op.nodeId]?.lane?.length?[op.nodeId]:[];
-  if(state.ledgerMode!==WORK_LEDGER)return [];
-  return (op.ledgerIds??[]).filter(id=>state?.lanes?.[id]?.lane?.length);
-}
-const mergeProven=checks=>{
-  const seen=new Map();
-  for(const check of checks)seen.set(`${check.name}|${check.command}`,check);
-  return [...seen.values()];
-};
-function advanceLanes(store,state,op,ctx,verified){
-  const nodes=laneNodesOf(state,op);
-  if(!nodes.length||!ctx.work)return {handled:false,completed:[]};
-  const completed=[];
-  for(const nodeId of nodes){
-    const entry=state.lanes[nodeId];
-    entry.done=unique([...(entry.done??[]),op.kind]);
-    entry.checks=mergeProven([...(entry.checks??[]),...provenChecks(verified.checks)]);
-    entry.head=op.head??entry.head??null;
-    const predicates=lanePredicates(ctx,ctx.work.node(nodeId));
-    laneSkip(entry,predicates);
-    const next=laneNext(entry,predicates);
-    store.appendEvent({event:'lane-step',op:op.id,node:nodeId,kind:op.kind,
-      step:laneProgress(entry),lane:entry.lane,skipped:[...(entry.skipped??[])],next:next??null});
-    if(next){
-      // Not done yet: the node keeps the kernel block of the step that just landed, and waits for the next one.
-      ledgerWrite(store,state,op,ctx,'in-progress',node=>ctx.work.api.markInProgress(ctx.work.repoRoot,node,{opId:op.id,dispatch:op.dispatch}),nodeId);
-      continue;
-    }
-    recordDone(store,state,op,ctx,{checks:entry.checks},{nodeId,head:entry.head??op.head});
-    ctx.guards.gitQueue(()=>commitLedgerWrite(store,state,op,ctx,nodeId));
-    completed.push(nodeId);
-  }
-  return {handled:true,completed};
-}
-
-/**
- * An accepted `work.author` op is measured against the tree, never against its own report: the ledger is
- * reloaded and the candidate enriched again, so the answer comes from `executableCandidates` exactly as the
- * next iteration will read it. A node that is schedulable now is logged `record-authored` and its own lane
- * creates its first step on the next iteration. A node that is still not schedulable is the one thing the
- * kernel cannot do for the user: the incompleteness is raised once, and `authorRecordOp` never creates a
- * second author op for it.
- *
- * The node keeps `state: todo` throughout, because authoring a record is not completing work: no `markDone`,
- * no completion, no evidence manifest - only the kernel's own `in-progress` receipt from the launch.
- */
-/**
- * An intake op authored records, not a node: it is settled by what the tree holds under its scope now and is
- * never measured as an incomplete record (srs-sds and command-context finished blocked with their drafts
- * accepted, asking the owner about a node called null). The records are listed, the open decisions among them
- * are the owner's and go to the report, and nothing asks the user.
- */
-function settleIntake(store,state,op,ctx){
-  const scope=op.intake.scope;
-  let loaded=null;
-  try{loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});if(loaded.ok)ctx.work.loaded=loaded;}
-  catch(error){store.appendEvent({event:'ledger-sync-failed',op:op.id,reason:error.message});}
-  const tree=loaded?.ok?loaded:ctx.work.loaded;
-  const records=(tree?.list??[]).filter(node=>scopeNames(node,scope)).map(node=>node.id);
-  try{
-    state.decisions=(ctx.work.api.decisionCandidates?.(tree,{scope:state.scope.length?state.scope:null})??[]).map(node=>({id:node.id,kind:node.kind,path:node.path,
-      operation:DECISION_OPERATION[node.kind]??'business.decide',title:describeNode(ctx.work.api,ctx.work.at,node)}));
-  }catch{/* the decisions the goal listed stand */}
-  state.needUser=state.needUser.filter(item=>!(item.kind==='ledger'&&!item.node&&String(item.detail??'').includes(`after ${op.id} completed`)));
-  store.appendEvent({event:'intake-authored',op:op.id,scope,records:records.length,decisions:state.decisions.map(item=>item.id)});
-  return 'intake-authored';
-}
-function settleAuthoredRecord(store,state,op,ctx){
-  if(op.kind===OWNER_ASK){settleOwnerAsk(store,state,op,op.reports.at(-1)??{});return 'owner-ask-settled';}
-  if(op.intake?.scope&&!op.nodeId)return settleIntake(store,state,op,ctx);
-  const nodeId=op.nodeId;
-  let candidate=null;
-  try{
-    const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});
-    if(loaded.ok){
-      ctx.work.loaded=loaded;
-      candidate=ctx.work.api.executableCandidates(loaded,{scope:state.scope.length?state.scope:null,
-        repository:ctx.work.code.repository,side:ctx.work.side}).find(item=>item.id===nodeId)??null;
-    }
-  }catch(error){store.appendEvent({event:'ledger-sync-failed',op:op.id,reason:error.message});}
-  if(candidate?.schedulable){
-    state.needUser=state.needUser.filter(item=>!(item.kind==='ledger'&&item.node===nodeId));
-    store.appendEvent({event:'record-authored',node:nodeId,op:op.id,allowlist:candidate.allowlist,
-      checks:candidate.checks.map(check=>check.assertion??check.command),
-      lane:[...(state.lanes?.[nodeId]?.lane??[])]});
-    return 'record-authored';
-  }
-  const detail=`ledger incomplete: ${candidate?.reason??`${nodeId} is still not launchable after ${op.id} completed its record`}`;
-  if(!state.needUser.some(item=>item.kind==='ledger'&&item.node===nodeId))state.needUser.push({node:nodeId,kind:'ledger',detail});
-  store.appendEvent({event:'record-still-incomplete',node:nodeId,op:op.id,detail});
-  return 'record-still-incomplete';
-}
-
-/**
- * A completion the kernel wrote can be refused by a later rule (a source coverage path that is not a source path).
- * The record is the kernel's, so the kernel rewrites it from what it knows - the kernel block's checks and head,
- * the completion's own paths, sanitized - instead of leaving the whole tree invalid for a human to fix by hand.
- */
-/**
- * A lane is templated the first time its node is seen. When the kinds profile later moves a node to another lane -
- * a `ui` node that used to share the frontend lane, say - the recorded template is stale, so at load every lane
- * whose fresh template differs and still contains every accepted step is re-templated; a lane that already
- * walked a step the new template does not know keeps its old one, and the mismatch stays visible in the events.
- */
-/**
- * A `ledger` question on the user's list names a node the kernel could not record; when the tree now says that
- * node is done - a later retry wrote it, or the record was repaired - the question is answered and is dropped,
- * with an event, so the morning list carries only what is still true.
- */
-function pruneAnsweredQuestions(store,state,loaded){
-  if(!Array.isArray(state.needUser)||!loaded?.nodes)return;
-  const kept=[];
-  for(const item of state.needUser){
-    const keyed=item?.op?state.ops.find(candidate=>candidate.id===item.op):null;
-    // A question about an op that was since superseded, or about a shared change that is no longer blocked, has no reason left.
-    if(keyed&&keyed.refusal==='superseded'){store.appendEvent({event:'need-user-answered',op:item.op,kind:item.kind,reason:'superseded'});continue;}
-    if(item?.kind==='shared-change'){
-      const named=(String(item.detail??'').match(/waits for the shared change (\S+), which is blocked/)??[])[1];
-      const shared=named?state.ops.find(candidate=>candidate.id===named):null;
-      if(shared&&shared.status!=='blocked'){store.appendEvent({event:'need-user-answered',op:item.op??null,kind:item.kind,reason:`${named} is ${shared.status}`});continue;}
-    }
-    if(item?.kind!=='ledger'){kept.push(item);continue;}
-    // An older build asked about "null" after an intake completed: an intake authors records, not a node.
-    const intakeOf=(String(item.detail??'').match(/after (\S+) completed its record/)??[])[1];
-    const intake=intakeOf?state.ops.find(candidate=>candidate.id===intakeOf):null;
-    if(!item.node&&intake?.intake?.scope){store.appendEvent({event:'need-user-answered',op:intake.id,kind:item.kind,reason:'an intake authors records, not a node'});continue;}
-    // Keyed by node, or by the op whose write was refused: the nodes that op closes (its own, or the set a review names).
-    const op=item.op?state.ops.find(candidate=>candidate.id===item.op):null;
-    const nodes=item.node?[item.node]:op?unique([...(op.nodeId?[op.nodeId]:[]),...(op.ledgerIds??[])]):[];
-    const answered=nodes.length>0&&nodes.every(id=>loaded.nodes.get(id)?.state==='done');
-    if(answered){store.appendEvent({event:'need-user-answered',node:item.node??null,op:item.op??null,nodes,detail:String(item.detail??'').slice(0,160)});continue;}
-    kept.push(item);
-  }
-  state.needUser=kept;
-}
-function retemplateLanes(store,state,loaded){
-  for(const [id,entry] of Object.entries(plain(state.lanes)?state.lanes:{})){
-    const node=loaded?.nodes?.get?.(id);
-    if(!node||!Array.isArray(entry?.lane)||!entry.lane.length)continue;
-    let fresh=[];
-    try{fresh=graph.laneFor({kind:node.kind,layout:nodeLayout(node),repositoryRole:node.repository??null});}catch{continue;}
-    if(!fresh.length||fresh.join('|')===entry.lane.join('|'))continue;
-    const done=entry.done??[];
-    if(!done.every(kind=>fresh.includes(kind))){store.appendEvent({event:'lane-template-stale',node:id,lane:entry.lane,fresh,done});continue;}
-    const before=[...entry.lane];
-    entry.lane=[...fresh];entry.skipped=[];
-    for(const item of state.ledger)if(item.id===id&&Array.isArray(item.lane))item.lane=[...fresh];
-    store.appendEvent({event:'lane-retemplated',node:id,from:before,to:fresh});
-  }
-}
-function repairKernelRecords(store,state,ctx,loaded){
-  if(!ctx.work||loaded.ok||!Array.isArray(loaded.errors))return [];
-  const api=ctx.work.api;
-  if(typeof api.markDone!=='function'||typeof api.buildSourceIdentity!=='function'||typeof api.readNode!=='function')return [];
-  const refused=unique(loaded.errors.filter(error=>['SOURCE_COVERAGE','SOURCE_IDENTITY','CODE_REFS'].includes(error.code)).map(error=>String(error.path??'')).filter(Boolean));
-  const repaired=[];
-  for(const node of loaded.list){
-    const own=refused.some(file=>file===node.path||file.startsWith(`${path.posix.dirname(node.path)}/evidence/`));
-    if(!own||node.state!=='done')continue;
-    let raw;try{raw=api.readNode(ctx.work.at??ctx.work.repoRoot,node);}catch{continue;}
-    const kernel=raw?.extensions?.work3?.kernel;
-    if(!kernel?.opId||!kernel.head||!Array.isArray(kernel.checks))continue;
-    const identity=raw?.completion?.sourceIdentity?.repositories?.[0];
-    const bindsCode=['implementation','release'].includes(String(node.kind??''));
-    try{
-      const rebuilt=bindsCode&&identity?api.buildSourceIdentity({repository:identity.repository,origin:identity.origin,commit:kernel.head,paths:identity.coverage?.paths??[],
-        dependencyCoverage:identity.coverage?.dependencyCoverage??'Dependencies were not re-verified by this operation.',limitations:identity.coverage?.limitations??['Only the operation allowlist was verified by the kernel.']}):null;
-      ctx.guards.gitQueue(()=>{
-        api.markDone(ctx.work.at??ctx.work.repoRoot,node,{opId:kernel.opId,head:kernel.head,checks:kernel.checks,verifiedBy:kernel.verifiedBy??'starci-kernel',at:kernel.at??null,
-          digest:ctx.work.digest,bindSource:bindsCode,...(rebuilt?{sourceIdentity:rebuilt}:{}),
-          evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',servedVersionEvidence:`Checks re-run by the StarCi kernel in workflow ${state.id} on branch ${state.branch}`}});
-        commitLedgerWrite(store,state,{id:kernel.opId,nodeId:node.id},ctx,node.id);
-      });
-      repaired.push(node.id);
-      store.appendEvent({event:'kernel-record-repaired',node:node.id,op:kernel.opId,codes:refused.length});
-    }catch(error){store.appendEvent({event:'kernel-record-repair-failed',node:node.id,reason:String(error.message).slice(0,200)});}
-  }
-  if(repaired.length){try{ctx.work.loaded=api.loadLedger({repoRoot:ctx.work.at??ctx.work.repoRoot,validate:ctx.work.validate});}catch{}}
-  return repaired;
-}
-
-/**
- * The ledger write is the kernel's own change to the repository, so it is committed too - under the node
- * directory it belongs to and with the same `Work:` trailer - instead of being left dirty in the worktree.
- * It follows the operation's commit because a completion binds the head of the slice it proves.
- */
-function commitLedgerWrite(store,state,op,ctx,nodeId=op.nodeId){
-  if(!ctx.work||!nodeId)return null;
-  const node=ctx.work.node(nodeId);
-  if(!node)return null;
-  // The write happens where the tree is, so the commit happens there too: in the owner repository, on whatever
-  // branch it is on, with the same `Work:` trailer. A shared ledger is the only case where that is not here.
-  const cwd=ctx.work.ledger?.repoRoot??state.worktree;
-  const scope=normalize(path.join(path.relative(cwd,ctx.work.ledger?.workRoot??path.join(cwd,'.starciwork')),path.dirname(node.path)));
-  // Ledger writes carry 64-hex digests that a repository secrets guard mistakes for keys; the kernel is the
-  // author of those digests, so it declares the scan skipped for exactly this commit.
-  const run=args=>ctx.git('git',args,{cwd,encoding:'utf8',windowsHide:true,env:{...process.env,ALLOW_SECRET_SCAN:'1'}});
-  const files=ledgerChanges(run,scope);
-  if(!files.length)return null;
-  run(['config','core.longpaths','true']);
-  if(run(['add','--',...files]).status!==0){store.appendEvent({event:'ledger-commit-failed',op:op.id,node:nodeId,reason:'git add'});return null;}
-  const committed=run(['commit','-q','-m',`work(${nodeId}): record ${op.id} in the Work ledger\n\nWork: ${nodeId}`]);
-  if(committed.status!==0){store.appendEvent({event:'ledger-commit-failed',op:op.id,node:nodeId,reason:tail(committed.stderr,200)});return null;}
-  const shown=run(['rev-parse','HEAD']);
-  const head=shown.status===0?(shown.stdout??'').trim():null;
-  // `state.head` is the head of the code this workflow produced; a commit in another repository is never that.
-  if(head&&!ctx.work.shared)state.head=head;
-  if(head)op.ledgerCommit=head;
-  store.appendEvent({event:'ledger-commit',op:op.id,node:nodeId,files,head,ledgerCommit:head,
-    ...(ctx.work.shared?{repository:ctx.work.ledger.repository,shared:true}:{})});
-  return head;
-}
-
-/** Pending ledger paths under one node directory, read where the tree lives rather than in this worktree. */
-function ledgerChanges(run,scope){
-  const shown=run(['status','--porcelain','--',scope]);
+function cleanStrayFiles(store,state,op,ctx){
+  if(typeof ctx.git!=='function')return [];
+  const shown=ctx.git('git',['status','--porcelain'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
   if(shown.status!==0)return [];
-  return unique((shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
-    .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))))
-    .filter(file=>inside(file,[scope]));
+  const live=state.ops.filter(item=>['running','paused','answering','ready'].includes(item.status)&&item.id!==op.id).flatMap(item=>item.allowlist??[]);
+  const ledger=/^\.starciwork\//;
+  const entries=(shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
+    .map(line=>({code:line.slice(0,2),file:normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))}))
+    .filter(entry=>!inside(entry.file,live)&&!inside(entry.file,op.kernelOwned??[])&&!ledger.test(entry.file)&&!entry.file.startsWith('.gitmounts/'));
+  if(!entries.length)return [];
+  const tracked=entries.filter(entry=>!entry.code.startsWith('??')).map(entry=>entry.file);
+  const untracked=entries.filter(entry=>entry.code.startsWith('??')).map(entry=>entry.file);
+  if(tracked.length)ctx.git('git',['checkout','--',...tracked],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
+  for(const file of untracked){try{fs.rmSync(path.join(state.worktree,file),{recursive:true,force:true});}catch{}}
+  const finding=`operation ${op.id} left changes outside every live allowlist; the kernel reverted ${tracked.length} tracked and removed ${untracked.length} untracked path(s): ${[...tracked,...untracked].slice(0,12).join(', ')}`;
+  op.strayFiles=[...tracked,...untracked];
+  state.reviewFindings=[...(state.reviewFindings??[]),{op:op.id,finding}];
+  store.appendEvent({event:'stray-files-reverted',op:op.id,tracked,untracked});
+  return op.strayFiles;
 }
 
-/** A decision is settled by observations, one per authored assertion; with none authored, one for the node. */
-function decisionObservations(ctx,node,op){
-  const authored=(()=>{try{const raw=ctx.work.api.readNode(ctx.work.at,node);return Array.isArray(raw.assertions)?raw.assertions.map(String):[];}catch{return [];}})();
-  const observation=firstLine(op.reports.at(-1)?.summary)||`${op.id} settled this decision`;
-  return (authored.length?authored:[String(node.id)]).map(id=>({id,outcome:'pass',observation}));
-}
+/* ------------------------------------------------------------------ the design routes */
 
 /**
  * A reported SDS gap reopens the design, it does not repair it in place: the architecture node the operation
@@ -2666,10 +576,6 @@ function architectureNodeFor(ctx,op,detail){
   const key=own?workModule(own):null;
   return nodes.find(node=>key&&workModule(node)===key)??null;
 }
-
-/** The check a design change must survive: the Work tree still validates after the decision is written. */
-const validateCommandAt=workRoot=>`node ${slash(path.join(skillRoot,'bin','starci.mjs'))} validate ${slash(workRoot)}`;
-const workValidateCommand=ctx=>validateCommandAt(ctx.work.ledger?.workRoot??path.join(ctx.work.repoRoot,'.starciwork'));
 
 /** `then: reopen` - the reporter waits for the op the route created and runs again with the settled material. */
 function reopenRequester(store,state,op,open,created,note){
@@ -2698,139 +604,6 @@ function reopenArchitecture(store,state,op,report,ctx,blocker){
   store.appendEvent({event:'sds-gap',op:op.id,node:op.nodeId,architecture:architecture.id,decide:decide.id});
   routed(store,op,'sds-gap',decide.id,decide.origin,{kind:decide.kind,node:architecture.id,then:route.then});
   return decide;
-}
-
-/* ------------------------------------------------------------------ the validator */
-
-/**
- * One validator per workflow, shared by every op: not an agent in a terminal (a serial bottleneck whose context
- * rots and that would itself need supervising) but an identity with memory - a headless `validateOp` call the
- * kernel makes for each result its own machine verification and proof already passed, before anything is
- * committed or written into the ledger. The kernel owns the memory (`<store>/validator/memory.md`, rebuilt
- * from `verdicts.jsonl` and the job rulings, bounded in lines and bytes) and hands it into every call, so the
- * verdicts stay consistent across ops. The verdict is data: it decides accept, retry or stop-at-the-user and
- * changes nothing else.
- */
-const validatorPaths=store=>{const dir=path.join(store.dir,'validator');return {dir,memory:path.join(dir,'memory.md'),verdicts:path.join(dir,'verdicts.jsonl')};};
-export function readValidatorMemory(store){try{return fs.readFileSync(validatorPaths(store).memory,'utf8');}catch{return '';}}
-const oneLine=(text,max=200)=>String(text??'').replace(/\s*\r?\n\s*/g,' ').trim().slice(0,max);
-function readVerdicts(store){
-  let text='';try{text=fs.readFileSync(validatorPaths(store).verdicts,'utf8');}catch{return [];}
-  return text.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{try{return JSON.parse(line);}catch{return null;}}).filter(Boolean);
-}
-/** The memory page: job rulings first (binding), then the latest verdict lines, oldest dropped until the page fits. */
-export function renderValidatorMemory(store,state){
-  const lines=readVerdicts(store).slice(-VALIDATOR_MEMORY_LINES).map(item=>{
-    const finding=item.verdict==='reject'&&item.findings?.[0]?` - finding: ${item.findings[0].file}: ${oneLine(item.findings[0].detail,120)}`:'';
-    return `- ${item.op} | ${item.verdict} | ${oneLine(item.summary||item.reason||'')}${finding}`;
-  });
-  const rulings=oneLine(rulingsText(store),6*1024);
-  const render=list=>[`# Validator memory - workflow ${state.id}`,``,`Job: ${firstLine(state.job)}`,``,
-    ...(rulings?[`## Job rulings (binding)`,``,rulings,``]:[]),
-    `## Verdicts (oldest first, op | verdict | summary)`,``,...(list.length?list:['- none yet']),``].join('\n');
-  let text=render(lines);
-  while(Buffer.byteLength(text)>VALIDATOR_MEMORY_BYTES&&lines.length>1){lines.shift();text=render(lines);}
-  return text;
-}
-function recordVerdict(store,state,op,record){
-  const paths=validatorPaths(store);
-  fs.mkdirSync(paths.dir,{recursive:true});
-  fs.appendFileSync(paths.verdicts,`${JSON.stringify({at:Date.now(),op:op.id,node:op.nodeId,attempt:op.attempt,...record})}\n`);
-  fs.writeFileSync(paths.memory,renderValidatorMemory(store,state));
-}
-
-/** The unified diff of the op's changed files against the head it started from; an untracked file is rendered as an added one. */
-export function opDiff(state,op,files,{git}){
-  const run=args=>git('git',args,{cwd:state.worktree,encoding:'utf8',windowsHide:true,maxBuffer:64*1024*1024});
-  const base=op.baseHead??'HEAD';
-  let text='';
-  if(files.length){
-    const shown=run(['diff','--no-color',base,'--',...files]);
-    if(shown.status===0)text=shown.stdout??'';
-    // `git diff <head>` shows nothing for a file git does not track yet: an added file is rendered as one.
-    const others=run(['ls-files','--others','--exclude-standard','--',...files]);
-    for(const file of (others.status===0?(others.stdout??''):'').split('\n').map(line=>normalize(line.trim())).filter(Boolean)){
-      let body='';try{body=fs.readFileSync(path.join(state.worktree,file),'utf8');}catch{continue;}
-      text+=`diff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n${body.split('\n').map(line=>`+${line}`).join('\n')}\n`;
-    }
-  }
-  const truncated=Buffer.byteLength(text)>VALIDATOR_DIFF_BYTES;
-  if(truncated)text=`${Buffer.from(text).subarray(0,VALIDATOR_DIFF_BYTES).toString()}\n[diff truncated by the kernel at ${VALIDATOR_DIFF_BYTES} bytes; the validator sees a prefix]\n`;
-  return {files,base,text,truncated};
-}
-/** The authored node the op closes, as the validator reads it: id, description and the assertions it must satisfy. */
-function validatorNode(ctx,op){
-  if(!ctx.work||!op.nodeId)return null;
-  const node=ctx.work.node(op.nodeId);
-  if(!node)return null;
-  try{
-    const raw=ctx.work.api.readNode(ctx.work.repoRoot,node);
-    const all=Array.isArray(raw?.assertions)?raw.assertions.map(String):[];
-    // An assertion this op does not carry a check for is proven elsewhere: by the kernel (work-valid) or by a later
-    // lane step (the e2e run, the review). The validator is told so, or it rejects the op for what is not its job.
-    const own=new Set((op.checks??[]).map(check=>String(check.name??'')));
-    let named=[];try{named=ctx.work.api.nodeChecks(raw).map(check=>check.assertion).filter(Boolean);}catch{named=[];}
-    const deferred=all.filter(assertion=>KERNEL_CHECK.test(assertion)||(named.includes(assertion)&&!own.has(assertion)));
-    return {id:node.id,description:raw?.description??null,assertions:all.filter(assertion=>!deferred.includes(assertion)),deferred};
-  }
-  catch{return {id:node.id,description:null,assertions:[],deferred:[]};}
-}
-/** Runtimes the allocator has parked: the validator skips them instead of paying a call into a closed door. */
-const coolingRuntimes=allocator=>{try{return (allocator?.snapshot?.()?.cooling??[]).map(item=>item?.runtime).filter(Boolean);}catch{return [];}};
-const findingText=finding=>`validator: ${finding.file}${finding.line?`:${finding.line}`:''}${finding.assertion?` [${finding.assertion}]`:''} - ${finding.detail}`;
-
-/**
- * Ask the validator about one result the kernel already reproduced. Returns `{verdict}` with `findings` on a
- * reject. `unavailable` (no provider, no parseable answer) never blocks: it is recorded, counted, and after
- * VALIDATOR_UNAVAILABLE_LIMIT in a row it is a needUser item. With `validateOp:null` the step is skipped once,
- * on the record.
- */
-/**
- * The brand the validator judges by is the one on disk now. An op that wrote the brand record itself is judged
- * by its own record, never by the summary the last sync read before it ran: brand-1 set rev 1 and was rejected
- * twice for the rev 4 the sync had seen. Any other op is judged by the tree as last read.
- */
-export function treeForVerdict(ctx,files){
-  if(!ctx?.work||!(files??[]).some(file=>/(^|\/)brand\/index\.yaml$/.test(slash(String(file)))))return ctx?.work?.loaded??null;
-  try{const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});ctx.work.loaded=loaded;return loaded;}catch{return ctx.work.loaded??null;}
-}
-function validateAccepted(store,state,op,ctx,{files,verified}){
-  if(ctx.validateOp===null||ctx.validateOp===undefined){
-    if(!state.validatorSkipped){state.validatorSkipped=true;store.appendEvent({event:'validator-skipped',reason:'no validator function was given to this kernel'});}
-    return {verdict:'skipped'};
-  }
-  // A review or a no-op slice changed nothing: there is no diff to judge, and a call on nothing could only misjudge.
-  if(!files.length){store.appendEvent({event:'validator-skipped',op:op.id,reason:'the operation changed nothing inside its allowlist, so there is no diff to judge'});return {verdict:'skipped'};}
-  const providers=ctx.validator??llm.DEFAULT_VALIDATOR_RUNTIMES;
-  const diff=opDiff(state,op,files,ctx);
-  let result;
-  // The kernel's own check (`work-valid`) is proven by the kernel, not by the agent: it goes to the validator with the
-  // re-run checks, so an acceptance statement naming it is never rejected as unproven (repair-5 was, four times).
-  const proven=[...verified.checks,...kernelProof(ctx,op.nodeId??op.ledgerIds?.[0]??null)];
-  try{result=ctx.validateOp({op,node:validatorNode(ctx,op),diff,checks:proven,references:op.references,
-    // The brand travels with every verdict: a colour, a font, an icon or an artwork slot outside it is a defect,
-    // and the validator can only say so if it was given the record the operation was supposed to read.
-    brand:brandPayload(treeForVerdict(ctx,files)),
-    memory:readValidatorMemory(store),providers,skip:coolingRuntimes(ctx.allocator),cwd:ctx.cwd});}
-  catch(error){result={ok:false,verdict:'unavailable',reason:error.message};}
-  const verdict=llm.VALIDATOR_VERDICTS.includes(result?.verdict)?result.verdict:'unavailable';
-  const summary=oneLine(result?.summary),provider=result?.provider??null,reason=oneLine(result?.reason)||null;
-  const findings=(Array.isArray(result?.findings)?result.findings:[]).filter(item=>item&&typeof item.file==='string');
-  op.validation={verdict,summary:summary||null,provider,at:ctx.now(),...(verdict==='unavailable'?{reason}:{})};
-  for(const dropped of Array.isArray(result?.dropped)?result.dropped:[])
-    store.appendEvent({event:'validator-finding-dropped',op:op.id,file:dropped.file,detail:oneLine(dropped.detail),diffFiles:files});
-  recordVerdict(store,state,op,{head:state.head??op.baseHead??null,verdict,summary,findings,provider,usage:result?.usage??null,reason,diffTruncated:diff.truncated});
-  if(verdict==='unavailable'){
-    state.validatorUnavailable=(state.validatorUnavailable??0)+1;
-    store.appendEvent({event:'validator-unavailable',op:op.id,reason,consecutive:state.validatorUnavailable,attempts:(result?.attempts??[]).length});
-    if(state.validatorUnavailable>=VALIDATOR_UNAVAILABLE_LIMIT&&!state.needUser.some(item=>item.kind==='validator'&&!item.op))
-      state.needUser.push({kind:'validator',detail:`the validator answered nothing usable for ${state.validatorUnavailable} op results in a row (${providers.join(', ')}); last: ${reason??'unknown'}`});
-    return {verdict};
-  }
-  state.validatorUnavailable=0;
-  if(verdict==='accept'){store.appendEvent({event:'validated',op:op.id,summary,provider,usage:result?.usage??null});return {verdict};}
-  store.appendEvent({event:'validator-rejected',op:op.id,summary,provider,findings:findings.slice(0,5).map(findingText),usage:result?.usage??null});
-  return {verdict,findings:findings.map(findingText)};
 }
 
 /**
@@ -2899,12 +672,6 @@ function growGrammar(store,state,op,report,blocker,ctx=null){
 
 /* ------------------------------------------------------------------ result policy */
 
-/**
- * How many times one op may be retried. The `validator-reject` route carries its own, lower limit: the accept
- * path that re-validates a written ledger (`validateAccepted`) reads it from here, so the bound lives in the
- * graph with every other route bound and not in two places.
- */
-export const validatorRejectLimit=()=>routeOf({verdict:'reject'})?.limit??RETRY_LIMIT;
 const retryLimitFor=reason=>reason==='validator-reject'?validatorRejectLimit():RETRY_LIMIT;
 
 function retryOp(store,state,op,findings,ctx,reason){
@@ -2957,26 +724,6 @@ function resumeOp(store,state,op,report,ctx){
   op.status='ready';op.attempt+=1;op.priorOpen=[...(report.open??[])];op.dispatch=null;op.terminal=null;op.nudged=false;
   store.appendEvent({event:'resume',op:op.id,attempt:op.attempt,open:op.priorOpen.slice(0,3)});
   return 'resume';
-}
-
-/** The kernel answers only mechanical questions (which runtime, a retry, a format); everything else is the owner's. */
-const MECHANICAL_QUESTION=/^(mechanical|runtime|retry|format|tooling)$/i;
-function answerOrEscalate(orca,store,state,op,report,ctx){
-  if(!MECHANICAL_QUESTION.test(String(report.question?.kind??'')))return openOwnerAsk(store,state,op,{kind:report.question?.kind??'decision',text:report.question?.text??report.summary,options:report.question?.options??[]},ctx,report);
-  const chosen=ctx.decide({situation:`${op.id} asked: ${report.question?.text}`,options:['answer','escalate-to-user'],
-    context:{options:report.question?.options??[],goal:firstLine(op.goal),allowlist:op.allowlist,acceptance:op.acceptance},cwd:ctx.cwd});
-  const option=chosen?.ok?chosen.value.option:'escalate-to-user';
-  store.appendEvent({event:'decide',op:op.id,option,rationale:chosen?.ok?chosen.value.rationale:'decide produced no valid option'});
-  if(option==='answer'&&chosen.value.instructions){
-    // The answered report file is retained out of the way so the operation can report once more on the same Dispatch.
-    const file=store.reportPath(op.dispatch);
-    if(fs.existsSync(file))fs.renameSync(file,`${file}.answered-${op.reports.length}`);
-    op.answer=chosen.value.instructions;op.status='answering';
-    return 'answer';
-  }
-  op.status='blocked';
-  state.needUser.push({op:op.id,kind:'authority',detail:report.question?.text??'the operation asked a question the kernel cannot answer'});
-  return 'escalate-to-user';
 }
 
 /* ------------------------------------------------------------------ shared changes */
@@ -3142,81 +889,6 @@ export function resumePaused(store,state){
   return resumed;
 }
 
-export const OWNER_ASK='owner.ask';
-/** Whether a blocker detail names a credential or a configuration the environment must provide. */
-export function credentialNeed(detail){
-  const text=String(detail??'');
-  return /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+){1,}\b/.test(text)||/\b(api[ -]?key|token|secret|credential|password|client[ -]?id|webhook|oauth)\b/i.test(text);
-}
-/** The decision folder of the feature an op belongs to, in the tree's own spelling. */
-function decisionAllowlistFor(state,op){
-  const paths=[...(op.ledgerIds??[]),op.nodeId??''].map(id=>String(id)).filter(Boolean);
-  const feature=(()=>{
-    for(const id of paths){const m=id.match(/^[^.]+\.([^.]+)\./);if(m)return m[1];}
-    for(const entry of op.allowlist??[]){const m=slash(entry).match(/features\/([^/]+)\//);if(m)return m[1];}
-    return null;
-  })();
-  return feature?[`.starciwork/features/${feature}/business/srs/decisions/**`]:['.starciwork/decisions/**'];
-}
-/**
- * A question only the owner can answer pauses the op that asked and opens one `owner.ask` op that prepares the
- * decision: a decided record that settles it answers it (`answered-from`), otherwise a decision record draft
- * with options and a recommendation waits for `workflow-answer`. The kernel never answers such a question
- * itself: the supervisor model used to, and the owner was never asked for a Zalo or Telegram key all day.
- */
-export function openOwnerAsk(store,state,op,question,ctx,report=null){
-  const same=state.ops.find(item=>item.kind===OWNER_ASK&&liveStatus.includes(item.status)&&item.question?.text===question.text);
-  const ask=same??addOp(store,state,{kind:OWNER_ASK,nodeId:null,
-    goal:`Prepare the owner's decision on the question ${op.id} asked: ${firstLine(question.text)}`,
-    question:{...question,from:op.id},ledgerIds:[],allowlist:decisionAllowlistFor(state,op),
-    references:unique([...(op.references??[])]),checks:ctx?.work?.at?.workRoot?[{name:'work-tree-validates',command:validateCommandAt(ctx.work.at.workRoot)}]:[],
-    acceptance:[`the question is either answered from a decided record (\`answered-from: <id>\`) or drafted as one decision record with numbered options and one recommendation`],
-    origin:'ask',requesters:[op.id]},`question of ${op.id} for the owner`);
-  if(!same&&ctx?.work)locateSharedTreePaths(ask,ctx);
-  if(same)same.requesters=unique([...(same.requesters??[]),op.id]);
-  const file=op.dispatch?store.reportPath(op.dispatch):null;
-  if(file&&fs.existsSync(file))fs.renameSync(file,`${file}.asked-${op.reports.length}`);
-  op.status='paused';op.waitingFor=ask.id;op.dispatch=null;op.terminal=null;op.nudged=false;
-  store.appendEvent({event:'owner-ask-opened',op:op.id,ask:ask.id,kind:question.kind,question:firstLine(question.text)});
-  return 'owner-ask';
-}
-/**
- * The ask op reported: `answered-from` is the answer, handed to every requester in its next contract; a
- * `decision:` record is the owner's question, listed for them until `workflow-answer` comes.
- */
-function settleOwnerAsk(store,state,ask,report){
-  const summary=String(report.summary??'');
-  const answered=summary.match(/^\s*answered-from:\s*(\S+)\s*\n?([\s\S]*)$/);
-  const requesters=state.ops.filter(item=>(ask.requesters??[]).includes(item.id));
-  if(answered){
-    for(const requester of requesters)resumeWithAnswer(store,state,requester,`Answered from the decided record ${answered[1]}: ${answered[2].trim()||'see that record'}`);
-    store.appendEvent({event:'owner-ask-answered-from-record',ask:ask.id,record:answered[1],requesters:requesters.map(item=>item.id)});
-    return;
-  }
-  const record=(summary.match(/^\s*decision:\s*(\S+)/)??[])[1]??null;
-  const options=ask.question?.options?.length?ask.question.options:(summary.match(/^\s*\d+\.\s.+$/gm)??[]).map(line=>line.replace(/^\s*\d+\.\s*/,''));
-  state.needUser.push({op:ask.id,kind:'decision',detail:`${ask.question?.text??ask.goal} - answer with workflow-answer --id ${state.id} --op ${ask.id} --choice <n> [--note "..."]${record?` (decision record ${record})`:''}`,record,options,requesters:requesters.map(item=>item.id)});
-  store.appendEvent({event:'owner-question',ask:ask.id,record,options:options.length,requesters:requesters.map(item=>item.id)});
-}
-function resumeWithAnswer(store,state,op,answer){
-  op.answer=answer;op.status='ready';op.waitingFor=null;op.dispatch=null;op.terminal=null;op.nudged=false;op.attempt+=1;
-  store.appendEvent({event:'owner-answer-delivered',op:op.id,answer:firstLine(answer)});
-}
-/** The owner's answer (`workflow-answer`): recorded on the ask op, delivered to every requester, the question gone. */
-export function answerOwnerQuestion(store,state,{op:askId,choice=null,note=null}){
-  const ask=state.ops.find(item=>item.id===askId&&item.kind===OWNER_ASK)??null;
-  need(ask,`No owner question ${askId} in workflow ${state.id}`);
-  const item=state.needUser.find(entry=>entry.op===ask.id&&entry.kind==='decision');
-  const options=item?.options??ask.question?.options??[];
-  const picked=choice!==null&&choice!==undefined&&String(choice).trim()?options[Number(choice)-1]??String(choice):null;
-  need(picked||String(note??'').trim(),'workflow-answer needs --choice <n> or --note "<answer>"');
-  const answer=`The owner decided on "${firstLine(ask.question?.text??ask.goal)}": ${picked?`option ${choice} - ${picked}`:''}${picked&&note?'; ':''}${note??''}`.trim();
-  ask.answer={choice:picked?String(choice):null,note:note??null,at:Date.now()};
-  state.needUser=state.needUser.filter(entry=>!(entry.op===ask.id&&entry.kind==='decision'));
-  for(const requester of state.ops.filter(candidate=>(ask.requesters??[]).includes(candidate.id)))resumeWithAnswer(store,state,requester,answer);
-  store.appendEvent({event:'owner-answered',ask:ask.id,choice:ask.answer.choice,note:note??null,requesters:[...(ask.requesters??[])]});
-  return {ask:ask.id,answer};
-}
 function handleBlocked(store,state,op,report,ctx){
   const blocker=report.blocker??{kind:'environment',detail:report.summary};
   if(blocker.kind==='shared-change'){
@@ -3270,6 +942,49 @@ function handleBlocked(store,state,op,report,ctx){
   return 'escalate-to-user';
 }
 
+/**
+ * An accepted `work.author` op is measured against the tree, never against its own report: the ledger is
+ * reloaded and the candidate enriched again, so the answer comes from `executableCandidates` exactly as the
+ * next iteration will read it. A node that is schedulable now is logged `record-authored` and its own lane
+ * creates its first step on the next iteration. A node that is still not schedulable is the one thing the
+ * kernel cannot do for the user: the incompleteness is raised once, and `authorRecordOp` never creates a
+ * second author op for it.
+ *
+ * The node keeps `state: todo` throughout, because authoring a record is not completing work: no `markDone`,
+ * no completion, no evidence manifest - only the kernel's own `in-progress` receipt from the launch.
+ */
+function settleAuthoredRecord(store,state,op,ctx){
+  if(op.kind===OWNER_ASK){settleOwnerAsk(store,state,op,op.reports.at(-1)??{});return 'owner-ask-settled';}
+  if(op.intake?.scope&&!op.nodeId){
+    const settled=settleIntake(store,state,op,ctx);
+    // A reconciliation the kernel could not accept comes back as findings, not as a verdict the intake acted on:
+    // retrying an operation is the kernel's policy and stays here, so the intake never has to know about it.
+    if(plain(settled)&&settled.retry)return retryOp(store,state,op,settled.findings,ctx,settled.reason);
+    return settled;
+  }
+  const nodeId=op.nodeId;
+  let candidate=null;
+  try{
+    const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});
+    if(loaded.ok){
+      ctx.work.loaded=loaded;
+      candidate=ctx.work.api.executableCandidates(loaded,{scope:state.scope.length?state.scope:null,
+        repository:ctx.work.code.repository,side:ctx.work.side}).find(item=>item.id===nodeId)??null;
+    }
+  }catch(error){store.appendEvent({event:'ledger-sync-failed',op:op.id,reason:error.message});}
+  if(candidate?.schedulable){
+    state.needUser=state.needUser.filter(item=>!(item.kind==='ledger'&&item.node===nodeId));
+    store.appendEvent({event:'record-authored',node:nodeId,op:op.id,allowlist:candidate.allowlist,
+      checks:candidate.checks.map(check=>check.assertion??check.command),
+      lane:[...(state.lanes?.[nodeId]?.lane??[])]});
+    return 'record-authored';
+  }
+  const detail=`ledger incomplete: ${candidate?.reason??`${nodeId} is still not launchable after ${op.id} completed its record`}`;
+  if(!state.needUser.some(item=>item.kind==='ledger'&&item.node===nodeId))state.needUser.push({node:nodeId,kind:'ledger',detail});
+  store.appendEvent({event:'record-still-incomplete',node:nodeId,op:op.id,detail});
+  return 'record-still-incomplete';
+}
+
 /** One accepted report, one deterministic action. `done` passes through machine verification and a commit. */
 export function applyOpReport(orca,store,state,op,report,ctx){
   if(validatorOnlyBlock(report)){
@@ -3319,6 +1034,28 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       return retryOp(store,state,op,verified.failed.map(check=>`the kernel re-ran ${check.name} (\`${check.command}\`) and it exited ${check.exitCode}: ${check.evidence}`),ctx,'machine-verify-failed');
     }
     const files=changedFiles(state,op,ctx,op.allowlist,{exclude:op.kernelOwned??[]});
+    // Every changed file is mapped to a record kind, and a file whose kind this op does not declare in `writes`
+    // is a defect the machine can name on its own: no model is asked, and the report goes back with the finding.
+    // `ctx.kindsProfile` is the profile to read it against: null is the compiled one, and a caller that runs the
+    // kernel against an authored or a fixture profile hands that one in instead of rebuilding `.dist` for it.
+    const undeclared=(()=>{try{return undeclaredWrites(op.kind,files,{profile:ctx.kindsProfile??null,nodeKind:ctx.work?.node?.(op.nodeId)?.kind??null});}catch{return [];}})();
+    if(undeclared.length){
+      op.reports.at(-1).downgradedTo='failed';
+      store.appendEvent({event:'io-undeclared-write',op:op.id,files:undeclared.map(item=>item.file)});
+      return retryOp(store,state,op,undeclared.map(item=>`produced a ${item.record} record it does not declare: ${item.file}`),ctx,'io-undeclared-write');
+    }
+    // A drawing is the grammar rendered, so the canon rules are checked from the bytes it produced, before any
+    // model judges it. A kernel given no render checker behaves exactly as it did before the rules existed.
+    if(op.kind==='interface.draw'&&typeof ctx.renderChecks==='function'){
+      const rendered=(()=>{try{return ctx.renderChecks({op,state,ctx,files});}catch(error){store.appendEvent({event:'render-check-unavailable',op:op.id,reason:String(error?.message??error).slice(0,240)});return null;}})();
+      if(plain(rendered)&&rendered.ok===false){
+        const failed=(Array.isArray(rendered.checks)?rendered.checks:[]).filter(check=>plain(check)&&check.outcome!=='pass');
+        op.reports.at(-1).downgradedTo='failed';
+        store.appendEvent({event:'render-check-failed',op:op.id,checks:failed.map(check=>`${check.id}=${check.outcome}`)});
+        return retryOp(store,state,op,failed.map(check=>`render check ${check.id} ${check.outcome}: ${check.detail??''}`.trim()),ctx,'render-check-failed');
+      }
+      if(plain(rendered)&&rendered.ok)store.appendEvent({event:'render-checked',op:op.id,checks:(rendered.checks??[]).map(check=>`${check.id}=${check.outcome}`)});
+    }
     // Proof by contrast: the specs this operation added must fail on the code it started from. A green check
     // alone is not evidence that the behavior changed.
     const plan=proofPlan(op,{changedFiles:files});
@@ -3605,27 +1342,6 @@ function refreshLedgerSummary(state,ctx){
   return state.ledgerSummary;
 }
 
-/**
- * A done workflow hands its lane back before it writes its final report: the outcome the report states is the
- * outcome after the merge, so a lane that cannot go home is `blocked` in the report and not `done` with a
- * footnote. A base worktree that is no longer on disk is not a failure - there is nothing to merge into, and
- * the branch is kept either way.
- */
-function settleLane(store,state,outcome,ctx){
-  if(outcome!=='done'||!plain(state.lane)||plain(state.lane.merged))return null;
-  const base=state.lane.base?.worktree;
-  if(!base||!fs.existsSync(base)){
-    store.appendEvent({event:'lane-merge-skipped',id:state.id,branch:state.lane.branch,base:slash(base??''),
-      reason:'the base worktree is not on disk'});
-    return null;
-  }
-  const merged=mergeLane(store,state,ctx);
-  if(merged.ok)return null;
-  const detail=`the lane branch ${state.lane.branch} does not merge into ${state.lane.base.branch} in ${slash(base)}: ${merged.files.length?`conflicts in ${merged.files.join(', ')}`:firstLine(state.lane.conflict?.reason)||'git refused the merge'}; merge it by hand, then approve the workflow again`;
-  if(!state.needUser.some(item=>item.kind==='merge'))state.needUser.push({kind:'merge',detail});
-  return {outcome:'blocked',reason:detail};
-}
-
 function finish(store,state,outcome,reason=null,ctx=null){
   // The lane is merged first, because a refused merge changes the outcome this report states.
   const settled=settleLane(store,state,outcome,ctx);
@@ -3709,165 +1425,8 @@ function answerQuestions(orca,store,state,ctx){
   }
 }
 
-/* ------------------------------------------------------------------ the loop */
+/* ------------------------------------------------------------------ the supervisor models */
 
-/**
- * Phase `run`. One iteration: schedule every operation whose dependencies are done and whose allowlist is
- * free, wait one tick, accept the reports that arrived (machine verification, commit, ledger), create the
- * reviews and repairs the results imply, and - when nothing is left to run - run the job gates and finish.
- * Every iteration appends a `tick` event and saves state, so re-running `workflow-run` continues.
- */
-/**
- * Reconcile the kernel's picture with Orca's: a live Dispatch of this Run that no operation names is an orphan
- * (a launch the kernel lost) and is settled; the check is cheap and runs at start and every RECONCILE_EVERY ticks.
- */
-export const RECONCILE_EVERY=10;
-/** The terminals Orca lists for a worktree, as `{handle,title}`; an unreachable Orca lists none. */
-function listTerminals(orca,cwd){
-  try{const listed=orca.invoke('terminal-list',{},{cwd});return listed.outcome==='ok'?(getPath(listed.receipt,'result.terminals')??[]).filter(plain):[];}catch{return [];}
-}
-const closeTerminal=(orca,cwd,handle)=>{try{const closed=orca.invoke('terminal-close',{terminal:handle},{cwd});return closed.outcome==='ok';}catch{return false;}};
-/**
- * The kernel's own Orca terminal: the tab titled `[Kernel] <id>` in the worktree. One that already exists (a
- * previous start of this workflow) is reused and any duplicate is closed; none exists, one is created. A
- * process restart therefore never adds a tab.
- */
-/**
- * The kernel's coordinator tab lost its pane (Orca: "The coordinator terminal has no stable pane identity"):
- * the old handle is closed, a fresh `[Kernel] <id>` tab is opened and the Run is re-bound to it, so the next
- * launch is accepted. The event names both handles.
- */
-export function recoverCoordinatorTab(orca,store,state,{cwd=state.worktree}={}){
-  const lost=state.from??null;
-  if(lost){try{orca.invoke('terminal-close',{terminal:lost},{cwd});}catch{}}
-  state.from=null;
-  try{state.from=ownKernelTerminal(orca,store,state,cwd);}
-  catch(error){store.appendEvent({event:'coordinator-tab-lost',terminal:lost,reason:String(error?.message??error)});state.from=lost;return false;}
-  state.kernelTerminalOwned=true;
-  let rebound=false;
-  try{rebound=rebindRunIfNeeded(orca,store,state,{cwd});}catch{rebound=false;}
-  store.appendEvent({event:'coordinator-tab-recovered',was:lost,terminal:state.from,rebound});
-  store.saveState(state);
-  return true;
-}
-function ownKernelTerminal(orca,store,state,worktree){
-  const title=`[Kernel] ${state.id}`;
-  const mine=listTerminals(orca,worktree).filter(item=>item.title===title&&item.handle);
-  for(const extra of mine.slice(1)){closeTerminal(orca,worktree,extra.handle);store.appendEvent({event:'kernel-terminal-closed',terminal:extra.handle,reason:'duplicate'});}
-  if(mine[0]){store.appendEvent({event:'kernel-terminal',terminal:mine[0].handle,reused:true});return mine[0].handle;}
-  const shell=process.platform==='win32'?'powershell -NoLogo':'bash';
-  const created=orca.invoke('terminal-create',{worktree:`path:${path.resolve(worktree)}`,title,command:shell},{cwd:worktree});
-  const handle=getPath(created.receipt,'result.terminal.handle')??null;
-  need(handle,`The kernel could not open its own Orca terminal: ${created.reason??'terminal-create failed'}; pass --from <own terminal>`);
-  store.appendEvent({event:'kernel-terminal',terminal:handle});
-  return handle;
-}
-/**
- * An operation's terminal has no reader once its report is accepted: it is closed with the acceptance. A
- * blocked or failed op keeps its terminal, which is where its last words are. `sweepStaleTerminals` closes
- * what an older build or a lost kernel left behind: `[Op]` tabs of this workflow's done ops, and `[Kernel]` tabs
- * of this workflow that are not the one the kernel is in. Tabs of other workflows are never touched.
- */
-function closeOpTerminal(orca,store,state,op){
-  if(!op?.terminal)return;
-  const handle=op.terminal;
-  if(closeTerminal(orca,state.worktree,handle))store.appendEvent({event:'op-terminal-closed',op:op.id,terminal:handle});
-  op.terminal=null;
-}
-/** An op tab has a reader only while its op is on it: running, answering a question, or paused to resume there. */
-const TAB_STATUSES=['running','answering','paused'];
-export const SWEEP_MS=5*60*1000;
-/**
- * Every tab of this workflow that nobody reads is closed: a stale kernel tab, and the tab of any op of this
- * workflow that is not on it right now - done, blocked, retried, pending alike - because a tab only exists for
- * the time its op runs. Tabs of other workflows and tabs the owner opened are never touched. The sweep runs on
- * time (`SWEEP_MS`), not only every N iterations: a workflow whose iterations are minutes long never reached
- * the N-th one, and the owner counted fifteen idle tabs.
- */
-export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Date.now}={}){
-  const closed=[];
-  const ours=new Map(state.ops.map(op=>[op.id,op]));
-  // A tab is an op's by the handle the op holds, whatever its title: a command-terminal launch whose rename
-  // never landed keeps the agent's default title, and those were the tabs nobody could match.
-  const byHandle=new Map(state.ops.filter(op=>op.terminal).map(op=>[op.terminal,op]));
-  for(const item of listTerminals(orca,cwd)){
-    const title=String(item.title??'');
-    if(title===`[Kernel] ${state.id}`&&item.handle!==state.from){if(closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,reason:'stale kernel tab'});continue;}
-    // The kernel tab of a sibling workflow of this repository that finished, or whose kernel is gone, has no reader.
-    const sibling=title.startsWith('[Kernel] ')?title.slice(9).trim():null;
-    if(sibling&&sibling!==state.id){
-      if(siblingKernelGone(store,sibling)&&closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,workflow:sibling,reason:'kernel tab of a workflow that is not running'});
-      continue;
-    }
-    const opId=title.startsWith('[Op] ')?title.slice(title.lastIndexOf(' - ')+3).trim():null;
-    const op=(opId?ours.get(opId):null)??byHandle.get(item.handle)??null;
-    if(!op)continue;
-    const inUse=op.terminal===item.handle&&TAB_STATUSES.includes(op.status);
-    if(inUse)continue;
-    if(closeTerminal(orca,cwd,item.handle)){closed.push({terminal:item.handle,op:op.id,reason:op.status==='done'?'op done':`op ${op.status}`});if(op.terminal===item.handle)op.terminal=null;}
-  }
-  state.lastSweepAt=now();
-  if(closed.length)store.appendEvent({event:'terminals-swept',closed});
-  return closed;
-}
-/** Whether a sibling workflow of this store root is finished or has no live kernel: its `[Kernel]` tab is then nobody's. */
-function siblingKernelGone(store,id){
-  const dir=path.join(path.dirname(store.dir),id);
-  let sibling=null;
-  // A workflow this store root does not know is not this kernel's to judge: its tab is left alone.
-  try{sibling=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));}catch{return false;}
-  if(sibling?.finished)return true;
-  try{const lock=JSON.parse(fs.readFileSync(path.join(dir,'kernel.lock'),'utf8'));process.kill(Number(lock.pid),0);return false;}catch{return true;}
-}
-/** The kernel's own tab is released when the kernel leaves without finishing: the next start opens one and re-binds the Run. */
-function releaseKernelTab(orca,store,state,{cwd,reason}){
-  if(!(state.kernelTerminalOwned&&state.from))return;
-  try{orca.invoke('terminal-close',{terminal:state.from},{cwd});}catch{}
-  store.appendEvent({event:'kernel-terminal-closed',terminal:state.from,reason});
-  state.from=null;state.kernelTerminalOwned=false;
-}
-export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync,allocator=null}={}){
-  const listed=orca.invoke('worker-list',{run:state.run},{cwd});
-  if(listed.outcome!=='ok')return {orphans:[],dead:[],reason:listed.reason};
-  const live=(getPath(listed.receipt,'result.workers')??[]).filter(w=>['ready','running','starting'].includes(w.workerState)||(w.workerState==='unsupervised'&&['dispatched','pending','ready'].includes(w.dispatchStatus)));
-  const known=new Set(state.ops.map(op=>op.dispatch).filter(Boolean));
-  const orphans=[];
-  for(const worker of live){
-    if(known.has(worker.dispatchId))continue;
-    const settlement=settleDispatch(orca,worker.dispatchId,{cwd,reason:'orphan dispatch not named by any operation',terminalHandle:worker.agentTerminalHandle??null,closeTerminal:true,wait});
-    orphans.push({dispatch:worker.dispatchId,terminal:worker.agentTerminalHandle??null,effectState:settlement.effectState});
-  }
-  if(orphans.length)store.appendEvent({event:'reconciled-orphans',orphans});
-  // The other direction: an op the kernel believes is running, whose Dispatch Orca no longer lists and whose
-  // terminal is gone, has no agent behind it. Nothing would ever observe it, so it is settled and queued again
-  // here; a report file it left is not touched - acceptReports consumes that first.
-  const terminals=orca.invoke('terminal-list',{},{cwd});
-  const handles=new Set((getPath(terminals.receipt,'result.terminals')??[]).map(item=>item.handle).filter(Boolean));
-  const liveDispatches=new Set(live.map(worker=>worker.dispatchId));
-  const dead=[];
-  if(terminals.outcome==='ok')for(const op of state.ops.filter(item=>item.status==='running'&&item.dispatch)){
-    if(liveDispatches.has(op.dispatch)||(op.terminal&&handles.has(op.terminal)))continue;
-    if(fs.existsSync(path.join(store.paths.reports,`${op.dispatch}.json`)))continue;
-    const settlement=settleDispatch(orca,op.dispatch,{cwd,reason:'dead: no worker and no terminal',terminalHandle:op.terminal,closeTerminal:false,wait});
-    if(allocator&&op.runtime)allocator.release(op.runtime,{op:op.id});
-    op.restarts+=1;
-    dead.push({op:op.id,dispatch:op.dispatch,terminal:op.terminal,runtime:op.runtime,effectState:settlement.effectState,restarts:op.restarts});
-    if(op.restarts>RESTART_LIMIT){
-      op.status='blocked';op.dispatch=null;op.terminal=null;
-      state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} lost its agent ${op.restarts} times; the last terminal ${op.terminal??'?'} no longer exists`});
-      continue;
-    }
-    op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;
-  }
-  if(dead.length)store.appendEvent({event:'reconciled-dead',dead});
-  return {orphans,dead};
-}
-
-/**
- * Triage: the one place a model reads an anomaly the policy table could not classify. It is called only when
- * the same anomaly signature repeats, it may only pick from a closed option set, and every pick is recorded so
- * the next occurrence becomes a rule instead of another call.
- */
 /** The decide role's preference starts with the supervisor runtimes that exist in the profile. */
 const plainObject=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 export function withSupervisorPreference(profile,runtimes){
@@ -3880,15 +1439,6 @@ export function withSupervisorPreference(profile,runtimes){
   return copy;
 }
 export const DEFAULT_SUPERVISOR_RUNTIMES=['claude-fable-5.1','gpt-6-astra'];
-/** `<host>/config.json` may set `critique.runtimes`: the critics every goal is challenged on, first answer wins. Astra first by default: one call per goal, and Fable's week is the scarcer window. */
-export function critiqueRuntimes(host){
-  try{
-    const config=JSON.parse(fs.readFileSync(path.join(host,'config.json'),'utf8'));
-    const listed=Array.isArray(config?.critique?.runtimes)?config.critique.runtimes:typeof config?.critique==='string'?[config.critique]:null;
-    const runtimes=(listed??[]).filter(item=>typeof item==='string'&&item.trim()).map(item=>item.trim());
-    return runtimes.length?runtimes:llm.DEFAULT_CRITIC_RUNTIMES;
-  }catch{return llm.DEFAULT_CRITIC_RUNTIMES;}
-}
 /** `<host>/config.json` may set `supervisor.runtimes`: the models triage and decide operations prefer, strongest first. */
 export function supervisorRuntimes(host){
   try{
@@ -3977,7 +1527,6 @@ function readmitCooled(store,state,ctx){
     store.appendEvent({event:'avoid-expired',op:op.id,runtimes:expired,avoid:op.avoidRuntimes});
   }
 }
-const clockOf=ctx=>typeof ctx?.now==='function'?ctx.now():Date.now();
 function guardedStage(store,state,ctx,stage,fn){
   try{fn();state.kernelErrors=0;return 'ok';}
   catch(error){
@@ -3990,6 +1539,11 @@ function guardedStage(store,state,ctx,stage,fn){
     return 'stop';
   }
 }
+/**
+ * Triage: the one place a model reads an anomaly the policy table could not classify. It is called only when
+ * the same anomaly signature repeats, it may only pick from a closed option set, and every pick is recorded so
+ * the next occurrence becomes a rule instead of another call.
+ */
 export const TRIAGE_OPTIONS=['resume-ops','park-runtime','settle-op','restart-kernel','needUser'];
 export function noteAnomaly(store,state,signature,detail){
   state.anomalies=state.anomalies??{};
@@ -4014,9 +1568,21 @@ export function triageAnomaly(store,state,signature,ctx){
   return option;
 }
 
+/* ------------------------------------------------------------------ the loop */
+
+/**
+ * Phase `run`. One iteration: schedule every operation whose dependencies are done and whose allowlist is
+ * free, wait one tick, accept the reports that arrived (machine verification, commit, ledger), create the
+ * reviews and repairs the results imply, and - when nothing is left to run - run the job gates and finish.
+ * Every iteration appends a `tick` event and saves state, so re-running `workflow-run` continues.
+ *
+ * `reconcile`, `renderChecks` and `contractDigest` are the three seams other modules plug into and each is
+ * `null` by default: a kernel that was given none behaves exactly as it did before the rule they carry existed.
+ */
 export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,validateOp=llm.validateOp,template,supervisor=null,validator=null,
   wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
   ledgerApi=work,validate=validateWorkTree,ledgerRoot=null,resolveLedger=resolveLedgerRoot,
+  reconcile=null,renderChecks=null,contractDigest=null,kindsProfile=null,
   waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now,host=hostDescriptorOf(orca)}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   need(plain(allocator),'A runtime allocator is required');
@@ -4024,6 +1590,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   required(state.run,'Orca run id');required(state.from,'own terminal handle');
   // `validateOp:null` is an explicit choice to run without the validator; it is recorded once as `validator-skipped`.
   const ctx={cwd,allocator,planOp,decide,validateOp,template,wait,exec,git,launch,now,guards,work:null,orca,host:hostDescriptorOf({host}),
+    reconcile,renderChecks,contractDigest,kindsProfile,
     supervisor:supervisor??supervisorRuntimes(state.host??''),validator:validator??validatorRuntimes(state.host??'')};
   // Which host runs this workflow is a fact of the run: a sequential host names itself so the log says why one op ran at a time.
   store.appendEvent({event:'host',name:ctx.host.name,capabilities:ctx.host.capabilities,sequential:ctx.host.sequential,maxParallelOps:allocator.maxParallelOps??null});
@@ -4192,60 +1759,9 @@ export function awaitLaunch(file,{wait=sleepSync,timeoutMs=LAUNCH_WAIT_MS,interv
   }
 }
 
-/**
- * A resumed kernel is expected to be the terminal Orca bound as the Run's coordinator; only that terminal may
- * launch operations. When the tab is gone (closed by a person, or by an older build) and the kernel opened a
- * new one, the Run is re-bound to it once - which fences the live Dispatches of the old tab, so the reconcile
- * that follows settles them - and the event says so. A matching coordinator changes nothing.
- */
-export function rebindRunIfNeeded(orca,store,state,{cwd}){
-  if(!state.run||!state.from)return false;
-  let coordinator=null;
-  try{const shown=orca.invoke('run-show',{id:state.run},{cwd});coordinator=getPath(shown.receipt,'result.run.coordinator_handle')??null;}catch{return false;}
-  if(!coordinator||coordinator===state.from)return false;
-  const bound=orca.invoke('run-use',{id:state.run,from:state.from},{cwd});
-  store.appendEvent({event:'run-rebound',run:state.run,from:state.from,was:coordinator,ok:bound.outcome==='ok',...(bound.outcome==='ok'?{}:{reason:bound.reason??null})});
-  return bound.outcome==='ok';
-}
-function bindRun(orca,{cwd,state,from}){
-  const created=orca.invoke('run-create',{objective:`Workflow ${state.id}: ${firstLine(state.job)}`,from},{cwd});
-  need(created.outcome==='ok',`run-create failed: ${created.reason}`);
-  const run=getPath(created.receipt,'result.run.id');
-  const shownRun=orca.invoke('run-show',{id:run},{cwd});
-  const coordinator=getPath(shownRun.receipt,'result.run.coordinator_handle')??null;
-  if(coordinator!==from){
-    // Binding is a one-time hand-off: a repeated run-use from the same terminal bumps Orca's consumer generation
-    // and invalidates every live Dispatch of the Run, so a resumed kernel never re-binds.
-    const bound=orca.invoke('run-use',{id:run,from},{cwd});
-    need(bound.outcome==='ok',`run-use failed: ${bound.reason}`);
-  }
-  return run;
-}
-
 const hostOf=(options,repoRoot)=>path.resolve(options.host??path.join(repoRoot,'.claude'));
 const launcherOf=host=>slash(path.join(host,'.dist','hosts','orca','launch.mjs'));
 const templateOf=host=>fs.readFileSync(path.join(host,'docs','supervision-templates','op.md'),'utf8');
-
-/**
- * The four commands of the runtime, as the canonical launcher routes them. `functions` is the injection
- * seam for the model functions and the process helpers, so the command path is testable without a provider.
- */
-/** `--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2`: slots per runtime in priority order. */
-export function parseQuota(value){
-  if(!value)return null;
-  const order=[],slots={},tags={};
-  for(const entry of String(value).split(',').map(item=>item.trim()).filter(Boolean)){
-    const [id,rest]=entry.split('=');
-    const [n,tagText]=String(rest??'').split(':');
-    need(id&&Number.isFinite(Number(n)),`--allocation entries are <runtime>=<slots>[:<easy+medium+hard>]: ${entry}`);
-    const runtime=id.trim();
-    order.push(runtime);slots[runtime]=Number(n);
-    const levels=String(tagText??'').split('+').map(level=>level.trim()).filter(Boolean);
-    for(const level of levels)need(['easy','medium','hard'].includes(level),`--allocation difficulty tags are easy|medium|hard: ${entry}`);
-    if(levels.length)tags[runtime]=levels;
-  }
-  return {order,slots,tags,total:Object.values(slots).reduce((a,b)=>a+b,0)};
-}
 
 /** One kernel per workflow: a pid lock in the store refuses a second process; a stop flag ends the loop cleanly. */
 function acquireKernelLock(store){
@@ -4314,10 +1830,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   const repoRoot=repositoryRoot(worktree);
   // The ledger a job works decides where its own runtime state lives too: a repository that shares another
   // repository's Work tree keeps no `.starciwork` of its own, so the workflow directory belongs to the owner.
-  const routed=()=>{try{return resolveLedgerRoot({repoRoot:worktree,host:hostOf(options,repoRoot),options});}catch{return null;}};
+  const routedLedger=()=>{try{return resolveLedgerRoot({repoRoot:worktree,host:hostOf(options,repoRoot),options});}catch{return null;}};
   const storeRootFor=id=>{
     if(fs.existsSync(path.join(workflowsRoot(repoRoot),id,'state.json')))return repoRoot;
-    const resolved=routed();
+    const resolved=routedLedger();
     return resolved?.sharedLedger&&fs.existsSync(path.join(workflowsRoot(resolved.ownerRepoRoot),id,'state.json'))
       ?resolved.ownerRepoRoot:repoRoot;
   };
@@ -4344,7 +1860,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     // `--lane` makes this workflow its own Orca worktree row, cut from the branch this command runs on. The id is
     // decided first, because it names both the lane and the row the owner reads.
     const lane=options.lane===undefined||options.lane===false||options.lane==='false'?null:(()=>{
-      const owner=laneOwnerOf([repoRoot,(()=>{try{return routed()?.ownerRepoRoot??null;}catch{return null;}})()],worktree);
+      const owner=laneOwnerOf([repoRoot,(()=>{try{return routedLedger()?.ownerRepoRoot??null;}catch{return null;}})()],worktree);
       need(!owner,`${slash(worktree)} is already the lane of workflow ${owner?.id}; a lane never opens a lane of its own - run workflow-goal --lane from the base worktree`);
       return openLane(orca,{id,name:laneNameOf(options.lane,id),repoRoot,base:worktree,baseBranch:currentBranch(worktree),cwd:worktree});
     })();

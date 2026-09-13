@@ -227,3 +227,10 @@ export function decisionKindFor(nodeKind,{profile=null}={}){
   const steps=laneFor({kind:nodeKind,layout:null},{profile});
   return steps.length===1?steps[0]:null;
 }
+
+/**
+ * The 5.1 map of decision node kind -> deciding operation. It survives only as the fallback of a kernel whose
+ * kinds profile cannot be read at all (a tree whose `.dist` is not built yet still has to load); with a
+ * profile present `decisionKindFor` answers from the lanes and this table is never consulted.
+ */
+export const DECISION_OPERATION=Object.freeze({architecture:'architecture.decide',business:'business.decide','business-overview':'business.decide',brand:'brand.decide'});

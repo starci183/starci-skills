@@ -1605,7 +1605,8 @@ test('a design operation carries the brand record and its assets, prints the Bra
     assert.doesNotMatch(renderContract({template,op:{...op,kind:'backend.implement'},state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'}),/## Brand/);
     // `grammar.update` is in the list from the other end: it grows the language every drawing reads, so it gets
     // the whole canon and the identity the new unit has to live inside before it adds a word to either.
-    assert.deepEqual(DESIGN_KINDS,['interface.draw','interface.asset','frontend.implement','uat.verify','grammar.update']);
+    // The set is what the catalog derives from `reads: [brand]`, in catalog order, so only membership is pinned here.
+    assert.deepEqual([...DESIGN_KINDS].sort(),['frontend.implement','grammar.update','interface.asset','interface.draw','uat.verify']);
     assert.match(renderContract({template,op:{...op,kind:'grammar.update'},state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'}),/## Brand/);
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
