@@ -145,11 +145,25 @@ Within an authorized delivery or design-repair scope, whenever a relevant gap is
    warning and continue dependent effects, or rewrite expectations to make code
    pass. Complete observable actors, guards, outcomes, alternatives/exceptions
    and acceptance in SRS; mechanisms, ownership, contracts and failure behavior
-   belong in SDS.
+   belong in SDS. Inside the workflow runtime this is a report and a route rather
+   than a judgement call: a requirement that is silent, ambiguous or
+   self-contradictory is `blocked` `srs-gap` and repaired by `business.revise` on
+   the business node that owns it; a design that does not say how is `blocked`
+   `sds-gap` and repaired by `architecture.revise`. Either repair states the
+   readings the record admits, takes the most reasonable one by the accepted
+   records and the product's own conventions, records why in the record's
+   `extensions.work3.decisionLog` and bumps its `rev` - so the owner reads what
+   was decided for them and overturns it there.
 3. Resolve elaboration and technical choices within delegated authority. Do not
    ask the user to approve every technical detail again. A new business policy,
    changed product scope or reserved external effect still needs the actual
    authorized decision maker; never fabricate that decision to obtain `done`.
+   The line is observable: when the readings differ in what is charged, paid,
+   refunded, taxed or owed and to whom, in who may do or see a thing, or in what
+   is stored, shown, shared or deleted about a person, prepare the decision with
+   numbered options and one recommendation and put it to the owner - the runtime
+   then carries the work on that recommendation until they answer, and settles
+   everything else itself.
 4. Review the revised specification against the full affected journey, shared
    consumers and relevant failure cases, not only the test that exposed the gap.
    Validate structure, links and completeness, then re-establish current design
