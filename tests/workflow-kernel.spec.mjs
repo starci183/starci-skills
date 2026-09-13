@@ -905,6 +905,11 @@ test('the items an older rule parked for the owner are judged again under the cu
     assert.notEqual(byId('repair-x').status,'blocked');
     // The spent review is escalated inside the runtime: one repair, and a provisional question because the finding cites no decided record.
     assert.ok(log.some(event=>event.event==='verify-escalated'&&event.component===node.id&&event.hidden===true));
+    // The hidden decision is prepared by the kernel, so it is a decision.prepare whatever its finding mentions.
+    const hidden=state2.ops.find(item=>item.kind==='decision.prepare'&&/keeps failing and its findings cite no decided record/.test(item.question?.text??''));
+    assert.ok(hidden,'the hidden decision is a decision.prepare, never a provision');
+    assert.equal(hidden.question.prepared,true);
+    assert.equal(state2.ops.some(item=>item.kind==='provision.ask'),false);
     assert.ok(state2.ops.some(item=>item.origin==='repair'&&item.ledgerIds.includes(node.id)&&item.id!==base.id),'the escalation is a repair op');
     // What is genuinely the owner's stays; everything mechanical is gone from the list.
     const kinds=state2.needUser.map(item=>item.kind);

@@ -1396,7 +1396,10 @@ function escalateVerify(store,state,ctx,{key,ledgerIds,findings,op}){
       if(!cited.length){
         store.appendEvent({event:'verify-hidden-decision',group:key,component:key,rounds:state.verifyRounds[key]??0,
           findings:findings.slice(0,3),op:repair.id});
-        openOwnerAsk(store,state,repair,{kind:'hidden-decision',
+        // Prepared by the kernel, so provisional by construction: the sentence quotes the finding, and a finding that
+        // mentions a token or a bank is what the decision is ABOUT, never a request for one (two hidden decisions of
+        // the chatbot review were once read as credential questions and waited for the owner over nothing).
+        openOwnerAsk(store,state,repair,{kind:'hidden-decision',prepared:true,
           text:`The review of ${key} keeps failing and its findings cite no decided record: ${findings[0]??'no finding text'}. Which rule should hold here? State the numbered options and recommend one; the runtime takes the recommendation and carries on, and the owner may answer differently later.`,
           options:[]},ctx);
       }
@@ -1856,8 +1859,11 @@ const MECHANICAL_LINES=['shared-depth','ledger-path','environment','shared-chang
 function sweepStaleLines(store,state){
   const dropped=[];
   state.needUser=state.needUser.filter(item=>{
-    if(!item.op||!MECHANICAL_LINES.includes(item.kind))return true;
-    const op=byId(state,item.op);
+    if(!MECHANICAL_LINES.includes(item.kind))return true;
+    // A triage line carries its op inside the signature (`settled:<op>:<liveness>`) rather than as a field.
+    const opId=item.op??(item.kind==='triage'?(String(item.detail??'').match(/^[a-z-]+:([^:]+):/)??[])[1]:null);
+    if(!opId)return true;
+    const op=byId(state,opId);
     if(!op||op.status==='blocked')return true;
     dropped.push({kind:item.kind,op:op.id,status:op.status});return false;
   });
@@ -2113,9 +2119,15 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   }
   // The one `owner.ask` kind of earlier builds is two kinds now: a state written before the split is renamed on
   // start by what its question is - a provision waits (`provision.ask`), everything else is prepared (`decision.prepare`).
-  for(const op of state.ops.filter(item=>item.kind==='owner.ask')){
-    const kind=STOP_KINDS.includes(op.question?.kind)?PROVISION_ASK:DECISION_PREPARE;
-    store.appendEvent({event:'kind-renamed',op:op.id,from:'owner.ask',to:kind});
+  const HIDDEN_DECISION=/^The review of \S+ keeps failing and its findings cite no decided record/;
+  for(const op of state.ops.filter(item=>item.kind==='owner.ask'||(item.kind===PROVISION_ASK&&HIDDEN_DECISION.test(String(item.question?.text??''))&&!['done','failed'].includes(item.status)))){
+    // A hidden decision the kernel raised is a prepared question whatever its sentence mentions; an earlier rule
+    // read one as a credential request. It is a decision.prepare, and its question says so.
+    const hidden=HIDDEN_DECISION.test(String(op.question?.text??''));
+    if(hidden&&plain(op.question))op.question={...op.question,kind:'hidden-decision',prepared:true};
+    const kind=!hidden&&STOP_KINDS.includes(op.question?.kind)?PROVISION_ASK:DECISION_PREPARE;
+    if(op.kind===kind)continue;
+    store.appendEvent({event:'kind-renamed',op:op.id,from:op.kind,to:kind,...(hidden?{hidden:true}:{})});
     op.kind=kind;
   }
   // An op the validator exhausted gets one more round on a fresh kernel start: the validator's rules may have changed.
