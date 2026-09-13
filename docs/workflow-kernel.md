@@ -509,6 +509,50 @@ not used in the kernel's own `launched` event** (`allocation.notAllocated`), nev
 attempt. Allocation itself is kept inside `allocator.launchableTargets(kind)`, so a runtime whose role has
 no profile for that operation is never chosen and then rejected.
 
+## Runtimes are shared across workflows
+
+Several workflows of one repository run at once, each with its own kernel and its own allocator, and the
+expensive runtimes are split across them, not owned by one. One file says so: the shared runtime ledger
+`<workflowsRoot>/runtime-loads.json` (`execution/runtime-loads.mjs`, schema `starci/runtime-loads@1`), beside
+the workflow directories every kernel of the repository already shares.
+
+```json
+{"schema":"starci/runtime-loads@1","runtimes":{"claude-fable-5.1":{
+  "live":[{"workflow":"20260912-101500-nivo-setup","op":"op-decide","since":1789000000000}],
+  "cooling":{"until":1789000600000,"reason":"HTTP 429","kind":"rate-limited","workflow":"20260912-101500-nivo-setup"},
+  "usedToday":3,"day":"2026-09-12"}}}
+```
+
+The kernel records a launch (the allocation was accepted **and** the operation actually launched), a release or
+a failure, and a provider cooldown; at start it drops its own leftovers - entries of this workflow whose
+operation is no longer running (`runtime-loads-swept`). Writes are atomic (temp file, rename) under a `.lock`
+beside the file carrying pid and timestamp, retried with short waits and broken when it is stale (30 s) or its
+pid is dead. Entries of a workflow whose kernel is dead - no live pid in its `kernel.lock` - are ignored on
+read and dropped on the next write, so a crashed kernel never holds a slot of Fable for the others. A
+cooldown outlives the kernel that found it: the limit belongs to the provider.
+
+What it changes in allocation, with `createAllocator({shared:{path, workflow}})`:
+
+- another kernel's live operations on a runtime count as **load**, so `maxParallel` is the runtime's cap across
+  the repository instead of per workflow;
+- a cooldown another kernel ran into is a cooldown here (`runtime-cooling-shared {runtime, until, from}`, once
+  per learned cooldown); only provider limits are published - a rate limit and an exhausted quota - while an
+  auth or local failure stays the kernel's own;
+- among the candidates that all qualify - role, free slot, budget, no cooldown - the one **no other kernel is
+  using** wins, and inside one shared load the local order decides (preference, then ratio, then chain order).
+  So a second workflow's hard operation goes to Astra while Fable carries the first one's, and the receipt says
+  so: `allocation-shared {op, runtime, preferredOver:[...], sharedLoad:{runtime:n}}`.
+
+The quota proposal reads the same file: when the first runtime of a kind's launch chain carries live operations
+of another workflow, the next chain runtime that has the role is proposed a slot too, with the reason in the
+row (`... is busy with <workflow>`), so a lane opened while another lane is on Fable proposes Astra without the
+owner saying "prefer Astra, Fable is busy".
+
+What it never changes: **a workflow's own quota.** The slots and order the user approved stay that workflow's
+cap, the per-workflow `maxParallelOps` is unchanged, and nothing shared ever widens them. And the ledger is
+never a gate: an unreadable, missing or foreign file reads as nothing shared, so allocation degrades to the
+local behaviour and a launch is never blocked by it.
+
 ## The operation contract
 
 `renderContract` owns every concrete value - the lane line (`Lane: interface.draw -> frontend.implement ->

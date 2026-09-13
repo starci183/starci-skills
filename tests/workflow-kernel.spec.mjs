@@ -10,13 +10,16 @@ import {buildReport} from '../execution/reports.mjs';
 import {spawnSync} from 'node:child_process';
 import {validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
 import {createStore} from '../execution/workflow-store.mjs';
+import {createAllocator} from '../execution/runtime-allocator.mjs';
+import {loadsFileFor} from '../execution/runtime-loads.mjs';
 import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,operationSpec,queueInbox,rebindRunIfNeeded,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,operationSpec,queueInbox,rebindRunIfNeeded,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
+const runtimeProfile=parseYaml(fs.readFileSync(new URL('../profiles/runtimes.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';
 const cwd=path.resolve(worktree);
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
@@ -2350,4 +2353,56 @@ test('with validateOp:null the step is skipped once on the record, and the kerne
     assert.equal(state.ops[0].validation,null);
     assert.ok(!fs.existsSync(path.join(harness.store.dir,'validator')));
   }finally{harness.cleanup();}
+});
+
+test('the kernel holds its launch in the repository runtime ledger and clears the entry when the report is accepted',()=>{
+  // The one test that runs the real allocator: what it writes into the shared ledger is the contract between
+  // the kernels of a repository, and a fake cannot prove it.
+  const scripts={'op-intake':[]};
+  const harness=setup({plan:salesPlan,dirty:[intakeFile],scripts});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const file=loadsFileFor(harness.store.dir);
+    assert.equal(path.dirname(file),path.dirname(harness.store.dir));
+    const allocator=createAllocator({runtimes:runtimeProfile,now:()=>Date.UTC(2026,8,12,9),
+      shared:{path:file,workflow:harness.store.id}});
+    harness.run({allocator,maxIterations:1});
+    const launched=events(harness.store).find(event=>event.event==='launched');
+    assert.equal(launched.op,'op-intake');
+    const ledger=()=>JSON.parse(fs.readFileSync(file,'utf8'));
+    assert.equal(ledger().schema,'starci/runtime-loads@1');
+    assert.deepEqual(ledger().runtimes[launched.runtime].live.map(item=>[item.workflow,item.op]),
+      [[harness.store.id,'op-intake']]);
+    assert.equal(ledger().runtimes[launched.runtime].usedToday,1);
+    // The report lands: the slot is released locally and the entry leaves the shared ledger with it.
+    scripts['op-intake'].push(doneReport(intakeFile,'sales'));
+    harness.run({allocator,maxIterations:2});
+    assert.equal(harness.state.ops.find(op=>op.id==='op-intake').status,'done');
+    assert.deepEqual(ledger().runtimes[launched.runtime].live.filter(item=>item.op==='op-intake'),[]);
+    assert.equal(ledger().runtimes[launched.runtime].usedToday,1);
+  }finally{harness.cleanup();}
+});
+
+test('the quota proposal opens the next chain runtime when the first one is busy with another workflow',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-quota-loads-'));
+  t.after(()=>{fs.rmSync(root,{recursive:true,force:true});});
+  const other='20260912-100000-other';
+  fs.mkdirSync(path.join(root,other),{recursive:true});
+  fs.writeFileSync(path.join(root,other,'kernel.lock'),JSON.stringify({pid:process.pid,startedAt:1}));
+  const state={id:'20260912-104251-mine',dir:path.join(root,'20260912-104251-mine'),
+    ops:[{id:'op-decide',kind:'architecture.decide',status:'pending',difficulty:'hard'}]};
+  // Alone in the repository the proposal names Fable, the first runtime of the decide chain, and nothing else.
+  const alone=proposeQuota(state);
+  assert.equal(alone.rows.some(row=>row.runtime==='gpt-6-astra'),false);
+  assert.equal(alone.rows.find(row=>row.runtime==='claude-fable-5.1').slots,1);
+  fs.writeFileSync(loadsFileFor(state.dir),JSON.stringify({schema:'starci/runtime-loads@1',
+    runtimes:{'claude-fable-5.1':{live:[{workflow:other,op:'op-other',since:1}],cooling:null,usedToday:1,day:new Date().toISOString().slice(0,10)}}}));
+  const shared=proposeQuota(state);
+  const astra=shared.rows.find(row=>row.runtime==='gpt-6-astra');
+  assert.equal(astra.slots,1);
+  assert.match(astra.why,/claude-fable-5\.1 is busy with 20260912-100000-other/);
+  assert.match(shared.text,/gpt-6-astra=1/);
+  // A lane is added, never taken away: the busy runtime keeps the slot this workflow's own quota gives it.
+  assert.equal(shared.rows.find(row=>row.runtime==='claude-fable-5.1').slots,1);
 });

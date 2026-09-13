@@ -1,6 +1,7 @@
 import {readDistJson} from '../core/runtime-root.mjs';
 import {resolveExecutionChain} from '../profiles/select.mjs';
 import {roleOf} from './kind-graph.mjs';
+import {SHARED_COOLING_KINDS,createLoadsLedger} from './runtime-loads.mjs';
 
 /**
  * Runtime allocation: pools with slots and budgets instead of an ordered provider chain. The kernel asks
@@ -8,6 +9,13 @@ import {roleOf} from './kind-graph.mjs';
  * the role, a free slot, a daily budget and no cooldown - and records loads so a saturated provider never
  * blocks the pool. A launch that fails is classified and the pool cools down with exponential backoff, so a
  * rate limit parks one runtime instead of stalling the workflow. All time comes from the injected `now`.
+ *
+ * Expensive runtimes are split across the workflows of a repository, not owned by one. With `shared:{path,
+ * workflow}` the allocator reads the repository's shared ledger (`execution/runtime-loads.mjs`) before it
+ * chooses: another kernel's live operations on a runtime count as load, so `maxParallel` holds across kernels,
+ * a cooldown another kernel ran into is a cooldown here too, and among candidates that all qualify the one no
+ * other kernel is using wins - which is how a second workflow's hard operation reaches Astra while Fable
+ * carries the first one's. Nothing shared ever widens a workflow's quota: that cap stays the workflow's own.
  *
  * Two policies order the eligible set. `prefer-then-overflow` (the shipped one) reads `allocation.preference`
  * per role and hands every operation the first preferred runtime that is eligible, so work concentrates on
@@ -87,7 +95,14 @@ export function applyQuota(runtimes,quota){
   return copy;
 }
 
-export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null}={}){
+/** The shared ledger handle: an already built one is used as it is, `{path, workflow}` opens one, null is local-only. */
+function sharedLedgerOf(shared,now){
+  if(!plain(shared))return null;
+  if(typeof shared.read==='function')return shared;
+  try{return createLoadsLedger({path:shared.path,workflow:shared.workflow,now});}catch{return null;}
+}
+
+export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null,shared=null}={}){
   runtimes=applyQuota(runtimes,quota);
   need(plain(runtimes)&&plain(runtimes.runtimes),'Runtime allocation needs a runtimes profile with a runtimes map');
   const pools=runtimes.runtimes,ids=Object.keys(pools),allocation=plain(runtimes.allocation)?runtimes.allocation:{};
@@ -99,6 +114,25 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const policy=typeof allocation.policy==='string'?allocation.policy:LEAST_LOADED;
   const preference=plain(allocation.preference)?allocation.preference:{};
   const live=adoptState(state,utcDay(now()));
+  const ledger=sharedLedgerOf(shared,now);
+  const workflow=ledger?.workflow??null;
+  /** Cooldowns learned from another kernel, drained by the caller so it can record them once. */
+  const notices=[],announced=new Map();
+  const EMPTY_SHARED={ok:false,loads:{},ops:{},cooling:{}};
+  /** The other kernels' view, re-read per review: a tick is minutes long and the file is a few hundred bytes. */
+  const outside=()=>{
+    if(!ledger)return EMPTY_SHARED;
+    let view=EMPTY_SHARED;
+    try{view=ledger.read();}catch{return EMPTY_SHARED;}
+    for(const [id,cool] of Object.entries(view.cooling)){
+      if(!cool.workflow||cool.workflow===workflow||announced.get(id)===cool.until)continue;
+      announced.set(id,cool.until);
+      notices.push({runtime:id,until:cool.until,wakeAt:new Date(cool.until).toISOString(),reason:cool.reason,kind:cool.kind,from:cool.workflow});
+    }
+    return view;
+  };
+  /** A write to the shared ledger is never fatal: a ledger this kernel cannot write is a local allocator. */
+  const note=(method,payload)=>{if(!ledger)return null;try{return ledger[method](payload);}catch{return null;}};
 
   const rollDay=()=>{const today=utcDay(now());if(today===live.day)return;live.day=today;live.usedToday={};live.tokensToday={};};
   const slots=id=>Math.max(0,finite(pools[id]?.maxParallel,1));
@@ -130,30 +164,43 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const review=(kind,{avoid=[],restrictTo=null,difficulty=null}={})=>{
     rollDay();
     const role=roleFor(kind),ready=[],blocked=[],order=preferenceOf(role,difficulty);
+    const view=outside();
+    // Another kernel's live operations are load here too, so `maxParallel` is the runtime's cap across the
+    // whole repository and not per workflow; a cooldown it recorded parks the runtime for this kernel as well.
+    const elsewhere=id=>view.loads[id]??0;
+    const sharedCooling=id=>{const entry=view.cooling[id];return entry&&entry.until>now()?entry:null;};
     for(const id of ids){
-      const pool=pools[id],cool=cooling(id),free=slots(id)-load(id);
+      const pool=pools[id],cool=cooling(id),parked=sharedCooling(id),held=elsewhere(id),free=slots(id)-load(id)-held;
       const tier=difficulty&&Array.isArray(tiers[difficulty])?tiers[difficulty]:null;
       const reason=!Array.isArray(pool?.roles)||!pool.roles.includes(role)?`no ${role} role`
         :tier&&tier.length&&!tier.includes(id)?`outside the ${difficulty} tier`
         :avoid.includes(id)?'avoided'
         :Array.isArray(restrictTo)&&!restrictTo.includes(id)?'not launchable for this operation'
         :cool?`cooling after ${cool.kind} until ${new Date(cool.until).toISOString()}`
+        :parked?`cooling after a shared ${parked.kind??'provider limit'} until ${new Date(parked.until).toISOString()}, seen by ${parked.workflow??'another workflow'}`
         :free<=0?'no free slot'
         :opsLeft(id)<=0?'daily op budget exhausted'
         :tokensLeft(id)<=0?'daily token budget exhausted'
         :null;
-      if(reason){blocked.push({runtime:id,reason});continue;}
-      ready.push({runtime:id,target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null});
+      // The shared detail travels beside the reason, never inside it: the kernel reads these reasons by shape.
+      if(reason){blocked.push({runtime:id,reason,...(held?{sharedLoad:held}:{}),...(parked&&!cool?{shared:true,from:parked.workflow??null}:{})});continue;}
+      ready.push({runtime:id,target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held});
     }
     // prefer-then-overflow: the first eligible runtime of the role's order wins, so a saturated or cooling
     // preference simply is not in `ready` and the next one takes the operation without any special case.
     // A difficulty tier with ratio fill spreads its operations in proportion to the slots (4:1), then keeps the order;
     // otherwise the order itself is the fill (prefer, then overflow).
     const tierRatio=difficulty&&allocation.tierFill==='ratio'&&Array.isArray(tiers[difficulty]);
-    if(order&&tierRatio)ready.sort((a,b)=>cmp(a.ratio,b.ratio)||cmp(a.preference,b.preference)||cmp(b.free,a.free)||cmp(a.rotation,b.rotation));
-    else if(order)ready.sort((a,b)=>cmp(a.preference,b.preference)||cmp(a.ratio,b.ratio)||cmp(b.free,a.free)||cmp(a.rotation,b.rotation));
-    else ready.sort((a,b)=>cmp(a.ratio,b.ratio)||cmp(b.free,a.free)||cmp(b.opsLeft,a.opsLeft)||cmp(a.rotation,b.rotation));
-    return {kind,role,ready,blocked,preference:order};
+    const locally=order&&tierRatio?(a,b)=>cmp(a.ratio,b.ratio)||cmp(a.preference,b.preference)||cmp(b.free,a.free)||cmp(a.rotation,b.rotation)
+      :order?(a,b)=>cmp(a.preference,b.preference)||cmp(a.ratio,b.ratio)||cmp(b.free,a.free)||cmp(a.rotation,b.rotation)
+      :(a,b)=>cmp(a.ratio,b.ratio)||cmp(b.free,a.free)||cmp(b.opsLeft,a.opsLeft)||cmp(a.rotation,b.rotation);
+    // What this kernel alone would have picked, kept so the receipt can name what the shared view passed over.
+    const localRanked=ledger?[...ready].sort(locally).map(item=>item.runtime):null;
+    // The shared key comes first and nothing else changes: a runtime no other kernel is using beats an equally
+    // capable one that carries another workflow's operation, and inside one shared load the local order decides.
+    ready.sort(ledger?(a,b)=>cmp(a.sharedLoad,b.sharedLoad)||locally(a,b):locally);
+    return {kind,role,ready,blocked,preference:order,localRanked,
+      shared:ledger?{workflow,loads:{...view.loads},cooling:{...view.cooling}}:null};
   };
 
   return {
@@ -165,36 +212,48 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     review,
     /** Pick the runtime for one operation; `avoid` is absolute, `restrictTo` limits the pools to launchable targets. */
     allocate(kind,{avoid=[],restrictTo=null,difficulty=null}={}){
-      const {role,ready,blocked,preference:order}=review(kind,{avoid,restrictTo,difficulty});
+      const {role,ready,blocked,preference:order,localRanked,shared:sharedView}=review(kind,{avoid,restrictTo,difficulty});
       if(inFlight()>=maxParallelOps)return {ok:false,kind,role,avoid,blocked,reason:`maxParallelOps ${maxParallelOps} is already in flight; release a slot before allocating ${kind}`};
       if(!ready.length)return {ok:false,kind,role,avoid,blocked,reason:`no runtime with the ${role} role, a free slot and budget for ${kind}: ${blocked.map(item=>`${item.runtime} (${item.reason})`).join(', ')||'no pool declares that role'}`};
       const chosen=ready[0];
       live.loads[chosen.runtime]=chosen.load+1;
       live.usedToday[chosen.runtime]=(live.usedToday[chosen.runtime]??0)+1;
       live.lastAllocated=chosen.runtime;
+      // Everything the local order ranked ahead of the chosen runtime was passed over for one reason only: it
+      // carries another kernel's operations. An empty list means the shared view changed nothing.
+      const preferredOver=localRanked?localRanked.slice(0,Math.max(0,localRanked.indexOf(chosen.runtime))):[];
+      const sharedLoad=Object.fromEntries(ready.filter(item=>item.sharedLoad>0).map(item=>[item.runtime,item.sharedLoad]));
       return {ok:true,kind,role,runtime:chosen.runtime,target:chosen.target,load:chosen.load+1,slots:chosen.slots,
         remaining:remainingOf(chosen.runtime),alternatives:ready.slice(1).map(item=>item.runtime),blocked,at:now(),
-        policy,preference:order,overflowed:Boolean(order)&&chosen.preference>0};
+        policy,preference:order,overflowed:Boolean(order)&&chosen.preference>0,
+        ...(ledger?{shared:{workflow,loads:sharedView?.loads??{}},sharedLoad,preferredOver}:{})};
     },
     /** Independent review: the implement runtime is excluded while `verifyAvoidsImplementRuntime` holds. */
     allocateVerify(kind,{implementRuntime=null,avoid=[],restrictTo=null,difficulty=null}={}){
       const strict=allocation.verifyAvoidsImplementRuntime!==false;
       return this.allocate(kind,{avoid:strict&&implementRuntime?[...avoid,implementRuntime]:avoid,restrictTo,difficulty});
     },
+    /** An operation the kernel actually launched: the shared ledger carries it until it is released or fails. */
+    launched(runtime,{op=null}={}){
+      need(Object.hasOwn(pools,runtime),`Unknown runtime ${runtime}`);
+      const recorded=op?note('launched',{runtime,op}):null;
+      return {ok:true,runtime,op,shared:Boolean(recorded?.ok)};
+    },
     /** An operation that finished: free the slot, charge the tokens it used and clear the failure streak. */
-    release(runtime,{tokens=0}={}){
+    release(runtime,{tokens=0,op=null}={}){
       rollDay();
       need(Object.hasOwn(pools,runtime),`Unknown runtime ${runtime}`);
       live.loads[runtime]=Math.max(0,load(runtime)-1);
       spend(runtime,tokens);
       delete live.streaks[runtime];
+      note('released',{runtime,op});
       return {ok:true,runtime,load:load(runtime),remaining:remainingOf(runtime)};
     },
     /**
      * A launch or an operation failed: free the slot, refund the op (it produced nothing) and cool the pool
      * down for the classified reason, doubling the wait per consecutive failure up to `maxCooldownMs`.
      */
-    failed(runtime,{reason='',tokens=0}={}){
+    failed(runtime,{reason='',tokens=0,op=null}={}){
       rollDay();
       need(Object.hasOwn(pools,runtime),`Unknown runtime ${runtime}`);
       live.loads[runtime]=Math.max(0,load(runtime)-1);
@@ -207,12 +266,26 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
       const until=now()+wait;
       live.streaks[runtime]=failures;
       live.cooling[runtime]={kind,until,cooldownMs:wait,reason:String(reason).slice(0,200)||null};
-      return {ok:false,runtime,kind,failures,cooldownMs:wait,until,wakeAt:new Date(until).toISOString()};
+      note('released',{runtime,op});
+      // A provider limit belongs to the provider, not to this workflow: a rate limit and an exhausted quota are
+      // published so the other kernels skip the runtime too. An auth or local failure stays this kernel's own.
+      if(SHARED_COOLING_KINDS.includes(kind))note('cooled',{runtime,until,reason:String(reason).slice(0,200)||null,kind});
+      return {ok:false,runtime,kind,failures,cooldownMs:wait,until,wakeAt:new Date(until).toISOString(),shared:SHARED_COOLING_KINDS.includes(kind)&&Boolean(ledger)};
     },
+    /** The shared ledger of this repository, or null when this allocator is the only one of its runtimes. */
+    sharedLedger:ledger,
+    /** What the other kernels hold right now: `{loads, ops, cooling}`, empty when there is no shared ledger. */
+    sharedView(){return ledger?outside():EMPTY_SHARED;},
+    /** At start: drop this workflow's own leftovers - ledger entries of operations that are no longer running. */
+    sharedSync(ops=[]){return ledger?note('sync',{ops}):null;},
+    /** Cooldowns learned from another kernel since the last call; the kernel records each one once. */
+    takeSharedNotices(){return notices.splice(0,notices.length);},
     /** What the kernel prints and logs: loads, remaining budget per pool and every cooling runtime's wake time. */
     snapshot(){
       rollDay();
+      const view=ledger?outside():null;
       return {
+        ...(view?{shared:{workflow,loads:{...view.loads},cooling:{...view.cooling}}}:{}),
         schema:ALLOCATION,day:live.day,policy,preference:Object.fromEntries(Object.entries(preference).filter(([,list])=>Array.isArray(list)).map(([role,list])=>[role,[...list]])),
         maxParallelOps,inFlight:inFlight(),lastAllocated:live.lastAllocated,
         runtimes:Object.fromEntries(ids.map(id=>[id,{roles:[...(pools[id].roles??[])],slots:slots(id),load:load(id),free:Math.max(0,slots(id)-load(id)),usedToday:live.usedToday[id]??0,tokensToday:live.tokensToday[id]??0,remaining:remainingOf(id)}])),

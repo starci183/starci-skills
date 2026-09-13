@@ -10,6 +10,7 @@ import {validateReport} from './reports.mjs';
 import {WORKFLOW_STATE,createStore,listWorkflows,newWorkflowId,repositoryRoot,workflowsRoot} from './workflow-store.mjs';
 import {grammarRepository,resolveLedgerRoot,samePath,sharedLedgerStatus} from './ledger-routing.mjs';
 import {createAllocator,loadRuntimes} from './runtime-allocator.mjs';
+import {loadsFileFor,readLoads} from './runtime-loads.mjs';
 import {resolveExecutionChain} from '../profiles/select.mjs';
 import {proofFinding,proofPlan,runAtBase} from './verify-proof.mjs';
 import {stepsFor} from './contract-steps.mjs';
@@ -921,7 +922,7 @@ export function syncLedgerOps(store,state,ctx){
     if(!foreign||foreign===ctx.work.code.repository)continue;
     if(liveStatus.includes(op.status)&&op.dispatch&&ctx.orca){
       settleDispatch(ctx.orca,op.dispatch,{cwd:state.worktree,reason:'out-of-repository',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
-      if(op.runtime)ctx.allocator.release(op.runtime);
+      if(op.runtime)ctx.allocator.release(op.runtime,{op:op.id});
     }
     op.status='blocked';op.refusal='out-of-repository';op.dispatch=null;op.terminal=null;
     for(const item of state.ledger)if(item.id===op.nodeId)item.status='out-of-repository';
@@ -1280,8 +1281,16 @@ function workGoalMarkdown(state,loaded){
 }
 
 /** The one human gate of the runtime: nothing is launched until the plan is approved. */
+/** The launch chain of one operation kind, in order, or nothing when the registry cannot resolve it. */
+function chainTargets(kind){
+  try{return resolveExecutionChain({skill:'starci',op:launchOperator(kind)}).candidates.map(candidate=>candidate.target);}catch{return [];}
+}
+/** The repository's shared runtime ledger as this workflow sees it; an unreadable one is simply nothing shared. */
+function sharedLoadsOf(state){
+  try{return readLoads({path:loadsFileFor(state.dir),workflow:state.id});}catch{return null;}
+}
 /** A quota proposal from the difficulty mix: hard/medium operations lean on the strongest runtimes, easy ones on the cheapest. The user always sets the final numbers. */
-export function proposeQuota(state,{runtimes=null}={}){
+export function proposeQuota(state,{runtimes=null,shared=undefined}={}){
   const profile=runtimes??(()=>{try{return loadRuntimes();}catch{return null;}})();
   const ops=state.ops.filter(op=>op.status!=='done');
   const hard=ops.filter(op=>op.difficulty==='hard').length,easy=ops.filter(op=>op.difficulty==='easy').length,medium=ops.length-hard-easy;
@@ -1305,12 +1314,27 @@ export function proposeQuota(state,{runtimes=null}={}){
   // ... and every kind's launch chain: a kind whose chain is [fable, astra] cannot run on a quota that names
   // only Sol, Opus and Qwen, whatever their roles. The first runtime of the chain gets a slot.
   for(const kind of unique(ops.map(op=>op.kind).filter(Boolean))){
-    let targets=[];
-    try{targets=resolveExecutionChain({skill:'starci',op:launchOperator(kind)}).candidates.map(candidate=>candidate.target);}catch{targets=[];}
+    const targets=chainTargets(kind);
     if(!targets.length||rows.some(row=>row.slots>0&&targets.includes(row.runtime)))continue;
     const row=rows.find(item=>targets.includes(item.runtime));
     if(row){row.slots=Math.max(1,row.slots);row.why=`${row.why}; in the launch chain of ${kind}`;continue;}
     rows.push({runtime:targets[0],slots:1,tags:'hard+medium',why:`first of the launch chain of ${kind}`});
+  }
+  // ... and what the other workflows of this repository are already on: when the first runtime of a kind's chain
+  // carries another kernel's operations, the next chain runtime that has the role is proposed a slot as well, so a
+  // lane opened while another lane is on Fable proposes Astra without the owner having to say it.
+  const outside=shared===undefined?sharedLoadsOf(state):plain(shared)?shared:null;
+  for(const kind of unique(ops.map(op=>op.kind).filter(Boolean))){
+    const targets=chainTargets(kind);
+    const first=targets[0];
+    const holder=first?(outside?.ops?.[first]??[])[0]?.workflow??null:null;
+    if(!holder)continue;
+    const role=kindRole(kind);
+    const next=targets.slice(1).find(id=>profile?.runtimes?.[id]&&(!role||rolesOf(id).includes(role)));
+    if(!next)continue;
+    const row=rows.find(item=>item.runtime===next);
+    if(row){row.slots=Math.max(1,row.slots);row.why=`${row.why}; ${first} is busy with ${holder}`;continue;}
+    rows.push({runtime:next,slots:1,tags:'hard+medium',why:`next in the launch chain of ${kind}: ${first} is busy with ${holder}`});
   }
   const text=rows.map(row=>`${row.runtime}=${row.slots}:${row.tags}`).join(',');
   const proposal={rows,text,summary:`${hard} hard, ${medium} medium, ${easy} easy of ${ops.length} operations; up to ${total} in parallel`};
@@ -1665,7 +1689,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
     task:launched?.task?.id??null,dispatch:launched?.dispatchId??null,stopReason:launched?.stopReason??null};
   if(!launched?.ok){
     op.launchFailures+=1;
-    ctx.allocator.failed(allocated.runtime,{reason:launched?.stopReason??'launch failed'});
+    ctx.allocator.failed(allocated.runtime,{reason:launched?.stopReason??'launch failed',op:op.id});
     op.avoidRuntimes=unique([...op.avoidRuntimes,allocated.runtime]);
     // The attempts travel with the event: a launch that failed is only diagnosable from what Orca said at each step.
     store.appendEvent({event:'launch-failed',op:op.id,runtime:allocated.runtime,stopReason:launched?.stopReason??null,attempts:launched?.attempts?.length??0,
@@ -1677,6 +1701,8 @@ function launchOp(orca,store,state,op,allocated,ctx){
     return {ok:false,reason:launched?.stopReason??'launch failed'};
   }
   op.status='running';op.runtime=allocated.runtime;op.target=allocated.target;
+  // The launch is what the other kernels of this repository must see: the allocation alone could still fail.
+  ctx.allocator.launched?.(allocated.runtime,{op:op.id});
   if(!op.baseHead){const shown=ctx.git('git',['rev-parse','HEAD'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});op.baseHead=shown.status===0?(shown.stdout??'').trim():null;}
   op.task=launched.task.id;op.dispatch=launched.dispatchId;op.terminal=launched.terminal;op.nudged=false;
   // A launch is an external effect: the state that names it is written before anything else can interrupt the kernel.
@@ -1836,10 +1862,13 @@ function scheduleOps(orca,store,state,ctx){
       }
       store.appendEvent({event:'allocation-deferred',op:op.id,reason,avoid});continue;
     }
+    // The shared view changed the choice: an equally capable runtime no other kernel is on took the operation.
+    if(allocated.preferredOver?.length)store.appendEvent({event:'allocation-shared',op:op.id,runtime:allocated.runtime,
+      preferredOver:allocated.preferredOver,sharedLoad:allocated.sharedLoad??{}});
     let candidate=null;
     try{candidate=allocated.candidate??ctx.allocator.candidateFor(launchOperator(op.kind),allocated.target);}
     catch(error){
-      ctx.allocator.failed(allocated.runtime,{reason:'not launchable'});
+      ctx.allocator.failed(allocated.runtime,{reason:'not launchable',op:op.id});
       op.avoidRuntimes=unique([...op.avoidRuntimes,allocated.runtime]);
       store.appendEvent({event:'allocation-rejected',op:op.id,runtime:allocated.runtime,reason:error.message});
       continue;
@@ -2973,7 +3002,7 @@ function acceptReports(orca,store,state,ctx){
     actions.push({op:op.id,action});
     state.stalls=0;
     if(op.status!=='answering'){
-      ctx.allocator.release(runtime);
+      ctx.allocator.release(runtime,{op:op.id});
       orca.invoke('worker-release',{dispatch},{cwd:state.worktree});
       sweepWorktree(orca,{cwd:state.worktree,from:state.from});
     }
@@ -3150,7 +3179,7 @@ function noteSilence(store,state,op,ctx){
   const window=[...(state.silences?.[runtime]??[]),at].filter(time=>at-time<=RATE_LIMIT_WINDOW_MS);
   state.silences={...(state.silences??{}),[runtime]:window};
   if(window.length<SILENCE_LIMIT)return false;
-  ctx.allocator.failed(runtime,{reason:'rate-limited (inferred from repeated silence)'});
+  ctx.allocator.failed(runtime,{reason:'rate-limited (inferred from repeated silence)',op:op.id});
   state.silences[runtime]=[];
   store.appendEvent({event:'rate-limit-inferred',op:op.id,runtime,silences:window.length,windowMs:RATE_LIMIT_WINDOW_MS});
   return true;
@@ -3169,8 +3198,8 @@ export function settleStalled(orca,store,state,ctx,tick){
     }
     if(!['stalled-prompt','stalled-silent','stalled-idle','dead','rate-limited'].includes(observed.liveness))continue;
     settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:observed.liveness,terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
-    if(observed.liveness==='rate-limited'){ctx.allocator.failed(op.runtime,{reason:`rate-limited (${observed.reason??'provider screen'})`});store.appendEvent({event:'rate-limit-parked',op:op.id,runtime:op.runtime});}
-    else ctx.allocator.release(op.runtime);
+    if(observed.liveness==='rate-limited'){ctx.allocator.failed(op.runtime,{reason:`rate-limited (${observed.reason??'provider screen'})`,op:op.id});store.appendEvent({event:'rate-limit-parked',op:op.id,runtime:op.runtime});}
+    else ctx.allocator.release(op.runtime,{op:op.id});
     if(observed.liveness==='stalled-silent'&&noteSilence(store,state,op,ctx))op.avoidRuntimes=unique([...op.avoidRuntimes,op.runtime].filter(Boolean));
     op.restarts+=1;
     store.appendEvent({event:'settled',op:op.id,liveness:observed.liveness,restarts:op.restarts});
@@ -3281,7 +3310,7 @@ export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=slee
     if(liveDispatches.has(op.dispatch)||(op.terminal&&handles.has(op.terminal)))continue;
     if(fs.existsSync(path.join(store.paths.reports,`${op.dispatch}.json`)))continue;
     const settlement=settleDispatch(orca,op.dispatch,{cwd,reason:'dead: no worker and no terminal',terminalHandle:op.terminal,closeTerminal:false,wait});
-    if(allocator&&op.runtime)allocator.release(op.runtime);
+    if(allocator&&op.runtime)allocator.release(op.runtime,{op:op.id});
     op.restarts+=1;
     dead.push({op:op.id,dispatch:op.dispatch,terminal:op.terminal,runtime:op.runtime,effectState:settlement.effectState,restarts:op.restarts});
     if(op.restarts>RESTART_LIMIT){
@@ -3502,6 +3531,10 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   // Operations created before a rule change carry their old check lists: the kernel-owned checks are stripped on load.
   for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
   reconcileWithOrca(orca,store,state,{cwd,wait,allocator});
+  // The shared runtime ledger is a repository-wide file: this kernel's own entries for operations that are no
+  // longer running are leftovers of a crashed start and would hold a slot of an expensive runtime for everybody.
+  const swept=allocator.sharedSync?.(state.ops.filter(op=>op.status==='running').map(op=>op.id));
+  if(swept?.dropped?.length)store.appendEvent({event:'runtime-loads-swept',dropped:swept.dropped});
   sweepTreeStrays(store,state,ctx);
   sweepStaleTerminals(orca,store,state,{cwd});
   state.buildStamp=buildStamp();
@@ -3522,6 +3555,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);planVerifyOps(store,state,ctx);})==='stop')break;
     if(guardedStage(store,state,ctx,'schedule',()=>scheduleOps(orca,store,state,ctx))==='stop')break;
     state.allocation=typeof allocator.serialize==='function'?allocator.serialize():allocator.snapshot?.()??null;
+    // A provider limit another kernel ran into is this kernel's limit too; it is recorded once, when it is learned.
+    for(const notice of allocator.takeSharedNotices?.()??[])
+      store.appendEvent({event:'runtime-cooling-shared',runtime:notice.runtime,until:notice.until,wakeAt:notice.wakeAt,from:notice.from,reason:notice.reason??null});
     const running=state.ops.filter(op=>op.status==='running');
     // Fast path: an operation whose report is already on disk is accepted before any blocking wait.
     let early=null;
@@ -3827,7 +3863,9 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const finished=(()=>{const release=acquireKernelLock(store);try{fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});return runLoop(orca,store,state,{cwd:worktree,wait,
       // Slots are derived from the operations that are actually running; saved loads may belong to a dead kernel.
       supervisor:supervisorRuntimes(state.host),validator:validatorRuntimes(state.host),
-      allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null}),template:templateOf(state.host),
+      // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
+      // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
+      allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(store.dir),workflow:state.id}}),template:templateOf(state.host),
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
     // The kernel's own tab is the Run's coordinator terminal, so it lives as long as the workflow: a pause or a

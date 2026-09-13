@@ -72,8 +72,10 @@ export function validateReport(report,{allowlist=null}={}){
   if(report.outcome==='failed'&&!(Array.isArray(report.checks)&&report.checks.some(check=>check.exitCode!==0))&&!(typeof report.summary==='string'&&report.summary.length>0))errors.push('failed requires a failing check or a summary');
   if(report.schema===WORKFLOW_REPORT&&['done','partial'].includes(report.outcome)&&(!report.branch||!report.head))errors.push('A workflow done/partial report needs branch and head');
   if(Array.isArray(allowlist)&&allowlist.length&&Array.isArray(report.files)){
-    const roots=allowlist.map(normalize);
-    for(const file of report.files)if(!roots.some(root=>file===root||file.startsWith(root.endsWith('/')?root:`${root}/`)))errors.push(`File outside the allowlist: ${file}`);
+    // An allowlist entry is a file or a folder root, written with or without a glob tail (`brand/**`, `src/*`):
+    // the tail names the folder, it is not part of the path a file must start with.
+    const roots=allowlist.map(entry=>normalize(entry).replace(/\/?\*+$/,'').replace(/\/+$/,''));
+    for(const file of report.files)if(!roots.some(root=>file===root||file.startsWith(`${root}/`)))errors.push(`File outside the allowlist: ${file}`);
   }
   if(report.signal?.type!==SIGNALS[report.outcome]?.type)errors.push('Signal does not match the outcome');
   return {ok:errors.length===0,errors};
