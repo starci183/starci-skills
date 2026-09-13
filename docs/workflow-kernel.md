@@ -15,6 +15,9 @@ orca-supervised-launch.mjs workflow-status  --id <id>
 orca-supervised-launch.mjs workflow-lane-close --id <id>
 ```
 
+Every command also takes `--host-adapter orca|headless` (default `orca`, or `headless` when `STARCI_HOST=headless`
+is set): see [Hosts: Orca and headless](#hosts-orca-and-headless-one-chat--one-workflow).
+
 `--allow-dynamic N` raises this workflow's run-time operation budget (default `DYNAMIC_OPS_BUDGET` = 64) and
 reinstates the operations the dynamic-op gate refused. Re-approving is how a user answers that gate.
 `--accept-critique "<reason>"` is how a user approves a goal whose critique returned `refuse` (see **Phases**).
@@ -687,6 +690,85 @@ those paths whole to `<store>/strays/<timestamp>/` (`stray-quarantined`), reads 
 valid again (`ledger-valid-again`) re-admits the ops the validator had exhausted only for a red whole-tree
 check (`op-readmitted`). One error on a tracked or owned path and nothing moves.
 
+## Hosts: Orca and headless (one chat = one workflow)
+
+The kernel runs on a **host**, and it reads exactly three things about it: a name, the capabilities it offers
+and whether it runs operations in parallel (`hostDescriptorOf(orca)`). Two hosts exist.
+
+- **Orca** - `execution/orca-calls.mjs`, `ORCA_HOST = {name:'orca', capabilities:['design-tool'], sequential:false}`:
+  the multi-agent IDE with terminals, a dispatch mailbox and a run coordinator, the runner every command always had.
+- **Headless** - `execution/orca-headless.mjs`, `HEADLESS_HOST = {name:'headless', capabilities:[], sequential:true}`:
+  the same `invoke(command, params, {cwd}) -> starci/orca-call-result@1` surface, answered with child processes
+  and files, so not one line of the kernel knows which host it is on. It is what a plain Claude Code chat or a
+  Codex chat uses to drive a workflow without Orca: **one chat = one workflow**, not multi-agent - operations
+  run one at a time as headless CLI processes (`claude -p`, `codex exec`, `qwen`) in the workflow's worktree.
+
+**Selection.** Every launcher command takes `--host-adapter orca|headless` (default `orca`); `headless` is also
+selected when `STARCI_HOST=headless` is in the environment, which is what the kernel sets on every operation
+process it spawns, so a child's own `report` reaches the host mailbox with no flag. `workflow-run` records the
+host as `state.hostAdapter`, and the supervisor starts the next kernel of that workflow with the same
+`--host-adapter`: a workflow never changes host behind the owner's back. The supervisor itself only spawns
+launchers, so `workflow-supervise` works on either host; on the headless one its budget probe reports
+`budget-probe-failed` with the host's reason (see `account list` below) and the last written budget stands.
+
+**What the headless host does with each call.** Its files live in `<store>/headless/` once the kernel has bound
+its workflow store (`bindStore`), and in `<repo>/.starciwork/_local/headless/` before one exists (a lane opened
+at goal time). A child process finds the same directory through `STARCI_HEADLESS_ROOT`; a `report` run by hand
+finds it beside the `--reports-dir` it was given.
+
+| call | headless answer |
+| --- | --- |
+| `worker-start` (managed agent) / `dispatch` (command terminal) | spawns the runtime's own headless command line from `HEADLESS_PROVIDERS` (`claude -p --output-format json`, `codex exec --json`, `qwen --approval-mode yolo ...`), detached, in the operation's worktree, with a short preamble (task, dispatch, terminal handle, "there is no `orca` here, skip the ping") plus the contract on stdin; stdout/stderr go to `<dispatch>.log`, the prompt to `<dispatch>.prompt.md`. Permissions are exactly what those command lines carry and nothing more. A launch asked for with no model passes none - the agent's own default, as Orca's `worker-start` without `--model` - and reports `model: null` back. A model no headless line exists for is a failed launch (`no headless command ...`), never a substitute |
+| `send` / `check` | `send` appends one line to `mailbox.jsonl`; `check` reads the unacknowledged messages of the run, hands them out under a delivery id, acknowledges a delivery on `--ack` and delivers an unacknowledged one again, so `singleTick` works unchanged. A blocking check ends when a message lands, when a process it watched exits, or at the timeout. A `--peek` for heartbeats answers one ping per live process: liveness is the heartbeat this host can vouch for |
+| `worker-list`, `task-list`, `terminal-list`, `dispatch-show`, `worker-show`, `run-*` | `table.json`, every pid checked alive on read. A dispatch stays listed until the kernel releases it, because the kernel settles only what it is shown. The run coordinator is the handle string the kernel gave (`term_h<n>`, its own synthetic terminal, found again by title on the next start) |
+| `terminal-create/read/send/rename/close` | handles in the table, no pty. A terminal's screen is made of the facts of its process: running for N minutes with the busy markers, exited (with the log tail), or past the wall-time bound (90 min, the same bound the Orca qwen command line carries) with no activity claimed. `send` to an exited process is a failed call, so the kernel records an answer as undelivered instead of believing a screen; `close` on a live process ends it - the terminal is the process here |
+| `worktree-create/set/show/rm` | `git worktree add -b workflow/<name> <repo>/.worktrees/lanes/<name> <base>`, a metadata write, `git rev-parse`, `git worktree remove` with the branch preserved |
+| `agent-context` | the calls contract itself, so `verify` passes |
+| `account list` | `outcome: 'unsupported'` with a reason, never a throw; `probeBudget()` returns `{ok:false, reason}` |
+
+**Sequential, by construction.** `createAllocator({sequential:true})` (`sequentialRuntimes`) caps
+`maxParallelOps` at 1 and every pool at one slot, after the quota is applied so no approved allocation widens
+it; `workflow-run` passes `host.sequential`, and the `host` event of every run says so. Two reasons, both
+structural: the operations are detached processes in one worktree with no terminal to supervise them from, so
+two of them would race on the same index and the allowlist arbitration a chat cannot see; and one chat drives
+one workflow - the owner reads one operation's outcome at a time. The scheduler's overlap, resource-lock and
+dependency rules still apply on top.
+
+**Liveness without a screen.** A headless process prints nothing until its turn ends, so the observer reads
+facts instead: a live pid inside the wall-time bound is `working` (and pings), a gone pid is `dead` (the kernel
+settles it and relaunches on another runtime, as for any dead worker), a live pid past the bound is
+`stalled-silent` and is settled the same way. An `ask` cannot be answered into a process that has already
+exited: the kernel's answer is recorded as undelivered, the op is relaunched, and the answer travels in the
+contract of that next attempt (`## Answer to the question you asked earlier`) - on every host alike.
+
+**Capabilities.** `profiles/kinds.yaml` may give a kind `needs: [<capability>]` from the closed vocabulary
+`capabilities` (`design-tool`; `CAPABILITIES` in `execution/kind-graph.mjs`, `needsOf(kind)`). `interface.draw`
+needs `design-tool`, which only Orca declares; every other kind runs anywhere. At schedule time an op whose kind
+needs what the host lacks is refused: `blocked` with `refusal: 'host-unsupported'`, one needUser item
+`{op, kind:'host', detail}`, event `op-host-unsupported {op, kind, host, missing}`, and the workflow carries on
+with everything else. On a frontend feature that means the design gate keeps holding the `frontend.implement`
+lane behind the ui node (`lane-waits-design`) - correctly: there is no drawing to build from - so the workflow
+finishes `blocked` naming the host item and the ledger items it could not verify. `workflow-approve` from a
+host that has the capability re-admits such ops (`op-readmitted {op, host}`), clears their host item and, as
+for any blocked finish, lets the supervisor start a kernel on that host; an approval from a host that still
+lacks it changes nothing. An approval queued to a *live* kernel (the inbox) is applied by that kernel on its
+own host, so the re-admission is given to a kernel on the capable host: stop the headless kernel, then approve
+from Orca.
+
+**Driving a workflow from a chat (Claude Code or Codex).** The assistant is the owner's hands, never an agent
+of the kernel:
+
+1. `workflow-goal --job "<text>" [--lane] --host-adapter headless` (or export `STARCI_HOST=headless` once);
+   the assistant reads `goal.md` back to the owner, who approves in the chat.
+2. `workflow-approve --id <id>` - the one human gate, unchanged.
+3. `workflow-run --id <id> --host-adapter headless` in the background (or `workflow-supervise --host <.claude>`
+   with `STARCI_HOST=headless`, which restarts the kernel after a crash or a rebuild exactly as on Orca).
+4. The assistant polls `workflow-status --id <id>` and the events, relays every `ask` the kernel escalated
+   (`needUser` kind `authority`) and every other needUser item (`host`, `ledger`, `environment`, ...) to the chat,
+   and the owner answers with the commands of the table below - `workflow-approve` again, an authored record, a
+   `workflow-stop`. `.starciwork/_local/workflows/<id>/headless/<dispatch>.log` is where an operation's process
+   left its output when the assistant needs to read one.
+
 ## Operating a running workflow
 
 Everything an operator does is a command or a file the kernel reads; nothing is a write to `state.json`, which
@@ -701,6 +783,7 @@ the kernel holds in memory and saves over at every tick.
 | read a workflow | `workflow-status --id <w>` | read-only |
 | clean up the worktree of a workflow that merged | `workflow-lane-close --id <w>` | `orca worktree rm --force` on the lane, branch preserved (`lane-closed`); refused while the kernel is alive or the lane is unmerged |
 | merge a lane the kernel could not merge | merge it yourself in the base worktree, then `workflow-approve --id <w>` | the conflict is in `lane-merge-conflict` and in the `merge` needUser item; the kernel never force-merges into a tree it does not own |
+| run a workflow from a chat, without Orca | `--host-adapter headless` on every command, or `STARCI_HOST=headless` once | one operation at a time as a headless process; a `host` needUser item names an op this host cannot run (see [Hosts](#hosts-orca-and-headless-one-chat--one-workflow)) |
 
 One thing that looks like a defect and is not: a workflow finishes `blocked` with every gate green when
 questions for the user remain - the gates say the code holds, the questions say what the owner still decides.

@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {parseYaml} from '../core/yaml.mjs';
-import {BLOCKERS,KINDS,KIND_GRAPH,LANE_BUILD,OUTCOMES,SAME,assertGraph,describeLane,familyOf,isReadOnly,
-  kindList,laneById,laneFor,laneRecordFor,mutationsOf,nextKind,operatorOf,predicatesOf,reportsOf,roleOf,
+import {BLOCKERS,CAPABILITIES,KINDS,KIND_GRAPH,LANE_BUILD,OUTCOMES,SAME,assertGraph,describeLane,familyOf,isReadOnly,
+  kindList,laneById,laneFor,laneRecordFor,mutationsOf,needsOf,nextKind,operatorOf,predicatesOf,reportsOf,roleOf,
   routeFor,routeList,validateGraph} from '../execution/kind-graph.mjs';
 
 const read=name=>parseYaml(fs.readFileSync(new URL(`../profiles/${name}`,import.meta.url),'utf8'));
@@ -345,4 +345,15 @@ test('the compiled profile is the one the kernel will read at run time',()=>{
   const compiled=JSON.parse(fs.readFileSync(dist,'utf8'));
   assert.deepEqual(compiled,profile);
   assert.deepEqual(validateGraph(compiled,{runtimes,operators}),[]);
+});
+
+test('a kind may need a host capability from the closed vocabulary: the drawing needs the design tool and every other kind runs on any host',()=>{
+  assert.deepEqual([...CAPABILITIES],['design-tool']);
+  assert.deepEqual(profile.vocabularies.capabilities,[...CAPABILITIES]);
+  assert.deepEqual(needsOf('interface.draw',{profile}),['design-tool']);
+  for(const kind of KINDS.filter(kind=>kind!=='interface.draw'))assert.deepEqual(needsOf(kind,{profile}),[],kind);
+  const unknown=clone();unknown.kinds['backend.implement'].needs=['orca-browser'];
+  assert.deepEqual(codes(validateGraph(unknown,{runtimes,operators})),['unknown-capability']);
+  const shape=clone();shape.kinds['backend.implement'].needs='design-tool';
+  assert.deepEqual(codes(validateGraph(shape,{runtimes,operators})),['needs-shape']);
 });

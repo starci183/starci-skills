@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
-import {getPath} from './orca-calls.mjs';
+import {ORCA_HOST,getPath} from './orca-calls.mjs';
 import {waitTick} from './orca-protocol.mjs';
 import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from './orca-supervised-launch.mjs';
 import {validateReport} from './reports.mjs';
@@ -1559,7 +1559,7 @@ export function proposeQuota(state,{runtimes=null,shared=undefined}={}){
   return proposal;
 }
 
-export function approve(store,state,{allocation=null,allowDynamic=null,acceptCritique=null}={}){
+export function approve(store,state,{allocation=null,allowDynamic=null,acceptCritique=null,host=null}={}){
   // A goal the critique refused is not approvable as it stands: either the question is answered and the goal is
   // written again, or the owner overrides the critique on the record. An override is the owner's own decision, so
   // it is taken once and never asked for again.
@@ -1583,6 +1583,17 @@ export function approve(store,state,{allocation=null,allowDynamic=null,acceptCri
     if(raised){
       for(const op of state.ops.filter(item=>item.status==='blocked'&&item.refusal==='dynamic-op')){op.status='pending';op.refusal=null;}
       state.needUser=state.needUser.filter(item=>item.kind!=='dynamic-op');
+    }
+  }
+  // An op a host refused for a capability it lacked is re-admitted the moment the approval comes from a host that
+  // has it: the refusal was the host's, not the op's, and this approval is on the record of which host gave it.
+  // Without a host descriptor (an approval that names none) nothing is assumed and the refusal stands.
+  if(plain(host)){
+    for(const op of state.ops.filter(item=>item.status==='blocked'&&item.refusal==='host-unsupported')){
+      if(hostMissing(host,op.kind).length)continue;
+      op.status='ready';op.refusal=null;op.dispatch=null;op.terminal=null;op.nudged=false;
+      state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&entry.kind==='host'));
+      store.appendEvent({event:'op-readmitted',op:op.id,reason:`the ${host.name} host has what ${op.kind} needs`,host:host.name});
     }
   }
   // A workflow that finished `blocked` stopped for the user's decision; the user approving it again IS that
@@ -1713,6 +1724,9 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     ...brandBlock(op,brand),
     ...(op.priorOpen.length?[`## Open items you inherit`,...op.priorOpen.map(item=>`- ${item}`),``]:[]),
     ...(op.findings.length?[`## Findings you must resolve`,...op.findings.map(item=>`- ${typeof item==='string'?item:JSON.stringify(item)}`),``]:[]),
+    // The answer to an `ask` is typed into the op's terminal on Orca; a headless process has already exited by
+    // then, so the answer reaches the op through the contract of its next attempt, on every host alike.
+    ...(typeof op.answer==='string'&&op.answer.trim()?[`## Answer to the question you asked earlier`,op.answer.trim(),`Act on it; do not ask the same question again.`,``]:[]),
     `## Acceptance`,...(op.acceptance.length?op.acceptance.map((item,index)=>`${index+1}. ${item}`):['1. the goal above holds']),``,
     stepsFor(op,{node:op.nodeId?state.ledger.find(item=>item.nodeId===op.nodeId)??null:null}),``,
     ...jobRulings(store),
@@ -1927,6 +1941,23 @@ export function launchWithCandidate(orca,{cwd,run,workflowTask,from,worktree,ope
     reason:'the runtime allocator assigned this operation to one runtime; the launcher was handed that candidate alone'}};
 }
 
+/**
+ * The host the kernel runs on, as the runner describes itself: Orca (`ORCA_HOST`) or the headless host. A runner
+ * that says nothing is Orca, which is what every runner before hosts existed was.
+ */
+export function hostDescriptorOf(orca){
+  const host=orca?.host;
+  if(!plain(host)||typeof host.name!=='string')return ORCA_HOST;
+  return {name:host.name,capabilities:Array.isArray(host.capabilities)?[...host.capabilities]:[],sequential:host.sequential===true};
+}
+/** The capabilities a kind needs that this host lacks; `[]` when the kind may run here (or the graph does not know it). */
+export function hostMissing(host,kind){
+  let needs=[];
+  try{needs=graph.needsOf(kind);}catch{needs=[];}
+  const offered=Array.isArray(host?.capabilities)?host.capabilities:[];
+  return needs.filter(capability=>!offered.includes(capability));
+}
+
 function launchOp(orca,store,state,op,allocated,ctx){
   if(op.needsReplan)replanOp(store,state,op,ctx);
   // A design operation derived before the brand was decided gets the record now: its references are the material
@@ -2110,6 +2141,17 @@ function scheduleOps(orca,store,state,ctx){
     if(foreignNodeOf(ctx,op)){
       op.status='blocked';op.refusal='out-of-repository';op.dispatch=null;op.terminal=null;
       store.appendEvent({event:'launch-refused',op:op.id,reason:'the node is delivered by another repository'});
+      continue;
+    }
+    // A kind that needs what this host does not have is refused here, not launched into a process that cannot do
+    // the work: the op is blocked with the one item that names the missing capability, everything else carries on,
+    // and approving the workflow again from a host that has it re-admits the op (`approve`).
+    const missing=hostMissing(ctx.host,op.kind);
+    if(missing.length){
+      op.status='blocked';op.refusal='host-unsupported';op.dispatch=null;op.terminal=null;
+      const detail=`${op.id} (${op.kind}) needs ${missing.join(', ')}, which the ${ctx.host.name} host does not have; approve the workflow again from a host that has it`;
+      if(!state.needUser.some(item=>item.op===op.id&&item.kind==='host'))state.needUser.push({op:op.id,kind:'host',detail});
+      store.appendEvent({event:'op-host-unsupported',op:op.id,kind:op.kind,node:op.nodeId??null,host:ctx.host.name,missing});
       continue;
     }
     const allocated=ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,launchOperator(op.kind)),difficulty:op.difficulty??null});
@@ -3778,14 +3820,16 @@ export function triageAnomaly(store,state,signature,ctx){
 export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,validateOp=llm.validateOp,template,supervisor=null,validator=null,
   wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
   ledgerApi=work,validate=validateWorkTree,ledgerRoot=null,resolveLedger=resolveLedgerRoot,
-  waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now}={}){
+  waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now,host=hostDescriptorOf(orca)}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   need(plain(allocator),'A runtime allocator is required');
   need(typeof template==='string'&&template.trim(),'The operation contract template is required');
   required(state.run,'Orca run id');required(state.from,'own terminal handle');
   // `validateOp:null` is an explicit choice to run without the validator; it is recorded once as `validator-skipped`.
-  const ctx={cwd,allocator,planOp,decide,validateOp,template,wait,exec,git,launch,now,guards,work:null,orca,
+  const ctx={cwd,allocator,planOp,decide,validateOp,template,wait,exec,git,launch,now,guards,work:null,orca,host:hostDescriptorOf({host}),
     supervisor:supervisor??supervisorRuntimes(state.host??''),validator:validator??validatorRuntimes(state.host??'')};
+  // Which host runs this workflow is a fact of the run: a sequential host names itself so the log says why one op ran at a time.
+  store.appendEvent({event:'host',name:ctx.host.name,capabilities:ctx.host.capabilities,sequential:ctx.host.sequential,maxParallelOps:allocator.maxParallelOps??null});
   // A state written before these bounds existed resumes with them.
   state.dynamicOps=state.ops.filter(item=>countsAgainstBudget(item)).length;
   state.dynamicOpsBudget=dynamicBudget(state);
@@ -4047,7 +4091,7 @@ function applyInbox(store,state,ctx){
     if(!plain(command))continue;
     if(command.kind==='approve'){
       const before={budget:dynamicBudget(state),quota:JSON.stringify(state.quota??null)};
-      approve(store,state,{allocation:command.allocation??null,allowDynamic:command.allowDynamic??null,acceptCritique:command.acceptCritique??null});
+      approve(store,state,{allocation:command.allocation??null,allowDynamic:command.allowDynamic??null,acceptCritique:command.acceptCritique??null,host:ctx.host});
       const quotaChanged=JSON.stringify(state.quota??null)!==before.quota;
       store.appendEvent({event:'inbox-applied',kind:'approve',allocation:command.allocation??null,allowDynamic:command.allowDynamic??null,budget:{from:before.budget,to:dynamicBudget(state)},quotaChanged});
       // The allocator was built from the quota at start: a new allocation takes effect at the next kernel start,
@@ -4158,12 +4202,12 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     }
     return {schema:WORKFLOW_KERNEL,command,dir:store.dir,
       ...approve(store,state,{allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null,
-        acceptCritique:options['accept-critique']??null})};
+        acceptCritique:options['accept-critique']??null,host:hostDescriptorOf(orca)})};
   }
   if(command==='workflow-status'){
     const {store,state}=open(options.id);
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:state.phase,approved:state.approved,
-      iterations:state.iterations,head:state.head,ledgerMode:state.ledgerMode,scope:state.scope,
+      iterations:state.iterations,head:state.head,ledgerMode:state.ledgerMode,scope:state.scope,hostAdapter:state.hostAdapter??null,
       worktree:slash(state.worktree),branch:state.branch,lane:laneView(state),
       ledgerRoot:state.ledgerRoot?slash(state.ledgerRoot):null,ledgerSource:state.ledgerSource??null,
       ledgerShared:Boolean(state.ledgerShared),ledgerOwner:state.ledgerOwner??null,codeSide:state.codeSide??null,
@@ -4183,6 +4227,11 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   if(command==='workflow-run'){
     const {store,state}=open(options.id);
     need(state.approved,`Workflow ${state.id} is not approved yet; run workflow-approve --id ${state.id}`);
+    const host=hostDescriptorOf(orca);
+    // A host that keeps files (the headless table, mailbox and dispatch logs) keeps them beside this workflow's own.
+    if(typeof orca?.bindStore==='function')orca.bindStore(store.dir);
+    // The supervisor starts the next kernel of this workflow on the same host, so the host is a fact of the state.
+    state.hostAdapter=host.name;
     const launchFile=options['launch-file']?path.resolve(worktree,options['launch-file']):store.paths.launch;
     let from=options.from??state.from,run=options.run??state.run;
     if(!from&&fs.existsSync(launchFile)){const launch=awaitLaunch(launchFile,{wait});from=launch.from;run=run??launch.run??null;state.workflowTask=launch.task??state.workflowTask;}
@@ -4205,7 +4254,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       supervisor:supervisorRuntimes(state.host),validator:validatorRuntimes(state.host),
       // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
       // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
-      allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(store.dir),workflow:state.id},budget:{path:path.dirname(store.dir)}}),template:templateOf(state.host),
+      // A sequential host (headless) caps the allocator at one operation whatever the approved quota says.
+      allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(store.dir),workflow:state.id},budget:{path:path.dirname(store.dir)},sequential:host.sequential}),template:templateOf(state.host),host,
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
     // The kernel's own tab is the Run's coordinator terminal, so it lives as long as the workflow: a pause or a

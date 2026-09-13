@@ -29,7 +29,9 @@ export function inspectWorkflow(entry,{now=Date.now}={}){
   const finished=Boolean(state?.finished);
   const approved=Boolean(state?.approved);
   const stopRequested=fs.existsSync(path.join(entry.dir,'stop.flag'));
-  return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null};
+  return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null,
+    // The host the last kernel of this workflow ran on: the next one is started on the same host, or it would bind a new Orca run over a headless table.
+    hostAdapter:typeof state?.hostAdapter==='string'&&state.hostAdapter?state.hostAdapter:null};
 }
 
 /** Decide, for one workflow, what the supervisor does this round. */
@@ -45,7 +47,8 @@ export function startKernel(info,{launcher,spawnFn=spawn,log=()=>{}}){
   if(!info.worktree)return {ok:false,reason:'the workflow state names no worktree'};
   // A workflow whose tree was named explicitly at goal time is reached the same way: its store follows that tree.
   const named=info.ledgerSource==='option'&&info.ledgerRoot?['--ledger-root',info.ledgerRoot]:[];
-  const args=[launcher,'workflow-run','--id',info.id,'--worktree','.','--host',info.host??'',...named].filter(Boolean);
+  const adapter=info.hostAdapter?['--host-adapter',info.hostAdapter]:[];
+  const args=[launcher,'workflow-run','--id',info.id,'--worktree','.','--host',info.host??'',...named,...adapter].filter(Boolean);
   // A kernel that dies must leave its last words: its stdout and stderr are appended to the workflow's own
   // kernel.log, so a crash after a gate round or a launch is readable the next morning instead of inferred.
   let out=null;
@@ -125,7 +128,12 @@ export function superviseForever({repoRoot,roots=null,launcher,pollMs=DEFAULT_PO
   }
 }
 
-export function supervisorMain(options,{cwd}){
+/**
+ * `runner` is the host the launcher selected (`--host-adapter`, `STARCI_HOST`): the supervisor only spawns
+ * launchers, so the one thing it takes from the host is the budget probe - a host that cannot read the provider
+ * quota answers with a reason and the last written budget stands, exactly as an unreachable Orca does.
+ */
+export function supervisorMain(options,{cwd,runner=null}){
   // The workflow store lives in the repository the worktree belongs to (git common dir), exactly as the kernel resolves it.
   const repoRoot=repositoryRoot(path.resolve(cwd));
   const roots=[repoRoot,path.resolve(cwd)];
@@ -136,5 +144,6 @@ export function supervisorMain(options,{cwd}){
   const log=event=>{const line=`${JSON.stringify({at:Date.now(),...event})}
 `;for(const file of logFiles){try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.appendFileSync(file,line);}catch{}}};
   if(options.once==='true')return superviseOnce({repoRoot,roots,launcher,log,only:options.id?[options.id]:null});
-  return superviseForever({repoRoot,roots,launcher,log,pollMs:Number(options['poll-ms']??DEFAULT_POLL_MS),healthMs:Number(options['health-ms']??DEFAULT_HEALTH_MS),probeMs:Number(options['probe-ms']??DEFAULT_PROBE_MS)});
+  const probe=typeof runner?.probeBudget==='function'?()=>runner.probeBudget():probeRuntimeBudget;
+  return superviseForever({repoRoot,roots,launcher,log,probe,pollMs:Number(options['poll-ms']??DEFAULT_POLL_MS),healthMs:Number(options['health-ms']??DEFAULT_HEALTH_MS),probeMs:Number(options['probe-ms']??DEFAULT_PROBE_MS)});
 }
