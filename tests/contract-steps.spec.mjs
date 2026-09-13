@@ -568,6 +568,9 @@ test('work.migrate declares the reconciliation and the integrations beside decid
   assert.match(listed[2],/`extensions\.work3\.integrations`/);
   assert.match(listed[2],/custody: identity:<slug>/);
   assert.match(listed[2],/Never a value/);
+  assert.match(listed[2],/The resource need not exist yet and you never create it/);
+  assert.match(listed[2],/A migration never asks for a shared change/);
+  assert.match(listed[1],/mirror the shape of an existing decision record of this tree/);
   assert.match(listed[3],/features\/<feature>\/integration\/<id>\/index\.yaml/);
   assert.match(listed[4],/nothing rewritten as a draft, nothing set to todo, nothing under implementation\/ or ui\/ touched/);
   assert.match(listed[5],/An error the validator reports under a path outside your allowlist is not yours/);

@@ -991,6 +991,34 @@ test('an op that lost its agent past the restart limit cools down and comes back
  * (asking for a Work path it had no business with) is settled on the marker: the requester carries the answer,
  * the ask is done, and nothing is sent to a terminal that may already be gone.
  */
+/**
+ * A record-authoring op writes records under its allowlist and nothing else. One that asks for a shared change -
+ * the identity resource it was only meant to declare, the code that reads the variable - is told the rule in its
+ * next attempt, and no shared op is opened on product code on its behalf.
+ */
+test('a record-authoring op that asks for a shared change is told the rule and runs again; no shared op opens on product code for it',()=>{
+  const harness=setup({plan:sharedPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state,{allowDynamic:9});
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const guards=stubGuards();
+    const ctx={cwd,allocator:harness.allocator,guards,git:harness.git.git,exec:()=>({status:0,stdout:'',stderr:''}),
+      now:()=>0,work:null,wait:noWait,decide:()=>{throw Error('a refused shared change is not a decision');}};
+    const intake=running(harness.state,'op-a','ctx_intake');
+    intake.kind='work.author';intake.intake={scope:'chatbot',mode:'migrate'};intake.allowlist=['.starciwork/features/chatbot/index.yaml','.starciwork/features/chatbot/integration/**'];
+    const before=harness.state.ops.length;
+    const report=buildReport({outcome:'blocked',run:'run_wf',task:'task_intake',dispatch:'ctx_intake',from:'term_ctx_intake',
+      summary:'no custody exists',blocker:{kind:'shared-change',detail:'.starciwork/_resources/identity/chatbot-telegram/secrets.enc.yaml and src/modules/bussiness/pod-credential/channel-provider.ts must change'}});
+    report.sent={messageId:'msg_intake',sentAt:1,type:report.signal.type};
+    assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,intake,report,ctx),'retry');
+    assert.equal(harness.state.ops.length,before,'no shared op was opened');
+    assert.equal(intake.status,'ready');
+    assert.match(intake.findings.at(-1),/declared, never created/);
+    const refused=events(harness.store).filter(event=>event.event==='shared-change-refused'&&event.op==='op-a');
+    assert.deepEqual(refused.map(event=>event.reason),['record-authoring op']);
+  }finally{harness.cleanup();}
+});
+
 test('an ask op that found the answer is settled on its marker whatever outcome it wrote, and the requester carries the answer',()=>{
   const harness=setup({plan:sharedPlan,scripts:{}});
   try{
