@@ -1820,7 +1820,7 @@ function avoidRuntime(op,runtime,now){
  * today; what the current rule still parks stays parked, and the list shrinks to what is genuinely the owner's.
  * The stamp changes when the parking rules do, never with the build.
  */
-export const PARK_RULE='5.0.0-plus';
+export const PARK_RULE='5.0.0-plus.2';
 export function rejudgeParked(store,state,ctx){
   if(state.parkRule===PARK_RULE)return [];
   const routed=[];
@@ -1838,7 +1838,9 @@ export function rejudgeParked(store,state,ctx){
     const op=item.op?byId(state,item.op):null;
     const stuck=Boolean(op&&op.status==='blocked'&&!op.refusal);
     let route=null;
-    if(item.kind==='ledger'&&/^never verified:/.test(String(item.detail??''))){drop(item);route='recomputed-at-finish';}
+    // A mechanical line about an op that is no longer blocked - it ran again, finished, or waits - is stale.
+    if(op&&!stuck&&['shared-depth','ledger-path','environment','shared-change','validator'].includes(item.kind)){drop(item);route=`stale:${op.status}`;}
+    else if(item.kind==='ledger'&&/^never verified:/.test(String(item.detail??''))){drop(item);route='recomputed-at-finish';}
     else if(item.kind==='review'){
       // The parked review of a group is escalated as the current rule escalates a spent review; its companion
       // line ("used its rounds and is implemented again") names no op and goes with it.
@@ -1880,6 +1882,19 @@ export function rejudgeParked(store,state,ctx){
       if(shared){drop(item);op.status='paused';op.waitingFor=shared.id;op.dispatch=null;op.terminal=null;op.nudged=false;route=`waits-for:${shared.id}`;}
     }
     if(route)routed.push({kind:item.kind,op:op?.id??null,route});
+  }
+  // A requester an older rule blocked behind a blocked shared change and then lost the line for (deduplicated,
+  // or dropped with the shared op's own item) waits for that change too; one whose changes are all done runs again.
+  const alive=dep=>dep&&dep.status!=='done'&&dep.status!=='failed'&&!(dep.status==='blocked'&&dep.refusal);
+  for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&(item.dependsOn??[]).length&&!state.needUser.some(entry=>entry.op===item.id))){
+    const deps=op.dependsOn.map(id=>byId(state,id)).filter(Boolean);
+    const shared=deps.find(alive);
+    if(shared){op.status='paused';op.waitingFor=shared.id;op.dispatch=null;op.terminal=null;op.nudged=false;routed.push({kind:'blocked-requester',op:op.id,route:`waits-for:${shared.id}`});continue;}
+    if(deps.length&&deps.every(dep=>dep.status==='done')){
+      op.status='ready';op.attempt+=1;op.waitingFor=null;op.dispatch=null;op.terminal=null;op.nudged=false;
+      op.priorOpen=deps.map(dep=>`shared change ${dep.id} done at ${dep.head??state.head??'unknown'}`);
+      routed.push({kind:'blocked-requester',op:op.id,route:'resumed'});
+    }
   }
   state.parkRule=PARK_RULE;
   store.appendEvent({event:'parked-rejudged',rule:PARK_RULE,routed,left:state.needUser.length});
