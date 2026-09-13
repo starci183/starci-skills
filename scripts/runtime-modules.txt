@@ -31,6 +31,15 @@ kernel/reports.mjs
 models/functions.mjs
 kernel/store.mjs
 kernel/kernel.mjs
+kernel/common.mjs
+kernel/io.mjs
+kernel/goal.mjs
+kernel/intake.mjs
+kernel/sync.mjs
+kernel/owner.mjs
+kernel/lanes.mjs
+kernel/terminals.mjs
+kernel/verify.mjs
 kernel/contract.mjs
 kernel/view.mjs
 kernel/guards.mjs

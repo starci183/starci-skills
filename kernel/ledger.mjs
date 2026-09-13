@@ -513,14 +513,18 @@ export function markInProgress(repoRoot,node,{opId,dispatch=null,startedAt=null,
  * node's authored assertions are not all proven by a passing check, so a green receipt always
  * names what proved it.
  */
-export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,bindSource=true,parse=parseYaml}={}){
+export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,bindSource=true,contractDigest=null,parse=parseYaml}={}){
   const id=text(opId,'operation id'),evidenceId=evidenceIdFor(id);
   return transact(repoRoot,node,register=>{
     const {raw,kernel}=existingKernel(repoRoot,node);
     const verified=checkList(checks);
     coverAssertions(raw,verified,assertions);
     const repo=repository?sanitizeId(repository):repositoryName(repoRoot);
-    writeNode(repoRoot,node,{kernel:{...kernel,opId:id,head:head??null,checks:verified,verifiedBy:text(verifiedBy,'verifier'),at:at??nowIso()},parse});
+    // A proof remembers the rules it was proven under: the digest of the kind's declaration travels with the
+    // receipt, so a later change of that declaration is a fact the ledger sync can see instead of a guess.
+    // A caller that supplies none leaves whatever the node already carries: an older proof is not invented one.
+    writeNode(repoRoot,node,{kernel:{...kernel,opId:id,head:head??null,checks:verified,verifiedBy:text(verifiedBy,'verifier'),at:at??nowIso(),
+      ...(contractDigest?{contractDigest:text(contractDigest,'contract digest')}:{})},parse});
     const bound=settledDigest(repoRoot,node,{inputDigest,digest});
     // The manifest has to bind the same settled digest, so write it here rather than before pass one.
     const folder=path.join(nodeDirectory(repoRoot,node),'evidence',evidenceId),fresh=evidence&&!fs.existsSync(folder);
