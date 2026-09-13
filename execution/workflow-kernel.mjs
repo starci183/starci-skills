@@ -545,7 +545,7 @@ function toOp(raw,index){
     status:'pending',origin:raw.origin??'plan',attempt:1,resumes:0,repairs:0,restarts:0,launchFailures:0,
     priorOpen:[...(raw.priorOpen??[])],findings:[...(raw.findings??[])],avoidRuntimes:[...(raw.avoidRuntimes??[])],
     runtime:null,target:null,task:null,dispatch:null,terminal:null,contractFile:null,nudged:false,
-    kernelOwned:[],kernelOwnedAt:null,waitingFor:null,refusal:null,createdIteration:0,
+    kernelOwned:[],kernelOwnedAt:null,waitingFor:null,refusal:null,createdIteration:0,question:plain(raw.question)?{...raw.question}:null,
     reports:[],files:[],head:null,verdict:null,validation:null,validatorRejects:0,needsReplan:Boolean(raw.needsReplan)};
 }
 function addOp(store,state,raw,reason){
@@ -1744,6 +1744,8 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
       `The kernel owns the node's \`state\`, \`completion\`, \`extensions.work3.kernel\` and its evidence. It reverts anything you write here and downgrades your report to \`failed\`.`,``]:[]),
     `## Resources`,...(locks.length?locks.map(entry=>`- \`${entry}\``):['- none: this operation claims no shared resource']),
     `Two operations that share a resource never run at the same time; never start, stop or reset one you did not declare.`,``,
+    `## Credentials and configuration`,
+    `A key, token, credential or configuration the environment does not provide is never invented, stubbed, defaulted or silently skipped. Report \`blocked\` with blocker \`environment\` naming the exact variable or secret name and where the code reads it; the owner provides the value out of band. Never write a secret value into a record, a report, a chat or a file the owner did not name.`,``,
     `## References`,...(op.references.length?op.references.map(entry=>`- ${entry}`):['- the goal and the allowlist above']),``,
     ...brandBlock(op,brand),
     ...(op.priorOpen.length?[`## Open items you inherit`,...op.priorOpen.map(item=>`- ${item}`),``]:[]),
@@ -1751,6 +1753,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     // The answer to an `ask` is typed into the op's terminal on Orca; a headless process has already exited by
     // then, so the answer reaches the op through the contract of its next attempt, on every host alike.
     ...(typeof op.answer==='string'&&op.answer.trim()?[`## Answer to the question you asked earlier`,op.answer.trim(),`Act on it; do not ask the same question again.`,``]:[]),
+    ...(plain(op.question)?[`## Question for the owner`,`Asked by \`${op.question.from??'the kernel'}\` (${op.question.kind??'decision'}): ${op.question.text}`,...(op.question.options?.length?op.question.options.map((item,index)=>`${index+1}. ${item}`):[]),``]:[]),
     `## Acceptance`,...(op.acceptance.length?op.acceptance.map((item,index)=>`${index+1}. ${item}`):['1. the goal above holds']),``,
     stepsFor(op,{node:op.nodeId?state.ledger.find(item=>item.nodeId===op.nodeId)??null:null}),``,
     ...jobRulings(store),
@@ -2476,6 +2479,7 @@ function settleIntake(store,state,op,ctx){
   return 'intake-authored';
 }
 function settleAuthoredRecord(store,state,op,ctx){
+  if(op.kind===OWNER_ASK){settleOwnerAsk(store,state,op,op.reports.at(-1)??{});return 'owner-ask-settled';}
   if(op.intake?.scope&&!op.nodeId)return settleIntake(store,state,op,ctx);
   const nodeId=op.nodeId;
   let candidate=null;
@@ -2943,7 +2947,10 @@ function resumeOp(store,state,op,report,ctx){
   return 'resume';
 }
 
+/** The kernel answers only mechanical questions (which runtime, a retry, a format); everything else is the owner's. */
+const MECHANICAL_QUESTION=/^(mechanical|runtime|retry|format|tooling)$/i;
 function answerOrEscalate(orca,store,state,op,report,ctx){
+  if(!MECHANICAL_QUESTION.test(String(report.question?.kind??'')))return openOwnerAsk(store,state,op,{kind:report.question?.kind??'decision',text:report.question?.text??report.summary,options:report.question?.options??[]},ctx,report);
   const chosen=ctx.decide({situation:`${op.id} asked: ${report.question?.text}`,options:['answer','escalate-to-user'],
     context:{options:report.question?.options??[],goal:firstLine(op.goal),allowlist:op.allowlist,acceptance:op.acceptance},cwd:ctx.cwd});
   const option=chosen?.ok?chosen.value.option:'escalate-to-user';
@@ -3103,6 +3110,9 @@ export function resumePaused(store,state){
   for(const op of state.ops.filter(item=>item.status==='paused'&&item.waitingFor)){
     const shared=byId(state,op.waitingFor);
     if(!shared)continue;
+    // A requester of an owner question waits for the owner's answer, not for the ask op's report: the answer
+    // (`workflow-answer`, or one found in a decided record) is what resumes it, with the ruling in its contract.
+    if(shared.kind===OWNER_ASK)continue;
     if(shared.status==='done'){
       op.status='ready';op.attempt+=1;op.waitingFor=null;
       op.priorOpen=[`shared change ${shared.id} done at ${shared.head??state.head??'unknown'}`];
@@ -3120,6 +3130,81 @@ export function resumePaused(store,state){
   return resumed;
 }
 
+export const OWNER_ASK='owner.ask';
+/** Whether a blocker detail names a credential or a configuration the environment must provide. */
+export function credentialNeed(detail){
+  const text=String(detail??'');
+  return /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+){1,}\b/.test(text)||/\b(api[ -]?key|token|secret|credential|password|client[ -]?id|webhook|oauth)\b/i.test(text);
+}
+/** The decision folder of the feature an op belongs to, in the tree's own spelling. */
+function decisionAllowlistFor(state,op){
+  const paths=[...(op.ledgerIds??[]),op.nodeId??''].map(id=>String(id)).filter(Boolean);
+  const feature=(()=>{
+    for(const id of paths){const m=id.match(/^[^.]+\.([^.]+)\./);if(m)return m[1];}
+    for(const entry of op.allowlist??[]){const m=slash(entry).match(/features\/([^/]+)\//);if(m)return m[1];}
+    return null;
+  })();
+  return feature?[`.starciwork/features/${feature}/business/srs/decisions/**`]:['.starciwork/decisions/**'];
+}
+/**
+ * A question only the owner can answer pauses the op that asked and opens one `owner.ask` op that prepares the
+ * decision: a decided record that settles it answers it (`answered-from`), otherwise a decision record draft
+ * with options and a recommendation waits for `workflow-answer`. The kernel never answers such a question
+ * itself: the supervisor model used to, and the owner was never asked for a Zalo or Telegram key all day.
+ */
+export function openOwnerAsk(store,state,op,question,ctx,report=null){
+  const same=state.ops.find(item=>item.kind===OWNER_ASK&&liveStatus.includes(item.status)&&item.question?.text===question.text);
+  const ask=same??addOp(store,state,{kind:OWNER_ASK,nodeId:null,
+    goal:`Prepare the owner's decision on the question ${op.id} asked: ${firstLine(question.text)}`,
+    question:{...question,from:op.id},ledgerIds:[],allowlist:decisionAllowlistFor(state,op),
+    references:unique([...(op.references??[])]),checks:ctx?.work?.at?.workRoot?[{name:'work-tree-validates',command:validateCommandAt(ctx.work.at.workRoot)}]:[],
+    acceptance:[`the question is either answered from a decided record (\`answered-from: <id>\`) or drafted as one decision record with numbered options and one recommendation`],
+    origin:'ask',requesters:[op.id]},`question of ${op.id} for the owner`);
+  if(!same&&ctx?.work)locateSharedTreePaths(ask,ctx);
+  if(same)same.requesters=unique([...(same.requesters??[]),op.id]);
+  const file=op.dispatch?store.reportPath(op.dispatch):null;
+  if(file&&fs.existsSync(file))fs.renameSync(file,`${file}.asked-${op.reports.length}`);
+  op.status='paused';op.waitingFor=ask.id;op.dispatch=null;op.terminal=null;op.nudged=false;
+  store.appendEvent({event:'owner-ask-opened',op:op.id,ask:ask.id,kind:question.kind,question:firstLine(question.text)});
+  return 'owner-ask';
+}
+/**
+ * The ask op reported: `answered-from` is the answer, handed to every requester in its next contract; a
+ * `decision:` record is the owner's question, listed for them until `workflow-answer` comes.
+ */
+function settleOwnerAsk(store,state,ask,report){
+  const summary=String(report.summary??'');
+  const answered=summary.match(/^\s*answered-from:\s*(\S+)\s*\n?([\s\S]*)$/);
+  const requesters=state.ops.filter(item=>(ask.requesters??[]).includes(item.id));
+  if(answered){
+    for(const requester of requesters)resumeWithAnswer(store,state,requester,`Answered from the decided record ${answered[1]}: ${answered[2].trim()||'see that record'}`);
+    store.appendEvent({event:'owner-ask-answered-from-record',ask:ask.id,record:answered[1],requesters:requesters.map(item=>item.id)});
+    return;
+  }
+  const record=(summary.match(/^\s*decision:\s*(\S+)/)??[])[1]??null;
+  const options=ask.question?.options?.length?ask.question.options:(summary.match(/^\s*\d+\.\s.+$/gm)??[]).map(line=>line.replace(/^\s*\d+\.\s*/,''));
+  state.needUser.push({op:ask.id,kind:'decision',detail:`${ask.question?.text??ask.goal} - answer with workflow-answer --id ${state.id} --op ${ask.id} --choice <n> [--note "..."]${record?` (decision record ${record})`:''}`,record,options,requesters:requesters.map(item=>item.id)});
+  store.appendEvent({event:'owner-question',ask:ask.id,record,options:options.length,requesters:requesters.map(item=>item.id)});
+}
+function resumeWithAnswer(store,state,op,answer){
+  op.answer=answer;op.status='ready';op.waitingFor=null;op.dispatch=null;op.terminal=null;op.nudged=false;op.attempt+=1;
+  store.appendEvent({event:'owner-answer-delivered',op:op.id,answer:firstLine(answer)});
+}
+/** The owner's answer (`workflow-answer`): recorded on the ask op, delivered to every requester, the question gone. */
+export function answerOwnerQuestion(store,state,{op:askId,choice=null,note=null}){
+  const ask=state.ops.find(item=>item.id===askId&&item.kind===OWNER_ASK)??null;
+  need(ask,`No owner question ${askId} in workflow ${state.id}`);
+  const item=state.needUser.find(entry=>entry.op===ask.id&&entry.kind==='decision');
+  const options=item?.options??ask.question?.options??[];
+  const picked=choice!==null&&choice!==undefined&&String(choice).trim()?options[Number(choice)-1]??String(choice):null;
+  need(picked||String(note??'').trim(),'workflow-answer needs --choice <n> or --note "<answer>"');
+  const answer=`The owner decided on "${firstLine(ask.question?.text??ask.goal)}": ${picked?`option ${choice} - ${picked}`:''}${picked&&note?'; ':''}${note??''}`.trim();
+  ask.answer={choice:picked?String(choice):null,note:note??null,at:Date.now()};
+  state.needUser=state.needUser.filter(entry=>!(entry.op===ask.id&&entry.kind==='decision'));
+  for(const requester of state.ops.filter(candidate=>(ask.requesters??[]).includes(candidate.id)))resumeWithAnswer(store,state,requester,answer);
+  store.appendEvent({event:'owner-answered',ask:ask.id,choice:ask.answer.choice,note:note??null,requesters:[...(ask.requesters??[])]});
+  return {ask:ask.id,answer};
+}
 function handleBlocked(store,state,op,report,ctx){
   const blocker=report.blocker??{kind:'environment',detail:report.summary};
   if(blocker.kind==='shared-change'){
@@ -3163,6 +3248,9 @@ function handleBlocked(store,state,op,report,ctx){
     routed(store,op,'sds-gap',architecture.id,architecture.origin,{kind:architecture.kind,then:route.then});
     return 'sds-gap';
   }
+  // A credential or a configuration the environment lacks is the owner's to provide: the question is prepared for
+  // them, with the exact variable name, instead of a bare line nobody answers.
+  if(['environment','authority'].includes(blocker.kind)&&credentialNeed(blocker.detail))return openOwnerAsk(store,state,op,{kind:blocker.kind==='authority'?'authority':'credential',text:blocker.detail,options:[]},ctx,report);
   // `environment`, `authority` and anything the graph has no rule for: the user decides, the kernel does not guess.
   op.status='blocked';
   state.needUser.push({op:op.id,kind:blocker.kind,detail:blocker.detail});
@@ -3258,7 +3346,8 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     if(commit.head)state.head=commit.head;
     op.status='done';op.files=files;op.head=commit.head??state.head;op.verifiedChecks=verified.checks;
     // An author op closes no node: it completed a record, so what follows is the ledger's answer, not a completion.
-    if(op.kind===AUTHOR_KIND){
+    // An owner.ask op closes no node either: it prepared or answered a question.
+    if(op.kind===AUTHOR_KIND||op.kind===OWNER_ASK){
       const settled=settleAuthoredRecord(store,state,op,ctx);
       store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
         checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
@@ -4176,6 +4265,9 @@ function applyInbox(store,state,ctx){
       // The allocator was built from the quota at start: a new allocation takes effect at the next kernel start,
       // which the supervisor gives within a minute once this loop returns.
       if(quotaChanged)state.restartRequested='allocation changed';
+    }else if(command.kind==='answer'){
+      try{const answered=answerOwnerQuestion(store,state,{op:command.op,choice:command.choice??null,note:command.note??null});store.appendEvent({event:'inbox-applied',kind:'answer',ask:answered.ask});}
+      catch(error){store.appendEvent({event:'inbox-rejected',kind:'answer',reason:String(error?.message??error)});}
     }else store.appendEvent({event:'inbox-ignored',kind:command.kind??null});
   }
 }
@@ -4282,6 +4374,17 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     return {schema:WORKFLOW_KERNEL,command,dir:store.dir,
       ...approve(store,state,{allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null,
         acceptCritique:options['accept-critique']??null,host:hostDescriptorOf(orca)})};
+  }
+  if(command==='workflow-answer'){
+    const {store,state}=open(options.id);
+    need(options.op,'workflow-answer needs --op <owner-ask op id>');
+    if(state.approved&&kernelAlive(store)){
+      const file=queueInbox(store,{kind:'answer',op:options.op,choice:options.choice??null,note:options.note??null});
+      return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,queued:true,inbox:file,next:'the running kernel delivers the answer at its next tick (event owner-answered)'};
+    }
+    const answered=answerOwnerQuestion(store,state,{op:options.op,choice:options.choice??null,note:options.note??null});
+    store.saveState(state);
+    return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,...answered,next:'approve or start the workflow again: the paused operation carries the answer in its next contract'};
   }
   if(command==='workflow-status'){
     const {store,state}=open(options.id);

@@ -18,7 +18,7 @@ import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
 import {machineVerify} from '../execution/workflow-kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -1103,6 +1103,71 @@ test('a check re-run for a shared-ledger op names the tree at its owner: the bar
   const verified=machineVerify({worktree:'C:/fe'},{checks:[{name:'tree',command:'node starci.mjs validate .starciwork'}]},{exec:command=>{seen.push(command);return {status:0,stdout:'',stderr:''};},work:ctx.work});
   assert.deepEqual(seen,['node starci.mjs validate C:/owner/backend/.starciwork']);
   assert.equal(verified.ok,true);
+});
+
+test('a question only the owner can answer pauses the op and opens an owner.ask op; the drafted decision is listed, the answer is delivered, and a mechanical question stays with the kernel',()=>{
+  const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
+  const question={outcome:'ask',summary:'Need a ruling.',files:[],checks:[],question:{text:'Which Telegram bot token does the chatbot use, and where does the owner provide it?',options:['a stack secret named TELEGRAM_BOT_TOKEN','an environment variable on the host'],kind:'credential'}};
+  const askReport={outcome:'done',summary:'decision: demo.sales.business.srs.decision.d-telegram-token\n1. a stack secret named TELEGRAM_BOT_TOKEN\n2. an environment variable on the host',files:[],checks:[passing('work-tree-validates','node starci.mjs validate')]};
+  const harness=setupWork({dirty:[file],scripts:{[nodeId]:[question,{outcome:'done',summary:'Intake implemented with the ruling.',files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+    'ask-1':[askReport]}});
+  try{
+    const {store,state}=harness;
+    approve(store,state);state.run='run_wf';state.from='term_kernel';
+    // Tick 1: the op asks; the kernel never hands a credential question to the supervisor model (the harness decide throws).
+    let after=harness.run({maxIterations:1});
+    const requester=after.ops.find(op=>op.id===nodeId),ask=after.ops.find(op=>op.kind==='owner.ask');
+    assert.ok(ask,'an owner.ask op was opened');
+    assert.deepEqual([ask.id,ask.origin,ask.allowlist,ask.requesters,ask.question.kind,ask.question.from],['ask-1','ask',['.starciwork/features/sales/business/srs/decisions/**'],[nodeId],'credential',nodeId]);
+    assert.deepEqual([requester.status,requester.waitingFor],['paused','ask-1']);
+    assert.ok(events(store).some(event=>event.event==='owner-ask-opened'&&event.op===nodeId&&event.ask==='ask-1'));
+    const contract=renderContract({template,op:ask,state:after,store,launcher:'L.mjs',run:'run_wf'});
+    assert.match(contract,/## Question for the owner\nAsked by `demo\.sales\.implementation\.backend\.intake` \(credential\): Which Telegram bot token/);
+    assert.match(contract,/## Credentials and configuration/);
+    // The ask op runs and reports the drafted decision: the question is listed for the owner with its options.
+    after=harness.run({maxIterations:4});
+    const listed=after.needUser.find(item=>item.kind==='decision');
+    assert.ok(listed,'the owner is asked');
+    assert.deepEqual([listed.op,listed.record,listed.options.length,listed.requesters],['ask-1','demo.sales.business.srs.decision.d-telegram-token',2,[nodeId]]);
+    assert.match(listed.detail,/workflow-answer --id .* --op ask-1 --choice <n>/);
+    assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused','the requester still waits');
+    // The owner answers through the inbox: the requester resumes with the answer in its next contract.
+    queueInbox(store,{kind:'answer',op:'ask-1',choice:'1',note:'the stack secret store, never a .env file'});
+    after=harness.run({maxIterations:6});
+    const resumed=after.ops.find(op=>op.id===nodeId);
+    assert.equal(after.needUser.some(item=>item.kind==='decision'),false,'the question is gone');
+    assert.match(String(resumed.answer),/The owner decided on "Which Telegram bot token.*option 1 - a stack secret named TELEGRAM_BOT_TOKEN; the stack secret store/);
+    const log=events(store);
+    assert.deepEqual(log.filter(event=>event.event==='owner-answered').map(event=>[event.ask,event.choice,event.requesters]),[['ask-1','1',[nodeId]]]);
+    assert.ok(log.some(event=>event.event==='owner-answer-delivered'&&event.op===nodeId));
+    assert.equal(resumed.status,'done','the requester finished on the ruling');
+    assert.match(renderContract({template,op:{...resumed,answer:resumed.answer},state:after,store,launcher:'L.mjs',run:'run_wf'}),/## Answer to the question you asked earlier\nThe owner decided on/);
+  }finally{harness.cleanup();}
+  // A mechanical question is the kernel's: the supervisor model answers it and no owner.ask op exists.
+  const mechanical=setupWork({dirty:[file],scripts:{[nodeId]:[{...question,question:{text:'Run the unit suite with vitest or jest?',options:['vitest','jest'],kind:'mechanical'}},{outcome:'done',summary:'Done.',files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]}]}});
+  try{
+    approve(mechanical.store,mechanical.state);mechanical.state.run='run_wf';mechanical.state.from='term_kernel';
+    const after=mechanical.run({maxIterations:6,decide:()=>({ok:true,value:{option:'answer',instructions:'vitest, as the repository already does',rationale:'tooling'}})});
+    assert.equal(after.ops.some(op=>op.kind==='owner.ask'),false);
+    assert.ok(events(mechanical.store).some(event=>event.event==='decide'&&event.option==='answer'));
+  }finally{mechanical.cleanup();}
+});
+
+test('an environment blocker that names a credential is the question of the owner, prepared by an owner.ask op, and credentialNeed reads the detail',()=>{
+  assert.equal(credentialNeed('TELEGRAM_BOT_TOKEN is not set; the delivery worker reads it in delivery.module.ts'),true);
+  assert.equal(credentialNeed('the Zalo OA api key the owner has not provided'),true);
+  assert.equal(credentialNeed('docker is not installed on this host'),false);
+  const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
+  const harness=setupWork({dirty:[file],scripts:{[nodeId]:[{outcome:'blocked',summary:'Cannot deliver without the bot token.',files:[],checks:[],blocker:{kind:'environment',detail:'TELEGRAM_BOT_TOKEN is not provided; apps/agentos-controlplane/src/chatbot/delivery.module.ts reads it at boot'}}]}});
+  try{
+    approve(harness.store,harness.state);harness.state.run='run_wf';harness.state.from='term_kernel';
+    const after=harness.run({maxIterations:1});
+    const ask=after.ops.find(op=>op.kind==='owner.ask');
+    assert.ok(ask,'the credential need became the question of the owner');
+    assert.deepEqual([ask.question.kind,ask.question.from],['credential',nodeId]);
+    assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused');
+    assert.equal(after.needUser.some(item=>item.kind==='environment'),false,'no bare environment line nobody answers');
+  }finally{harness.cleanup();}
 });
 
 test('a contract longer than a task can carry is handed over as its head plus the file it lives in',()=>{

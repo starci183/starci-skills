@@ -11,6 +11,7 @@ ops:
   - interface.draw
   - interface.implement
   - knowledge.repair
+  - owner.ask
   - release.deliver
   - review.verify
   - runtime.operate
@@ -32,6 +33,7 @@ consolidation:
   supporting:
     - e2e.verify
     - brand.decide
+    - owner.ask
     - interface.asset
     - grammar.update
     - work.author
@@ -179,3 +181,4 @@ consolidation:
     - e2e.verify
     - brand.decide
     - grammar.update
+    - owner.ask

@@ -43,7 +43,9 @@ export function buildReport({kind='op',outcome,run,task,dispatch,from,summary,fi
       need(plain(check)&&typeof check.name==='string'&&typeof check.command==='string'&&Number.isInteger(check.exitCode),'Each check needs name, command and an integer exitCode');
       return {name:check.name,command:check.command,exitCode:check.exitCode,evidence:typeof check.evidence==='string'?check.evidence.slice(0,400):null};
     }),
-    open:list(open,'open items'),question:question?{text:text(question.text,'question text'),options:Array.isArray(question.options)?list(question.options,'question options'):[]}:null,
+    open:list(open,'open items'),question:question?{text:text(question.text,'question text'),options:Array.isArray(question.options)?list(question.options,'question options'):[],
+      // `mechanical` (which runtime, retry, a format) is the kernel's to answer; anything else is the owner's.
+      ...(typeof question.kind==='string'&&question.kind.trim()?{kind:question.kind.trim()}:{})}:null,
     blocker:blocker?{kind:text(blocker.kind,'blocker kind'),detail:text(blocker.detail,'blocker detail')}:null,
     branch:branch?text(branch,'branch'):null,head:head?text(head,'head'):null,gates:gates.map(gate=>{need(plain(gate)&&typeof gate.name==='string'&&typeof gate.status==='string','Each gate needs name and status');return {name:gate.name,status:gate.status};}),
     observations:list(observations,'observations'),reportedAt,signal:signalFor(outcome),sent:null

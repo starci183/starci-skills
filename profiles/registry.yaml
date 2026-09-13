@@ -68,6 +68,7 @@ defaults:
     working: qwen3.8-flash-worker
     reasoning: qwen3.8-flash-reviewer
 reasoningOps:
+  - owner.ask
   - business.decide
   - architecture.decide
   - review.verify
@@ -193,6 +194,13 @@ operators:
     environments:
       - {environment: codex, profiles: [gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-opus]}
+  owner.ask:
+    skill: starci
+    # Preparing the owner's decision is a reasoning task; Astra first to spare Fable's week, Fable when Astra is out.
+    chain: [gpt-6-astra, claude-fable-5.1, claude-opus]
+    environments:
+      - {environment: codex, profiles: [gpt-6-astra]}
+      - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
   business.decide:
     skill: starci
     chain: [claude-fable-5.1, gpt-6-astra, claude-opus]

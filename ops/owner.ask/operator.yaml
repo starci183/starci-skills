@@ -1,0 +1,97 @@
+id: owner.ask
+goal:
+  en: Prepare one decision for the owner - the question, why it matters, the options analysed per side,
+    one recommendation - or answer the question from the records the product already decided, so the
+    runtime never decides for the owner and never guesses a rule, a design, an authority or a credential.
+nodeKinds:
+  - business
+completionProfile: business
+sideEffects: []
+graphPolicy:
+  mode: selected-scope-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: question
+    path: "the operation goal (section 'Question for the owner') and the operation that asked it"
+    purpose:
+      en: Read the question exactly as it was raised - by which operation, of which kind (business, design,
+        authority, credential), what it blocks - before anything is written. A question of business, design,
+        authority, security, money or customer data is the owner's to answer; only a mechanical one is not.
+  - id: decided
+    path: ".starciwork/<feature>/business/**/index.yaml + .starciwork/<feature>/architecture/**/index.yaml (done)"
+    purpose:
+      en: Read every decided business (SRS) and architecture (SDS) record the question touches. A decided
+        record that already settles the question is the answer, named by id; the owner is not asked twice.
+  - id: environment
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: For a credential or configuration question, read where the code reads the value - the exact
+        variable or secret name - and what the owner has to provide and where. Never the value itself.
+writes:
+  - id: decision
+    path: .starciwork/<feature>/business/srs/decisions/<slug>/index.yaml
+    fields:
+      - description
+      - extensions.work3.decision
+      - refs
+    content:
+      en: One decision record draft, state todo, carrying in order the question in one sentence; why it
+        matters and what stays blocked until it is answered; the options, numbered, each with what it means
+        for the architecture, the user stories, the security and authority, the business rules and the
+        quality limits, and what it costs; the decided records each option agrees or conflicts with, by id;
+        and exactly one recommendation with its reason. Real product-shaped content, no placeholder, no
+        secret value.
+steps:
+  - reads:
+      - question
+      - decided
+    writes: []
+    action:
+      en: >-
+        Try the decided records first. When one settles the question, report done with the first line of
+        the summary exactly "answered-from: <record id>" followed by the answer in one paragraph, and write
+        nothing.
+  - reads:
+      - question
+      - decided
+      - environment
+    writes:
+      - decision
+    action:
+      en: Otherwise write the one decision record draft with the question, why it matters, the numbered
+        options analysed per side, the decided records each touches and one recommendation. A credential
+        question names the exact variable or secret name, where the code reads it and what the owner
+        provides and where; it never asks for the value.
+  - reads:
+      - question
+    writes: []
+    action:
+      en: >-
+        Run the workspace validation and report done exactly once with the first line of the summary
+        "decision: <record id>" and the options numbered as the owner will answer them.
+proofs:
+  - id: decided-first
+    requirement:
+      en: A question a decided record settles is answered from that record, by id, and no record is written.
+  - id: one-record
+    requirement:
+      en: Otherwise exactly one decision record draft exists with the question, the numbered options analysed
+        per side, the touched records by id and one recommendation, and the workspace validates.
+  - id: no-secret
+    requirement:
+      en: No value of any credential or secret appears in the record, the report or anywhere else.
+blockers:
+  - code: QUESTION_UNCLEAR
+    condition:
+      en: The question names no decidable choice and no record it touches; the operation that asked it is
+        sent back to state it.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: The feature the question belongs to has no records to draft the decision under.
+placeholders:
+  feature: Selected feature slug
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  slug: Stable decision slug

@@ -669,6 +669,23 @@ launcher grants trust to the exact worktree the way the agent records the owner'
 (`[projects.'<path>'] trust_level = "trusted"`) - touching nothing else in those files; the attempt record
 carries `trust: {action: trusted | already-trusted | no-dialog}`.
 
+## The owner is asked, the model never decides for them
+
+A question an operation raises that is not mechanical (a business rule, a design choice, an authority, a
+credential the environment lacks, money, customer data) pauses that operation and opens one `owner.ask` op
+(`owner-ask-opened`). That op first reads the decided records: a record that settles the question answers it
+(`answered-from: <id>` - the answer reaches the requester in its next contract, `owner-answer-delivered`).
+Otherwise it writes one decision record draft in the feature's decisions folder - the question, why it matters,
+numbered options analysed per side (architecture, user stories, security and authority, business rules,
+quality), the decided records each touches, and one recommendation - and the workflow lists the question for
+the owner (`needUser` kind `decision`, `owner-question`). The owner answers with
+`workflow-answer --id <wf> --op <ask op> --choice <n> [--note "..."]` (queued to a live kernel's inbox); the
+answer is delivered to every requester (`owner-answered`). The supervisor model answers only questions whose
+`question.kind` is `mechanical` (which runtime, a retry, a format). A blocker `environment` or `authority`
+whose detail names a variable, a key, a token or a credential is the same owner question (`credentialNeed`).
+Every contract carries the credential rule: a key the environment lacks is reported `blocked` with the exact
+variable name, never invented, stubbed or silently skipped, and no secret value is ever written anywhere.
+
 ## A tab exists only while its op runs
 
 Every five minutes (and at every reconcile) the kernel closes every tab of this workflow that nobody reads:

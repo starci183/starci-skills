@@ -556,6 +556,8 @@ function usage(){return `Usage:
     then live in the owner repository, while code, checks and code commits stay in this worktree. A node that
     names no repository belongs to the side its layout sits in, so implementation/frontend/** is never a
     backend job's work and implementation/backend/** is never a frontend's.
+  node orca-supervised-launch.mjs workflow-answer --id <workflow-id> --op <owner-ask-op> [--choice <n>] [--note "<answer>"] [--host <path-to-.claude>] [--worktree <relative-path>]
+    the owner's answer to a question the kernel prepared (needUser kind 'decision'): the option number and/or a note; the answer reaches the paused operation in its next contract.
   node orca-supervised-launch.mjs workflow-approve --id <workflow-id> [--allocation <runtime=slots,...>] [--allow-dynamic N] [--accept-critique "<reason>"] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     --accept-critique is the owner overriding a goal critique that answered refuse: the reason is recorded and
     the kernel never asks for it again.
@@ -583,7 +585,7 @@ function usage(){return `Usage:
   processes in the worktree, reports reach the kernel through a mailbox file, and a kind that needs a host
   capability the headless host lacks (interface.draw needs design-tool) is refused as host-unsupported.`;}
 
-const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-run','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise'];
+const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
 const VIEW_COMMANDS=['workflow-list'];
 
