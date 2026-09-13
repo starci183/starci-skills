@@ -15,7 +15,17 @@ import {addOp,firstLine,liveStatus,locateSharedTreePaths,need,slash,unique,valid
  * when they like, and a different answer reopens what was built on it. A mechanical bound - review rounds,
  * shared-change depth, launch attempts, a record path an op asked for - is never a question for the owner at all.
  */
-export const OWNER_ASK='owner.ask';
+/**
+ * The two operations that put something to the owner. `decision.prepare` prepares a decision - the question,
+ * the sides, the numbered options, one recommendation - that the runtime takes provisionally and the owner
+ * overturns later; it never waits. `provision.ask` asks for the one thing only the owner can give (a credential,
+ * an account, a dataset, an authority, the go-ahead for an irreversible effect) and waits in its own tab. The old
+ * single kind `owner.ask` is renamed on kernel start (`kind-renamed`).
+ */
+export const DECISION_PREPARE='decision.prepare';
+export const PROVISION_ASK='provision.ask';
+export const ASK_KINDS=Object.freeze([DECISION_PREPARE,PROVISION_ASK]);
+export const isAsk=kind=>ASK_KINDS.includes(String(kind??''));
 /**
  * The two reasons a question stops the work. `credential` is one member of the provision class below; the
  * others stop the requester exactly as it does, because a proof against a system nobody gave us an account on,
@@ -154,7 +164,7 @@ function decisionExampleFor(ctx,feature){
  */
 export function openOwnerAsk(store,state,op,question,ctx,report=null){
   // The op that prepares the owner's question cannot itself be prepared for: its block is the owner's item as it is.
-  if(op.kind===OWNER_ASK){
+  if(isAsk(op.kind)){
     op.status='blocked';
     state.needUser.push({op:op.id,kind:'decision',detail:`${op.id} could not prepare the question of ${(op.requesters??[]).join(', ')||'the workflow'}: ${firstLine(question.text)} - answer with workflow-answer --id ${state.id} --op ${op.id} --note "..."`,record:null,options:[],requesters:[...(op.requesters??[])]});
     store.appendEvent({event:'owner-question',ask:op.id,record:null,options:0,requesters:[...(op.requesters??[])],reason:'the ask op itself blocked'});
@@ -162,9 +172,9 @@ export function openOwnerAsk(store,state,op,question,ctx,report=null){
   }
   const stop=stopReasonFor(question);
   const kind=stop??(question.kind&&QUESTION_KINDS.includes(String(question.kind))?question.kind:'decision');
-  const same=state.ops.find(item=>item.kind===OWNER_ASK&&liveStatus.includes(item.status)&&item.question?.text===question.text);
+  const same=state.ops.find(item=>isAsk(item.kind)&&liveStatus.includes(item.status)&&item.question?.text===question.text);
   const allowlist=decisionAllowlistFor(state,op,ctx);
-  const ask=same??addOp(store,state,{kind:OWNER_ASK,nodeId:null,
+  const ask=same??addOp(store,state,{kind:stop?PROVISION_ASK:DECISION_PREPARE,nodeId:null,
     goal:`Prepare the owner's decision on the question ${op.id} asked: ${firstLine(question.text)}`,
     question:{...question,kind,stop:stop??null,from:op.id},ledgerIds:[],allowlist,
     references:unique([...(op.references??[]),...decisionExampleFor(ctx,(allowlist[0].match(/features\/([^/]+)\//)??[])[1]??null)]),
@@ -374,7 +384,7 @@ function reopenForDecision(store,state,ctx,decision,answer){
  * a decision the runtime already took provisionally is confirmed or overturned here.
  */
 export function answerOwnerQuestion(store,state,{op:askId,choice=null,note=null},ctx=null){
-  const ask=state.ops.find(item=>item.id===askId&&item.kind===OWNER_ASK)??null;
+  const ask=state.ops.find(item=>item.id===askId&&isAsk(item.kind))??null;
   const item=state.needUser.find(entry=>entry.op===askId&&entry.kind==='decision')??null;
   const pending=(state.provisional??[]).find(entry=>entry.op===askId&&!entry.answered)??null;
   const raiser=ask??(item?state.ops.find(entry=>entry.id===askId)??null:null);

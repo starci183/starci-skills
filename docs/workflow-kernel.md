@@ -222,8 +222,8 @@ what happens to the reporter (`pause`, `reopen`, `retry`) and with which bound. 
 | review findings | the lane's build kind (so a finding on frontend work comes back as `frontend.implement`), origin `repair` | finished; the repair carries the work | 3 rounds per reviewed node set |
 | `uat.verify` reporting `failed` | the lane's build kind, origin `repair` | reopened behind the repair | the same 3 review rounds |
 | validator reject | retry of the same op | retried | 2 (`validatorRejectLimit()`) |
-| `blocked` `environment` / `authority` naming something only the owner can provide, or an effect nobody can undo | `owner.ask`, origin `ask` | paused, and a `needUser` `decision` item once the ask has prepared it | - |
-| `blocked` `authority` naming neither | `owner.ask`, origin `ask` | not paused: it depends on the ask and resumes with the runtime's own recommendation, recorded under `state.provisional` | - |
+| `blocked` `environment` / `authority` naming something only the owner can provide, or an effect nobody can undo | `decision.prepare` (or `provision.ask` for a provision), origin `ask` | paused, and a `needUser` `decision` item once the ask has prepared it | - |
+| `blocked` `authority` naming neither | `decision.prepare` (or `provision.ask` for a provision), origin `ask` | not paused: it depends on the ask and resumes with the runtime's own recommendation, recorded under `state.provisional` | - |
 | `blocked` `environment` naming neither | nothing | blocked, `needUser` | - |
 
 Kinds younger than `ops/registry.yaml` are resolved to a launchable operator id once, at the launch seam:
@@ -303,7 +303,7 @@ and in the `## Phản biện (critique)` section of `goal.md` above the definiti
   all (`hidden-decision-deferred`): the record repair (`business.revise`, `architecture.revise`) settles it
   towards the most reasonable reading when an operation actually hits it, and the owner overturns it from the
   record's decision log. A **decisive** one - it changes an observable outcome about money, authority or
-  customer data - becomes one `owner.ask` of `question.kind: decision`, planned before every operation that
+  customer data - becomes one `decision.prepare` (or `provision.ask` for a provision) of `question.kind: decision`, planned before every operation that
   touches its feature (`planCritiqueDecisions`, event `decision-planned`), so the owner is asked before the
   work rather than after it. A decisive decision about a feature no operation of this goal touches is reported
   (`decision-unplanned`) rather than turned into a question nobody is waiting for.
@@ -621,7 +621,7 @@ that asked (`owner-ask-opened {op, ask, kind, stop}`) and is listed for the owne
 it (`needUser` kind `decision`, `owner-question`).
 
 **Open.** Every other question - a business rule, a design choice, a reconciliation conflict, a
-`hidden-decision` a review found - opens the same `owner.ask` op and does **not** pause the requester: it only
+`hidden-decision` a review found - opens the same `decision.prepare` (or `provision.ask` for a provision) op and does **not** pause the requester: it only
 `dependsOn` the ask (`owner-ask-opened {provisional: true}`). The ask op's allowlist is the feature's own
 policy-decision folder (`decisionAllowlistFor`, read from the node's path in the tree and never from the id
 segment), and one existing policy decision of the tree travels as a reference to mirror. A second operation
@@ -661,7 +661,7 @@ On a decision the runtime had already taken, the same option is `decision-confir
 was built; a different option is `decision-overturned {decision, choice, reopened}` and every done node whose
 kernel block lists that decision is `markReopened`, its work planned again with the owner's answer as a
 finding. **The same command answers a reconciliation conflict**, and the `--op` there is the intake operation
-that wrote the decision record rather than an `owner.ask`: `answerOwnerQuestion` finds the ask when there is
+that wrote the decision record rather than an `decision.prepare` (or `provision.ask` for a provision): `answerOwnerQuestion` finds the ask when there is
 one and otherwise the `decision` item on the list, records the answer on that item's own record, and resumes
 only requesters that are still live - the intake itself is already accepted, and re-running it would undo the
 reconciliation the owner just settled.
@@ -855,15 +855,15 @@ the validator and writes `validator-skipped` once; tests inject a stub the same 
 | `blocked` `sds-gap` from an **intake** | the 5.1 rule that let an intake report what a decided record must become as `sds-gap` is withdrawn. An intake edits no record of another feature and files no gap against one: a change to what that record decided is a `conflict` row the owner decides, or a `new` row the feature declares. The route still exists for every other kind, and an intake that raises the blocker anyway is answered by the same route - but its contract and the validator rule both say it is a defect of the report | - |
 | `blocked` `interface-gap` | the route's `interface.draw` op on the same node; the reporter is reopened behind it | - |
 | `blocked` `grammar-gap` | the route's `grammar.update` op, allowlisted to the `grammar` repository of the workspace binding plus the canon (`knowledge/grammars/**`, `knowledge/patterns/fe/**`) and to nothing of the product, with the whole canon as its references and the acceptance "the grammar renders `<detail>`", "published at a new version and the consumer imports it", "the canon names the new unit"; the reporter is reopened behind it and reads the canon again. A binding with no `grammar` role creates nothing: one `environment` item naming `role \`grammar\` in .workspaces/projects/<project>/work.json`, a `grammar-unbound` event, and the requester stays `blocked` | 2 rounds per node |
-| `blocked` `environment` / `authority` naming something only the owner can provide (a credential, an account on an outside system, a real dataset, a legal authority) or an effect nobody can undo | one `owner.ask` op, the requester **paused** (`owner-ask-opened {stop}`); the prepared question is a `needUser` `decision` item | - |
-| `blocked` `authority` naming neither | one `owner.ask` op, the requester **not paused** - it `dependsOn` the ask and resumes with `provisional: option <n> …`; the decision is listed under `state.provisional`, never `needUser` | - |
+| `blocked` `environment` / `authority` naming something only the owner can provide (a credential, an account on an outside system, a real dataset, a legal authority) or an effect nobody can undo | one `decision.prepare` (or `provision.ask` for a provision) op, the requester **paused** (`owner-ask-opened {stop}`); the prepared question is a `needUser` `decision` item | - |
+| `blocked` `authority` naming neither | one `decision.prepare` (or `provision.ask` for a provision) op, the requester **not paused** - it `dependsOn` the ask and resumes with `provisional: option <n> …`; the decision is listed under `state.provisional`, never `needUser` | - |
 | `blocked` `environment` naming neither | `needUser`, op blocked | - |
 | a question the runtime took provisionally, answered later | the same option is `decision-confirmed` and nothing moves; a different one is `decision-overturned` and every done node whose kernel block lists that decision is `markReopened` and planned again | - |
 | an op that asked for Work-tree record paths **and** code paths | split: `ledger-path-refused` for the record paths, the code paths continue as the scoped shared op. Record paths alone are refused in the op's own terminal, never a `needUser` item | - |
 | a shared change already at `SHARED_DEPTH_LIMIT`, inside this repository | one `work.author` op authoring a Work node for exactly those paths (`shared-authored`), scheduled like any node; the requester waits for it as for any shared op | - |
 | an op whose launch attempts (`chain-exhausted`) or `stalled-idle` restarts are spent | `launch-cooling`, then `launch-readmitted` after `RATE_LIMIT_COOLDOWN_MS` with its counters cleared | `LAUNCH_DAILY_CAP` (6) re-admissions per op per day, then one `environment` item |
 | review with findings | one repair op of the lane's build kind on the files the findings name inside the group's allowlists, then a fresh review | 3 rounds per ledger group |
-| review rounds spent | one more repair on the strongest implement runtime the group has not had (`verify-escalated`), plus the review that judges it; findings citing no decided record open a provisional `owner.ask` first (`verify-hidden-decision`) | `VERIFY_ROUNDS * 2` escalations per group per day, then `verify-parked` + one `review` item |
+| review rounds spent | one more repair on the strongest implement runtime the group has not had (`verify-escalated`), plus the review that judges it; findings citing no decided record open a provisional `decision.prepare` (or `provision.ask` for a provision) first (`verify-hidden-decision`) | `VERIFY_ROUNDS * 2` escalations per group per day, then `verify-parked` + one `review` item |
 | a `uat.verify` op reporting `failed` | one repair op of the lane's build kind, and the UAT run itself reopened behind it | the same 3 rounds per node set |
 | failing gate | one repair op whose findings are the tail of the gate output, then the gates again | 3 rounds |
 | `stalled-prompt` / `stalled-silent` / `dead` from the tick | `settleDispatch(close)` and requeue on another runtime | 3 restarts |
@@ -1405,7 +1405,7 @@ minutes were read as a quota refusal; `rate-limit-readmitted` the cooldown passe
 `parked-rejudged` the owner's list was judged again under the current rule on kernel start, once per rule (its `routed` names every item and where it went);
 `launch-cooling {migrated: true}` an environment line an older build or the terminal reconciliation parked (a lost agent, an idle restart, a launch nobody could take) was migrated to a cooldown by `readmitCooled`;
 an ask op holding a provision or an irreversible effect (`STOP_KINDS`) is waiting for the owner in its tab by design and is never nudged or restarted as `stalled-idle`; an ask op on any other question reports `decision` at once and never waits;
-A decision record has one shape in the whole runtime: a business record at `features/<f>/business/srs/business-rules/policy-decisions/<slug>/index.yaml` with the `starci/srs-policy-decision@1` section (`decisionStatus: open` while `state: todo`), `refs: []` - the shape an owner.ask writes, the reconciliation checker accepts (`isPolicyDecision`), the record catalog names and the validator's SRS layout allows. It names the records it concerns by id in its text, never as a graph edge into another feature.
+A decision record has one shape in the whole runtime: a business record at `features/<f>/business/srs/business-rules/policy-decisions/<slug>/index.yaml` with the `starci/srs-policy-decision@1` section (`decisionStatus: open` while `state: todo`), `refs: []` - the shape an decision.prepare writes, the reconciliation checker accepts (`isPolicyDecision`), the record catalog names and the validator's SRS layout allows. It names the records it concerns by id in its text, never as a graph edge into another feature.
 `shared-change-refused {reason: record-authoring op}` an intake, a migration or a node author asked for a shared change: a record author writes records under its allowlist and delegates no code change, so it is told the rule in its next attempt; `shared-op-withdrawn` a shared op an older rule opened on such an op's behalf was withdrawn on kernel start and its requester runs again with the rule;
 `owner-ask-marker-honoured` an ask op wrote `answered-from`, `answered-by-owner`, `credential` or `provided` beside an outcome other than `done`: the marker is the ruling and the ask is settled on it;
 `launch-readmitted` / `launch-cap-reached` an op whose launch attempts or `stalled-idle` restarts were spent

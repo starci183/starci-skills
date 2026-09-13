@@ -1055,7 +1055,7 @@ test('an ask op that found the answer is settled on its marker whatever outcome 
     const op=id=>harness.state.ops.find(item=>item.id===id);
     const requester=op('op-a');
     requester.status='paused';requester.waitingFor='ask-9';requester.dependsOn=[...(requester.dependsOn??[]),'ask-9'];
-    const ask={...structuredClone(requester),id:'ask-9',kind:'owner.ask',origin:'ask',status:'running',dispatch:'ctx_ask-9',terminal:'term_ask-9',
+    const ask={...structuredClone(requester),id:'ask-9',kind:'decision.prepare',origin:'ask',status:'running',dispatch:'ctx_ask-9',terminal:'term_ask-9',
       requesters:['op-a'],dependsOn:[],waitingFor:null,ledgerIds:[],reports:[],attempt:1,runtime:'gpt-6-astra',
       question:{kind:'decision',text:'Which refund window holds?',options:[],from:'op-a'},
       allowlist:['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],checks:[],acceptance:['the question is answered from a decided record or drafted as one decision record']};
@@ -1411,7 +1411,7 @@ test('a check re-run for a shared-ledger op names the tree at its owner: the bar
   assert.equal(verified.ok,true);
 });
 
-test('a question only the owner can answer pauses the op and opens an owner.ask op; the drafted decision is listed, the answer is delivered, and a mechanical question stays with the kernel',()=>{
+test('a question only the owner can answer pauses the op and opens a decision.prepare op; the drafted decision is listed, the answer is delivered, and a mechanical question stays with the kernel',()=>{
   const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
   const question={outcome:'ask',summary:'Need a ruling.',files:[],checks:[],question:{text:'Which Telegram bot token does the chatbot use, and where does the owner provide it?',options:['a stack secret named TELEGRAM_BOT_TOKEN','an environment variable on the host'],kind:'credential'}};
   const askReport={outcome:'done',summary:'decision: demo.sales.business.srs.decision.d-telegram-token\n1. a stack secret named TELEGRAM_BOT_TOKEN\n2. an environment variable on the host',files:[],checks:[passing('work-tree-validates','node starci.mjs validate')]};
@@ -1422,8 +1422,8 @@ test('a question only the owner can answer pauses the op and opens an owner.ask 
     approve(store,state);state.run='run_wf';state.from='term_kernel';
     // Tick 1: the op asks; the kernel never hands a credential question to the supervisor model (the harness decide throws).
     let after=harness.run({maxIterations:1});
-    const requester=after.ops.find(op=>op.id===nodeId),ask=after.ops.find(op=>op.kind==='owner.ask');
-    assert.ok(ask,'an owner.ask op was opened');
+    const requester=after.ops.find(op=>op.id===nodeId),ask=after.ops.find(op=>['decision.prepare','provision.ask'].includes(op.kind));
+    assert.ok(ask,'a decision.prepare op was opened');
     // The decision lands where the tree keeps its policy decisions, under the feature folder read from the tree.
     assert.deepEqual([ask.id,ask.origin,ask.allowlist,ask.requesters,ask.question.kind,ask.question.from],['ask-1','ask',['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],[nodeId],'credential',nodeId]);
     assert.equal(ask.question.stop,'credential','a credential is one of the two stop reasons: the requester waits');
@@ -1451,17 +1451,17 @@ test('a question only the owner can answer pauses the op and opens an owner.ask 
     assert.equal(resumed.status,'done','the requester finished on the ruling');
     assert.match(renderContract({template,op:{...resumed,answer:resumed.answer},state:after,store,launcher:'L.mjs',run:'run_wf'}),/## Answer to the question you asked earlier\nThe owner decided on/);
   }finally{harness.cleanup();}
-  // A mechanical question is the kernel's: the supervisor model answers it and no owner.ask op exists.
+  // A mechanical question is the kernel's: the supervisor model answers it and no ask op exists.
   const mechanical=setupWork({dirty:[file],scripts:{[nodeId]:[{...question,question:{text:'Run the unit suite with vitest or jest?',options:['vitest','jest'],kind:'mechanical'}},{outcome:'done',summary:'Done.',files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]}]}});
   try{
     approve(mechanical.store,mechanical.state);mechanical.state.run='run_wf';mechanical.state.from='term_kernel';
     const after=mechanical.run({maxIterations:6,decide:()=>({ok:true,value:{option:'answer',instructions:'vitest, as the repository already does',rationale:'tooling'}})});
-    assert.equal(after.ops.some(op=>op.kind==='owner.ask'),false);
+    assert.equal(after.ops.some(op=>['decision.prepare','provision.ask'].includes(op.kind)),false);
     assert.ok(events(mechanical.store).some(event=>event.event==='decide'&&event.option==='answer'));
   }finally{mechanical.cleanup();}
 });
 
-test('an environment blocker that names a credential is the question of the owner, prepared by an owner.ask op, and credentialNeed reads the detail',()=>{
+test('an environment blocker that names a credential is the question of the owner, put by a provision.ask op, and credentialNeed reads the detail',()=>{
   assert.equal(credentialNeed('TELEGRAM_BOT_TOKEN is not set; the delivery worker reads it in delivery.module.ts'),true);
   assert.equal(credentialNeed('the Zalo OA api key the owner has not provided'),true);
   assert.equal(credentialNeed('docker is not installed on this host'),false);
@@ -1473,7 +1473,7 @@ test('an environment blocker that names a credential is the question of the owne
   try{
     approve(harness.store,harness.state);harness.state.run='run_wf';harness.state.from='term_kernel';
     const after=harness.run({maxIterations:1});
-    const ask=after.ops.find(op=>op.kind==='owner.ask');
+    const ask=after.ops.find(op=>['decision.prepare','provision.ask'].includes(op.kind));
     assert.ok(ask,'the credential need became the question of the owner');
     assert.deepEqual([ask.question.kind,ask.question.from,ask.question.stop],['credential',nodeId,'credential']);
     assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused');
@@ -1484,7 +1484,7 @@ test('an environment blocker that names a credential is the question of the owne
   try{
     approve(undoable.store,undoable.state);undoable.state.run='run_wf';undoable.state.from='term_kernel';
     const after=undoable.run({maxIterations:1});
-    const ask=after.ops.find(op=>op.kind==='owner.ask');
+    const ask=after.ops.find(op=>['decision.prepare','provision.ask'].includes(op.kind));
     assert.deepEqual([ask.question.kind,ask.question.stop],['irreversible','irreversible']);
     assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused','only the owner performs an effect nobody can undo');
     assert.equal(irreversibleEffect('the run publishes the release to production'),true);
@@ -1494,7 +1494,7 @@ test('an environment blocker that names a credential is the question of the owne
   try{
     approve(open.store,open.state);open.state.run='run_wf';open.state.from='term_kernel';
     const after=open.run({maxIterations:1});
-    const ask=after.ops.find(op=>op.kind==='owner.ask');
+    const ask=after.ops.find(op=>['decision.prepare','provision.ask'].includes(op.kind));
     assert.deepEqual([ask.question.kind,ask.question.stop],['decision',null]);
     const requester=after.ops.find(op=>op.id===nodeId);
     assert.deepEqual([requester.status,requester.waitingFor,requester.dependsOn.includes(ask.id)],['pending',null,true]);
@@ -1833,13 +1833,13 @@ test('a decisive hidden decision is planned as an owner question before the work
     critiqueGoal:critique({verdict:'revise',objections,required:['name who may refund an order']})});
   try{
     const state=harness.state,events=harness.store.readEvents();
-    const ask=state.ops.find(op=>op.kind==='owner.ask');
+    const ask=state.ops.find(op=>['decision.prepare','provision.ask'].includes(op.kind));
     assert.ok(ask,'the decisive hidden decision became one owner question');
     assert.equal(ask.question.kind,'decision','the provisional kind: the ask writes a decision record and the work goes on');
     assert.match(ask.question.text,/a support agent may refund an order/);
     assert.match(ask.question.text,/Money leaves without a manager/);
     // Exactly one: the non-decisive objection is deferred to the record repair, not asked about.
-    assert.equal(state.ops.filter(op=>op.kind==='owner.ask').length,1);
+    assert.equal(state.ops.filter(op=>['decision.prepare','provision.ask'].includes(op.kind)).length,1);
     const planned=events.filter(event=>event.event==='decision-planned');
     assert.equal(planned.length,1);
     assert.equal(planned[0].op,ask.id);
@@ -1862,7 +1862,7 @@ test('a decisive hidden decision is planned as an owner question before the work
       claim:'The goal decides who may read a stored card',evidence:'features/billing/business/srs/cards/index.yaml',
       consequence:'Customer data is shown to more people.',decisive:true}]})});
   try{
-    assert.equal(elsewhere.state.ops.some(op=>op.kind==='owner.ask'),false);
+    assert.equal(elsewhere.state.ops.some(op=>['decision.prepare','provision.ask'].includes(op.kind)),false);
     const unplanned=elsewhere.store.readEvents().find(event=>event.event==='decision-unplanned');
     assert.equal(unplanned.feature,'billing');
     assert.match(unplanned.reason,/no operation of this goal touches it/);
@@ -2894,12 +2894,12 @@ test('an ask op waiting for a provision is not a stalled op; one on a provisiona
     harness.state.run='run_wf';harness.state.from='term_kernel';
     const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>0,work:null};
     const ask=running(harness.state,'op-intake','ctx_ask');
-    ask.kind='owner.ask';ask.origin='ask';ask.question={kind:'credential',text:'TELEGRAM_BOT_TOKEN',options:[],from:'op-x'};
+    ask.kind='provision.ask';ask.origin='ask';ask.question={kind:'credential',text:'TELEGRAM_BOT_TOKEN',options:[],from:'op-x'};
     const before=events(harness.store).length;
     settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_ask',liveness:'stalled-idle'}]});
     assert.equal(ask.status,'running');
     assert.deepEqual(events(harness.store).slice(before).filter(event=>['nudged','settled'].includes(event.event)),[],'the wait for the owner is not a stall');
-    ask.question={kind:'decision',text:'Which window?',options:[],from:'op-x'};
+    ask.kind='decision.prepare';ask.question={kind:'decision',text:'Which window?',options:[],from:'op-x'};
     settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_ask',liveness:'stalled-idle'}]});
     assert.deepEqual(events(harness.store).slice(before).map(event=>event.event).filter(name=>['nudged','settled'].includes(name)),['nudged']);
   }finally{harness.cleanup();}

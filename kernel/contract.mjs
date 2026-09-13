@@ -28,7 +28,7 @@
 
 export const STEPS_HEADING='## Working order (mandatory, in this order)';
 export const DONE_HEADING='## Definition of done for this kind';
-export const SEQUENCES=['work.author','work.intake','work.migrate','work.cut','owner.ask','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','integration.verify','uat','uat.verify','operations','migration','architecture.revise','business.revise','grammar.update','decide','brand.decide','generic'];
+export const SEQUENCES=['work.author','work.intake','work.migrate','work.cut','decision.prepare','provision.ask','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','integration.verify','uat','uat.verify','operations','migration','architecture.revise','business.revise','grammar.update','decide','brand.decide','generic'];
 
 const IMPLEMENT_KINDS=['backend.implement','interface.implement','frontend.implement'];
 const IMPLEMENT_NODES=['implementation','ui'];
@@ -69,7 +69,8 @@ export function sequenceFor(op,{node=null}={}){
   if(kind==='implementation.plan'||(kind==='work.author'&&plain(op?.cut)))return 'work.cut';
   if(kind==='work.author')return plain(op?.intake)?(op.intake.mode==='migrate'?'work.migrate':'work.intake'):'work.author';
   if(kind==='review.verify')return 'review.verify';
-  if(kind==='owner.ask')return 'owner.ask';
+  if(kind==='decision.prepare')return 'decision.prepare';
+  if(kind==='provision.ask')return 'provision.ask';
   if(kind==='interface.draw')return 'interface.draw';
   // The identity record is settled before anything is drawn inside it, and it is the node's whole lane.
   if(kind==='brand.decide'||nodeKind==='brand')return 'brand.decide';
@@ -193,28 +194,44 @@ const SEQUENCE_STEPS={
       `no product code changed: this operation precedes the node's lane, and the kernel launches that lane itself once the record is complete`
     ]
   }),
-  // The runtime prepares the owner's decision; it never takes it. The op first tries the decided records - a
-  // question they already settle is answered from them, with the record named - and only a truly open question
-  // becomes a decision record draft. Then it asks IN ITS OWN TERMINAL: the owner is at a keyboard, in front of
-  // this tab, and making them leave it to type a command is how a question waited a day for a one-word answer.
-  // A credential is never asked for as a value: the owner puts it into the tree's own encrypted custody with
-  // one command, says `set`, and this operation verifies only that it is there.
-  'owner.ask':v=>({
+  // The runtime prepares the owner's decision; it never takes it and it never waits for it. The op first tries the
+  // decided records - a question they already settle is answered from them, with the record named - and only a
+  // truly open question becomes a decision record draft. It prints the question in its own terminal so the owner
+  // sees it where they sit, then reports the recommendation at once: the runtime carries it into the work behind
+  // it, and the owner overturns it later with one command.
+  'decision.prepare':v=>({
     steps:[
-      `Read the question under \`## Question for the owner\` in the goal - who asked it, what it blocks - and every decided business (SRS) and architecture (SDS) record among the references (${v.references}). If a decided record already settles the question, do not ask the owner: report \`done\` with the first line of the summary exactly \`answered-from: <record id>\` followed by the answer in one paragraph, and write nothing.`,
-      `Otherwise write ONE policy-decision record draft at the path the allowlist names (${v.allowlist}), schema work/node@2, kind \`business\`, an \`srs-policy-decision\` section with \`decisionStatus: open\`, \`state: todo\`, in the shape of the policy decisions this tree already holds, whose description carries in this order: the question in one sentence; why it matters and what it changes until it is answered; the options, numbered, each with what it means for the architecture, the user stories, the security and authority, the business rules and the quality limits, and what it costs; the decided records each option agrees or conflicts with, by id; and exactly one recommendation with its reason. Real product-shaped content, no placeholders.`,
-      `A credential, an account on an outside system, a dataset or a legal authority is something only the owner can provide, and the question names exactly what and exactly how. A credential names the variable the code reads, the outside system it belongs to, and the custody it will live in: \`_resources/identity/<slug>/\` of this Work tree, encrypted with sops. Tell the owner the one command that puts it there - \`node <skill root>/bin/starci.mjs identity set <slug> --name <VAR>\`, which reads the value from stdin, never from the command line, and never prints it - and never ask for the value itself, in the terminal or anywhere else. An environment variable is not custody: it belongs to whichever terminal exported it and is gone on the next machine.`,
-      `Then ASK IN THIS TERMINAL, before you report: print the question and the options numbered exactly as they stand in the record, and print "the owner may answer here with the number, or later with workflow-answer --op <this op> --choice <n>". Whether you WAIT depends on the question. A PROVISION (a credential, an account on an outside system, a dataset, a legal authority) or an IRREVERSIBLE effect is the owner's alone: wait for the answer as long as your contract lets you wait, and then report. Any other question is taken provisionally on your recommendation: do not wait - report \`decision: <record id>\` at once, the runtime carries the recommendation into the work behind it, and the owner overturns it later with workflow-answer if they disagree.`,
-      `If the owner answers here with a number, report \`done\` with the first line of the summary exactly \`answered-by-owner: <n>\` - that is the owner's ruling and the kernel treats it exactly as the command would. If the owner answers a provision question by saying \`set\` (or \`provided\`), verify only PRESENCE and never the value: for a credential run \`sops exec-env <work tree>/_resources/identity/<slug>/${IDENTITY_SECRETS} 'node -e "process.exit(process.env.<VAR>?0:1)"'\` and, when it exits 0, report \`done\` with the first line exactly \`credential: <VAR> present in identity:<slug>\`; for an account, a dataset or an authority report \`provided: <what the owner provided, in a few words>\`. Never print, echo, log, copy or paste the value, not even partially, and never write it into any file.`,
-      `Never answer a question of business, design, authority, security, money or customer data yourself: the recommendation is advice, the decision is the owner's. Never change any other record. Never write product code.`,
+      `Read the question under \`## Question for the owner\` in the goal - who asked it, what it blocks - and every decided business (SRS) and architecture (SDS) record among the references (${v.references}). If a decided record already settles the question, do not prepare anything: report \`done\` with the first line of the summary exactly \`answered-from: <record id>\` followed by the answer in one paragraph, and write nothing.`,
+      `Otherwise write ONE policy-decision record draft at the path the allowlist names (${v.allowlist}), schema work/node@2, kind \`business\`, an \`srs-policy-decision\` section with \`decisionStatus: open\`, \`state: todo\`, \`refs: []\`, in the shape of the policy decisions this tree already holds, whose description carries in this order: the question in one sentence; why it matters and what it changes until it is answered; the options, numbered, each with what it means for the architecture, the user stories, the security and authority, the business rules and the quality limits, and what it costs; the decided records each option agrees or conflicts with, by id in the text, never as a graph edge; and exactly one recommendation with its reason. Real product-shaped content, no placeholders.`,
+      `Print the question and the options numbered exactly as they stand in the record in this terminal, and print "the owner may answer here with the number, or later with workflow-answer --op <this op> --choice <n>". Do not wait: a decision is taken provisionally on your recommendation, the runtime carries it into the work behind it, and the owner overturns it later if they disagree. A provision - a credential, an account, a dataset, an authority - is not yours to ask for; that is a provision.ask and the kernel opens one when it is needed.`,
+      `Never answer a question of business, design, authority, security, money or customer data as if it were settled: the recommendation is advice, the decision is the owner's. Never change any other record. Never write product code.`,
       `Run the listed validator check verbatim: ${v.declared}; the record validates in the tree as it stands and \`git status\` shows nothing outside the allowlist.`,
-      `If the owner did not answer here, report \`done\` exactly once with the first line of the summary exactly \`decision: <record id>\`, then a line \`recommended: <n>\`, then the options numbered as the owner will answer them. The kernel takes your recommendation provisionally so the work continues, and tells the owner it did.`
+      `Report \`done\` exactly once with the first line of the summary exactly \`decision: <record id>\`, then a line \`recommended: <n>\`, then the options numbered as the owner will answer them. The kernel takes your recommendation provisionally so the work continues, and tells the owner it did. If the owner happened to answer here with a number before you reported, the first line is \`answered-by-owner: <n>\` instead - that is the owner's ruling and the kernel treats it exactly as the command would.`
     ],
     done:[
-      `either the summary begins \`answered-from: <decided record id>\` and no file changed, or \`answered-by-owner: <n>\` / \`credential: <VAR> present in identity:<slug>\` / \`provided: <what>\` because the owner answered in this terminal, or exactly one policy-decision record draft exists at ${v.allowlist} and the summary begins \`decision: <record id>\` with \`recommended: <n>\` and the numbered options`,
-      `the question and its numbered options were printed in this terminal with the two ways to answer them, before any report`,
-      `no value of any credential or secret appears anywhere - not in a record, a report, a log, this terminal or a file; a credential question names only the variable, the outside system and the \`identity:<slug>\` custody, and presence is all that was ever checked`,
+      `either the summary begins \`answered-from: <decided record id>\` and no file changed, or \`answered-by-owner: <n>\` because the owner answered in this terminal, or exactly one policy-decision record draft exists at ${v.allowlist} and the summary begins \`decision: <record id>\` with \`recommended: <n>\` and the numbered options`,
+      `the question and its numbered options were printed in this terminal with the two ways to answer them, before the report, and nothing waited for the owner`,
       `no other record and no product code changed, and the validator check exits 0: ${v.declared}`
+    ]
+  }),
+  // A provision is the one thing the runtime cannot obtain and must not invent: a credential, an account on an
+  // outside system, a dataset, a legal authority, the go-ahead for an irreversible effect. This operation names it
+  // exactly, asks IN ITS OWN TERMINAL - the owner is at a keyboard, in front of this tab - and waits. A credential
+  // is never asked for as a value: the owner puts it into the tree's own encrypted custody with one command, says
+  // \`set\`, and this operation verifies only that it is there.
+  'provision.ask':v=>({
+    steps:[
+      `Read the question under \`## Question for the owner\` in the goal - who asked it, what it blocks, which kind of provision it is - and, for a credential, the references (${v.references}) and the code that reads the value, to name the exact variable. Name the provision exactly: a credential names the variable the code reads, the outside system it belongs to, and the custody it will live in: \`_resources/identity/<slug>/\` of this Work tree, encrypted with sops; an account, a dataset or an authority names what and for which system. Never invent, stub, default or skip it, and never ask for a value.`,
+      `ASK IN THIS TERMINAL, before you report: print what the owner provides and how. For a credential, tell the owner the one command that puts it there - \`node <skill root>/bin/starci.mjs identity set <slug> --name <VAR>\`, which reads the value from stdin, never from the command line, and never prints it - and ask them to reply \`set\`; for anything else, ask them to reply \`provided\` once it exists. An environment variable is not custody: it belongs to whichever terminal exported it and is gone on the next machine. Then WAIT for the answer as long as your contract lets you wait: this is the one operation of the runtime that waits for the owner, and nothing else waits behind it.`,
+      `When the owner replies, verify only PRESENCE and never the value: for a credential run \`sops exec-env <work tree>/_resources/identity/<slug>/${IDENTITY_SECRETS} 'node -e "process.exit(process.env.<VAR>?0:1)"'\` and, when it exits 0, report \`done\` exactly once with the first line exactly \`credential: <VAR> present in identity:<slug>\`; for an account, a dataset or an authority report \`done\` exactly once with the first line exactly \`provided: <what the owner provided, in a few words>\`. Never print, echo, log, copy or paste the value, not even partially, and never write it into any file.`,
+      `Self-audit before you report: this terminal shows exactly what the owner provides and how, no value of anything appears in it, in a file or in your summary, and \`git status\` shows nothing changed - not under the allowlist (${v.allowlist}) and not anywhere else: a provision changes nothing in the tree but its custody. Never write any record and never write product code.`,
+      `If the wait ends with no answer, report \`blocked\` exactly once with the blocker kind \`authority\` and the exact name of the provision: the kernel keeps it on the owner's list, the operation that needs it stays paused, and nothing else in the workflow waits for it.`
+    ],
+    done:[
+      `the provision is named exactly - the variable, the outside system and the \`identity:<slug>\` custody for a credential; what and for which system otherwise - and nothing was invented, stubbed, defaulted or skipped in its place`,
+      `what the owner provides and how was printed in this terminal before any report, and the operation waited`,
+      `the summary begins \`credential: <VAR> present in identity:<slug>\` or \`provided: <what>\` because the owner provided it, or the report is \`blocked\` with blocker kind \`authority\` naming it`,
+      `no value of any credential or secret appears anywhere - not in a record, a report, a log, this terminal or a file - and presence is all that was ever checked; no record and no product code changed`
     ]
   }),
   // An intake authors the records of a feature the tree does not have yet: full business drafts, an architecture

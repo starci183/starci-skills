@@ -34,6 +34,7 @@ wrote it - and every kind below declares its `reads` and its `writes` over exact
 | `record` | `**/index.yaml` - the authored fields of one Work node | - |
 | `srs` | `features/*/business/**` | `decision` |
 | `sds` | `features/*/architecture/**` | `srs`, `decision` |
+<!-- decision.prepare prepares a decision the runtime takes provisionally and never waits; provision.ask asks for what only the owner can give and waits in its tab. The old single kind owner.ask is renamed on kernel start (kind-renamed). -->
 | `decision` | `features/*/business/srs/business-rules/policy-decisions/**` (a business record with the `srs-policy-decision` section) | - (the owner's) |
 | `brand` | `brand/index.yaml` | `code` (the real token files) |
 | `design` | `features/*/ui/**` | `srs`, `sds`, `brand`, `grammar` |
@@ -63,7 +64,7 @@ that carries it.
 | `architecture.revise` | repair | decide | srs, sds, decision | sds | `architecture.decide` | Repair a design record a builder found silent or wrong; bump its `rev`. |
 | `business.revise` | repair | decide | srs, decision | srs | `business.decide` | Repair a requirement record a builder found silent, confusing or self-contradictory; bump its `rev`. |
 | `brand.decide` | design | decide | code, grammar | brand, asset | `brand.decide` | Settle the visual identity - colour tokens traced to real source files, typography, mascot, logo, imagery rules - in the one brand record. |
-| `owner.ask` | design | decide | srs, sds, decision | decision | `owner.ask` | Prepare one decision for the owner - question, analysis per side, options, recommendation - or answer it from the decided records. |
+| `decision.prepare` (or `provision.ask` for a provision) | design | decide | srs, sds, decision | decision | `decision.prepare` (or `provision.ask` for a provision) | Prepare one decision for the owner - question, analysis per side, options, recommendation - or answer it from the decided records. |
 | `interface.draw` | design | write | srs, sds, brand, grammar, design | design, asset | `interface.draw` | Render each screen's main state from the installed grammar in a browser (never an image model), describe every other state, and declare every artwork the candidate embeds. |
 | `interface.asset` (needs `design-tool`) | design | write | design, brand | asset, design, code | `interface.asset` | Generate the artwork the design record declares as real repository assets, and bind each file back to its slot. |
 | `frontend.implement` | build | implement | srs, sds, design, asset, brand, grammar, code | code | `interface.implement` | Build the interface the drawing settled. |

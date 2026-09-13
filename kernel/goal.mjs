@@ -12,7 +12,7 @@ import {GOAL_RECORD,WORK_LEDGER,allowlistsOverlap,byId,describeNode,dynamicBudge
   launchOperator,ledgerBinding,ledgerItem,locateSharedTreePaths,need,parseGate,parseQuota,plain,required,slash,tail,toOp,
   unique,workModule,workOpId,writeJson} from './common.mjs';
 import {decisionKindFor} from './io.mjs';
-import {OWNER_ASK,openOwnerAsk} from './owner.mjs';
+import {isAsk,openOwnerAsk} from './owner.mjs';
 import {laneView} from './lanes.mjs';
 import {intakeOp,scopeNames} from './intake.mjs';
 import {cutOpFor,cutPlanned,cutReason,deriveWorkOp,designGate,laneOf,laneText,laneWalked} from './sync.mjs';
@@ -219,7 +219,7 @@ const opTouches=(op,feature)=>[op.nodeId,...(op.ledgerIds??[]),...(op.allowlist?
  * changes nothing observable about money, authority or customer data costs nobody a question here, because the
  * record repair (`business.revise`, `architecture.revise`) settles it the moment an operation actually hits it,
  * towards the most reasonable reading and with the reason in the decision log. A DECISIVE one is the opposite:
- * it is put to the owner as one `owner.ask` of kind `decision` before any operation of its feature runs, which
+ * it is put to the owner as one `decision.prepare` of kind `decision` before any operation of its feature runs, which
  * WP8a then takes provisionally on its recommendation so the work is prepared rather than stopped.
  */
 export function planCritiqueDecisions(store,state,{ctx=null}={}){
@@ -233,7 +233,7 @@ export function planCritiqueDecisions(store,state,{ctx=null}={}){
     const feature=featureIn(objection.evidence,objection.claim);
     // The ops this decision stands in front of: the ones that touch its feature, or - when no feature can be
     // read out of the objection at all - every op of the goal, because the kernel may not guess which are safe.
-    const touching=state.ops.filter(op=>op.kind!==OWNER_ASK&&(feature?opTouches(op,feature):true));
+    const touching=state.ops.filter(op=>!isAsk(op.kind)&&(feature?opTouches(op,feature):true));
     const requester=touching[0]??null;
     if(!requester){
       store.appendEvent({event:'decision-unplanned',claim:firstLine(objection.claim),feature,reason:'no operation of this goal touches it'});
@@ -244,7 +244,7 @@ export function planCritiqueDecisions(store,state,{ctx=null}={}){
     // with numbered options and one recommendation, and the work continues on that recommendation.
     // Prepared by the kernel from the critic's objection: provisional by construction, never read as a stop.
     openOwnerAsk(store,state,requester,{kind:'decision',text,options:[],prepared:true},ctx);
-    const ask=state.ops.find(op=>op.kind===OWNER_ASK&&op.question?.text===text)??null;
+    const ask=state.ops.find(op=>isAsk(op.kind)&&op.question?.text===text)??null;
     if(!ask)continue;
     for(const op of touching)if(op.id!==ask.id&&op.id!==requester.id)op.dependsOn=unique([...(op.dependsOn??[]),ask.id]);
     planned.push(ask);

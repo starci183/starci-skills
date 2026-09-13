@@ -1,8 +1,11 @@
-id: owner.ask
+id: decision.prepare
 goal:
-  en: Prepare one decision for the owner - the question, why it matters, the options analysed per side,
-    one recommendation - or answer the question from the records the product already decided, so the
-    runtime never decides for the owner and never guesses a rule, a design, an authority or a credential.
+  en: >-
+    Prepare one decision the runtime takes provisionally - the question, why it matters, the options analysed
+    per side, one recommendation - or answer the question from the records the product already decided. The
+    runtime never decides for the owner: it carries the recommendation into the work and the owner overturns it
+    later with workflow-answer. A provision (a credential, an account, a dataset, an authority) is not prepared
+    here; that is provision.ask, the one operation that waits for the owner.
 nodeKinds:
   - business
 completionProfile: business
@@ -63,28 +66,25 @@ steps:
       - decision
     action:
       en: Otherwise write the one policy-decision record draft with the question, why it matters, the numbered
-        options analysed per side, the decided records each touches and one recommendation. A credential
-        question names the exact variable, the outside system it belongs to and the identity custody of this
-        tree that will hold it; it never asks for the value.
+        options analysed per side, the decided records each touches by id in the text (never as a graph edge)
+        and one recommendation. A provision is not prepared here; that is provision.ask.
   - reads:
       - question
     writes: []
     action:
       en: >-
-        Ask in this terminal before reporting: print the question and its numbered options and say that the
-        owner may answer here with the number, or later with workflow-answer. For a credential, tell the owner
-        the one command that puts the value into custody - node <skill root>/bin/starci.mjs identity set <slug>
-        --name <VAR>, which reads the value from stdin and never prints it - and ask them to reply "set".
+        Print the question and its numbered options in this terminal and say that the owner may answer here
+        with the number, or later with workflow-answer; do not wait - a decision is taken provisionally on the
+        recommendation and the owner overturns it later.
   - reads:
       - question
     writes: []
     action:
       en: >-
-        Run the workspace validation and report done exactly once. The owner answered here: first line
-        "answered-by-owner: <n>", or "credential: <VAR> present in identity:<slug>" after verifying presence
-        alone with sops exec-env ... 'node -e "process.exit(process.env.<VAR>?0:1)"', or "provided: <what>".
-        The owner did not answer here: first line "decision: <record id>", then "recommended: <n>", then the
-        options numbered as the owner will answer them.
+        Run the workspace validation and report done exactly once: first line "decision: <record id>", then
+        "recommended: <n>", then the options numbered as the owner will answer them. If the owner happened to
+        answer here already, the first line is "answered-by-owner: <n>" instead.
+
 proofs:
   - id: decided-first
     requirement:

@@ -26,7 +26,10 @@ test('every sequence renders a numbered working order and a definition of done, 
       allowlist:['.starciwork/features/sales/implementation/backend/checkout/**'],
       references:['features/sales/implementation/backend/checkout/index.yaml','features/sales/architecture/sds/checkout/index.yaml'],
       acceptance:['exactly one child is the seam, and every other child dependsOn it','the tree validates']}),{kind:'implementation'}],
-    'owner.ask':[op({kind:'owner.ask',origin:'ask',question:{kind:'credential',text:'Which Telegram bot token does the chatbot use, and where is it provided?',options:[],from:'op-intake'},allowlist:['.starciwork/features/chatbot/business/srs/business-rules/policy-decisions/**'],references:['features/chatbot/business/overview/index.yaml'],acceptance:['the question is answered from a decided record or drafted as one decision record']}),null],
+    'decision.prepare':[op({kind:'decision.prepare',origin:'ask',question:{kind:'decision',text:'Which refund window holds once collab exists?',options:['14 days','30 days'],from:'op-intake'},
+      allowlist:['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],references:['features/sales/business/overview/index.yaml'],
+      acceptance:['the question is answered from a decided record or drafted as one decision record']}),null],
+    'provision.ask':[op({kind:'provision.ask',origin:'ask',checks:[],question:{kind:'credential',text:'Which Telegram bot token does the chatbot use, and where is it provided?',options:[],from:'op-intake'},allowlist:['.starciwork/features/chatbot/business/srs/business-rules/policy-decisions/**'],references:['features/chatbot/business/overview/index.yaml'],acceptance:['the question is answered from a decided record or drafted as one decision record']}),null],
     'implement.ledger':[op(),{kind:'implementation'}],
     'implement.shared':[op({origin:'shared',requesters:['op-catalog']}),null],
     'implement.repair':[op({origin:'repair',findings:['intake.ts:12 breaks unit-tests-pass']}),null],
@@ -639,36 +642,64 @@ test('e2e.verify proves a backend slice through the API on the real stack, never
  * two ways to answer are printed side by side. And a credential is never asked for as a value at all: the
  * owner puts it into the tree's own encrypted custody with one command and says `set`; the op checks presence.
  */
-test('the owner.ask sequence asks in its own terminal, and a credential is put into custody by the owner, never handed over',()=>{
-  const ask=op({kind:'owner.ask',origin:'ask',checks:[{name:'work-tree-validates',command:'node starci.mjs validate .starciwork'}],
-    question:{kind:'credential',text:'Which key does the payment client use?',options:[],from:'op-intake'},
+/**
+ * Two operations put something to the owner, and they differ in the one thing that matters: whether the runtime
+ * waits. `decision.prepare` prepares a decision, prints it, reports the recommendation at once and never waits;
+ * `provision.ask` names the one thing only the owner can give, asks in its own terminal and waits - and a
+ * credential is put into custody by the owner's own command, never handed over as a value.
+ */
+test('decision.prepare prepares a decision in the policy-decision shape, prints it in its terminal and reports the recommendation at once, never waiting',()=>{
+  const prepare=op({kind:'decision.prepare',origin:'ask',checks:[{name:'work-tree-validates',command:'node starci.mjs validate .starciwork'}],
+    question:{kind:'decision',text:'Does a refund reopen the order or close it?',options:[],from:'op-intake'},
     allowlist:['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],
     references:['features/sales/business/overview/index.yaml'],
     acceptance:['the question is answered from a decided record or drafted as one decision record']});
-  const rendered=stepsFor(ask,{node:null});
+  const rendered=stepsFor(prepare,{node:null});
+  assert.equal(sequenceFor(prepare),'decision.prepare');
   // A decided record still answers first, and nothing is written when one does.
   assert.match(rendered,/`answered-from: <record id>`/);
-  // The question is put in this terminal, with both doors, before any report.
-  assert.match(rendered,/ASK IN THIS TERMINAL, before you report/);
+  // The question is printed in this terminal with both doors, and nothing waits.
   assert.match(rendered,/the owner may answer here with the number, or later with workflow-answer/);
-  // Only a provision or an irreversible effect is waited for; every other question is provisional and reported at once.
-  assert.match(rendered,/A PROVISION \(a credential, an account on an outside system, a dataset, a legal authority\) or an IRREVERSIBLE effect is the owner's alone: wait for the answer/);
-  assert.match(rendered,/do not wait - report `decision: <record id>` at once/);
-  assert.match(rendered,/`answered-by-owner: <n>`/);
+  assert.match(rendered,/Do not wait: a decision is taken provisionally on your recommendation/);
+  assert.match(rendered,/that is a provision\.ask and the kernel opens one when it is needed/);
   // The recommendation is what the kernel takes provisionally, so it has to be reported as a number.
   assert.match(rendered,/`decision: <record id>`, then a line `recommended: <n>`/);
   assert.match(rendered,/takes your recommendation provisionally so the work continues/);
+  assert.match(rendered,/`answered-by-owner: <n>`/);
+  // The record is a policy decision where the tree keeps them, with no graph edge into another feature.
+  assert.match(rendered,/srs-policy-decision` section with `decisionStatus: open`/);
+  assert.match(rendered,/by id in the text, never as a graph edge/);
+  assert.match(rendered,/`\.starciwork\/features\/sales\/business\/srs\/business-rules\/policy-decisions\/\*\*`/);
+  assert.match(done(rendered).join('\n'),/nothing waited for the owner/);
+  // A provision is not this sequence's business at all.
+  assert.doesNotMatch(rendered,/identity set <slug> --name <VAR>/);
+  assert.doesNotMatch(rendered,/WAIT for the answer/);
+});
+
+test('provision.ask names the one thing only the owner can give, asks in its own terminal and waits, and a credential is put into custody by the owner, never handed over',()=>{
+  const ask=op({kind:'provision.ask',origin:'ask',checks:[],
+    question:{kind:'credential',text:'Which key does the payment client use?',options:[],from:'op-intake'},
+    allowlist:[],references:['features/sales/business/overview/index.yaml'],
+    acceptance:['the credential is present in identity custody, and its value was never seen']});
+  const rendered=stepsFor(ask,{node:null});
+  assert.equal(sequenceFor(ask),'provision.ask');
+  assert.match(rendered,/Never invent, stub, default or skip it, and never ask for a value/);
+  // The question is put in this terminal and waited for: the one operation that waits for the owner.
+  assert.match(rendered,/ASK IN THIS TERMINAL, before you report/);
+  assert.match(rendered,/WAIT for the answer as long as your contract lets you wait/);
+  assert.match(rendered,/this is the one operation of the runtime that waits for the owner/);
   // Custody, not a value: the owner's own command, presence only, and nothing printed.
   assert.match(rendered,/identity set <slug> --name <VAR>/);
   assert.match(rendered,/reads the value from stdin, never from the command line, and never prints it/);
   assert.match(rendered,/verify only PRESENCE and never the value/);
   assert.match(rendered,/`credential: <VAR> present in identity:<slug>`/);
+  assert.match(rendered,/`provided: <what the owner provided, in a few words>`/);
   assert.match(rendered,/An environment variable is not custody/);
   assert.match(rendered,/Never print, echo, log, copy or paste the value/);
+  // No answer is a blocked report naming the provision, never a guess and never a record.
+  assert.match(rendered,/report `blocked` exactly once with the blocker kind `authority` and the exact name of the provision/);
   assert.match(done(rendered).join('\n'),/no value of any credential or secret appears anywhere/);
-  // The record is a policy decision where the tree keeps them, never a folder the tree does not have.
-  assert.match(rendered,/srs-policy-decision` section with `decisionStatus: open`/);
-  assert.match(rendered,/`\.starciwork\/features\/sales\/business\/srs\/business-rules\/policy-decisions\/\*\*`/);
+  assert.doesNotMatch(rendered,/policy-decision record draft/);
 });
 
 /**

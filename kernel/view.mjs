@@ -149,7 +149,7 @@ const escapeRegExp=value=>String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 /**
  * What only the owner can provide, and how far each one has got. The list itself is the critique's, read once
  * from the whole product before anything was planned (`state.provisions`); the status is read back off the
- * `owner.ask` operations the kernel opened - `asked` once one names it, `provided` once its answer says
+ * `decision.prepare` / `provision.ask` operations the kernel opened - `asked` once one names it, `provided` once its answer says
  * `credential: <name> present` or `provided: <what>`, `open` until then. Nothing here writes or asks anything:
  * the operation that needs a provision asks for it in its own tab at the moment it needs it, and nothing else
  * in the workflow waits for that answer.
@@ -157,7 +157,7 @@ const escapeRegExp=value=>String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function readProvisions(state){
   const provisions=(Array.isArray(state?.provisions)?state.provisions:[]).filter(plain);
   if(!provisions.length)return [];
-  const asks=(Array.isArray(state?.ops)?state.ops:[]).filter(op=>op?.kind==='owner.ask');
+  const asks=(Array.isArray(state?.ops)?state.ops:[]).filter(op=>['decision.prepare','provision.ask','owner.ask'].includes(op?.kind));
   const answersOf=op=>[typeof op.answer==='string'?op.answer:op.answer?.note??'',
     ...(Array.isArray(op.reports)?op.reports.map(report=>String(report?.summary??'')):[])].filter(Boolean);
   const textsOf=op=>[String(op.question?.text??''),String(op.goal??''),...answersOf(op)];

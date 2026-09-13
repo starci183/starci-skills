@@ -32,7 +32,7 @@ import {renderChecksFor} from '../checks/render.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
 import {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
-import {OWNER_ASK,STOP_KINDS,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
+import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
   openOwnerAsk,provisionalLines,settleOwnerAsk,stopReasonFor} from './owner.mjs';
 import {BRAND_PAYLOAD,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
@@ -75,7 +75,7 @@ export {WORKFLOW_KERNEL,FINAL_REPORT,GOAL_RECORD,LEDGER_MODES,WORK_LEDGER,WORK_O
 export {laneRowTitle,LANE_NAME,laneNameOf,laneOwnerOf,openLane,laneView} from './lanes.mjs';
 export {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,recoverCoordinatorTab,reconcileWithOrca,rebindRunIfNeeded,
   sweepStaleTerminals} from './terminals.mjs';
-export {OWNER_ASK,PROVISION_KINDS,QUESTION_KINDS,STOP_KINDS,answerCommand,answerOwnerQuestion,credentialNeed,
+export {ASK_KINDS,DECISION_PREPARE,PROVISION_ASK,isAsk,PROVISION_KINDS,QUESTION_KINDS,STOP_KINDS,answerCommand,answerOwnerQuestion,credentialNeed,
   decisionAllowlistFor,dedupeNeedUser,inheritProvisional,irreversibleEffect,openOwnerAsk,ownerProvisionNeed,
   provisionalLines,redactSecrets,stopReasonFor} from './owner.mjs';
 export {BRAND_PAYLOAD,brandFields,brandPayload,brandSummary,changedFiles,machineVerify,opDiff,readValidatorMemory,
@@ -1003,7 +1003,7 @@ export function resumePaused(store,state){
     if(!shared)continue;
     // A requester of an owner question waits for the owner's answer, not for the ask op's report: the answer
     // (`workflow-answer`, or one found in a decided record) is what resumes it, with the ruling in its contract.
-    if(shared.kind===OWNER_ASK)continue;
+    if(isAsk(shared.kind))continue;
     if(shared.status==='done'){
       op.status='ready';op.attempt+=1;op.waitingFor=null;
       op.priorOpen=[`shared change ${shared.id} done at ${shared.head??state.head??'unknown'}`];
@@ -1112,7 +1112,7 @@ function handleBlocked(store,state,op,report,ctx){
  * no completion, no evidence manifest - only the kernel's own `in-progress` receipt from the launch.
  */
 function settleAuthoredRecord(store,state,op,ctx){
-  if(op.kind===OWNER_ASK){settleOwnerAsk(store,state,op,op.reports.at(-1)??{});return 'owner-ask-settled';}
+  if(isAsk(op.kind)){settleOwnerAsk(store,state,op,op.reports.at(-1)??{});return 'owner-ask-settled';}
   // A node authored for a shared change closes nothing and completes no existing record: the tree is re-read so
   // the next sync sees the new node, and the requester is released by `resumePaused` like any other shared op.
   if(Array.isArray(op.sharedAuthored)){
@@ -1184,7 +1184,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
   // has done its job whatever outcome it wrote: the marker is the ruling, and a `blocked` beside it is noise
   // (one ask answered from a record, then asked for a Work path it had no business with, and died four times
   // being told so). No check of its own is owed: the answer is the record's, and the requester carries it.
-  const askMarker=op.kind===OWNER_ASK&&report.outcome!=='done'?(String(report.summary??'').match(/^\s*(answered-from|answered-by-owner|credential|provided):/i)??[])[1]??null:null;
+  const askMarker=isAsk(op.kind)&&report.outcome!=='done'?(String(report.summary??'').match(/^\s*(answered-from|answered-by-owner|credential|provided):/i)??[])[1]??null:null;
   if(askMarker){
     op.status='done';op.dispatch=null;op.terminal=null;op.nudged=false;
     store.appendEvent({event:'owner-ask-marker-honoured',op:op.id,outcome:report.outcome,marker:askMarker.toLowerCase()});
@@ -1278,8 +1278,8 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     if(commit.head)state.head=commit.head;
     op.status='done';op.files=files;op.head=commit.head??state.head;op.verifiedChecks=verified.checks;
     // An author op closes no node: it completed a record, so what follows is the ledger's answer, not a completion.
-    // An owner.ask op closes no node either: it prepared or answered a question.
-    if(authorsRecord(op.kind)||op.kind===OWNER_ASK){
+    // An ask op closes no node either: it prepared a decision, answered a question or confirmed a provision.
+    if(authorsRecord(op.kind)||isAsk(op.kind)){
       const settled=settleAuthoredRecord(store,state,op,ctx);
       store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
         checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
@@ -1697,9 +1697,9 @@ export function settleStalled(orca,store,state,ctx,tick){
   for(const op of state.ops.filter(item=>item.status==='running')){
     const observed=(tick.liveness??[]).find(item=>item.dispatch===op.dispatch);
     if(!observed)continue;
-    // An ask op that holds a provision or an irreversible effect is waiting for the owner in its tab by design:
-    // its idleness is the wait, not a stall. Every other question is provisional and its op never waits.
-    if(op.kind===OWNER_ASK&&STOP_KINDS.includes(op.question?.kind)&&observed.liveness==='stalled-idle')continue;
+    // A provision.ask is waiting for the owner in its tab by design: its idleness is the wait, not a stall.
+    // A decision.prepare never waits, so its idleness is a stall like any other op's.
+    if(op.kind===PROVISION_ASK&&observed.liveness==='stalled-idle')continue;
     if(observed.liveness==='stalled-idle'&&!op.nudged){
       notifyTerminal(orca,{cwd:state.worktree,terminal:op.terminal,wait:ctx.wait,
         text:'Continue; when you are finished report exactly once with the report command in your contract'});
@@ -2111,6 +2111,13 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
       requester.dependsOn=(requester.dependsOn??[]).filter(id=>id!==shared.id);
     }
   }
+  // The one `owner.ask` kind of earlier builds is two kinds now: a state written before the split is renamed on
+  // start by what its question is - a provision waits (`provision.ask`), everything else is prepared (`decision.prepare`).
+  for(const op of state.ops.filter(item=>item.kind==='owner.ask')){
+    const kind=STOP_KINDS.includes(op.question?.kind)?PROVISION_ASK:DECISION_PREPARE;
+    store.appendEvent({event:'kind-renamed',op:op.id,from:'owner.ask',to:kind});
+    op.kind=kind;
+  }
   // An op the validator exhausted gets one more round on a fresh kernel start: the validator's rules may have changed.
   for(const op of state.ops)if(op.status==='blocked'&&!op.refusal&&(op.validatorRejects??0)>=validatorRejectLimit()&&!op.validatorReset){op.status='ready';op.validatorRejects=0;op.validatorReset=true;op.dispatch=null;op.terminal=null;state.needUser=state.needUser.filter(item=>!(item.op===op.id&&item.kind==='validator'));}
   state.sharedQueue=Array.isArray(state.sharedQueue)?state.sharedQueue:[];
@@ -2444,7 +2451,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   }
   if(command==='workflow-answer'){
     const {store,state}=open(options.id);
-    need(options.op,'workflow-answer needs --op <owner-ask op id>');
+    need(options.op,'workflow-answer needs --op <decision.prepare or provision.ask op id>');
     if(state.approved&&kernelAlive(store)){
       const file=queueInbox(store,{kind:'answer',op:options.op,choice:options.choice??null,note:options.note??null});
       return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,queued:true,inbox:file,next:'the running kernel delivers the answer at its next tick (event owner-answered)'};

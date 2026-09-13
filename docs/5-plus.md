@@ -18,7 +18,7 @@ Job (the owner's prompt, verbatim)
            └─ workflow   one kernel, one worktree (a lane), one host: Orca or headless
               ├─ op       one kind, one contract: what it READS, what it PRODUCES, its checks, its acceptance
               │  └─ record   every kind of record declares what it is derived from; the kernel matches the two
-              ├─ owner question   a non-mechanical ask or a missing credential pauses the op: owner.ask
+              ├─ owner question   a non-mechanical ask or a missing credential pauses the op: decision.prepare
               ├─ reconciliation   a feature against decided records: reference | conflict | new, as data
               ├─ validator        the one validator, given the declared inputs and outputs, not a feeling
               ├─ render checks    a drawing is the grammar rendered; canon rules are checked from the bytes
@@ -47,7 +47,7 @@ Six statements hold the release together. Every section below is one of them mad
    what is new, declaring what it reads from the decided records and what it hands on. An intake determines
    every side as checkable claims before it reconciles.
 5. **The owner decides; the runtime prepares.** A question that is not mechanical, or a credential or
-   authority the environment lacks, pauses the op and opens `owner.ask`; the supervisor model answers only
+   authority the environment lacks, pauses the op and opens `decision.prepare` (or `provision.ask` for a provision); the supervisor model answers only
    mechanical questions; a credential is never invented, stubbed, defaulted or silently skipped, and no
    secret value is written anywhere. What is NOT a question for the owner is an unclear record: an SRS or an
    SDS that is confusing, contradictory or silent is revised by the runtime towards its most reasonable
@@ -110,7 +110,7 @@ own. This is the shipped table, entry for entry:
 
 | kind | reads | writes |
 | --- | --- | --- |
-| `owner.ask` | `srs`, `sds`, `decision` | `decision` |
+| `decision.prepare` (or `provision.ask` for a provision) | `srs`, `sds`, `decision` | `decision` |
 | `business.decide` | `srs`, `decision` | `srs`, `decision` |
 | `business.revise` | `srs`, `decision` | `srs` |
 | `architecture.decide` | `srs`, `sds`, `decision` | `sds`, `decision` |
@@ -284,16 +284,16 @@ that cites a sibling design, is a peer citation and not a derivation. Without it
 example.
 
 What the kernel does with a valid table (`reconciled {op, scope, reference, conflict, new}`): every
-`conflict` row is put to the owner exactly as an `owner.ask` decision is - a `needUser` item of kind
+`conflict` row is put to the owner exactly as an `decision.prepare` (or `provision.ask` for a provision) decision is - a `needUser` item of kind
 `decision` carrying the decision record, its numbered options and the command that answers it. The command is
-the same one an `owner.ask` takes, and its `--op` is **the intake operation's id**, because the intake is the
+the same one an `decision.prepare` (or `provision.ask` for a provision) takes, and its `--op` is **the intake operation's id**, because the intake is the
 op that wrote the decision record:
 
 ```
 starci workflow-answer --id <workflow> --op <intake op id> --choice <n> [--note "..."]
 ```
 
-`answerOwnerQuestion` recognises both shapes: an `owner.ask` op answers on the ask, and any other op with a
+`answerOwnerQuestion` recognises both shapes: an `decision.prepare` (or `provision.ask` for a provision) op answers on the ask, and any other op with a
 `decision` item on the list answers on that item's own record (`raiser.decisions`). Only a requester that is
 still live is resumed - the intake itself is already accepted, and re-running it would undo the
 reconciliation the owner just settled. The workflow finishes `blocked` on an unanswered conflict, never
@@ -394,7 +394,7 @@ decision record (`models/functions.mjs`, VALIDATOR_RULES).
 
 The same split runs one phase earlier, on the goal. The critic marks each `hidden-decision` objection
 `decisive` or not. A non-decisive one becomes **nothing**: the repair will settle it when an operation hits
-it. A decisive one becomes one `owner.ask` of kind `decision`, planned before every operation that touches
+it. A decisive one becomes one `decision.prepare` (or `provision.ask` for a provision) of kind `decision`, planned before every operation that touches
 its feature (`kernel/goal.mjs`, `planCritiqueDecisions`, event `decision-planned`), so the owner is asked
 before the work rather than after it.
 
@@ -448,7 +448,7 @@ alone is never a stop, because it is also the kernel's own generic blocker kind 
 ### Provisional decisions
 
 Every other question the records do not settle - a real conflict between decided records, money, authority,
-customer data, a `hidden-decision` a review found - opens the **same** `owner.ask` op, and the requester is
+customer data, a `hidden-decision` a review found - opens the **same** `decision.prepare` (or `provision.ask` for a provision) op, and the requester is
 **not** paused. It only `dependsOn` the ask op, so nothing schedules it before a recommendation exists
 (`owner-ask-opened {provisional: true}`).
 
@@ -536,7 +536,7 @@ And `needUser` itself is deduplicated by `(kind, op|node, first 120 characters o
 
 1. **Open.** A report `ask` whose `question.kind` is not mechanical
    (`MECHANICAL_QUESTION = /^(mechanical|runtime|retry|format|tooling)$/i`), or a `blocked`
-   `environment`/`authority` the rules above recognise, opens one `owner.ask` op with the question, the
+   `environment`/`authority` the rules above recognise, opens one `decision.prepare` (or `provision.ask` for a provision) op with the question, the
    requester, the feature's own **policy-decision** folder as its allowlist (`decisionAllowlistFor`, read from
    the node's path in the tree, never from the id segment) and an existing policy decision of the tree as a
    reference to mirror. A second op asking the same question joins the existing ask as another requester. A
@@ -863,13 +863,13 @@ last row group.
 | the validator is told what the kernel already checked | `tests/llm-functions.spec.mjs` - "the intake rule tells the validator what the kernel already checked and what only a reader can judge" |
 | the critic answers the overlaps as the cases, and the formula is gone | `tests/llm-functions.spec.mjs` - "the critic answers the overlaps with the decided records as the three cases, and the formula is gone" |
 | the Work schema documents the reconciliation row | `tests/reconciliation.spec.mjs` - "the Work schema documents the reconciliation row and leaves extensions free-form" |
-| a non-mechanical question opens an `owner.ask`; a mechanical one stays with the kernel | `tests/workflow-kernel.spec.mjs` - "a question only the owner can answer pauses the op and opens an owner.ask op; the drafted decision is listed, the answer is delivered, and a mechanical question stays with the kernel" |
-| a credential the environment lacks is the owner's question, and so is an effect nobody can undo; an `authority` block that names neither is a provisional decision | `tests/workflow-kernel.spec.mjs` - "an environment blocker that names a credential is the question of the owner, prepared by an owner.ask op, and credentialNeed reads the detail" |
+| a non-mechanical question opens an `decision.prepare` (or `provision.ask` for a provision); a mechanical one stays with the kernel | `tests/workflow-kernel.spec.mjs` - "a question only the owner can answer pauses the op and opens an decision.prepare op; the drafted decision is listed, the answer is delivered, and a mechanical question stays with the kernel" |
+| a credential the environment lacks is the owner's question, and so is an effect nobody can undo; an `authority` block that names neither is a provisional decision | `tests/workflow-kernel.spec.mjs` - "an environment blocker that names a credential is the question of the owner, prepared by an decision.prepare op, and credentialNeed reads the detail" |
 | the owner is asked only for what the runtime cannot obtain and cannot undo, over product-agnostic sentences | `tests/kernel-seams.spec.mjs` - "the runtime asks the owner only for what it cannot obtain and for what it cannot undo" |
 | every other decision is taken provisionally, the requester continues, and the owner is told | `tests/kernel-seams.spec.mjs` - "a decision the records do not settle is taken provisionally: the requester continues and the owner is told" |
 | the same option confirms; a different one reopens what rested on it | `tests/kernel-seams.spec.mjs` - "the same option confirms a provisional decision; a different one overturns it and reopens what rested on it" |
 | a proof records the decisions it rests on that the owner has not taken | `tests/kernel-seams.spec.mjs` - "markDone stores the digest of the declaration the proof was accepted under" |
-| the owner answers in the op's own terminal, and a credential reports only presence | `tests/kernel-seams.spec.mjs` - "the owner answers in the op's own terminal, and a credential reports only that it is present"; `tests/contract-steps.spec.mjs` - "the owner.ask sequence asks in its own terminal, and a credential is put into custody by the owner, never handed over"; `tests/ops.spec.mjs` - "the owner.ask operator asks in its own terminal and never asks for a credential value" |
+| the owner answers in the op's own terminal, and a credential reports only presence | `tests/kernel-seams.spec.mjs` - "the owner answers in the op's own terminal, and a credential reports only that it is present"; `tests/contract-steps.spec.mjs` - "the decision.prepare sequence asks in its own terminal, and a credential is put into custody by the owner, never handed over"; `tests/ops.spec.mjs` - "the decision.prepare operator asks in its own terminal and never asks for a credential value" |
 | a credential lives in the tree's encrypted custody, filled from stdin alone and echoed nowhere | `tests/cli.spec.mjs` - "identity set puts a value into the tree's encrypted custody from stdin alone, and echoes it nowhere", "identity set refuses with the exact reason when sops or its key is not there, and writes nothing" |
 | a spent review bound escalates inside the runtime instead of asking | `tests/workflow-kernel.spec.mjs` - "a spent review bound escalates inside the runtime: one more repair on an unused runtime, and findings that cite no decided record become a provisional decision" |
 | a shared change too deep becomes one Work node, never a question | `tests/workflow-kernel.spec.mjs` - "a shared change too deep to delegate again becomes one Work node the kernel authors, not a question for the owner" |
