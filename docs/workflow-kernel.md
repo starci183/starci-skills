@@ -486,9 +486,14 @@ so without it the ordinary case of a requirement citing a requirement would read
 
 The **critic** answers `overlaps: [{record, case, evidence}]` beside its verdict, over the two cases visible
 from the goal text and the decided records (`reference`, `conflict`); the third is not an overlap with
-anything and is not the critic's to name. A `conflict` overlap is rendered under `### Conflicts for the
-owner` on the goal page and travels into the intake's contract; a `reference` overlap is the list of records
-the intake must cite. The **validator** is told which case each row claims and which ids the kernel already
+anything and is not the critic's to name. Its binding move is the verdict: a goal that would only be added
+beside the decided records, naming none of them, is `revise` with the reconciliation in `required`, and a
+`revise` reaches the owner's approval page and the contract of every operation. The overlaps themselves,
+as built, do not travel - `critiqueGoalPhase` records the verdict, objections, required changes,
+alternatives, question and prerequisites in `state.critique` and drops `overlaps`, so no section of the goal
+page and no block of the intake contract carries them. The intake reconciles from the decided records
+themselves, which is where the checkable answer is; the critic's head start is simply not used.
+The **validator** is told which case each row claims and which ids the kernel already
 checked, and judges only what a reader can. The **intake contract** (`work.intake`) is written around the
 sides and the three cases and names the table shape verbatim. An intake edits no record of another feature
 and files no gap against one: what a decided record must become is either the owner's decision or new work

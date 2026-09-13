@@ -34,14 +34,16 @@ without evidence is dropped and said so in the result; a `revise` or `refuse` wi
 a `revise` with no required change, or a `refuse` with no question is an invalid form and goes back to the model.
 Beside the verdict it answers **`overlaps`**: one entry per decided record the goal touches, as
 `{record, case, evidence}` over the two cases visible from the goal text and the decided records
-(`OVERLAP_CASES = [reference, conflict]`). That is what turns a critique into a plan - a `conflict` is
-rendered for the owner under `### Conflicts for the owner` and travels into the intake's contract, a
-`reference` is the list of records the intake must cite. The third case of a reconciliation, `new`, is not an
-overlap with anything and is deliberately not the critic's to name: the intake authors it under its own
-feature and declares what it reads and what it hands on. Overlaps are read as leniently as objections - an
-entry naming no record, or a case outside the two, is dropped and counted in the result's reasons - because
-a goal that goes uncritiqued costs more than an overlap the kernel could not shape. A goal that would only be
-added beside the decided records, naming none of them, is `revise` with the reconciliation in `required`.
+(`OVERLAP_CASES = [reference, conflict]`). The third case of a reconciliation, `new`, is not an overlap with
+anything and is deliberately not the critic's to name: the intake authors it under its own feature and
+declares what it reads and what it hands on. Overlaps are read as leniently as objections — an entry naming
+no record, or a case outside the two, is dropped and counted in the result's reasons — because a goal that
+goes uncritiqued costs more than an overlap the kernel could not shape. The rule that actually binds is the
+verdict: a goal that would only be added beside the decided records, naming none of them, is `revise` with
+the reconciliation in `required`, and a `revise` reaches the approval page and every operation's contract.
+The `overlaps` list itself is returned by this function and, as the kernel is built today, goes no further —
+`critiqueGoalPhase` stores the verdict without it — so the intake reconciles from the decided records rather
+than from the critic's reading of them.
 
 It also names the `prerequisites` the goal rests on and the tree lacks (`srs | sds | brand | decision`, with the
 feature and why), which the kernel plans as intake first. Default providers are the host's `critique.runtimes`,

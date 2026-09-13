@@ -32,10 +32,11 @@ Six statements hold the release together. Every section below is one of them mad
    `host-unsupported` for what a host cannot do); the supervisor and the kernels follow the build; the
    provider quota is probed, never guessed.
 2. **Every owner prompt is critiqued before it is a goal.** The critique changes the plan: a prerequisite the
-   tree lacks becomes the intake that runs first, an overlap with a decided record becomes a reconciliation
-   case, and a `refuse` is not approvable without the owner's stated override. The critic reads objections
-   and overlaps leniently, because a goal that goes uncritiqued costs more than a row the kernel could not
-   shape.
+   tree lacks becomes the intake that runs first, a `revise` binds the contract of every operation, and a
+   `refuse` is not approvable without the owner's stated override. The critic also reads the goal against the
+   decided records and names its overlaps, though as built those overlaps go no further than its answer (§4).
+   Objections and overlaps alike are read leniently, because a goal that goes uncritiqued costs more than a
+   row the kernel could not shape.
 3. **Input and output are explicit.** Every operation kind and every record kind declares what it reads and
    what it produces, as data in `model/kinds.yaml` and `model/records.yaml`; the op catalog, the kind graph,
    the contract and the validator are held to the same declaration by `validateGraph` and `ops/validate.mjs`.
@@ -293,10 +294,19 @@ The three participants see the same cases:
 
 - **The critic** answers `overlaps: [{record, case, evidence}]` beside its verdict, over the two cases it can
   see from the goal text and the decided records (`OVERLAP_CASES = [reference, conflict]`). The third case is
-  not an overlap with anything and is not the critic's to name. A `conflict` overlap is rendered under
-  `### Conflicts for the owner` on the goal page and travels into the intake's contract; a `reference`
-  overlap is the list of records the intake must cite. Overlaps are read as leniently as objections: an entry
-  naming no record or an unknown case is dropped and counted, never a reason to send a whole critique back.
+  not an overlap with anything and is not the critic's to name. Overlaps are read as leniently as objections:
+  an entry naming no record or an unknown case is dropped and counted, never a reason to send a whole
+  critique back. Its rules are binding in the other direction too - a goal that would only be added beside
+  the decided records, naming none of them, is `revise` with the reconciliation in `required`, and that
+  *does* reach the owner and every operation's contract.
+
+  **As built, the overlaps themselves go no further than the function's answer.** `critiqueGoalPhase` records
+  the verdict, the objections, the required changes, the alternatives, the question and the prerequisites in
+  `state.critique`, and `overlaps` is not among them; no `### Conflicts for the owner` section is written to
+  the goal page and no `## Reconciliation the critic found` block reaches the intake's contract. The intake
+  therefore reconciles from the decided records themselves, which is where the checkable answer lives anyway -
+  but the critic's head start is discarded, and a conflict the critic saw is re-found by the intake or not at
+  all. That is a gap between this design and the runtime, not a rule; §12 names it.
 - **The intake contract** (`work.intake` in `kernel/contract.mjs`) is written around the sides and the three
   cases and names the table shape verbatim.
 - **The validator** is told which case each row claims and which ids the kernel already checked, and judges
@@ -454,7 +464,7 @@ status view prints, per declared integration:
 | `none` | nothing proved it, or the only live run failed | not proven |
 
 There is no fourth state, and a failed live run is `none` rather than `live`: it ran, it did not prove.
-`workflow-status` prints one line per declared integration under **`## Integrations`**, reading the tree
+`workflow-status` prints one line per declared integration under **`## Integrations (n)`**, reading the tree
 through the bounded `readLedgerTree` so a status view never spawns the validator; a workflow that names no
 tree leaves the section out rather than guessing.
 
@@ -539,7 +549,7 @@ The goal page carries the critique with `### Conflicts for the owner` when the c
 approval the intake op runs (`intake-planned {mode: reconcile}`), its report is checked mechanically
 (`reconciled {reference, conflict, new}`), every `conflict` row is listed for the owner as a `decision` item
 (`reconciliation-conflict`) and answered with `workflow-answer` naming the intake op. `workflow-status` lists
-that conflict under `## Needs you`; the table itself is read from the feature's module record, because the
+that conflict under `## Needs you (n)`; the table itself is read from the feature's module record, because the
 status page prints `## Integrations` and not a reconciliation section. The unit version of the proof is `tests/reconciliation.spec.mjs`
 (the seven findings, one test each, plus "a full pass counts the three cases and hands the conflict to the
 owner with its numbered options") and the kernel test **"an accepted intake settles by what the tree holds
@@ -630,3 +640,8 @@ than left to be discovered:
 - **`recordReadsOf` includes the record's own kind.** The peer-citation rule is exercised indirectly by
   `new-reads-blind` in `tests/reconciliation.spec.mjs` (a `new` row citing a peer passes there), but no test
   asserts the inclusion itself, so a change that dropped it would fail only through that indirection.
+- **The critic's `overlaps` reach nobody.** `tests/llm-functions.spec.mjs` holds that `critiqueGoal` answers
+  them as the cases, and `tests/kind-graph.spec.mjs` and `tests/reconciliation.spec.mjs` hold everything the
+  intake does with the decided records - but nothing holds the step between them, because the runtime does
+  not take it: the goal phase records the critique without `overlaps`. There is no test to name because there
+  is no behaviour to hold.
