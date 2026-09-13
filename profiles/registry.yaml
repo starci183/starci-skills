@@ -230,10 +230,13 @@ operators:
       - {environment: codex, profiles: [gpt-5.6-sol]}
   interface.draw:
     skill: starci
-    # Drawing generates PNG candidates with the image model; only the Codex runtime carries one ($imagegen).
-    chain: [gpt-5.6-sol]
+    # Drawing renders the installed grammar in a browser - node plus headless Chrome - so every runtime that
+    # implements can draw; Sol stays first because the owner judges its compositions best.
+    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
     environments:
       - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: claude, profiles: [claude-opus]}
+      - {environment: qwen, profiles: [qwen3.8-flash]}
   interface.implement:
     skill: starci
     chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
@@ -343,8 +346,8 @@ costPolicy: |-
   5.1 and Codex gpt-6-astra, but the op also generates a placeholder mascot when the product has none and only
   Codex gpt-5.6-sol carries an image generator, so that target leads its chain as the launchable candidate and
   the decide-role runtimes follow and defer the artwork with a concrete brief.
-  interface.draw keeps Codex gpt-5.6-sol first for image generation, then Claude
-  Opus with deferred artwork, then Qwen 3.8 Flash; interface.asset re-renders the artwork that drawing
+  interface.draw renders the grammar in a browser and needs no image model, so it keeps Codex gpt-5.6-sol
+  first for its compositions, then Claude Opus, then Qwen 3.8 Flash; interface.asset re-renders the artwork that drawing
   approved and therefore carries the same single image-capable link, with no deferral fallback - a deferred
   slot is exactly what this operation exists to close. grammar.update is the opposite case: it grows the
   installed grammar as code - a typed unit with its stories, its tests, its published version and its canon

@@ -350,8 +350,9 @@ test('the compiled profile is the one the kernel will read at run time',()=>{
 test('a kind may need a host capability from the closed vocabulary: the drawing needs the design tool and every other kind runs on any host',()=>{
   assert.deepEqual([...CAPABILITIES],['design-tool']);
   assert.deepEqual(profile.vocabularies.capabilities,[...CAPABILITIES]);
-  assert.deepEqual(needsOf('interface.draw',{profile}),['design-tool']);
-  for(const kind of KINDS.filter(kind=>kind!=='interface.draw'))assert.deepEqual(needsOf(kind,{profile}),[],kind);
+  assert.deepEqual(needsOf('interface.asset',{profile}),['design-tool'],'the artwork needs the image model');
+  assert.deepEqual(needsOf('interface.draw',{profile}),[],'the drawing renders the grammar in a browser and runs on every host');
+  for(const kind of KINDS.filter(kind=>kind!=='interface.asset'))assert.deepEqual(needsOf(kind,{profile}),[],kind);
   const unknown=clone();unknown.kinds['backend.implement'].needs=['orca-browser'];
   assert.deepEqual(codes(validateGraph(unknown,{runtimes,operators})),['unknown-capability']);
   const shape=clone();shape.kinds['backend.implement'].needs='design-tool';

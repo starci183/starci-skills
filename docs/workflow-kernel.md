@@ -752,8 +752,11 @@ exited: the kernel's answer is recorded as undelivered, the op is relaunched, an
 contract of that next attempt (`## Answer to the question you asked earlier`) - on every host alike.
 
 **Capabilities.** `profiles/kinds.yaml` may give a kind `needs: [<capability>]` from the closed vocabulary
-`capabilities` (`design-tool`; `CAPABILITIES` in `execution/kind-graph.mjs`, `needsOf(kind)`). `interface.draw`
-needs `design-tool`, which only Orca declares; every other kind runs anywhere. At schedule time an op whose kind
+`capabilities` (`design-tool`; `CAPABILITIES` in `execution/kind-graph.mjs`, `needsOf(kind)`). `interface.asset`
+needs `design-tool` (the image model that generates the declared artwork), which only Orca declares; every other
+kind runs anywhere - `interface.draw` included, because a drawing is the installed grammar rendered in a browser
+(one candidate per screen and viewport, the main state only; loading, empty and error are described in the
+record and rendered by the build from the grammar's state contracts), never an image-model painting. At schedule time an op whose kind
 needs what the host lacks is refused: `blocked` with `refusal: 'host-unsupported'`, one needUser item
 `{op, kind:'host', detail}`, event `op-host-unsupported {op, kind, host, missing}`, and the workflow carries on
 with everything else. On a frontend feature that means the design gate keeps holding the `frontend.implement`

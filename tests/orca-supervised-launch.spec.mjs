@@ -85,7 +85,7 @@ test('operation request carries the whole chain with its launch kinds and owns t
   assert.deepEqual(planned.candidates[0].dispatchParams,{task:'$operationTaskId',to:'$terminalHandle',from:'term_monitor_sales',run:'run_sales','return-preamble':true});
   assert.equal(planned.candidates[1].workerParams.model,undefined);
   assert.equal(planned.candidates[2].workerParams.model,'gpt-5.6-sol');
-  assert.equal(planned.candidates[1].workerParams['timeout-ms'],120000);
+  assert.equal(planned.candidates[1].workerParams['timeout-ms'],300000,'five minutes for the TUI to consume the pasted spec');
   assert.deepEqual(planned.runAttestationParams,{id:'run_sales'});
   assert.equal(planned.taskParams['display-name'],opName);
   assert.throws(()=>buildOperationLaunch({...input,worktree:'current'}),/filesystem-relative path/);

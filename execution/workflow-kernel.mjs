@@ -1988,7 +1988,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
     avoidRuntime(op,allocated.runtime,clockOf(ctx));
     // The attempts travel with the event: a launch that failed is only diagnosable from what Orca said at each step.
     store.appendEvent({event:'launch-failed',op:op.id,runtime:allocated.runtime,stopReason:launched?.stopReason??null,attempts:launched?.attempts?.length??0,
-      detail:(launched?.attempts??[]).slice(0,4).map(attempt=>({target:attempt.target??null,stage:attempt.stage??null,effectState:attempt.effectState??null,reason:String(attempt.reason??'').slice(0,240)}))});
+      detail:(launched?.attempts??[]).slice(0,4).map(attempt=>({target:attempt.target??null,stage:attempt.stage??null,effectState:attempt.effectState??null,reason:String(attempt.reason??'').slice(0,240),...(attempt.recovery?{recovery:attempt.recovery}:{})}))});
     if(op.launchFailures>=LAUNCH_LIMIT){
       op.status='blocked';
       state.needUser.push({op:op.id,kind:'environment',detail:`no runtime could launch ${op.id} (${op.launchFailures} attempts, last ${launched?.stopReason??'unknown'})`});
@@ -3759,7 +3759,13 @@ export function validatorRuntimes(host){
  * 142-file allowlist once made `task-create` fail with ENAMETOOLONG and took the kernel down with it. A contract
  * past this length is handed over as its head plus where the whole of it is, and the agent reads the file.
  */
-export const SPEC_LIMIT=12000;
+/**
+ * Orca pastes the task spec into the agent's terminal and fails the Dispatch when the TUI has not consumed it
+ * within its start timeout: a 12k paste sat behind a "[Pasted Content]" marker on Claude and Codex alike
+ * (`agent_prompt_stalled`) and no drawing launched for an afternoon. A short spec - the head plus the pointer to
+ * the complete contract file - is consumed at once, and the agent reads the rest from disk.
+ */
+export const SPEC_LIMIT=4000;
 export function operationSpec(op,contract){
   const text=String(contract??'');
   if(text.length<=SPEC_LIMIT)return text;

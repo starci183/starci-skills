@@ -42,12 +42,12 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.deepEqual(Object.keys(registry.operators).sort(),[...ops].sort());
   // An operator declares every runtime that carries its role, so runtime allocation always resolves a
   // launch shape: the decide ops gained Opus as the reasoning overflow, review.verify gained Opus and Astra.
-  // interface.draw generates PNG candidates with the image model, which only the Codex runtime carries: one link, no overflow.
+  // interface.draw renders the installed grammar in a browser, so every implementing runtime can draw: Sol first for its compositions, then Opus, then Qwen.
   // brand.decide also generates a placeholder mascot, so it runs on the working chain (Codex, then Opus); interface.asset
   // re-renders the artwork the candidates embed, so it needs the same image model and the same one link as interface.draw.
   // grammar.update writes code, stories, tests and a published version, so it drops the image model entirely and
   // carries the two runtimes that read a whole repository's conventions before changing one.
-  const expectedCounts={'business.decide':3,'architecture.decide':3,'brand.decide':2,'review.verify':5,'interface.draw':1,'interface.asset':1,'grammar.update':2,'work.author':2};
+  const expectedCounts={'business.decide':3,'architecture.decide':3,'brand.decide':2,'review.verify':5,'interface.draw':3,'interface.asset':1,'grammar.update':2,'work.author':2};
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
     const expectedCount=expectedCounts[op]??3;
@@ -55,7 +55,7 @@ test('every operator has an ordered external-agent chain and skill-level default
     assert.equal(new Set(route.candidates.map(x=>x.target)).size,expectedCount);
     assert.ok(route.candidates.every(candidate=>candidate.orcaLaunch.kind==='managed-agent'||(candidate.orcaLaunch.kind==='command-terminal'&&candidate.orcaLaunch.dispatch==='return-preamble-and-send')),op);
   }
-  assert.deepEqual(resolveExecutionChain({op:'interface.draw'}).candidates.map(x=>x.target),['gpt-5.6-sol']);
+  assert.deepEqual(resolveExecutionChain({op:'interface.draw'}).candidates.map(x=>x.target),['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
   assert.equal(resolveExecutionChain({op:'interface.draw'}).candidates[0].model,'gpt-5.6-sol');
   // Generating the declared artwork is the same image-model requirement, so it cannot fall through to a runtime
   // that would defer the slot: a deferred slot is exactly what this operation exists to close.

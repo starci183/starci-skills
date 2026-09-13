@@ -40,7 +40,8 @@ export function createHostRunner({adapter,cwd=process.cwd(),env=process.env,repo
 export const qwenLaunchMode='command-terminal';
 const OP_LAUNCH='starci/orca-supervised-op-launch@2';
 const SETTLEMENT='starci/orca-supervised-settlement@1';
-const WORKER_START_TIMEOUT_MS=120000;
+// Orca fails the Dispatch when the TUI has not consumed the pasted spec in this time; five minutes covers a slow TUI on a busy machine.
+const WORKER_START_TIMEOUT_MS=300000;
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};

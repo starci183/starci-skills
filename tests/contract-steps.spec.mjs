@@ -114,7 +114,10 @@ test('interface.draw enumerates every screen state and writes the design record 
   assert.match(text,/installed design grammar/);assert.match(text,/invent no component, token, colour or icon of your own/);assert.match(text,/design binding/);
   assert.match(text,/interface design record at the path the allowlist names \(`features\/sales\/ui\/intake\/index\.yaml`\)/);
   assert.match(text,/blueprint \(the regions in order\)/);assert.match(text,/contract slots/);assert.match(text,/the exact copy/);
-  assert.match(text,/one candidate PNG per screen state and viewport WITH THE IMAGE MODEL.*is NOT a candidate/);assert.match(text,/never a capture of a working feature/);
+  // The candidate is the grammar rendering the screen's main state in a browser; other states are described, not drawn.
+  assert.match(text,/Render ONE candidate per screen and viewport \(desktop and mobile\) - the main state only - FROM THE INSTALLED GRAMMAR ITSELF/);
+  assert.match(text,/Never an image model for a surface/);assert.match(text,/never a capture of a working feature/);
+  assert.match(text,/loading, empty and error are the grammar's own state contracts and the build renders them from code/);
   // The artwork the chosen candidate embeds is declared, so nothing of the approved picture is lost at build time.
   assert.match(drawn[5],/List every artwork the chosen candidate embeds/);
   for(const part of ['each illustration','each appearance of the brand mascot','each decorative image','each chart or media placeholder'])assert.ok(drawn[5].includes(part),part);
