@@ -13,8 +13,22 @@ import {parseYaml} from '../core/yaml.mjs';
  * Every other authored line of an index.yaml is preserved byte for byte.
  */
 export const DECISION_KINDS=['business','business-overview','architecture','brand'];
-export const EXECUTABLE_KINDS=['implementation','uat','e2e','operations','ui'];
+export const EXECUTABLE_KINDS=['implementation','uat','e2e','operations','ui','integration'];
 export const KERNEL_EXTENSION=['extensions','work3','kernel'];
+/** Where a record declares the outside systems it talks to. The list is data, never prose. */
+export const INTEGRATION_EXTENSION=['extensions','work3','integrations'];
+/** The node kind that carries one integration's live proof, one per declared integration. */
+export const INTEGRATION_KIND='integration';
+/**
+ * The record kinds that may declare an integration: the business (SRS) and design (SDS) sides of a
+ * feature, which are the two records an integration is derived from. An implementation node that names a
+ * provider is not a declaration - it is code written against one a record already declared.
+ */
+export const INTEGRATION_DECLARING_KINDS=['business','business-overview','module','architecture'];
+/** What an evidence manifest proved against: the product's own API, or the outside system itself. */
+export const PROOF_BOUNDARIES=['api','live'];
+/** A credential is the owner's. No other provider of one is a declaration the runtime will act on. */
+export const CREDENTIAL_PROVIDER='owner';
 export const EVIDENCE_SCHEMA='work/evidence@1';
 export const REVIEW_SCHEMA='starci/design-review@1';
 export const HOST_BIN=new URL('../bin/starci.mjs',import.meta.url);
@@ -513,18 +527,22 @@ export function markInProgress(repoRoot,node,{opId,dispatch=null,startedAt=null,
  * node's authored assertions are not all proven by a passing check, so a green receipt always
  * names what proved it.
  */
-export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,bindSource=true,parse=parseYaml}={}){
+export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,bindSource=true,contractDigest=null,proof=null,parse=parseYaml}={}){
   const id=text(opId,'operation id'),evidenceId=evidenceIdFor(id);
+  // A proof remembers the rules it was proven under: the digest of the kind's declaration travels into the
+  // kernel block, so a node completed under a rule that has since moved is reopened rather than trusted.
+  const boundRules=contractDigest===null||contractDigest===undefined?null:String(contractDigest).trim();
+  need(boundRules===null||HEX64.test(boundRules),'contractDigest must be a lowercase sha-256 of the kind declaration');
   return transact(repoRoot,node,register=>{
     const {raw,kernel}=existingKernel(repoRoot,node);
     const verified=checkList(checks);
     coverAssertions(raw,verified,assertions);
     const repo=repository?sanitizeId(repository):repositoryName(repoRoot);
-    writeNode(repoRoot,node,{kernel:{...kernel,opId:id,head:head??null,checks:verified,verifiedBy:text(verifiedBy,'verifier'),at:at??nowIso()},parse});
+    writeNode(repoRoot,node,{kernel:{...kernel,opId:id,head:head??null,checks:verified,verifiedBy:text(verifiedBy,'verifier'),at:at??nowIso(),...(boundRules?{contractDigest:boundRules}:{})},parse});
     const bound=settledDigest(repoRoot,node,{inputDigest,digest});
     // The manifest has to bind the same settled digest, so write it here rather than before pass one.
     const folder=path.join(nodeDirectory(repoRoot,node),'evidence',evidenceId),fresh=evidence&&!fs.existsSync(folder);
-    const written=evidence?writeEvidence(repoRoot,node,{...(plain(evidence)?evidence:{}),opId:id,head,checks,repository:repo,assertions,sourceIdentity:bindSource?sourceIdentity:null,bindSource,inputDigest:bound}):null;
+    const written=evidence?writeEvidence(repoRoot,node,{...(plain(evidence)?evidence:{}),opId:id,head,checks,repository:repo,assertions,sourceIdentity:bindSource?sourceIdentity:null,bindSource,inputDigest:bound,...(proof?{proof}:{})}):null;
     if(fresh)register(()=>fs.rmSync(folder,{recursive:true,force:true}));
     const completion={inputDigest:bound,evidence:[evidenceId],...sourceBinding(repo,head,sourceIdentity,bindSource)};
     return {...writeNode(repoRoot,node,{state:'done',completion,parse}),evidence:written};
@@ -610,6 +628,7 @@ export function writeEvidence(repoRoot,node,evidence={}){
     need(sha,`Asset ${relative} has no sha256 and no file under ${slash(directory)}`);
     return {path:relative,sha256:sha,...(asset.scope?{scope:asset.scope}:{})};
   });
+  const proof=readProof(evidence.proof);
   const bound=settledDigest(repoRoot,node,{inputDigest:evidence.inputDigest??null,digest:evidence.digest??null});
   // `nodeId` + `inputDigest` already bind the primary node; repeating it in `bindings` is a
   // DUPLICATE_EVIDENCE_BINDING, so only extra nodes this record also proves belong there.
@@ -619,6 +638,7 @@ export function writeEvidence(repoRoot,node,evidence={}){
     ...(extra.length?{bindings:extra}:{}),
     outcome:evidence.outcome??(failed?'fail':'pass'),
     assertions,assets,
+    ...(proof?{proof}:{}),
     provenance:{
       environment:sanitizeId(evidence.environment??'local'),
       actor:sanitizeId(evidence.actor??'starci-kernel'),
@@ -634,8 +654,233 @@ export function writeEvidence(repoRoot,node,evidence={}){
   const body_=emitDocument(manifest);
   fs.writeFileSync(file,body_);
   const parsed=(evidence.parse??parseYaml)(body_);
-  need(contains(parsed,{schema:EVIDENCE_SCHEMA,id,nodeId:manifest.nodeId,outcome:manifest.outcome,inputDigest:bound}),`The evidence manifest for ${id} did not round-trip`);
+  need(contains(parsed,{schema:EVIDENCE_SCHEMA,id,nodeId:manifest.nodeId,outcome:manifest.outcome,inputDigest:bound,...(proof?{proof}:{})}),`The evidence manifest for ${id} did not round-trip`);
   return file;
+}
+
+/**
+ * What an evidence record says it proved against. `boundary` is required once a proof is given at all,
+ * because "unspecified" is the state that let four faked channels read as verified; `fakes` defaults to the
+ * empty list, which is the only honest default for a record that names none.
+ */
+function readProof(value){
+  if(value===null||value===undefined)return null;
+  need(plain(value),'An evidence proof is {boundary, fakes}');
+  const boundary=text(value.boundary,'evidence proof boundary');
+  need(PROOF_BOUNDARIES.includes(boundary),`An evidence proof boundary is ${PROOF_BOUNDARIES.join(' or ')}: ${boundary}`);
+  const fakes=Array.isArray(value.fakes)?value.fakes:value.fakes===null||value.fakes===undefined?[]:null;
+  need(fakes,'An evidence proof lists its fakes as provider ids');
+  return {boundary,fakes:unique(fakes.map(item=>text(item,'faked provider id')))};
+}
+
+// ---------------------------------------------------------------------------- external integrations
+
+/**
+ * An external integration is proven live, or it is not proven. Four `e2e.verify` operations once reported
+ * four chatbot delivery nodes verified without ever asking the owner for a credential, because a faked
+ * channel was inside their contract and nothing in the tree said otherwise. These functions are what makes
+ * that impossible to repeat: the integration is a declared record, its node is required, and every proof
+ * says what it was proven against.
+ */
+
+/** Read a whole Work tree without the validator: the bounded filesystem read a status view can afford. */
+export const LEDGER_SCAN_LIMIT=4000;
+
+/**
+ * The tree as files, for a reader that must not spawn the validator (the status view). It answers the same
+ * `{at, list, nodes}` shape the integration functions below read, with `file` on every node, and stops at
+ * `limit` records so a pathological tree cannot hang a status page. A path that is not a tree answers null.
+ */
+export function readLedgerTree(workRoot,{limit=LEDGER_SCAN_LIMIT}={}){
+  const root=path.resolve(text(workRoot,'work tree root'));
+  let stat;
+  try{stat=fs.statSync(root);}catch{return null;}
+  if(!stat.isDirectory())return null;
+  const list=[];
+  const walk=dir=>{
+    if(list.length>=limit)return;
+    let entries;
+    try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch{return;}
+    for(const entry of [...entries].sort((a,b)=>a.name.localeCompare(b.name))){
+      if(list.length>=limit)return;
+      if(entry.isSymbolicLink())continue;
+      const file=path.join(dir,entry.name);
+      // `_local` is execution state and `assets` is payload; neither holds a Work node, and both can be large.
+      if(entry.isDirectory()){if(!['_local','assets','node_modules','.git'].includes(entry.name))walk(file);continue;}
+      if(entry.name!=='index.yaml')continue;
+      let raw;
+      try{raw=parseYaml(fs.readFileSync(file,'utf8'));}catch{continue;}
+      if(!plain(raw)||typeof raw.id!=='string'||!raw.id.trim())continue;
+      list.push({id:raw.id.trim(),kind:typeof raw.kind==='string'?raw.kind:null,state:typeof raw.state==='string'?raw.state:null,
+        path:slash(path.relative(root,file)),file});
+    }
+  };
+  walk(root);
+  const repoRoot=path.dirname(root);
+  return {at:{repoRoot,workRoot:root},repoRoot,workRoot:root,list,nodes:new Map(list.map(node=>[node.id,node])),bounded:list.length>=limit};
+}
+
+const treeAt=ledger=>ledger?.at??ledger?.repoRoot;
+const trimmed=value=>typeof value==='string'&&value.trim()?value.trim():null;
+/** A record the reader cannot parse is a validator finding, not a crash in a status view. */
+function tryReadNode(ledger,node){try{return readNode(treeAt(ledger),node);}catch{return null;}}
+
+/**
+ * The integrations a tree declares, as `{id, provider, credential:{name, providedBy, where}, sandbox?,
+ * declaredBy}` under `list`, and every shape defect under `problems`. An entry the runtime cannot act on -
+ * no credential name, or a credential somebody other than the owner provides - is a finding rather than a
+ * silent skip, because that is exactly the declaration a faked proof hides behind. An entry with an id is
+ * still listed even when its credential is a finding, so the tree still owes it an `integration` node.
+ */
+export function declaredIntegrations(ledger){
+  const list=[],problems=[];
+  const fault=(declaredBy,id,code,detail)=>problems.push({code,id:id??null,declaredBy,detail});
+  for(const node of (ledger?.list??[]).filter(item=>INTEGRATION_DECLARING_KINDS.includes(item.kind))){
+    const raw=tryReadNode(ledger,node);
+    const declared=raw?.extensions?.work3?.integrations;
+    if(declared===null||declared===undefined)continue;
+    if(!Array.isArray(declared)){fault(node.id,null,'integration-shape','extensions.work3.integrations must be a list of declarations');continue;}
+    for(const entry of declared){
+      if(!plain(entry)){fault(node.id,null,'integration-shape','each declared integration is a mapping of id, provider and credential');continue;}
+      const id=typeof entry.id==='string'&&entry.id.trim()?entry.id.trim():null;
+      const provider=typeof entry.provider==='string'&&entry.provider.trim()?entry.provider.trim():null;
+      if(!id){fault(node.id,null,'integration-shape','a declared integration needs an id the integration node is named after');continue;}
+      if(!provider)fault(node.id,id,'integration-shape','a declared integration names the outside system it talks to');
+      const credential=plain(entry.credential)?entry.credential:null;
+      const name=typeof credential?.name==='string'&&credential.name.trim()?credential.name.trim():null;
+      const providedBy=typeof credential?.providedBy==='string'&&credential.providedBy.trim()?credential.providedBy.trim():null;
+      if(!name)fault(node.id,id,'credential-missing',`integration ${id} declares no credential name; the exact variable is what the owner is asked for`);
+      else if(providedBy!==CREDENTIAL_PROVIDER)fault(node.id,id,'credential-not-owner',`integration ${id} says its credential is provided by ${providedBy??'nobody'}; a credential is the owner's`);
+      list.push({id,provider,declaredBy:node.id,
+        credential:{name,providedBy:providedBy??null,where:typeof credential?.where==='string'&&credential.where.trim()?credential.where.trim():null},
+        ...(typeof entry.sandbox==='string'&&entry.sandbox.trim()?{sandbox:entry.sandbox.trim()}:{})});
+    }
+  }
+  return {list,problems};
+}
+
+/** The integration id a node proves: `features/<f>/integration/<id>/index.yaml` names it in its layout. */
+export function integrationIdOf(node){
+  const parts=layoutOf(node).split('/').filter(Boolean);
+  if(parts[0]==='integration'&&parts.length>1)return parts.slice(1).join('/');
+  return null;
+}
+
+/** The nodes that carry an integration proof; one per declared integration is what the tree owes. */
+export function integrationNodes(ledger){return (ledger?.list??[]).filter(node=>node.kind===INTEGRATION_KIND);}
+
+/** A node proves an integration when its layout names it, or when the tail of its id does. */
+const provesIntegration=(node,id)=>integrationIdOf(node)===id||String(node.id??'').split('.').at(-1)===id;
+
+/**
+ * The declared ids the tree holds no `integration` node for. The kernel lists them as `ledger incomplete`
+ * and closes them with `work.author`: an integration nobody has to prove is an integration nobody proves.
+ */
+export function missingIntegrationNodes(ledger){
+  const nodes=integrationNodes(ledger);
+  return unique(declaredIntegrations(ledger).list.map(item=>item.id)).filter(id=>!nodes.some(node=>provesIntegration(node,id)));
+}
+
+/** Every evidence manifest under the tree's nodes, with what it says it proved against. */
+function evidenceManifests(ledger){
+  const at=treeAt(ledger);
+  const out=[];
+  for(const node of ledger?.list??[]){
+    let folders;
+    let directory;
+    try{directory=path.join(nodeDirectory(at,node),'evidence');}catch{continue;}
+    try{folders=fs.readdirSync(directory,{withFileTypes:true});}catch{continue;}
+    for(const folder of folders){
+      if(!folder.isDirectory())continue;
+      const file=path.join(directory,folder.name,'manifest.yaml');
+      let manifest;
+      try{manifest=parseYaml(fs.readFileSync(file,'utf8'));}catch{continue;}
+      if(!plain(manifest))continue;
+      const proof=plain(manifest.proof)?manifest.proof:null;
+      out.push({file,node:node.id,nodeId:typeof manifest.nodeId==='string'?manifest.nodeId:node.id,
+        outcome:typeof manifest.outcome==='string'?manifest.outcome:null,
+        proof:proof&&PROOF_BOUNDARIES.includes(proof.boundary)
+          ?{boundary:proof.boundary,fakes:(Array.isArray(proof.fakes)?proof.fakes:[]).filter(item=>typeof item==='string').map(item=>item.trim()).filter(Boolean)}
+          :null});
+    }
+  }
+  return out;
+}
+
+/**
+ * Per declared integration, what the tree can honestly claim about it. `live` needs a passing manifest with
+ * `proof.boundary: live` on its own integration node - the only evidence `integration.verify` writes.
+ * `fake` is an integration that appears only in some other proof's `proof.fakes` (an `e2e.verify` run
+ * against `boundary: api`). `none` is an integration nothing proved at all. There is no fourth state, and
+ * a failed live run is `none` rather than `live`: it ran, it did not prove.
+ */
+export function integrationProofStatus(ledger){
+  const nodes=integrationNodes(ledger);
+  const manifests=evidenceManifests(ledger);
+  const seen=new Set();
+  const out=[];
+  for(const item of declaredIntegrations(ledger).list){
+    if(seen.has(item.id))continue;
+    seen.add(item.id);
+    const node=nodes.find(candidate=>provesIntegration(candidate,item.id))??null;
+    const own=node?manifests.filter(entry=>entry.nodeId===node.id&&entry.proof?.boundary==='live'):[];
+    const live=own.filter(entry=>entry.outcome==='pass');
+    const faked=manifests.filter(entry=>entry.proof?.boundary==='api'&&entry.proof.fakes.includes(item.id));
+    const evidence=[...own,...faked].map(entry=>({file:entry.file,node:entry.nodeId,outcome:entry.outcome,boundary:entry.proof.boundary,fakes:entry.proof.fakes}));
+    out.push({id:item.id,provider:item.provider,node:node?.id??null,proven:live.length?'live':faked.length?'fake':'none',evidence});
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------- a proof under which rules
+
+/** Stable key order at every depth, so the same declaration always hashes to the same digest. */
+const canonical=value=>{
+  if(Array.isArray(value))return `[${value.map(canonical).join(',')}]`;
+  if(plain(value))return `{${Object.keys(value).sort().map(key=>`${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`;
+  return JSON.stringify(value===undefined?null:value);
+};
+
+/**
+ * The digest of the rules an operation of this kind is held to: its `model/kinds.yaml` entry, its operator
+ * contract and the validator rules that judge it. The kernel supplies all three - this module owns only the
+ * canonical form, so a digest written today and a digest computed tomorrow compare byte for byte.
+ */
+export function contractDigestOf({kind,kindRecord=null,operator=null,rules=[]}={}){
+  return sha256(Buffer.from(canonical({
+    kind:text(kind,'operation kind'),
+    kindRecord:kindRecord??null,
+    operator:operator??null,
+    rules:(Array.isArray(rules)?rules:[rules]).filter(item=>item!==null&&item!==undefined).map(String)
+  }),'utf8'));
+}
+
+/**
+ * Done nodes whose stored proof was taken under a declaration that has since moved: `[{node, stored,
+ * current}]`. Only a node the kernel itself completed is considered (its kernel block names the `opId` that
+ * wrote it), so a decided record settled by review is never dragged in. A node the kernel completed and that
+ * stored no digest at all reads as `stored: null` - a proof that does not remember its rules is exactly the
+ * case §8 of the 5-plus design reopens. `kindOf(node,{raw,kernel})` is how the kernel tells this module
+ * which kind ran, because the ledger stores the node kind and the kernel knows the operation kind;
+ * `digestOf(kind,{node,opId})` answering null means the kernel has no declaration to compare and the node is
+ * left alone.
+ */
+export function staleProofs(ledger,{digestOf,kindOf=null}={}){
+  need(typeof digestOf==='function','staleProofs needs a digestOf(kind) the kernel supplies');
+  const stale=[];
+  for(const node of (ledger?.list??[]).filter(item=>item.state==='done')){
+    const raw=tryReadNode(ledger,node);
+    const kernel=raw?.extensions?.work3?.kernel;
+    if(!plain(kernel)||!trimmed(kernel.opId))continue;
+    const kind=typeof kindOf==='function'?kindOf(node,{raw,kernel}):node.kind;
+    if(!trimmed(kind))continue;
+    const current=trimmed(digestOf(kind,{node,opId:kernel.opId}));
+    if(!current)continue;
+    const stored=trimmed(kernel.contractDigest);
+    if(stored===current)continue;
+    stale.push({node,stored,current});
+  }
+  return stale;
 }
 
 // ---------------------------------------------------------------------------- status

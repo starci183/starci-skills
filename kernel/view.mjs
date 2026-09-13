@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {listWorkflows,workflowsRoot} from './store.mjs';
+import {integrationProofStatus,readLedgerTree} from './ledger.mjs';
 
 /**
  * One truthful status view of a workflow. This is what replaces "go and watch the agents": every number
@@ -106,6 +107,25 @@ function readValidator(dir,events){
     lastSummary:latest?String(latest.summary??latest.note??latest.reason??latest.event).slice(0,300):null,lastAt:at(latest)};
 }
 
+/** The three things a status page may say about an external system, and nothing in between. */
+export const PROOF_WORDS={live:'proven live',fake:'proven against a fake, not live',none:'not proven'};
+
+/**
+ * The integrations the worked tree declares and what each one is actually proven by. The view still opens
+ * no store and runs no validator: `readLedgerTree` is a bounded filesystem read of `state.ledgerRoot`, and
+ * a workflow that names no tree, or a tree that is gone, leaves the section out rather than failing a page
+ * that is otherwise complete.
+ */
+function readIntegrations(state){
+  const root=typeof state?.ledgerRoot==='string'&&state.ledgerRoot.trim()?state.ledgerRoot.trim():null;
+  if(!root)return [];
+  try{
+    const tree=readLedgerTree(root);
+    return tree?integrationProofStatus(tree).map(entry=>({id:entry.id,provider:entry.provider??null,node:entry.node,
+      proven:entry.proven,evidence:entry.evidence.length})):[];
+  }catch{return [];}
+}
+
 /** Lanes are the kernel's optional grouping of nodes; both shapes it may take are read, neither is required. */
 function readLanes(state,statusOf){
   const lanes=state?.lanes;
@@ -206,6 +226,7 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
       treeEligible:state.ledgerSummary?.eligible??null,treeTotal:state.ledgerSummary?.total??null,
       byFeature:[...features.values()].sort((a,b)=>a.feature.localeCompare(b.feature))},
     lanes:readLanes(state,statusOf),
+    integrations:readIntegrations(state),
     reviews:{rounds:plain(state.verifyRounds)?{...state.verifyRounds}:{},
       exhausted:unique(events.filter(event=>event.event==='verify-exhausted').map(event=>event.component).filter(Boolean)),
       findings:Array.isArray(state.reviewFindings)?state.reviewFindings.length:0},
@@ -265,6 +286,11 @@ export function renderView(view){
   if(view.ledger.byFeature.length)lines.push('',`## Ledger by feature${view.ledger.treeTotal===null?'':` (tree: ${view.ledger.treeEligible}/${view.ledger.treeTotal} nodes eligible in scope)`}`,
     table(['feature','done','total'],view.ledger.byFeature.map(entry=>[entry.feature,entry.done,entry.total])));
   if(view.lanes?.length)lines.push('','## Lanes',table(['lane','done','total'],view.lanes.map(lane=>[lane.lane,lane.done,lane.total])));
+  // One line per declared external system and what the tree may honestly claim about it. An integration
+  // that is only ever faked is printed as such, so a workflow can never read as finished over one.
+  if(view.integrations?.length)lines.push('',`## Integrations (${view.integrations.length})`,
+    ...view.integrations.map(entry=>`- ${entry.id}${entry.provider&&entry.provider!==entry.id?` (${entry.provider})`:''}: `
+      +`${PROOF_WORDS[entry.proven]??entry.proven}${entry.node?'':' - no integration node in the tree'}`));
 
   const rounds=Object.entries(view.reviews.rounds);
   if(rounds.length||view.reviews.exhausted.length)lines.push('','## Reviews',

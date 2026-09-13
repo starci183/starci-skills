@@ -27,6 +27,9 @@ test('every sequence renders a numbered working order and a definition of done, 
     'frontend.implement':[op({kind:'frontend.implement',allowlist:['src/screens/intake/page.tsx']}),{kind:'implementation',inputRef:'features/sales/implementation/frontend/intake/index.yaml'}],
     uat:[op({kind:'task.execute',allowlist:['e2e/checkout.spec.ts'],resources:['e2e-runtime']}),{kind:'uat'}],
     'e2e.verify':[op({kind:'e2e.verify',allowlist:['src/tests/e2e/checkout.e2e-spec.ts'],resources:['e2e-runtime'],acceptance:['order-persisted']}),{kind:'uat'}],
+    'integration.verify':[op({kind:'integration.verify',origin:'ledger',allowlist:['src/tests/integration/telegram.live-spec.ts'],
+      references:['features/sales/integration/telegram/index.yaml','features/sales/architecture/sds/delivery/index.yaml'],
+      acceptance:['a message reaches the telegram sandbox chat']}),{kind:'integration',path:'features/sales/integration/telegram/index.yaml'}],
     'uat.verify':[op({kind:'uat.verify',allowlist:['uat/checkout/runs/1/run.md'],resources:['e2e-runtime']}),{kind:'uat'}],
     operations:[op({kind:'runtime.operate',allowlist:['ops/rotate.sh'],resources:['postgres']}),{kind:'operations'}],
     migration:[op({allowlist:['src/migrations/0007-orders.ts'],resources:['postgres']}),{kind:'implementation'}],
@@ -436,4 +439,43 @@ test('e2e.verify proves a backend slice through the API on the real stack, never
   assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'uat',path:'features/sales/uat/checkout/index.yaml'}}),'uat');
   assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'e2e',path:'features/sales/e2e/checkout/index.yaml'}}),'e2e.verify');
   assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'uat',path:'features/sales/implementation/frontend/checkout/index.yaml'}}),'uat.verify');
+});
+
+/**
+ * The sequence that closes the hole four faked chatbot channels went through: `e2e.verify` may still fake
+ * an outside provider, but it must now name it in the evidence, and the only operation that can call a
+ * declared provider proven is one that actually calls it.
+ */
+test('an integration is proven live or it is not proven: the credential is the owner\'s, no fake stands in, and e2e names what it faked',()=>{
+  const live=op({kind:'integration.verify',origin:'ledger',allowlist:['src/tests/integration/telegram.live-spec.ts'],
+    references:['features/sales/integration/telegram/index.yaml'],acceptance:['a message reaches the telegram sandbox chat'],
+    checks:[{name:'integration',command:'npm run test:integration -- telegram'}]});
+  const node={kind:'integration',path:'features/sales/integration/telegram/index.yaml'};
+  const rendered=stepsFor(live,{node});
+  assert.match(rendered,/Sequence `integration\.verify`/);
+  // Every kind, origin and allowlist shape routes an integration node to this one sequence and no other.
+  assert.equal(sequenceFor(live,{node}),'integration.verify');
+  assert.equal(sequenceFor(op({kind:'task.execute',origin:'repair',allowlist:['db/migrations/9.sql']}),{node}),'integration.verify');
+  assert.equal(sequenceFor(op({kind:'integration.verify'}),{node:null}),'integration.verify');
+
+  // The credential: one named variable, from the environment, and a missing one stops the work by name.
+  assert.match(rendered,/the environment variable the declaration names/);
+  assert.match(rendered,/Never read it from a file you create/);
+  assert.match(rendered,/`blocked` with blocker `environment` naming that exact variable and nothing else/);
+  // No double of any spelling may stand in for the provider, and the secret never leaves the variable name.
+  assert.match(rendered,/No fake, no stub, no mock, no recorded or replayed response, no local double/);
+  assert.match(rendered,/calling the real provider's own sandbox over the network/);
+  assert.match(rendered,/every secret masked/);
+  assert.match(rendered,/`proof: \{boundary: live, fakes: \[\]\}`/);
+  assert.match(rendered,/only on a green live run/);
+  assert.match(rendered,/a provider outage, a sandbox that will not answer or a rate limit is `failed`/);
+  assert.match(rendered,/`npm run test:integration -- telegram`/);
+  assert.match(rendered,/`src\/tests\/integration\/telegram\.live-spec\.ts`/);
+
+  // The other half of the rule: an API proof may fake a provider, but the evidence has to name it.
+  const api=stepsFor(op({kind:'e2e.verify',allowlist:['src/tests/e2e/checkout.e2e-spec.ts'],resources:['e2e-runtime'],
+    acceptance:['order-persisted'],checks:[{name:'e2e',command:'npm run test:e2e -- checkout'}]}),{node:{kind:'e2e'}});
+  assert.match(api,/`proof: \{boundary: api, fakes: \[<provider ids>\]\}`/);
+  assert.match(api,/a provider the diff fakes that the evidence does not list is a defect/);
+  assert.match(api,/its own `integration` node walking `integration\.verify`/);
 });

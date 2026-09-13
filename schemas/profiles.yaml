@@ -35,3 +35,5 @@ business-overview:
 # frontend token sources it names. Nothing is launched into a worktree to settle it.
 brand:
   assertions: true
+integration:
+  assertions: true

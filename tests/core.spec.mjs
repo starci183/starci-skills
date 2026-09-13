@@ -76,6 +76,31 @@ test('extension semantics are hashed and prototype names cannot become supported
   f.node('biz',{...f.metas.get('biz'),extensions:{future:{value:2}}});assert.notEqual(f.run().nodes[0].inputDigest,old);
   f.node('unknown',{kind:'toString'});f.done('unknown');assert.ok(codes(f.run()).includes('UNSUPPORTED_PROFILE'));
 });
+/**
+ * An external integration is a node kind of its own, with a completion profile of its own: assertions, no
+ * code binding and no capture. Its evidence says what it was proven against, which is the whole point of
+ * the kind - a manifest with `proof: {boundary: live, fakes: []}` must validate, and so must the
+ * `boundary: api` form an e2e run writes when it names the providers it faked.
+ */
+test('an integration node completes on its own profile and its evidence may declare the boundary it proved',t=>{
+  const f=fixture(t);
+  f.node('checkout-telegram',{kind:'integration'});
+  f.done('checkout-telegram',{proof:{boundary:'live',fakes:[]}});
+  const r=f.run();
+  assert.equal(r.ok,true,JSON.stringify(r.errors));
+  assert.ok(!codes(r).includes('UNSUPPORTED_PROFILE'),'`integration` is a published completion profile');
+  assert.equal(r.nodes.find(n=>n.id==='checkout-telegram').effectiveState,'done');
+  assert.ok(!r.warnings.some(w=>w.code==='UNSUPPORTED_PROFILE'));
+
+  // The api form, with the providers a run faked, is equally valid; an invented boundary is not.
+  const api=fixture(t);api.node('checkout-api',{kind:'e2e'});api.done('checkout-api',{proof:{boundary:'api',fakes:['telegram-bot-api']}});
+  assert.equal(api.run().ok,true);
+  const bogus=fixture(t);bogus.node('checkout-bogus',{kind:'e2e'});bogus.done('checkout-bogus',{proof:{boundary:'recorded'}});
+  assert.ok(codes(bogus.run()).includes('SCHEMA_VALUE'),'`recorded` is not one of the two boundaries a proof may claim');
+  const unknown=fixture(t);unknown.node('checkout-unknown',{kind:'e2e'});unknown.done('checkout-unknown',{proof:{boundary:'live',mocked:['x']}});
+  assert.ok(codes(unknown.run()).includes('UNKNOWN_FIELD'),'a proof names its fakes under `fakes` or not at all');
+});
+
 test('failed, empty, wrong-owner and uncovered assertions reject fake done',t=>{
   for(const change of [{outcome:'fail'},{assertions:[]},{nodeId:'absent'},{assertions:[{id:'other',outcome:'pass',observation:'Synthetic'}]},{assertions:[null]}]){
     const f=fixture(t);f.node('biz');f.done('biz',change);const r=f.run();assert.equal(r.ok,false);assert.notEqual(r.nodes[0]?.effectiveState,'done');assert.ok(!codes(r).includes('MALFORMED_WORKSPACE'));

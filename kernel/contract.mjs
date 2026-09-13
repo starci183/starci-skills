@@ -28,7 +28,7 @@
 
 export const STEPS_HEADING='## Working order (mandatory, in this order)';
 export const DONE_HEADING='## Definition of done for this kind';
-export const SEQUENCES=['work.author','work.intake','owner.ask','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','uat','uat.verify','operations','migration','architecture.revise','grammar.update','decide','brand.decide','generic'];
+export const SEQUENCES=['work.author','work.intake','owner.ask','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','integration.verify','uat','uat.verify','operations','migration','architecture.revise','grammar.update','decide','brand.decide','generic'];
 
 const IMPLEMENT_KINDS=['backend.implement','interface.implement','frontend.implement'];
 const IMPLEMENT_NODES=['implementation','ui'];
@@ -80,6 +80,9 @@ export function sequenceFor(op,{node=null}={}){
   // backend lane's prove step, and a ledger `uat` node outside the frontend layout is such a scenario.
   if(kind==='e2e.verify')return 'e2e.verify';
   if(nodeKind==='e2e')return 'e2e.verify';
+  // An external system is proven against itself or it is not proven, so an `integration` node has exactly
+  // one sequence and no origin, allowlist or implementing kind may route it into a build or an API proof.
+  if(kind==='integration.verify'||nodeKind==='integration')return 'integration.verify';
   if(nodeKind==='uat')return frontendNode(node)?'uat.verify':'uat';
   const implement=IMPLEMENT_KINDS.includes(kind)||IMPLEMENT_NODES.includes(nodeKind);
   if(implement&&origin==='shared')return 'implement.shared';
@@ -300,6 +303,7 @@ const SEQUENCE_STEPS={
       `Read the design (SDS) and requirement (SRS) material in ${v.references} and the node assertions (${v.acceptance}); restate, per assertion, the request a client sends and the observable effect the stack must show.`,
       `Write or extend the end-to-end spec at the path the allowlist names (${v.allowlist}): one scenario per assertion, exercised through the public API on the real stack (database, identity, containers) with no mock of the unit under proof; never through a screen.`,
       `Start only the end-to-end runtime named in resources (${v.resources}) and seed it as the scenario needs; touch no other runtime and change no product code - a behavior that is wrong is a finding to report, not a fix to make here.`,
+      `Name every external provider your scenarios do NOT call for real - each one you mock, stub, record, replay or point at a local double - and write those ids into the evidence as \`proof: {boundary: api, fakes: [<provider ids>]}\`. This operation proves the product's API against a real stack, so a faked outside system is allowed here, but never unnamed: a provider the diff fakes that the evidence does not list is a defect, and proving that provider for real is its own \`integration\` node walking \`integration.verify\`.`,
       `Run the listed check verbatim (${v.checks}) and keep the run output; a scenario that passes without the stack running proves nothing and is a defect of the spec.`,
       `Self-audit: every assertion has a scenario, every scenario ran on ${v.resources}, and \`git status\` shows only ${v.allowlist}.`,
       `Report \`done\` exactly once with the run output in the summary and the spec paths; a failing scenario is \`failed\` naming the assertion and the observed response; a runtime that cannot start is \`failed\` with the exact reason (\`blocked\` \`environment\` only when it provably cannot be fixed from the allowlist); never \`done\` on an unrun or partial spec.`
@@ -307,8 +311,31 @@ const SEQUENCE_STEPS={
     done:[
       `the spec at ${v.allowlist} exercises every assertion (${v.acceptance}) through the API on the real stack`,
       `it ran on ${v.resources} and its output is in the report`,
+      `the evidence carries \`proof: {boundary: api, fakes: [...]}\` naming every external provider the scenarios faked, stubbed, recorded or replaced with a double`,
       `a failing scenario or a runtime that did not start is \`failed\`, never a \`done\``,
       'Lane: this op is the prove step of `backend.implement` -> `e2e.verify` -> `review.verify`; the node is done only after `review.verify` accepts the slice this spec proved.'
+    ]
+  }),
+  // An external system is proven against itself or it is not proven. The whole sequence exists because a
+  // fake of a declared provider was once inside a prove operation's contract: here it is a defect by name,
+  // the credential is the owner's and is read from the environment only, and a missing one stops the work
+  // with the exact variable rather than quietly running against a double.
+  'integration.verify':v=>({
+    steps:[
+      `Read the integration declaration this node proves (${v.references}) - the \`extensions.work3.integrations\` entry in the business (SRS) or design (SDS) record that declared it: its id, the provider, the exact credential variable the owner provides, where the code reads it, and the provider's own sandbox - and the design the integration belongs to and the node assertions (${v.acceptance}); restate per assertion the call this product makes to that provider and the observable effect the provider must show.`,
+      `The credential is the owner's and has exactly one source: the environment variable the declaration names. Never read it from a file you create, never from a second variable of your own naming, never a default and never a value you invent. If the environment does not hold that variable, stop here and report \`blocked\` with blocker \`environment\` naming that exact variable and nothing else - no value, no guess, no partial run, no fallback.`,
+      `Write the live scenario at the path the allowlist names (${v.allowlist}): one scenario per assertion, each one calling the real provider's own sandbox over the network. No fake, no stub, no mock, no recorded or replayed response, no local double, no skipped or conditionally-skipped test, and no "when the key is missing" branch - a scenario that can pass while the provider is silent proves nothing and is a defect of the spec.`,
+      `Run the listed check verbatim: ${v.checks}; keep the whole run output and put it in the report with every secret masked. The credential's value is never printed, logged, echoed, committed into the spec or a fixture, or written into the evidence: the variable name is what travels, never what it holds.`,
+      `Write the evidence for this node with \`proof: {boundary: live, fakes: []}\` - this operation proves the outside system itself, so it names no fake, and an evidence record of this kind that lists one is a defect.`,
+      `Self-audit: every assertion has a scenario that actually reached the provider, the run output carries the provider's real responses, no secret value appears in any file the diff touches, and \`git status\` shows nothing outside ${v.allowlist}.`,
+      `Report \`done\` exactly once and only on a green live run, with the run output and the spec paths. A scenario the provider rejected is \`failed\` naming the assertion and the response it returned; a provider outage, a sandbox that will not answer or a rate limit is \`failed\` with that exact reason; a missing credential is \`blocked\` \`environment\` with the variable name. Never \`done\` on a skipped, faked or unrun scenario.`
+    ],
+    done:[
+      `the scenario at ${v.allowlist} calls the real provider's sandbox for every assertion (${v.acceptance}), with the credential read only from the environment variable the declaration names`,
+      `no fake, stub, mock, recorded response, local double or skipped scenario stands in for the declared provider anywhere in this operation`,
+      `the evidence carries \`proof: {boundary: live, fakes: []}\` and the run output is in the report with every secret masked; no credential value exists in any record, spec, fixture, log or report`,
+      `a missing credential is \`blocked\` \`environment\` naming the exact variable, and a provider outage or a red scenario is \`failed\` - never a \`done\``,
+      'Lane: the node is the tree\'s one proof of this declared integration; `e2e.verify` may fake the same provider under `proof: {boundary: api}`, and only this operation makes it proven live.'
     ]
   }),
   uat:v=>({
