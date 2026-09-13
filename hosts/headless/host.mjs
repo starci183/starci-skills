@@ -26,7 +26,7 @@ import {repositoryRoot} from '../../kernel/reports.mjs';
  *
  * What this host cannot do it says so: `account list` (the provider quota Orca reads) is `unsupported`, never a
  * throw, and the host declares no capability, so an operation kind whose catalog entry `needs` one (the design
- * tool behind `interface.draw`) is refused at schedule time instead of being launched into a process that has
+ * tool behind `interface.asset`) is refused at schedule time instead of being launched into a process that has
  * no tool to draw with. The host also runs strictly sequentially - see `sequential` - because one chat drives
  * one workflow and there is no terminal to supervise a second process from.
  */

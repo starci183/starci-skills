@@ -592,7 +592,8 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
   Every command accepts --host-adapter orca|headless (default orca; headless when STARCI_HOST=headless). The
   headless host runs the same kernel without Orca: operations are one-at-a-time claude -p / codex exec
   processes in the worktree, reports reach the kernel through a mailbox file, and a kind that needs a host
-  capability the headless host lacks (interface.draw needs design-tool) is refused as host-unsupported.`;}
+  capability the headless host lacks (interface.asset needs design-tool, which model/hosts.yaml declares only
+  for the Orca host) is refused as host-unsupported.`;}
 
 const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
