@@ -868,6 +868,10 @@ test('the items an older rule parked for the owner are judged again under the cu
     state.needUser.push({kind:'ledger',detail:`never verified: ${node.id} (review-exhausted)`});
     // 7. a genuine owner item: a provision. It stays.
     state.needUser.push({op:'req-1',kind:'credential',detail:'TELEGRAM_BOT_TOKEN'});
+    // 8. a stale line about a shared change that has since finished, and a requester blocked behind an alive shared change with no line of its own
+    state.ops.push(clone('shared-done',{origin:'shared',status:'done'}));
+    state.needUser.push({op:'shared-done',kind:'shared-depth',detail:'shared-done is a shared change 2 levels deep and still needs src/x.ts'});
+    state.ops.push(clone('req-2',{dependsOn:['shared-9','shared-done']}));
     approve(store,state);
     state.run='run_wf';state.from='term_kernel';
     const before=store.readEvents().length;
@@ -875,7 +879,7 @@ test('the items an older rule parked for the owner are judged again under the cu
     const log=store.readEvents().slice(before);
     const rejudged=log.filter(event=>event.event==='parked-rejudged');
     assert.equal(rejudged.length,1);
-    assert.equal(rejudged[0].rule,'5.0.0-plus');
+    const rule=rejudged[0].rule;assert.match(rule,/^5\.0\.0-plus/);
     const routes=Object.fromEntries(rejudged[0].routed.map(entry=>[`${entry.kind}:${entry.op??'-'}`,entry.route]));
     assert.equal(routes['environment:env-1'],'launch-cooling');
     assert.equal(routes['shared-change:req-1'],'waits-for:shared-9');
@@ -884,12 +888,15 @@ test('the items an older rule parked for the owner are judged again under the cu
     assert.equal(routes['review:verify-x'],'verify-escalated');
     assert.equal(routes['review:-'],'companion-line');
     assert.equal(routes['ledger:-'],'recomputed-at-finish');
+    assert.equal(routes['shared-depth:shared-done'],'stale:done');
+    assert.equal(routes['blocked-requester:req-2'],'waits-for:shared-9');
     const byId=id=>state2.ops.find(item=>item.id===id);
     // The launch cooled and came back at once; the requester waits; the record-only request runs again with the rule in hand.
     assert.ok(log.some(event=>event.event==='launch-cooling'&&event.op==='env-1'));
     assert.ok(log.some(event=>event.event==='launch-readmitted'&&event.op==='env-1'));
     assert.notEqual(byId('env-1').status,'blocked');
     assert.equal(byId('req-1').waitingFor,'shared-9');
+    assert.equal(byId('req-2').status,'paused');
     assert.notEqual(byId('shared-y').status,'blocked');
     assert.match(byId('shared-y').findings.at(-1),/not a change any operation may ask for/);
     // The record path is refused with the same event the live rule uses, and the code path became a shared change.
@@ -903,7 +910,7 @@ test('the items an older rule parked for the owner are judged again under the cu
     const kinds=state2.needUser.map(item=>item.kind);
     assert.ok(kinds.includes('credential'),'a provision stays the owner\'s');
     for(const gone of ['environment','shared-change','ledger-path','review','ledger'])assert.equal(kinds.includes(gone),false,`${gone} is no longer on the owner's list`);
-    assert.equal(state2.parkRule,'5.0.0-plus');
+    assert.equal(state2.parkRule,rule);
     // Once per rule: the next start finds the stamp and judges nothing again.
     const again=store.readEvents().length;
     harness.run({maxIterations:1});
