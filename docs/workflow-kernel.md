@@ -671,6 +671,10 @@ worktree, one row.
 
 ## The provider quota is probed, not guessed
 
+The supervisor follows the build exactly as the kernels do: a rebuilt launcher (`npm run build`) is seen at the
+next round, a successor is started from the same command line and this one leaves (`supervisor-rebuilt`), so no
+build needs a hand restart to take effect.
+
 Every three minutes the supervisor asks Orca for the usage windows its status bar shows (`orca account list
 --json` -> `rateLimits`: Claude's five-hour session, its week and Fable's own week; Codex's week) and writes
 them whole beside every store root it covers as `_local/workflows/runtime-budget.json` (`budget-probed`; a

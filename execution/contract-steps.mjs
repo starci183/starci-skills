@@ -136,19 +136,20 @@ const SEQUENCE_STEPS={
     ]
   }),
   // An intake authors the records of a feature the tree does not have yet: full business drafts, an architecture
-  // skeleton, every record todo. It closes no node - the records it writes are the nodes the tree has afterwards.
+  // skeleton, every leaf record todo (the roots carry no state, like the example). It closes no node - the records it
+  // writes are the nodes the tree has afterwards.
   'work.intake':v=>({
     steps:[
       `Read the job this workflow was given (the goal above) and the workspace record and example feature the references name (${v.references}); restate in five lines what the feature must let the business do, for whom, and where its boundary against the existing features runs - as the customer would say it, never as a screen or a table.`,
-      `Open the example feature and read its whole shape - the module record, business/overview, business/srs (business-rules, customer-journeys, data, functional-requirements, non-functional-requirements, decisions), architecture/overview and architecture/sds (components, contracts, data, decisions) - and mirror that shape exactly under the allowlist (${v.allowlist}): the same folders, the same record schema (work/node@2), ids under the same prefix, every record \`state: todo\`, every record naming the ones it refers to.`,
+      `Open the example feature and read its whole shape - the module record, business/overview, business/srs (business-rules, customer-journeys, data, functional-requirements, non-functional-requirements, decisions), architecture/overview and architecture/sds (components, contracts, data, decisions) - and mirror that shape exactly under the allowlist (${v.allowlist}): the same folders, the same record schema (work/node@2), ids under the same prefix, every leaf record \`state: todo\` and the roots (module, business, srs, architecture, sds index records) without a state exactly as the example has them, every record naming the ones it refers to.`,
       `Write the business records as full drafts, not stubs: the overview in the customer's language, every business rule with the outcome it protects, every customer journey step by step with what the person sees and does, the data the feature owns, one testable claim per functional requirement, non-functional requirements with their limits, and every question the job does not settle as an open decision record - a requirement the job does not settle is an open decision, never a guess.`,
-      `Write the architecture records as a skeleton that names the components, contracts and data the design will settle, each referencing the requirement it answers, every one \`state: todo\` with no design chosen; a design the owner has not taken is an open decision, not a chosen mechanism.`,
+      `Write the architecture records as a skeleton that names the components, contracts and data the design will settle, each referencing the requirement it answers, every leaf \`state: todo\` with no design chosen; a design the owner has not taken is an open decision, not a chosen mechanism.`,
       `Never write \`completion\`, evidence, the kernel's own extension block or any record outside the allowlist; never change an existing feature; never write product code.`,
       `Run the listed validator check verbatim: ${v.declared}; every record you wrote validates in the tree as it stands, and \`git status\` shows nothing outside the allowlist.`,
       `Report \`done\` exactly once with the records you authored and the open decisions you left for the owner; a boundary the job does not determine is \`ask\` with the exact question.`
     ],
     done:[
-      `features under ${v.allowlist} carry a module record, a business overview, SRS records (rules, journeys, data, functional and non-functional requirements, open decisions) and an architecture skeleton, all \`state: todo\` and valid`,
+      `features under ${v.allowlist} carry a module record, a business overview, SRS records (rules, journeys, data, functional and non-functional requirements, open decisions) and an architecture skeleton, every leaf record \`state: todo\` (the roots carry no state, as the example) and the whole feature valid`,
       `every requirement is a claim the owner can read and test, and every open question is an open decision record, never a guess`,
       `no existing feature changed, no product code changed, and the validator check exits 0: ${v.declared}`
     ]

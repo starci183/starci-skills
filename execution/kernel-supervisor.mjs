@@ -83,11 +83,28 @@ export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEA
 }
 
 /** The long-running supervisor: poll, act, sleep; exits only when no approved workflow is unfinished. */
+/** The build the supervisor runs from: the launcher's mtime, which every `npm run build` rewrites. */
+export function launcherStamp(launcher){try{return Math.round(fs.statSync(launcher).mtimeMs);}catch{return null;}}
+/** The supervisor's replacement: the same command line, detached, so the process that reads the new build outlives this one. */
+export function respawnSelf({spawnFn=spawn,cwd=process.cwd()}={}){
+  const child=spawnFn(process.execPath,process.argv.slice(1),{cwd,detached:true,stdio:'ignore',windowsHide:true});
+  child.unref?.();
+  return child.pid??null;
+}
 export function superviseForever({repoRoot,roots=null,launcher,pollMs=DEFAULT_POLL_MS,healthMs,log=()=>{},maxRounds=Infinity,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),
-  probe=probeRuntimeBudget,probeMs=DEFAULT_PROBE_MS,now=Date.now}){
+  probe=probeRuntimeBudget,probeMs=DEFAULT_PROBE_MS,now=Date.now,stamp=()=>launcherStamp(launcher),respawn=null}){
   let round=0,lastProbe=null;
   const stores=[...new Set((roots??[repoRoot]).map(root=>workflowsRoot(root)))];
+  const born=stamp();
   for(;;){
+    // The supervisor follows the build exactly as the kernels do: a rebuilt launcher is a new supervisor, started
+    // from the same command line before this one leaves, so no build ever needs a hand restart to take effect.
+    const current=stamp();
+    if(born&&current&&current!==born){
+      const pid=respawn?respawn():respawnSelf({cwd:process.cwd()});
+      log({event:'supervisor-rebuilt',from:born,to:current,successor:pid});
+      return {rounds:[],rebuilt:{from:born,to:current,successor:pid}};
+    }
     // The provider quota, on a slow cadence, written beside every store root: kernels read the file, never Orca.
     // A probe that fails leaves the last good budget in place and says so.
     if(lastProbe===null||now()-lastProbe>=probeMs){

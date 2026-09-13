@@ -70,6 +70,22 @@ test('a workflow whose tree was named explicitly is started with the same --ledg
  * A lane does not move the store: it lives in the repository, so the supervisor lists it once whether it polls
  * from the base worktree or from the lane, and starts the kernel inside the lane - the tree that workflow owns.
  */
+test('a rebuilt launcher ends the supervisor after it started its successor from the same command line',()=>{
+  const root=tmp();
+  try{
+    workflow(root,'live',{lastAt:1,stop:true});
+    let build=100;const logged=[];const slept=[];
+    const result=superviseForever({repoRoot:root,launcher:'L.mjs',maxRounds:5,log:event=>logged.push(event),sleep:ms=>{slept.push(ms);build=200;},pollMs:5,
+      probe:()=>({ok:false,reason:'no orca in tests'}),stamp:()=>build,respawn:()=>4242});
+    assert.deepEqual(result.rebuilt,{from:100,to:200,successor:4242});
+    assert.equal(slept.length,1,'one round ran on the old build, the rebuilt one was seen at the next');
+    assert.deepEqual(logged.filter(event=>event.event==='supervisor-rebuilt').map(event=>[event.from,event.to,event.successor]),[[100,200,4242]]);
+    // A launcher that cannot be read binds nothing: the supervisor simply keeps going.
+    const blind=superviseForever({repoRoot:root,launcher:'L.mjs',maxRounds:2,log:()=>{},sleep:()=>{},pollMs:5,probe:()=>({ok:false,reason:'x'}),stamp:()=>null,respawn:()=>{throw Error('never');}});
+    assert.equal(blind.rebuilt,undefined);
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
 test('a workflow that owns a lane is listed once from the repository store and its kernel is started inside the lane',()=>{
   const root=tmp();const now=()=>10_000_000;
   const lane=path.join(root,'lanes','laned');

@@ -1320,10 +1320,10 @@ function intakeOp(state,{workRoot,loaded,index,entry=null,repositories={}}){
   // Always a real record to mirror: the module roots when the tree has them, else the first record under the example.
   const exampleRefs=found.length?found:paths.filter(where=>example&&where.startsWith(`${example}/`)).sort().slice(0,1);
   return {id:`${name.replace(/[^A-Za-z0-9._-]+/g,'-')}-intake`,kind:AUTHOR_KIND,nodeId:null,intake:{scope:name,example},
-    goal:`Author the Work records of the feature ${name} from the job: ${state.job}. Mirror the shape of the existing feature ${example??'(none yet)'}: the module record, the business overview and SRS as full drafts, the architecture as a skeleton; every record todo, every open question an open decision.`,
+    goal:`Author the Work records of the feature ${name} from the job: ${state.job}. Mirror the shape of the existing feature ${example??'(none yet)'}: the module record, the business overview and SRS as full drafts, the architecture as a skeleton; every leaf record todo (the module, business, srs, architecture and sds roots carry no state, exactly as the example), every open question an open decision.`,
     ledgerIds:[],allowlist:[`.starciwork/features/${name}/**`],
     references:unique(['workspace.yaml',...exampleRefs]),checks:[check],
-    acceptance:[`features/${name} has a module record, a business overview, SRS records and an architecture skeleton, all todo and valid`,'no existing feature changed','the Work tree still validates'],origin:'ledger'};
+    acceptance:[`features/${name} has a module record, a business overview, SRS records and an architecture skeleton, every leaf record todo and the whole feature valid - the roots (module, business, srs, architecture, sds) carry no state, as in the example feature`,'no existing feature changed','the Work tree still validates'],origin:'ledger'};
 }
 export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless,
   ledgerRoot=null,git=spawnSync,resolveLedger=resolveLedgerRoot}={}){
