@@ -1,6 +1,6 @@
 # Running a workflow from a chat
 
-A workflow does not need Orca. The kernel (`execution/workflow-kernel.mjs`, see
+A workflow does not need Orca. The kernel (`kernel/kernel.mjs`, see
 [workflow-kernel.md](workflow-kernel.md)) is one process that owns the whole control loop, and Orca
 only ever supplied two things to it: worktrees and attested agent terminals. The headless host adapter
 (`workflow-run --host-adapter headless`, or `STARCI_HOST=headless` in the environment) supplies the
@@ -51,13 +51,13 @@ keeps it in the owner repository).
 
 ```
 node <skill root>/scripts/ensure-build.mjs
-node <skill root>/.dist/execution/orca-supervised-launch.mjs workflow-goal    --host <skill root> --job "<the owner's prompt>" [--scope f1,f2] [--lane [<name>]]
-node <skill root>/.dist/execution/orca-supervised-launch.mjs workflow-approve --host <skill root> --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
-node <skill root>/.dist/execution/orca-supervised-launch.mjs workflow-run     --host <skill root> --id <id> --host-adapter headless   # detached, output appended to <dir>/kernel.log
-node <skill root>/.dist/execution/orca-supervised-launch.mjs workflow-status  --host <skill root> --id <id> [--json true]
-node <skill root>/.dist/execution/orca-supervised-launch.mjs workflow-stop    --host <skill root> --id <id>
-node <skill root>/.dist/execution/orca-supervised-launch.mjs workflow-list
-STARCI_HOST=headless node <skill root>/.dist/execution/orca-supervised-launch.mjs workflow-supervise --host <skill root>   # detached; starts and restarts every approved, unfinished workflow of the repository
+node <skill root>/.dist/hosts/orca/launch.mjs workflow-goal    --host <skill root> --job "<the owner's prompt>" [--scope f1,f2] [--lane [<name>]]
+node <skill root>/.dist/hosts/orca/launch.mjs workflow-approve --host <skill root> --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
+node <skill root>/.dist/hosts/orca/launch.mjs workflow-run     --host <skill root> --id <id> --host-adapter headless   # detached, output appended to <dir>/kernel.log
+node <skill root>/.dist/hosts/orca/launch.mjs workflow-status  --host <skill root> --id <id> [--json true]
+node <skill root>/.dist/hosts/orca/launch.mjs workflow-stop    --host <skill root> --id <id>
+node <skill root>/.dist/hosts/orca/launch.mjs workflow-list
+STARCI_HOST=headless node <skill root>/.dist/hosts/orca/launch.mjs workflow-supervise --host <skill root>   # detached; starts and restarts every approved, unfinished workflow of the repository
 ```
 
 `workflow-run` and `workflow-supervise` are started detached and never in the chat's foreground: a chat

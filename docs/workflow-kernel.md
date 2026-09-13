@@ -1,6 +1,6 @@
 # The workflow kernel (StarCi 5.0)
 
-`execution/workflow-kernel.mjs` is the whole control plane of a job. One process per workflow: no Plan
+`kernel/kernel.mjs` is the whole control plane of a job. One process per workflow: no Plan
 Coordinator, no per-module Monitor, no provider chain. A **job** is any piece of work ("implement backend
 feature A", "backend for three modules with the existing SRS/SDS", "write an SRS"); its **inputs** are typed
 refs (`sds:path`, `srs:path`, `file:path`, `note:...`) of which specifications are one kind among many.
@@ -8,11 +8,11 @@ refs (`sds:path`, `srs:path`, `file:path`, `note:...`) of which specifications a
 Entry points are the canonical launcher's commands, which route straight into `kernelMain`:
 
 ```
-orca-supervised-launch.mjs workflow-goal    --job <text> [--lane [<name>]] [--inputs a,b] [--gates name=command,...] [--ledger work|plan] [--scope f1,f2] [--id <id>]
-orca-supervised-launch.mjs workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
-orca-supervised-launch.mjs workflow-run     --id <id> [--from <own terminal> --run <run>] [--launch-file <f>] [--max-iterations N]
-orca-supervised-launch.mjs workflow-status  --id <id>
-orca-supervised-launch.mjs workflow-lane-close --id <id>
+hosts/orca/launch.mjs workflow-goal    --job <text> [--lane [<name>]] [--inputs a,b] [--gates name=command,...] [--ledger work|plan] [--scope f1,f2] [--id <id>]
+hosts/orca/launch.mjs workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
+hosts/orca/launch.mjs workflow-run     --id <id> [--from <own terminal> --run <run>] [--launch-file <f>] [--max-iterations N]
+hosts/orca/launch.mjs workflow-status  --id <id>
+hosts/orca/launch.mjs workflow-lane-close --id <id>
 ```
 
 Every command also takes `--host-adapter orca|headless` (default `orca`, or `headless` when `STARCI_HOST=headless`
@@ -22,7 +22,7 @@ is set): see [Hosts: Orca and headless](#hosts-orca-and-headless-one-chat--one-w
 reinstates the operations the dynamic-op gate refused. Re-approving is how a user answers that gate.
 `--accept-critique "<reason>"` is how a user approves a goal whose critique returned `refuse` (see **Phases**).
 
-All runtime state of one workflow lives in one directory (`execution/workflow-store.mjs`):
+All runtime state of one workflow lives in one directory (`kernel/store.mjs`):
 `state.json` (atomic snapshot), `events.jsonl` (append-only audit), `goal.md` / `goal.json`, `contracts/`,
 `reports/`, `checks/`, `validator/` (the validator's memory and verdict log), `final-report.json`.
 
@@ -48,7 +48,7 @@ launched into a worktree - a decision is answered. The exception is a reported `
 
 ### Ledger incomplete -> work.author
 
-`enrich` in `execution/work-ledger.mjs` marks a candidate `schedulable:false` with a `reason` when its record
+`enrich` in `kernel/ledger.mjs` marks a candidate `schedulable:false` with a `reason` when its record
 declares no write scope (`implementation.changes[].files` or `extensions.work3.allowlist`) or no check
 (`extensions.work3.checks`). Nothing of that node's lane may start, because the kernel would have to invent the
 two things it refuses to invent. Completing the record, though, is work - reading the node, its neighbours and
@@ -100,7 +100,7 @@ it. Inventing a repository root for a language is exactly the guess the routing 
 ## Lanes and routes
 
 One Work node is not one operation. It is a **lane**: the ordered kinds it travels before its ledger entry may
-be called done. `profiles/kinds.yaml` declares the catalog and the lanes; `execution/kind-graph.mjs` reads it
+be called done. `model/kinds.yaml` declares the catalog and the lanes; `kernel/graph.mjs` reads it
 (`laneFor`, `nextKind`, `routeFor`, `roleOf`, `familyOf`, `isReadOnly`, `describeLane`, `validateGraph`), and the
 kernel only walks what it answers. Adding "frontend work is drawn before it is coded, and proved by a UAT run"
 is a profile edit, not a patch to the control loop.
@@ -256,7 +256,7 @@ Two bodies of material stand behind every surface this kernel builds. The **gram
 same for every product (`knowledge/grammars/**`, `knowledge/patterns/fe/**`, `knowledge/ui/**`, listed by
 `grammarReferences()`). The **brand** is the product's own and lives in the Work tree: one `brand` node whose
 record carries the name, the design family, every colour token with the role it plays, the fonts, the mascot
-and logo assets, what is forbidden and the rules every imagery prompt must carry. `execution/work-ledger.mjs`
+and logo assets, what is forbidden and the rules every imagery prompt must carry. `kernel/ledger.mjs`
 answers it as `ledger.brand = {node, rev, file, spec} | null`, and `brandReferences(ledger)` names the record
 file plus every `brand/assets/**` path beside it.
 
@@ -425,7 +425,7 @@ for a whole pool.
 
 ## The guards the kernel owes itself
 
-`execution/kernel-guards.mjs` is the only place these mechanical protections live; the kernel reaches every
+`kernel/guards.mjs` is the only place these mechanical protections live; the kernel reaches every
 one of them through `ctx.guards` (default `kernelGuards`), so a host or a test can inject the contract, and a
 tree shipped without the module falls back to a minimal implementation of the same contract.
 
@@ -458,7 +458,7 @@ Anything the table cannot settle becomes an entry in `needUser[]`, and the workf
 
 ## Writing the ledger back
 
-Every write to a Work node goes through `execution/work-ledger.mjs`, which owns exactly four things -
+Every write to a Work node goes through `kernel/ledger.mjs`, which owns exactly four things -
 `state`, `completion`, `extensions.work3.kernel` and the evidence manifest - and preserves every other
 authored line byte for byte. The kernel calls it at four points:
 
@@ -482,7 +482,7 @@ life of the op: see the guards above.
 
 ### When the ledger belongs to another repository
 
-The tree a job works is resolved once, before the store exists, by `execution/ledger-routing.mjs`:
+The tree a job works is resolved once, before the store exists, by `kernel/routing.mjs`:
 `--ledger-root`, else the host route registry, else `<repoRoot>/.starciwork`. A frontend job therefore works
 the Work tree its backend owns — see **Shared ledger across repositories** in
 [work-ledger.md](work-ledger.md) for the resolution rules and what a shared tree changes.
@@ -568,7 +568,7 @@ no profile for that operation is never chosen and then rejected.
 
 Several workflows of one repository run at once, each with its own kernel and its own allocator, and the
 expensive runtimes are split across them, not owned by one. One file says so: the shared runtime ledger
-`<workflowsRoot>/runtime-loads.json` (`execution/runtime-loads.mjs`, schema `starci/runtime-loads@1`), beside
+`<workflowsRoot>/runtime-loads.json` (`kernel/loads.mjs`, schema `starci/runtime-loads@1`), beside
 the workflow directories every kernel of the repository already shares.
 
 ```json
@@ -617,7 +617,7 @@ open items, findings, acceptance, the exact check commands, the checks file, the
 `--reports-dir`. A design-family operation also gets the short `## Brand` block under its references (see
 [Brand and artwork](#brand-and-artwork)).
 Between the acceptance and the process prose it splices the kind-specific working order from
-`execution/contract-steps.mjs` (`stepsFor`): see [op-granularity.md](op-granularity.md), "Working order per kind".
+`kernel/contract.mjs` (`stepsFor`): see [op-granularity.md](op-granularity.md), "Working order per kind".
 The process prose (`## Cook until done`, `## Ping (mandatory)`, `## Never`) is reused verbatim from
 `docs/supervision-templates/op.md`, so one template serves every operation kind and no placeholder survives
 into a rendered contract.
@@ -639,12 +639,12 @@ A workflow has no monitor agent. Three layers keep it running on their own:
 - **Triage (LLM, closed options)**: the policy table handles known outcomes (done/failed/question/shared-change/stall/rate-limit). When the same anomaly signature repeats `TRIAGE_AFTER` (3) times, the kernel asks the `decide` function once, offering only `resume-ops | park-runtime | settle-op | restart-kernel | needUser`; the pick is applied, recorded (`triage` event) and never asked again for that signature in the workflow. Without a decider (tests, `--functions` off) triage is a no-op and the anomaly stays a counter.
 
 ```
-node .claude/.dist/execution/orca-supervised-launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000]
+node .claude/.dist/hosts/orca/launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000]
 ```
 
 ### Supervisor level
 
-`config.json` (host-local, gitignored) may carry `supervisor.runtimes`: the models triage and the `decide` role prefer, strongest first. The default is `[claude-fable-5.1, gpt-6-astra]`; lower it (for example to `[claude-opus]`) to save budget. Only ids declared in `profiles/runtimes.yaml` take effect; the rest of the profile's `decide` preference follows.
+`config.json` (host-local, gitignored) may carry `supervisor.runtimes`: the models triage and the `decide` role prefer, strongest first. The default is `[claude-fable-5.1, gpt-6-astra]`; lower it (for example to `[claude-opus]`) to save budget. Only ids declared in `model/runtimes.yaml` take effect; the rest of the profile's `decide` preference follows.
 
 ### Review rounds and the dynamic budget
 
@@ -747,9 +747,9 @@ check (`op-readmitted`). One error on a tracked or owned path and nothing moves.
 The kernel runs on a **host**, and it reads exactly three things about it: a name, the capabilities it offers
 and whether it runs operations in parallel (`hostDescriptorOf(orca)`). Two hosts exist.
 
-- **Orca** - `execution/orca-calls.mjs`, `ORCA_HOST = {name:'orca', capabilities:['design-tool'], sequential:false}`:
+- **Orca** - `hosts/orca/calls.mjs`, `ORCA_HOST = {name:'orca', capabilities:['design-tool'], sequential:false}`:
   the multi-agent IDE with terminals, a dispatch mailbox and a run coordinator, the runner every command always had.
-- **Headless** - `execution/orca-headless.mjs`, `HEADLESS_HOST = {name:'headless', capabilities:[], sequential:true}`:
+- **Headless** - `hosts/headless/host.mjs`, `HEADLESS_HOST = {name:'headless', capabilities:[], sequential:true}`:
   the same `invoke(command, params, {cwd}) -> starci/orca-call-result@1` surface, answered with child processes
   and files, so not one line of the kernel knows which host it is on. It is what a plain Claude Code chat or a
   Codex chat uses to drive a workflow without Orca: **one chat = one workflow**, not multi-agent - operations
@@ -793,8 +793,8 @@ settles it and relaunches on another runtime, as for any dead worker), a live pi
 exited: the kernel's answer is recorded as undelivered, the op is relaunched, and the answer travels in the
 contract of that next attempt (`## Answer to the question you asked earlier`) - on every host alike.
 
-**Capabilities.** `profiles/kinds.yaml` may give a kind `needs: [<capability>]` from the closed vocabulary
-`capabilities` (`design-tool`; `CAPABILITIES` in `execution/kind-graph.mjs`, `needsOf(kind)`). `interface.asset`
+**Capabilities.** `model/kinds.yaml` may give a kind `needs: [<capability>]` from the closed vocabulary
+`capabilities` (`design-tool`; `CAPABILITIES` in `kernel/graph.mjs`, `needsOf(kind)`). `interface.asset`
 needs `design-tool` (the image model that generates the declared artwork), which only Orca declares; every other
 kind runs anywhere - `interface.draw` included, because a drawing is the installed grammar rendered in a browser
 (one candidate per screen and viewport, the main state only; loading, empty and error are described in the
@@ -856,7 +856,7 @@ Every three minutes the supervisor asks Orca for the usage windows its status ba
 --json` -> `rateLimits`: Claude's five-hour session, its week and Fable's own week; Codex's week) and writes
 them whole beside every store root it covers as `_local/workflows/runtime-budget.json` (`budget-probed`; a
 failed probe leaves the last good file and says `budget-probe-failed`). A runtime is bound by the generic
-windows of its provider (`provider:` in profiles/runtimes.yaml) and by a named window only when its profile
+windows of its provider (`provider:` in model/runtimes.yaml) and by a named window only when its profile
 names it (`budgetWindow: fableWeekly`); `budgetVerdict` says whether a window is exhausted (95% and not yet
 reset) and what share is left. Kernels read the file, never Orca. The allocator folds the verdict into every
 pick: a runtime whose window is exhausted is blocked (`provider window exhausted until <reset>`) until the
@@ -869,12 +869,12 @@ remaining:{runtime:share}}`.
 ## Reading a workflow
 
 A workflow has no monitor agent to ask, so the one way to know where it stands is its own files.
-`execution/workflow-view.mjs` derives a single page from them - `state.json`, `events.jsonl`, `kernel.lock`,
+`kernel/view.mjs` derives a single page from them - `state.json`, `events.jsonl`, `kernel.lock`,
 `stop.flag`, `validator/verdicts.jsonl` and the repository's `supervisor.log` - and the launcher prints it:
 
 ```
-orca-supervised-launch.mjs workflow-status --id <id> [--json true]
-orca-supervised-launch.mjs workflow-list
+hosts/orca/launch.mjs workflow-status --id <id> [--json true]
+hosts/orca/launch.mjs workflow-list
 ```
 
 `workflow-status` prints the page; `--json true` prints the machine record instead (the kernel's own status

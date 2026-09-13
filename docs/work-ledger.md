@@ -2,7 +2,7 @@
 
 The product ledger is the canonical Work tree: `<repo>/.starciwork/features/**/index.yaml`, schema
 `work/node@2`, laid out by [work-layout.yaml](../schemas/work-layout.yaml). There is no second list
-of things to do. `execution/work-ledger.mjs` is the kernel's only door to it: it reads the tree
+of things to do. `kernel/ledger.mjs` is the kernel's only door to it: it reads the tree
 through `starci validate`, decides what may be scheduled, and writes back four things and nothing
 else. The authored specification — SRS, SDS, the implementation record, gaps, assets — belongs to the
 workflows that author it, and a kernel write preserves every one of those lines byte for byte.
@@ -238,7 +238,7 @@ decides on its own; only a node that declares none is filtered by side — and a
 
 A product has exactly one canonical `.starciwork`, owned by its backend. Its frontend is a different
 repository with no Work tree of its own, so a frontend workflow reads and writes the backend's tree.
-`execution/ledger-routing.mjs` is the only thing that decides which tree that is:
+`kernel/routing.mjs` is the only thing that decides which tree that is:
 
 | order | source | how |
 | --- | --- | --- |

@@ -6,7 +6,7 @@ different purple, the mascot a designer approved can be absent from the tree, an
 a component nobody reopened, and a token the record names can be a name no grammar declares — styling
 nothing, while the record reads as applied.
 
-`execution/brand-checks.mjs` re-derives each of those claims from the artefacts themselves and reports every
+`checks/brand.mjs` re-derives each of those claims from the artefacts themselves and reports every
 one it could not reproduce. The brand is **bound** to the source, not copied from it; **proven**, not stated.
 
 Nothing in this module renders, installs, commits or edits. Every check reads. The colour mathematics is

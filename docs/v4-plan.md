@@ -11,8 +11,8 @@ Three observed failure classes stop orchestrated mode today. None is a product d
 | # | Observed (reproducible) | Where it lives now | Root cause |
 | --- | --- | --- | --- |
 | F1 | `worker-start --agent qwen-code` boots a branded Qwen TUI, then fails at `dispatch_input` with `agent_prompt_stalled` / `session_not_reported`; retries create idle duplicate terminals. | `docs/orca-runtime-upgrades.md`, `providers/orca/adapters/qwen.yaml` | Orca's Qwen adapter uses `stdin-after-start` prompt injection; Qwen 0.23.3 expects an interactive startup prompt. StarCi cannot fix Orca, but it can *detect* the stall as `effectState: none` and fall through. Today it throws a string. |
-| F2 | Workflow Monitors (Codex, `gpt-5.6-sol`) end in `stage: process_exited`, `last_error: "Agent process stop was requested but never confirmed"`, terminal retained with `identity_unproven`. Seen on `run_4f84cba16322` (`ctx_d54000752ea9`, `ctx_a7a7b599bc7d`). | `execution/orca-supervised-launch.mjs` (`startMonitor` hardcodes `codex` + `gpt-5.6-sol`, `--timeout-ms 60000`, runner timeout 90 s) | No monitor provider chain, no liveness/replacement loop, no settlement (`worker-stop` → `worker-release` → verify) before retry. |
-| F3 | Every Orca failure is reduced to `Error(message)`; the structured `stage`, `failedStage`, `effects`, `residualResources`, `recovery` JSON that Orca returns on exit 1 is discarded. | `createOrcaRunner` in `orca-supervised-launch.mjs` | The launcher takes `candidates[0]` only and never classifies effect state, so the registry's fallback rule (`requiredEffectState: none`) can never be satisfied mechanically. `--retry-request <id>` (Orca's idempotency key for unknown mutation results) is never used. |
+| F2 | Workflow Monitors (Codex, `gpt-5.6-sol`) end in `stage: process_exited`, `last_error: "Agent process stop was requested but never confirmed"`, terminal retained with `identity_unproven`. Seen on `run_4f84cba16322` (`ctx_d54000752ea9`, `ctx_a7a7b599bc7d`). | `hosts/orca/launch.mjs` (`startMonitor` hardcodes `codex` + `gpt-5.6-sol`, `--timeout-ms 60000`, runner timeout 90 s) | No monitor provider chain, no liveness/replacement loop, no settlement (`worker-stop` → `worker-release` → verify) before retry. |
+| F3 | Every Orca failure is reduced to `Error(message)`; the structured `stage`, `failedStage`, `effects`, `residualResources`, `recovery` JSON that Orca returns on exit 1 is discarded. | `createOrcaRunner` in `hosts/orca/launch.mjs` | The launcher takes `candidates[0]` only and never classifies effect state, so the registry's fallback rule (`requiredEffectState: none`) can never be satisfied mechanically. `--retry-request <id>` (Orca's idempotency key for unknown mutation results) is never used. |
 
 The 8 most recent `fix(orchestration)` commits each patched one symptom. 4.0 replaces the
 prose-driven call path with a typed call contract and a launcher that resolves, attempts,
@@ -28,14 +28,14 @@ classifies, fences and falls through by contract.
 ## 3. Target architecture (4.0)
 
 ```text
-profiles/registry.yaml        per-op ordered chains (policy only)
+model/registry.yaml        per-op ordered chains (policy only)
         │
 providers/orca/api.yaml       live-verified command signatures (from agent-context)
 providers/orca/calls.yaml     NEW: one typed call contract per Orca mutation/read
         │
-execution/orca-calls.mjs      NEW: runner that returns {outcome, effectState, receipt, recovery}
+hosts/orca/calls.mjs      NEW: runner that returns {outcome, effectState, receipt, recovery}
         │                      never throws on Orca exit 1; throws only on contract violation
-execution/orca-supervised-launch.mjs   REWRITE: start-op / start-monitor / settle / replace
+hosts/orca/launch.mjs   REWRITE: start-op / start-monitor / settle / replace
         │                      resolve chain → attempt → classify → fence → next candidate
 execution/orca.mjs, solo.mjs  consume the same call layer through adapters
 ```
@@ -57,13 +57,13 @@ Calls in scope: `run-create`, `run-use`, `run-show`, `task-create`, `task-update
 `worker-show`, `worker-read`, `worker-stop`, `worker-abandon`, `worker-release`, `worker-list`,
 `check`, `send`, `reply`, `worktree set|show|current`, `terminal rename`, `status`, `agent-context`.
 
-### 3.2 Runner (`execution/orca-calls.mjs`)
+### 3.2 Runner (`hosts/orca/calls.mjs`)
 
 - Loads `calls.json` and the live `agent-context` once; refuses to run if a declared command or flag is missing (`onMismatch: stop-before-effects`, already declared in `validation.yaml` but not executed today).
 - Every mutation carries `--retry-request <deterministic id>` derived from `(run, task, operation, attempt)`; a timeout or non-JSON reply is re-issued with the same id and the receipt is reconciled instead of assumed lost.
 - Returns a `starci/orca-call-result@1` envelope. `ok:false` with `effectState` is a *result*, not an exception.
 
-### 3.3 Launcher 4.0 (`orca-supervised-launch.mjs`)
+### 3.3 Launcher 4.0 (`hosts/orca/launch.mjs`)
 
 `start-op`:
 1. attest nested Run and `coordinator_handle` (unchanged);
@@ -72,13 +72,13 @@ Calls in scope: `run-create`, `run-use`, `run-show`, `task-create`, `task-update
 4. on failure: classify; if `effectState: none` → `worker-stop` → `worker-release` → verify `already_released|released` → record attempt → next candidate; if `partial|unknown` → stop, emit reconciliation request;
 5. exhausted chain → `ok:false, exhausted:true, attempts[]` (never a bare throw).
 
-`start-monitor`: same loop over a new `workflowManager` chain in `profiles/registry.yaml` (no hardcoded `codex`/`gpt-5.6-sol`).
+`start-monitor`: same loop over a new `workflowManager` chain in `model/registry.yaml` (no hardcoded `codex`/`gpt-5.6-sol`).
 
 `settle --dispatch`: new subcommand; stop → release → verify; reports `settled|retained|unknown`.
 
 `replace-monitor`: new subcommand for F2; fences the dead monitor, settles, relaunches with `--retry-of`, re-binds Run cursor.
 
-### 3.4 Chain policy (`profiles/registry.yaml`)
+### 3.4 Chain policy (`model/registry.yaml`)
 
 Decided per op family (user decision 2026-09-12; per-op placement is the maintainer's call):
 
@@ -104,10 +104,10 @@ the same model also exists as a working target.
 | Phase | Deliverable | Files | Proof | Est. |
 | --- | --- | --- | --- | --- |
 | 0 Baseline | Branch `v4/orchestration` from current head; capture live `agent-context` snapshot as fixture; record failing dispatch receipts as fixtures | `tests/fixtures/orca/*.json` | `npm test` 738 green before any change | 0.5 h |
-| 1 Chains | Registry per §3.4; `workflowManager`/`planCoordinator` chains; Qwen Max as managed-agent with attested model; docs/costPolicy updated | `profiles/registry.yaml`, `profiles/qwen.yaml`, `tests/profiles-assets.spec.mjs`, `tests/execution-resolve-v3.spec.mjs`, `docs/orca-execution.md` | chain tests rewritten; build:check | 1.5 h |
+| 1 Chains | Registry per §3.4; `workflowManager`/`planCoordinator` chains; Qwen Max as managed-agent with attested model; docs/costPolicy updated | `model/registry.yaml`, `model/qwen.yaml`, `tests/profiles-assets.spec.mjs`, `tests/execution-resolve-v3.spec.mjs`, `docs/orca-execution.md` | chain tests rewritten; build:check | 1.5 h |
 | 2 Call contract | `calls.yaml` + schema + validator wired into `providers/validate.mjs`; live-vs-contract diff test | `providers/orca/calls.yaml`, `schemas/orca-call.schema.yaml`, `providers/validate.mjs`, `tests/provider-orca.spec.mjs` | validator rejects a missing flag / unknown command / literal `--on`; passes against the captured snapshot | 3 h |
-| 3 Runner | `execution/orca-calls.mjs` with retry-request, classification, recovery execution; fixture-driven tests for every Orca exit-1 shape (`process_exited`, `agent_prompt_stalled`, `session_not_reported`, `outcome_unknown`, non-JSON, timeout) | `execution/orca-calls.mjs`, `tests/orca-calls.spec.mjs` | each fixture yields the expected `effectState`; no path throws on Orca exit 1 | 4 h |
-| 4 Launcher | Rewrite `start-op`/`start-monitor` on the runner; add `settle`, `replace-monitor`; prompt-delivery proof; chain fall-through | `execution/orca-supervised-launch.mjs`, `execution/supervision.mjs`, `tests/orca-supervised-launch.spec.mjs` | simulated Qwen stall → fenced → released → Opus selected; simulated monitor death → replaced with `--retry-of` | 5 h |
+| 3 Runner | `hosts/orca/calls.mjs` with retry-request, classification, recovery execution; fixture-driven tests for every Orca exit-1 shape (`process_exited`, `agent_prompt_stalled`, `session_not_reported`, `outcome_unknown`, non-JSON, timeout) | `hosts/orca/calls.mjs`, `tests/orca-calls.spec.mjs` | each fixture yields the expected `effectState`; no path throws on Orca exit 1 | 4 h |
+| 4 Launcher | Rewrite `start-op`/`start-monitor` on the runner; add `settle`, `replace-monitor`; prompt-delivery proof; chain fall-through | `hosts/orca/launch.mjs`, `execution/supervision.mjs`, `tests/orca-supervised-launch.spec.mjs` | simulated Qwen stall → fenced → released → Opus selected; simulated monitor death → replaced with `--retry-of` | 5 h |
 | 5 Coordinator loop | `orca.mjs` adapter consumes the runner; `check --wait` with `--ack`, keepalive filtering; liveness → `replace-monitor` | `execution/orca.mjs`, `tests/orca-execution.spec.mjs` | event-loop tests: timeout re-arm, worker_done ack, escalation routing | 3 h |
 | 6 Solo parity | `solo.mjs` uses the same result envelope for Agent-tool operations (no behavior change beyond envelope) | `execution/solo.mjs`, `tests/solo-execution.spec.mjs` | existing solo tests green + envelope assertions | 1.5 h |
 | 7 Contracts & docs | `providers/orca/index|recipes|validation.yaml` reference `calls`; `docs/orca-execution.md`, `execution-agent-model.md`, `orca-runtime-upgrades.md` (mark F1–F3 resolved-in-runtime); `SKILL.md` paragraph on Orca launch rewritten to point at `start-op`/`settle`/`replace-monitor`; version `4.0.0-alpha.1`; `INDEX.yaml`, `README.yaml` | as named | `npm run build`, `build:check`, `build:knowledge:check`, `npm test`, `starci doctor --quick` in a scratch host | 2 h |

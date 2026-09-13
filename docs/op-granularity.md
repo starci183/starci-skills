@@ -35,7 +35,7 @@ seed/cleanup so a flow never depends on another flow's state.
 An operation is cut small, but the agent still needs the order of work inside it: without one, some
 wrote a green spec first, some skipped the design, some edited outside the allowlist. So every contract
 carries a mandatory numbered section, `## Working order (mandatory, in this order)`, rendered by
-`execution/contract-steps.mjs` (`stepsFor`, `sequenceFor`) from the operation's own values - its
+`kernel/contract.mjs` (`stepsFor`, `sequenceFor`) from the operation's own values - its
 allowlist, its `name: command` checks, its acceptance ids, references, resources, requesters and
 findings - never from generic wording. The sequence is chosen from the op kind and origin, then from
 the Work node kind and layout it closes, then from its allowlist; an unknown kind falls back to `generic`.

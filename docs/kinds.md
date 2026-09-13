@@ -1,6 +1,6 @@
 # Operation kinds, lanes and routes: the workflow brain as data
 
-`profiles/kinds.yaml` is the catalog, `execution/kind-graph.mjs` is the pure module that reads it, and
+`model/kinds.yaml` is the catalog, `kernel/graph.mjs` is the pure module that reads it, and
 together they own the process of a workflow: which operation kinds exist, which sequence a ledger node must
 walk, and where an outcome may go. The kernel calls the module; nothing here runs an agent.
 
@@ -25,9 +25,9 @@ that skipping it is not available.
 ## The catalog
 
 Fourteen kinds, and the list is closed in both directions: `validateGraph` reports `catalog-drift` when the
-profile and the `KINDS` constant of `execution/kind-graph.mjs` disagree, so a fifteenth kind cannot appear by
+profile and the `KINDS` constant of `kernel/graph.mjs` disagree, so a fifteenth kind cannot appear by
 accident. `family` says what an operation is for, `role` is the allocator role of
-[`profiles/runtimes.yaml`](runtime-allocation.md) (and must equal its `roleOfKind` entry), `mutates` is what it
+[`model/runtimes.yaml`](runtime-allocation.md) (and must equal its `roleOfKind` entry), `mutates` is what it
 may change, and `operator` is the launchable operator contract in `ops/` that carries it.
 
 | kind | family | role | read-only | mutates | operator | purpose |
@@ -175,9 +175,9 @@ two named kinds (`route-cycle`).
 
 ## The module
 
-`execution/kind-graph.mjs` is pure apart from `loadKinds`, which reads the compiled
-`.dist/profiles/kinds.json` exactly as `loadRuntimes` reads the allocator profile (or an authored
-`profiles/kinds.yaml` when given a `profileDir`).
+`kernel/graph.mjs` is pure apart from `loadKinds`, which reads the compiled
+`.dist/model/kinds.json` exactly as `loadRuntimes` reads the allocator profile (or an authored
+`model/kinds.yaml` when given a `profileDir`).
 
 | export | signature | answers |
 | --- | --- | --- |

@@ -103,14 +103,14 @@ Companion `workflows/*.mjs` stay executable.
 
 ---
 
-## `profiles/`
+## `model/`
 
 | Path | Class | Notes |
 | --- | --- | --- |
-| `profiles/registry.json` | authored-declarative → YAML | Profile catalogue. |
-| `profiles/claude.json` | authored-declarative → YAML | Host profile. |
-| `profiles/codex.json` | authored-declarative → YAML | Host profile. |
-| `profiles/select.mjs` | executable → keep | |
+| `model/registry.json` | authored-declarative → YAML | Profile catalogue. |
+| `model/claude.json` | authored-declarative → YAML | Host profile. |
+| `model/codex.json` | authored-declarative → YAML | Host profile. |
+| `kernel/chains.mjs` | executable → keep | |
 
 ---
 

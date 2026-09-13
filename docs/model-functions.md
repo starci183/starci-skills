@@ -3,7 +3,7 @@
 The runtime never hands a model the control loop. It calls the model the way it calls a function: a fixed
 prompt frame, a required JSON form, a headless provider command, validation, and a bounded retry. The model
 fills the form; the kernel decides what happens next. Everything procedural — which provider, how many
-retries, how long to wait, who reports to whom, when to commit — is fixed by `execution/llm-functions.mjs`
+retries, how long to wait, who reports to whom, when to commit — is fixed by `models/functions.mjs`
 and the supervisor, and is not reachable from the prompt.
 
 There are five functions.

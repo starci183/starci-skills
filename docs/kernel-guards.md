@@ -1,6 +1,6 @@
 # Kernel guards
 
-`execution/kernel-guards.mjs` holds the three things the kernel never delegates to an operation
+`kernel/guards.mjs` holds the three things the kernel never delegates to an operation
 agent: the ledger record of the node the agent is working on, an exclusive machine resource, and the
 worktree's git index. Each guard reads or repairs; none of them decides what to schedule.
 
@@ -15,7 +15,7 @@ files that differ from HEAD or are untracked; an untracked directory that git co
 `git checkout --` for the tracked ones, deletion for untracked files under a protected directory,
 and `{reverted, removed}` as the receipt. Everything outside `paths` is untouched, so the operation
 keeps the work it was actually launched to do. A `completion` an agent writes itself is a claim, not
-a record: the kernel reverts it and writes the record through `execution/work-ledger.mjs`.
+a record: the kernel reverts it and writes the record through `kernel/ledger.mjs`.
 
 ## Exclusive resources
 

@@ -4,8 +4,8 @@ A supervised operation runs inside an agent's own TUI, so the only honest statem
 one its screen makes. Until 5.0 that reading lived in the wait tick as a single union of regexes — Claude's
 `esc to interrupt` next to Qwen's `Allow execution`, one hard-coded `1` for every confirmation dialog — which
 meant that adding a provider meant editing the kernel, and that a dialog was answered with a keystroke the
-provider might not understand. `execution/provider-observe.mjs` holds that knowledge per provider family
-instead, and `execution/orca-protocol.mjs` consumes it: `classifyWorker` is now the protocol-side name for
+provider might not understand. `hosts/orca/observe.mjs` holds that knowledge per provider family
+instead, and `hosts/orca/protocol.mjs` consumes it: `classifyWorker` is now the protocol-side name for
 `observe`, and the tick sends the keystroke the observed family declares.
 
 ## The signature table
@@ -68,7 +68,7 @@ what the provider actually said. It covers a bare `429`, rate-limit and `too man
 `credit balance`. This is a deliberately sensitive reading: the cost of missing a refusal is an operation that
 burns its whole wait window against a provider that will not answer, while the cost of a false positive is one
 op re-dispatched to another runtime. `kind` is passed on as the failure reason, which is what
-`execution/runtime-allocator.mjs` classifies into a cooldown, so a quota lockout cools longer than a burst.
+`kernel/schedule.mjs` classifies into a cooldown, so a quota lockout cools longer than a burst.
 
 ## Token accounting
 
@@ -93,7 +93,7 @@ the model for a correction — and returns it as `usage` on both the successful 
 `assessGoal`, `planOp` and `decide` all carry what they spent. A caller that injects a plain string-returning
 runner (as the unit tests do) simply produces `usage: null`.
 
-The kernel is what turns that into budget. `execution/runtime-allocator.mjs` charges tokens when a slot is
+The kernel is what turns that into budget. `kernel/schedule.mjs` charges tokens when a slot is
 freed, so an operation that finished hands the total it spent to `release`, and a failed one hands its total to
 `failed` with the reason:
 
