@@ -83,17 +83,29 @@ kinds:
   # op's own recommendation provisionally so the work continues, and tells the owner it did. The owner answers
   # in this op's own terminal with the option number, or later with `workflow-answer`; a different answer then
   # reopens what was built on the recommendation.
-  owner.ask:
+  decision.prepare:
     family: design
     role: decide
-    operator: owner.ask
+    operator: decision.prepare
     readOnly: false
     # It reads what the question touches and writes the one thing the owner owns: the decision record.
     reads: [srs, sds, decision]
     writes: [decision]
-    purpose: Prepare one decision for the owner - question, analysis per side, options, recommendation - or answer it from the decided records when they already settle it.
+    purpose: Prepare one decision the runtime takes provisionally - question, analysis per side, options, recommendation - or answer it from the decided records when they already settle it. It never decides for the owner and never waits for them; the owner overturns a provisional decision later with workflow-answer.
     reports:
       outcomes: [done, failed]
+  provision.ask:
+    family: design
+    role: decide
+    operator: provision.ask
+    readOnly: true
+    # It reads what the question touches and the integration it belongs to; it writes nothing - the owner puts a
+    # credential into custody with their own command, and this operation only confirms that it is there.
+    reads: [srs, sds, integration]
+    writes: []
+    purpose: Ask the owner for what only they can give - a credential, an account, a dataset, an authority, the go-ahead for an irreversible effect - exactly named, in its own terminal, and wait; verify presence, never a value.
+    reports:
+      outcomes: [done, blocked, failed]
   business.decide:
     family: design
     role: decide
@@ -112,7 +124,7 @@ kinds:
   # of its own - except the one exception both revise sequences state, where the readings differ in an
   # observable outcome about money, authority or customer data: then it does not choose silently, it reports
   # `ask` with `question.kind: decision`, the numbered options and one recommendation, and the kernel's
-  # `owner.ask` writes that decision record and continues on the recommendation until the owner overturns it.
+  # `decision.prepare` writes that decision record and continues on the recommendation until the owner overturns it.
   business.revise:
     family: repair
     role: decide

@@ -531,7 +531,7 @@ export const CRITIQUE_FORM={
   // list, is not sent back for it - the kernel shapes what it can and drops what names no evidence. Two
   // providers in a row failed the strict form on a real goal and the goal went uncritiqued. An objection may
   // carry `decisive`, which only a `hidden-decision` uses: true when the decision the goal takes silently is
-  // about money, authority or customer data, and the kernel then plans an owner.ask before the work that
+  // about money, authority or customer data, and the kernel then plans a decision.prepare before the work that
   // touches its feature; false (or absent) when the record repair will settle it when an operation hits it.
   objections:{type:'list',optional:true},
   // What the owner must provide, read as leniently as the objections are: an entry with no known kind or no

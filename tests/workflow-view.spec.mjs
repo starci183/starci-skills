@@ -439,10 +439,10 @@ test('workflow-status prints what the owner provides, with each one open, asked 
       {kind:'dataset',name:'three real bank statements',feature:'accounting',why:'reconciliation cannot be proven on invented rows'}],
     ops:[
       // Answered: the owner said the credential is there, so the provision is `provided`.
-      {id:'ask-1',kind:'owner.ask',status:'done',question:{kind:'credential',text:'Which value does VNPAY_SANDBOX_SECRET carry?'},
+      {id:'ask-1',kind:'provision.ask',status:'done',question:{kind:'credential',text:'Which value does VNPAY_SANDBOX_SECRET carry?'},
         answer:'The owner decided on "VNPAY_SANDBOX_SECRET": credential: VNPAY_SANDBOX_SECRET present',reports:[]},
       // Asked and still open: the question names the account, no answer yet.
-      {id:'ask-2',kind:'owner.ask',status:'ready',question:{kind:'authority',text:'Is there a VNPay sandbox merchant we may use?'},reports:[]},
+      {id:'ask-2',kind:'provision.ask',status:'ready',question:{kind:'authority',text:'Is there a VNPay sandbox merchant we may use?'},reports:[]},
       {id:'x',kind:'backend.implement',status:'ready'}],
     needUser:[]}));
   writeLines(path.join(dir,'events.jsonl'),[{at:ago(5),seq:1,event:'goal-critiqued',verdict:'sound',provisions:3}]);

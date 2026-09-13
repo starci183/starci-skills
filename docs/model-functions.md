@@ -53,7 +53,7 @@ shape, an ordering or a default the product can live either way with. It is read
 else on a critique - `true`, `"yes"`, `"money"`, `"authority"` all mean true - and the kernel acts on it in
 `planCritiqueDecisions`: a non-decisive hidden decision becomes **nothing**, because the record repair
 (`business.revise`, `architecture.revise`) settles it towards the most reasonable reading when an operation
-hits it; a decisive one becomes one `owner.ask` of `question.kind: decision` planned before every operation
+hits it; a decisive one becomes one `decision.prepare` (or `provision.ask` for a provision) of `question.kind: decision` planned before every operation
 that touches its feature.
 
 Beside all that it answers **`provisions`**: everything only the OWNER can provide for the proofs of this goal

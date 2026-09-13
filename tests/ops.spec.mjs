@@ -226,20 +226,34 @@ test('the live integration operator proves through the real provider with the ow
  * terminal before any report, and a credential is put into the tree's encrypted custody by the owner's own
  * command - this operation only ever checks that it is there.
  */
-test('the owner.ask operator asks in its own terminal and never asks for a credential value',()=>{
-  const document=fs.readFileSync(path.join(root,'owner.ask','operator.yaml'),'utf8');
-  const contract=catalogue.ops.find(op=>op.id==='owner.ask').contract;
+test('the decision.prepare operator prepares the decision, prints it in its own terminal and never waits',()=>{
+  const document=fs.readFileSync(path.join(root,'decision.prepare','operator.yaml'),'utf8');
+  const contract=catalogue.ops.find(op=>op.id==='decision.prepare').contract;
   assert.deepEqual(contract.writes.map(write=>write.id),['decision']);
   // The decision is a policy-decision leaf where the tree already keeps them, never a folder the tree lacks.
   assert.match(contract.writes[0].path,/business\/srs\/business-rules\/policy-decisions\/<slug>\/index\.yaml$/);
   for(const text of [document,JSON.stringify(contract)]){
     assert.match(text,/srs-policy-decision section with decisionStatus\s*\n?\s*open/);
-    assert.match(text,/answer here with the number, or later with workflow-answer/);
+    assert.match(text,/answer here\s*\n?\s*with the number, or later with workflow-answer/);
+    assert.match(text,/do not wait/);
     assert.match(text,/answered-by-owner: <n>/);
     assert.match(text,/recommended: <n>/);
+    assert.match(text,/that is provision\.ask/);
+  }
+  assert.ok(contract.proofs.some(proof=>proof.id==='asked-in-the-terminal'),'printing in the tab is a proof, not a hope');
+});
+
+test('the provision.ask operator names the provision exactly, waits in its own terminal and never asks for a credential value',()=>{
+  const document=fs.readFileSync(path.join(root,'provision.ask','operator.yaml'),'utf8');
+  const contract=catalogue.ops.find(op=>op.id==='provision.ask').contract;
+  assert.deepEqual(contract.writes.map(write=>write.path),['E/manifest.yaml'],'the only write is the report of the attempt, never the tree');
+  for(const text of [document,JSON.stringify(contract)]){
+    assert.match(text,/Never invent, stub, default or skip it/);
+    assert.match(text,/Ask in this terminal and wait/);
     assert.match(text,/identity set <slug>\s*\n?\s*--name <VAR>/);
     assert.match(text,/never prints it/);
-    assert.match(text,/never asks for the value/);
+    assert.match(text,/credential: <VAR> present in identity:<slug>/);
+    assert.match(text,/provided: <what the owner provided, in a few words>/);
   }
   assert.ok(contract.proofs.some(proof=>proof.id==='asked-in-the-terminal'),'asking in the tab is a proof, not a hope');
   assert.match(contract.proofs.find(proof=>proof.id==='no-secret').requirement.en,/verifies only that it is present/);

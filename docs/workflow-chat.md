@@ -45,7 +45,7 @@ verification.
    workflow-answer --id <id> --op <op> --choice <n> [--note "<the owner's words>"]
    ```
 
-   That item comes from one of two places, and `--op` names a different operation in each. An **`owner.ask`**
+   That item comes from one of two places, and `--op` names a different operation in each. An **`decision.prepare` (or `provision.ask` for a provision)**
    op prepared it - a business rule, a design choice, an authority, a credential the environment lacks - and
    `--op` is that ask op; the owner's pick reaches every paused requester in its next contract. Or a
    **reconciliation conflict** raised it: the intake found that the new feature cannot hold together with
@@ -66,7 +66,7 @@ verification.
    every node that was built on it.** Say that when you relay one, so an answer is never given carelessly.
 
    The owner can also answer **in the operation's own terminal**, by typing the option number there while the
-   `owner.ask` op is still open; the kernel treats that exactly as the command. For a credential the op will
+   `decision.prepare` (or `provision.ask` for a provision) op is still open; the kernel treats that exactly as the command. For a credential the op will
    ask them to run `starci identity set <slug> --name <VAR>` - which reads the value from stdin and never
    prints it - and to reply `set`; the op then checks only that it is present. Never ask the owner for a
    credential value in the chat, never accept one if it is pasted, and never write one anywhere.

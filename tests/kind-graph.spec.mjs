@@ -423,8 +423,10 @@ test('every kind declares what it reads and what it produces, over the one recor
   }
   // The declaration of the 5-plus design, kind by kind: what settles intent, what changes the product, what
   // only inspects it. These are the values the contract, the validator and the kernel are all held to.
-  assert.deepEqual(readsOf('owner.ask',{profile}),['srs','sds','decision']);
-  assert.deepEqual(writesOf('owner.ask',{profile}),['decision']);
+  assert.deepEqual(readsOf('decision.prepare',{profile}),['srs','sds','decision']);
+  assert.deepEqual(writesOf('decision.prepare',{profile}),['decision']);
+  assert.deepEqual(readsOf('provision.ask',{profile}),['srs','sds','integration']);
+  assert.deepEqual(writesOf('provision.ask',{profile}),[],'a provision changes nothing in the tree but its custody');
   assert.deepEqual(writesOf('business.decide',{profile}),['srs','decision']);
   assert.deepEqual(writesOf('architecture.decide',{profile}),['sds','decision']);
   assert.deepEqual(readsOf('brand.decide',{profile}),['code','grammar'],'every token is read out of the real token files');
@@ -495,9 +497,9 @@ test('a declared external integration is proven live on a lane of its own',()=>{
   assert.equal(nextKind(laneFor({kind:'integration',layout:null},{profile}),[],{profile}),'integration.verify');
   assert.equal(nextKind(laneFor({kind:'integration',layout:null},{profile}),['integration.verify'],{profile}),null);
   assert.equal(describeLane('integration',{profile}),'integration: `integration.verify`');
-  // A credential the environment lacks is the owner's question, and it is the only kind that reads the
-  // integration record the business or design side declared.
-  assert.deepEqual(kindsReading('integration',{profile}),['integration.verify']);
+  // A credential the environment lacks is the owner's to provide: the ask that names it reads the integration
+  // record the business or design side declared, and the proof that needs it reads the same record.
+  assert.deepEqual(kindsReading('integration',{profile}),['provision.ask','integration.verify']);
   const missing=routeFor({outcome:'blocked',blocker:'environment',kind:'integration.verify',
     lane:laneFor({kind:'integration',layout:null},{profile})},{profile});
   assert.deepEqual({kind:missing.kind,needUser:missing.needUser,then:missing.then},{kind:null,needUser:true,then:'needUser'});

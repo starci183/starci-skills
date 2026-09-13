@@ -476,7 +476,7 @@ test('a decision the records do not settle is taken provisionally: the requester
     state.provisional=[];
     assert.equal(openOwnerAsk(store,state,requester,{kind:'decision',
       text:'Should a refund reopen the order or close it?',options:[]},null),'owner-ask');
-    const ask=state.ops.find(op=>op.kind==='owner.ask');
+    const ask=state.ops.find(op=>op.kind==='decision.prepare');
     // Not paused: it waits for the ask op alone, so nothing schedules it before the recommendation exists.
     assert.deepEqual([requester.status,requester.waitingFor,requester.dependsOn],['pending',null,[ask.id]]);
     const opened=store.events.find(item=>item.event==='owner-ask-opened');
@@ -511,7 +511,7 @@ test('the same option confirms a provisional decision; a different one overturns
   const dir=tmp();
   try{
     const store=stubStore(dir);
-    const ask=toOp({id:'ask-1',kind:'owner.ask',goal:'Prepare the refund decision',allowlist:['.starciwork/decisions/**'],
+    const ask=toOp({id:'ask-1',kind:'decision.prepare',goal:'Prepare the refund decision',allowlist:['.starciwork/decisions/**'],
       question:{kind:'decision',text:'Should a refund reopen the order or close it?',options:[]},requesters:['op-intake']},0);
     const built=toOp({id:'op-intake',kind:'backend.implement',goal:'Build the intake',allowlist:['src/intake.ts'],
       nodeId:'demo.sales.implementation.backend.intake'},1);
@@ -557,7 +557,7 @@ test('the owner answers in the op\'s own terminal, and a credential reports only
     const store=stubStore(dir);
     const requester=toOp({id:'op-intake',kind:'backend.implement',goal:'Build the intake',allowlist:['src/intake.ts']},0);
     requester.status='paused';
-    const ask=toOp({id:'ask-1',kind:'owner.ask',goal:'Prepare the decision',allowlist:['.starciwork/decisions/**'],
+    const ask=toOp({id:'ask-1',kind:'decision.prepare',goal:'Prepare the decision',allowlist:['.starciwork/decisions/**'],
       question:{kind:'decision',text:'Which retry policy?',options:['retry twice','retry five times']},requesters:['op-intake']},1);
     const state=stubState(store,[requester,ask]);
     state.provisional=[];
@@ -572,7 +572,7 @@ test('the owner answers in the op\'s own terminal, and a credential reports only
     const store2=stubStore(dir);
     const waiting=toOp({id:'op-send',kind:'integration.verify',goal:'Prove the delivery',allowlist:['src/live.spec.ts']},0);
     waiting.status='paused';
-    const credentialAsk=toOp({id:'ask-1',kind:'owner.ask',goal:'Prepare the credential question',allowlist:['.starciwork/decisions/**'],
+    const credentialAsk=toOp({id:'ask-1',kind:'provision.ask',goal:'Prepare the credential question',allowlist:['.starciwork/decisions/**'],
       question:{kind:'credential',text:'PAY_API_KEY is not provided'},requesters:['op-send']},1);
     credentialAsk.question.stop='credential';
     const state2=stubState(store2,[waiting,credentialAsk]);

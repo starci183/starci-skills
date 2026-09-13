@@ -80,7 +80,7 @@ writes. The chat is a monitor, never an agent layer above the kernel and never a
   - A `decision` item wants the owner's pick, which you pass on with
     `workflow-answer --id <id> --op <op> --choice <n> [--note "..."]` - the option number the owner named
     and their own words, never a choice of yours. `--op` is **the op the item names**, and it is one of
-    two things. An `owner.ask` op prepared the question (a business rule, a design choice, an authority, a
+    two things. An `decision.prepare` (or `provision.ask` for a provision) op prepared the question (a business rule, a design choice, an authority, a
     credential the environment lacks), and the answer reaches every paused requester in its next contract.
     Or the item is a **reconciliation conflict**: the intake found the new feature cannot hold together
     with what a decided record settled and wrote the decision record under its own feature, so `--op` is

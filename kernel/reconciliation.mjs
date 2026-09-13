@@ -303,7 +303,7 @@ export function checkReconciliation(rows,{tree,scope,readNode,decidedIds=null,di
       if(!decision)findings.push(finding('conflict-without-decision',row.record,`the decision record ${row.decision} is not in the tree`));
       else if(!inScope(decision,scope))findings.push(finding('conflict-without-decision',row.record,`the decision record ${row.decision} is not under ${scope}; a conflict is decided under the feature that raised it`));
       // A decision record is the policy decision this tree already holds: a business record under
-      // business/srs/business-rules/policy-decisions with the srs-policy-decision section, exactly what an owner.ask
+      // business/srs/business-rules/policy-decisions with the srs-policy-decision section, exactly what a decision.prepare
       // writes and what the SRS layout rule of the validator accepts (kind business under business/srs). A record of
       // any other kind, or under another folder, is not one.
       else if(!isPolicyDecision(decision))findings.push(finding('conflict-without-decision',row.record,`${row.decision} is ${describeNotDecision(decision)}, not a decision record (a business record under business/srs/business-rules/policy-decisions with the srs-policy-decision section)`));
@@ -349,7 +349,7 @@ export function decisionOptions(record){
 /**
  * Every `conflict` row as the owner's question: the decided record it is with, the decision record the intake
  * wrote under C, that record's numbered options and the one-line detail. The kernel lists each of these as a
- * `needUser` decision item, exactly as it lists an `owner.ask`, and the workflow finishes `blocked` on an
+ * `needUser` decision item, exactly as it lists a `decision.prepare`, and the workflow finishes `blocked` on an
  * unanswered one - never `done` over a conflict nobody decided.
  */
 export function conflictQuestions(rows,{tree,readNode}={}){

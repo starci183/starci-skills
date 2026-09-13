@@ -1,0 +1,87 @@
+id: provision.ask
+goal:
+  en: >-
+    Ask the owner for the one thing only they can give - a credential, an account on an outside system, a
+    dataset, a legal authority, or the go-ahead for an irreversible effect - exactly named, in this operation's
+    own terminal, and wait for it. A value is never asked for: the owner puts a credential into the tree's
+    encrypted identity custody with one command, and this operation verifies only that it is present.
+nodeKinds:
+  - business
+completionProfile: business
+sideEffects: []
+graphPolicy:
+  mode: selected-scope-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: question
+    path: "the operation goal (section 'Question for the owner') and the operation that asked it"
+    purpose:
+      en: Read what is asked for exactly as it was raised - which operation, what it blocks, which kind of
+        provision (credential, account, dataset, authority, irreversible) - before anything is printed.
+  - id: environment
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: For a credential, read where the code reads the value - the exact variable name - and which identity
+        custody of this tree (.starciwork/_resources/identity/<slug>/) will hold it. Never the value itself.
+writes:
+  - id: report
+    path: E/manifest.yaml
+    fields:
+      - summary
+    content:
+      en: The report of the attempt itself - the fact that the provision is present, and nothing else; never a value, never a record in the tree.
+steps:
+  - reads:
+      - question
+      - environment
+    writes: []
+    action:
+      en: >-
+        Name the provision exactly: a credential names the variable the code reads, the outside system it belongs
+        to and the custody it will live in (identity:<slug>); an account, a dataset or an authority names what
+        and for which system. Never invent, stub, default or skip it.
+  - reads:
+      - question
+    writes: []
+    action:
+      en: >-
+        Ask in this terminal and wait: print what the owner provides and how. For a credential, print the one
+        command that puts the value into custody - node <skill root>/bin/starci.mjs identity set <slug>
+        --name <VAR>, which reads the value from stdin and never prints it - and ask them to reply "set". For
+        anything else, ask them to reply "provided" once it exists. Wait as long as the contract lets you.
+  - reads:
+      - question
+      - environment
+    writes:
+      - report
+    action:
+      en: >-
+        When the owner replies, verify PRESENCE alone: for a credential run sops exec-env
+        <work tree>/_resources/identity/<slug>/secrets.enc.yaml 'node -e "process.exit(process.env.<VAR>?0:1)"'
+        and report done with the first line exactly "credential: <VAR> present in identity:<slug>" when it exits
+        0; for anything else report done with "provided: <what the owner provided, in a few words>". If the wait
+        ends with no answer, report blocked with blocker kind authority naming the provision; the kernel keeps it
+        on the owner's list and nothing else waits for it.
+proofs:
+  - id: named-exactly
+    requirement:
+      en: The provision is named exactly - the variable, the system, the custody - and nothing was invented,
+        stubbed, defaulted or skipped in its place.
+  - id: asked-in-the-terminal
+    requirement:
+      en: What the owner provides and how was printed in this operation's own terminal before any report.
+  - id: no-secret
+    requirement:
+      en: No value of any credential or secret appears in the report, the terminal or anywhere else; a
+        credential is put into the tree's encrypted identity custody by the owner's own command and this
+        operation verifies only that it is present.
+blockers:
+  - code: QUESTION_UNCLEAR
+    condition:
+      en: The question names no provision and no system; the operation that asked it is sent back to state it.
+placeholders:
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  slug: Stable identity custody slug

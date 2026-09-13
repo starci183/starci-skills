@@ -100,7 +100,7 @@ export function retemplateIntakeOps(store,state,ctx,loaded){
  * kernel was given a checker (`ctx.reconcile`). A failing check is not an opinion: it names the rows that break
  * a rule, the report is downgraded to `failed` and the op runs again - which is why this returns the findings
  * instead of retrying itself. Retrying is the kernel's policy and stays there. A passing check puts every
- * `conflict` row to the owner exactly as an `owner.ask` decision is put, and the workflow finishes `blocked` on
+ * `conflict` row to the owner exactly as a `decision.prepare` decision is put, and the workflow finishes `blocked` on
  * those items rather than `done` over a conflict nobody settled.
  */
 export function settleIntake(store,state,op,ctx){
@@ -144,7 +144,7 @@ function reconcileIntake(store,state,op,ctx,tree,scope){
   const counts=plain(result.counts)?result.counts:{};
   store.appendEvent({event:'reconciled',op:op.id,scope,...counts});
   for(const conflict of (Array.isArray(result.conflicts)?result.conflicts:[]).filter(plain)){
-    // The owner settles a conflict, exactly as they settle an `owner.ask`: the same item shape, the same
+    // The owner settles a conflict, exactly as they settle a `decision.prepare`: the same item shape, the same
     // command, the same answer path. The kernel never picks a side and never averages two decided records.
     if(state.needUser.some(item=>item.kind==='decision'&&item.op===op.id&&item.record===(conflict.decision??null)))continue;
     state.needUser.push({op:op.id,kind:'decision',

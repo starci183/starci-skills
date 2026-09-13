@@ -77,7 +77,8 @@ roleOfKind:
   uat.verify: verify
   architecture.decide: decide
   business.decide: decide
-  owner.ask: decide
+  decision.prepare: decide
+  provision.ask: decide
   brand.decide: write
   interface.draw: write
   interface.asset: write
