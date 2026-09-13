@@ -53,6 +53,26 @@ test('a launcher usage error is reported by the launcher and the CLI keeps its o
   const help=run([entry,'--help'],parent);
   assert.equal(help.status,0,help.stderr);
   assert.match(help.stdout,/starci workspace init/);
+  // The installer page is only half the entry. Every command this entry forwards to the kernel launcher is
+  // named after it, one line each, and so are the two machine checks - otherwise the help teaches a command
+  // line that is missing the commands a person types most.
+  assert.match(help.stdout,/workflow kernel \(forwarded to the launcher/);
+  for(const command of ['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status',
+    'workflow-list','workflow-stop','workflow-lane-close','workflow-supervise'])
+    assert.match(help.stdout,new RegExp(`^\\s{2}${command}\\s{2,}\\S`,'m'),command);
+  assert.match(help.stdout,/^ {2}render check .*--brand <work root>/m);
+  assert.match(help.stdout,/^ {2}brand check <work root>/m);
+  // The installer page still comes first: the kernel block is an addition, never a replacement.
+  assert.ok(help.stdout.indexOf('starci workspace init')<help.stdout.indexOf('workflow kernel'),help.stdout);
+  // Product-agnostic: no repository, product or machine path is named in what a person is taught to type.
+  assert.doesNotMatch(help.stdout.slice(help.stdout.indexOf('workflow kernel')),/starci-academy|[A-Za-z]:[\\/]/);
+
+  // `help` and `-h` are the same page as `--help`.
+  for(const flag of ['help','-h']){
+    const same=run([entry,flag],parent);
+    assert.equal(same.status,0,same.stderr);
+    assert.equal(same.stdout,help.stdout,flag);
+  }
   const workflows=run([entry,'workflows'],parent);
   assert.equal(workflows.status,0,workflows.stderr);
   assert.equal(JSON.parse(workflows.stdout).workflows.length,16);
