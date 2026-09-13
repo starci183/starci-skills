@@ -1037,6 +1037,29 @@ test('a report that failed only on the whole-tree validator is read as done, and
   }finally{parked.cleanup();}
 });
 
+/**
+ * A stall over a bound that time lifts - the daily op budget of every runtime that could take the op - is a wait,
+ * never a finish: the budget rolls with the UTC day. A finish an older rule declared over such a stall is withdrawn
+ * on the next start, and the supervisor never treats it as finished.
+ */
+test('a stall over a spent daily budget is a wait, and a finish declared over one is withdrawn on start',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    state.finished={outcome:'blocked',reason:'no runtime accepted an operation',report:'x'};state.phase='finished';
+    state.needUser.push({kind:'environment',detail:'no runtime accepted an operation for 30 minutes (71 attempts)'});
+    for(const op of state.ops)if(op.status==='ready')op.deferral={reason:'no runtime with the plan role, a free slot and budget for work.author: claude-fable-5.1 (daily op budget exhausted), gpt-6-astra (daily op budget exhausted)',at:0};
+    const before=store.readEvents().length;
+    const state2=harness.run({maxIterations:1});
+    const log=store.readEvents().slice(before);
+    assert.ok(log.some(event=>event.event==='finish-withdrawn'&&event.reason==='no runtime accepted an operation'));
+    assert.equal(state2.finished,null);
+    assert.equal(state2.needUser.some(item=>/^no runtime accepted an operation/.test(item.detail??'')),false);
+  }finally{harness.cleanup();}
+});
+
 test('an op that lost its agent past the restart limit cools down and comes back, and the owner is not asked',()=>{
   const harness=setupWork();
   try{
