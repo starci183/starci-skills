@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {createOrcaCalls} from '../execution/orca-calls.mjs';
 import {resolveExecutionChain} from '../profiles/select.mjs';
 import {buildOperationLaunch,defaultOrcaExecutable,main,notifyTerminal,parseSkip,promptDelivery,qwenLaunchMode,resolveSupervisorChain,settleDispatch,startOperation,sweepWorktree} from '../execution/orca-supervised-launch.mjs';
+import {ensureAgentTrust} from '../execution/orca-supervised-launch.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';
@@ -475,6 +477,34 @@ test('notify proves Coordinator -> Monitor delivery from the screen, not from th
     assert.equal(missing.effectState,'none');
     assert.match(missing.reason,/not visible/);
   }finally{fs.rmSync(path.dirname(file),{recursive:true,force:true});}
+});
+
+test('the worktree is trusted for the agent before its worker starts: Claude in ~/.claude.json, Codex in ~/.codex/config.toml, nothing else touched',()=>{
+  const home=fs.mkdtempSync(path.join(os.tmpdir(),'starci-trust-'));
+  try{
+    const worktree=path.join(home,'wt','feature');
+    fs.mkdirSync(worktree,{recursive:true});
+    fs.writeFileSync(path.join(home,'.claude.json'),JSON.stringify({numStartups:3,projects:{'C:\\elsewhere':{allowedTools:[],hasTrustDialogAccepted:true}}}));
+    const first=ensureAgentTrust('claude',worktree,{home});
+    assert.deepEqual([first.ok,first.action],[true,'trusted']);
+    const claude=JSON.parse(fs.readFileSync(path.join(home,'.claude.json'),'utf8'));
+    assert.equal(claude.numStartups,3,'unrelated settings are kept');
+    assert.equal(claude.projects['C:\\elsewhere'].hasTrustDialogAccepted,true,'other projects are kept');
+    assert.equal(claude.projects[path.resolve(worktree)].hasTrustDialogAccepted,true);
+    assert.equal(ensureAgentTrust('claude',worktree,{home}).action,'already-trusted');
+    // Codex: an entry is appended to the TOML the way Codex writes it, once.
+    fs.mkdirSync(path.join(home,'.codex'),{recursive:true});
+    fs.writeFileSync(path.join(home,'.codex','config.toml'),'model = "gpt-5.6-sol"\n');
+    assert.equal(ensureAgentTrust('codex',worktree,{home}).action,'trusted');
+    const toml=fs.readFileSync(path.join(home,'.codex','config.toml'),'utf8');
+    assert.match(toml,/^model = "gpt-5.6-sol"$/m);
+    assert.match(toml,/\[projects\.'.*feature'\]\r?\ntrust_level = "trusted"/);
+    assert.equal(ensureAgentTrust('codex',worktree,{home}).action,'already-trusted');
+    assert.equal((toml.match(/trust_level/g)||[]).length,1);
+    // An agent with no folder dialog needs nothing; an unwritable home is a reason, never a throw.
+    assert.equal(ensureAgentTrust('qwen',worktree,{home}).action,'no-dialog');
+    assert.equal(ensureAgentTrust('claude',worktree,{home:path.join(home,'.claude.json')}).ok,false);
+  }finally{fs.rmSync(home,{recursive:true,force:true});}
 });
 
 test('a managed agent whose prompt is staged in its input box is submitted once instead of fenced',()=>{

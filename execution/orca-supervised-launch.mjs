@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {readDistJson} from '../core/runtime-root.mjs';
 import {resolveExecutionChain} from '../profiles/select.mjs';
@@ -337,10 +338,55 @@ function launchCommandTerminalCandidate(orca,{cwd,candidate,taskId,displayName,w
   return {ok:true,dispatchId,terminal:handle,attestation,titleDrift:false,call:created,launch:'command-terminal'};
 }
 
-function launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName,expectedPath,attest,wait}){
+/**
+ * A TUI agent asks whether it may trust a folder it has never been opened in, and Orca's pasted task lands in
+ * that dialog: the start times out (`agent_prompt_stalled`), the agent exits, and every attempt in a fresh
+ * worktree fails the same way - no drawing launched in the frontend worktrees all afternoon. Trust is granted
+ * to the exact worktree before the worker starts, the way the agent itself would record the owner's answer:
+ * Claude Code in `~/.claude.json` (`projects[path].hasTrustDialogAccepted`), Codex in `~/.codex/config.toml`
+ * (`[projects.'<path>'] trust_level = "trusted"`). Nothing else in those files is touched.
+ */
+export function ensureAgentTrust(agent,worktree,{home=os.homedir()}={}){
+  const absolute=path.resolve(String(worktree??''));
+  if(!absolute)return {ok:false,agent,reason:'no worktree'};
+  try{
+    if(agent==='claude'){
+      const file=path.join(home,'.claude.json');
+      let config={};
+      try{config=JSON.parse(fs.readFileSync(file,'utf8'));}catch{config={};}
+      if(!config||typeof config!=='object'||Array.isArray(config))config={};
+      config.projects=config.projects&&typeof config.projects==='object'?config.projects:{};
+      const keys=[absolute,absolute.replaceAll('\\','/')];
+      const known=keys.find(key=>config.projects[key]&&typeof config.projects[key]==='object');
+      if(known&&config.projects[known].hasTrustDialogAccepted===true)return {ok:true,agent,worktree:absolute,action:'already-trusted'};
+      const entry=known?config.projects[known]:{allowedTools:[],mcpContextUris:[],enabledMcpjsonServers:[],disabledMcpjsonServers:[]};
+      config.projects[known??absolute]={...entry,hasTrustDialogAccepted:true,hasClaudeMdExternalIncludesApproved:entry.hasClaudeMdExternalIncludesApproved??false,hasClaudeMdExternalIncludesWarningShown:entry.hasClaudeMdExternalIncludesWarningShown??false};
+      fs.writeFileSync(file,`${JSON.stringify(config,null,2)}\n`);
+      return {ok:true,agent,worktree:absolute,action:'trusted'};
+    }
+    if(agent==='codex'){
+      const file=path.join(home,'.codex','config.toml');
+      let text='';
+      try{text=fs.readFileSync(file,'utf8');}catch{text='';}
+      // Codex writes the project key lower-cased with backslashes on Windows; the same spelling is matched here.
+      const key=process.platform==='win32'?absolute.toLowerCase():absolute;
+      const escaped=key.replaceAll('\\','\\\\');
+      const present=new RegExp(`^\\[projects\\.(?:'${key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}'|"${escaped.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}")\\]\\s*\\r?\\ntrust_level\\s*=\\s*"trusted"`,'m');
+      if(present.test(text))return {ok:true,agent,worktree:absolute,action:'already-trusted'};
+      fs.mkdirSync(path.dirname(file),{recursive:true});
+      const block=`${text.length&&!text.endsWith('\n')?'\n':''}${text.length?'\n':''}[projects.'${key}']\ntrust_level = "trusted"\n`;
+      fs.appendFileSync(file,block);
+      return {ok:true,agent,worktree:absolute,action:'trusted'};
+    }
+    return {ok:true,agent,worktree:absolute,action:'no-dialog'};
+  }catch(error){return {ok:false,agent,worktree:absolute,reason:String(error?.message??error)};}
+}
+function launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName,expectedPath,attest,wait,trust=ensureAgentTrust}){
   if(candidate.launch==='command-terminal')return launchCommandTerminalCandidate(orca,{cwd,candidate,taskId,displayName,wait});
+  const trusted=trust(candidate.selection?.orcaLaunch?.agent??candidate.workerParams?.agent,expectedPath??cwd);
   const params={...candidate.workerParams,task:taskId};
   let started=orca.invoke('worker-start',params,{cwd});
+  if(started.outcome==='ok'&&started.receipt&&typeof started.receipt==='object')started={...started,receipt:{...started.receipt,trust:trusted}};
   const dispatchId=dispatchIdFromReceipt(started.receipt);
   let recovery=null;
   // The stall is read from the whole receipt: the reason field alone missed the flat `result.lastError` Orca prints.
@@ -352,7 +398,7 @@ function launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName,expec
     const ownTerminal=(getPath(started.receipt,'result.residualResources')??getPath(started.receipt,'result.effects')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
     const settlement=dispatchId&&started.effectState!=='none'?settleDispatch(orca,dispatchId,{cwd,reason:`worker-start ${started.outcome}`,terminalHandle:ownTerminal}):null;
     const effectState=settlement?settlement.effectState:started.effectState==='unknown'&&!dispatchId?'unknown':started.effectState;
-    return {ok:false,dispatchId,effectState,reason:started.reason??`worker-start ${started.outcome}`,stage:started.stage,call:started,settlement,
+    return {ok:false,dispatchId,effectState,reason:started.reason??`worker-start ${started.outcome}`,stage:started.stage,call:started,settlement,trust:trusted,
       ...(recovery?{recovery:{ok:recovery.ok,reason:recovery.reason??null,action:recovery.action??null}}:{})};
   }
   need(dispatchId,'Orca worker-start receipt is missing the supervised Dispatch');
@@ -427,7 +473,7 @@ function runChain(orca,{cwd,request,candidates,taskId,taskRecord,attest,expected
   for(const [index,candidate] of candidates.entries()){
     const result=launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName:request.displayName,expectedPath,attest:attest.bind(null,candidate.selection),wait});
     if(result.ok)return {ok:true,candidate,result,attempts};
-    attempts.push(attemptRecord(candidate,{dispatchId:result.dispatchId,effectState:result.effectState,reason:result.reason,stage:result.stage??null,settlement:result.settlement,...(result.recovery?{recovery:result.recovery}:{})}));
+    attempts.push(attemptRecord(candidate,{dispatchId:result.dispatchId,effectState:result.effectState,reason:result.reason,stage:result.stage??null,settlement:result.settlement,...(result.trust?{trust:result.trust}:{}),...(result.recovery?{recovery:result.recovery}:{})}));
     if(result.effectState!=='none')return {ok:false,exhausted:false,stopReason:'partial-or-unknown-effects',attempts};
     // A settled attempt leaves the Task blocked or failed; only a ready Task accepts the next candidate.
     if(index<candidates.length-1&&result.dispatchId){

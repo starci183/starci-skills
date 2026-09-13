@@ -651,6 +651,15 @@ is closed when its report is accepted (`op-terminal-closed`); a blocked or faile
 where its last words are. Every reconcile also sweeps what an older build left behind - stale `[Kernel]` tabs
 and done-op tabs of this workflow (`terminals-swept`) - and never touches another workflow's tabs.
 
+## The worktree is trusted before the agent opens it
+
+A TUI agent asks whether it may trust a folder it has never been opened in, and Orca's pasted task lands in
+that dialog: the start times out (`agent_prompt_stalled`) and the agent exits. Before every managed launch the
+launcher grants trust to the exact worktree the way the agent records the owner's own answer - Claude Code in
+`~/.claude.json` (`projects[<path>].hasTrustDialogAccepted`), Codex in `~/.codex/config.toml`
+(`[projects.'<path>'] trust_level = "trusted"`) - touching nothing else in those files; the attempt record
+carries `trust: {action: trusted | already-trusted | no-dialog}`.
+
 ## A tab exists only while its op runs
 
 Every five minutes (and at every reconcile) the kernel closes every tab of this workflow that nobody reads:
