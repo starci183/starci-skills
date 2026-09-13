@@ -26,7 +26,8 @@ import {RECORD_KINDS, loadRecords, recordReads} from './io.mjs';
 export const KIND_GRAPH='starci/kind-graph@1';
 /** The closed catalog. `validateGraph` refuses a profile that adds to it or drops from it. */
 export const KINDS=Object.freeze(['owner.ask','business.decide','architecture.decide','architecture.revise','brand.decide','interface.draw','interface.asset','e2e.verify',
-  'frontend.implement','backend.implement','runtime.operate','grammar.update','uat.verify','integration.verify','review.verify','work.author']);
+  'frontend.implement','backend.implement','runtime.operate','grammar.update','uat.verify','integration.verify','review.verify','work.author',
+  'implementation.plan']);
 export const FAMILIES=Object.freeze(['design','build','prove','repair']);
 export const ROLES=Object.freeze(['decide','plan','implement','verify','write']);
 /**

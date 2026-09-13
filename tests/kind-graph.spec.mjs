@@ -64,8 +64,21 @@ test('the shipped catalog validates against the allocator profile and the operat
   // Asset bytes come from the identity (a placeholder mascot), from the capture the drawing took, or from the
   // artwork step that re-renders the slots that capture declared - nowhere else.
   assert.deepEqual(kindsWriting('asset',{profile}),['brand.decide','interface.draw','interface.asset']);
-  // The node's own authored fields are completed once, by the one kind that stands before every lane.
-  assert.deepEqual(kindsWriting('record',{profile}),['work.author']);
+  // The node's own authored fields are written by the two kinds that stand before every lane: one completes the
+  // record a node needs to be launchable at all, the other cuts a node too big for one operation into children.
+  assert.deepEqual(kindsWriting('record',{profile}),['work.author','implementation.plan']);
+  // The cut is a kind of its own - that is what the goal page, the status view and the events show - but it
+  // carries the record-authoring operator contract, so no second operator exists for it.
+  assert.equal(familyOf('implementation.plan',{profile}),'design');
+  assert.equal(roleOf('implementation.plan',{profile}),'plan');
+  assert.equal(isReadOnly('implementation.plan',{profile}),false);
+  assert.equal(operatorOf('implementation.plan',{profile}),'work.author');
+  assert.equal(runtimes.roleOfKind['implementation.plan'],'plan');
+  assert.deepEqual(writesOf('implementation.plan',{profile}),['record'],'it writes records and builds nothing');
+  assert.deepEqual(reportsOf('implementation.plan',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['sds-gap','authority']});
+  // Like the record author it belongs to no lane and to no route: the kernel plans it itself, once per node.
+  for(const entry of profile.lanes)assert.equal(entry.steps.some(step=>step.kind==='implementation.plan'),false,entry.id);
+  for(const route of profile.routes)assert.notEqual(route.to?.kind,'implementation.plan');
   // A drawing that finds no settled identity says so with its own blocker; it never invents a colour instead.
   assert.ok(reportsOf('interface.draw',{profile}).blockers.includes('brand-gap'));
   // The language itself is grown by one kind, which belongs to no lane and is the only one that may change it.

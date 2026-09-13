@@ -28,7 +28,7 @@
 
 export const STEPS_HEADING='## Working order (mandatory, in this order)';
 export const DONE_HEADING='## Definition of done for this kind';
-export const SEQUENCES=['work.author','work.intake','owner.ask','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','integration.verify','uat','uat.verify','operations','migration','architecture.revise','grammar.update','decide','brand.decide','generic'];
+export const SEQUENCES=['work.author','work.intake','work.cut','owner.ask','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','integration.verify','uat','uat.verify','operations','migration','architecture.revise','grammar.update','decide','brand.decide','generic'];
 
 const IMPLEMENT_KINDS=['backend.implement','interface.implement','frontend.implement'];
 const IMPLEMENT_NODES=['implementation','ui'];
@@ -61,6 +61,10 @@ export function sequenceFor(op,{node=null}={}){
   const kind=text(op?.kind),origin=text(op?.origin),nodeKind=text(node?.kind),allowlist=list(op?.allowlist);
   // Authoring a record comes before the node's lane and owns the record itself, so neither the node kind nor
   // the origin may route it anywhere else.
+  // The record-authoring contract carries three modes and the operation itself says which: an `intake` scope
+  // authors a feature the tree does not hold, `implementation.plan` (an op carrying a `cut` node) splits one
+  // too-big node into children, and neither may be rerouted by a node kind, an origin or an allowlist.
+  if(kind==='implementation.plan'||(kind==='work.author'&&plain(op?.cut)))return 'work.cut';
   if(kind==='work.author')return plain(op?.intake)?'work.intake':'work.author';
   if(kind==='review.verify')return 'review.verify';
   if(kind==='owner.ask')return 'owner.ask';
@@ -113,9 +117,18 @@ function values(op,node){
     resources:codes(op?.resources,'no declared runtime'),
     requesters:codes(op?.requesters,'the operation that reported the shared change'),
     findings:count(findings.length,'finding'),
-    node:node?.id??op?.nodeId??null
+    node:node?.id??op?.nodeId??null,
+    cutNode:text(op?.cut?.node)||text(op?.nodeId)||'this node',
+    cutReason:text(op?.cut?.reason)||'it is more than one operation can build'
   };
 }
+
+/**
+ * The bounds a cut is measured against, mirrored from `kernel/sync.mjs` (`CUT_FILES`, `CUT_ASSERTIONS`) so this
+ * module keeps its one property: it depends on nothing and reads only the operation handed to it. A test pins
+ * the two copies together, because a contract that states a bound the kernel does not apply is worse than none.
+ */
+const CUT_FILES=12,CUT_ASSERTIONS=8;
 
 const SEQUENCE_STEPS={
   // Before a node can travel its lane its record must say what may be written and what proves it. That is this
@@ -182,6 +195,31 @@ const SEQUENCE_STEPS={
       `every \`reference\` row cites a decided record by id and no record of this feature restates it; every \`conflict\` row names a \`todo\` decision record of this feature that states both sides, the consequences, the numbered options and one recommendation; every \`new\` row names a record authored under this feature and declares the \`reads\` it rests on and the \`hands\` it passes work to`,
       `every requirement is a claim the owner can read and test, and every open question is an open decision record, never a guess`,
       `no record of another feature changed by a single byte - a conflict is put to the owner, never overwritten and never averaged - no product code changed, and the validator check exits 0: ${v.declared}`
+    ]
+  }),
+  // Heavy work runs in parallel, and this operation is what makes that possible: a node too big to be one
+  // operation becomes many small nodes with disjoint write scopes. Its one hard rule is the order - the SEAM
+  // every other child would otherwise touch is named and built FIRST and alone, and only then does the rest fan
+  // out - because two builds that both edit the module wiring are not parallel work, they are one merge conflict
+  // with two authors. It writes records, never product code, and a node that really is one behaviour is left alone.
+  'work.cut':v=>({
+    steps:[
+      `Read the node this operation cuts (${v.cutNode}) and everything it names (${v.references}): its description, its assertions, its declared write scope, and the accepted requirement (SRS) and design (SDS) records it refers to. Restate in three lines what the whole node must deliver; the kernel measured it as too big because ${v.cutReason}.`,
+      `Open the actual code the node's write scope names and read it - the modules, their wiring, their contracts and their migrations. A boundary you have not read is not a boundary you may draw, and a part the material does not determine is \`ask\` with the exact question, never a guess.`,
+      `Name the SEAM first, before any other part: the ONE child that owns what every other child would otherwise touch - module wiring and registration, dependency-injection setup, database migrations, shared contracts, shared types and shared fixtures. It is built first and alone. A group with no seam is a group whose children will collide; if nothing is shared, say so in the report and give the reason.`,
+      `Cut the rest by acceptance, never by file: each remaining child is ONE observable behaviour, with a write scope of at most ${CUT_FILES} files that is disjoint from every sibling AND from the seam, one runnable check per assertion, and every assertion traced to the same SRS/SDS ids the parent traced to. A behaviour that needs a sibling's file is not a separate child - it belongs to the seam or to that sibling. Then declare the order: every non-seam child carries the seam's node id in \`dependsOn\` and no other dependency on a sibling, so the kernel builds the seam first and fans the rest out behind it; two children that must wait for each other were cut wrong.`,
+      `Write each child at \`<node dir>/<part>/index.yaml\` inside the allowlist (${v.allowlist}): schema \`work/node@2\`, \`kind: implementation\`, \`state: todo\`, \`required: true\`, its description, its assertions, its write scope and its checks - exactly the record a build can be launched from without anyone inventing its scope.`,
+      `Turn ${v.cutNode} into a derived parent: remove its \`state\`, its \`completion\` and its write scope, and keep its assertions as the group's acceptance under \`extensions.work3.groupAssertions\`. A parent with children authors no state - it derives one from them - and that group acceptance is what the group's single proof is judged against.`,
+      `Run the listed validator check verbatim: ${v.declared}; the tree must validate with the parent derived and every child launchable, and \`git status\` must show nothing outside the allowlist. Never write \`completion\`, the kernel's own extension block or anything under an evidence folder, never edit another node, and never write product code.`,
+      `Report \`done\` exactly once, naming the seam, then each child with its behaviour, its write scope and its checks. A node that is genuinely one observable behaviour is not split: report \`done\` with \`cut: none\` and the reason, and the kernel runs the node as it is.`
+    ],
+    done:[
+      `either exactly one child is named the SEAM and every other child \`dependsOn\` it, or the report says \`cut: none\` and nothing under ${v.allowlist} changed`,
+      `every child is one observable behaviour at \`<node dir>/<part>/index.yaml\` (work/node@2, \`kind: implementation\`, \`state: todo\`, \`required: true\`) with a write scope of at most ${CUT_FILES} files, disjoint from every sibling and from the seam, and one runnable check per assertion`,
+      `no child states more than ${CUT_ASSERTIONS} assertions, and every child assertion traces to the same SRS/SDS ids ${v.cutNode} traced to`,
+      `${v.cutNode} is a derived parent: no \`state\`, no \`completion\`, no write scope, its assertions kept as \`extensions.work3.groupAssertions\``,
+      `the validator check exits 0: ${v.declared}`,
+      'no product code changed: this operation precedes the children\'s lanes, and the kernel launches them itself - the seam first, then the rest at once, and one proof for the whole group'
     ]
   }),
   'implement.ledger':v=>({

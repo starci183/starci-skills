@@ -4,8 +4,8 @@ import crypto from 'node:crypto';
 import {parseYaml} from '../core/yaml.mjs';
 import {settleDispatch} from '../hosts/orca/launch.mjs';
 import * as graph from './graph.mjs';
-import {AUTHOR_KIND,BRAND_DECIDE,KERNEL_CHECK,RECORD_OWNED,WORK_LEDGER,WORK_OPERATION,allowRoot,describeNode,firstLine,
-  gateDynamicOp,grammarReferences,inside,kernelGuards,kindRole,ledgerItem,liveStatus,locateSharedTreePaths,normalize,plain,
+import {AUTHOR_KIND,PLAN_KIND,authorsRecord,BRAND_DECIDE,KERNEL_CHECK,RECORD_OWNED,WORK_LEDGER,WORK_OPERATION,allowRoot,describeNode,firstLine,
+  gateDynamicOp,grammarReferences,inside,kernelGuards,kindRole,ledgerItem,liveStatus,locateSharedTreePaths,normalize,pathsIn,plain,
   slash,tail,toOp,unique,UI_KIND,workModule,workOpId,workValidateCommand,byId,ledgerAccess,workRootOf} from './common.mjs';
 import {kindsReadingBrand} from './io.mjs';
 import {brandReferencesOf,kernelProof,noteBrand,provenChecks,rereadBrand} from './verify.mjs';
@@ -49,11 +49,11 @@ export function laneOf(state,node){
   const lane=(()=>{try{return graph.laneFor({kind:node?.kind??null,layout:nodeLayout(node),repositoryRole:node?.repository??null});}catch{return [];}})();
   // A node that already has accepted ops (a state from before lanes existed) starts its lane where those ops left it.
   // An accepted author op is not one of them: it completed the record the lane is templated from, it walked no step.
-  const accepted=state.ops.filter(op=>op.nodeId===id&&op.status==='done'&&op.kind!==AUTHOR_KIND).map(op=>op.kind);
+  const accepted=state.ops.filter(op=>op.nodeId===id&&op.status==='done'&&!authorsRecord(op.kind)).map(op=>op.kind);
   return state.lanes[id]={lane:[...lane],done:unique([...(existing?.done??[]),...accepted]),checks:[...(existing?.checks??[])],
     // `authored` is the bound on record authoring, not lane progress: it survives a re-template of the lane.
     ...(existing?.authored?{authored:existing.authored}:{}),
-    head:existing?.head??state.ops.find(op=>op.nodeId===id&&op.status==='done'&&op.head&&op.kind!==AUTHOR_KIND)?.head??null};
+    head:existing?.head??state.ops.find(op=>op.nodeId===id&&op.status==='done'&&op.head&&!authorsRecord(op.kind))?.head??null};
 }
 export const laneNext=(entry,predicates=null)=>{
   try{return graph.nextKind(entry?.lane??[],entry?.done??[],{predicates:predicates??{}});}catch{return null;}
@@ -324,10 +324,19 @@ export function syncLedgerOps(store,state,ctx){
     const mine=state.ops.filter(op=>op.nodeId===node.id);
     // The op that completed this node's record is not a step of its lane: it precedes the lane, so the lane's
     // first step is still the first step and still carries the node's own id.
-    const laneOps=mine.filter(op=>op.kind!==AUTHOR_KIND);
+    const laneOps=mine.filter(op=>!authorsRecord(op.kind));
     // One step at a time: a node yields its next lane step only when nothing of it is still in flight.
     if(mine.some(op=>op.status!=='done'))continue;
+    // The design gate comes first even for a cut: a frontend node is cut by screen and region, which is exactly
+    // what the feature's drawing settles, so there is nothing to cut it by until that `ui` node is done.
     if(!laneOps.length&&designGate(store,state,{api:ctx.work.api,at:ctx.work.at,loaded},node,entry))continue;
+    // Before the lane, and instead of its first step: a node too big to be one operation is cut into children
+    // first. The cut runs once per node; when it authored children the node is a derived parent and is not a
+    // candidate at all on the next read, and when it reported `cut: none` the node starts its lane as it is.
+    if(!laneOps.length){
+      const cut=cutOp(store,state,node,ctx,taken);
+      if(cut){added.push(cut.id);continue;}
+    }
     const predicates=lanePredicates({api:ctx.work.api,at:ctx.work.at,loaded},node);
     laneSkip(entry,predicates);
     const next=laneNext(entry,predicates);
@@ -343,7 +352,8 @@ export function syncLedgerOps(store,state,ctx){
       ctx.guards.gitQueue(()=>commitLedgerWrite(store,state,last,ctx,node.id));
       continue;
     }
-    if(!next||KERNEL_PLANNED_KINDS.includes(next)||mine.some(op=>op.kind===next))continue;
+    // A cut child never plans its own prove step: `e2e.verify` and `review.verify` are planned once per parent.
+    if(!next||KERNEL_PLANNED_KINDS.includes(next)||cutChildDefers(state,node.id,next)||mine.some(op=>op.kind===next))continue;
     const id=laneOpId(node.id,next,!laneOps.length,taken);opOfNode.set(node.id,id);
     const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done,loaded});
     locateSharedTreePaths(op,ctx);
@@ -443,6 +453,223 @@ export function authorRecordOp(store,state,ctx,node,taken){
   store.appendEvent({event:'op-added',op:op.id,node:node.id,kind:op.kind,reason:`ledger incomplete: ${node.reason}`});
   gateDynamicOp(store,state,op);
   return op;
+}
+
+/* ------------------------------------------------------------------ a heavy node is cut, then fanned out */
+
+/**
+ * Heavy work runs in parallel. A node whose record asks for more than one operation can deliver is not launched
+ * as one long build: a planning operation cuts it into child nodes with disjoint write scopes, the seam that
+ * everyone would otherwise share (module wiring, DI registration, migrations, shared contracts and types) is
+ * built first and alone, the rest fan out across the free slots, and the proof - `e2e.verify` and `review.verify` -
+ * runs ONCE for the whole group on a runtime none of the children used.
+ *
+ * The three measures below are the whole test of "too big", and all three are facts of the record, never a
+ * judgement: how many files the node's write scope names, how many assertions it states, and how many design
+ * components the SDS records it references carry. One of them over its bound is one `work.author` op in `cut`
+ * mode before the lane and instead of the node's first step; none of them is a node that starts its lane as it is.
+ */
+export const CUT_FILES=12;
+export const CUT_ASSERTIONS=8;
+export const CUT_COMPONENTS=3;
+/** Default fan-out policy, for a runtimes profile that declares no `allocation.fanOut`. */
+export const FAN_OUT={seamFirst:true,maxPerGroup:9};
+
+const SDS_PATH=/(^|\/)architecture\/(sds|overview)(\/|$)/;
+/**
+ * The design components the SDS records a node references name. A reference is read from the tree (its record,
+ * not the projection), because the count is what the design actually declares: the `components` list of an
+ * `extensions.work3.sds` payload, or the record itself when it IS one component leaf.
+ */
+export function sdsComponents(ctx,node,loaded=null){
+  const nodes=(loaded??ctx?.work?.loaded)?.nodes;
+  const api=ctx?.work?.api;
+  if(typeof api?.readNode!=='function')return [];
+  const found=[];
+  for(const id of unique([...(node?.refs??[]),...(node?.dependsOn??[])])){
+    const target=typeof nodes?.get==='function'?nodes.get(id):null;
+    const where=slash(target?.path??String(id??''));
+    if(!SDS_PATH.test(where))continue;
+    let raw=null;try{raw=api.readNode(ctx.work.at,target??where);}catch{raw=null;}
+    const sds=plain(raw?.extensions?.work3?.sds)?raw.extensions.work3.sds:null;
+    const components=Array.isArray(sds?.components)?sds.components:[];
+    for(const item of components)found.push(String(plain(item)?(item.id??item.name??item.component??JSON.stringify(item)):item));
+    if(!components.length&&String(sds?.schema??'')==='starci/sds-component@1')found.push(String(raw?.id??where));
+  }
+  return unique(found.filter(Boolean));
+}
+
+/**
+ * Why this node is too big to be one operation, or null. Only a schedulable `implementation` node is measured:
+ * a record that does not yet say what it writes is `work.author`'s job first, and a design, a walk or a
+ * decision is one answer by construction.
+ */
+export function cutReason(ctx,node,loaded=null){
+  if(String(node?.kind??'')!=='implementation'||node?.schedulable!==true)return null;
+  const files=(node.allowlist??[]).length,assertions=(node.assertions??[]).length;
+  const components=sdsComponents(ctx,node,loaded);
+  const reason=files>CUT_FILES
+    ?`its write scope names ${files} files, past the ${CUT_FILES} one operation may hold`
+    :assertions>CUT_ASSERTIONS
+      ?`it states ${assertions} assertions, past the ${CUT_ASSERTIONS} one operation may prove`
+      :components.length>=CUT_COMPONENTS
+        ?`the design it references names ${components.length} components (${components.slice(0,6).join(', ')}), which is more than one operation builds`
+        :null;
+  return reason?{reason,files,assertions,components}:null;
+}
+
+/**
+ * The cut operation of one node. Its write scope is the node's own folder in the tree - a record write, which
+ * is why its kind is `work.author` - its check is the whole-tree validator, and its references are the node,
+ * the requirement and design it rests on, and the code its own allowlist names. It is bounded exactly as the
+ * record-authoring op is: one per node per workflow (`lane.cut`), whatever it leaves behind.
+ */
+export function cutOp(store,state,node,ctx,taken=new Set()){
+  const lane=laneOf(state,node);
+  if(lane.cut||ctx.work.shared&&!ctx.work.ledger?.repoRoot)return null;
+  const found=cutReason(ctx,node,ctx.work.loaded);
+  if(!found)return null;
+  const dir=`.starciwork/${slash(path.dirname(String(node.path??'')))}`;
+  const id=workOpId(`${node.id}-cut`,taken);
+  const op=toOp({id,nodeId:node.id,kind:PLAN_KIND,
+    goal:`Cut the Work node ${node.id} into child nodes that can be built in parallel: ${found.reason}. Name the SEAM first - the one child that owns what every other child would otherwise touch (module wiring, DI registration, migrations, shared contracts and types) - then cut the rest by acceptance, one observable behaviour each, disjoint from every sibling and from the seam. A node that really is one behaviour is not split: report \`done\` with \`cut: none\`.`,
+    // No ledger item and no ledger id: the cut closes no node - the children it writes are the nodes the tree has after it.
+    ledgerIds:[],allowlist:[`${dir}/**`],
+    references:unique([node.path,...(node.refs??[]),...(node.dependsOn??[]),...(node.allowlist??[])]),
+    checks:[{name:'work-valid',command:workValidateCommand(ctx)}],
+    acceptance:[`${node.id} is a derived parent: no state, no completion, no write scope, its assertions kept as the group's acceptance under extensions.work3.groupAssertions`,
+      `every child is written at ${dir}/<part>/index.yaml as work/node@2, kind implementation, state todo, required true, one observable behaviour, an allowlist of at most ${CUT_FILES} files disjoint from every sibling and from the seam, and one runnable check per assertion`,
+      'exactly one child is the seam, and every other child dependsOn it',
+      `every child assertion traces to the same SRS/SDS ids ${node.id} traced to`,
+      'the tree validates'],
+    origin:'ledger'},state.ops.length);
+  op.cut={node:node.id,reason:found.reason};
+  op.difficulty='hard';
+  op.createdIteration=state.iterations;
+  lane.cut=op.id;
+  locateSharedTreePaths(op,ctx);
+  state.ops.push(op);
+  store.appendEvent({event:'cut-planned',op:op.id,node:node.id,reason:found.reason,
+    files:found.files,assertions:found.assertions,components:found.components.length});
+  gateDynamicOp(store,state,op);
+  return op;
+}
+
+/** The cut groups of this workflow: `state.cuts[parent] = {children, seam, assertions}`, created at acceptance. */
+const cutsOf=state=>{state.cuts=plain(state?.cuts)?state.cuts:{};return state.cuts;};
+export const cutGroup=(state,parent)=>cutsOf(state)[String(parent??'')]??null;
+/** The cut parent of a node, or null. A child never proves itself: its prove steps are the parent's one proof. */
+export function cutParentOf(state,nodeId){
+  const id=String(nodeId??'');
+  if(!id)return null;
+  for(const [parent,group] of Object.entries(cutsOf(state)))if((group?.children??[]).includes(id))return parent;
+  return null;
+}
+/** Every child of the cut groups these ledger ids belong to - the set one group proof must cover. */
+export const cutSiblings=(state,ledgerIds=[])=>unique(ledgerIds.map(id=>cutParentOf(state,id)).filter(Boolean)
+  .flatMap(parent=>cutGroup(state,parent)?.children??[]));
+/** True when these ids are part of a cut group but are not all of it: the group proof waits for every child. */
+export function groupIncomplete(state,ledgerIds=[]){
+  const siblings=cutSiblings(state,ledgerIds);
+  return siblings.length>0&&siblings.some(child=>!ledgerIds.includes(child));
+}
+/** Kinds a cut child never plans for itself: every prove step of its lane belongs to the parent's one proof. */
+export const cutChildDefers=(state,nodeId,kind)=>Boolean(cutParentOf(state,nodeId))&&kindRole(kind)==='verify';
+/**
+ * The one proof this group still owes: the first verify step of the children's lane that some child has not
+ * walked yet - `e2e.verify` before `review.verify` - so one API proof and one review cover the whole group.
+ */
+export function groupVerifyKind(state,ledgerIds=[]){
+  const entries=ledgerIds.map(id=>state?.lanes?.[id]).filter(entry=>entry?.lane?.length);
+  const proves=unique(entries.flatMap(entry=>entry.lane.filter(kind=>kindRole(kind)==='verify')));
+  return proves.find(kind=>entries.some(entry=>!(entry.done??[]).includes(kind)))??'review.verify';
+}
+
+/**
+ * An accepted cut is measured against the tree, never against its own report: the ledger is re-read and the
+ * children are whatever now sits under the node's folder. Children make the node a derived parent and the group
+ * the unit every later proof is planned for (`cut-authored`); no child at all is the honest answer that the node
+ * is one behaviour, and the kernel proceeds with it as it is (`cut-none`).
+ */
+export function settleCut(store,state,op,ctx){
+  const nodeId=op.cut?.node??op.nodeId;
+  const entry=state.lanes?.[nodeId]??null;
+  let loaded=null;
+  try{loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});if(loaded.ok)ctx.work.loaded=loaded;}
+  catch(error){store.appendEvent({event:'ledger-sync-failed',op:op.id,reason:error.message});}
+  const tree=loaded?.ok?loaded:ctx.work.loaded;
+  const parent=(tree?.list??[]).find(item=>item.id===nodeId)??ctx.work.node(nodeId)??null;
+  const dir=`${slash(path.dirname(String(parent?.path??'')))}/`;
+  const children=(tree?.list??[]).filter(item=>item.id!==nodeId&&item.kind===String(parent?.kind??'implementation')
+    &&slash(item.path??'').startsWith(dir));
+  if(!children.length){
+    if(entry)entry.cutNone=true;
+    store.appendEvent({event:'cut-none',node:nodeId,op:op.id,reason:'the node is one observable behaviour; it starts its lane as it is'});
+    return 'cut-none';
+  }
+  const ids=children.map(child=>child.id);
+  // The seam is a fact of the records: the one child every other child declares it depends on.
+  const seam=children.find(child=>children.filter(other=>other.id!==child.id)
+    .every(other=>(other.dependsOn??[]).includes(child.id)))??null;
+  const assertions=(()=>{try{
+    const raw=ctx.work.api.readNode(ctx.work.at,parent);
+    const declared=raw?.extensions?.work3?.groupAssertions;
+    return Array.isArray(declared)?declared.filter(item=>typeof item==='string'):[];
+  }catch{return [];}})();
+  cutsOf(state)[nodeId]={children:ids,seam:seam?.id??null,assertions};
+  if(entry)entry.cutInto={children:[...ids],seam:seam?.id??null};
+  // The parent closes no ledger item of its own any more; its group acceptance is the proof's acceptance.
+  state.ledger=state.ledger.filter(item=>item.id!==nodeId);
+  state.needUser=state.needUser.filter(item=>!(item.kind==='ledger'&&item.node===nodeId));
+  store.appendEvent({event:'cut-authored',node:nodeId,op:op.id,children:ids,seam:seam?.id??null,
+    groupAssertions:assertions.length});
+  return 'cut-authored';
+}
+
+/**
+ * The scheduler's fan-out rule, as a fact of the cut group rather than of the allocator: at most
+ * `allocation.fanOut.maxPerGroup` children of one parent run at once, and while `seamFirst` holds the seam runs
+ * alone - nothing of its group beside it. Returns the reason to defer, or null when the op may launch.
+ */
+export function fanOutDeferral(state,op,busy=[],ctx=null){
+  const groupOf=item=>cutParentOf(state,item?.nodeId??(item?.ledgerIds??[])[0]??'');
+  const parent=groupOf(op);
+  if(!parent)return null;
+  const policy=plain(ctx?.allocator?.fanOut)?ctx.allocator.fanOut:FAN_OUT;
+  const max=Number.isFinite(policy.maxPerGroup)?policy.maxPerGroup:FAN_OUT.maxPerGroup;
+  const seam=cutGroup(state,parent)?.seam??null;
+  const siblings=busy.filter(other=>other.id!==op.id&&groupOf(other)===parent);
+  if(policy.seamFirst!==false&&seam){
+    if(op.nodeId===seam&&siblings.length)
+      return {reason:`the seam of ${parent} runs alone`,parent,running:siblings.map(other=>other.id)};
+    if(op.nodeId!==seam&&siblings.some(other=>other.nodeId===seam))
+      return {reason:`the seam ${seam} of ${parent} runs alone`,parent,running:[seam]};
+  }
+  if(siblings.length>=max)
+    return {reason:`${max} children of ${parent} already run (allocation.fanOut.maxPerGroup)`,parent,running:siblings.map(other=>other.id)};
+  return null;
+}
+
+/** The child of a cut group whose build step holds this file, or null when no child's write scope names it. */
+export function childOwning(state,ledgerIds=[],file){
+  const target=normalize(file);
+  for(const id of ledgerIds)
+    if(state.ops.some(op=>(op.nodeId===id||(op.ledgerIds??[]).includes(id))&&kindRole(op.kind)==='implement'&&inside(target,op.allowlist??[])))
+      return id;
+  return null;
+}
+/**
+ * Where a group proof's findings are repaired: the one child whose write scope holds every file the findings
+ * name. Findings spread over several children (or over none) stay the group's, exactly as before the cut.
+ */
+export function repairTarget(state,op,findings=[]){
+  const ledgerIds=op?.ledgerIds??[];
+  if(!cutSiblings(state,ledgerIds).length)return null;
+  const owners=unique(unique(findings.flatMap(pathsIn)).map(file=>childOwning(state,ledgerIds,file)).filter(Boolean));
+  if(owners.length!==1)return null;
+  const nodeId=owners[0];
+  const build=state.ops.find(item=>item.nodeId===nodeId&&kindRole(item.kind)==='implement');
+  return {nodeId,ledgerIds:[nodeId],allowlist:build?.allowlist??op.allowlist,checks:build?.checks??op.checks};
 }
 
 /**
@@ -549,8 +776,12 @@ export function kernelOwnedPaths(state,op,ctx){
   const node=ctx.work.node(op.nodeId);
   if(!node)return [];
   const granted=(op.allowlist??[]).map(normalize);
+  // A cut holds the node's whole folder, and the node's own record is exactly what it must turn into a derived
+  // parent, so the folder glob grants that record the way an author op's literal path does. The evidence folder
+  // under it stays the kernel's all the same: a cut proves nothing and writes no evidence.
+  const held=file=>granted.includes(file)||(plain(op.cut)&&!/(^|\/)evidence(\/|$)/.test(file)&&inside(allowRoot(file),granted));
   return unique(((ctx.guards??kernelGuards).protectedPaths(node,ctx.work.ledger?.repoRoot??ctx.work.repoRoot)??[]).map(normalize))
-    .filter(file=>!granted.includes(file));
+    .filter(file=>!held(file));
 }
 
 /** Content fingerprint of those paths: at acceptance the only pending change there must be the kernel's own. */
@@ -604,17 +835,30 @@ export function recordBlocks(ctx,nodeId){
  * launch. A changed block is reverted with the rest of the file and the report is not accepted, exactly as a
  * written kernel path is for any other op: a completion an agent writes itself is a claim, not a record.
  */
+export const CUT_OWNED=['completion'];
+const BLOCK_KEY={state:'state',completion:'completion','extensions.work3.kernel':'kernel'};
+/** The kernel-owned blocks of a record an author op holds, compared field by field rather than as one string. */
+const sameBlocks=(before,after,owned)=>{
+  if(before===after)return true;
+  try{
+    const a=JSON.parse(before),b=JSON.parse(after);
+    return owned.every(name=>JSON.stringify(a?.[BLOCK_KEY[name]??name]??null)===JSON.stringify(b?.[BLOCK_KEY[name]??name]??null));
+  }catch{return false;}
+};
 export function guardRecordBlocks(store,state,op,ctx){
-  if(op.kind!==AUTHOR_KIND||typeof op.recordBlocks!=='string')return [];
+  if(!authorsRecord(op.kind)||typeof op.recordBlocks!=='string')return [];
   const now=recordBlocks(ctx,op.nodeId);
-  if(now===null||now===op.recordBlocks)return [];
+  // A cut turns the node into a derived parent, and a parent authors no state: removing `state` is the job, not
+  // a forgery. Only `completion` stays the kernel's there - a cut proves nothing and may never claim it did.
+  const owned=plain(op.cut)?CUT_OWNED:RECORD_OWNED;
+  if(now===null||sameBlocks(op.recordBlocks,now,owned))return [];
   const paths=op.allowlist??[];
   const cwd=ctx.work?.ledger?.repoRoot??ctx.work?.repoRoot??state.worktree;
   const result=ctx.guards.gitQueue(()=>ctx.guards.revertProtected(ctx.git,{cwd,paths}))??{};
   op.recordBlocks=recordBlocks(ctx,op.nodeId)??op.recordBlocks;
   const reverted=unique([...(result.reverted??[]),...(result.removed??[])]).map(normalize);
   const touched=reverted.length?reverted:paths;
-  store.appendEvent({event:'record-blocks-modified',op:op.id,node:op.nodeId,blocks:RECORD_OWNED,paths:touched,reverted});
+  store.appendEvent({event:'record-blocks-modified',op:op.id,node:op.nodeId,blocks:owned,paths:touched,reverted});
   return touched;
 }
 
@@ -793,10 +1037,12 @@ export function markLedger(state,op,head){
     item.evidence=[...(item.evidence??[]),{opId:op.id,kind:op.kind,head:head??null}];
     // Only the LAST step of a node's lane proves it (`review.verify` on a backend lane, `uat.verify` on a frontend
     // one); an earlier prove step such as `e2e.verify` leaves the item implemented so the review is still planned.
-    const lane=op.nodeId?state.lanes?.[op.nodeId]?.lane:null;
+    // The lane that decides is the ITEM's, not the operation's: a group proof closes every child of a cut parent
+    // at once and carries no node id of its own, and a backend group's `e2e.verify` must still leave the review to run.
+    const entry=state.lanes?.[op.nodeId??id]??state.lanes?.[id]??null;
+    const lane=entry?.lane??null;
     // A lane that ends on a design step - a ui node, drawn then its artwork generated - is complete when that
     // step is accepted: no review is planned for it, so its last step is the one that settles the item.
-    const entry=op.nodeId?state.lanes?.[op.nodeId]:null;
     const walked=laneWalked(entry);
     const proves=Array.isArray(lane)&&lane.length
       ?lane.at(-1)===op.kind||(!lane.includes('review.verify')&&walked.length>0&&walked.every(kind=>kind===op.kind||(entry.done??[]).includes(kind)))

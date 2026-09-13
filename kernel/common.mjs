@@ -57,6 +57,17 @@ export const kindRole=kind=>{try{return graph.roleOf(kind);}catch{return null;}}
  * creates it, and the kernel creates exactly one per node when the ledger reports that node incomplete.
  */
 export const AUTHOR_KIND='work.author';
+/**
+ * Its sibling: the kind that cuts one node too big for a single operation into child nodes with disjoint write
+ * scopes. It carries the same operator contract (`work.author`, sequence `work.cut`) and the same standing -
+ * before the lane, no route, no lane names it, one per node, planned by the kernel itself - but it is a kind of
+ * its own because that is what the goal page, the status view and the events show: a heavy node reads
+ * `1 implementation.plan -> seam -> N backend.implement -> 1 e2e.verify -> 1 review.verify`.
+ */
+export const PLAN_KIND='implementation.plan';
+/** The two kinds that author a Work record instead of working from one. Neither walks a step of any lane. */
+export const AUTHORS_RECORD=[AUTHOR_KIND,PLAN_KIND];
+export const authorsRecord=kind=>AUTHORS_RECORD.includes(String(kind??''));
 /** What stays the kernel's inside a record an author op may otherwise write. Compared before and after, never reverted field by field. */
 export const RECORD_OWNED=['state','completion','extensions.work3.kernel'];
 export const RESUME_LIMIT=5,RETRY_LIMIT=3,RESTART_LIMIT=3,VERIFY_ROUNDS=3,GATE_ROUNDS=3,LAUNCH_LIMIT=3;
