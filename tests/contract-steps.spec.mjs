@@ -646,6 +646,9 @@ test('the owner.ask sequence asks in its own terminal, and a credential is put i
   // The question is put in this terminal, with both doors, before any report.
   assert.match(rendered,/ASK IN THIS TERMINAL, before you report/);
   assert.match(rendered,/the owner may answer here with the number, or later with workflow-answer/);
+  // Only a provision or an irreversible effect is waited for; every other question is provisional and reported at once.
+  assert.match(rendered,/A PROVISION \(a credential, an account on an outside system, a dataset, a legal authority\) or an IRREVERSIBLE effect is the owner's alone: wait for the answer/);
+  assert.match(rendered,/do not wait - report `decision: <record id>` at once/);
   assert.match(rendered,/`answered-by-owner: <n>`/);
   // The recommendation is what the kernel takes provisionally, so it has to be reported as a number.
   assert.match(rendered,/`decision: <record id>`, then a line `recommended: <n>`/);

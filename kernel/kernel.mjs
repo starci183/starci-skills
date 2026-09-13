@@ -32,7 +32,7 @@ import {renderChecksFor} from '../checks/render.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
 import {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
-import {OWNER_ASK,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
+import {OWNER_ASK,STOP_KINDS,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
   openOwnerAsk,provisionalLines,settleOwnerAsk,stopReasonFor} from './owner.mjs';
 import {BRAND_PAYLOAD,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
@@ -1689,6 +1689,9 @@ export function settleStalled(orca,store,state,ctx,tick){
   for(const op of state.ops.filter(item=>item.status==='running')){
     const observed=(tick.liveness??[]).find(item=>item.dispatch===op.dispatch);
     if(!observed)continue;
+    // An ask op that holds a provision or an irreversible effect is waiting for the owner in its tab by design:
+    // its idleness is the wait, not a stall. Every other question is provisional and its op never waits.
+    if(op.kind===OWNER_ASK&&STOP_KINDS.includes(op.question?.kind)&&observed.liveness==='stalled-idle')continue;
     if(observed.liveness==='stalled-idle'&&!op.nudged){
       notifyTerminal(orca,{cwd:state.worktree,terminal:op.terminal,wait:ctx.wait,
         text:'Continue; when you are finished report exactly once with the report command in your contract'});

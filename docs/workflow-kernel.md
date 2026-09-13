@@ -1403,6 +1403,7 @@ an operation was moved off it; `rate-limit-inferred` two silent settlements of o
 minutes were read as a quota refusal; `rate-limit-readmitted` the cooldown passed; `launch-cooling` /
 `parked-rejudged` the owner's list was judged again under the current rule on kernel start, once per rule (its `routed` names every item and where it went);
 `launch-cooling {migrated: true}` an environment line an older build or the terminal reconciliation parked (a lost agent, an idle restart, a launch nobody could take) was migrated to a cooldown by `readmitCooled`;
+an ask op holding a provision or an irreversible effect (`STOP_KINDS`) is waiting for the owner in its tab by design and is never nudged or restarted as `stalled-idle`; an ask op on any other question reports `decision` at once and never waits;
 `owner-ask-marker-honoured` an ask op wrote `answered-from`, `answered-by-owner`, `credential` or `provided` beside an outcome other than `done`: the marker is the ruling and the ask is settled on it;
 `launch-readmitted` / `launch-cap-reached` an op whose launch attempts or `stalled-idle` restarts were spent
 cooled, came back, and - past `LAUNCH_DAILY_CAP` in one day - became the owner's `environment` item;
