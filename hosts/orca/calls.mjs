@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {readDistJson} from '../../core/runtime-root.mjs';
+import {hostDescriptor} from '../index.mjs';
 
 /**
  * Typed Orca call runner. Every argv is built from providers/orca/calls.json, every exit code and
@@ -11,11 +12,17 @@ export const RESULT_SCHEMA='starci/orca-call-result@1';
 export const defaultOrcaExecutable=process.platform==='win32'?'orca.exe':'orca';
 /**
  * What the Orca host is to the kernel: its name, the capabilities an operation kind may `need` (Orca carries
- * the design tooling `interface.draw` draws with), and that it runs operations in parallel. The headless host
- * (`hosts/headless/host.mjs`) declares the same shape with no capability and sequential execution, and the
- * kernel reads nothing else about a host.
+ * the design tooling artwork is drawn with), and that it runs operations in parallel. The three facts are
+ * declared in `model/hosts.yaml` and read here through `hostDescriptor`, so this adapter and
+ * `hosts/headless/host.mjs` cannot describe the host model differently; the kernel reads nothing else about a
+ * host.
+ *
+ * It is read once at module load and frozen, because a descriptor that changed under a running kernel would
+ * change what `host-unsupported` means halfway through a workflow. `hostDescriptor` answers from the built-in
+ * values when no profile can be read: a host must be able to describe itself before a build exists, and this
+ * module is imported by the very command line that produces `.dist`.
  */
-export const ORCA_HOST=Object.freeze({name:'orca',capabilities:Object.freeze(['design-tool']),sequential:false});
+export const ORCA_HOST=Object.freeze({...hostDescriptor('orca'),capabilities:Object.freeze(hostDescriptor('orca').capabilities)});
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};

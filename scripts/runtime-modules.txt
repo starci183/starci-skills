@@ -23,6 +23,7 @@ execution/resolve.mjs
 execution/solo.mjs
 execution/orca.mjs
 execution/supervision.mjs
+hosts/index.mjs
 hosts/orca/calls.mjs
 hosts/orca/launch.mjs
 hosts/orca/protocol.mjs
