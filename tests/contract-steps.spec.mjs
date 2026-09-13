@@ -424,6 +424,49 @@ test('work.author completes the record from real material, keeps the kernel fiel
   assert.equal(sequenceFor(op({kind:'work.author',allowlist:['db/migrations/1.sql']}),{node:{kind:'uat'}}),'work.author');
 });
 
+/**
+ * An intake is a reconciliation with exactly three cases, written as data. The contract has to say so in the
+ * words the kernel then checks mechanically: the table key, the row fields, and what each case obliges. The
+ * two rulings it must NOT carry any more are the old "fit, change or conflict" vocabulary and the `sds-gap`
+ * report against another feature's record - a change a decided record needs is the owner's decision or new
+ * work this feature declares, never an edit and never a gap filed against someone else's record.
+ */
+test('work.intake determines every side, then reconciles it as three typed cases, and edits no other feature',()=>{
+  const intake=op({kind:'work.author',origin:'ledger',intake:{scope:'collab',example:'features/sales'},
+    allowlist:['work/features/collab/**'],references:['workspace.yaml','features/sales/index.yaml'],
+    acceptance:['features/collab has a module record, a business overview, SRS records and an architecture skeleton'],
+    checks:[{name:'work-valid',command:'node bin/starci.mjs validate .'}]});
+  const text=stepsFor(intake);
+  const listed=steps(text),closed=done(text);
+  assert.equal(sequenceFor(intake),'work.intake');
+  // The sides come first: the feature is determined as checkable claims before anything is reconciled.
+  assert.match(listed[1],/Determine the feature, do not just describe it/);
+  for(const side of ['ARCHITECTURE','USER STORIES','SECURITY AND AUTHORITY','BUSINESS RULES','QUALITY','EXTERNAL INTEGRATIONS AND CREDENTIALS','OPEN DECISIONS'])
+    assert.ok(listed[1].includes(side),`the sides sentence still names ${side}`);
+  // The table is named by its key and by its row fields, exactly as the kernel reads them.
+  assert.match(listed[2],/`extensions\.work3\.reconciliation`/);
+  assert.match(listed[2],/`\{case, record, decision, reads, hands, detail\}`/);
+  assert.match(listed[2],/There are exactly three cases and no fourth/);
+  // reference: cited by id, never restated.
+  assert.match(listed[2],/`case: reference`.*cite it by its `record` id and never restate, re-word or redefine a line of it/);
+  // conflict: never overwritten, never averaged; the decision record is this feature's and the owner answers it.
+  assert.match(listed[2],/`case: conflict`.*never overwrite it and never average the two/);
+  assert.match(listed[2],/decision record under THIS feature \(`state: todo`\) stating both sides, the consequences of each, the numbered options and exactly one recommendation/);
+  assert.match(listed[2],/name that record in `decision`/);
+  assert.match(listed[2],/the kernel puts the question to the owner/);
+  // new: authored here, declaring what it reads and what it hands on.
+  assert.match(listed[2],/`case: new`.*declare in `reads` the decided records it rests on and in `hands` the records of this feature it hands on to/);
+  // The definition of done repeats the table and the untouched neighbour, and the report carries the counts.
+  assert.ok(closed.some(item=>/one row `\{case, record, decision, reads, hands, detail\}` per decided record/.test(item)));
+  assert.ok(closed.some(item=>/every `reference` row cites a decided record by id and no record of this feature restates it/.test(item)));
+  assert.ok(closed.some(item=>/no record of another feature changed by a single byte/.test(item)));
+  assert.match(listed.at(-1),/the reconciliation table with its count per case/);
+  // The two withdrawn rulings are gone from the whole sequence: no old vocabulary, no formula, no sds-gap.
+  assert.doesNotMatch(text,/fit, a change or a conflict|fit, change or conflict/);
+  assert.doesNotMatch(text,/sds-gap/);
+  assert.doesNotMatch(text,/A'|A, B \+ C/);
+});
+
 test('e2e.verify proves a backend slice through the API on the real stack, never a screen, and a backend uat node resolves to it while a frontend one walks the surface',()=>{
   const e2e=op({kind:'e2e.verify',allowlist:['src/tests/e2e/checkout.e2e-spec.ts'],resources:['e2e-runtime'],acceptance:['order-persisted'],checks:[{name:'e2e',command:'npm run test:e2e -- checkout'}]});
   const rendered=stepsFor(e2e,{node:{kind:'uat'}});
