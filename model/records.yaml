@@ -39,9 +39,9 @@ records:
     nodeKinds: [architecture]
     reads: [srs, decision]
   decision:
-    purpose: One question the owner answered, with the options analysed per side and the one recommendation that was put to them.
-    layout: ['features/*/business/srs/decisions/**']
-    nodeKinds: [decision]
+    purpose: One question the owner answered, with the options analysed per side and the one recommendation that was put to them. A business record under business-rules/policy-decisions with the srs-policy-decision section - the shape the tree already holds and the validator's SRS layout accepts.
+    layout: ['features/*/business/srs/business-rules/policy-decisions/**']
+    nodeKinds: [business]
     # The owner's own. A decision is derived from the question, never from another record.
     reads: []
   brand:

@@ -118,10 +118,20 @@ export function sharedCheckCommand(command,ctx){
   if(!workRoot)return command;
   return String(command??'').replace(/(^|\s)\.starciwork(?=\s|$|\/)/g,`$1${workRoot}`);
 }
+const TREE_CHECK=/^work-(valid|tree-validates)$/i;
 export function machineVerify(state,op,{exec,cwd=state.worktree,work=null}={}){
   const checks=[];
-  // The whole-tree validator is the kernel's own gate at acceptance, never an operation check.
+  // The whole-tree validator is the kernel's own gate at acceptance, never an operation check. An op that lists it
+  // under its other name (`work-tree-validates`, the intake's and the cut's) is judged the way the kernel judges its
+  // own: over the errors this op could have caused, never over a red corner of the tree another workflow owns.
   for(const check of (op.checks??[]).filter(check=>!KERNEL_CHECK.test(check.name??''))){
+    if(TREE_CHECK.test(check.name??'')&&work){
+      const verdict=treeVerdictFor({work},op);
+      checks.push({name:check.name,command:check.command,exitCode:verdict.ok?0:1,evidence:verdict.ok
+        ?(verdict.foreign.length?`${verdict.foreign.length} error(s) elsewhere in the tree are outside this operation`:'')
+        :verdict.own.map(error=>`${error.code} ${error.path??''}: ${error.message??''}`).join('; ')});
+      continue;
+    }
     const result=exec(sharedCheckCommand(check.command,{work}),{cwd,timeoutMs:op.timeoutMs??CHECK_TIMEOUT_MS});
     const exitCode=Number.isInteger(result?.status)?result.status:1;
     checks.push({name:check.name,command:check.command,exitCode,evidence:tail(`${result?.stdout??''}${result?.stderr??''}`)});

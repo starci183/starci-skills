@@ -570,7 +570,9 @@ test('work.migrate declares the reconciliation and the integrations beside decid
   assert.match(listed[2],/Never a value/);
   assert.match(listed[2],/The resource need not exist yet and you never create it/);
   assert.match(listed[2],/A migration never asks for a shared change/);
-  assert.match(listed[1],/mirror the shape of an existing decision record of this tree/);
+  assert.match(listed[1],/business\/srs\/business-rules\/policy-decisions\/<slug>\/index\.yaml/);
+  assert.match(listed[1],/starci\/srs-policy-decision@1/);
+  assert.match(listed[1],/never in `refs` or `dependsOn` \(a graph edge into another feature is a cycle\)/);
   assert.match(listed[3],/features\/<feature>\/integration\/<id>\/index\.yaml/);
   assert.match(listed[4],/nothing rewritten as a draft, nothing set to todo, nothing under implementation\/ or ui\/ touched/);
   assert.match(listed[5],/An error the validator reports under a path outside your allowlist is not yours/);
@@ -601,7 +603,7 @@ test('work.intake determines every side, then reconciles it as three typed cases
   assert.match(listed[2],/`case: reference`.*cite it by its `record` id and never restate, re-word or redefine a line of it/);
   // conflict: never overwritten, never averaged; the decision record is this feature's and the owner answers it.
   assert.match(listed[2],/`case: conflict`.*never overwrite it and never average the two/);
-  assert.match(listed[2],/decision record under THIS feature \(`state: todo`\) stating both sides, the consequences of each, the numbered options and exactly one recommendation/);
+  assert.match(listed[2],/decision record under THIS feature at `business\/srs\/business-rules\/policy-decisions\/<slug>\/index\.yaml`[^\n]*stating both sides, the consequences of each, the numbered options and exactly one recommendation/);
   assert.match(listed[2],/name that record in `decision`/);
   assert.match(listed[2],/the kernel puts the question to the owner/);
   // new: authored here, declaring what it reads and what it hands on.

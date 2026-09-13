@@ -34,7 +34,7 @@ wrote it - and every kind below declares its `reads` and its `writes` over exact
 | `record` | `**/index.yaml` - the authored fields of one Work node | - |
 | `srs` | `features/*/business/**` | `decision` |
 | `sds` | `features/*/architecture/**` | `srs`, `decision` |
-| `decision` | `features/*/business/srs/decisions/**` | - (the owner's) |
+| `decision` | `features/*/business/srs/business-rules/policy-decisions/**` (a business record with the `srs-policy-decision` section) | - (the owner's) |
 | `brand` | `brand/index.yaml` | `code` (the real token files) |
 | `design` | `features/*/ui/**` | `srs`, `sds`, `brand`, `grammar` |
 | `asset` | `**/assets/**` | `design`, `brand` |
