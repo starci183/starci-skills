@@ -1,6 +1,8 @@
 # Solo execution
 
-`execution/solo.mjs` hosts one fixed StarCi workflow inside the current Codex, Claude or Orca session.
+`execution/solo.mjs` hosts one fixed StarCi workflow inside the current Codex, Claude or Orca session. It
+is the 4.x Plan route and is unrelated to the 5-plus workflow kernel in `kernel/`, which runs a job as a
+process of its own; see [workflow-kernel.md](workflow-kernel.md).
 The session may combine Plan, Coordinator and workflow-wrapper responsibilities. Each operation instance,
 not the whole workflow, is the mandatory isolation boundary. See the shared
 [execution agent model](execution-agent-model.md).

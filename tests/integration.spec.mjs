@@ -126,6 +126,34 @@ test('major upgrade requires opt-in before writing and never converts existing w
   assert.equal(read(root, '.worktrees/uat/evidence.txt'), 'Historical unverified evidence.');
 });
 
+// A version that asks something of the operator - a tree move, a command line that no longer exists, a
+// process to restart - says so where they are looking, which is the line the installer prints. The note
+// itself ships with the payload, so an operator with no network still has it.
+test('an update that changed the installed version names the upgrade note of what it installed', t => {
+  const root = host(t);
+  init({ dir: root, bootstrap: false }, quiet);
+  const version = JSON.parse(read(packageRoot, 'package.json')).version;
+  const catalog = read(root, '.claude/upgrades/index.yaml');
+  assert.match(catalog, /^schema: starci\/upgrades@1$/m);
+  const note = new RegExp(`^\\s*-\\s*version:\\s*${version.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\s*$`, 'm');
+  assert.match(catalog, note, catalog);
+  assert.equal(fs.existsSync(path.join(root, '.claude/upgrades', `${version}.md`)), true);
+
+  // An update over an older installed version prints the note of the version it just installed.
+  const manifestPath = path.join(root, '.claude/.starci-skills.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.version = `${version}-previous`;
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  const said = [];
+  update({ dir: root }, line => said.push(line));
+  assert.ok(said.some(line => line === `upgrade notes: .claude/upgrades/${version}.md`), said.join('\n'));
+
+  // An update that installed the version already present asks nothing new and stays quiet about it.
+  const again = [];
+  update({ dir: root }, line => again.push(line));
+  assert.equal(again.some(line => line.startsWith('upgrade notes:')), false, again.join('\n'));
+});
+
 test('known old managed entry is replaced, custom text and CRLF suffix preserved', t => {
   const root = host(t);
   init({ dir: root, bootstrap: true }, quiet);

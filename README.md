@@ -16,7 +16,7 @@ StarCi provides:
 
 StarCi is not a hosted agent service or an autonomous project runner. Your coding agent executes the work; the CLI supplies installation, inspection and validation. It does not call an LLM or need its own API key.
 
-**Status:** `5.0.0-alpha.1` · **Requirements:** Node.js 20+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release of this build. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
+**Status:** `5.0.0-plus` · **Requirements:** Node.js 20+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release of this build. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
 
 [Quick start](#quick-start) · [First project](#first-project) · [Execution modes](#execution-modes) · [CLI](#cli) · [Documentation](#documentation)
 
@@ -46,11 +46,11 @@ Start with an empty test host. The installer writes **source** into `.claude`, b
 
 ### Install an archive with npx
 
-If you have a reviewed `starci-5.0.0-alpha.1.tgz`, run from the directory containing it:
+If you have a reviewed `starci-5.0.0-plus.tgz`, run from the directory containing it:
 
 ```sh
-npx --yes --package=./starci-5.0.0-alpha.1.tgz starci init --dir /absolute/path/to/host
-npx --yes --package=./starci-5.0.0-alpha.1.tgz starci doctor --dir /absolute/path/to/host --quick
+npx --yes --package=./starci-5.0.0-plus.tgz starci init --dir /absolute/path/to/host
+npx --yes --package=./starci-5.0.0-plus.tgz starci doctor --dir /absolute/path/to/host --quick
 ```
 
 No global installation is required. `npx` executes package code: inspect the archive and choose the target deliberately. Maintainers can create an archive with `npm pack`; see [release verification](docs/releasing.md).
@@ -58,7 +58,7 @@ No global installation is required. `npx` executes package code: inspect the arc
 After this exact version is published, the equivalent registry command will be:
 
 ```sh
-npx starci@5.0.0-alpha.1 init --dir /absolute/path/to/host
+npx starci@5.0.0-plus init --dir /absolute/path/to/host
 ```
 
 That registry command is a future release instruction, **not the current quick start**. See [installation](docs/installation.md) for update, doctor and project binding.
@@ -145,6 +145,31 @@ Auto identifies the initial ASAP chain and later checkpoint. It is not limited t
 
 User-facing language and execution preferences live in the installed `.claude/config.json`; defaults are Vietnamese (`vi`), inherited model and `medium` effort. Runtime contracts, knowledge and all canonical SRS/SDS content remain English. The configured locale affects conversation and presentation only. Installation does not change the current agent's model or enable auto.
 
+## 5-plus: the workflow kernel
+
+Beside the Plan route above, this release ships the **workflow kernel**: one ordinary process that owns a whole job — it freezes the approved goal, allocates a runtime per ready operation, launches operation agents, re-runs their checks itself, commits, runs the gates and writes the final report. A language model fills forms inside it and never runs the loop. It runs on the Orca IDE or on a plain Claude Code / Codex chat.
+
+The runtime is laid out by concept, one folder per concern:
+
+| folder | holds |
+| --- | --- |
+| `model/` | the declared data the runtime runs on — record kinds, operation kinds, hosts, runtimes, the registry; no code |
+| `kernel/` | the control loop, split by the reason each file exists |
+| `hosts/` | the host model as data, and the two adapters behind one call surface |
+| `models/` | the model functions and their headless providers |
+| `checks/` | machine checks over bytes — the brand record, a drawing's capture and markup, a proof bundle |
+| `ops/` | one operator contract per operation kind |
+
+**One command line.** Everything is `node <host>/.claude/bin/starci.mjs <command>`; no instruction ever names a module path inside the runtime.
+
+```sh
+node /absolute/path/to/host/.claude/bin/starci.mjs --help
+```
+
+**Two proofs it works.** A feature added to a product that already decided others is reconciled rather than appended — every decided record it touches is cited, or becomes a conflict the owner decides, or is declared as new work — and `tests/reconciliation.spec.mjs` holds each rule. A drawing is the installed design grammar rendered in a browser, checked from the pixels it captured and the markup it kept beside them — `starci render check <ui node> --brand <work root>` — and `tests/render-checks.spec.mjs` holds those.
+
+The design is [docs/5-plus.md](docs/5-plus.md); the kernel in detail is [docs/workflow-kernel.md](docs/workflow-kernel.md); running one from a chat is [docs/workflow-chat.md](docs/workflow-chat.md).
+
 ## CLI
 
 Once installed, invoke the pinned local runtime without fetching npm again:
@@ -188,6 +213,9 @@ For older projects, `.work` becomes `.starciwork`, and `.starci` or `.starcitemp
 - [Skill design and compatibility](docs/skill-design.md)
 - [Author knowledge YAML](docs/knowledge-yaml.md)
 - [Build, test, package and release](docs/releasing.md)
+- [The 5-plus design: one flow, declared inputs and outputs, the owner decides](docs/5-plus.md)
+- [The workflow kernel](docs/workflow-kernel.md) · [operation kinds, lanes and routes](docs/kinds.md) · [running a workflow from a chat](docs/workflow-chat.md)
+- [What an operator of an installed runtime must do after an update](upgrades/index.yaml)
 
 Agent instructions live in [SKILL.md](SKILL.md); humans do not need to preload the entire knowledge catalog. Runtime maintenance rules live in [UPDATE.json](UPDATE.json). [README.json](README.json) is a machine-readable summary, not the user guide.
 

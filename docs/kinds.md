@@ -64,7 +64,7 @@ that carries it.
 | `brand.decide` | design | decide | code, grammar | brand, asset | `brand.decide` | Settle the visual identity - colour tokens traced to real source files, typography, mascot, logo, imagery rules - in the one brand record. |
 | `owner.ask` | design | decide | srs, sds, decision | decision | `owner.ask` | Prepare one decision for the owner - question, analysis per side, options, recommendation - or answer it from the decided records. |
 | `interface.draw` | design | write | srs, sds, brand, grammar, design | design, asset | `interface.draw` | Render each screen's main state from the installed grammar in a browser (never an image model), describe every other state, and declare every artwork the candidate embeds. |
-| `interface.asset` | design | write | design, brand | asset, design, code | `interface.asset` | Generate the artwork the design record declares as real repository assets, and bind each file back to its slot. |
+| `interface.asset` (needs `design-tool`) | design | write | design, brand | asset, design, code | `interface.asset` | Generate the artwork the design record declares as real repository assets, and bind each file back to its slot. |
 | `frontend.implement` | build | implement | sds, design, asset, brand, grammar, code | code | `interface.implement` | Build the interface the drawing settled. |
 | `backend.implement` | build | implement | srs, sds, decision, code | code | `backend.implement` | Build one slice of behind-the-interface behaviour. |
 | `runtime.operate` | build | implement | sds, code, runtime | runtime, code | `runtime.operate` | Migrations, environment, deployment, infrastructure. |
@@ -82,10 +82,24 @@ changes nothing cannot need a path it is not allowed to write.
 Four of `validateGraph`'s refusals are about this declaration rather than about the shape of the process.
 `unknown-record` is a record kind the catalog does not declare. `writer-blind` is a kind that writes a record
 it shares no derivation source with - it would be authoring something it cannot check against anything it
-saw. `lane-proof-blind` is a lane whose prove step cannot read what its build step wrote. `route-target-blind`
+saw. The rule is precisely "reads, **or itself writes**, at least one source of the record": a kind that
+authors two records in one operation may satisfy the derivation from its own output, which is how
+`business.decide` writes `srs` while writing the `decision` that `srs` is derived from, and a record with no
+declared sources (`record`, `decision`) exempts its writers entirely because there is nothing to be blind to.
+`lane-proof-blind` is a lane whose prove step cannot read what its build step wrote. `route-target-blind`
 is a blocker answered by a kind that writes nothing every possible requester reads. `readonly-writes` and
-`writes-nothing` hold the read-only invariant over `writes`. `ops/validate.mjs` adds `IO_DRIFT` over the same
-declaration: an operator contract whose `writes[].path` maps to a record its kind may not produce.
+`writes-nothing` hold the read-only invariant over `writes`, and `unknown-capability` / `needs-shape` refuse a
+`needs` entry outside the `capabilities` vocabulary - a promise no host could ever satisfy.
+
+`ops/validate.mjs` adds `IO_DRIFT` over the same declaration: an operator contract whose `writes[].path` maps
+to a record its kind may not produce. Three destinations are outside it, because they belong to the kernel
+rather than to the operation's kind: everything under `E/` (the attempt report every operation writes
+whatever its kind), a `node` row on `N/index.yaml` whose fields are only `state`, `blocker`, `completion` or
+`extensions.work3.kernel` (the kernel's own receipt), and an evidence manifest recognised by its own fields
+(`id`, `nodeId`, `inputDigest`, `outcome`, `assertions`, `assets`) wherever it is written - because a
+frontend build keeps its capture of the running page under the node's `assets/`, and a path alone cannot tell
+that capture apart from declared artwork. An operator that carries no kind at all is outside the declaration
+and is not held to it.
 
 `brand.decide` is the identity of the product as data: one record per product, a `brand:` spec (identity and
 installed grammar family, colour tokens as *grammar token name -> value* with their roles and the policy that
@@ -239,7 +253,8 @@ two named kinds (`route-cycle`).
 | `routeList`, `kindList`, `kindRecord` | `({profile?})` | the catalog for a status view |
 | `roleOf`, `familyOf`, `isReadOnly`, `readsOf`, `writesOf`, `operatorOf`, `reportsOf`, `predicatesOf` | `(kind, {profile?})` | one property of one kind |
 | `kindsReading`, `kindsWriting` | `(record, {profile?}) -> kind[]` | who may cite a record kind, and who may produce it |
-| `KINDS`, `FAMILIES`, `ROLES`, `RECORDS`, `ORIGINS`, `OUTCOMES`, `BLOCKERS`, `VERDICTS`, `THEN`, `SAME`, `LANE_BUILD` | constants | the closed vocabularies |
+| `needsOf` | `(kind, {profile?}) -> capability[]` | what a kind needs from its host beyond a worktree and a runtime |
+| `KINDS`, `FAMILIES`, `ROLES`, `ORIGINS`, `OUTCOMES`, `BLOCKERS`, `VERDICTS`, `THEN`, `CAPABILITIES`, `SAME`, `LANE_BUILD` | constants | the closed vocabularies; the record vocabulary is `RECORD_KINDS` of `kernel/io.mjs`, not restated here |
 
 `kernel/io.mjs` is the other half, and the only module that reads the record catalog:
 
@@ -247,10 +262,12 @@ two named kinds (`route-cycle`).
 | --- | --- | --- |
 | `loadRecords` | `({profileDir?}) -> profile` | the record catalog, compiled or authored |
 | `validateRecords` | `(profile?) -> errors[]` | `unknown-record-read`, `record-shape`, `catalog-drift` |
+| `recordEntry`, `recordReads` | `(record, {records?})` | one catalog entry, and what that record kind is derived from |
 | `recordKindOfPath` | `(path, {nodeKind?, records?}) -> record \| null` | what one path IS; `null` when it is not a record at all |
-| `undeclaredWrites` | `(kind, files, {profile?, records?}) -> [{file, record}]` | what an operation produced that its kind never declared |
+| `undeclaredWrites` | `(kind, files, {profile?, records?, nodeKind?}) -> [{file, record}]` | what an operation produced that its kind never declared |
 | `ioBlock`, `ioPayload` | `(kind, {profile?, records?})` | the declaration as markdown under the goal, and as data for the validator |
-| `kindsReadingBrand`, `intakeKindFor`, `decisionKindFor` | - | what the kernel used to keep as `DESIGN_KINDS`, `WORK_OPERATION` and `DECISION_OPERATION` |
+| `kindsReadingBrand`, `intakeKindFor`, `decisionKindFor` | - | the three questions the kernel used to answer from sets of its own: which kinds receive the brand payload, which kind opens a scope the tree does not hold (`brand` -> `brand.decide`, anything else -> `work.author`), and which operation settles one decision node - read from the lanes, because a decision node's lane is a single step and that step is the answer |
+| `DECISION_OPERATION` | constant | the 5.1 map, surviving only as the fallback for a kernel whose kinds profile cannot be read at all |
 | `RECORD_KINDS`, `RECORDS_SCHEMA` | constants | the closed record vocabulary |
 
 `tests/kind-graph.spec.mjs` holds the shipped profile to all of it: it validates against the real runtime

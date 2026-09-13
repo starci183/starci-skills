@@ -1,6 +1,6 @@
 # Runtime allocation: prefer, then overflow
 
-In runtime 5.0 the kernel no longer walks an ordered list of providers. Every
+In runtime 5-plus the kernel no longer walks an ordered list of providers. Every
 runtime is a pool declared in `model/runtimes.yaml` with the roles it may
 take, how many operations it can run at once and what it may spend in a day.
 For each ready operation the kernel calls `allocate(kind, {avoid})` and receives

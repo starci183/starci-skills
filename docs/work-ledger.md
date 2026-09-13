@@ -195,7 +195,7 @@ completion:
 | --- | --- | --- |
 | `state` | `markDone`, `markReopened`, `markDecided` | operational; excluded from the semantic digest |
 | `completion` | `markDone` (evidence), `markDecided` (review) | operational proof binding |
-| `extensions.work3.kernel` | every transition | the kernel's own receipt: opId, dispatch, head, checks, verifiedBy, at, reopened[], contractDigest |
+| `extensions.work3.kernel` | every transition | the kernel's own receipt: opId, dispatch, head, checks, verifiedBy, at, reopened[], and - on a completion - `contractDigest` with the `contractKind` it was taken for |
 | `<node>/evidence/<opId>/manifest.yaml` | `writeEvidence` | the `work/evidence@1` record `completion.evidence` names |
 
 Nothing else. There is no kernel-owned prose, no status sentence appended to a description, no
@@ -271,8 +271,12 @@ into the one answer the status page prints, per declared integration:
 
 There is no fourth state. A failed live run is `none`: it ran, it did not prove.
 
-**A proof remembers the rules it was proven under.** `markDone` accepts `contractDigest` and stores it in
-`extensions.work3.kernel`; `contractDigestOf({kind, kindRecord, operator, rules})` is its canonical
+**A proof remembers the rules it was proven under.** `markDone` accepts `contractDigest` and `contractKind`
+and stores both in `extensions.work3.kernel` — the digest, and the name of the operation kind it was taken
+for, so a later comparison computes the current digest for the same declaration rather than guessing at one
+from the node's lane. Only a block written by an older build carries no `contractKind`, and there the kernel
+falls back to the last step of the node's lane and then to the node kind.
+`contractDigestOf({kind, kindRecord, operator, rules})` is its canonical
 sha-256, with stable key order at every depth (list order is part of the declaration, key order is not).
 The kernel supplies the three inputs — the `model/kinds.yaml` entry, the operator contract and the
 validator rules of that kind. `staleProofs(ledger,{digestOf,kindOf})` then answers `[{node, stored,

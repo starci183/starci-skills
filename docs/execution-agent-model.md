@@ -1,6 +1,6 @@
 # Execution agent model
 
-StarCi 5.0 has three kinds of participant, and only one of them is an agent.
+StarCi 5-plus has three kinds of participant, and only one of them is an agent.
 
 1. **Kernel (code).** One ordinary process owns the whole control loop: it freezes the approved goal,
    allocates a runtime per ready operation, launches operation agents, verifies their acceptance,
@@ -8,10 +8,12 @@ StarCi 5.0 has three kinds of participant, and only one of them is an agent.
    workflow state, and it never performs operation work.
 2. **Model functions.** A model is called as a function with a typed form, never as a control loop.
    `assessGoal` turns a job into a definition of done, a ledger of required artifacts and the operation
-   set. `planOp` turns one operation node plus its SDS material and prior reports into that operation's
-   contract. `decide` chooses between enumerated options and returns the option with a rationale. Each
-   answers one JSON object against a declared form; the process around it — provider, retries, waiting,
-   reporting — is fixed by the runtime and is not the model's to change.
+   set. `critiqueGoal` objects to the goal itself before anyone works from it. `planOp` turns one operation
+   node plus its SDS material and prior reports into that operation's contract. `decide` chooses between
+   enumerated options and returns the option with a rationale. `validateOp` answers the one closed verdict
+   on an accepted result. Each answers one JSON object against a declared form; the process around it —
+   provider, retries, waiting, reporting — is fixed by the runtime (`models/functions.mjs`) and is not the
+   model's to change.
 3. **Operation agents.** One agent executes exactly one operation contract inside the workflow worktree
    and ends with exactly one typed report. It does not schedule, supervise, re-plan, or create worktrees.
 

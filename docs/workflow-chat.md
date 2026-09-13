@@ -34,14 +34,31 @@ verification.
 2. **The status page.** `workflow-status --id <id>` renders kernel liveness, running and blocked
    operations, the ledger by feature, the validator, `## Needs you (n)`, the rate and the last events,
    all derived from the store's own files (see [Reading a workflow](workflow-kernel.md#reading-a-workflow)).
-3. **Questions.** An operation that reports `ask` is first offered to the kernel's `decide` function;
-   what it cannot answer becomes a `needUser` item with the question text, and the operation is `blocked`
-   until the owner decides. The chat relays the item verbatim and says what answering it takes. A
-   `decision` item is the one the kernel prepared options for, and the owner's pick reaches the paused
-   operation in its next contract through
-   `workflow-answer --id <id> --op <ask op> --choice <n> [--note "..."]`; every other kind is answered in
-   the world - a Work record, the goal's wording, the machine - and after the owner acted,
-   `workflow-approve --id <id>` re-admits the operation.
+3. **Questions.** An operation that reports `ask` is first offered to the kernel's `decide` function, which
+   may answer only a mechanical question (which runtime, a retry, a format) and only from the closed options
+   it was given; everything else becomes a `needUser` item with the question text, and the operation is
+   `blocked` until the owner decides. The chat relays the item verbatim and says what answering it takes.
+
+   A `decision` item is the one the kernel prepared options for, and one command answers it:
+
+   ```
+   workflow-answer --id <id> --op <op> --choice <n> [--note "<the owner's words>"]
+   ```
+
+   That item comes from one of two places, and `--op` names a different operation in each. An **`owner.ask`**
+   op prepared it - a business rule, a design choice, an authority, a credential the environment lacks - and
+   `--op` is that ask op; the owner's pick reaches every paused requester in its next contract. Or a
+   **reconciliation conflict** raised it: the intake found that the new feature cannot hold together with
+   what a decided record settled, wrote the decision record under its own feature with both sides, the
+   numbered options and one recommendation, and the kernel listed it. There `--op` is **the intake operation's
+   id**, because the intake is the op that wrote the decision; the answer is recorded on that decision record
+   and the intake itself is not re-run, since re-running it would undo the reconciliation the owner just
+   settled. The item on the list names its own op either way, so the chat passes on what it reads.
+
+   A `host` item is different again: the operation's kind needs a capability this host does not offer, as
+   `model/hosts.yaml` declares it. There is nothing to arrange locally - the same workflow resumes in Orca.
+   Every other kind is answered in the world - a Work record, the goal's wording, the machine - and after the
+   owner acted, `workflow-approve --id <id>` re-admits the operation.
 4. **The end.** `state.finished` carries the outcome and the path of `<dir>/final-report.json`. A
    `blocked` finish with every gate green means questions for the owner remain; that is the report's
    `needUser[]`, not a defect.
@@ -60,7 +77,7 @@ argv untouched, so no command line a person types names a module path inside the
 node <skill root>/scripts/ensure-build.mjs
 node <skill root>/bin/starci.mjs workflow-goal    --host <skill root> --job "<the owner's prompt>" [--scope f1,f2] [--lane [<name>]]
 node <skill root>/bin/starci.mjs workflow-approve --host <skill root> --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
-node <skill root>/bin/starci.mjs workflow-answer  --host <skill root> --id <id> --op <ask op> --choice <n> [--note "<the owner's words>"]
+node <skill root>/bin/starci.mjs workflow-answer  --host <skill root> --id <id> --op <ask op or intake op> --choice <n> [--note "<the owner's words>"]
 node <skill root>/bin/starci.mjs workflow-run     --host <skill root> --id <id> --host-adapter headless   # detached, output appended to <dir>/kernel.log
 node <skill root>/bin/starci.mjs workflow-status  --host <skill root> --id <id> [--json true]
 node <skill root>/bin/starci.mjs workflow-stop    --host <skill root> --id <id>

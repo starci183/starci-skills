@@ -76,14 +76,21 @@ writes. The chat is a monitor, never an agent layer above the kernel and never a
   window (25 min) the supervisor restarts the kernel, and without a supervisor you start
   `workflow-run --id <id> --host-adapter headless` again, which resumes the same workflow.
 - Relay every `Needs you` item and every `ask` question verbatim (kind, op or node, detail, options),
-  then say what answering it takes: a `decision` item wants the owner's pick, which you pass on with
-  `workflow-answer --id <id> --op <ask op> --choice <n> [--note "..."]` - the option number the owner
-  named and their own words, never a choice of yours; a `ledger` item wants an allowlist or checks
-  authored on the named node; a `dynamic-op` item wants `workflow-approve --id <id> --allow-dynamic N`;
-  a `merge` item wants the owner to merge the lane branch into the base worktree; `authority`,
-  `environment` and every other kind want the owner's decision, which lands in a Work record, in the
-  goal's wording or on the machine, never in your hands. After the owner acted,
-  `workflow-approve --id <id>` re-admits what was blocked.
+  then say what answering it takes.
+  - A `decision` item wants the owner's pick, which you pass on with
+    `workflow-answer --id <id> --op <op> --choice <n> [--note "..."]` - the option number the owner named
+    and their own words, never a choice of yours. `--op` is **the op the item names**, and it is one of
+    two things. An `owner.ask` op prepared the question (a business rule, a design choice, an authority, a
+    credential the environment lacks), and the answer reaches every paused requester in its next contract.
+    Or the item is a **reconciliation conflict**: the intake found the new feature cannot hold together
+    with what a decided record settled and wrote the decision record under its own feature, so `--op` is
+    the intake op's id and the answer is recorded on that decision record. Never re-run the intake to
+    settle a conflict; the owner's answer is what settles it.
+  - A `ledger` item wants an allowlist or checks authored on the named node; a `dynamic-op` item wants
+    `workflow-approve --id <id> --allow-dynamic N`; a `merge` item wants the owner to merge the lane
+    branch into the base worktree; `authority`, `environment` and every other kind want the owner's
+    decision, which lands in a Work record, in the goal's wording or on the machine, never in your hands.
+    After the owner acted, `workflow-approve --id <id>` re-admits what was blocked.
 - Relay an operation reported `host-unsupported` as "this needs the Orca host". Its `host` needUser item
   names the capability the operation's kind needs and this host does not offer - a capability declared in
   `model/hosts.yaml`, so the item says which host has it and which does not, and there is nothing to
