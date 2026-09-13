@@ -640,6 +640,15 @@ is closed when its report is accepted (`op-terminal-closed`); a blocked or faile
 where its last words are. Every reconcile also sweeps what an older build left behind - stale `[Kernel]` tabs
 and done-op tabs of this workflow (`terminals-swept`) - and never touches another workflow's tabs.
 
+## Approving again after a blocked finish
+
+A workflow that finished `blocked` stopped for the owner's decision, and `workflow-approve --id <id>` on it is that
+decision: the finish is cleared (`resumed-after-block`, with the ops it re-admits) and every op a limit had
+exhausted - the validator's two rejections, the launch attempts, the restarts, a stall - goes back to `ready`
+with its counters at zero and its question gone (`op-readmitted`). An op the kernel refused on principle
+(superseded, out of the repository, a dynamic op over budget) stays refused: approving again changes nothing
+it was refused for. The supervisor then starts the kernel, which carries on from where it stopped.
+
 ## Strays that break the tree are quarantined
 
 An invalid tree whose every error sits under an untracked path that no live operation owns is what an
@@ -681,9 +690,13 @@ them whole beside every store root it covers as `_local/workflows/runtime-budget
 failed probe leaves the last good file and says `budget-probe-failed`). A runtime is bound by the generic
 windows of its provider (`provider:` in profiles/runtimes.yaml) and by a named window only when its profile
 names it (`budgetWindow: fableWeekly`); `budgetVerdict` says whether a window is exhausted (95% and not yet
-reset) and what share is left. Kernels read the file, never Orca. What allocation does with the verdict -
-skip an exhausted provider until its reset, prefer the runtime with more share left when two qualify - is the
-shared-runtime rule set (see "Runtimes are shared across workflows").
+reset) and what share is left. Kernels read the file, never Orca. The allocator folds the verdict into every
+pick: a runtime whose window is exhausted is blocked (`provider window exhausted until <reset>`) until the
+reset, and among the ready runtimes the one with clearly more of its window left comes first - in bands of
+25 points, so a few percent never reorder a role's own chain while a half-spent week does; a runtime no window
+binds (a local model, an unread provider) sits in the top band. The shared-load key still comes first. When
+the budget alone moved the choice the launch says so: `allocation-budgeted {op, runtime, sparedOver:[...],
+remaining:{runtime:share}}`.
 
 ## Reading a workflow
 

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,classifyFailure,createAllocator} from '../execution/runtime-allocator.mjs';
+import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator} from '../execution/runtime-allocator.mjs';
 import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../execution/runtime-loads.mjs';
 
 const profile=parseYaml(fs.readFileSync(new URL('../profiles/runtimes.yaml',import.meta.url),'utf8'));
@@ -356,6 +356,37 @@ test('entries of a dead kernel are ignored and dropped, and an unreadable ledger
   assert.equal(local.sharedView().ok,false);
   assert.equal(local.allocate('architecture.decide').runtime,'claude-fable-5.1');
   assert.deepEqual(local.allocate('backend.implement').preferredOver,[]);
+});
+
+test('the probed provider budget blocks an exhausted window until its reset and ranks clearly-more-headroom first, in bands, without touching the shared key',()=>{
+  const at=Date.UTC(2026,8,13,9);
+  const budgetAt=(claude,codex,{fable=claude}={})=>({schema:'starci/runtime-budget@1',at,providers:{
+    claude:{status:'ok',windows:{session:{usedPercent:10,resetsAt:at+3_600_000,minutes:300},weekly:{usedPercent:claude,resetsAt:at+86_400_000,minutes:10080},fableWeekly:{usedPercent:fable,resetsAt:at+86_400_000,minutes:10080}}},
+    codex:{status:'ok',windows:{weekly:{usedPercent:codex,resetsAt:at+86_400_000,minutes:10080}}}}});
+  // Fable's own week is nearly gone while Codex has most of its week: astra takes the decide even though the chain says fable first.
+  const spare=createAllocator({runtimes:profile,now:()=>at,budget:budgetAt(40,20,{fable:70})});
+  const review=spare.review('architecture.decide');
+  assert.deepEqual(review.ready.map(item=>[item.runtime,item.remainingShare,item.band]),[['gpt-6-astra',80,3],['claude-fable-5.1',30,1]]);
+  const decided=spare.allocate('architecture.decide');
+  assert.equal(decided.runtime,'gpt-6-astra');
+  assert.deepEqual(decided.sparedOver,['claude-fable-5.1']);
+  assert.deepEqual(decided.budget,{'gpt-6-astra':80,'claude-fable-5.1':30});
+  // Inside one band the role's own order stands: a few points never reorder the chain.
+  const close=createAllocator({runtimes:profile,now:()=>at,budget:budgetAt(40,45)});
+  assert.equal(close.allocate('architecture.decide').runtime,'claude-fable-5.1');
+  assert.deepEqual(close.allocate('architecture.decide').sparedOver,[]);
+  // An exhausted window blocks the runtime until the reset; past it the window binds nothing.
+  const gone=createAllocator({runtimes:profile,now:()=>at,budget:budgetAt(40,96)});
+  const blocked=gone.allocate('architecture.decide');
+  assert.equal(blocked.runtime,'claude-fable-5.1');
+  assert.match(blocked.blocked.find(item=>item.runtime==='gpt-6-astra').reason,/provider window exhausted until 2026-09-14T09:00:00/);
+  assert.deepEqual(blocked.blocked.find(item=>item.runtime==='gpt-6-astra').budget,{remaining:4,until:at+86_400_000});
+  const later=createAllocator({runtimes:profile,now:()=>at+86_400_001,budget:budgetAt(40,96)});
+  assert.equal(later.review('architecture.decide').blocked.some(item=>/exhausted/.test(item.reason)),false);
+  // A runtime no window binds sits in the top band; an unreadable file is no budget at all.
+  assert.equal(budgetBand(null),4);assert.equal(budgetBand(100),4);assert.equal(budgetBand(99),3);assert.equal(budgetBand(0),0);
+  const blind=createAllocator({runtimes:profile,now:()=>at,budget:{path:path.join(os.tmpdir(),'no-such-starci-budget-dir')}});
+  assert.equal(blind.review('architecture.decide').budget,null);
 });
 
 test('two kernels write the one ledger under a lock and both their launches survive',t=>{

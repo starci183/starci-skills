@@ -1571,7 +1571,18 @@ export function approve(store,state,{allocation=null,allowDynamic=null,acceptCri
   if(state.finished&&state.finished.outcome==='blocked'&&state.approved){
     const before=state.finished;
     state.finished=null;state.phase='run';state.stalls=0;state.stalledSince=null;state.kernelErrors=0;
-    store.appendEvent({event:'resumed-after-block',reason:before.reason??null,budget:dynamicBudget(state)});
+    // The ops a limit exhausted - the validator's rejections, the launch attempts, the restarts, a stall - are the
+    // items the policy could not settle, and the owner approving again says: try them again. Their counters start
+    // over and their questions go; an op the kernel refused on principle (superseded, out of the repository, a
+    // dynamic op over budget) stays refused, because approving again does not change what it was refused for.
+    const readmitted=[];
+    for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal)){
+      op.status='ready';op.validatorRejects=0;op.launchFailures=0;op.restarts=0;op.dispatch=null;op.terminal=null;op.nudged=false;
+      state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&['validator','environment','restart','stall'].includes(entry.kind)));
+      readmitted.push(op.id);
+    }
+    store.appendEvent({event:'resumed-after-block',reason:before.reason??null,budget:dynamicBudget(state),readmitted});
+    for(const id of readmitted)store.appendEvent({event:'op-readmitted',op:id,reason:'the owner approved the workflow again after it finished blocked'});
   }
   // The user sets the runtime allocation at approval; without --allocation the proposal from goal.md is used and recorded.
   if(!state.quota){const proposal=state.quotaProposal??proposeQuota(state);state.quota=parseQuota(proposal.text);state.quotaSource='proposal';}else state.quotaSource=allocation?'user':state.quotaSource??'user';
@@ -1796,7 +1807,13 @@ function quarantineStrays(store,state,ctx,loaded){
   const moved=[];
   for(const stray of culprits){
     const from=path.join(root,stray),to=path.join(store.dir,'strays',stamp,stray);
-    try{fs.mkdirSync(path.dirname(to),{recursive:true});fs.renameSync(from,to);moved.push({from:stray,to:slash(to)});}catch(error){store.appendEvent({event:'stray-quarantine-failed',path:stray,reason:String(error?.message??error)});}
+    try{
+      fs.mkdirSync(path.dirname(to),{recursive:true});
+      // The store may live on another drive than the worktree (an Orca worktree on C:, the repository on D:):
+      // a rename cannot cross drives, a copy followed by the removal can.
+      try{fs.renameSync(from,to);}catch(error){if(error?.code!=='EXDEV')throw error;fs.cpSync(from,to,{recursive:true});fs.rmSync(from,{recursive:true,force:true});}
+      moved.push({from:stray,to:slash(to)});
+    }catch(error){store.appendEvent({event:'stray-quarantine-failed',path:stray,reason:String(error?.message??error)});}
   }
   if(moved.length)store.appendEvent({event:'stray-quarantined',strays:moved,errors:loaded.errors.slice(0,5).map(error=>`${error.code} ${error.path??''}`)});
   return moved;
@@ -2091,6 +2108,9 @@ function scheduleOps(orca,store,state,ctx){
     // The shared view changed the choice: an equally capable runtime no other kernel is on took the operation.
     if(allocated.preferredOver?.length)store.appendEvent({event:'allocation-shared',op:op.id,runtime:allocated.runtime,
       preferredOver:allocated.preferredOver,sharedLoad:allocated.sharedLoad??{}});
+    // The probed provider budget changed the choice: a runtime with clearly more of its window left took the operation.
+    if(allocated.sparedOver?.length)store.appendEvent({event:'allocation-budgeted',op:op.id,runtime:allocated.runtime,
+      sparedOver:allocated.sparedOver,remaining:allocated.budget??{}});
     let candidate=null;
     try{candidate=allocated.candidate??ctx.allocator.candidateFor(launchOperator(op.kind),allocated.target);}
     catch(error){
@@ -4103,7 +4123,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       supervisor:supervisorRuntimes(state.host),validator:validatorRuntimes(state.host),
       // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
       // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
-      allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(store.dir),workflow:state.id}}),template:templateOf(state.host),
+      allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(store.dir),workflow:state.id},budget:{path:path.dirname(store.dir)}}),template:templateOf(state.host),
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
     // The kernel's own tab is the Run's coordinator terminal, so it lives as long as the workflow: a pause or a

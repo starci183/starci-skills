@@ -2,6 +2,7 @@ import {readDistJson} from '../core/runtime-root.mjs';
 import {resolveExecutionChain} from '../profiles/select.mjs';
 import {roleOf} from './kind-graph.mjs';
 import {SHARED_COOLING_KINDS,createLoadsLedger} from './runtime-loads.mjs';
+import {budgetVerdict,readRuntimeBudget} from './runtime-budget.mjs';
 
 /**
  * Runtime allocation: pools with slots and budgets instead of an ordered provider chain. The kernel asks
@@ -102,7 +103,24 @@ function sharedLedgerOf(shared,now){
   try{return createLoadsLedger({path:shared.path,workflow:shared.workflow,now});}catch{return null;}
 }
 
-export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null,shared=null}={}){
+/**
+ * The provider budget the supervisor probed (`runtime-budget.json` beside the stores) is read per review and
+ * folded into the pick in two ways: a runtime whose provider window is exhausted (95% and not reset) is
+ * blocked until that reset, and among the ready ones the runtime with clearly more of its window left comes
+ * first - in bands of 25 points, so a few percent never reorder the role's own chain, a half-spent week does.
+ * A runtime no window binds (a local model, an unread provider) is never penalised: it sits in the top band.
+ */
+export const BUDGET_BAND=25;
+export function budgetBand(remaining){return remaining===null||remaining===undefined?Math.ceil(100/BUDGET_BAND):Math.floor(Math.max(0,Math.min(100,remaining))/BUDGET_BAND);}
+function budgetReaderOf(budget){
+  if(!budget)return null;
+  if(typeof budget==='function')return budget;
+  if(typeof budget.read==='function')return ()=>budget.read();
+  if(typeof budget.path==='string')return ()=>{try{return readRuntimeBudget(budget.path);}catch{return null;}};
+  if(plain(budget.providers))return ()=>budget;
+  return null;
+}
+export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null,shared=null,budget=null}={}){
   runtimes=applyQuota(runtimes,quota);
   need(plain(runtimes)&&plain(runtimes.runtimes),'Runtime allocation needs a runtimes profile with a runtimes map');
   const pools=runtimes.runtimes,ids=Object.keys(pools),allocation=plain(runtimes.allocation)?runtimes.allocation:{};
@@ -116,6 +134,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const live=adoptState(state,utcDay(now()));
   const ledger=sharedLedgerOf(shared,now);
   const workflow=ledger?.workflow??null;
+  const readBudget=budgetReaderOf(budget);
   /** Cooldowns learned from another kernel, drained by the caller so it can record them once. */
   const notices=[],announced=new Map();
   const EMPTY_SHARED={ok:false,loads:{},ops:{},cooling:{}};
@@ -169,8 +188,10 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     // whole repository and not per workflow; a cooldown it recorded parks the runtime for this kernel as well.
     const elsewhere=id=>view.loads[id]??0;
     const sharedCooling=id=>{const entry=view.cooling[id];return entry&&entry.until>now()?entry:null;};
+    const probed=readBudget?readBudget():null;
+    const verdictOf=id=>probed?budgetVerdict(pools[id],probed,{now:now()}):{known:false,exhausted:false,until:null,remaining:null,windows:[]};
     for(const id of ids){
-      const pool=pools[id],cool=cooling(id),parked=sharedCooling(id),held=elsewhere(id),free=slots(id)-load(id)-held;
+      const pool=pools[id],cool=cooling(id),parked=sharedCooling(id),held=elsewhere(id),free=slots(id)-load(id)-held,window=verdictOf(id);
       const tier=difficulty&&Array.isArray(tiers[difficulty])?tiers[difficulty]:null;
       const reason=!Array.isArray(pool?.roles)||!pool.roles.includes(role)?`no ${role} role`
         :tier&&tier.length&&!tier.includes(id)?`outside the ${difficulty} tier`
@@ -178,13 +199,14 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
         :Array.isArray(restrictTo)&&!restrictTo.includes(id)?'not launchable for this operation'
         :cool?`cooling after ${cool.kind} until ${new Date(cool.until).toISOString()}`
         :parked?`cooling after a shared ${parked.kind??'provider limit'} until ${new Date(parked.until).toISOString()}, seen by ${parked.workflow??'another workflow'}`
+        :window.exhausted?`provider window exhausted until ${new Date(window.until??now()).toISOString()}`
         :free<=0?'no free slot'
         :opsLeft(id)<=0?'daily op budget exhausted'
         :tokensLeft(id)<=0?'daily token budget exhausted'
         :null;
       // The shared detail travels beside the reason, never inside it: the kernel reads these reasons by shape.
-      if(reason){blocked.push({runtime:id,reason,...(held?{sharedLoad:held}:{}),...(parked&&!cool?{shared:true,from:parked.workflow??null}:{})});continue;}
-      ready.push({runtime:id,target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held});
+      if(reason){blocked.push({runtime:id,reason,...(held?{sharedLoad:held}:{}),...(parked&&!cool?{shared:true,from:parked.workflow??null}:{}),...(window.exhausted?{budget:{remaining:window.remaining,until:window.until}}:{})});continue;}
+      ready.push({runtime:id,target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held,remainingShare:window.remaining,band:budgetBand(window.remaining)});
     }
     // prefer-then-overflow: the first eligible runtime of the role's order wins, so a saturated or cooling
     // preference simply is not in `ready` and the next one takes the operation without any special case.
@@ -196,10 +218,14 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
       :(a,b)=>cmp(a.ratio,b.ratio)||cmp(b.free,a.free)||cmp(b.opsLeft,a.opsLeft)||cmp(a.rotation,b.rotation);
     // What this kernel alone would have picked, kept so the receipt can name what the shared view passed over.
     const localRanked=ledger?[...ready].sort(locally).map(item=>item.runtime):null;
-    // The shared key comes first and nothing else changes: a runtime no other kernel is using beats an equally
-    // capable one that carries another workflow's operation, and inside one shared load the local order decides.
-    ready.sort(ledger?(a,b)=>cmp(a.sharedLoad,b.sharedLoad)||locally(a,b):locally);
-    return {kind,role,ready,blocked,preference:order,localRanked,
+    // The shared key comes first, the budget band second, and nothing else changes: a runtime no other kernel
+    // is using beats an equally capable one that carries another workflow's operation; inside one shared load
+    // the runtime with clearly more of its provider window left comes first; inside one band the local order decides.
+    const bySharedOnly=ledger?(a,b)=>cmp(a.sharedLoad,b.sharedLoad)||locally(a,b):locally;
+    const withoutBudget=probed?[...ready].sort(bySharedOnly).map(item=>item.runtime):null;
+    ready.sort(ledger?(a,b)=>cmp(a.sharedLoad,b.sharedLoad)||cmp(b.band,a.band)||locally(a,b):(a,b)=>cmp(b.band,a.band)||locally(a,b));
+    return {kind,role,ready,blocked,preference:order,localRanked,withoutBudget,
+      budget:probed?Object.fromEntries(ready.map(item=>[item.runtime,item.remainingShare])):null,
       shared:ledger?{workflow,loads:{...view.loads},cooling:{...view.cooling}}:null};
   };
 
@@ -212,7 +238,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     review,
     /** Pick the runtime for one operation; `avoid` is absolute, `restrictTo` limits the pools to launchable targets. */
     allocate(kind,{avoid=[],restrictTo=null,difficulty=null}={}){
-      const {role,ready,blocked,preference:order,localRanked,shared:sharedView}=review(kind,{avoid,restrictTo,difficulty});
+      const {role,ready,blocked,preference:order,localRanked,withoutBudget,budget:budgetView,shared:sharedView}=review(kind,{avoid,restrictTo,difficulty});
       if(inFlight()>=maxParallelOps)return {ok:false,kind,role,avoid,blocked,reason:`maxParallelOps ${maxParallelOps} is already in flight; release a slot before allocating ${kind}`};
       if(!ready.length)return {ok:false,kind,role,avoid,blocked,reason:`no runtime with the ${role} role, a free slot and budget for ${kind}: ${blocked.map(item=>`${item.runtime} (${item.reason})`).join(', ')||'no pool declares that role'}`};
       const chosen=ready[0];
@@ -223,9 +249,13 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
       // carries another kernel's operations. An empty list means the shared view changed nothing.
       const preferredOver=localRanked?localRanked.slice(0,Math.max(0,localRanked.indexOf(chosen.runtime))):[];
       const sharedLoad=Object.fromEntries(ready.filter(item=>item.sharedLoad>0).map(item=>[item.runtime,item.sharedLoad]));
+      // What the budget alone moved: the runtimes the shared-and-local order ranked ahead of the chosen one, passed
+      // over only because they have clearly less of their provider window left. Empty when the budget changed nothing.
+      const sparedOver=withoutBudget?withoutBudget.slice(0,Math.max(0,withoutBudget.indexOf(chosen.runtime))):[];
       return {ok:true,kind,role,runtime:chosen.runtime,target:chosen.target,load:chosen.load+1,slots:chosen.slots,
         remaining:remainingOf(chosen.runtime),alternatives:ready.slice(1).map(item=>item.runtime),blocked,at:now(),
         policy,preference:order,overflowed:Boolean(order)&&chosen.preference>0,
+        ...(budgetView?{budget:budgetView,sparedOver}:{}),
         ...(ledger?{shared:{workflow,loads:sharedView?.loads??{}},sharedLoad,preferredOver}:{})};
     },
     /** Independent review: the implement runtime is excluded while `verifyAvoidsImplementRuntime` holds. */
