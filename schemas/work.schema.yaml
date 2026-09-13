@@ -1168,7 +1168,14 @@ $defs:
           the sandbox a live proof runs against; extensions.work3.reconciliation is the list of
           reconciliationRow entries a feature module record carries after an intake, one row per decided
           record the feature touches, checked by the kernel itself; extensions.work3.checks and
-          extensions.work3.allowlist are what the kernel may launch the node with; and
+          extensions.work3.allowlist are what the kernel may launch the node with;
+          extensions.work3.decisionLog is the append-only log a revise operation writes, one entry per
+          revision of this record, each {rev (the rev this entry settled, an integer), at (ISO-8601), gap
+          (the blocker detail that opened the revision), chosen (the reading that was written into the
+          record), why (why that reading is the most reasonable one by the accepted records, the other
+          features' decided records and the product's own conventions), alternatives (the other readings the
+          record admitted, one line each)} - an entry is never rewritten and never deleted, so the owner can
+          read what the runtime decided for them and overturn it; and
           extensions.work3.kernel is the kernel own receipt, including the contractDigest of the kind
           declaration the proof was taken under."
       description:

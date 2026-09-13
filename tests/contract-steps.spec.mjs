@@ -34,6 +34,7 @@ test('every sequence renders a numbered working order and a definition of done, 
     operations:[op({kind:'runtime.operate',allowlist:['ops/rotate.sh'],resources:['postgres']}),{kind:'operations'}],
     migration:[op({allowlist:['src/migrations/0007-orders.ts'],resources:['postgres']}),{kind:'implementation'}],
     'architecture.revise':[op({kind:'architecture.revise',origin:'sds-gap',allowlist:['features/sales/architecture/sds/intake/index.yaml'],findings:['intake has no rule for an expired cart']}),null],
+    'business.revise':[op({kind:'business.revise',origin:'business',allowlist:['features/sales/business/srs/intake/index.yaml'],findings:['the intake requirement does not say whether a partial order is billable']}),{kind:'business'}],
     'grammar.update':[op({kind:'grammar.update',origin:'architecture',allowlist:['/grammars/starci/**'],
       findings:['no contract renders a stepped progress rail'],acceptance:['the grammar renders a stepped progress rail']}),{kind:'implementation'}],
     decide:[op({kind:'architecture.decide',origin:'architecture',allowlist:['features/sales/architecture/sds/intake/index.yaml'],checks:[]}),null],
@@ -235,24 +236,59 @@ test('uat.verify walks the rendered surface with a screenshot per step, compares
   assert.match(text,/Lane: the feature's `ui` node is its interface design record and walks `interface\.draw` -> `interface\.asset`/);
 });
 
-test('architecture.revise edits one SDS section, bumps rev, keeps the decision log and writes no code',()=>{
-  const text=stepsFor(op({kind:'architecture.revise',origin:'sds-gap',allowlist:['features/sales/architecture/sds/intake/index.yaml'],
+test('both revise sequences state the readings, choose one, log why and move on - and ask only about money, authority or customer data',()=>{
+  const design=op({kind:'architecture.revise',origin:'architecture',allowlist:['features/sales/architecture/sds/intake/index.yaml'],
     references:['features/sales/business/srs/intake/index.yaml'],findings:['intake has no rule for an expired cart'],
-    checks:[{name:'work-valid',command:'node bin/starci.mjs validate .'}]}));
-  const revised=steps(text);
-  assert.match(text,/Sequence `architecture\.revise`/);
-  assert.match(revised[0],/gap report that opened this operation \(1 finding\)/);
-  assert.match(revised[1],/Edit only that section inside the allowlist \(`features\/sales\/architecture\/sds\/intake\/index\.yaml`\)/);
-  assert.match(revised[1],/no code file/);
-  assert.match(revised[2],/Bump that section's `rev`/);assert.match(revised[2],/never rewrite or delete an earlier entry/);
-  assert.match(revised[3],/work-valid: `node bin\/starci\.mjs validate \.`/);
-  assert.match(revised[4],/`rev` is higher than it was/);assert.match(revised[4],/no product code/);
-  assert.match(revised[5],/with the new `rev` and the sections you changed/);
-  assert.match(revised[5],/`ask` with the exact question/);
-  // A design revision never writes a spec or product code, so it carries no red-spec rule and no lane hint.
-  assert.doesNotMatch(text,/MUST fail now/);
-  assert.doesNotMatch(text,/Lane: the feature's `ui` node/);
-  assert.match(text,/no product code changed and no other design section moved/);
+    checks:[{name:'work-valid',command:'node bin/starci.mjs validate .'}]});
+  const requirement=op({kind:'business.revise',origin:'business',allowlist:['features/sales/business/srs/intake/index.yaml'],
+    references:['features/payments/business/srs/refund/index.yaml'],findings:['the intake requirement does not say whether a partial order is billable'],
+    checks:[{name:'work-valid',command:'node bin/starci.mjs validate .'}]});
+  const cases=[{key:'architecture.revise',operation:design,record:'design (SDS)',where:'the SDS section'},
+    {key:'business.revise',operation:requirement,record:'requirement (SRS)',where:'the requirement, rule or journey'}];
+  for(const {key,operation,record,where} of cases){
+    const text=stepsFor(operation);
+    const revised=steps(text);
+    assert.ok(text.includes(`Sequence \`${key}\``),key);
+    assert.equal(revised.length,8,key);
+    // 1: the gap itself. 2: the readings the record admits - and a record that admits one reading is not a gap.
+    assert.match(revised[0],/gap report that opened this operation \(1 finding\)/,key);
+    assert.ok(revised[0].includes(`exact ${record} passage it names`),key);
+    assert.ok(revised[1].includes('readings that passage actually admits'),key);
+    assert.ok(revised[1].includes('admits exactly one reading is not a gap'),key);
+    // 3: the runtime chooses, from the accepted records, the other features' decided records and the conventions.
+    assert.ok(revised[2].includes('most reasonable reading'),key);
+    assert.ok(revised[2].includes("decided records of the OTHER features"),key);
+    assert.ok(revised[2].includes('is not a reason to stop'),key);
+    // The one exception, stated identically in both sequences: money, authority or customer data is never silent.
+    assert.ok(revised[2].includes('UNLESS the readings differ in an observable outcome about MONEY'),key);
+    assert.ok(revised[2].includes('AUTHORITY'),key);assert.ok(revised[2].includes('CUSTOMER DATA'),key);
+    assert.ok(revised[2].includes('report `ask` exactly once with `question.kind: decision`'),key);
+    assert.ok(revised[2].includes('ONE recommendation'),key);
+    assert.ok(revised[2].includes('ONLY thing this operation may ever `ask` about'),key);
+    // 4: the chosen reading goes into the record the allowlist names, and nothing else moves.
+    assert.ok(revised[3].includes(`Write the chosen reading into ${where}`),key);
+    assert.ok(revised[3].includes(`\`${operation.allowlist[0]}\``),key);
+    assert.ok(revised[3].includes('no code file'),key);
+    // 5: the rev and exactly one decision-log entry, in the shape schemas/work.schema.yaml documents.
+    assert.ok(revised[4].includes("Bump that record's `rev`"),key);
+    assert.ok(revised[4].includes('EXACTLY ONE entry to `extensions.work3.decisionLog`'),key);
+    assert.ok(revised[4].includes('{rev, at, gap, chosen, why, alternatives}'),key);
+    assert.ok(revised[4].includes('Never rewrite and never delete an earlier entry'),key);
+    // 6-8: validate, self-audit, report the rev and the entry - and never ask for anything else.
+    assert.match(revised[5],/work-valid: `node bin\/starci\.mjs validate \.`/,key);
+    assert.ok(revised[6].includes('`rev` is higher than it was'),key);
+    assert.ok(revised[6].includes('exactly one new entry naming this gap'),key);
+    assert.ok(revised[7].includes('with the new `rev` and the decision-log entry'),key);
+    assert.ok(revised[7].includes('an unclear record is revised, not asked about'),key);
+    // A record revision never writes a spec or product code, so it carries no red-spec rule and no lane hint.
+    assert.doesNotMatch(text,/MUST fail now/,key);
+    assert.doesNotMatch(text,/Lane: the feature's `ui` node/,key);
+    assert.ok(text.includes('no product code changed and no other passage of this record, and no other record, moved'),key);
+    assert.ok(text.includes('exactly one new `{rev, at, gap, chosen, why, alternatives}` entry'),key);
+  }
+  // Each sequence escapes to the OTHER record's gap rather than answering it in the wrong layer.
+  assert.match(stepsFor(design),/really a missing or self-contradictory REQUIREMENT is `blocked` `srs-gap`/);
+  assert.match(stepsFor(requirement),/really a missing DESIGN[\s\S]*is `blocked` `sds-gap`/);
 });
 
 test('grammar.update tries the composition of existing contracts first and publishes only behind green gates',()=>{

@@ -104,8 +104,9 @@ kinds:
   # lane: nothing schedules it, a reported `srs-gap` creates it, and it edits the record a builder could not
   # derive its behaviour from. It reads the same records the decision did and it may not write a new `decision`
   # of its own - except the one exception both revise sequences state, where the readings differ in an
-  # observable outcome about money, authority or customer data and the owner's decision record is prepared with
-  # numbered options and one recommendation, reported as `ask`.
+  # observable outcome about money, authority or customer data: then it does not choose silently, it reports
+  # `ask` with `question.kind: decision`, the numbered options and one recommendation, and the kernel's
+  # `owner.ask` writes that decision record and continues on the recommendation until the owner overturns it.
   business.revise:
     family: repair
     role: decide
