@@ -495,10 +495,10 @@ export const DEFAULT_CRITIC_RUNTIMES=['gpt-6-astra','claude-fable-5.1'];
 export const PREREQUISITE_KINDS=['srs','sds','brand','decision'];
 export const CRITIQUE_FORM={
   verdict:{type:'string',enum:CRITIQUE_VERDICTS},
-  objections:{type:'object[]',optional:true,each:{kind:{type:'string',enum:OBJECTION_KINDS},claim:{type:'string'},
-    // Evidence is optional in the form and mandatory in the result: an objection without it is dropped rather
-    // than sent back, so one unevidenced line never invalidates the objections that do name their record.
-    evidence:{type:'string',optional:true},consequence:{type:'string'}}},
+  // Objections are read leniently: a model that answers them as sentences, or with a kind outside the closed
+  // list, is not sent back for it - the kernel shapes what it can and drops what names no evidence. Two
+  // providers in a row failed the strict form on a real goal and the goal went uncritiqued.
+  objections:{type:'list',optional:true},
   required:{type:'string[]',optional:true},alternatives:{type:'string[]',optional:true},question:{type:'string',optional:true},
   // A prerequisite of a kind the kernel does not know is dropped, never a reason to send the whole critique back.
   prerequisites:{type:'object[]',optional:true,each:{kind:{type:'string'},feature:{type:'string',optional:true},why:{type:'string'}}}
@@ -531,6 +531,7 @@ const summarize=list=>(Array.isArray(list)?list:[]).filter(plain).map(item=>({id
 const critiqueRules=answer=>{
   const errors=[];
   const evidenced=(Array.isArray(answer.objections)?answer.objections:[]).filter(item=>plain(item)&&String(item.evidence??'').trim());
+  // A closed-list kind is not demanded of the model: the kernel maps an unknown one, so the list is advice here.
   if(['revise','refuse'].includes(answer.verdict)&&!evidenced.length)
     errors.push(`a ${answer.verdict} must carry at least one objection, and every objection must name its evidence (a record id, a rule statement, a fact of the job text)`);
   if(answer.verdict==='revise'&&!strings(answer.required).length)
@@ -583,9 +584,13 @@ export function critiqueGoal({job,scope=[],ledger=[],decisions=[],records=[],mat
     attempts:result.attempts??[],usage:result.usage??null,objections:[],dropped:[],required:[],alternatives:[],question:null,prerequisites:[]};
   const answer=result.value;
   const objections=[],dropped=[];
-  for(const raw of (Array.isArray(answer.objections)?answer.objections:[]).filter(plain)){
-    const item={kind:String(raw.kind??'').trim(),claim:String(raw.claim??'').trim(),
-      evidence:String(raw.evidence??'').trim(),consequence:String(raw.consequence??'').trim()};
+  for(const raw of (Array.isArray(answer.objections)?answer.objections:[])){
+    const given=plain(raw)?raw:typeof raw==='string'?{claim:raw}:null;
+    if(!given)continue;
+    const kind=String(given.kind??'').trim().toLowerCase();
+    const item={kind:OBJECTION_KINDS.includes(kind)?kind:'consistency',claim:String(given.claim??given.text??given.objection??'').trim(),
+      evidence:String(given.evidence??'').trim(),consequence:String(given.consequence??given.impact??'').trim()};
+    if(!item.claim)continue;
     (item.evidence?objections:dropped).push(item);
   }
   return {ok:true,schema:CRITIQUE,verdict:answer.verdict,objections,dropped,

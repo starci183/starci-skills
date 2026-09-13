@@ -352,6 +352,11 @@ test('a critique that costs work must carry something to act on: evidence, requi
     [['claude-fable-5.1',0],['claude-fable-5.1',1],['gpt-6-astra',0]]);
   // The supervisor runtimes are the default chain, and a goal with no job text is not a goal to critique.
   assert.deepEqual(DEFAULT_CRITIC_RUNTIMES,['gpt-6-astra','claude-fable-5.1'],'astra first: one call per goal, and Fable has the scarcer week');
+  // Objections written as sentences or with a kind outside the list are shaped, never sent back: the evidenced ones stay.
+  const lenient=critiqueCall([JSON.stringify({verdict:'revise',required:['name the record'],objections:['just a sentence',{kind:'security',claim:'The token is read from a file nobody fills',evidence:'delivery.module.ts',consequence:'Delivery silently disabled.'}]})]);
+  assert.equal(lenient.result.verdict,'revise');
+  assert.deepEqual(lenient.result.objections.map(item=>[item.kind,item.claim]),[['consistency','The token is read from a file nobody fills']]);
+  assert.equal(lenient.result.dropped.length,1,'the sentence without evidence was dropped, not fatal');
   // A prerequisite is kept when it names a feature (or is the brand) and has a known kind; anything else is dropped quietly.
   const withPrereqs=critiqueCall([JSON.stringify({verdict:'revise',objections:[objection()],required:['author the chat records first'],
     prerequisites:[{kind:'sds',feature:'chat',why:'the goal extends a module the tree has no architecture record for'},{kind:'brand',why:'the design needs tokens'},{kind:'sds',why:'no feature named'},{kind:'other',feature:'x',why:'unknown kind'}]})]);

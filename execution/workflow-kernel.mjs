@@ -693,8 +693,9 @@ export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,pro
   if(!critiqued?.ok){
     state.critique={verdict:'unavailable',objections:[],required:[],alternatives:[],question:null,prerequisites:[],provider:null,
       at:Date.now(),reason:critiqued?.reason??'critiqueGoal was not available'};
+    // The form errors of the attempts travel with the event: an unavailable critique is only diagnosable from them.
     store.appendEvent({event:'goal-critique-unavailable',reason:state.critique.reason,
-      attempts:critiqued?.attempts?.length??0,providers:chain});
+      attempts:critiqued?.attempts?.length??0,providers:chain,errors:(critiqued?.attempts??[]).slice(-2).map(item=>({provider:item.provider,errors:(item.errors??[]).slice(0,3)}))});
     return state.critique;
   }
   state.critique={verdict:critiqued.verdict,objections:(critiqued.objections??[]).map(item=>({...item})),
