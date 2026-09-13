@@ -166,6 +166,7 @@ what happens to the reporter (`pause`, `reopen`, `retry`) and with which bound. 
 
 | on | routes to | the reporter | bound |
 | --- | --- | --- | --- |
+| `blocked` `srs-gap` | `business.revise` on the business node the report names (its `index.yaml` plus its SRS folder), origin `business`, whose own check is that the Work tree still validates; `markDecided` bumps the node's `rev` | reopened behind it | 2 rounds, then the user |
 | `blocked` `sds-gap` | `architecture.revise` on the architecture node (its `index.yaml` plus its SDS folder), origin `architecture`, whose own check is that the Work tree still validates; `markDecided` bumps the node's `rev` | reopened behind it | - |
 | `blocked` `interface-gap` | `interface.draw` on the same node, origin `architecture` | reopened behind it | - |
 | `blocked` `grammar-gap` | `grammar.update` in the repository the binding's `grammar` role names, origin `architecture`, allowlisted to that repository and the canon | reopened behind it | 2 rounds; no `grammar` role means no op at all |
@@ -176,8 +177,9 @@ what happens to the reporter (`pause`, `reopen`, `retry`) and with which bound. 
 | `blocked` `environment` / `authority` | nothing | blocked, `needUser` | - |
 
 Kinds younger than `ops/registry.yaml` are resolved to a launchable operator id once, at the launch seam:
-`frontend.implement` launches as `interface.implement` and `architecture.revise` as `architecture.decide`
-(`launchOperator`). The allocator is asked for the op's own kind, because `roleOf` from the graph is what
+`frontend.implement` launches as `interface.implement`, `architecture.revise` as `architecture.decide` and
+`business.revise` as `business.decide` (`launchOperator`), so both repairs run on the reasoning chain that
+decided the record in the first place - Fable, then Astra, then Opus. The allocator is asked for the op's own kind, because `roleOf` from the graph is what
 decides its role - the runtimes profile's `roleOfKind` map is only the fallback for a kind the graph lacks.
 
 A profile that cannot be read is not fatal: the graph is empty, `DECISION_OPERATION` in `kernel/io.mjs` maps
@@ -245,6 +247,24 @@ and in the `## Phản biện (critique)` section of `goal.md` above the definiti
   it (`intake-planned` with `prerequisite`), and **every other operation of the goal waits for it** - the build
   starts from a record, never from the prompt. One the tree holds is `prerequisite-held` and changes nothing;
   a `decision` is the owner's (`prerequisite-owner`) and stays on the page under `### Prerequisites`.
+
+- **`hidden-decision` objections** - what the goal decides silently that the owner should decide. They are not
+  all the same, and the critic says which is which with `decisive`. A **non-decisive** one becomes nothing at
+  all (`hidden-decision-deferred`): the record repair (`business.revise`, `architecture.revise`) settles it
+  towards the most reasonable reading when an operation actually hits it, and the owner overturns it from the
+  record's decision log. A **decisive** one - it changes an observable outcome about money, authority or
+  customer data - becomes one `owner.ask` of `question.kind: decision`, planned before every operation that
+  touches its feature (`planCritiqueDecisions`, event `decision-planned`), so the owner is asked before the
+  work rather than after it. A decisive decision about a feature no operation of this goal touches is reported
+  (`decision-unplanned`) rather than turned into a question nobody is waiting for.
+
+- **`provisions`** - everything only the **owner** can provide for the proofs of this goal to be real: a
+  credential or token, a sandbox or test account on an external system, a real dataset or sample, the legal or
+  consent authority to act for real. The critic names every one the goal's scope implies from the decided
+  records, not only what the job text says. They are `state.provisions`, listed on the goal page under
+  `### The owner provides` and printed by `workflow-status` as `## The owner provides (n)` with each one
+  `open`, `asked` or `provided`. **Nothing waits on that list**: the operation that needs one opens the
+  question in its own tab at the moment it needs it, with the exact name, and every other operation carries on.
 
 A critic no provider could answer is `goal-critique-unavailable`: the goal page says `Phản biện: chưa chạy được`,
 nothing binds an operation, and the workflow carries on - a dead provider is never a veto over the owner's job.
@@ -688,6 +708,7 @@ the validator and writes `validator-skipped` once; tests inject a stub the same 
 | an author op that moved `state`, `completion` or `extensions.work3.kernel` inside the record it authors | the file is reverted, the report downgraded to `failed` with the finding `operation modified kernel-owned fields (...)`, op retried | retry bound |
 | an op created at run time past `state.dynamicOpsBudget`, or whose whole allowlist is outside `state.scope` | the op is created `blocked` and becomes a `needUser` item; `workflow-approve --allow-dynamic N` reinstates it | 6 dynamic ops per workflow |
 | two `stalled-silent` settlements of one runtime within 30 minutes | `allocator.failed(runtime,{reason:'rate-limited (inferred from repeated silence)'})` and a `rate-limit-inferred` event | the window is cleared after it fires |
+| `blocked` `srs-gap` from a **builder, a prover or a design op** | on the Work ledger: `markReopened` the business node the report names (or the one in the op's module) and create the route's `business.revise` op on that node's `index.yaml` and SRS folder, whose own check is that the Work tree still validates; `markDecided` settles it with a bumped `rev` when the op is accepted (`reopenRecordOwner`, event `srs-gap`). The blocked op is reopened behind it exactly as for `sds-gap` and reads the settled requirement on its next attempt. With no Work tree, or no business node to revise, the requirement is the owner's and the kernel says so rather than guessing | 2 rounds per node, then the user |
 | `blocked` `sds-gap` from a **builder or a prover** | on the Work ledger: `markReopened` the architecture node the report names (or the one in the op's module) and create the route's `architecture.revise` op on that node's `index.yaml` and SDS folder, whose own check is that the Work tree still validates; `markDecided` settles it with a bumped `rev` when the op is accepted. On a plan ledger: an `architecture.decide` op on the design inputs, re-planned with `planOp` afterwards. Either way the blocked op depends on it and resumes afterwards | - |
 | `blocked` `sds-gap` from an **intake** | the 5.1 rule that let an intake report what a decided record must become as `sds-gap` is withdrawn. An intake edits no record of another feature and files no gap against one: a change to what that record decided is a `conflict` row the owner decides, or a `new` row the feature declares. The route still exists for every other kind, and an intake that raises the blocker anyway is answered by the same route - but its contract and the validator rule both say it is a defect of the report | - |
 | `blocked` `interface-gap` | the route's `interface.draw` op on the same node; the reporter is reopened behind it | - |

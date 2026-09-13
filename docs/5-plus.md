@@ -49,7 +49,12 @@ Six statements hold the release together. Every section below is one of them mad
 5. **The owner decides; the runtime prepares.** A question that is not mechanical, or a credential or
    authority the environment lacks, pauses the op and opens `owner.ask`; the supervisor model answers only
    mechanical questions; a credential is never invented, stubbed, defaulted or silently skipped, and no
-   secret value is written anywhere.
+   secret value is written anywhere. What is NOT a question for the owner is an unclear record: an SRS or an
+   SDS that is confusing, contradictory or silent is revised by the runtime towards its most reasonable
+   reading, with the reason in the record's decision log and the `rev` bumped, and only a reading that moves
+   money, authority or customer data is put to the owner - provisionally, on the runtime's recommendation,
+   so the work is prepared rather than stopped (§4b). What the owner must PROVIDE is read from the whole
+   product up front instead of one stuck operation at a time.
 6. **A drawing is the installed grammar rendered in a browser.** One candidate per screen and viewport of the
    main state, composed from the grammar's renderers and the brand tokens, captured by headless Chrome, with
    the markup kept beside each capture; the other states are described and rendered by the build from the
@@ -107,12 +112,13 @@ own. This is the shipped table, entry for entry:
 | --- | --- | --- |
 | `owner.ask` | `srs`, `sds`, `decision` | `decision` |
 | `business.decide` | `srs`, `decision` | `srs`, `decision` |
+| `business.revise` | `srs`, `decision` | `srs` |
 | `architecture.decide` | `srs`, `sds`, `decision` | `sds`, `decision` |
 | `architecture.revise` | `srs`, `sds`, `decision` | `sds` |
 | `brand.decide` | `code`, `grammar` | `brand`, `asset` |
 | `interface.draw` | `srs`, `sds`, `brand`, `grammar`, `design` | `design`, `asset` |
 | `interface.asset` (needs `design-tool`) | `design`, `brand` | `asset`, `design`, `code` |
-| `frontend.implement` | `sds`, `design`, `asset`, `brand`, `grammar`, `code` | `code` |
+| `frontend.implement` | `srs`, `sds`, `design`, `asset`, `brand`, `grammar`, `code` | `code` |
 | `backend.implement` | `srs`, `sds`, `decision`, `code` | `code` |
 | `runtime.operate` | `sds`, `code`, `runtime` | `runtime`, `code` |
 | `grammar.update` | `design`, `grammar`, `brand` | `grammar`, `code` |
@@ -122,8 +128,10 @@ own. This is the shipped table, entry for entry:
 | `review.verify` | `srs`, `sds`, `code`, `evidence`, `runtime` | - (read-only) |
 | `work.author` | `srs`, `sds`, `decision`, `code`, `record` | `record`, `srs`, `sds`, `decision` |
 
-Four of these rows are wider than the first draft, and each one is a fact of the operator that was already
-shipping. `interface.draw` writes `asset` because the drawing captures one PNG per screen and viewport into
+Five of these rows are wider than the first draft, and each one is a fact of the operator that was already
+shipping. `frontend.implement` reads `srs` because an operation may only report `srs-gap` about a requirement
+it actually had in front of it (§4b), and a build that never reads the requirement cannot say the
+requirement is unsettled. `interface.draw` writes `asset` because the drawing captures one PNG per screen and viewport into
 the ui node's `assets/` (§7). `interface.asset` writes `code` because the generated artwork lands in the
 bound source repository at the path the design record declares - the files are asset bytes and product
 source at once. `e2e.verify` and `uat.verify` write `code` because each authors its scenario spec inside the
@@ -323,6 +331,71 @@ conflict (the owner's) or new work that A hands to C (declared).
 (`intake-planned {mode: reconcile}`), which is how a feature authored before 5-plus is brought under the
 three cases (the first proof in §11).
 
+## 4b. The record is revised, not asked about
+
+An SRS or an SDS that is confusing, contradictory or silent is not a reason to stop. The owner ruled it on
+2026-09-14 and the runtime is built to it: **the runtime revises the record itself towards the most
+reasonable reading, states why, bumps the `rev` and moves on.** The owner reads the log and overturns it if
+they disagree, and the proof digests reopen whatever was built on the old reading. Only a reading that
+changes an observable outcome about **money, authority or customer data** is not the runtime's to take
+silently - and even then the work does not stop: the decision is taken **provisionally** on the runtime's
+own recommendation while the owner is asked.
+
+There are two repair kinds, one per record, and they are mirrors of each other:
+
+| blocker | the record it is about | the kind that repairs it | origin | limit | then |
+| --- | --- | --- | --- | --- | --- |
+| `srs-gap` | the requirement does not settle the case, or settles it twice in two ways | `business.revise` (operator `business.decide`) | `business` | 2 | reopen |
+| `sds-gap` | the design does not say how | `architecture.revise` (operator `architecture.decide`) | `architecture` | 2 | reopen |
+
+Neither belongs to a lane: nothing schedules them, a report creates them. The kernel reopens the node that
+**owns** the record - never the operation that tripped over it - creates the repair on that node's own file
+and the record folder around it, and puts the requester behind it (`kernel/kernel.mjs`, `reopenRecordOwner`,
+events `srs-gap` / `sds-gap`). Accepting the repair settles the node as a decision with a bumped `rev`
+(`kernel/sync.mjs`, `recordDone`), so a reopened record is never read as the first one. A kind may only
+report a gap in a record it actually **reads** - which is why `frontend.implement` gained `srs` in its
+`reads` when `srs-gap` was added to what it may raise.
+
+Both repair sequences are the same eight steps (`kernel/contract.mjs`, one `REVISE` builder):
+
+1. read the gap and the passage it names;
+2. state the two or three readings that passage actually admits - a passage that admits exactly one reading
+   is not a gap, and a gap that belongs to the other layer is `blocked` back to it;
+3. choose the most reasonable reading, from the accepted records of this feature, the decided records of the
+   **other** features and the product's own conventions - **unless** the readings differ in an observable
+   outcome about money, authority or customer data, and then report `ask` with `question.kind: decision`,
+   one numbered option per reading and one recommendation;
+4. write it into the record with the acceptance an implementer derives code from;
+5. bump the `rev` and append **exactly one** `extensions.work3.decisionLog` entry
+   `{rev, at, gap, chosen, why, alternatives}`, rewriting and deleting nothing;
+6. run the validator; 7. self-audit; 8. report `done` with the rev and the entry.
+
+That is the only thing either sequence may ever `ask` about. The validator holds the other end: a changed
+record with no log entry is a defect, and so is a money/authority/customer-data reading taken with no
+decision record (`models/functions.mjs`, VALIDATOR_RULES).
+
+The same split runs one phase earlier, on the goal. The critic marks each `hidden-decision` objection
+`decisive` or not. A non-decisive one becomes **nothing**: the repair will settle it when an operation hits
+it. A decisive one becomes one `owner.ask` of kind `decision`, planned before every operation that touches
+its feature (`kernel/goal.mjs`, `planCritiqueDecisions`, event `decision-planned`), so the owner is asked
+before the work rather than after it.
+
+### The whole product is read for what the owner must provide
+
+The runtime thinks about the whole product up front instead of discovering each missing thing when an
+operation gets stuck. The critic answers `provisions`: everything only the **owner** can provide for the
+proofs of this goal to be real - a credential or token, a sandbox or test account on an external system (a
+payment gateway, a bank, e-invoice, tax, SMS or email, identity, storage), a real dataset or sample
+(transaction statements, invoices), or the legal and consent authority to act for real (messaging real
+users, charging real cards). It names every one the goal's scope **implies** from the decided records, not
+only what the job text says: an accounting feature that settles transactions implies the gateway sandbox and
+the statement samples even when nobody wrote that down.
+
+They are `state.provisions`, rendered on the goal page under `### The owner provides` and printed by
+`workflow-status` as `## The owner provides (n)` with each one `open`, `asked` or `provided`. Nothing waits
+on that list: the operation that needs one asks for it in its own tab at the moment it needs it, with the
+exact name, and every other operation carries on.
+
 ## 5. The owner loop
 
 `kernel/owner.mjs` owns the whole loop, and the kernel calls it at three seams:
@@ -349,6 +422,13 @@ three cases (the first proof in §11).
 The credential rule is one sentence in every contract and one validator rule: a key the environment lacks is
 reported `blocked` with the exact variable name, never invented, stubbed, defaulted or silently skipped, and
 no secret value is ever written into a record, a report, a log or a chat.
+
+What the owner will have to provide is not discovered one stuck operation at a time. The critic reads the
+whole product for it up front and answers `provisions` - credentials, sandbox or test accounts on external
+systems, real datasets, legal and consent authority - which the goal page lists under `### The owner
+provides` and `workflow-status` prints with each one `open`, `asked` or `provided` (§4b). That list waits
+for nothing: it tells the owner what is coming, and the operation that needs one opens the question in its
+own tab at the moment it needs it.
 
 ## 6. The host model
 

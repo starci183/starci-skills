@@ -49,8 +49,8 @@ record of kind K may cite another record only through the kinds K reads.
 
 ## The catalog
 
-Sixteen kinds, and the list is closed in both directions: `validateGraph` reports `catalog-drift` when the
-profile and the `KINDS` constant of `kernel/graph.mjs` disagree, so a seventeenth kind cannot appear by
+Seventeen kinds, and the list is closed in both directions: `validateGraph` reports `catalog-drift` when the
+profile and the `KINDS` constant of `kernel/graph.mjs` disagree, so an eighteenth kind cannot appear by
 accident. `family` says what an operation is for, `role` is the allocator role of
 [`model/runtimes.yaml`](runtime-allocation.md) (and must equal its `roleOfKind` entry), `reads` and `writes`
 are the record kinds it may cite and produce, and `operator` is the launchable operator contract in `ops/`
@@ -61,11 +61,12 @@ that carries it.
 | `business.decide` | design | decide | srs, decision | srs, decision | `business.decide` | Settle what the product must do, before anything is designed against it. |
 | `architecture.decide` | design | decide | srs, sds, decision | sds, decision | `architecture.decide` | Settle how the product realises a requirement. |
 | `architecture.revise` | repair | decide | srs, sds, decision | sds | `architecture.decide` | Repair a design record a builder found silent or wrong; bump its `rev`. |
+| `business.revise` | repair | decide | srs, decision | srs | `business.decide` | Repair a requirement record a builder found silent, confusing or self-contradictory; bump its `rev`. |
 | `brand.decide` | design | decide | code, grammar | brand, asset | `brand.decide` | Settle the visual identity - colour tokens traced to real source files, typography, mascot, logo, imagery rules - in the one brand record. |
 | `owner.ask` | design | decide | srs, sds, decision | decision | `owner.ask` | Prepare one decision for the owner - question, analysis per side, options, recommendation - or answer it from the decided records. |
 | `interface.draw` | design | write | srs, sds, brand, grammar, design | design, asset | `interface.draw` | Render each screen's main state from the installed grammar in a browser (never an image model), describe every other state, and declare every artwork the candidate embeds. |
 | `interface.asset` (needs `design-tool`) | design | write | design, brand | asset, design, code | `interface.asset` | Generate the artwork the design record declares as real repository assets, and bind each file back to its slot. |
-| `frontend.implement` | build | implement | sds, design, asset, brand, grammar, code | code | `interface.implement` | Build the interface the drawing settled. |
+| `frontend.implement` | build | implement | srs, sds, design, asset, brand, grammar, code | code | `interface.implement` | Build the interface the drawing settled. |
 | `backend.implement` | build | implement | srs, sds, decision, code | code | `backend.implement` | Build one slice of behind-the-interface behaviour. |
 | `runtime.operate` | build | implement | sds, code, runtime | runtime, code | `runtime.operate` | Migrations, environment, deployment, infrastructure. |
 | `grammar.update` | build | implement | design, grammar, brand | grammar, code | `grammar.update` | Grow the installed grammar by one semantic unit no composition of existing contracts renders: implement it with its stories and tests, publish it, bump the consumer, record it in the canon. |
@@ -184,6 +185,7 @@ walk repairs what that lane builds). Both need the reporter's context; an unreso
 | verdict `findings` | `review.verify` | `lane.build` | repair | 3 | settle |
 | verdict `rejected` | any | `same` | - | 2 | retry |
 | verdict `gate-failed` | any | `lane.build` | gate | 3 | settle |
+| blocker `srs-gap` | any | `business.revise` | business | 2 | reopen |
 | blocker `sds-gap` | any | `architecture.revise` | architecture | 2 | reopen |
 | blocker `interface-gap` | any | `interface.draw` | architecture | 2 | reopen |
 | blocker `brand-gap` | any | `brand.decide` | architecture | 2 | reopen |
@@ -198,6 +200,19 @@ walk repairs what that lane builds). Both need the reporter's context; an unreso
 `then` is what happens to the operation that reported: `retry` runs the same op again (no new op), `reopen`
 returns it to pending behind the routed op, `pause` parks it until the routed op is done, `settle` finishes it
 and lets the routed op carry the work forward, `needUser` stops the workflow.
+
+`srs-gap` is the deepest of the record gaps and the newest: the **requirement** the work derives from does not
+settle the case, or settles it twice in two ways. It is not an `sds-gap` - revising the design would invent the
+product rule the design is supposed to realise - and it is not an `authority` block, because a confusing,
+contradictory or silent record is not a reason to stop. `business.revise` states the readings the record
+admits, takes the most reasonable one by the accepted records, the other features' decided records and the
+product's own conventions, writes it into the requirement with its acceptance, says why in
+`extensions.work3.decisionLog` and bumps the `rev`; the requester reads the settled record behind it. The one
+thing it does not take silently is a reading that changes an observable outcome about money, authority or
+customer data: that is reported `ask` with `question.kind: decision`, numbered options and one recommendation,
+which the kernel takes provisionally while the owner is asked. `architecture.revise` is the same move one
+layer later, and both are held to it by the same contract sequence and the same two validator rules. Only a
+kind that **reads** the requirement may raise `srs-gap`, which is why `frontend.implement` reads `srs`.
 
 `brand-gap` is the identity counterpart of `interface-gap`. A drawing with nothing settled to draw inside, or a
 slot brief the brand record cannot satisfy - a mascot in a placement the record forbids, imagery rules the brief
@@ -216,10 +231,11 @@ which is the owner's question, and no secret value is written into a record, a r
 Its evidence manifest carries `proof: {boundary: live, fakes: []}`, which is what lets a status view say that
 an integration whose only evidence is a faked one was *proven against a fake, not live*.
 
-`grammar-gap` is the third gap, and the three are not the same question: `interface-gap` means the drawing is
-silent, `brand-gap` means the identity is unsettled, `grammar-gap` means the language itself lacks the word.
-Each routes to the record that owns it - the drawing, the brand record, the grammar package - so nothing is
-answered in the place that merely discovered it. The grammar one is the deepest and the most bounded: only the
+`grammar-gap` is the last gap, and the four are not the same question: `srs-gap` means the requirement is
+unsettled, `interface-gap` means the drawing is silent, `brand-gap` means the identity is unsettled,
+`grammar-gap` means the language itself lacks the word. Each routes to the record that owns it - the
+requirement, the drawing, the brand record, the grammar package - so nothing is answered in the place that
+merely discovered it. The grammar one is the deepest and the most bounded: only the
 two kinds that render a surface (`interface.draw`, `frontend.implement`) may raise it, and only after writing
 down an attempt to express the shape as a composition of existing contracts, because a grammar that gains a
 unit per screen is no longer a grammar. `grammar.update` then grows it once, in the grammar's own repository,
