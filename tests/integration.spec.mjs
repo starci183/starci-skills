@@ -307,6 +307,35 @@ test('retirement removes only unchanged owned files and keeps data through repea
 });
 
 
+test('a fresh install carries the 5-plus runtime roots and an update sheds the folder they replaced', t => {
+  const root = host(t);
+  init({ dir: root, bootstrap: true }, quiet);
+  // The renamed tree must actually arrive: one file from each root the release introduced, so an install that
+  // shipped the package.json `files` list without one of them fails here instead of at the first workflow.
+  for (const relative of ['.claude/kernel/kernel.mjs', '.claude/model/kinds.yaml', '.claude/model/hosts.yaml',
+    '.claude/hosts/index.mjs', '.claude/hosts/orca/launch.mjs', '.claude/models/functions.mjs', '.claude/checks/brand.mjs']) {
+    assert.ok(fs.existsSync(path.join(root, relative)), relative);
+  }
+  // An install upgraded from before the rename still has `profiles/` from its own manifest. It is ours and
+  // unchanged, so the update deletes it; a file the user edited under the same root is kept, because
+  // retirement removes only what we wrote and nobody touched.
+  ownRetired(root, 'profiles/kinds.yaml', 'the pre-5-plus kind catalog');
+  ownRetired(root, 'profiles/runtimes.yaml', 'the pre-5-plus allocator profile');
+  ownRetired(root, 'profiles/local.yaml', 'shipped, then edited by the owner');
+  put(root, '.claude/profiles/local.yaml', 'edited by the owner');
+  const result = update({ dir: root, force: true }, quiet);
+  assert.deepEqual(result.removedRetired.filter(relative => relative.startsWith('profiles/')).sort(),
+    ['profiles/kinds.yaml', 'profiles/runtimes.yaml']);
+  assert.ok(result.preservedRetired.includes('profiles/local.yaml'));
+  assert.equal(fs.existsSync(path.join(root, '.claude/profiles/kinds.yaml')), false);
+  assert.equal(read(root, '.claude/profiles/local.yaml'), 'edited by the owner');
+  // The roots that replaced it are live payload, so the same update leaves every one of them in place.
+  for (const relative of ['.claude/kernel/kernel.mjs', '.claude/model/hosts.yaml', '.claude/hosts/orca/launch.mjs']) {
+    assert.ok(fs.existsSync(path.join(root, relative)), relative);
+  }
+  assert.equal(result.removedRetired.some(relative => /^(model|kernel|hosts|models|checks|execution)\//.test(relative)), false);
+});
+
 test('V2 docs and sites survive forced update and init even when previously installer-owned', t => {
   const root=host(t);
   init({dir:root,bootstrap:true},quiet);
