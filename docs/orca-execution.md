@@ -1,15 +1,15 @@
 # Orca execution adapter
 
 This is the Orca realization of the shared [execution agent model](execution-agent-model.md).
-In runtime 5.0 the topology is two layers, not five: **one workflow kernel** and **a pool of operation
-agents**. A workflow is one goal in one worktree; the kernel is an ordinary local process
-(`kernel/kernel.mjs`) that owns the loop in that worktree, and each operation instance is the
+In runtime 5-plus the topology is two layers, not five: **one workflow kernel** and **a pool of operation
+agents**. A workflow is one goal in one worktree; the kernel is an ordinary local process (the `kernel/`
+folder, entered through `bin/starci.mjs`) that owns the loop in that worktree, and each operation instance is the
 mandatory agent boundary and maps one-to-one to one concrete provider agent. Operations never create
 worktrees and never create nested agents.
 
 There is no Plan Coordinator and no per-workflow Workflow Manager. A model is no longer asked to run a
 control loop: the loop is code, and a model is called only as a typed function for a decision a model is
-actually better at (`assessGoal`, `planOp`, `decide`). Orca supplies exactly two things - worktrees, and
+actually better at (`assessGoal`, `critiqueGoal`, `planOp`, `decide`, `validateOp`). Orca supplies exactly two things - worktrees, and
 terminals in which an agent can be launched and attested - so the same kernel runs in a Codex or Claude host
 session with no Orca present. `supervise`, `coordinate`, `start-monitor`, `replace-monitor` and
 `start-coordinator` are gone with the layers they served; see [v5-plan.md](v5-plan.md) for why each 4.x
@@ -166,7 +166,7 @@ metadata: native activity may change it while the agent works. The kernel restor
 `[Op] ...` title without fencing the worker when the immutable identities still match, and restores it once
 more before release. Title drift alone never invalidates otherwise valid operation effects.
 
-## Workflow kernel (5.0)
+## Workflow kernel (5-plus)
 
 The control loop above the launcher is code, not an agent. `workflow-goal` turns a job into a goal and prints it
 for exactly one user approval. In a repository that owns a Work tree (`<repo>/.starciwork/features`) the

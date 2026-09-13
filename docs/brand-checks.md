@@ -183,10 +183,19 @@ rather than a DOM library, which the runtime does not install. The card classes 
 `starci-core-surface` / `starci-core-surface-card` when the host carries no snapshot. A collection outside
 every card passes, whether a `<section>` holds it or a heading introduces it.
 
+**A check that cannot be performed is `skip` with its reason, never `pass`** — no markup kept beside a
+capture, a PNG format the decoder does not read, a record that declares no capture, a brand that names no
+mascot, a surface the brand does not allow the mascot on. A `skip` never makes a run `ok: false` and never
+makes it green either, because an unproven claim must not read as a proven one.
+
 `renderChecksFor({op, state, ctx, files})` is the kernel's hook: it finds the ui node from the operation's
 allowlist or the files its diff touched, runs the same checks, and returns **null** — not a green result —
 for an operation that wrote no design record, so an operation that drew nothing is never reported as a
-drawing that passed. The knowledge these checks enforce is `COLLECTION-1`/`COLLECTION-2`
+drawing that passed. When the run cannot start at all — a tree with no brand record, a node with no `ui:`
+spec — the hook answers a single check, `render-checks-unavailable`, as a `skip` carrying the reason: a
+broken input is one unproven claim, never a failed drawing and never a passing one. The kernel records that
+as `render-check-unavailable` and judges the drawing as it would have before these rules existed. The
+knowledge these checks enforce is `COLLECTION-1`/`COLLECTION-2`
 (`knowledge/ui/composition/collection.yaml`) and `BRAND-1` to `BRAND-3`
 (`knowledge/ui/proof/brand.yaml`).
 
