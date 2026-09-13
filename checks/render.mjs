@@ -231,7 +231,11 @@ const nearest=(colour,palette)=>palette.reduce((best,entry)=>{
  * the brand's primary is nowhere in the capture - a screen drawn in the brand's neutrals with the brand's
  * primary missing is off-brand exactly as much as one drawn in a foreign purple.
  */
-export function checkPalette({png,brand,buckets=DEFAULT_BUCKETS}){
+export function checkPalette(first,second){
+  // The shared interface note spells this call `checkPalette(png, {brand})` and the package spells it as one
+  // options object. Both are accepted: a decoded PNG is recognisable by its pixels, and a caller written
+  // against either spelling should get the check rather than an undefined image.
+  const {png,brand,buckets=DEFAULT_BUCKETS}=first?.pixels?{png:first,...(second??{})}:(first??{});
   const palette=brandColours(brand);
   const base={tolerance:PALETTE_TOLERANCE,scale:'OKLab delta-E x100',minimumShare:MIN_BUCKET_SHARE,
     brandColours:palette.length,chromaFloor:CHROMA_FLOOR,lightnessBand:[MIN_LIGHTNESS,MAX_LIGHTNESS]};
@@ -441,7 +445,10 @@ const names=(one,two)=>{
  * mascot - naming it, or naming a `brand/assets/mascot` master - so the asset operation can draw it and the
  * build can wire it. A surface the brand does not name skips: an allowance is not an obligation everywhere.
  */
-export function checkMascotSlot({record,brand,screen}){
+export function checkMascotSlot(first,second){
+  // As with the palette check, the record may arrive as the first argument or inside the options object;
+  // a `brand` key in the second argument is what tells the two spellings apart.
+  const {record,brand,screen}=second&&typeof second==='object'?{record:first,...second}:(first??{});
   const id='mascot-slot-missing';
   const mascot=brand?.mascot;
   const surface=typeof screen==='string'?{name:screen,route:null}:(screen??{});

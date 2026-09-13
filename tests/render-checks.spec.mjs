@@ -178,6 +178,9 @@ test('the palette of a capture is the brand tokens, and the primary has to be in
   const onScale=checkPalette({png:decodePng(png([{hex:'#5a2fe0',rows:6},{hex:ACCENT,rows:4}])),brand});
   assert.deepEqual(onScale.map(entry=>entry.outcome),['pass','pass']);
 
+  // Both spellings of the call reach the same check: the options object, and the positional PNG.
+  assert.deepEqual(checkPalette(decodePng(IN_BRAND()),{brand}).map(entry=>entry.outcome),['pass','pass']);
+
   // Nothing to compare against is a skip, never a pass.
   const bare=checkPalette({png:decodePng(IN_BRAND()),brand:{color:{tokens:[{token:'--x',value:'var(--y)',role:'primary'}]}}});
   assert.deepEqual(bare.map(entry=>entry.outcome),['skip','skip']);
@@ -245,6 +248,7 @@ test('the mascot has a slot exactly where the brand allows it',()=>{
   const record={ui:{artworkSlots:[MASCOT_SLOT]}};
   const dashboard={name:'Dashboard',route:'/dashboard'};
   assert.equal(checkMascotSlot({record,brand,screen:dashboard}).outcome,'pass');
+  assert.equal(checkMascotSlot(record,{brand,screen:dashboard}).outcome,'pass','the positional spelling reaches the same check');
   const missing=checkMascotSlot({record:{ui:{artworkSlots:[{id:'hero',screen:'Dashboard',purpose:'A chart placeholder',brief:'A weekly bar chart'}]}},brand,screen:dashboard});
   assert.equal(missing.outcome,'fail');
   assert.equal(missing.id,'mascot-slot-missing');
