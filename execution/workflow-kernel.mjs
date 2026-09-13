@@ -2125,7 +2125,10 @@ function validateAccepted(store,state,op,ctx,{files,verified}){
   const providers=ctx.validator??llm.DEFAULT_VALIDATOR_RUNTIMES;
   const diff=opDiff(state,op,files,ctx);
   let result;
-  try{result=ctx.validateOp({op,node:validatorNode(ctx,op),diff,checks:verified.checks,references:op.references,
+  // The kernel's own check (`work-valid`) is proven by the kernel, not by the agent: it goes to the validator with the
+  // re-run checks, so an acceptance statement naming it is never rejected as unproven (repair-5 was, four times).
+  const proven=[...verified.checks,...kernelProof(ctx,op.nodeId??op.ledgerIds?.[0]??null)];
+  try{result=ctx.validateOp({op,node:validatorNode(ctx,op),diff,checks:proven,references:op.references,
     // The brand travels with every verdict: a colour, a font, an icon or an artwork slot outside it is a defect,
     // and the validator can only say so if it was given the record the operation was supposed to read.
     brand:brandPayload(ctx.work?.loaded),
@@ -2802,7 +2805,11 @@ export function settleStalled(orca,store,state,ctx,tick){
     triageAnomaly(store,state,`settled:${op.id}:${observed.liveness}`,{...ctx,orca});
     if(op.restarts>RESTART_LIMIT){
       op.status='blocked';
-      state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} was restarted ${op.restarts} times (${observed.liveness})`});
+      if(observed.liveness==='rate-limited'){
+        // A provider limit is time, not a defect: the op cools down and comes back on another runtime by itself.
+        op.refusal='rate-limited';op.coolUntil=ctx.now()+RATE_LIMIT_COOLDOWN_MS;
+        store.appendEvent({event:'rate-limit-cooling',op:op.id,runtime:op.runtime,until:op.coolUntil,restarts:op.restarts});
+      }else state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} was restarted ${op.restarts} times (${observed.liveness})`});
       continue;
     }
     op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;op.avoidRuntimes=unique([...op.avoidRuntimes,op.runtime].filter(Boolean));
@@ -2922,6 +2929,31 @@ export const TRIAGE_AFTER=3;
  * kernel that dies at the same line every minute.
  */
 export const KERNEL_ERROR_LIMIT=5;
+/** How long an op blocked by a provider rate limit waits before it is re-admitted on another runtime. */
+export const RATE_LIMIT_COOLDOWN_MS=60*60*1000;
+/**
+ * An op the restart limit blocked for a rate limit is not the user's question: once its cooldown has passed it is
+ * ready again with its restarts cleared and the limited runtime avoided. An op blocked by an older build - a
+ * `restarted N times (rate-limited)` question with no cooldown recorded - is given one at load and released the
+ * same way, and its question goes.
+ */
+function readmitCooled(store,state,ctx){
+  const now=typeof ctx?.now==='function'?ctx.now():Date.now();
+  for(const item of state.needUser.filter(entry=>entry.kind==='environment'&&/\(rate-limited\)$/.test(String(entry.detail??'')))){
+    const op=state.ops.find(candidate=>candidate.id===item.op);
+    if(!op||op.status!=='blocked'||op.refusal)continue;
+    op.refusal='rate-limited';op.coolUntil=now;
+    state.needUser=state.needUser.filter(entry=>entry!==item);
+    store.appendEvent({event:'rate-limit-cooling',op:op.id,runtime:op.runtime,until:op.coolUntil,restarts:op.restarts,migrated:true});
+  }
+  for(const op of state.ops.filter(candidate=>candidate.status==='blocked'&&candidate.refusal==='rate-limited')){
+    if(!(Number(op.coolUntil??0)<=now))continue;
+    const limited=op.runtime;
+    op.status='ready';op.refusal=null;op.coolUntil=null;op.restarts=0;op.dispatch=null;op.terminal=null;op.nudged=false;
+    op.avoidRuntimes=unique([...(op.avoidRuntimes??[]),limited].filter(Boolean));
+    store.appendEvent({event:'rate-limit-readmitted',op:op.id,avoid:op.avoidRuntimes});
+  }
+}
 function guardedStage(store,state,ctx,stage,fn){
   try{fn();state.kernelErrors=0;return 'ok';}
   catch(error){
@@ -3054,6 +3086,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     store.appendEvent({event:'tick',iteration:state.iterations,
       ops:state.ops.map(op=>`${op.id}=${op.status}`),ledger:state.ledger.map(item=>`${item.id}=${item.status}`)});
     answerQuestions(orca,store,state,ctx);
+    readmitCooled(store,state,ctx);
     resumePaused(store,state);
     drainSharedQueue(store,state);
     if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);planVerifyOps(store,state,ctx);})==='stop')break;

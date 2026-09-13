@@ -12,7 +12,7 @@ import {validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
 import {createStore} from '../execution/workflow-store.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,SPEC_LIMIT,operationSpec,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,operationSpec,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -759,6 +759,30 @@ test('a scope entry that names nothing in the tree begins with an intake operati
   // A scope the tree does know plans no intake.
   const known=setupWork({scope:['payments']});
   try{assert.equal(known.state.ops.some(op=>op.intake),false);}finally{known.cleanup();}
+});
+
+test('an op the restart limit blocked for a rate limit cools down and is re-admitted on another runtime, and an older block is migrated',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    const op=state.ops[0];
+    // An older build's block: a question, no cooldown recorded. The first pass gives it one and drops the question.
+    op.status='blocked';op.runtime='gpt-5.6-sol';op.restarts=4;
+    state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} was restarted 4 times (rate-limited)`});
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    const before=store.readEvents().length;
+    // One tick: the block is migrated to a cooldown that is already due, so the op is re-admitted at once.
+    const state2=harness.run({maxIterations:1});
+    const log=store.readEvents().slice(before);
+    assert.deepEqual(log.filter(event=>event.event==='rate-limit-cooling').map(event=>[event.op,event.migrated]),[[op.id,true]]);
+    assert.deepEqual(log.filter(event=>event.event==='rate-limit-readmitted').map(event=>[event.op,event.avoid]),[[op.id,['gpt-5.6-sol']]]);
+    assert.equal(state2.needUser.some(item=>item.kind==='environment'),false,'the question is gone: a limit is time, not a defect');
+    const readmitted=state2.ops.find(item=>item.id===op.id);
+    assert.equal(readmitted.restarts,0);
+    assert.notEqual(readmitted.status,'blocked');
+    assert.ok(RATE_LIMIT_COOLDOWN_MS>=30*60*1000);
+  }finally{harness.cleanup();}
 });
 
 test('a contract longer than a task can carry is handed over as its head plus the file it lives in',()=>{
