@@ -28,21 +28,27 @@ allocation:
 runtimes:
   gpt-5.6-sol:
     target: gpt-5.6-sol
+    provider: codex
     roles: [implement, verify, write]
     maxParallel: 5
     budget: {opsPerDay: 60, tokensPerDay: 12000000}
   claude-opus:
     target: claude-opus
+    provider: claude
     roles: [implement, verify, write, plan]
     maxParallel: 3
     budget: {opsPerDay: 60, tokensPerDay: 20000000}
   claude-fable-5.1:
     target: claude-fable-5.1
+    provider: claude
+    # Fable has a weekly window of its own on top of the Claude session and week.
+    budgetWindow: fableWeekly
     roles: [verify, decide, plan, write]
     maxParallel: 2
     budget: {opsPerDay: 40, tokensPerDay: 8000000}
   gpt-6-astra:
     target: gpt-6-astra
+    provider: codex
     roles: [decide, verify, plan]
     maxParallel: 1
     budget: {opsPerDay: 20, tokensPerDay: 4000000}

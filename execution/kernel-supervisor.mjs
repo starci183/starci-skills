@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {listWorkflows,repositoryRoot,workflowsRoot} from './workflow-store.mjs';
+import {DEFAULT_PROBE_MS,probeRuntimeBudget,writeRuntimeBudget} from './runtime-budget.mjs';
 
 /**
  * The process supervisor for workflow kernels: one kernel per approved, unfinished workflow; a kernel that
@@ -82,10 +83,22 @@ export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEA
 }
 
 /** The long-running supervisor: poll, act, sleep; exits only when no approved workflow is unfinished. */
-export function superviseForever({repoRoot,roots=null,launcher,pollMs=DEFAULT_POLL_MS,healthMs,log=()=>{},maxRounds=Infinity,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms)}){
-  let round=0;
+export function superviseForever({repoRoot,roots=null,launcher,pollMs=DEFAULT_POLL_MS,healthMs,log=()=>{},maxRounds=Infinity,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),
+  probe=probeRuntimeBudget,probeMs=DEFAULT_PROBE_MS,now=Date.now}){
+  let round=0,lastProbe=null;
+  const stores=[...new Set((roots??[repoRoot]).map(root=>workflowsRoot(root)))];
   for(;;){
-    const result=superviseOnce({repoRoot,roots,launcher,healthMs,log});
+    // The provider quota, on a slow cadence, written beside every store root: kernels read the file, never Orca.
+    // A probe that fails leaves the last good budget in place and says so.
+    if(lastProbe===null||now()-lastProbe>=probeMs){
+      lastProbe=now();
+      const probed=probe({at:lastProbe});
+      if(probed?.ok){
+        for(const store of stores){try{writeRuntimeBudget(store,probed.budget);}catch(error){log({event:'budget-write-failed',store,reason:String(error?.message??error)});}}
+        log({event:'budget-probed',providers:Object.fromEntries(Object.entries(probed.budget.providers).map(([provider,entry])=>[provider,Object.fromEntries(Object.entries(entry.windows).map(([name,win])=>[name,win.usedPercent]))]))});
+      }else log({event:'budget-probe-failed',reason:probed?.reason??'unknown'});
+    }
+    const result=superviseOnce({repoRoot,roots,launcher,healthMs,log,now});
     log({event:'supervisor-round',round,rounds:result.rounds.map(item=>`${item.id}:${item.action}`)});
     // The supervisor lives as long as any approved workflow is unfinished: a stop flag pauses a kernel, it does not
     // end supervision, because the flag is removed when the kernel may run again.
@@ -106,5 +119,5 @@ export function supervisorMain(options,{cwd}){
   const log=event=>{const line=`${JSON.stringify({at:Date.now(),...event})}
 `;for(const file of logFiles){try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.appendFileSync(file,line);}catch{}}};
   if(options.once==='true')return superviseOnce({repoRoot,roots,launcher,log,only:options.id?[options.id]:null});
-  return superviseForever({repoRoot,roots,launcher,log,pollMs:Number(options['poll-ms']??DEFAULT_POLL_MS),healthMs:Number(options['health-ms']??DEFAULT_HEALTH_MS)});
+  return superviseForever({repoRoot,roots,launcher,log,pollMs:Number(options['poll-ms']??DEFAULT_POLL_MS),healthMs:Number(options['health-ms']??DEFAULT_HEALTH_MS),probeMs:Number(options['probe-ms']??DEFAULT_PROBE_MS)});
 }

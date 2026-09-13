@@ -927,6 +927,12 @@ export function syncLedgerOps(store,state,ctx){
     for(const item of state.ledger)if(item.id===op.nodeId)item.status='out-of-repository';
     store.appendEvent({event:'op-out-of-repository',op:op.id,node:op.nodeId,repository:foreign,own:ctx.work.code.repository});
   }
+  let quarantined=false;
+  if(!loaded.ok&&quarantineStrays(store,state,ctx,loaded).length){
+    // Strays an abandoned operation left in the tree were moved aside: the tree is read again before anything
+    // is concluded from its errors.
+    try{loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});ctx.work.loaded=loaded;quarantined=loaded.ok;}catch{/* the invalid branch below says what it sees */}
+  }
   if(!loaded.ok){
     // No node of an invalid tree is a trustworthy TODO, so nothing is derived from it - and that is said once per
     // distinct set of errors, never silently and never on every tick.
@@ -937,7 +943,15 @@ export function syncLedgerOps(store,state,ctx){
     }
     return [];
   }
-  if(state.ledgerInvalid){state.ledgerInvalid=null;store.appendEvent({event:'ledger-valid-again'});}
+  if(state.ledgerInvalid||quarantined){
+    state.ledgerInvalid=null;store.appendEvent({event:'ledger-valid-again',...(quarantined?{after:'quarantine'}:{})});
+    // Ops the validator exhausted only because the whole-tree check was red are judged again now that it is green.
+    for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&state.needUser.some(entry=>entry.op===item.id&&entry.kind==='validator'&&/work-valid/.test(String(entry.detail??''))))){
+      op.status='ready';op.validatorRejects=0;op.dispatch=null;op.terminal=null;
+      state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&entry.kind==='validator'));
+      store.appendEvent({event:'op-readmitted',op:op.id,reason:'the tree is valid again; the validator rejected only its whole-tree check'});
+    }
+  }
   const scope=state.scope.length?state.scope:null;
   const taken=new Set(state.ops.map(op=>op.id));
   const opOfNode=new Map(state.ops.filter(op=>op.nodeId).map(op=>[op.nodeId,op.id]));
@@ -1506,6 +1520,37 @@ function cleanStrayFiles(store,state,op,ctx){
  * was never accepted (settled, blocked, out of repository): the owner kernel removes them, so a kernel sharing
  * the tree never has to step around them. Tracked changes and kernel-owned records are never touched here.
  */
+/**
+ * An invalid tree whose every error sits under an untracked path that no live operation owns is not the
+ * owner's problem to untangle: an abandoned operation left those files (a settled intake once left half a
+ * feature in the base worktree and every backend op failed `work-valid` for an hour). They are moved, whole,
+ * to `<store>/strays/<timestamp>/` - kept for the owner, out of the tree - and the tree is read again.
+ * Tracked files are never touched; a stray inside a live op's allowlist is that op's, and stays.
+ */
+function quarantineStrays(store,state,ctx,loaded){
+  if(!ctx.work||ctx.work.shared||typeof ctx.git!=='function'||!Array.isArray(loaded?.errors)||!loaded.errors.length)return [];
+  const root=ctx.work.ledger?.repoRoot??ctx.work.repoRoot??state.worktree;
+  const shown=ctx.git('git',['status','--porcelain','--','.starciwork'],{cwd:root,encoding:'utf8',windowsHide:true});
+  if(shown.status!==0)return [];
+  const untracked=(shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(line=>line.startsWith('??'))
+    .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))).filter(file=>file.startsWith('.starciwork/')&&!/(^|\/)_local\//.test(file));
+  if(!untracked.length)return [];
+  const live=state.ops.filter(item=>liveStatus.includes(item.status)).flatMap(item=>item.allowlist??[]).map(normalize);
+  const treePaths=loaded.errors.map(error=>normalize(`.starciwork/${String(error.path??'')}`));
+  const owns=(stray,file)=>file===stray||file.startsWith(stray.endsWith('/')?stray:`${stray}/`);
+  // Every error must sit under a stray nobody owns; one error on a tracked or owned path and nothing moves.
+  const culprits=unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))).filter(Boolean));
+  if(!culprits.length||culprits.length!==unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))??'∅')).length)return [];
+  if(culprits.some(stray=>inside(stray,live)))return [];
+  const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+  const moved=[];
+  for(const stray of culprits){
+    const from=path.join(root,stray),to=path.join(store.dir,'strays',stamp,stray);
+    try{fs.mkdirSync(path.dirname(to),{recursive:true});fs.renameSync(from,to);moved.push({from:stray,to:slash(to)});}catch(error){store.appendEvent({event:'stray-quarantine-failed',path:stray,reason:String(error?.message??error)});}
+  }
+  if(moved.length)store.appendEvent({event:'stray-quarantined',strays:moved,errors:loaded.errors.slice(0,5).map(error=>`${error.code} ${error.path??''}`)});
+  return moved;
+}
 function sweepTreeStrays(store,state,ctx){
   if(!ctx.work||ctx.work.shared||typeof ctx.git!=='function')return [];
   const shown=ctx.git('git',['status','--porcelain','--','.starciwork'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
@@ -3534,6 +3579,21 @@ export function awaitLaunch(file,{wait=sleepSync,timeoutMs=LAUNCH_WAIT_MS,interv
   }
 }
 
+/**
+ * A resumed kernel is expected to be the terminal Orca bound as the Run's coordinator; only that terminal may
+ * launch operations. When the tab is gone (closed by a person, or by an older build) and the kernel opened a
+ * new one, the Run is re-bound to it once - which fences the live Dispatches of the old tab, so the reconcile
+ * that follows settles them - and the event says so. A matching coordinator changes nothing.
+ */
+export function rebindRunIfNeeded(orca,store,state,{cwd}){
+  if(!state.run||!state.from)return false;
+  let coordinator=null;
+  try{const shown=orca.invoke('run-show',{id:state.run},{cwd});coordinator=getPath(shown.receipt,'result.run.coordinator_handle')??null;}catch{return false;}
+  if(!coordinator||coordinator===state.from)return false;
+  const bound=orca.invoke('run-use',{id:state.run,from:state.from},{cwd});
+  store.appendEvent({event:'run-rebound',run:state.run,from:state.from,was:coordinator,ok:bound.outcome==='ok',...(bound.outcome==='ok'?{}:{reason:bound.reason??null})});
+  return bound.outcome==='ok';
+}
 function bindRun(orca,{cwd,state,from}){
   const created=orca.invoke('run-create',{objective:`Workflow ${state.id}: ${firstLine(state.job)}`,from},{cwd});
   need(created.outcome==='ok',`run-create failed: ${created.reason}`);
@@ -3760,6 +3820,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     // `run-bound` is the one-time hand-off this kernel performed; joining a run it already has is `run-resumed`.
     const binding=!run;
     state.run=run??bindRun(orca,{cwd:worktree,state,from:state.from});
+    if(!binding)rebindRunIfNeeded(orca,store,state,{cwd:worktree});
     state.host=state.host??hostOf(options,repoRoot);
     state.launcher=state.launcher??launcherOf(state.host);
     store.appendEvent({event:binding?'run-bound':'run-resumed',run:state.run,from:state.from,iterations:state.iterations});
@@ -3769,9 +3830,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       allocator:createAllocator({runtimes:withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host)),state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null}),template:templateOf(state.host),
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
-    // The kernel's own tab has no reader once the kernel has left: a pause, a restart or a finish closes it, and
-    // the next start reuses or recreates one. Stale tabs were the owner's first complaint after a day of restarts.
-    if(state.kernelTerminalOwned&&state.from){try{orca.invoke('terminal-close',{terminal:state.from},{cwd:worktree});}catch{}store.appendEvent({event:'kernel-terminal-closed',terminal:state.from});state.from=null;state.kernelTerminalOwned=false;store.saveState(state);}
+    // The kernel's own tab is the Run's coordinator terminal, so it lives as long as the workflow: a pause or a
+    // rebuild leaves it for the next start to reuse (a new tab would have to re-bind the Run and fence every live
+    // Dispatch). A finished workflow closes it: nobody reads it any more.
+    if(finished.finished&&state.kernelTerminalOwned&&state.from){try{orca.invoke('terminal-close',{terminal:state.from},{cwd:worktree});}catch{}store.appendEvent({event:'kernel-terminal-closed',terminal:state.from});state.from=null;state.kernelTerminalOwned=false;store.saveState(state);}
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:finished.phase,ledgerMode:finished.ledgerMode,
       finished:finished.finished,lane:laneView(finished),ledger:finished.ledger.map(item=>`${item.id}=${item.status}`),
       ledgerSummary:finished.ledgerSummary,needUser:finished.needUser,head:finished.head,iterations:finished.iterations,

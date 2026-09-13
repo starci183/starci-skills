@@ -13,7 +13,7 @@ import {createStore} from '../execution/workflow-store.mjs';
 import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,operationSpec,queueInbox,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,operationSpec,queueInbox,rebindRunIfNeeded,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -887,6 +887,59 @@ test('an accepted op closes its terminal, and the reconcile sweep closes stale k
     assert.ok(harness.fake.terminals.has('term_other'),'another workflow\'s kernel tab is never touched');
     assert.ok(harness.fake.terminals.has('term_foreign_op'),'another workflow\'s op tab is never touched');
     assert.equal(harness.fake.terminals.has('term_stale_kernel'),false);
+  }finally{harness.cleanup();}
+});
+
+test('untracked strays that alone make the tree invalid are quarantined beside the store, the tree is read again, and ops the red tree had exhausted are judged again',()=>{
+  const nodeId='demo.sales.implementation.backend.intake';
+  const harness=setupWork({dirty:['apps/agentos-controlplane/src/sales/intake.ts'],scripts:{}});
+  try{
+    const {store,state,repo}=harness;
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    // Half a feature an abandoned op left in the tree: untracked, owned by nobody, and invalid.
+    const stray=path.join(repo,'.starciwork','features','collab','architecture','sds','x','index.yaml');
+    fs.mkdirSync(path.dirname(stray),{recursive:true});
+    fs.writeFileSync(stray,'schema: work/node@2\nid: demo.collab.x\nkind: architecture\nstate: todo\n');
+    // The fake validator projection says the tree is invalid because of it, and the fake git lists it as untracked.
+    const validate=()=>({ok:false,errors:[{code:'SDS_MAP',path:'features/collab/architecture/sds/x/index.yaml',message:'Unsupported SDS status'}],warnings:[],nodes:[],resources:[]});
+    const git=(executable,args,options)=>args[0]==='status'&&args.includes('.starciwork')?{status:0,stdout:'?? .starciwork/features/collab/\n',stderr:''}:harness.git.git(executable,args,options);
+    // An op the validator exhausted while the tree was red.
+    const op=state.ops.find(item=>item.id===nodeId);
+    op.status='blocked';op.validatorRejects=2;
+    state.needUser.push({op:op.id,kind:'validator',detail:`${op.id} was rejected by the validator 2 times: the required work-valid check exits 1`});
+    // The tree is invalid exactly while the stray is in it.
+    const after=harness.run({maxIterations:2,git,validate:()=>fs.existsSync(stray)?validate():harness.validate()});
+    const log=events(store);
+    const quarantined=log.find(event=>event.event==='stray-quarantined');
+    assert.ok(quarantined,'the stray was quarantined');
+    assert.deepEqual(quarantined.strays.map(item=>item.from),['.starciwork/features/collab/']);
+    assert.equal(fs.existsSync(stray),false,'the stray left the tree');
+    assert.ok(fs.existsSync(path.join(store.dir,'strays')),'and is kept beside the store');
+    assert.ok(log.some(event=>event.event==='ledger-valid-again'));
+    // The op the red tree had exhausted is not blocked any more (a kernel start re-admits validator-blocked ops; a mid-run recovery says `op-readmitted`).
+    assert.notEqual(after.ops.find(item=>item.id===nodeId).status,'blocked');
+    assert.equal(after.needUser.some(item=>item.kind==='validator'),false);
+  }finally{harness.cleanup();}
+});
+
+test('a run bound to a coordinator tab that is gone is re-bound to the tab the kernel is in, once, and a matching one is left alone',()=>{
+  const harness=setupWork();
+  try{
+    const {store,state}=harness;
+    state.run='run_wf';state.from='term_new';
+    const calls=[];
+    const orca={invoke:(command,params)=>{calls.push([command,params]);
+      if(command==='run-show')return {outcome:'ok',receipt:{ok:true,result:{run:{id:'run_wf',coordinator_handle:'term_gone'}}}};
+      if(command==='run-use')return {outcome:'ok',receipt:{ok:true,result:{}}};
+      return {outcome:'ok',receipt:{}};}};
+    assert.equal(rebindRunIfNeeded(orca,store,state,{cwd}),true);
+    assert.deepEqual(calls.map(([command])=>command),['run-show','run-use']);
+    assert.deepEqual(calls[1][1],{id:'run_wf',from:'term_new'});
+    assert.deepEqual(events(store).filter(event=>event.event==='run-rebound').map(event=>[event.from,event.was,event.ok]),[['term_new','term_gone',true]]);
+    // The coordinator already is this tab: nothing is re-bound.
+    const quiet={invoke:(command)=>command==='run-show'?{outcome:'ok',receipt:{ok:true,result:{run:{id:'run_wf',coordinator_handle:'term_new'}}}}:{outcome:'ok',receipt:{}}};
+    assert.equal(rebindRunIfNeeded(quiet,store,state,{cwd}),false);
   }finally{harness.cleanup();}
 });
 

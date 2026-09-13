@@ -553,11 +553,21 @@ A review round is counted per reviewed node set (`verifyRounds[<ids joined by +>
 
 ## Terminals
 
-The kernel is one Orca tab, `[Kernel] <id>`, in its worktree: a start reuses the tab a previous start left
-(and closes a duplicate), and a pause, a restart or a finish closes it (`kernel-terminal-closed`). An op's tab
+The kernel is one Orca tab, `[Kernel] <id>`, in its worktree, and that tab is the Run's coordinator: a start
+reuses the tab a previous start left (and closes a duplicate); a pause or a rebuild leaves it in place; only a
+finished workflow closes it (`kernel-terminal-closed`). A kernel that finds the Run bound to a tab that is gone
+re-binds the Run to its own tab once (`run-rebound`), which fences the old tab's live Dispatches. An op's tab
 is closed when its report is accepted (`op-terminal-closed`); a blocked or failed op keeps its tab, which is
 where its last words are. Every reconcile also sweeps what an older build left behind - stale `[Kernel]` tabs
 and done-op tabs of this workflow (`terminals-swept`) - and never touches another workflow's tabs.
+
+## Strays that break the tree are quarantined
+
+An invalid tree whose every error sits under an untracked path that no live operation owns is what an
+abandoned operation left behind - never the owner's draft, which would be tracked or owned. The kernel moves
+those paths whole to `<store>/strays/<timestamp>/` (`stray-quarantined`), reads the tree again, and when it is
+valid again (`ledger-valid-again`) re-admits the ops the validator had exhausted only for a red whole-tree
+check (`op-readmitted`). One error on a tracked or owned path and nothing moves.
 
 ## Operating a running workflow
 
@@ -579,6 +589,18 @@ questions for the user remain - the gates say the code holds, the questions say 
 And one that was a defect: Orca groups agent terminals by worktree, so the ops of several workflows sharing one
 worktree all hang under the first run's node in the sidebar. That is what `--lane` ends - one workflow, one
 worktree, one row.
+
+## The provider quota is probed, not guessed
+
+Every three minutes the supervisor asks Orca for the usage windows its status bar shows (`orca account list
+--json` -> `rateLimits`: Claude's five-hour session, its week and Fable's own week; Codex's week) and writes
+them whole beside every store root it covers as `_local/workflows/runtime-budget.json` (`budget-probed`; a
+failed probe leaves the last good file and says `budget-probe-failed`). A runtime is bound by the generic
+windows of its provider (`provider:` in profiles/runtimes.yaml) and by a named window only when its profile
+names it (`budgetWindow: fableWeekly`); `budgetVerdict` says whether a window is exhausted (95% and not yet
+reset) and what share is left. Kernels read the file, never Orca. What allocation does with the verdict -
+skip an exhausted provider until its reset, prefer the runtime with more share left when two qualify - is the
+shared-runtime rule set (see "Runtimes are shared across workflows").
 
 ## Reading a workflow
 

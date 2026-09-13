@@ -37,6 +37,7 @@ execution/kernel-guards.mjs
 execution/kernel-supervisor.mjs
 execution/verify-proof.mjs
 execution/runtime-allocator.mjs
+execution/runtime-budget.mjs
 execution/kind-graph.mjs
 execution/work-ledger.mjs
 execution/ledger-routing.mjs
