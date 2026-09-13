@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {PROOF_POLICY,isSpecPath,policyFor,proofFinding,proofPlan,runAtBase} from '../execution/verify-proof.mjs';
+import {PROOF_POLICY,isSpecPath,policyFor,proofFinding,proofPlan,runAtBase} from '../checks/proof.mjs';
 
 const tmp=()=>{
   const dir=path.join(os.tmpdir(),'starci-verify-proof-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);
@@ -191,5 +191,5 @@ test('an empty plan is checks-only and runs nothing',()=>{
 
 test('the module is listed as a runtime module',()=>{
   const listed=fs.readFileSync(new URL('../scripts/runtime-modules.txt',import.meta.url),'utf8');
-  assert.match(listed,/^execution\/verify-proof\.mjs$/m);
+  assert.match(listed,/^checks\/proof\.mjs$/m);
 });

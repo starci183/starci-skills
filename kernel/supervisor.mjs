@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
-import {listWorkflows,repositoryRoot,workflowsRoot} from './workflow-store.mjs';
-import {DEFAULT_PROBE_MS,probeRuntimeBudget,writeRuntimeBudget} from './runtime-budget.mjs';
+import {listWorkflows,repositoryRoot,workflowsRoot} from './store.mjs';
+import {DEFAULT_PROBE_MS,probeRuntimeBudget,writeRuntimeBudget} from './budget.mjs';
 
 /**
  * The process supervisor for workflow kernels: one kernel per approved, unfinished workflow; a kernel that
@@ -138,7 +138,7 @@ export function supervisorMain(options,{cwd,runner=null}){
   const repoRoot=repositoryRoot(path.resolve(cwd));
   const roots=[repoRoot,path.resolve(cwd)];
   const host=path.resolve(options.host??'');
-  const launcher=path.join(host,'.dist','execution','orca-supervised-launch.mjs');
+  const launcher=path.join(host,'.dist','hosts','orca','launch.mjs');
   // One line per round into every store root this supervisor covers, so each workflow's view finds its supervisor beside it.
   const logFiles=[...new Set(roots.map(root=>path.join(workflowsRoot(root),'supervisor.log')))];
   const log=event=>{const line=`${JSON.stringify({at:Date.now(),...event})}

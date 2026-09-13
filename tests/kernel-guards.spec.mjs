@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {
   changedProtected,gitQueue,gitQueueIdle,parseSharedChangePaths,preflight,protectedPaths,
   resourceLocks,resourcesClash,revertProtected
-} from '../execution/kernel-guards.mjs';
+} from '../kernel/guards.mjs';
 
 const NODE={id:'demo.billing.implementation.backend',kind:'implementation',path:'features/billing/implementation/index.yaml'};
 const INDEX=`schema: work/node@2

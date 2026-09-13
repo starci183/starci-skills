@@ -4,13 +4,13 @@ purpose: |-
   workflow may run, the mandatory lane (an ordered template) every ledger node walks, and the bounded routes
   that an outcome may take. A model fills the content of one operation and picks among the closed options an
   operation offers; it never decides which step comes next, which kind repairs what, or how many rounds a
-  repair may take. The kernel asks `execution/kind-graph.mjs`, and `execution/kind-graph.mjs` only reads this
+  repair may take. The kernel asks `kernel/graph.mjs`, and `kernel/graph.mjs` only reads this
   file: changing the process means editing this profile, never prompting harder.
 vocabularies:
   # What an operation is for. `design` settles intent, `build` changes the product, `prove` only inspects it,
   # `repair` puts an authored record back in agreement with what was found.
   families: [design, build, prove, repair]
-  # The allocator role of profiles/runtimes.yaml; `roleOfKind` there must agree with `role` here.
+  # The allocator role of model/runtimes.yaml; `roleOfKind` there must agree with `role` here.
   roles: [decide, plan, implement, verify, write]
   # What a kind is allowed to change. `readOnly: true` means this list is empty. `design` is the interface
   # design record and `record` is an authored Work record itself: `work.author` completes the fields a node must
@@ -22,13 +22,13 @@ vocabularies:
   mutates: [code, sds, srs, decision, design, asset, runtime, record, grammar]
   # Why an operation exists, as the kernel records it on the op.
   origins: [ledger, shared, repair, gate, verify, architecture]
-  # The report outcomes of execution/reports.mjs.
+  # The report outcomes of kernel/reports.mjs.
   outcomes: [done, partial, failed, ask, blocked]
   # What a host may offer beyond a worktree and a runtime. A kind lists what it `needs` from this vocabulary and
   # runs only on a host that declares it: the Orca IDE declares `design-tool` (the drawing tooling behind
   # `interface.draw`), the headless host - a chat driving the kernel through `claude -p` / `codex exec` processes -
   # declares nothing. A kind without `needs` runs on every host. Keep this list in step with `CAPABILITIES` of
-  # `execution/kind-graph.mjs` and the host descriptors of `execution/orca-calls.mjs` / `execution/orca-headless.mjs`.
+  # `kernel/graph.mjs` and the host descriptors of `hosts/orca/calls.mjs` / `hosts/headless/host.mjs`.
   capabilities: [design-tool]
   # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
   # walk that finds the interface design silent is not an SDS gap and must not be routed as one. `brand-gap` is
@@ -38,7 +38,7 @@ vocabularies:
   # inventing an image. `grammar-gap` is the third gap and the deepest one: the accepted requirement needs a shape
   # the installed grammar cannot render and that no composition of existing contracts covers, so the language itself
   # is short a word - grown once in the grammar package, never invented beside it in a page.
-  # Keep this list in step with `BLOCKER_KINDS` of `execution/reports.mjs`.
+  # Keep this list in step with `BLOCKER_KINDS` of `kernel/reports.mjs`.
   blockers: [shared-change, sds-gap, interface-gap, brand-gap, grammar-gap, environment, authority]
   # Verdicts the kernel computes about a report (never the reporter's own claim) and routes on.
   verdicts: [pass, findings, rejected, gate-failed]

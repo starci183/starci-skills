@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../execution/runtime-allocator.mjs';
-import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../execution/runtime-loads.mjs';
+import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../kernel/schedule.mjs';
+import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../kernel/loads.mjs';
 
-const profile=parseYaml(fs.readFileSync(new URL('../profiles/runtimes.yaml',import.meta.url),'utf8'));
+const profile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
 const clock=start=>{const box={at:start};return {now:()=>box.at,advance:ms=>{box.at+=ms;}};};
 /**
  * A throwaway workflows root: the shared runtime ledger beside the workflow directories, each of which may hold

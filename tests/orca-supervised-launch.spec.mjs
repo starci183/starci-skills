@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {createOrcaCalls} from '../execution/orca-calls.mjs';
-import {resolveExecutionChain} from '../profiles/select.mjs';
-import {buildOperationLaunch,defaultOrcaExecutable,main,notifyTerminal,parseSkip,promptDelivery,qwenLaunchMode,resolveSupervisorChain,settleDispatch,startOperation,sweepWorktree} from '../execution/orca-supervised-launch.mjs';
-import {ensureAgentTrust} from '../execution/orca-supervised-launch.mjs';
+import {createOrcaCalls} from '../hosts/orca/calls.mjs';
+import {resolveExecutionChain} from '../kernel/chains.mjs';
+import {buildOperationLaunch,defaultOrcaExecutable,main,notifyTerminal,parseSkip,promptDelivery,qwenLaunchMode,resolveSupervisorChain,settleDispatch,startOperation,sweepWorktree} from '../hosts/orca/launch.mjs';
+import {ensureAgentTrust} from '../hosts/orca/launch.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';

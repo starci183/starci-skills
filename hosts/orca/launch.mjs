@@ -3,16 +3,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
-import {readDistJson} from '../core/runtime-root.mjs';
-import {resolveExecutionChain} from '../profiles/select.mjs';
-import {createOrcaCalls,defaultOrcaExecutable,getPath} from './orca-calls.mjs';
-import {HOST_ENV,createHeadlessHost,headlessRoot} from './orca-headless.mjs';
-import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} from './supervision.mjs';
-import {protocolMain} from './orca-protocol.mjs';
-import {kernelMain} from './workflow-kernel.mjs';
-import {supervisorMain} from './kernel-supervisor.mjs';
-import {WORKFLOW_LIST,buildList,buildView,renderList,renderView} from './workflow-view.mjs';
-import {repositoryRoot} from './workflow-store.mjs';
+import {readDistJson} from '../../core/runtime-root.mjs';
+import {resolveExecutionChain} from '../../kernel/chains.mjs';
+import {createOrcaCalls,defaultOrcaExecutable,getPath} from './calls.mjs';
+import {HOST_ENV,createHeadlessHost,headlessRoot} from '../headless/host.mjs';
+import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} from '../../execution/supervision.mjs';
+import {protocolMain} from './protocol.mjs';
+import {kernelMain} from '../../kernel/kernel.mjs';
+import {supervisorMain} from '../../kernel/supervisor.mjs';
+import {WORKFLOW_LIST,buildList,buildView,renderList,renderView} from '../../kernel/view.mjs';
+import {repositoryRoot} from '../../kernel/store.mjs';
 
 /**
  * Canonical supervised launcher for Orca operation agents, plus the CLI surface of the 5.0 workflow
@@ -23,7 +23,7 @@ export {defaultOrcaExecutable};
 export const supervisedQwenModel='qwen3.8-flash';
 /**
  * The hosts a launcher command may run against. `orca` is the runner every command always had; `headless` is
- * `execution/orca-headless.mjs`, the same call surface answered with child processes and files, selected with
+ * `hosts/headless/host.mjs`, the same call surface answered with child processes and files, selected with
  * `--host-adapter headless` or with `STARCI_HOST=headless` in the environment - which is what the kernel sets on
  * every operation process it spawns, so a child's own `report` lands in the host mailbox without a flag.
  */
@@ -107,8 +107,8 @@ function worktreeMatches(workerShow,expectedPath){
   return normalize(actual)===normalize(expectedPath)?{ok:true}:{ok:false,reason:`Worker worktree mismatch: expected ${expectedPath}, received ${actual}`};
 }
 
-/** Supervisor chains come from profiles/registry.json; every candidate must be a managed agent. */
-export function resolveSupervisorChain(role,registry=readDistJson('profiles','registry.json')){
+/** Supervisor chains come from model/registry.json; every candidate must be a managed agent. */
+export function resolveSupervisorChain(role,registry=readDistJson('model','registry.json')){
   const chain=registry?.supervisors?.[role]?.chain;
   need(Array.isArray(chain)&&chain.length,`Supervisor chain is missing for ${role}`);
   const effort=registry.supervisors[role].effort??null;
@@ -117,14 +117,14 @@ export function resolveSupervisorChain(role,registry=readDistJson('profiles','re
     need(plain(route)&&route.orcaLaunch?.kind==='managed-agent',`Supervisor target must be a managed agent: ${target}`);
     const runtime=registry.aliases?.[route.runtime]??route.runtime;
     const profileId=route.profiles?.working??route.profiles?.reasoning;
-    const profile=readDistJson('profiles',`${runtime}.json`).profiles?.[profileId];
+    const profile=readDistJson('model',`${runtime}.json`).profiles?.[profileId];
     need(plain(profile),`Unknown supervisor profile: ${target}`);
     return {priority,target,runtime,profile:profileId,model:profile.model??route.requestedModel??null,effort:profile.model||route.requestedModel?effort:null,orcaLaunch:structuredClone(route.orcaLaunch)};
   });
 }
 
 /** Parse `--skip target:reason[,target:reason]` into registry-allowed no-effect attempts. */
-export function parseSkip(value,chain,registry=readDistJson('profiles','registry.json')){
+export function parseSkip(value,chain,registry=readDistJson('model','registry.json')){
   if(value===undefined||value===null||value==='')return [];
   const allowed=registry.fallback.allowedReasons;
   return String(value).split(',').filter(Boolean).map(entry=>{
@@ -534,14 +534,14 @@ export function startOperation(input,{orca=createOrcaCalls(),wait,candidates=nul
 }
 
 function usage(){return `Usage:
-  node orca-supervised-launch.mjs start-op --run <nested-workflow-run> --workflow-task <parent-workflow-task> --from <monitor-terminal> --worktree <relative-path> --operation <op> --scope <scope> --spec-file <relative-file> [--skip <target:reason[,target:reason]>] [--dry-run]
+  node hosts/orca/launch.mjs start-op --run <nested-workflow-run> --workflow-task <parent-workflow-task> --from <monitor-terminal> --worktree <relative-path> --operation <op> --scope <scope> --spec-file <relative-file> [--skip <target:reason[,target:reason]>] [--dry-run]
     --skip records a Monitor-verified no-effect failure for a chain target (reason from registry fallback.allowedReasons) so the chain starts at the next candidate
-  node orca-supervised-launch.mjs settle --dispatch <dispatch> [--worktree <relative-path>] [--terminal <own-agent-terminal>] [--close true]
-  node orca-supervised-launch.mjs sweep --worktree <relative-path> --from <monitor-terminal> [--keep <handle,handle>]
-  node orca-supervised-launch.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
-  node orca-supervised-launch.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
-  node orca-supervised-launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
-  node orca-supervised-launch.mjs workflow-goal --job <text> [--id <workflow-id>] [--lane [<name>]] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--reintake feature] [--ledger-root <path>] [--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node hosts/orca/launch.mjs settle --dispatch <dispatch> [--worktree <relative-path>] [--terminal <own-agent-terminal>] [--close true]
+  node hosts/orca/launch.mjs sweep --worktree <relative-path> --from <monitor-terminal> [--keep <handle,handle>]
+  node hosts/orca/launch.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
+  node hosts/orca/launch.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
+  node hosts/orca/launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
+  node hosts/orca/launch.mjs workflow-goal --job <text> [--id <workflow-id>] [--lane [<name>]] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--reintake feature] [--ledger-root <path>] [--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2] [--host <path-to-.claude>] [--worktree <relative-path>]
     --lane gives the workflow a worktree of its own: an Orca worktree of this repository on a new branch cut
     from the branch you are on, as the top-level row [Workflow] <id> (default name: the workflow id). The
     kernel and every operation run in it, and its branch is merged back into the base branch when the
@@ -556,30 +556,30 @@ function usage(){return `Usage:
     then live in the owner repository, while code, checks and code commits stay in this worktree. A node that
     names no repository belongs to the side its layout sits in, so implementation/frontend/** is never a
     backend job's work and implementation/backend/** is never a frontend's.
-  node orca-supervised-launch.mjs workflow-answer --id <workflow-id> --op <owner-ask-op> [--choice <n>] [--note "<answer>"] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node hosts/orca/launch.mjs workflow-answer --id <workflow-id> --op <owner-ask-op> [--choice <n>] [--note "<answer>"] [--host <path-to-.claude>] [--worktree <relative-path>]
     the owner's answer to a question the kernel prepared (needUser kind 'decision'): the option number and/or a note; the answer reaches the paused operation in its next contract.
-  node orca-supervised-launch.mjs workflow-approve --id <workflow-id> [--allocation <runtime=slots,...>] [--allow-dynamic N] [--accept-critique "<reason>"] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node hosts/orca/launch.mjs workflow-approve --id <workflow-id> [--allocation <runtime=slots,...>] [--allow-dynamic N] [--accept-critique "<reason>"] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     --accept-critique is the owner overriding a goal critique that answered refuse: the reason is recorded and
     the kernel never asks for it again.
-  node orca-supervised-launch.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--allocation <runtime=slots,...>] [--max-iterations N] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node hosts/orca/launch.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--allocation <runtime=slots,...>] [--max-iterations N] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     runs the kernel loop: up to 10 operation agents in one worktree, machine-verified acceptance, gates, final report.
     On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and
     committed with a "Work: <node id>" trailer - in the repository that owns the tree, which is this one
     unless the product routes the Work elsewhere.
-  node orca-supervised-launch.mjs workflow-status --id <workflow-id> [--json true] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node hosts/orca/launch.mjs workflow-status --id <workflow-id> [--json true] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     prints one status view of the workflow, derived from its own files: kernel liveness, runtimes, running
     and blocked operations, the ledger by feature, reviews, the validator, what needs you, the rate and the
     last events. --json true prints the machine shape (the kernel's own status fields plus view).
-  node orca-supervised-launch.mjs workflow-list [--json true] [--worktree <relative-path>]
+  node hosts/orca/launch.mjs workflow-list [--json true] [--worktree <relative-path>]
     one line per workflow of this repository: phase, operations done, kernel liveness, last event age
-  node orca-supervised-launch.mjs workflow-stop --id <workflow-id> [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node hosts/orca/launch.mjs workflow-stop --id <workflow-id> [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     approve, status and stop find the workflow directory where the goal put it, so a job whose ledger is
     owned by another repository is reached with the same --host (or --ledger-root) the goal was given.
-  node orca-supervised-launch.mjs workflow-lane-close --id <workflow-id> [--host <path-to-.claude>] [--worktree <relative-path>]
+  node hosts/orca/launch.mjs workflow-lane-close --id <workflow-id> [--host <path-to-.claude>] [--worktree <relative-path>]
     removes the merged lane worktree from Orca and from git and keeps its branch. Refused while the kernel is
     alive (workflow-stop first) and while the lane has not been merged into its base branch.
-  node orca-supervised-launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000] [--worktree <repo>]
-  node orca-supervised-launch.mjs verify
+  node hosts/orca/launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000] [--worktree <repo>]
+  node hosts/orca/launch.mjs verify
   Every command accepts --host-adapter orca|headless (default orca; headless when STARCI_HOST=headless). The
   headless host runs the same kernel without Orca: operations are one-at-a-time claude -p / codex exec
   processes in the worktree, reports reach the kernel through a mailbox file, and a kind that needs a host

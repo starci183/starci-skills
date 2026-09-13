@@ -1,7 +1,7 @@
 /**
  * Runtime contract resolution for ordinary agent/CLI execution.
  *
- * All workflows/ops/schemas/knowledge/specifications/profiles JSON consumed at
+ * All workflows/ops/schemas/knowledge/specifications/model JSON consumed at
  * runtime must come from `.dist` (after `node scripts/ensure-build.mjs`).
  * Authored trees under the skill root remain for maintenance/build tooling only.
  *

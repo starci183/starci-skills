@@ -44,7 +44,7 @@ reads:
         duplicated under a second name. Reading the surrounding code is for placing the file only; this operation
         changes no product code.
   - id: profile
-    path: profiles/registry.json + selected runtime execution profile + actual host tools/model
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
     purpose:
       en: "Resolve this operator's request-bound external-agent chain and confirm the actual host carries an
         image generator before any slot is attempted. Historical model names are not availability proof, and a

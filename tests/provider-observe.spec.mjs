@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PROVIDER_FAMILIES,SCAN_ORDER,SCREENS,detect,detectFromTitle,observe,rateLimitSignal} from '../execution/provider-observe.mjs';
+import {PROVIDER_FAMILIES,SCAN_ORDER,SCREENS,detect,detectFromTitle,observe,rateLimitSignal} from '../hosts/orca/observe.mjs';
 
 const term=(extra={})=>({handle:'t',status:'running',lastOutputAt:1000,title:'[Op] backend.implement - Sales',...extra});
 const at=(screen,extra={})=>observe({screen,terminal:term(extra.terminal),now:2000,...extra});

@@ -8,7 +8,7 @@ import {
   DECISION_KINDS,EXECUTABLE_KINDS,decisionCandidates,disjoint,executableCandidates,layoutOf,layoutSide,ledgerSummary,nodeRepository,
   brandReferences,buildSourceIdentity,checkAssertions,loadLedger,markDecided,markDone,markInProgress,markReopened,
   nodeFile,readNode,writeEvidence
-} from '../execution/work-ledger.mjs';
+} from '../kernel/ledger.mjs';
 
 const DIGEST='a'.repeat(64);
 const HEAD='b'.repeat(40);

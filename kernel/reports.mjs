@@ -9,7 +9,7 @@ import {spawnSync} from 'node:child_process';
 export const OP_REPORT='starci/op-report@1';
 export const WORKFLOW_REPORT='starci/workflow-report@1';
 export const OUTCOMES=['done','partial','failed','ask','blocked'];
-/** The blocker vocabulary of `profiles/kinds.yaml`; the graph routes each one, so the two lists must agree. */
+/** The blocker vocabulary of `model/kinds.yaml`; the graph routes each one, so the two lists must agree. */
 export const BLOCKER_KINDS=['shared-change','sds-gap','interface-gap','brand-gap','grammar-gap','environment','authority'];
 /** Orca signal per outcome: the message type the receiver's blocking wait subscribes to. */
 export const SIGNALS={

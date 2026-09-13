@@ -122,7 +122,7 @@ test('relocated workflow executes without source checkout or native agent dispat
   const x = fixture(t), relocated = path.join(x.parent, 'installed'); fs.mkdirSync(relocated);
   fs.cpSync(path.join(packageRoot, 'workflows'), path.join(relocated, 'workflows'), { recursive: true });
   fs.cpSync(path.join(packageRoot, 'contracts'), path.join(relocated, 'contracts'), { recursive: true });
-  fs.cpSync(path.join(packageRoot, 'profiles'), path.join(relocated, 'profiles'), { recursive: true });
+  fs.cpSync(path.join(packageRoot, 'kernel'), path.join(relocated, 'kernel'), { recursive: true });
   fs.cpSync(path.join(packageRoot, 'core'), path.join(relocated, 'core'), { recursive: true });
   fs.cpSync(path.join(packageRoot, '.dist'), path.join(relocated, '.dist'), { recursive: true });
   fs.mkdirSync(path.join(relocated,'scripts'));

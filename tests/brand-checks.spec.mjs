@@ -12,7 +12,7 @@ import {
   checkContrastAa,checkIconSetOnly,checkMascotAssetsPresent,checkPrimaryDangerDistinct,checkTokensInGrammar,checkTokensMatchSource,
   contrastRatio,deltaEOk,formatBrandChecks,importSpecifiers,parseColor,parseCssCustomProperties,parseTokenData,
   readBrandRecord,runBrandChecks
-} from '../execution/brand-checks.mjs';
+} from '../checks/brand.mjs';
 
 const cli=fileURLToPath(new URL('../cli/main.mjs',import.meta.url));
 const ACCENT='#7547ff';

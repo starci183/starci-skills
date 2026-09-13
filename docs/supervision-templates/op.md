@@ -5,7 +5,7 @@ input: the heading, the worktree and branch, the goal, the goal items, the allow
 inherited open items, the findings, the acceptance statements, the exact check commands with their checks
 file, and the report command with its run, reports directory and checks file.
 
-The working order of one operation is not here: `execution/contract-steps.mjs` renders a kind-specific
+The working order of one operation is not here: `kernel/contract.mjs` renders a kind-specific
 "Working order (mandatory, in this order)" section from the operation's own values (see
 [op-granularity.md](../op-granularity.md), "Working order per kind"). The sections below are the process
 around that order. They are identical for every operation kind and are reused from this file verbatim, so

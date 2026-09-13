@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {parseYaml} from '../core/yaml.mjs';
-import {classifyReceipt,createOrcaCalls,loadOrcaCalls,receiptError} from '../execution/orca-calls.mjs';
-import {boundaryMessages,createOrcaAdapter} from '../execution/orca-adapter.mjs';
+import {classifyReceipt,createOrcaCalls,loadOrcaCalls,receiptError} from '../hosts/orca/calls.mjs';
+import {boundaryMessages,createOrcaAdapter} from '../hosts/orca/adapter.mjs';
 import {planOrcaExecution,startOrcaExecution} from '../execution/orca.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));

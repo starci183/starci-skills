@@ -3,21 +3,21 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
-import {ORCA_HOST,getPath} from './orca-calls.mjs';
-import {waitTick} from './orca-protocol.mjs';
-import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from './orca-supervised-launch.mjs';
+import {ORCA_HOST,getPath} from '../hosts/orca/calls.mjs';
+import {waitTick} from '../hosts/orca/protocol.mjs';
+import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from '../hosts/orca/launch.mjs';
 import {validateReport} from './reports.mjs';
-import {WORKFLOW_STATE,createStore,listWorkflows,newWorkflowId,repositoryRoot,workflowsRoot} from './workflow-store.mjs';
-import {grammarRepository,resolveLedgerRoot,samePath,sharedLedgerStatus} from './ledger-routing.mjs';
-import {createAllocator,loadRuntimes} from './runtime-allocator.mjs';
-import {loadsFileFor,readLoads} from './runtime-loads.mjs';
-import {resolveExecutionChain} from '../profiles/select.mjs';
-import {proofFinding,proofPlan,runAtBase} from './verify-proof.mjs';
-import {stepsFor} from './contract-steps.mjs';
+import {WORKFLOW_STATE,createStore,listWorkflows,newWorkflowId,repositoryRoot,workflowsRoot} from './store.mjs';
+import {grammarRepository,resolveLedgerRoot,samePath,sharedLedgerStatus} from './routing.mjs';
+import {createAllocator,loadRuntimes} from './schedule.mjs';
+import {loadsFileFor,readLoads} from './loads.mjs';
+import {resolveExecutionChain} from './chains.mjs';
+import {proofFinding,proofPlan,runAtBase} from '../checks/proof.mjs';
+import {stepsFor} from './contract.mjs';
 import {parseYaml} from '../core/yaml.mjs';
-import * as work from './work-ledger.mjs';
-import * as llm from './llm-functions.mjs';
-import * as graph from './kind-graph.mjs';
+import * as work from './ledger.mjs';
+import * as llm from '../models/functions.mjs';
+import * as graph from './graph.mjs';
 
 /**
  * The StarCi 5.0 workflow kernel: one process per job. It assesses the goal into a ledger and a dynamic
@@ -41,7 +41,7 @@ export const LEDGER_MODES=['work','plan'];
 export const WORK_LEDGER='work';
 /**
  * Work kind -> the operation kind that executes it. This is the fallback only: the lane of the node
- * (`profiles/kinds.yaml` through `execution/kind-graph.mjs`) decides the kind of every step, and this map is
+ * (`model/kinds.yaml` through `kernel/graph.mjs`) decides the kind of every step, and this map is
  * what a tree whose kind graph cannot be read falls back to. Decision kinds are answered, never launched.
  */
 export const WORK_OPERATION={implementation:'backend.implement',ui:'interface.implement',uat:'uat.verify',e2e:'e2e.verify',operations:'runtime.operate'};
@@ -117,7 +117,7 @@ const inScopePath=(file,scope=[])=>{
 };
 
 /**
- * The guard surface (`execution/kernel-guards.mjs`): path protection, resource locks, git serialization and
+ * The guard surface (`kernel/guards.mjs`): path protection, resource locks, git serialization and
  * the worktree preflight. It is loaded optionally, because a tree that ships without it must still run the
  * kernel - the fallbacks below are the same contract, implemented minimally, and every call goes through
  * `ctx.guards`, so a test or a host can inject its own.
@@ -145,7 +145,7 @@ const FALLBACK_GUARDS={
   gitQueue:fn=>fn(),
   preflight:()=>({ok:true,fixes:[],problems:[]})
 };
-const loadedGuards=await import('./kernel-guards.mjs').then(module=>module,()=>null);
+const loadedGuards=await import('./guards.mjs').then(module=>module,()=>null);
 export const kernelGuards=Object.fromEntries(Object.entries(FALLBACK_GUARDS)
   .map(([name,fallback])=>[name,typeof loadedGuards?.[name]==='function'?loadedGuards[name]:fallback]));
 
@@ -808,7 +808,7 @@ function noteCritiqueInGoal(store,state){
  */
 export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,renderGoalMarkdown=llm.renderGoalMarkdown,extractMaterial=llm.extractMaterial,cwd=state.worktree,providers,runHeadless}={}){
   need(!state.approved,`Workflow ${state.id} is already approved; run workflow-run`);
-  need(typeof assessGoal==='function','assessGoal is not available yet in execution/llm-functions.mjs');
+  need(typeof assessGoal==='function','assessGoal is not available yet in models/functions.mjs');
   const material=typeof extractMaterial==='function'?extractMaterial(state.inputs.map(item=>item.ref),{cwd}):[];
   const assessed=assessGoal({job:state.job,inputs:state.inputs,material,constraints:[
     `every op runs in the one worktree ${slash(state.worktree)} on branch ${state.branch}: allowlists of ops that may run in parallel must be disjoint`,
@@ -4223,7 +4223,7 @@ function bindRun(orca,{cwd,state,from}){
 }
 
 const hostOf=(options,repoRoot)=>path.resolve(options.host??path.join(repoRoot,'.claude'));
-const launcherOf=host=>slash(path.join(host,'.dist','execution','orca-supervised-launch.mjs'));
+const launcherOf=host=>slash(path.join(host,'.dist','hosts','orca','launch.mjs'));
 const templateOf=host=>fs.readFileSync(path.join(host,'docs','supervision-templates','op.md'),'utf8');
 
 /**
@@ -4483,5 +4483,5 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   throw Error(`Unsupported workflow kernel command: ${command}`);
 }
 
-// The CLI surface is the canonical launcher (`orca-supervised-launch.mjs workflow-goal|workflow-approve|
+// The CLI surface is the canonical launcher (`hosts/orca/launch.mjs workflow-goal|workflow-approve|
 // workflow-run|workflow-status`), which routes straight into kernelMain; this module stays import-only.

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {CRITIQUE,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
+import {CRITIQUE,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../models/functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
   references:['.starciwork/features/sales/sds.md#3'],checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:[`${id} works`],dependsOn:[],...extra});
@@ -171,7 +171,7 @@ test('a call charges every attempt it paid for, and a plain string runner simply
 test('the goal-plan schema file documents the form the runtime validates',()=>{
   const schema=parseYaml(fs.readFileSync(new URL('../schemas/goal-plan.yaml',import.meta.url),'utf8'));
   assert.equal(schema.describes,GOAL_PLAN);
-  assert.equal(schema.module,'execution/llm-functions.mjs');
+  assert.equal(schema.module,'models/functions.mjs');
   for(const key of Object.keys(GOAL_FORM))assert.ok(key in schema.fields,`schemas/goal-plan.yaml does not document ${key}`);
   assert.ok(schema.rules.some(rule=>/disjoint/.test(rule)));
 });

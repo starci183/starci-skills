@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {createOrcaCalls} from '../execution/orca-calls.mjs';
-import {BLOCKER_KINDS,OUTCOMES,buildReport,reportBody,reportsDirectory,repositoryRoot,validateReport} from '../execution/reports.mjs';
-import {classifyWorker,reportOutcome,waitTick} from '../execution/orca-protocol.mjs';
+import {createOrcaCalls} from '../hosts/orca/calls.mjs';
+import {BLOCKER_KINDS,OUTCOMES,buildReport,reportBody,reportsDirectory,repositoryRoot,validateReport} from '../kernel/reports.mjs';
+import {classifyWorker,reportOutcome,waitTick} from '../hosts/orca/protocol.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const base={run:'run_sales',task:'task_op',dispatch:'ctx_op',from:'term_op',summary:'Implemented the slice and ran the focused suite.'};

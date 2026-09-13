@@ -24,7 +24,7 @@ test('every companion skill declares its directory name and a description, and t
 
 test('the workflow-chat skill names only launcher commands that exist and the flags the headless host takes',()=>{
   const skill=read('skills/workflow-chat/SKILL.md');
-  const launcher=read('execution/orca-supervised-launch.mjs');
+  const launcher=read('hosts/orca/launch.mjs');
   const list=name=>JSON.parse(launcher.match(new RegExp(`const ${name}=(\\[[^\\]]*\\])`))[1].replaceAll("'",'"'));
   const known=new Set([...list('KERNEL_COMMANDS'),...list('VIEW_COMMANDS')]);
   // Every backticked `workflow-<x>` the skill tells a chat to run must be a command the launcher dispatches,

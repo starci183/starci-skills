@@ -1,6 +1,6 @@
 schema: starci/op-report-schema@1
 describes: starci/op-report@1
-module: execution/reports.mjs
+module: kernel/reports.mjs
 purpose: |-
   The single typed outcome of one operation attempt. The file under
   .starciwork/_local/runtime/reports/<run>/<dispatch>.json is the source of truth; the Orca message

@@ -25,12 +25,12 @@ test('relocated runtime uses only .dist and bootstrap, never authored code or da
   assert.equal(JSON.parse(run(['bin/starci.mjs','workflows'])).workflows.length,16);
   run(['bin/starci.mjs','op','backend.implement']);
   run(['--input-type=module','-e',`import {resolveProjectSkillPath} from './.dist/workflows/lifecycle.mjs';
-    import {selectProfile} from './.dist/profiles/select.mjs';
+    import {selectProfile} from './.dist/kernel/chains.mjs';
     import {selectWorkflow} from './.dist/workflows/select.mjs';
     import {readDistJson} from './.dist/core/runtime-root.mjs';
     if(!resolveProjectSkillPath().endsWith('SKILL.md'))throw Error('wrong skill root');
     const result=selectWorkflow(readDistJson('workflows','catalog.json'),{classification:{action:'implement-backend',effectful:true}});
     if(result.id!=='implement-backend')throw Error('wrong route');
     selectProfile({runtime:'codex',op:'backend.implement'});`]);
-  for(const name of ['core','cli','scripts','contracts','specifications','workflows','knowledge','profiles','approvals','schemas'])assert.equal(fs.existsSync(path.join(base,name)),false,'source dependency leaked: '+name);
+  for(const name of ['core','cli','scripts','contracts','specifications','workflows','knowledge','model','kernel','hosts','models','checks','approvals','schemas'])assert.equal(fs.existsSync(path.join(base,name)),false,'source dependency leaked: '+name);
 });

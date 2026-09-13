@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {inspectWorkflow,superviseForever,superviseOnce,supervisorAction} from '../execution/kernel-supervisor.mjs';
+import {inspectWorkflow,superviseForever,superviseOnce,supervisorAction} from '../kernel/supervisor.mjs';
 
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-supervisor-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(path.join(dir,'.starciwork','_local','workflows'),{recursive:true});return dir;};
 function workflow(root,id,{approved=true,finished=null,lastAt,pid=null,stop=false,worktree=root,lane=null}={}){

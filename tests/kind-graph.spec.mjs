@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import {parseYaml} from '../core/yaml.mjs';
 import {BLOCKERS,CAPABILITIES,KINDS,KIND_GRAPH,LANE_BUILD,OUTCOMES,SAME,assertGraph,describeLane,familyOf,isReadOnly,
   kindList,laneById,laneFor,laneRecordFor,mutationsOf,needsOf,nextKind,operatorOf,predicatesOf,reportsOf,roleOf,
-  routeFor,routeList,validateGraph} from '../execution/kind-graph.mjs';
+  routeFor,routeList,validateGraph} from '../kernel/graph.mjs';
 
-const read=name=>parseYaml(fs.readFileSync(new URL(`../profiles/${name}`,import.meta.url),'utf8'));
+const read=name=>parseYaml(fs.readFileSync(new URL(`../model/${name}`,import.meta.url),'utf8'));
 const profile=read('kinds.yaml');
 const runtimes=read('runtimes.yaml');
 const operators=fs.readdirSync(new URL('../ops/',import.meta.url),{withFileTypes:true})
@@ -340,7 +340,7 @@ test('an invalid profile is rejected with a named error, never silently repaired
 });
 
 test('the compiled profile is the one the kernel will read at run time',()=>{
-  const dist=new URL('../.dist/profiles/kinds.json',import.meta.url);
+  const dist=new URL('../.dist/model/kinds.json',import.meta.url);
   if(!fs.existsSync(dist))return;
   const compiled=JSON.parse(fs.readFileSync(dist,'utf8'));
   assert.deepEqual(compiled,profile);

@@ -1,6 +1,6 @@
 schema: starci/workflow-report-schema@1
 describes: starci/workflow-report@1
-module: execution/reports.mjs
+module: kernel/reports.mjs
 purpose: |-
   The normalized boundary a Workflow Monitor reports to the Plan Coordinator. Same outcomes and
   signals as starci/op-report@1, plus the branch state the Coordinator integrates.

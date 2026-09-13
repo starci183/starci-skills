@@ -4,7 +4,7 @@ import {readDistJson} from '../core/runtime-root.mjs';
 import {parseYaml} from '../core/yaml.mjs';
 
 /**
- * The workflow brain as data. `profiles/kinds.yaml` declares three things and this module is the only code
+ * The workflow brain as data. `model/kinds.yaml` declares three things and this module is the only code
  * that reads them: the complete catalog of operation kinds (family, allocator role, what each may change,
  * what each may report), the mandatory lane every ledger node walks, and the bounded routes an outcome may
  * take. Everything here is a pure function of that profile; the only I/O is `loadKinds`.
@@ -50,14 +50,14 @@ const listOf=value=>Array.isArray(value)?value.filter(item=>typeof item==='strin
 let distProfile=null;
 
 /**
- * Load the catalog. Without `profileDir` it is the compiled `.dist/profiles/kinds.json`, exactly as
+ * Load the catalog. Without `profileDir` it is the compiled `.dist/model/kinds.json`, exactly as
  * `loadRuntimes` loads the allocator's profile, so the same call works from the authored tree and from the
  * `.dist` copy. With `profileDir` the authored YAML (or a fixture) is read directly, which is how the tests
  * and `validateGraph` read a profile that has not been built yet.
  */
 export function loadKinds({profileDir=null}={}){
   if(!profileDir){
-    if(!distProfile)distProfile=readDistJson('profiles','kinds.json');
+    if(!distProfile)distProfile=readDistJson('model','kinds.json');
     return distProfile;
   }
   const dir=path.resolve(profileDir);
@@ -295,7 +295,7 @@ export function validateGraph(given=null,{runtimes=null,operators=null}={}){
 
   // The catalog is closed in both directions: the compiled KINDS list and the profile must agree.
   for(const kind of KINDS)if(!catalogue.includes(kind))fail(errors,'catalog-drift',`The catalog is missing the required kind ${kind}`,{kind});
-  for(const kind of catalogue)if(!KINDS.includes(kind))fail(errors,'catalog-drift',`${kind} is not in the closed KINDS list of execution/kind-graph.mjs`,{kind});
+  for(const kind of catalogue)if(!KINDS.includes(kind))fail(errors,'catalog-drift',`${kind} is not in the closed KINDS list of kernel/graph.mjs`,{kind});
 
   for(const [kind,record] of Object.entries(profile.kinds)){
     if(!plain(record)){fail(errors,'kind-shape',`Kind ${kind} is not a mapping`,{kind});continue;}

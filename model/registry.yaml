@@ -372,7 +372,7 @@ costPolicy: |-
   Never infer price or quality superiority from a subscription label; benchmark bounded
   representative operations before proposing another routing change. A native worker is released
   after its exact worker_done result is accepted; the workflow child remains until integration is
-  complete. In runtime 5.0 the chain no longer decides who runs an operation - `profiles/runtimes.yaml`
+  complete. In runtime 5.0 the chain no longer decides who runs an operation - `model/runtimes.yaml`
   does, by role preference - so every operator's `environments` must declare every runtime that carries
   that operation's role and owns a profile for it, and the chain lists exactly those targets so
   `candidateFor` can answer with a launch shape for whichever runtime the allocator picked. A runtime

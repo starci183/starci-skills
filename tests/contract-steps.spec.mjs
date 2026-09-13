@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DONE_HEADING,SEQUENCES,STEPS_HEADING,sequenceFor,stepsFor} from '../execution/contract-steps.mjs';
+import {DONE_HEADING,SEQUENCES,STEPS_HEADING,sequenceFor,stepsFor} from '../kernel/contract.mjs';
 
 /** A minimal operation the way `toOp` shapes one; every field an agent's steps interpolate is present. */
 const op=(over={})=>({id:'op-1',kind:'backend.implement',origin:'ledger',nodeId:null,allowlist:['src/sales/intake.ts'],
@@ -386,7 +386,7 @@ test('brand.decide reads every value out of a real source file, bumps the rev, a
 
 test('the module carries no product path or repository name',async()=>{
   const fs=await import('node:fs');
-  const source=fs.readFileSync(new URL('../execution/contract-steps.mjs',import.meta.url),'utf8');
+  const source=fs.readFileSync(new URL('../kernel/contract.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(source,/starci-academy|agentos|nivo|apps\/|\.starciwork/i);
 });
 

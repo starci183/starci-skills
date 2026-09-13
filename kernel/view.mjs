@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {listWorkflows,workflowsRoot} from './workflow-store.mjs';
+import {listWorkflows,workflowsRoot} from './store.mjs';
 
 /**
  * One truthful status view of a workflow. This is what replaces "go and watch the agents": every number

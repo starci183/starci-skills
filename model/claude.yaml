@@ -1,7 +1,7 @@
 schema: starci/execution-profiles@1
 runtime: claude
 provider: anthropic
-source: legacy/resources/agents/profiles/claude.json
+source: legacy/resources/agents/model/claude.json
 modelPolicy: use-current-host-configuration; legacy model preferences are historical, never availability proof
 profiles:
   opus:

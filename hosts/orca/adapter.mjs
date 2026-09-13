@@ -1,5 +1,5 @@
-import {createOrcaCalls,getPath} from './orca-calls.mjs';
-import {settleDispatch} from './orca-supervised-launch.mjs';
+import {createOrcaCalls,getPath} from './calls.mjs';
+import {settleDispatch} from './launch.mjs';
 
 /**
  * Concrete Orca adapter for execution/orca.mjs, built on the typed call runner. Every injected

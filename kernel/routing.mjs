@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {LEDGER_DIRECTORY,normalizeOrigin,repositoryName} from './work-ledger.mjs';
+import {LEDGER_DIRECTORY,normalizeOrigin,repositoryName} from './ledger.mjs';
 
 /**
  * Which Work ledger a workflow works, when the repository it runs in is not the repository that owns the

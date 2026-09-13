@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {resolveExecutionChain,selectExecutionTarget,selectProfile} from '../profiles/select.mjs';
+import {resolveExecutionChain,selectExecutionTarget,selectProfile} from '../kernel/chains.mjs';
 import {readPublicJson} from './helpers/read-public.mjs';
 import {validateAssets} from '../contracts/assets.mjs';
 
@@ -26,7 +26,7 @@ test('active roles select Codex, Claude or Qwen without reviving retired profile
   assert.throws(()=>selectProfile({runtime:'unknown',op:'interface.implement'}));
 });
 test('every operator has an ordered external-agent chain and skill-level defaults remain usable',()=>{
-  const registry=readPublicJson('profiles/registry.json'),ops=readPublicJson('ops/catalog.json').ops.map(x=>x.id);
+  const registry=readPublicJson('model/registry.json'),ops=readPublicJson('ops/catalog.json').ops.map(x=>x.id);
   assert.equal(registry.schema,'starci/profile-registry@3');
   assert.deepEqual(registry.agentArchitecture.levels,['plan','coordinator','workflow-wrapper','operation-wrapper-agent','concrete-operation-agent']);
   assert.equal(registry.agentArchitecture.isolationBoundary,'operation');
@@ -138,7 +138,7 @@ test('Qwen Flash executes then Opus then Sol, Sol draws, Fable then Astra reason
   assert.equal(review[0].target,'qwen3.8-flash');
   assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus']);
   assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus']);
-  const ops=Object.keys(readPublicJson('profiles/registry.json').operators);
+  const ops=Object.keys(readPublicJson('model/registry.json').operators);
   for(const op of ops){
     const chain=resolveExecutionChain({op}).candidates;
     assert.ok(!chain.some(candidate=>['qwen3.8-max','deepseek-v4-pro'].includes(candidate.model)),op);

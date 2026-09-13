@@ -1,6 +1,6 @@
 import { validateJourneys } from '../contracts/journeys.mjs';
 import { validateAssets } from '../contracts/assets.mjs';
-import { selectProfile } from '../profiles/select.mjs';
+import { selectProfile } from '../kernel/chains.mjs';
 import { distPath, requireDist, readDistJson } from '../core/runtime-root.mjs';
 import fs from 'node:fs';
 import path from 'node:path';

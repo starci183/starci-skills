@@ -11,7 +11,11 @@ folders:
   skills: Companion skills a host discovers beside the entry (workflow chat, Orca stubs); routing stays in SKILL.md
   ops: Operator JSON and authority
   workflows: Matrices, contracts and runtime gates
-  profiles: Host profiles
+  model: Declared data the runtime runs on - kinds, runtimes, registry and host profiles
+  kernel: The control loop and what only it uses
+  hosts: Host adapters the kernel launches operations through
+  models: Model functions - assess, critique, validate and decide
+  checks: Machine checks over bytes
   providers: Provider capabilities, full API inventories, adapters, recipes and fail-closed validation
   knowledge: Lazy-loaded JSON guidance
   contracts: Validation code

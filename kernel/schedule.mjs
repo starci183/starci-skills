@@ -1,8 +1,8 @@
 import {readDistJson} from '../core/runtime-root.mjs';
-import {resolveExecutionChain} from '../profiles/select.mjs';
-import {roleOf} from './kind-graph.mjs';
-import {SHARED_COOLING_KINDS,createLoadsLedger} from './runtime-loads.mjs';
-import {budgetVerdict,readRuntimeBudget} from './runtime-budget.mjs';
+import {resolveExecutionChain} from './chains.mjs';
+import {roleOf} from './graph.mjs';
+import {SHARED_COOLING_KINDS,createLoadsLedger} from './loads.mjs';
+import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
 
 /**
  * Runtime allocation: pools with slots and budgets instead of an ordered provider chain. The kernel asks
@@ -12,7 +12,7 @@ import {budgetVerdict,readRuntimeBudget} from './runtime-budget.mjs';
  * rate limit parks one runtime instead of stalling the workflow. All time comes from the injected `now`.
  *
  * Expensive runtimes are split across the workflows of a repository, not owned by one. With `shared:{path,
- * workflow}` the allocator reads the repository's shared ledger (`execution/runtime-loads.mjs`) before it
+ * workflow}` the allocator reads the repository's shared ledger (`kernel/loads.mjs`) before it
  * chooses: another kernel's live operations on a runtime count as load, so `maxParallel` holds across kernels,
  * a cooldown another kernel ran into is a cooldown here too, and among candidates that all qualify the one no
  * other kernel is using wins - which is how a second workflow's hard operation reaches Astra while Fable
@@ -48,7 +48,7 @@ const finite=(value,fallback)=>Number.isFinite(value)?value:fallback;
 const orNull=value=>Number.isFinite(value)?value:null;
 const counters=value=>plain(value)?Object.fromEntries(Object.entries(value).filter(([,count])=>Number.isFinite(count))):{};
 
-export function loadRuntimes(){return readDistJson('profiles','runtimes.json');}
+export function loadRuntimes(){return readDistJson('model','runtimes.json');}
 /** The graph's role for an operation kind, or null when it knows none; never throws for an unknown kind. */
 const graphRole=kind=>{try{return roleOf(kind);}catch{return null;}};
 
@@ -353,7 +353,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     candidateFor(kind,target){
       const chain=resolveExecutionChain({skill:'starci',op:kind}).candidates;
       const found=chain.find(candidate=>candidate.target===target);
-      need(found,`Runtime target ${target} is not launchable for ${kind}; that operation's environments offer ${chain.map(candidate=>candidate.target).join(', ')||'nothing'}. Add the target to the operation's environments in profiles/registry.yaml, or allocate with restrictTo: launchableTargets('${kind}').`);
+      need(found,`Runtime target ${target} is not launchable for ${kind}; that operation's environments offer ${chain.map(candidate=>candidate.target).join(', ')||'nothing'}. Add the target to the operation's environments in model/registry.yaml, or allocate with restrictTo: launchableTargets('${kind}').`);
       return found;
     }
   };

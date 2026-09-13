@@ -8,7 +8,7 @@ import path from 'node:path';
 import {canonicalJSON,sha256,validateWorkspace,previewCompletion} from '../core/index.mjs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import { readDistJson } from '../core/runtime-root.mjs';
-import {resolveExecutionChain} from '../profiles/select.mjs';
+import {resolveExecutionChain} from '../kernel/chains.mjs';
 import {fileURLToPath} from 'node:url';
 import {validBackendRun} from './select.mjs';
 import {assertSourceLayout} from './source-layout.mjs';

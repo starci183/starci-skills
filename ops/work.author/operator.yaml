@@ -42,7 +42,7 @@ reads:
       en: Read the commands this repository already exposes, so every declared check is a command that can be
         run verbatim and that actually exercises the assertion it claims. Never invent a runner or a script name.
   - id: profile
-    path: profiles/registry.json + selected runtime execution profile + actual host tools/model
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability proof.

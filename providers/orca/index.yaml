@@ -37,7 +37,7 @@ names:
 workflowKernel:
   role: one-local-process-per-workflow-in-the-workflow-worktree
   note: |-
-    The kernel is not an Orca worker. It is ordinary Node code (execution/workflow-kernel.mjs) running in a
+    The kernel is not an Orca worker. It is ordinary Node code (kernel/kernel.mjs) running in a
     worktree: it binds a Run, launches operation agents through the canonical launcher, reads their report
     files and waits on the Run boundary. Orca supplies worktrees and attested terminals; everything above
     them is the kernel's.
@@ -68,11 +68,11 @@ workflowKernel:
 operationAgent:
   role: one-supervised-native-agent-per-operation-attempt
   canonicalLauncher:
-    module: execution/orca-supervised-launch.mjs
+    module: hosts/orca/launch.mjs
     command: start-op
     authority: exclusive-effectful-construction-path
     calls: calls.json
-    runner: execution/orca-calls.mjs
+    runner: hosts/orca/calls.mjs
     companions:
       settle: Stop, release and verify one Dispatch; returns a typed settlement.
       sweep: The kernel closes dead terminals in its worktree after every settlement and before the final report; live workers, the kernel's own terminal and unknown terminals are kept.

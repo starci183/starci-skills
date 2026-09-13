@@ -2,7 +2,7 @@ schema: starci/orca-calls@1
 provider: orca
 api: api.json
 purpose: |-
-  One typed contract per Orca call that StarCi may issue. The runner in execution/orca-calls.mjs
+  One typed contract per Orca call that StarCi may issue. The runner in hosts/orca/calls.mjs
   builds argv only from these entries, verifies each command and flag against the live
   agent-context before the first effect, and converts every exit code and receipt into a typed
   result envelope. An Orca failure is a classified result, never an untyped exception.

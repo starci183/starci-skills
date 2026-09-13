@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {RATE_WINDOW_MS,buildList,buildView,featureOf,renderJson,renderList,renderView} from '../execution/workflow-view.mjs';
+import {RATE_WINDOW_MS,buildList,buildView,featureOf,renderJson,renderList,renderView} from '../kernel/view.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 const NOW=1_700_000_000_000;
@@ -266,12 +266,12 @@ test('workflow-list is one row per workflow of the repository, newest first',t=>
   assert.equal(renderList([]),'no workflows in this repository\n');
 
   // The CLI prints the page itself: a text view must never reach a terminal as an escaped JSON string.
-  const cli=spawnSync(process.execPath,[path.join(root,'execution','orca-supervised-launch.mjs'),'workflow-list'],
+  const cli=spawnSync(process.execPath,[path.join(root,'hosts','orca','launch.mjs'),'workflow-list'],
     {cwd:repoRoot,encoding:'utf8'});
   assert.equal(cli.status,0,cli.stderr);
   assert.match(cli.stdout,/\| 20260101-000000-rich \| run \| - \| 1\/6 \|/);
   assert.equal(cli.stdout.includes('\\n'),false);
-  const json=spawnSync(process.execPath,[path.join(root,'execution','orca-supervised-launch.mjs'),'workflow-list','--json','true'],
+  const json=spawnSync(process.execPath,[path.join(root,'hosts','orca','launch.mjs'),'workflow-list','--json','true'],
     {cwd:repoRoot,encoding:'utf8'});
   assert.equal(json.status,0,json.stderr);
   assert.equal(JSON.parse(json.stdout).workflows.length,2);
@@ -314,5 +314,5 @@ test('a feature is the first two segments of a Work node id, and nothing is inve
 });
 
 test('the module is listed as a runtime module',()=>{
-  assert.match(fs.readFileSync(path.join(root,'scripts','runtime-modules.txt'),'utf8'),/^execution\/workflow-view\.mjs$/m);
+  assert.match(fs.readFileSync(path.join(root,'scripts','runtime-modules.txt'),'utf8'),/^kernel\/view\.mjs$/m);
 });

@@ -163,7 +163,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const {createWorkflowReceipt,validateWorkflowRequest}=await import('../execution/contracts.mjs');
       const {planWorkflowExecution,inspectWorkflowExecution,createSharedConflictEscalation}=await import('../execution/api.mjs');
       if(action==='map'){
-        exactArgs(input,0);const registry=readDistJson('profiles','registry.json');
+        exactArgs(input,0);const registry=readDistJson('model','registry.json');
         emit({schema:'starci/execution-map@1',modes:registry.executionModes,skills:registry.skills,operators:registry.operators,targets:registry.targets,fallback:registry.fallback,approvals:readDistJson('approvals','policy.json'),secondaryRoutes:secondaryRoutes()});return 0;
       }
       if(action==='create'){
@@ -171,11 +171,11 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       }
       if(action==='plan'){
         exactArgs(input,2);const request=dataFile(input[0]);const inventory=csv(input[1],'Ready runtimes');
-        emit(planWorkflowExecution({request,registry:readDistJson('profiles','registry.json'),inventory}));return 0;
+        emit(planWorkflowExecution({request,registry:readDistJson('model','registry.json'),inventory}));return 0;
       }
       if(action==='resolve'){
         exactArgs(input,3);const request=dataFile(input[0]);const {resolveOperationExecution}=await import('../execution/resolve.mjs');
-        emit(resolveOperationExecution({workflowRequest:request,operationId:input[1],registry:readDistJson('profiles','registry.json'),inventory:csv(input[2],'Ready runtimes')}));return 0;
+        emit(resolveOperationExecution({workflowRequest:request,operationId:input[1],registry:readDistJson('model','registry.json'),inventory:csv(input[2],'Ready runtimes')}));return 0;
       }
       if(action==='show'||action==='resume'){
         exactArgs(input,2);const result=inspectWorkflowExecution({request:dataFile(input[0]),receipt:dataFile(input[1])});
@@ -198,7 +198,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
         rest.splice(at,2);
       }
       exactArgs(rest,1);
-      const {runBrandChecks,formatBrandChecks}=await import('../execution/brand-checks.mjs');
+      const {runBrandChecks,formatBrandChecks}=await import('../checks/brand.mjs');
       const result=runBrandChecks({tree:directory(rest[0]),sourceRoot:source?directory(source):null});
       emit(json?result:formatBrandChecks(result));
       return result.ok?0:1;
@@ -236,7 +236,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       exactArgs(args,3);
       const inventory=args[2].split(',').map(runtime=>runtime.trim()).filter(Boolean);
       if(!inventory.length)throw Error('At least one observed ready runtime is required');
-      const {selectExecutionTarget}=await import('../profiles/select.mjs');
+      const {selectExecutionTarget}=await import('../kernel/chains.mjs');
       emit(selectExecutionTarget({skill:args[0],op:args[1],inventory}));
       return 0;
     }

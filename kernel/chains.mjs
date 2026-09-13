@@ -1,7 +1,7 @@
 import {loadConfig,validateConfig} from '../scripts/config.mjs';
 import { readDistJson } from '../core/runtime-root.mjs';
-const registry=readDistJson('profiles','registry.json');
-const runtimes=Object.fromEntries(registry.runtimes.map(name=>[name,readDistJson('profiles',`${name}.json`)]));
+const registry=readDistJson('model','registry.json');
+const runtimes=Object.fromEntries(registry.runtimes.map(name=>[name,readDistJson('model',`${name}.json`)]));
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const normalizeRuntime=runtime=>registry.aliases[runtime]??runtime;
 const need=(condition,message)=>{if(!condition)throw Error(message);};

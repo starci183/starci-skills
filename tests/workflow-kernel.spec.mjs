@@ -4,25 +4,25 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {resolveExecutionChain} from '../profiles/select.mjs';
-import {ORCA_HOST,createOrcaCalls} from '../execution/orca-calls.mjs';
-import {HEADLESS_HOST,createHeadlessHost} from '../execution/orca-headless.mjs';
-import {reportOutcome} from '../execution/orca-protocol.mjs';
-import {buildReport} from '../execution/reports.mjs';
+import {resolveExecutionChain} from '../kernel/chains.mjs';
+import {ORCA_HOST,createOrcaCalls} from '../hosts/orca/calls.mjs';
+import {HEADLESS_HOST,createHeadlessHost} from '../hosts/headless/host.mjs';
+import {reportOutcome} from '../hosts/orca/protocol.mjs';
+import {buildReport} from '../kernel/reports.mjs';
 import {spawnSync} from 'node:child_process';
-import {validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
-import {createStore} from '../execution/workflow-store.mjs';
-import {createAllocator} from '../execution/runtime-allocator.mjs';
-import {loadsFileFor} from '../execution/runtime-loads.mjs';
-import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
-import * as work from '../execution/work-ledger.mjs';
-import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {machineVerify} from '../execution/workflow-kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
+import {validateGoalPlan,validateOp} from '../models/functions.mjs';
+import {createStore} from '../kernel/store.mjs';
+import {createAllocator} from '../kernel/schedule.mjs';
+import {loadsFileFor} from '../kernel/loads.mjs';
+import {resolveLedgerRoot} from '../kernel/routing.mjs';
+import * as work from '../kernel/ledger.mjs';
+import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
+import {machineVerify} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
-const runtimeProfile=parseYaml(fs.readFileSync(new URL('../profiles/runtimes.yaml',import.meta.url),'utf8'));
+const runtimeProfile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';
 const cwd=path.resolve(worktree);
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
@@ -185,7 +185,7 @@ function fakeGit(dirty){
 }
 
 /**
- * The `execution/kernel-guards.mjs` surface, stubbed so each test owns exactly what the path protection, the
+ * The `kernel/guards.mjs` surface, stubbed so each test owns exactly what the path protection, the
  * resource locks, the git queue and the preflight do. The kernel defaults to the real module; these tests
  * inject the contract instead, because a fake worktree git cannot check anything out.
  */
@@ -683,7 +683,7 @@ const brandSpec=rev=>({name:'Aurora',family:'aurora',rev,
   mascotAssets:[MASCOT],forbidden:['the bare word white inside a style tag'],
   imageryPromptRules:['every imagery prompt names the mascot sheet and the accent token']});
 /**
- * What `execution/work-ledger.mjs` will answer once the brand node kind lands: `loadLedger` carries
+ * What `kernel/ledger.mjs` will answer once the brand node kind lands: `loadLedger` carries
  * `brand = {node, rev, file, spec} | null`, `brandReferences` names the record and every asset beside it, and a
  * `brand` node is a decision candidate. The rev is read from the record on disk, so an accepted `brand.decide`
  * moves it exactly as the real loader would.

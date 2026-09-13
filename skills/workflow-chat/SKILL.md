@@ -24,7 +24,7 @@ writes. The chat is a monitor, never an agent layer above the kernel and never a
   shares another repository's Work tree resolve its ledger:
 
   ```
-  node <skill root>/.dist/execution/orca-supervised-launch.mjs <command> --host <skill root> ...
+  node <skill root>/.dist/hosts/orca/launch.mjs <command> --host <skill root> ...
   ```
 
   Run `node <skill root>/scripts/ensure-build.mjs` first when `.dist` is missing or stale, because the

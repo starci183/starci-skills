@@ -1,6 +1,6 @@
 schema: starci/goal-plan-schema@1
 describes: starci/goal-plan@1
-module: execution/llm-functions.mjs
+module: models/functions.mjs
 purpose: |-
   The answer of assessGoal: one job, read together with its inputs, turned into a definition of done,
   a ledger of the things that must exist, and as many operations as the job needs. The user approves the

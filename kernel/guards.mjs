@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {nodeDirectory,nodeFile} from './work-ledger.mjs';
+import {nodeDirectory,nodeFile} from './ledger.mjs';
 
 /**
  * The guards the kernel owes itself before and around an operation (5.0). Three things an operation

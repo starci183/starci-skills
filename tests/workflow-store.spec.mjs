@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {WORKFLOW_STATE,createStore,listWorkflows,newWorkflowId,repositoryRoot,workflowsRoot} from '../execution/workflow-store.mjs';
+import {WORKFLOW_STATE,createStore,listWorkflows,newWorkflowId,repositoryRoot,workflowsRoot} from '../kernel/store.mjs';
 
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-workflow-store-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(dir,{recursive:true});return dir;};
 const state=extra=>({schema:WORKFLOW_STATE,phase:'plan',...extra});

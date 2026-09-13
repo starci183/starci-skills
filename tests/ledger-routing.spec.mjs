@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {KERNEL_OWNED_LEDGER,ROLE_SIDES,bindingRoutes,readBindings,registryRoot,resolveLedgerRoot,sharedLedgerStatus} from '../execution/ledger-routing.mjs';
-import {sameRepository} from '../execution/ledger-routing.mjs';
+import {KERNEL_OWNED_LEDGER,ROLE_SIDES,bindingRoutes,readBindings,registryRoot,resolveLedgerRoot,sharedLedgerStatus} from '../kernel/routing.mjs';
+import {sameRepository} from '../kernel/routing.mjs';
 import {spawnSync as runGit} from 'node:child_process';
 
 /**

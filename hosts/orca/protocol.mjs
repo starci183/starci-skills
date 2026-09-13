@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {getPath} from './orca-calls.mjs';
-import {buildReport,readReports,reportBody,reportPath,reportsDirectory,validateReport} from './reports.mjs';
-import {notifyTerminal,settleDispatch,sweepWorktree} from './orca-supervised-launch.mjs';
-import {DEFAULT_STALLED_AFTER_MS,observe} from './provider-observe.mjs';
+import {getPath} from './calls.mjs';
+import {buildReport,readReports,reportBody,reportPath,reportsDirectory,validateReport} from '../../kernel/reports.mjs';
+import {notifyTerminal,settleDispatch,sweepWorktree} from './launch.mjs';
+import {DEFAULT_STALLED_AFTER_MS,observe} from './observe.mjs';
 
 /**
  * The operation-side protocol on top of the typed Orca runner: `report` (one typed outcome, file first,
@@ -56,7 +56,7 @@ const isLive=w=>['ready','running','starting'].includes(w.workerState)||(w.worke
 
 /**
  * Classify one live worker from its screen and terminal metadata. The signatures live with the provider
- * adapters in `provider-observe.mjs`, so this is the protocol-side name for `observe`: the same verdict, plus
+ * adapters in `hosts/orca/observe.mjs`, so this is the protocol-side name for `observe`: the same verdict, plus
  * the family that produced it and the keystroke that family's confirmation dialog accepts.
  */
 export const classifyWorker=input=>observe(input);

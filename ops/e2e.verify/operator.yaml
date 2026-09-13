@@ -73,7 +73,7 @@ reads:
         mutation and unbounded retry are outside this op; discover an unknown external outcome by
         read-only correlation before repeating an attempt.
   - id: profile
-    path: profiles/registry.json + selected runtime execution profile + actual host tools/model
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability

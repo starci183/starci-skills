@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-import {readDistJson} from '../core/runtime-root.mjs';
+import {readDistJson} from '../../core/runtime-root.mjs';
 
 /**
  * Typed Orca call runner. Every argv is built from providers/orca/calls.json, every exit code and
@@ -12,7 +12,7 @@ export const defaultOrcaExecutable=process.platform==='win32'?'orca.exe':'orca';
 /**
  * What the Orca host is to the kernel: its name, the capabilities an operation kind may `need` (Orca carries
  * the design tooling `interface.draw` draws with), and that it runs operations in parallel. The headless host
- * (`execution/orca-headless.mjs`) declares the same shape with no capability and sequential execution, and the
+ * (`hosts/headless/host.mjs`) declares the same shape with no capability and sequential execution, and the
  * kernel reads nothing else about a host.
  */
 export const ORCA_HOST=Object.freeze({name:'orca',capabilities:Object.freeze(['design-tool']),sequential:false});

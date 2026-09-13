@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawn as spawnChild,spawnSync} from 'node:child_process';
-import {RESULT_SCHEMA,buildArgs,classifyReceipt,loadOrcaCalls,verifyLiveSchema} from './orca-calls.mjs';
-import {HEADLESS_PROVIDERS} from './llm-functions.mjs';
-import {repositoryRoot} from './reports.mjs';
+import {RESULT_SCHEMA,buildArgs,classifyReceipt,loadOrcaCalls,verifyLiveSchema} from '../orca/calls.mjs';
+import {HEADLESS_PROVIDERS} from '../../models/functions.mjs';
+import {repositoryRoot} from '../../kernel/reports.mjs';
 
 /**
  * The headless host: the workflow kernel without Orca. It answers the exact call surface the kernel and the
