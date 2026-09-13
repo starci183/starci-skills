@@ -51,7 +51,7 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.equal(familyOf('work.author',{profile}),'design');
   assert.equal(roleOf('work.author',{profile}),'plan');
   assert.equal(operatorOf('work.author',{profile}),'work.author');
-  assert.deepEqual(reportsOf('work.author',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['sds-gap','shared-change','authority']},'a per-node author op may report its own node's missing design as sds-gap; an intake never reports one against another feature');
+  assert.deepEqual(reportsOf('work.author',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['sds-gap','shared-change','authority']},'a per-node author op may report the missing design of its own node as sds-gap; an intake never reports one against another feature');
   // The identity kind writes the one brand record, because that record IS its decision, and it produces the
   // placeholder mascot the product does not have yet.
   assert.equal(familyOf('brand.decide',{profile}),'design');
