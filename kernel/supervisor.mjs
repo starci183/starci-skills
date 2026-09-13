@@ -26,9 +26,7 @@ export function inspectWorkflow(entry,{now=Date.now}={}){
   const lock=readJson(path.join(entry.dir,'kernel.lock'),null);
   let alive=false;
   if(lock?.pid){try{process.kill(lock.pid,0);alive=true;}catch{alive=false;}}
-  // A finish declared over a stall that time lifts (the daily op budget) is not a finish: the kernel withdraws it
-  // on start, so the supervisor keeps such a workflow alive and starts it again.
-  const finished=Boolean(state?.finished)&&state.finished.reason!=='no runtime accepted an operation';
+  const finished=Boolean(state?.finished);
   const approved=Boolean(state?.approved);
   const stopRequested=fs.existsSync(path.join(entry.dir,'stop.flag'));
   return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null,
