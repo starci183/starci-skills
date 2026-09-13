@@ -17,7 +17,7 @@ import {loadsFileFor} from '../execution/runtime-loads.mjs';
 import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,rebindRunIfNeeded,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,rebindRunIfNeeded,reportAllowlist,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -1083,6 +1083,13 @@ test('a kernel paused by the stop flag releases its own tab, and the next start 
     assert.equal(harness.fake.terminals.has('term_kernel'),false,'the paused kernel left no tab');
     assert.deepEqual(events(harness.store).filter(event=>event.event==='kernel-terminal-closed').map(event=>event.reason),['paused by stop flag']);
   }finally{harness.cleanup();}
+});
+
+test('a report on a shared tree is checked against both spellings of its allowlist: the absolute path of the owner and the tree-relative one',()=>{
+  const ctx={work:{shared:true,ledger:{repoRoot:'C:/owner/backend',workRoot:'C:/owner/backend/.starciwork'}}};
+  assert.deepEqual(reportAllowlist({allowlist:['C:/owner/backend/.starciwork/features/sales/ui/**','apps/x/**']},ctx),
+    ['C:/owner/backend/.starciwork/features/sales/ui/**','.starciwork/features/sales/ui/**','apps/x/**']);
+  assert.deepEqual(reportAllowlist({allowlist:['.starciwork/features/sales/ui/**']},{work:{shared:false}}),['.starciwork/features/sales/ui/**'],'a local tree is left as it is');
 });
 
 test('a contract longer than a task can carry is handed over as its head plus the file it lives in',()=>{
@@ -2596,6 +2603,7 @@ test('a prerequisite the critique names and the tree lacks is planned as the int
     required:['author the chat records before touching the backend'],
     prerequisites:[{kind:'sds',feature:'chat',why:'the goal extends the chat module and the tree holds no record of it'},
       {kind:'srs',feature:'sales',why:'already there'},
+      {kind:'sds',feature:'module command contract',why:'a contract, not a feature'},
       {kind:'decision',feature:'chat',why:'who owns the message write'}]})();}});
   try{
     const {state,store}=harness;
@@ -2610,12 +2618,14 @@ test('a prerequisite the critique names and the tree lacks is planned as the int
     assert.deepEqual(log.filter(event=>event.event==='intake-planned').map(event=>[event.op,event.prerequisite]),[['chat-intake','sds']]);
     assert.deepEqual(log.filter(event=>event.event==='prerequisite-held').map(event=>event.feature),['sales']);
     assert.deepEqual(log.filter(event=>event.event==='prerequisite-owner').map(event=>event.why),['who owns the message write']);
-    assert.equal(log.find(event=>event.event==='goal-critiqued').prerequisites,3);
+    assert.deepEqual(log.filter(event=>event.event==='prerequisite-unresolved').map(event=>event.feature),['module command contract'],'a contract name is not a feature to author');
+    assert.equal(state.ops.some(op=>/module/.test(op.id)),false);
+    assert.equal(log.find(event=>event.event==='goal-critiqued').prerequisites,4);
     const page=fs.readFileSync(store.paths.goal,'utf8');
     assert.match(page,/### Prerequisites\n\n- \*\*sds\*\* of `chat` - the goal extends the chat module and the tree holds no record of it\. Planned first as `chat-intake`; every other operation waits for it\./);
     assert.match(page,/- \*\*srs\*\* of `sales` - already there\. The tree already holds it\./);
     assert.match(page,/- \*\*decision\*\* of `chat` - who owns the message write\. The owner decides it\./);
-    assert.equal(harness.goal.critique.prerequisites,3);
+    assert.equal(harness.goal.critique.prerequisites,4);
     assert.equal(JSON.parse(fs.readFileSync(store.paths.goalJson,'utf8')).ops.find(op=>op.id==='chat-intake').kind,'work.author');
   }finally{harness.cleanup();}
 });

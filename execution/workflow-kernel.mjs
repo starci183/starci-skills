@@ -720,6 +720,9 @@ function planCritiquePrerequisites(store,state,{loaded,workRoot,repositories={},
   for(const item of listed){
     const entry=item.kind==='brand'?'brand':slash(String(item.feature??'')).replace(/\/+$/,'');
     if(!entry)continue;
+    // A prerequisite that names a record or a contract rather than a feature ("module command contract") is not a
+    // feature to author: it is reported for the owner, never turned into an intake of a folder that cannot exist.
+    if(item.kind!=='decision'&&entry!=='brand'&&!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(entry)){store.appendEvent({event:'prerequisite-unresolved',kind:item.kind,feature:item.feature??null,why:item.why});continue;}
     if(item.kind==='decision'){store.appendEvent({event:'prerequisite-owner',kind:item.kind,feature:item.feature??null,why:item.why});continue;}
     const held=entry==='brand'?Boolean(state.brand):loaded.list.some(node=>scopeNames(node,entry));
     if(held){store.appendEvent({event:'prerequisite-held',kind:item.kind,feature:entry,why:item.why});continue;}
@@ -995,6 +998,18 @@ function noteBrand(store,state,loaded,{op=null,silent=false}={}){
  * `.starciwork/` and a reference that names a tree file are rewritten to the owner's absolute path, so the
  * operation writes and reads the one tree there is. A ledger that is here is left alone.
  */
+/**
+ * The allowlist a report is checked against names the shared tree both ways: the agent writes at the owner's
+ * absolute path and reports the file the way the tree names it (`.starciwork/...`). The first grammar drawing
+ * was rejected for `.starciwork/features/sales/ui/index.yaml` while its allowlist held only the absolute form.
+ */
+export function reportAllowlist(op,ctx){
+  const owner=ctx?.work?.shared?ctx.work.ledger?.repoRoot:null;
+  const entries=(op?.allowlist??[]).map(slash);
+  if(!owner)return entries;
+  const prefix=`${slash(owner)}/`;
+  return unique(entries.flatMap(entry=>entry.startsWith(`${prefix}.starciwork/`)?[entry,entry.slice(prefix.length)]:[entry]));
+}
 function locateSharedTreePaths(op,ctx){
   const owner=ctx?.work?.shared?ctx.work.ledger?.repoRoot:null;
   if(!owner)return op;
@@ -1429,7 +1444,8 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   critiqueGoalPhase(store,state,{critiqueGoal,providers,cwd,runHeadless,
     ledger:state.ledger.map(item=>({id:item.id,kind:item.kind,title:item.title})),
     decisions:state.decisions.map(item=>({id:item.id,kind:item.kind,title:item.title})),
-    records:decidedRecords(ledgerApi,at,loaded,{scope:state.scope}),
+    // A feature being authored is reconciled against what the whole product decided, not against its own scope.
+    records:decidedRecords(ledgerApi,at,loaded,{scope:intake.length?[]:state.scope}),
     constraints:[
       `the ledger is the authored Work tree under ${slash(binding.ledgerRoot)}: the goal may not add, drop or rewrite a node, so an objection to the ledger is an objection to the scope of this goal`,
       `the Work tree ${loaded.ok?'validates':'does NOT validate'}, and ${state.ledgerSummary?.eligible??0} of ${state.ledgerSummary?.total??0} nodes in scope are eligible`,
@@ -3150,7 +3166,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     store.appendEvent({event:'validator-only-block',op:op.id,note:'treated as partial: the kernel owns work-valid'});
     report={...report,outcome:'partial',open:[...(report.open??[]),'previous attempt was blocked only by the whole-tree validator while a sibling wrote the ledger; the kernel validates at acceptance'],blocker:null,signal:{type:'worker_done',orcaOutcome:'succeeded'}};
   }
-  const checked=validateReport(report,{allowlist:op.allowlist});
+  const checked=validateReport(report,{allowlist:reportAllowlist(op,ctx)});
   op.reports.push({attempt:op.attempt,runtime:op.runtime,outcome:report.outcome,summary:report.summary,
     files:report.files,open:report.open,checks:report.checks,blocker:report.blocker,question:report.question,valid:checked.ok});
   if(!checked.ok){
