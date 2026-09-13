@@ -266,6 +266,22 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     r.specDigest=digest(canonicalJSON({metadata:r.meta,files:files.sort((a,b)=>a.path.localeCompare(b.path))}));
   }
   const operational = new Set(Object.entries(metadataSchema.$defs.node.properties).filter(([,shape])=>shape['x-operational']===true).map(([key])=>key));
+  // Two declarations under extensions.work3 are the kernel's reading of a record's relations, never decided
+  // content: the typed reconciliation rows and the integrations a feature declares. A migration that adds them
+  // to a decided module record must not turn every completion beneath that record stale, so they are left out
+  // of the semantic digest; everything else under extensions stays in, conservatively, as before.
+  const DECLARATIONS=['reconciliation','integrations'];
+  const semanticMetadata=meta=>{
+    const out=Object.fromEntries(Object.entries(meta).filter(([k])=>!operational.has(k)&&!(meta.schema==='work/node@2'&&k==='description')));
+    const work3=out.extensions&&typeof out.extensions==='object'&&out.extensions.work3&&typeof out.extensions.work3==='object'&&!Array.isArray(out.extensions.work3)?out.extensions.work3:null;
+    if(work3&&DECLARATIONS.some(key=>key in work3)){
+      const rest={...work3};for(const key of DECLARATIONS)delete rest[key];
+      // An emptied container is dropped, so a record that never carried extensions digests the same as one whose only extension was a declaration.
+      const extensions={...out.extensions};if(Object.keys(rest).length)extensions.work3=rest;else delete extensions.work3;
+      if(Object.keys(extensions).length)out.extensions=extensions;else delete out.extensions;
+    }
+    return out;
+  };
   const ownedAccounts = new Set();
   for (const n of nodes) {
     const candidates=nodes.filter(a=>a!==n && within(a.dir,n.dir) && a.dir!==n.dir).sort((a,b)=>b.dir.length-a.dir.length);
@@ -328,7 +344,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       }catch{issue('ACCOUNTS_SCHEMA',rel(accountsPath),'Disposable accounts must match work/disposable-accounts@1 exactly: disposable true and nonempty role, username and password strings only.');}
     }
     n.ownedAssets=ownedAssets;
-    n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),...(localFiles.length?{localFiles:localFiles.sort((a,b)=>a.path.localeCompare(b.path))}:{}),metadata:Object.fromEntries(Object.entries(n.meta).filter(([k])=>!operational.has(k)&&!(n.meta.schema==='work/node@2'&&k==='description'))),body:n.body}));
+    n.specDigest=digest(canonicalJSON({...(n.meta.assets!==undefined?{assets:ownedAssets}:{}),...(localFiles.length?{localFiles:localFiles.sort((a,b)=>a.path.localeCompare(b.path))}:{}),metadata:semanticMetadata(n.meta),body:n.body}));
   }
   if(canonicalV2)for(const p of accountFiles)if(!ownedAccounts.has(path.resolve(p)))issue('ACCOUNTS_OWNER',rel(p),'accounts.yaml is allowed only beside its owning Work v2 UAT index.yaml and must be declared as uat.localFiles.accounts.');
   for (const n of nodes) {

@@ -17,6 +17,10 @@ test('every sequence renders a numbered working order and a definition of done, 
       acceptance:['the node declares an allowlist and checks that name its assertions','the tree validates']}),{kind:'implementation'}],
     'work.intake':[op({kind:'work.author',origin:'ledger',intake:{scope:'collab',example:'features/sales'},allowlist:['.starciwork/features/collab/**'],
       references:['workspace.yaml','features/sales/index.yaml'],acceptance:['features/collab has a module record, a business overview, SRS records and an architecture skeleton, all todo and valid']}),null],
+    'work.migrate':[op({kind:'work.author',origin:'ledger',intake:{scope:'sales',example:'features/payments',mode:'migrate'},
+      allowlist:['.starciwork/features/sales/index.yaml','.starciwork/features/sales/business/**','.starciwork/features/sales/architecture/**','.starciwork/features/sales/integration/**'],
+      references:['workspace.yaml','features/sales/index.yaml','features/payments/business/overview/index.yaml'],
+      acceptance:['the module record of sales carries extensions.work3.reconciliation','no decided record of sales changed']}),null],
     'work.cut':[op({kind:'implementation.plan',origin:'ledger',nodeId:'demo.sales.implementation.backend.checkout',
       cut:{node:'demo.sales.implementation.backend.checkout',reason:'its write scope names 21 files, past the 12 one operation may hold'},
       allowlist:['.starciwork/features/sales/implementation/backend/checkout/**'],
@@ -544,6 +548,36 @@ test('work.cut names the seam first, cuts the rest by acceptance into disjoint c
  * report against another feature's record - a change a decided record needs is the owner's decision or new
  * work this feature declares, never an edit and never a gap filed against someone else's record.
  */
+/**
+ * A migration declares and never re-decides: the reconciliation and the integrations go onto the module record,
+ * one integration node per declaration is authored, and no decided record is rewritten, re-versioned or set to
+ * todo - the sentence that makes an intake rewrite every leaf as a draft is absent from this sequence.
+ */
+test('work.migrate declares the reconciliation and the integrations beside decided content and re-decides nothing',()=>{
+  const migrate=op({kind:'work.author',origin:'ledger',intake:{scope:'sales',example:'features/payments',mode:'migrate'},
+    allowlist:['.starciwork/features/sales/index.yaml','.starciwork/features/sales/business/**','.starciwork/features/sales/architecture/**','.starciwork/features/sales/integration/**'],
+    references:['workspace.yaml','features/sales/index.yaml'],acceptance:['no decided record of sales changed'],
+    checks:[{name:'work-valid',command:'node bin/starci.mjs validate .'}]});
+  const text=stepsFor(migrate);
+  const listed=steps(text),closed=done(text);
+  assert.equal(sequenceFor(migrate),'work.migrate');
+  assert.match(text,/Sequence `work\.migrate`/);
+  assert.match(listed[0],/re-decides none of it/);
+  assert.match(listed[1],/`extensions\.work3\.reconciliation`/);
+  assert.match(listed[1],/leave both decided records byte for byte/);
+  assert.match(listed[2],/`extensions\.work3\.integrations`/);
+  assert.match(listed[2],/custody: identity:<slug>/);
+  assert.match(listed[2],/Never a value/);
+  assert.match(listed[3],/features\/<feature>\/integration\/<id>\/index\.yaml/);
+  assert.match(listed[4],/nothing rewritten as a draft, nothing set to todo, nothing under implementation\/ or ui\/ touched/);
+  assert.match(listed[5],/An error the validator reports under a path outside your allowlist is not yours/);
+  assert.match(listed[6],/Report `ask` only for a provision the owner alone holds/);
+  assert.doesNotMatch(text,/every leaf record `state: todo`/);
+  assert.doesNotMatch(text,/Mirror the shape/);
+  assert.ok(closed.some(line=>/no decided record of this feature changed its state, its rev or its substance/.test(line)));
+  assert.ok(closed.some(line=>/no secret value appears in any record/.test(line)));
+});
+
 test('work.intake determines every side, then reconciles it as three typed cases, and edits no other feature',()=>{
   const intake=op({kind:'work.author',origin:'ledger',intake:{scope:'collab',example:'features/sales'},
     allowlist:['work/features/collab/**'],references:['workspace.yaml','features/sales/index.yaml'],

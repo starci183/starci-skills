@@ -336,7 +336,11 @@ feature in migrate mode, no node executed, allowlists that never meet (the modul
 `architecture/**`, `integration/**`), so every feature migrates at once on its own runtime slot. It adds what
 5-plus makes explicit - the typed reconciliation, the integrations with their credential custody, the
 integration nodes the tree then owes - and re-decides nothing: a decided record keeps its state, its rev
-and its wording, and a contradiction is a `conflict` row and a decision record.
+and its wording, and a contradiction is a `conflict` row and a decision record. Two things make that
+possible: the `work.migrate` sequence (declare, never rewrite a draft, never set a record to todo), and the
+validator digest, which leaves `extensions.work3.reconciliation` and `extensions.work3.integrations` out
+of a record semantic inputs - they are the kernel reading of the record relations, not what it decided -
+so declaring them on a decided module record stales none of the completions beneath it.
 
 The same principle reaches the owner's list itself. A rule that turns a bound into an escalation applies to
 what an older rule already parked: on kernel start, once per rule, `rejudgeParked` judges every parked item

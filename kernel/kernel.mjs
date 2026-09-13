@@ -36,7 +36,7 @@ import {OWNER_ASK,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedU
   openOwnerAsk,provisionalLines,settleOwnerAsk,stopReasonFor} from './owner.mjs';
 import {BRAND_PAYLOAD,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
-  rereadBrand,sharedCheckCommand,treeForVerdict,validateAccepted,validatorRejectLimit} from './verify.mjs';
+  rereadBrand,sharedCheckCommand,treeForVerdict,treeVerdictFor,validateAccepted,validatorRejectLimit} from './verify.mjs';
 import {KERNEL_PLANNED_KINDS,LANE_LAYOUTS,advanceLanes,authorRecordOp,commitLedgerWrite,cutParentOf,deriveWorkOp,designGate,
   designNodeOf,designRecord,fanOutDeferral,groupIncomplete,groupVerifyKind,guardKernelPaths,guardRecordBlocks,kernelOwnedPaths,
   laneNext,laneOf,lanePredicates,
@@ -1178,8 +1178,12 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     // tree is held to it here: the record it wrote must leave a tree that still validates, before anything is committed.
     if(authorsRecord(op.kind)){
       const command=workValidateCommand(ctx);
-      const tree=(()=>{try{return {ok:Boolean(ctx.work.validate({repoRoot:ctx.work.ledger?.repoRoot??ctx.work.repoRoot,workRoot:ctx.work.ledger?.workRoot??null}).ok),reason:null};}
-        catch(error){return {ok:false,reason:error.message};}})();
+      // Scoped to what this op could have caused, the way a node's own proof is judged: an error under a path
+      // another workflow owns is evidence in the check, never this op's failure.
+      const verdict=treeVerdictFor(ctx,op);
+      const tree={ok:verdict.ok,reason:verdict.ok
+        ?(verdict.foreign.length?`${verdict.foreign.length} error(s) elsewhere in the tree are outside this operation`:null)
+        :verdict.own.map(error=>`${error.code} ${error.path??''}`).join('; ')};
       verified.checks.push({name:'work-valid',command,exitCode:tree.ok?0:1,evidence:tree.reason??''});
       if(!tree.ok){
         verified.ok=false;
@@ -1463,7 +1467,7 @@ function repairFromUat(store,state,op,findings,ctx){
 function validatorOnlyBlock(report){
   if(report?.outcome!=='blocked'||report?.blocker?.kind!=='shared-change')return false;
   const failing=(report.checks??[]).filter(check=>check.exitCode!==0);
-  return failing.length>0&&failing.every(check=>/work-valid/i.test(check.name??''))&&/\.starciwork|work-valid|validator/i.test(report.blocker.detail??'');
+  return failing.length>0&&failing.every(check=>/work-valid|work-tree-validates/i.test(check.name??''))&&/\.starciwork|work-valid|validator/i.test(report.blocker.detail??'');
 }
 
 function acceptReports(orca,store,state,ctx){

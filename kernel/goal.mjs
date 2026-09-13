@@ -467,8 +467,14 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   const migrating=migrate.length>0;
   const unknownFeatures=migrate.filter(entry=>entry!=='all'&&!featuresOfTree.includes(entry));
   need(!unknownFeatures.length,`--migrate names no feature of the tree: ${unknownFeatures.join(', ')} (the tree has ${featuresOfTree.join(', ')||'none'})`);
-  const migrated=migrating?(migrate.includes('all')?featuresOfTree:unique(migrate)):[];
-  need(!migrating||migrated.length,'--migrate names no feature and the tree has none to migrate');
+  // `all` is every feature with a decided business or architecture record: a feature nobody has decided yet has
+  // nothing to bring under the model, and is left for its own intake. A feature named explicitly always runs.
+  const decidedFeatures=new Set(loaded.list.filter(node=>node.state==='done'&&/^features\/[^/]+\/(business|architecture)\//.test(slash(node.path??'')))
+    .map(node=>(slash(node.path).match(/^features\/([^/]+)\//)??[])[1]).filter(Boolean));
+  const migrated=migrating?(migrate.includes('all')?featuresOfTree.filter(feature=>decidedFeatures.has(feature)):unique(migrate)):[];
+  const skipped=migrating&&migrate.includes('all')?featuresOfTree.filter(feature=>!decidedFeatures.has(feature)):[];
+  if(skipped.length)store.appendEvent({event:'migrate-skipped',features:skipped,reason:'no decided business or architecture record to bring under the model'});
+  need(!migrating||migrated.length,'--migrate all finds no feature with a decided business or architecture record, and the tree has nothing to migrate');
   const executables=migrating?[]:ledgerApi.executableCandidates(loaded,{scope,repository,side:binding.side});
   const ready=executables.filter(node=>node.schedulable),incomplete=executables.filter(node=>!node.schedulable);
   // A scope entry that names nothing in the tree is a feature - or the brand - still to be authored. The workflow

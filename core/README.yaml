@@ -65,7 +65,9 @@ sections:
     blocks:
       - "`specDigest` covers all node metadata except fields marked `x-operational` in the schema
         (`state`, `completion`, `blocker`, `suspensionReason`, `timestamps`, `createdAt`,
-        `updatedAt`), plus normalized Markdown body. `naReason` is semantic: changing an
+        `updatedAt`), plus normalized Markdown body. Two declarations under `extensions.work3`,
+        `reconciliation` and `integrations`, are the kernel's reading of a record's relations and are
+        left out of the digest, so declaring them on a decided module record stales nothing beneath it. `naReason` is semantic: changing an
         applicability justification invalidates consumers of that scope. Unknown extension fields
         are included conservatively. `inputDigest` additionally binds workspace metadata, ancestor
         specifications and their referenced inputs, recursively referenced
