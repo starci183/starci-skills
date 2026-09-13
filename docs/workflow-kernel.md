@@ -645,7 +645,8 @@ and done-op tabs of this workflow (`terminals-swept`) - and never touches anothe
 A workflow that finished `blocked` stopped for the owner's decision, and `workflow-approve --id <id>` on it is that
 decision: the finish is cleared (`resumed-after-block`, with the ops it re-admits) and every op a limit had
 exhausted - the validator's two rejections, the launch attempts, the restarts, a stall - goes back to `ready`
-with its counters at zero and its question gone (`op-readmitted`). An op the kernel refused on principle
+with its counters at zero, the runtimes it had learned to avoid open to it again, and its question gone
+(`op-readmitted`). An op the kernel refused on principle
 (superseded, out of the repository, a dynamic op over budget) stays refused: approving again changes nothing
 it was refused for. The supervisor then starts the kernel, which carries on from where it stopped.
 

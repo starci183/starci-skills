@@ -819,7 +819,7 @@ test('approving a workflow that finished blocked resumes it, and questions whose
     state.ops.push({...gone,id:'shared-1',refusal:null,status:'pending',requesters:['x']});
     state.needUser.push({op:'x',kind:'shared-change',detail:'x waits for the shared change shared-1, which is blocked'});
     // Ops a limit exhausted: the validator's rejections and the launch attempts. Approving again is the owner's "try again".
-    const spent=state.ops.find(item=>item.id==='shared-1');spent.status='blocked';spent.validatorRejects=2;
+    const spent=state.ops.find(item=>item.id==='shared-1');spent.status='blocked';spent.validatorRejects=2;spent.avoidRuntimes=['gpt-5.6-sol'];
     state.needUser.push({op:spent.id,kind:'validator',detail:`${spent.id} was rejected by the validator 2 times: ...`});
     const unlaunched={...gone,id:'shared-2',refusal:null,status:'blocked',launchFailures:3,requesters:['x']};state.ops.push(unlaunched);
     state.needUser.push({op:unlaunched.id,kind:'environment',detail:`no runtime could launch ${unlaunched.id} (3 attempts, last Operation can be launched only by the exact Workflow Monitor)`});
@@ -828,7 +828,7 @@ test('approving a workflow that finished blocked resumes it, and questions whose
     assert.equal(state.phase,'run');
     assert.equal(state.dynamicOpsBudget,64);
     assert.deepEqual(events(store).filter(event=>event.event==='resumed-after-block').map(event=>[event.budget,event.readmitted]),[[64,[spent.id,unlaunched.id]]]);
-    assert.deepEqual([spent.status,spent.validatorRejects,unlaunched.status,unlaunched.launchFailures],['ready',0,'ready',0]);
+    assert.deepEqual([spent.status,spent.validatorRejects,spent.avoidRuntimes,unlaunched.status,unlaunched.launchFailures],['ready',0,[],'ready',0],'a clean slate: counters and avoided runtimes alike');
     assert.equal(gone.status,'blocked','an op refused on principle stays refused');
     assert.deepEqual(state.needUser.filter(item=>['validator','environment'].includes(item.kind)),[],'their questions went with the block');
     assert.deepEqual(events(store).filter(event=>event.event==='op-readmitted').map(event=>event.op),[spent.id,unlaunched.id]);

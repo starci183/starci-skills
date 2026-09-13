@@ -1577,7 +1577,9 @@ export function approve(store,state,{allocation=null,allowDynamic=null,acceptCri
     // dynamic op over budget) stays refused, because approving again does not change what it was refused for.
     const readmitted=[];
     for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal)){
-      op.status='ready';op.validatorRejects=0;op.launchFailures=0;op.restarts=0;op.dispatch=null;op.terminal=null;op.nudged=false;
+      // A clean slate: the runtimes a rate limit or a restart taught the op to avoid are open to it again, else an op
+      // only one of them can run (a mascot needs Sol) would wait for a slot it may never get.
+      op.status='ready';op.validatorRejects=0;op.launchFailures=0;op.restarts=0;op.dispatch=null;op.terminal=null;op.nudged=false;op.avoidRuntimes=[];
       state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&['validator','environment','restart','stall'].includes(entry.kind)));
       readmitted.push(op.id);
     }
