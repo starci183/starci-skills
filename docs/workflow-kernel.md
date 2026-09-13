@@ -292,6 +292,10 @@ record, business overview and SRS as full drafts, architecture skeleton - with e
 reads drafts and the decisions stay the owner's. Neither op closes a Work node (`ledgerIds: []`); the records
 it writes are the nodes the next `syncLedgerOps` sees.
 
+An intake op's goal and acceptance are re-derived from the current build at every sync (`intake-retemplated`):
+the validator reads the acceptance literally, so a wording the build corrected must reach the ops planned before
+the correction; the allowlist and references stay what the owner approved.
+
 **The design record is the feature's `ui` node.** Its `ui:` spec - surfaces, states, the candidate images under
 its own `assets/` and the `artworkSlots` the drawing declared - is the authority for the interface lanes, and
 `lanePredicates` reads it from disk (`designRecord`): a `ui` node reads itself, an implementation node reads
@@ -639,6 +643,20 @@ re-binds the Run to its own tab once (`run-rebound`), which fences the old tab's
 is closed when its report is accepted (`op-terminal-closed`); a blocked or failed op keeps its tab, which is
 where its last words are. Every reconcile also sweeps what an older build left behind - stale `[Kernel]` tabs
 and done-op tabs of this workflow (`terminals-swept`) - and never touches another workflow's tabs.
+
+## A command reaches a running kernel within one tick
+
+The wait for running operations is sliced (`tickMs`, two minutes), and between two slices the kernel looks
+for a queued inbox command or a stop flag: either ends the wait (`wait {result: "woken"}`) so the next
+iteration applies it, instead of the command sitting until the whole wait for the running operations is over.
+
+## Avoided runtimes expire
+
+A runtime an op learned to avoid - it failed to launch there, stalled there, was rate-limited there - is
+avoided for the rate-limit cooldown (one hour), not for ever: the avoidance carries its stamp
+(`op.avoidedAt`) and `readmitCooled` opens the runtime to the op again once the cooldown has passed
+(`avoid-expired`). A verify op's avoidance of its implementers carries no stamp and never expires: that one
+is independence, not a failure.
 
 ## Approving again after a blocked finish
 

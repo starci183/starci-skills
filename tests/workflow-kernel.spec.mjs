@@ -805,6 +805,13 @@ test('an op the restart limit blocked for a rate limit cools down and is re-admi
     assert.equal(readmitted.restarts,0);
     assert.notEqual(readmitted.status,'blocked');
     assert.ok(RATE_LIMIT_COOLDOWN_MS>=30*60*1000);
+    // The avoidance is stamped and expires with the cooldown: an hour later Sol is open to the op again.
+    assert.equal(typeof readmitted.avoidedAt['gpt-5.6-sol'],'number');
+    readmitted.status='ready';readmitted.avoidedAt['gpt-5.6-sol']=Date.now()-RATE_LIMIT_COOLDOWN_MS-1;
+    const state3=harness.run({maxIterations:1});
+    const later=state3.ops.find(item=>item.id===op.id);
+    assert.deepEqual(later.avoidRuntimes,[]);
+    assert.deepEqual(store.readEvents().filter(event=>event.event==='avoid-expired').map(event=>[event.op,event.runtimes]),[[op.id,['gpt-5.6-sol']]]);
   }finally{harness.cleanup();}
 });
 
@@ -962,6 +969,25 @@ test('a run bound to a coordinator tab that is gone is re-bound to the tab the k
     // The coordinator already is this tab: nothing is re-bound.
     const quiet={invoke:(command)=>command==='run-show'?{outcome:'ok',receipt:{ok:true,result:{run:{id:'run_wf',coordinator_handle:'term_new'}}}}:{outcome:'ok',receipt:{}}};
     assert.equal(rebindRunIfNeeded(quiet,store,state,{cwd}),false);
+  }finally{harness.cleanup();}
+});
+
+test('an intake op planned by an older build carries the current goal and acceptance after a sync, its allowlist untouched',()=>{
+  const harness=setupWork({scope:['collab']});
+  try{
+    const {store,state}=harness;
+    approve(store,state);
+    const op=state.ops.find(item=>item.intake?.scope==='collab');
+    op.acceptance=['features/collab has a module record, a business overview, SRS records and an architecture skeleton, all todo and valid','no existing feature changed','the Work tree still validates'];
+    op.goal='an older wording';
+    const allowlist=[...op.allowlist];
+    state.run='run_wf';state.from='term_kernel';
+    const after=harness.run({maxIterations:1});
+    const fresh=after.ops.find(item=>item.id===op.id);
+    assert.match(fresh.acceptance[0],/every leaf record todo and the whole feature valid - the roots/);
+    assert.match(fresh.goal,/every leaf record todo/);
+    assert.deepEqual(fresh.allowlist,allowlist);
+    assert.deepEqual(events(store).filter(event=>event.event==='intake-retemplated').map(event=>[event.op,event.changed]),[[op.id,['goal','acceptance']]]);
   }finally{harness.cleanup();}
 });
 

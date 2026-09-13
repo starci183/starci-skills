@@ -169,6 +169,24 @@ test('a worker that neither pings nor prints inside the grace window is reported
   }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
 });
 
+test('the wait between ticks ends when the caller has something to handle: a queued command reaches the kernel within one tick',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-wake-'));
+  try{
+    const empty={outcome:'ok',receipt:{ok:true,result:{messages:[],deliveryId:null,workers:[],terminals:[],tasks:[]}}};
+    // Each Orca call costs the clock half a second: the slices end on time whether or not anything sleeps.
+    let clock=0;const wait=ms=>{clock+=ms;};
+    const orca={invoke:()=>{clock+=500;return empty;}};
+    let queued=0;
+    const woken=waitTick(orca,{cwd:dir,run:'run_x',from:'term_k',timeoutMs:600000,tickMs:1000,reportsDir:dir,now:()=>clock,wait,wake:()=>++queued>=2});
+    assert.equal(woken.event,'woken');
+    assert.equal(woken.ticks,2,'the second slice saw the command');
+    assert.ok(woken.elapsedMs<600000,'the wait did not run to its timeout');
+    // Without anything to wake for the wait runs to its timeout as before.
+    const timed=waitTick(orca,{cwd:dir,run:'run_x',from:'term_k',timeoutMs:3000,tickMs:1000,reportsDir:dir,now:()=>clock,wait,wake:()=>false});
+    assert.equal(timed.event,'timeout');
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
 test('an allowlist folder written with a glob tail covers every file beneath it, and a file entry covers only itself',()=>{
   const report=buildReport({outcome:'done',summary:'drawn',files:['.starciwork/brand/assets/logo/mark.svg','.starciwork/brand/index.yaml'],checks:[{name:'work-tree-validates',command:'node starci.mjs validate .starciwork',exitCode:0,evidence:'ok'}],run:'run_wf',task:'task_1',dispatch:'ctx_1',from:'term_1'});
   assert.deepEqual(validateReport(report,{allowlist:['.starciwork/brand/index.yaml','.starciwork/brand/**']}).errors.filter(error=>/outside/.test(error)),[]);

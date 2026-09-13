@@ -72,7 +72,7 @@ export const DEFAULT_TICK_MS=120000;
  * once per tick while the supervisor keeps waiting; the call returns at the first boundary (report, stalled,
  * dead) or after the whole timeout with `timeout`.
  */
-export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK_MS,reportsDir=null,stalledAfterMs=DEFAULT_STALLED_AFTER_MS,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack=null,noAck=false,now=Date.now,wait=sleepSync}){
+export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK_MS,reportsDir=null,stalledAfterMs=DEFAULT_STALLED_AFTER_MS,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack=null,noAck=false,now=Date.now,wake=null,wait=sleepSync}){
   const started=now();
   const ticks=[];
   let ackOnce=ack,noAckOnce=noAck;
@@ -83,6 +83,9 @@ export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK
     ackOnce=null;noAckOnce=false;
     ticks.push({at:now(),event:tick.event,liveness:tick.liveness.map(item=>`${item.dispatch}:${item.liveness}`)});
     if(tick.event!=='timeout'||now()-started>=timeoutMs)return {...tick,ticks:ticks.length,elapsedMs:now()-started};
+    // Something the caller wants handled now - a queued command, a stop flag - ends the wait between two slices,
+    // so an approval reaches a kernel within one tick instead of after the whole wait for its running operations.
+    if(typeof wake==='function'&&wake())return {...tick,event:'woken',ticks:ticks.length,elapsedMs:now()-started};
   }
 }
 

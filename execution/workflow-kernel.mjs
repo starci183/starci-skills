@@ -1090,6 +1090,24 @@ export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,la
  * Dynamic operations: the Work tree is re-read every iteration and every newly schedulable node (a node the
  * user added, or one whose dependencies just became done) becomes an operation of this workflow.
  */
+/**
+ * An intake op's goal and acceptance are the current build's words, not the ones frozen at goal time: the
+ * validator reads the acceptance literally, so a wording the build has since corrected ("all todo" against a
+ * tree whose roots carry no state) kept rejecting an op planned before the correction. Only the text moves;
+ * the allowlist and the references the op was granted stay what the owner approved.
+ */
+function retemplateIntakeOps(store,state,ctx,loaded){
+  const workRoot=ctx.work?.at?.workRoot??null;
+  if(!workRoot)return;
+  for(const op of state.ops.filter(item=>item.intake?.scope&&!['done','blocked'].includes(item.status)||item.intake?.scope&&item.status==='blocked'&&!item.refusal)){
+    let fresh=null;
+    try{fresh=intakeOp(state,{workRoot,loaded,index:0,entry:op.intake.scope,repositories:{}});}catch{continue;}
+    const changed=['goal','acceptance'].filter(key=>JSON.stringify(op[key])!==JSON.stringify(fresh[key]));
+    if(!changed.length)continue;
+    for(const key of changed)op[key]=fresh[key];
+    store.appendEvent({event:'intake-retemplated',op:op.id,changed});
+  }
+}
 export function syncLedgerOps(store,state,ctx){
   if(!ctx.work)return [];
   let loaded;
@@ -1098,6 +1116,7 @@ export function syncLedgerOps(store,state,ctx){
   ctx.work.loaded=loaded;
   // A brand that moved since the last read is named here too: the re-read is what makes the new rev current.
   noteBrand(store,state,loaded);
+  retemplateIntakeOps(store,state,ctx,loaded);
   // An operation created before the repository rule for a node another repository delivers is settled and blocked.
   for(const op of state.ops){
     if(!op.nodeId||op.refusal==='out-of-repository'||!ctx.work.code.repository||typeof ctx.work.api.nodeRepository!=='function')continue;
@@ -1579,7 +1598,7 @@ export function approve(store,state,{allocation=null,allowDynamic=null,acceptCri
     for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal)){
       // A clean slate: the runtimes a rate limit or a restart taught the op to avoid are open to it again, else an op
       // only one of them can run (a mascot needs Sol) would wait for a slot it may never get.
-      op.status='ready';op.validatorRejects=0;op.launchFailures=0;op.restarts=0;op.dispatch=null;op.terminal=null;op.nudged=false;op.avoidRuntimes=[];
+      op.status='ready';op.validatorRejects=0;op.launchFailures=0;op.restarts=0;op.dispatch=null;op.terminal=null;op.nudged=false;op.avoidRuntimes=[];op.avoidedAt={};
       state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&['validator','environment','restart','stall'].includes(entry.kind)));
       readmitted.push(op.id);
     }
@@ -1935,7 +1954,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
   if(!launched?.ok){
     op.launchFailures+=1;
     ctx.allocator.failed(allocated.runtime,{reason:launched?.stopReason??'launch failed',op:op.id});
-    op.avoidRuntimes=unique([...op.avoidRuntimes,allocated.runtime]);
+    avoidRuntime(op,allocated.runtime,clockOf(ctx));
     // The attempts travel with the event: a launch that failed is only diagnosable from what Orca said at each step.
     store.appendEvent({event:'launch-failed',op:op.id,runtime:allocated.runtime,stopReason:launched?.stopReason??null,attempts:launched?.attempts?.length??0,
       detail:(launched?.attempts??[]).slice(0,4).map(attempt=>({target:attempt.target??null,stage:attempt.stage??null,effectState:attempt.effectState??null,reason:String(attempt.reason??'').slice(0,240)}))});
@@ -2117,7 +2136,7 @@ function scheduleOps(orca,store,state,ctx){
     try{candidate=allocated.candidate??ctx.allocator.candidateFor(launchOperator(op.kind),allocated.target);}
     catch(error){
       ctx.allocator.failed(allocated.runtime,{reason:'not launchable',op:op.id});
-      op.avoidRuntimes=unique([...op.avoidRuntimes,allocated.runtime]);
+      avoidRuntime(op,allocated.runtime,clockOf(ctx));
       store.appendEvent({event:'allocation-rejected',op:op.id,runtime:allocated.runtime,reason:error.message});
       continue;
     }
@@ -2784,7 +2803,7 @@ function retryOp(store,state,op,findings,ctx,reason){
       }
       store.appendEvent({event:'split-refused',op:op.id,reason:'a single-path allowlist cannot be split'});
     }
-    op.avoidRuntimes=unique([...op.avoidRuntimes,op.runtime].filter(Boolean));
+    avoidRuntime(op,op.runtime,clockOf(ctx));
     op.repairs=retryLimitFor(reason);
   }
   op.status='ready';op.attempt+=1;op.findings=findings;op.priorOpen=[];op.dispatch=null;op.terminal=null;op.nudged=false;
@@ -3448,7 +3467,7 @@ export function settleStalled(orca,store,state,ctx,tick){
     settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:observed.liveness,terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
     if(observed.liveness==='rate-limited'){ctx.allocator.failed(op.runtime,{reason:`rate-limited (${observed.reason??'provider screen'})`,op:op.id});store.appendEvent({event:'rate-limit-parked',op:op.id,runtime:op.runtime});}
     else ctx.allocator.release(op.runtime,{op:op.id});
-    if(observed.liveness==='stalled-silent'&&noteSilence(store,state,op,ctx))op.avoidRuntimes=unique([...op.avoidRuntimes,op.runtime].filter(Boolean));
+    if(observed.liveness==='stalled-silent'&&noteSilence(store,state,op,ctx))avoidRuntime(op,op.runtime,clockOf(ctx));
     op.restarts+=1;
     store.appendEvent({event:'settled',op:op.id,liveness:observed.liveness,restarts:op.restarts});
     noteAnomaly(store,state,`settled:${op.id}:${observed.liveness}`,{op:op.id,runtime:op.runtime,liveness:observed.liveness});
@@ -3462,7 +3481,7 @@ export function settleStalled(orca,store,state,ctx,tick){
       }else state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} was restarted ${op.restarts} times (${observed.liveness})`});
       continue;
     }
-    op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;op.avoidRuntimes=unique([...op.avoidRuntimes,op.runtime].filter(Boolean));
+    op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;avoidRuntime(op,op.runtime,clockOf(ctx));
   }
 }
 
@@ -3639,6 +3658,17 @@ export const KERNEL_ERROR_LIMIT=5;
 /** How long an op blocked by a provider rate limit waits before it is re-admitted on another runtime. */
 export const RATE_LIMIT_COOLDOWN_MS=60*60*1000;
 /**
+ * A runtime an op learned to avoid - it failed to launch there, stalled there, or was rate-limited there - is
+ * avoided for the cooldown, not for ever: the stamp says when, and `readmitCooled` opens the runtime to the op
+ * again once the cooldown has passed (`avoid-expired`). A verify op's avoidance of its implementers carries no
+ * stamp and never expires: that one is independence, not a failure.
+ */
+function avoidRuntime(op,runtime,now){
+  if(!runtime)return;
+  op.avoidRuntimes=unique([...(op.avoidRuntimes??[]),runtime]);
+  op.avoidedAt={...(plain(op.avoidedAt)?op.avoidedAt:{}),[runtime]:now};
+}
+/**
  * An op the restart limit blocked for a rate limit is not the user's question: once its cooldown has passed it is
  * ready again with its restarts cleared and the limited runtime avoided. An op blocked by an older build - a
  * `restarted N times (rate-limited)` question with no cooldown recorded - is given one at load and released the
@@ -3657,10 +3687,19 @@ function readmitCooled(store,state,ctx){
     if(!(Number(op.coolUntil??0)<=now))continue;
     const limited=op.runtime;
     op.status='ready';op.refusal=null;op.coolUntil=null;op.restarts=0;op.dispatch=null;op.terminal=null;op.nudged=false;
-    op.avoidRuntimes=unique([...(op.avoidRuntimes??[]),limited].filter(Boolean));
+    avoidRuntime(op,limited,now);
     store.appendEvent({event:'rate-limit-readmitted',op:op.id,avoid:op.avoidRuntimes});
   }
+  // An avoidance older than the cooldown is over: the runtime is open to the op again.
+  for(const op of state.ops.filter(candidate=>['pending','ready'].includes(candidate.status)&&plain(candidate.avoidedAt))){
+    const expired=Object.entries(op.avoidedAt).filter(([,at])=>now-Number(at)>=RATE_LIMIT_COOLDOWN_MS).map(([id])=>id);
+    if(!expired.length)continue;
+    op.avoidRuntimes=(op.avoidRuntimes??[]).filter(id=>!expired.includes(id));
+    for(const id of expired)delete op.avoidedAt[id];
+    store.appendEvent({event:'avoid-expired',op:op.id,runtimes:expired,avoid:op.avoidRuntimes});
+  }
 }
+const clockOf=ctx=>typeof ctx?.now==='function'?ctx.now():Date.now();
 function guardedStage(store,state,ctx,stage,fn){
   try{fn();state.kernelErrors=0;return 'ok';}
   catch(error){
@@ -3822,7 +3861,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     if(Array.isArray(early)&&early.length){store.appendEvent({event:'accepted-early',ops:early.map(item=>item.op)});store.saveState(state);continue;}
     if(running.length){
       const tick=waitTick(orca,{cwd:state.worktree,run:state.run,from:state.from,timeoutMs:waitTimeoutMs,tickMs,
-        reportsDir:store.paths.reports,now,wait});
+        reportsDir:store.paths.reports,now,wait,wake:()=>inboxPending(store)||stopRequested(store)});
       if(tick.event==='check-failed'){noteAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{reason:tick.check?.reason??null});triageAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{...ctx,orca});}
     store.appendEvent({event:'wait',result:tick.event,ticks:tick.ticks,
         liveness:(tick.liveness??[]).map(item=>`${item.dispatch}:${item.liveness}`)});
@@ -3939,6 +3978,8 @@ function acquireKernelLock(store){
   return ()=>{try{const now=JSON.parse(fs.readFileSync(lock,'utf8'));if(now.pid===process.pid)fs.rmSync(lock);}catch{}};
 }
 export function stopRequested(store){return fs.existsSync(path.join(store.dir,'stop.flag'));}
+/** Whether a command waits in the inbox: the wait between ticks ends for it. */
+export function inboxPending(store){try{return fs.readdirSync(store.paths.inbox).some(name=>name.endsWith('.json'));}catch{return false;}}
 /** Whether the kernel of this store is a live process, by its lock. */
 export function kernelAlive(store){
   const lock=readJson(path.join(store.dir,'kernel.lock'),null);
