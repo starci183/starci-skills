@@ -429,18 +429,24 @@ const VALIDATOR_RULES=[
   'a design candidate of an interface.draw operation is the installed grammar rendering the screen\'s main state, captured by a browser: its components are grammar contracts and its colours brand tokens, with real product-shaped content; an image-model painting, a script that paints boxes and text, a mockup-tool export, a screenshot of unstyled markup, or grey placeholder bars for content is a defect and the result is rejected; loading, empty and error states are described in the record, never drawn, and a candidate per state is not required',
   'when a `brand` record is given it is binding: a design candidate or a built surface that uses a colour, a font or an icon outside the brand colour tokens (each with the role the record gives it) and the installed grammar is a defect, and so is one that uses anything the record forbids',
   'a credential, a key, a token or a configuration the environment does not provide is never invented, stubbed, defaulted or silently skipped: code that hardcodes a value, falls back to a fake, or disables an integration when its key is missing instead of reporting blocked with the exact variable name is a defect; a record that describes an external integration without naming the credential the owner provides is a defect',
-  'an intake (work.author over a whole feature) is judged as a reconciliation: a record that restates or redefines what a decided record of another feature already settles, instead of referencing it by id, is a defect; a change another feature needs that was edited by hand instead of reported as sds-gap is a defect; two decided rules that cannot both hold once the feature exists must appear as an open decision record, and their absence is a defect',
+  'an intake (work.author over a whole feature) is judged as a reconciliation of three cases - `reference`, `conflict`, `new` - and the kernel has ALREADY checked every id of its table: that the records exist, that a referenced one is decided, that each conflict names an open decision record under this feature, and that no decided record was edited. Judge only what a reader can: whether a `reference` row\'s cited record really covers the claim it is cited for, whether a record the table calls `new` restates a decided record in other words rather than adding something, and whether a `conflict` row\'s decision record states both sides, the consequences of each, the numbered options and exactly one recommendation. A record of another feature that this operation edited, and a side of the feature the table leaves out altogether, are defects',
   'an interface.asset result is the artwork of the slots the design record declared: a slot whose file is missing, or artwork that ignores the brand mascot and logo references the record names, is a defect',
   'a frontend.implement result that substitutes its own image for a declared artwork slot, or omits a declared slot altogether, is a defect - the slot files the asset step produced are what the surface must use',
   'an external integration is proven live or it is not proven: an `integration.verify` result whose scenario fakes, stubs, mocks, records, replays or skips the declared provider, or that reads the credential from anywhere but the environment variable the declaration names, or that prints, logs or commits a secret value, is a defect; and an `e2e.verify` evidence whose `proof.fakes` omits a provider the diff fakes is a defect - a faked outside system is allowed there, unnamed it is not',
   'an assertion listed under node.deferred is proven by the kernel itself or by a later step of the node lane (an end-to-end run, a review): never reject this operation for it, and never ask this operation to prove it',
   'the process (retry, commit, ledger) is the kernel\'s; you answer accept or reject and one line of summary'
 ];
+/**
+ * The declared input and output of the operation's kind, when the caller hands them over. It is the one rule
+ * that can be stated over data rather than over prose: the kind says which record kinds it may read and which
+ * it may produce, so a citation or a write outside that declaration is a defect nobody has to feel out.
+ */
+export const VALIDATOR_IO_RULE='this operation declares what it reads and what it produces (`io.reads`, `io.writes`, as record kinds): a record cited outside `io.reads` or written outside `io.writes` is a defect, whatever else the diff gets right';
 const normalizeFile=value=>String(value??'').replaceAll('\\','/').replace(/^\.\//,'').replace(/^\/+/,'').trim();
 /** A reject must carry a finding, otherwise there is nothing for the operation to fix. */
 const validationRules=answer=>({errors:answer.verdict==='reject'&&!(Array.isArray(answer.findings)&&answer.findings.length)?['a reject must carry at least one finding']:[]});
 
-export function validateOp({op,node=null,diff,checks=[],references=[],brand=null,memory='',providers=DEFAULT_VALIDATOR_RUNTIMES,skip=[],cwd,runHeadless:run}){
+export function validateOp({op,node=null,diff,checks=[],references=[],brand=null,io=null,memory='',providers=DEFAULT_VALIDATOR_RUNTIMES,skip=[],cwd,runHeadless:run}){
   need(plain(op)&&typeof op.id==='string','validateOp needs the operation');
   const files=unique((diff?.files??[]).map(normalizeFile).filter(Boolean));
   // A provider the allocator reports as cooling is skipped, not tried: a rate limit parks it for every caller.
@@ -455,9 +461,12 @@ export function validateOp({op,node=null,diff,checks=[],references=[],brand=null
     // assets, what is forbidden and the rules an imagery prompt must carry. It is the rule set a surface is
     // judged against, so it travels as data beside the diff, never as prose in the role line.
     ...(plain(brand)?{brand}:{}),
+    // What the kind declares it reads and produces, when the kernel hands it over. It travels as data, and the
+    // rule that makes it binding travels with it: an operation with no declaration is judged without either.
+    ...(plain(io)?{io:{reads:unique(strings(io.reads)),writes:unique(strings(io.writes))}}:{}),
     diff:{files,truncated:Boolean(diff?.truncated),text:String(diff?.text??'')},
     memory:String(memory??''),
-    rules:VALIDATOR_RULES
+    rules:plain(io)?[...VALIDATOR_RULES,VALIDATOR_IO_RULE]:VALIDATOR_RULES
   };
   const result=callFunction({kind:'validateOp',payload,form:VALIDATION_FORM,providers:chain,cwd,runHeadless:run,extra:validationRules,role:VALIDATOR_ROLE});
   if(!result.ok)return {ok:false,verdict:'unavailable',reason:result.reason??'no provider produced a valid verdict',attempts:result.attempts,usage:result.usage,findings:[],dropped:[]};
@@ -485,10 +494,22 @@ export function validateOp({op,node=null,diff,checks=[],references=[],brand=null
  * `required` changes - which the kernel renders into the contract of every operation - and `refuse` stops the
  * approval until the one question is answered or the owner overrides it. An objection that names no evidence is
  * dropped here, so a critique can never cost work on the strength of an opinion alone.
+ *
+ * Beside the verdict the critic answers `overlaps`: one entry per decided record the goal touches, with the
+ * case it is - `reference` (the record already holds it, so the work cites it) or `conflict` (it cannot hold
+ * together with what that record settled, so the owner decides). That is what turns a critique into a plan: a
+ * conflict is rendered for the owner and travels into the intake's contract, a reference is the list of
+ * records the intake must cite. What no decided record covers is not an overlap at all, and is left out.
  */
 export const CRITIQUE='starci/goal-critique@1';
 export const CRITIQUE_VERDICTS=['sound','revise','refuse'];
 export const OBJECTION_KINDS=['premise','scope','testability','hidden-decision','consistency'];
+/**
+ * The two cases the critic can see from the goal text and the decided records. The third case of a
+ * reconciliation - `new` - is not an overlap with anything, so it is not the critic's to name: the intake
+ * authors it and declares what it reads and what it hands on.
+ */
+export const OVERLAP_CASES=['reference','conflict'];
 /** Fable first, Astra as the fallback: the host's supervisor runtimes, overridable by `supervisor.runtimes` in config.json. */
 /** Astra first: the critique is one call per goal and Fable's own weekly window is the scarcer one. `critique.runtimes` in config.json overrides it. */
 export const DEFAULT_CRITIC_RUNTIMES=['gpt-6-astra','claude-fable-5.1'];
@@ -500,6 +521,10 @@ export const CRITIQUE_FORM={
   // list, is not sent back for it - the kernel shapes what it can and drops what names no evidence. Two
   // providers in a row failed the strict form on a real goal and the goal went uncritiqued.
   objections:{type:'list',optional:true},
+  // The overlaps with the decided records, read as leniently as the objections are: an entry that names no
+  // record, or a case outside `reference`/`conflict`, is dropped and counted - never a reason to send a whole
+  // critique back, because a goal that goes uncritiqued costs more than an overlap the kernel could not shape.
+  overlaps:{type:'list',optional:true},
   required:{type:'string[]',optional:true},alternatives:{type:'string[]',optional:true},question:{type:'string',optional:true},
   // A prerequisite of a kind the kernel does not know is dropped, never a reason to send the whole critique back.
   prerequisites:{type:'object[]',optional:true,each:{kind:{type:'string'},feature:{type:'string',optional:true},why:{type:'string'}}}
@@ -514,7 +539,10 @@ const CRITIC_RULES=[
   'offer the alternatives: a cheaper or a safer way to the same outcome, one sentence each',
   'check the consistency with the accepted records and name the record you checked against',
   'the verdict is closed: `sound` proceeds as written, `revise` proceeds only under the changes you list in `required`, `refuse` is for a goal that contradicts an accepted record or that cannot be verified at all - and then `question` is the one question whose answer would unblock it',
-  'a goal that adds a feature or a capability to a product with decided records is a reconciliation, never an append: it must name the decided records it touches and what they become (A, B + C => A\', B\', C\'); a goal that only adds C beside A and B is `revise` with the reconciliation in `required`',
+  'a goal that adds a feature or a capability to a product with decided records is a reconciliation, never an append: fill `overlaps` with one entry per decided record the goal touches, `{record: <id of a decided record below>, case: reference | conflict, evidence: the statement of that record the goal meets}` - a goal that would only be added beside the decided records, naming none of them, is `revise` with the reconciliation in `required`',
+  '`reference` is an overlap the goal repeats: the decided record already holds it, so the work cites that record by its id and restates, re-words or redefines nothing of it',
+  '`conflict` is an overlap that cannot hold together with what the decided record settled: it is never overwritten and never averaged, it becomes a decision record stating both sides, the consequences, the numbered options and one recommendation, and the OWNER answers it - never you and never the operation',
+  'what no decided record covers is new work, not an overlap: leave it out of `overlaps` entirely - the intake authors it under its own feature and declares what it reads and what it hands on',
   'name the prerequisites: a record the goal builds on that the decided records and the ledger do not hold - the srs or sds of the feature it extends ("add X to the backend" with no record of X), the brand a design needs, a decision nobody took - goes to `prerequisites` with the feature it belongs to and why; the kernel authors those records first and holds the build behind them, so a missing record is a prerequisite, never a reason to refuse',
   'never restate the goal and never praise it: a line that is not a defect is not an objection'
 ];
@@ -565,7 +593,7 @@ export function critiqueGoal({job,scope=[],ledger=[],decisions=[],records=[],mat
   need(String(job??'').trim(),'critiqueGoal needs the job text: the goal it is asked to critique');
   const chain=(Array.isArray(providers)?providers:[providers]).filter(item=>typeof item==='string'&&item.trim());
   if(!chain.length)return {ok:false,verdict:'unavailable',reason:'no critic provider was given',attempts:[],usage:null,
-    objections:[],dropped:[],required:[],alternatives:[],question:null,prerequisites:[]};
+    objections:[],dropped:[],overlaps:[],required:[],alternatives:[],question:null,prerequisites:[]};
   const bounded=boundRecords(records);
   const payload={
     job:String(job),
@@ -582,7 +610,7 @@ export function critiqueGoal({job,scope=[],ledger=[],decisions=[],records=[],mat
   const result=callFunction({kind:'critiqueGoal',payload,form:CRITIQUE_FORM,providers:chain,cwd,runHeadless:run,
     extra:critiqueRules,role:CRITIC_ROLE});
   if(!result.ok)return {ok:false,verdict:'unavailable',reason:result.reason??'no provider produced a valid critique',
-    attempts:result.attempts??[],usage:result.usage??null,objections:[],dropped:[],required:[],alternatives:[],question:null,prerequisites:[]};
+    attempts:result.attempts??[],usage:result.usage??null,objections:[],dropped:[],overlaps:[],required:[],alternatives:[],question:null,prerequisites:[]};
   const answer=result.value;
   const objections=[],dropped=[];
   for(const raw of (Array.isArray(answer.objections)?answer.objections:[])){
@@ -594,11 +622,26 @@ export function critiqueGoal({job,scope=[],ledger=[],decisions=[],records=[],mat
     if(!item.claim)continue;
     (item.evidence?objections:dropped).push(item);
   }
-  return {ok:true,schema:CRITIQUE,verdict:answer.verdict,objections,dropped,
+  // The overlaps with the decided records, as the three cases the intake will then write as data. An entry
+  // that names no record, or a case the runtime does not know, is dropped and counted rather than argued with:
+  // the kernel renders a `conflict` for the owner and hands a `reference` to the intake as a record to cite, so
+  // an unshaped entry would name work nobody could act on.
+  const overlaps=[];let overlapsDropped=0;
+  for(const raw of (Array.isArray(answer.overlaps)?answer.overlaps:[])){
+    const given=plain(raw)?raw:null;
+    const kind=String(given?.case??given?.kind??'').trim().toLowerCase();
+    const record=String(given?.record??given?.id??'').trim();
+    if(!given||!record||!OVERLAP_CASES.includes(kind)){overlapsDropped+=1;continue;}
+    overlaps.push({record,case:kind,evidence:String(given.evidence??given.statement??'').trim()});
+  }
+  const reasons=[...(dropped.length?[`${dropped.length} objection(s) named no evidence and were dropped by the kernel`]:[]),
+    ...(overlapsDropped?[`${overlapsDropped} overlap(s) named no decided record or no known case and were dropped by the kernel`]:[])];
+  return {ok:true,schema:CRITIQUE,verdict:answer.verdict,objections,dropped,overlaps,
+    ...(overlapsDropped?{overlapsDropped}:{}),
     required:strings(answer.required),alternatives:strings(answer.alternatives),
     question:String(answer.question??'').trim()||null,
     prerequisites:(Array.isArray(answer.prerequisites)?answer.prerequisites:[]).filter(plain).map(raw=>({kind:String(raw.kind??'').trim(),
       feature:String(raw.feature??'').trim()||null,why:String(raw.why??'').trim()})).filter(item=>PREREQUISITE_KINDS.includes(item.kind)&&(item.kind==='brand'||item.feature)),
     provider:result.provider,attempt:result.attempt,attempts:result.attempts,usage:result.usage,
-    ...(dropped.length?{reason:`${dropped.length} objection(s) named no evidence and were dropped by the kernel`}:{})};
+    ...(reasons.length?{reason:reasons.join('; ')}:{})};
 }

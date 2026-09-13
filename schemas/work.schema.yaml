@@ -1048,6 +1048,46 @@ $defs:
           present a gap as already implemented.
     description: One executable UAT flow with direct environment details, collocated fixture paths,
       steps, evidence and observed result.
+  reconciliationRow:
+    type: object
+    additionalProperties: false
+    required:
+      - case
+      - record
+    properties:
+      case:
+        enum:
+          - reference
+          - conflict
+          - new
+        description: "Which of the three reconciliation cases this row is. reference: the decided record
+          already holds what this feature repeats, so it is cited by id and never restated. conflict: this
+          feature cannot hold together with what that record decided, so it is neither overwritten nor
+          averaged - a decision record under this feature states both sides and the owner answers it. new:
+          no decided record covers it, so it is authored under this feature."
+      record:
+        $ref: "#/$defs/id"
+        description: The record this row is about - the decided record of another feature for reference and
+          conflict, and the newly authored record of this feature for new.
+      decision:
+        $ref: "#/$defs/id"
+        description: Required by a conflict row - the todo decision record authored under this feature that
+          states both sides, the consequences, the numbered options and one recommendation. The kernel puts
+          it to the owner and the workflow does not finish over an unanswered one.
+      reads:
+        $ref: "#/$defs/ids"
+        description: Declared by a new row - the decided records it rests on, each of a record kind its own
+          record kind is derived from.
+      hands:
+        $ref: "#/$defs/ids"
+        description: Declared by a new row - the records of this feature it hands work on to.
+      detail:
+        $ref: "#/$defs/string"
+        description: One line saying what this feature shares with, conflicts with, or adds beyond the
+          named record; it is the claim the validator judges the row against.
+    description: One typed row of a feature's reconciliation against the records the product already decided.
+      The list of these rows lives at extensions.work3.reconciliation of the feature's module record; the
+      kernel checks it mechanically when an intake reports done and before the validator reads it.
   node:
     type: object
     additionalProperties: false
@@ -1122,12 +1162,14 @@ $defs:
       extensions:
         type: object
         description: "Free-form namespaced payloads the validator preserves and hashes but does not
-          constrain. The runtime authors these under work3: extensions.work3.integrations is a list of
-          integrationDeclaration entries - every external system this record talks to, its provider, the
-          exact credential variable the owner provides and the sandbox a live proof runs against;
-          extensions.work3.reconciliation is the intake's typed table; extensions.work3.checks and
+          constrain, so a runtime adds keys here without a schema change. The runtime authors these under
+          work3: extensions.work3.integrations is a list of integrationDeclaration entries - every external
+          system this record talks to, its provider, the exact credential variable the owner provides and
+          the sandbox a live proof runs against; extensions.work3.reconciliation is the list of
+          reconciliationRow entries a feature module record carries after an intake, one row per decided
+          record the feature touches, checked by the kernel itself; extensions.work3.checks and
           extensions.work3.allowlist are what the kernel may launch the node with; and
-          extensions.work3.kernel is the kernel's own receipt, including the contractDigest of the kind
+          extensions.work3.kernel is the kernel own receipt, including the contractDigest of the kind
           declaration the proof was taken under."
       description:
         type: string

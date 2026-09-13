@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {CRITIQUE,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../models/functions.mjs';
+import {CRITIQUE,CRITIQUE_FORM,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,OVERLAP_CASES,VALIDATOR_IO_RULE,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../models/functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
   references:['.starciwork/features/sales/sds.md#3'],checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:[`${id} works`],dependsOn:[],...extra});
@@ -274,6 +274,57 @@ test('validateOp carries the brand record into the prompt, with the rules that m
 });
 
 /**
+ * An operation's kind declares which record kinds it may read and which it may produce. When the kernel hands
+ * that declaration over, it becomes a rule the validator is held to instead of a feeling about scope; when it
+ * does not, neither the data nor the rule is in the prompt, so no operation is judged against a declaration
+ * nobody gave it.
+ */
+test('validateOp carries the declared reads and writes of the kind, with the rule that makes them binding, and omits both when none is given',()=>{
+  const prompts=[];
+  const op={id:'op-draw',kind:'interface.draw',goal:'Draw the cart.',acceptance:['the cart is drawn'],allowlist:['features/sales/ui/cart/index.yaml'],attempt:1};
+  const diff={files:['features/sales/ui/cart/index.yaml'],text:'diff --git a/features/sales/ui/cart/index.yaml b/features/sales/ui/cart/index.yaml\n+screens: []\n',truncated:false};
+  const call=extra=>validateOp({op,diff,checks:[],references:[],providers:['gpt-5.6-sol'],
+    runHeadless:(provider,prompt)=>{prompts.push(prompt);return JSON.stringify({verdict:'accept',summary:'inside the declaration'});},...extra});
+  call({io:{reads:['srs','sds','brand','grammar','design','srs'],writes:['design']}});
+  const prompt=prompts[0];
+  assert.match(prompt,/"io": \{/);
+  // The record kinds travel as data, deduplicated, exactly as the kind declares them.
+  assert.match(prompt,/"reads": \[\s*"srs",\s*"sds",\s*"brand",\s*"grammar",\s*"design"\s*\]/);
+  assert.match(prompt,/"writes": \[\s*"design"\s*\]/);
+  assert.ok(prompt.includes(VALIDATOR_IO_RULE),'the rule that makes the declaration binding travels with it');
+  assert.match(VALIDATOR_IO_RULE,/a record cited outside `io\.reads` or written outside `io\.writes` is a defect/);
+  // No declaration, no data and no rule: the kind's own contract is the only thing that was given.
+  prompts.length=0;
+  call();
+  assert.doesNotMatch(prompts[0],/"io"/);
+  assert.ok(!prompts[0].includes(VALIDATOR_IO_RULE));
+});
+
+/**
+ * An intake is judged as a reconciliation of three cases, and the mechanical half of it is already done: the
+ * kernel checked every id before the validator was called. What is left for a reader is exactly three things,
+ * and the rule has to say so, or the validator re-does the kernel's work and misses its own.
+ */
+test('the intake rule tells the validator what the kernel already checked and what only a reader can judge',()=>{
+  const prompts=[];
+  const op={id:'op-intake',kind:'work.author',goal:'Author the collab records.',acceptance:['collab is authored'],allowlist:['features/collab/**'],attempt:1};
+  validateOp({op,diff:{files:['features/collab/index.yaml'],text:'+case: reference\n',truncated:false},checks:[],
+    providers:['gpt-5.6-sol'],runHeadless:(provider,prompt)=>{prompts.push(prompt);return JSON.stringify({verdict:'accept',summary:'reconciled'});}});
+  const prompt=prompts[0];
+  for(const phrase of ["a reconciliation of three cases - `reference`, `conflict`, `new`",
+    "the kernel has ALREADY checked every id of its table",
+    "that a referenced one is decided, that each conflict names an open decision record under this feature, and that no decided record was edited",
+    "whether a `reference` row's cited record really covers the claim it is cited for",
+    "whether a record the table calls `new` restates a decided record in other words",
+    "whether a `conflict` row's decision record states both sides, the consequences of each, the numbered options and exactly one recommendation",
+    "A record of another feature that this operation edited, and a side of the feature the table leaves out altogether, are defects"])
+    assert.ok(prompt.includes(phrase),`the intake rule says: ${phrase}`);
+  // The two withdrawn rulings are gone: no sds-gap against another feature's record, no formula anywhere.
+  assert.doesNotMatch(prompt,/sds-gap/);
+  assert.doesNotMatch(prompt,/A, B \+ C/);
+});
+
+/**
  * The critique of a goal is a function like any other: a fixed frame, a closed verdict, a bounded retry. What is
  * particular to it is the price of an objection - it can cost the owner a re-write of the goal - so an objection
  * that names no evidence is dropped, and a verdict that costs work with nothing to act on is not a valid form.
@@ -383,4 +434,53 @@ test('a critique that costs work must carry something to act on: evidence, requi
   assert.deepEqual(withPrereqs.result.prerequisites,[{kind:'sds',feature:'chat',why:'the goal extends a module the tree has no architecture record for'},{kind:'brand',feature:null,why:'the design needs tokens'}]);
   assert.throws(()=>critiqueGoal({job:'  ',runHeadless:()=>'{}'}),/critiqueGoal needs the job text/);
   assert.equal(critiqueGoal({job:'x',providers:[],runHeadless:()=>'{}'}).verdict,'unavailable');
+});
+
+/**
+ * A goal that adds to a product with decided records is a reconciliation, and the critic is where the runtime
+ * first sees it. It answers the two cases it can see from the goal text - `reference` and `conflict` - and the
+ * three of them are stated as rules instead of as the formula the owner once used to explain the thinking.
+ */
+test('the critic answers the overlaps with the decided records as the three cases, and the formula is gone',()=>{
+  assert.deepEqual(OVERLAP_CASES,['reference','conflict']);
+  assert.equal(CRITIQUE_FORM.overlaps.type,'list','overlaps is read as leniently as the objections are');
+  assert.equal(CRITIQUE_FORM.overlaps.optional,true);
+  const objection={kind:'consistency',claim:'The goal writes the order outside the ledger writer',
+    evidence:'demo.sales.architecture.sds.ledger',consequence:'Two components would own one write path.'};
+  const {result,seen}=critiqueCall([JSON.stringify({verdict:'revise',objections:[objection],required:['reconcile against the sales records'],
+    overlaps:[
+      {record:'demo.sales.business.srs.policy.refund',case:'reference',evidence:'the refund window is already decided there'},
+      {record:'demo.sales.architecture.sds.ledger',case:'CONFLICT',evidence:'collab needs an asynchronous write'},
+      // Dropped and counted: a case the runtime does not know, an entry that names no record, a bare sentence.
+      {record:'demo.sales.business.srs.policy.refund',case:'new',evidence:'nothing decided covers it'},
+      {case:'reference',evidence:'some record somewhere'},
+      'the refund policy is related'
+    ]})]);
+  assert.equal(result.verdict,'revise');
+  assert.deepEqual(result.overlaps,[
+    {record:'demo.sales.business.srs.policy.refund',case:'reference',evidence:'the refund window is already decided there'},
+    {record:'demo.sales.architecture.sds.ledger',case:'conflict',evidence:'collab needs an asynchronous write'}]);
+  assert.equal(result.overlapsDropped,3);
+  assert.match(result.reason,/3 overlap\(s\) named no decided record or no known case and were dropped by the kernel/);
+  // The rules that replaced the formula: the three cases, and the instruction to fill `overlaps` with them.
+  const prompt=seen[0][1];
+  for(const rule of ['fill `overlaps` with one entry per decided record the goal touches',
+    '{record: <id of a decided record below>, case: reference | conflict, evidence: the statement of that record the goal meets}',
+    '`reference` is an overlap the goal repeats',
+    'cites that record by its id and restates, re-words or redefines nothing of it',
+    '`conflict` is an overlap that cannot hold together with what the decided record settled',
+    'it is never overwritten and never averaged',
+    'the OWNER answers it - never you and never the operation',
+    'what no decided record covers is new work, not an overlap: leave it out of `overlaps` entirely'])
+    assert.ok(prompt.includes(rule),`the critic is held to: ${rule}`);
+  assert.doesNotMatch(prompt,/A, B \+ C/,'the illustrative formula is not runtime content');
+  assert.doesNotMatch(prompt,/=> A'/);
+  // A critique that names no overlap at all answers an empty list, and says nothing about dropping any.
+  const none=critiqueCall([JSON.stringify({verdict:'sound',objections:[]})]);
+  assert.deepEqual(none.result.overlaps,[]);
+  assert.equal(none.result.overlapsDropped,undefined);
+  assert.equal(none.result.reason,undefined);
+  // An unavailable critique still answers the shape, so the kernel never reads `overlaps` off undefined.
+  assert.deepEqual(critiqueGoal({job:'x',providers:[],runHeadless:()=>'{}'}).overlaps,[]);
+  assert.deepEqual(critiqueCall(['nonsense','nonsense',Error('gpt-6-astra headless exited 1')]).result.overlaps,[]);
 });
