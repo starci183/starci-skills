@@ -7,7 +7,7 @@
  * `stepsFor` renders a mandatory, numbered sequence per operation kind, interpolated from the operation's own
  * values (allowlist, checks, acceptance, references, resources, requesters, findings), so the contract tells
  * the agent what to do first, what must be red before code, and how to report exactly once with the real
- * report vocabulary (`done|partial|failed|ask|blocked`; blockers `shared-change|sds-gap|interface-gap|brand-gap|environment|authority`).
+ * report vocabulary (`done|partial|failed|ask|blocked`; blockers `shared-change|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority`).
  *
  * The frontend lane is four operations, never one: `interface.draw` writes the interface design record
  * (screens, every state, blueprint, contract slots, copy) and declares every artwork the chosen candidate
@@ -28,7 +28,7 @@
 
 export const STEPS_HEADING='## Working order (mandatory, in this order)';
 export const DONE_HEADING='## Definition of done for this kind';
-export const SEQUENCES=['work.author','work.intake','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','uat','uat.verify','operations','migration','architecture.revise','decide','brand.decide','generic'];
+export const SEQUENCES=['work.author','work.intake','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','uat','uat.verify','operations','migration','architecture.revise','grammar.update','decide','brand.decide','generic'];
 
 const IMPLEMENT_KINDS=['backend.implement','interface.implement','frontend.implement'];
 const IMPLEMENT_NODES=['implementation','ui'];
@@ -70,6 +70,9 @@ export function sequenceFor(op,{node=null}={}){
   // image files, so neither the node kind nor a repair origin may reroute it into a build sequence.
   if(kind==='interface.asset')return 'interface.asset';
   if(kind==='architecture.revise')return 'architecture.revise';
+  // Growing the installed grammar happens in the grammar's own repository, so no node kind, origin or allowlist
+  // may reroute it into a product build: it is the one sequence that tries NOT to change anything first.
+  if(kind==='grammar.update')return 'grammar.update';
   if(DECIDE_KINDS.includes(kind))return 'decide';
   if(kind==='uat.verify')return 'uat.verify';
   // End-to-end proof of a backend slice goes through the API on a real stack, never a screen: `e2e.verify` is the
@@ -326,6 +329,31 @@ const SEQUENCE_STEPS={
       `the named gap is answered in ${v.allowlist}, its \`rev\` is bumped and the decision log has one new entry`,
       `the validator check exits 0: ${v.declared}`,
       `no product code changed and no other design section moved`
+    ]
+  }),
+  // The language itself, grown by one word. Its first move is an attempt NOT to grow it: a shape that composes
+  // out of existing contracts is not a missing word, and a grammar that gains a unit per screen is no grammar.
+  // What it changes lives in another repository with its own gates and its own published version, so the
+  // irreversible step - the publish - comes last and only behind green gates.
+  'grammar.update':v=>({
+    steps:[
+      `Read the gap report that opened this operation (${v.findings}) and ${v.references}: the exact shape the requester could not render, the accepted requirement and design that oblige it, the interface design record and the screen, state and region it belongs to - then read the WHOLE installed canon (the grammar family files DNA, family, idioms and playbook, every frontend pattern, every UI composition, presentation and proof rule) and the brand record. A gap that is really a missing business rule or a missing screen is \`blocked\` \`sds-gap\` or \`interface-gap\` back to the record that owns it, never answered with a new component.`,
+      `FIRST try to express the shape as a composition of existing contracts and blueprint regions, and write that attempt down: which contracts, which named slots, which constraints, which region each sits in. If it composes, the grammar is not short a word: report \`done\` with the composition, change nothing in the grammar, and let the requester draw it that way.`,
+      `Only when it does not compose, name the one new semantic unit: whether it is a primitive (a fixed semantic unit) or a block (it carries feature meaning), its anatomy, its named slots, every state it can be in and the tokens, typography, spacing and icons it reuses - none invented, none widened. One unit per operation; whether the unit is really new is \`ask\` with the composition attempt attached, never a guess.`,
+      `Implement it in the grammar repository inside the allowlist (${v.allowlist}), following that repository's own conventions for how a contract component, its slots and its states are declared, with the stories and tests it requires: write them first and show them failing on the revision you started from, then green after your change.`,
+      `Run that repository's gates verbatim, all of them, on the same revision - ${v.checks} - and only when every one is green publish a new version of the package. The publish is irreversible: a red or unavailable gate is \`failed\` or \`blocked\`, never a publish. Report the exact version, and read it back from the registry before you claim it (\`npm view <pkg>@<version>\`): a registry may serve a new version only one to three minutes after it accepts it, and an unread version is not a published one.`,
+      `Bind that exact version in the consuming repository: when the consumer is inside the allowlist, bump its dependency and prove it resolves; when it is outside, report \`blocked\` with \`shared-change\` and the exact manifest paths. Never edit a consumer silently and never leave the version unbound.`,
+      `Record the unit in the canon - the grammar family files and the frontend pattern it belongs to - with its anatomy, slots, states and the tokens it reuses, so a later drawing finds the word instead of asking for it again.`,
+      `Self-audit, then report \`done\` exactly once with the unit, the exact published version and the canon entries you wrote: \`git status\` shows nothing outside ${v.allowlist}, no product page or screen changed, and no second unit was slipped in. A path outside the allowlist is \`blocked\` with \`shared-change\` and the exact paths.`
+    ],
+    done:[
+      `the composition of existing contracts was tried first and the attempt is written down, naming the contracts, slots and regions and exactly why the shape does not compose`,
+      `exactly one semantic unit was added, classified as a primitive or a block, with its anatomy, slots, states and reused tokens declared - nothing invented, no token set widened`,
+      `the unit has the stories and tests that repository requires, red on the revision you started from and green after your change`,
+      `every gate of the grammar repository exits 0: ${v.checks}`,
+      `one new version is published and was read back from the registry as actually served, with the exact version reported`,
+      `the consumer resolves that version - bumped inside the allowlist or raised as \`shared-change\` with the exact paths - and the canon names the new unit`,
+      `only allowlisted paths changed: no product page, no screen and no second unit`
     ]
   }),
   operations:v=>({

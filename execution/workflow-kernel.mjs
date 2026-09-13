@@ -8,7 +8,7 @@ import {waitTick} from './orca-protocol.mjs';
 import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from './orca-supervised-launch.mjs';
 import {validateReport} from './reports.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} from './workflow-store.mjs';
-import {resolveLedgerRoot,sharedLedgerStatus} from './ledger-routing.mjs';
+import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './ledger-routing.mjs';
 import {createAllocator,loadRuntimes} from './runtime-allocator.mjs';
 import {proofFinding,proofPlan,runAtBase} from './verify-proof.mjs';
 import {stepsFor} from './contract-steps.mjs';
@@ -186,6 +186,7 @@ export function ledgerBinding(state,{repoRoot,host=null,ledgerRoot=null,git=spaw
     return {source:state.ledgerSource??'state',ledgerRoot:state.ledgerRoot,ownerRepoRoot:state.ledgerOwner.repoRoot,
       ownerRepository:state.ledgerOwner.repository??null,ownerRole:state.ledgerOwner.role??null,
       project:state.ledgerOwner.project??null,role:state.codeRole??null,side:state.codeSide??null,
+      roles:plain(state.ledgerRoles)?state.ledgerRoles:null,
       sharedLedger:Boolean(state.ledgerShared),exists:true};
   const resolved=resolve({repoRoot,host,options:ledgerRoot?{'ledger-root':ledgerRoot}:{},git});
   state.ledgerRoot=resolved.ledgerRoot;
@@ -194,6 +195,9 @@ export function ledgerBinding(state,{repoRoot,host=null,ledgerRoot=null,git=spaw
   state.ledgerShared=Boolean(resolved.sharedLedger);
   state.codeRole=resolved.role??null;
   state.codeSide=resolved.side??null;
+  // Every role the binding declares, kept so a resumed run still knows the repositories that are neither the
+  // code nor the ledger owner - the optional `grammar` one a reported `grammar-gap` is grown in.
+  state.ledgerRoles=plain(resolved.roles)?resolved.roles:null;
   return resolved;
 }
 
@@ -211,6 +215,9 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     // another repository of the same product.
     ledgerRoot:ledgerRoot?path.resolve(ledgerRoot):null,ledgerOwner:plain(ledgerOwner)?{...ledgerOwner}:null,
     ledgerSource,ledgerShared:Boolean(ledgerShared),codeRole,codeSide,
+    // The repositories the binding declares by role, resolved at goal time and on every resume; `grammar` is the
+    // one the kernel routes to itself, and null here means this workflow may not change the grammar.
+    ledgerRoles:null,
     run:null,from:null,workflowTask:null,phase:'goal',approved:false,
     definitionOfDone:[],risks:[],questions:[],ledger:[],ops:[],needUser:[],gateResults:[],verifyRounds:{},gateRounds:0,
     lanes:{},
@@ -543,11 +550,13 @@ export const KERNEL_CHECK=/^work-valid$/i;
  * state canon) is a reference of every design-family operation: a drawing, a frontend build or a walk without it
  * invents its own look. Product-agnostic: every grammar family the host carries is listed.
  *
- * The brand record is the second half of that material and it is the product's own: these four kinds are what
+ * The brand record is the second half of that material and it is the product's own: these kinds are what
  * `brand.decide` exists for, so each of them references the brand file and every asset beside it, and each of
- * them refuses to run on a tree that has no brand record at all.
+ * them refuses to run on a tree that has no brand record at all. `grammar.update` is in the list for the same
+ * reason from the other end: it grows the language every drawing reads, so it reads the whole canon and the
+ * identity the new unit has to live inside before it adds a word to either.
  */
-export const DESIGN_KINDS=['interface.draw','interface.asset','frontend.implement','uat.verify'];
+export const DESIGN_KINDS=['interface.draw','interface.asset','frontend.implement','uat.verify','grammar.update'];
 /** The repository a node is delivered in when it is not this kernel's own; null when it is ours or unknown. */
 function foreignNodeOf(ctx,op){
   if(!ctx?.work||!op?.nodeId||!ctx.work.code?.repository||typeof ctx.work.api?.nodeRepository!=='function')return null;
@@ -1229,7 +1238,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `Record every command with its exit code in \`${checksFile}\` as a JSON array \`[{"name","command","exitCode","evidence"}]\`.`,
     `The kernel re-runs these exact commands itself after your report and computes your changed files from git: a \`done\` the machine cannot reproduce is downgraded to \`failed\` and comes back to you.`,``,
     `## Report (exactly once, at the end)`,
-    `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" --files <comma-separated changed paths> --checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|sds-gap|interface-gap|environment|authority:<detail>]\``,
+    `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" --files <comma-separated changed paths> --checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority:<detail>]\``,
     `- \`done\` needs every check exiting 0 and no open item; otherwise report \`partial\` (with \`--open\`) or \`failed\`.`,
     `- \`ask\` pauses you until the kernel answers in this terminal; then continue and report again.`,
     `- The command must print \`ok:true\`. Never report twice; never exit without reporting.`,``,
@@ -2193,6 +2202,46 @@ function reopenInterface(store,state,op,report,blocker,ctx=null){
   return draw;
 }
 
+/**
+ * `grammar-gap`: a drawing or a build met a shape the installed grammar cannot render, and it is not a
+ * composition of existing contracts. The route grows the grammar once - in the grammar's own repository, as one
+ * semantic unit, published and recorded in the canon - and the requester reads that canon again behind it,
+ * instead of inventing the shape beside the grammar in a product page.
+ *
+ * The one thing the kernel will not guess is where a language lives. A workspace binding with no `grammar`
+ * repository role means this workflow may not change the grammar at all: nothing is created, nothing is
+ * reopened, the requester stays blocked, and the question reaches the user naming the file that would answer it.
+ */
+function growGrammar(store,state,op,report,blocker,ctx=null){
+  const grammar=ctx?.work?.grammar??null;
+  if(!grammar){
+    op.status='blocked';
+    const detail=`grammar-gap from ${op.id} but the workspace binds no grammar repository (role \`grammar\` in .workspaces/projects/<project>/work.json)`;
+    if(!state.needUser.some(item=>item.op===op.id&&item.kind==='environment'&&item.detail===detail))
+      state.needUser.push({op:op.id,kind:'environment',detail});
+    store.appendEvent({event:'grammar-unbound',op:op.id,node:op.nodeId??null,detail:blocker.detail});
+    return 'grammar-unbound';
+  }
+  const route=routeOf({blocker:'grammar-gap',kind:op.kind})??{kind:'grammar.update',origin:'architecture',then:'reopen'};
+  const named=grammar.package?` (\`${grammar.package}\`)`:'';
+  // The grammar repository and the canon that names its units: both are outside the product tree, and the
+  // operation may write nothing else - a product page is exactly what this route exists to prevent.
+  const canon=[path.join(skillRoot,'knowledge','grammars'),path.join(skillRoot,'knowledge','patterns','fe')]
+    .map(entry=>`${slash(entry)}/**`);
+  const grow=addOp(store,state,{id:nextId(state,'grammar'),kind:routeKind(route,state,op)??'grammar.update',nodeId:op.nodeId??null,
+    goal:`Grow the installed grammar${named} by the one semantic unit ${op.id} found missing: ${blocker.detail}. Try to express it as a composition of existing contracts first and write that attempt down; only a shape that does not compose becomes a new unit, implemented with its stories and tests, published at a new version and recorded in the canon. No product page.`,
+    ledgerIds:op.ledgerIds,allowlist:unique([`${slash(grammar.root)}/**`,...canon]),
+    references:unique([...op.references,...grammarReferences()]),checks:op.checks,
+    acceptance:[`the grammar renders: ${blocker.detail}`,
+      'the grammar package is published at a new version and the consumer imports it',
+      'the canon names the new unit'],origin:route.origin??'architecture'},
+    `grammar-gap reported by ${op.id}`);
+  reopenRequester(store,state,op,report.open,grow,`the grammar is grown by ${grow.id}; read the canon again first`);
+  store.appendEvent({event:'grammar-gap',op:op.id,node:op.nodeId??null,grammar:slash(grammar.root),package:grammar.package??null,grow:grow.id});
+  routed(store,op,'grammar-gap',grow.id,grow.origin,{kind:grow.kind,node:op.nodeId??null,then:route.then});
+  return 'grammar-gap';
+}
+
 /* ------------------------------------------------------------------ result policy */
 
 /**
@@ -2405,6 +2454,8 @@ function handleBlocked(store,state,op,report,ctx){
     reopenInterface(store,state,op,report,blocker,ctx);
     return 'interface-gap';
   }
+  // A shape the installed grammar cannot render is grown into the grammar, once, never invented beside it.
+  if(blocker.kind==='grammar-gap')return growGrammar(store,state,op,report,blocker,ctx);
   if(blocker.kind==='sds-gap'){
     if(ctx.work&&reopenArchitecture(store,state,op,report,ctx,blocker))return 'sds-gap';
     const design=unique([...state.inputs.filter(item=>item.kind==='sds').map(item=>item.ref),
@@ -3067,6 +3118,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     const shared=binding.sharedLedger?{owner:ledger.repository??slash(ledger.repoRoot),root:slash(ledger.workRoot)}:null;
     ctx.work={api:ledgerApi,loaded,validate,digest,node:id=>loaded.nodes.get(id)??null,
       code,ledger,at,shared:Boolean(shared),side:binding.side??null,source:binding.source,
+      // The repositories of the product by role, and the one optional role the kernel routes to itself: the
+      // grammar. Null when the binding declares none, which is a question for the user, never a guessed root.
+      roles:plain(binding.roles)?binding.roles:null,grammar:grammarRepository(binding.roles),
       repoRoot:ledger.repoRoot,workRoot:ledger.workRoot,origin:code.origin,repository:code.repository};
     repairKernelRecords(store,state,ctx,loaded);
     retemplateLanes(store,state,loaded);

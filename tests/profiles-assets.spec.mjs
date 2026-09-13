@@ -45,7 +45,9 @@ test('every operator has an ordered external-agent chain and skill-level default
   // interface.draw generates PNG candidates with the image model, which only the Codex runtime carries: one link, no overflow.
   // brand.decide also generates a placeholder mascot, so it runs on the working chain (Codex, then Opus); interface.asset
   // re-renders the artwork the candidates embed, so it needs the same image model and the same one link as interface.draw.
-  const expectedCounts={'business.decide':3,'architecture.decide':3,'brand.decide':2,'review.verify':5,'interface.draw':1,'interface.asset':1};
+  // grammar.update writes code, stories, tests and a published version, so it drops the image model entirely and
+  // carries the two runtimes that read a whole repository's conventions before changing one.
+  const expectedCounts={'business.decide':3,'architecture.decide':3,'brand.decide':2,'review.verify':5,'interface.draw':1,'interface.asset':1,'grammar.update':2};
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
     const expectedCount=expectedCounts[op]??3;
@@ -61,6 +63,10 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.equal(resolveExecutionChain({op:'interface.asset'}).candidates[0].model,'gpt-5.6-sol');
   assert.equal(resolveExecutionChain({op:'interface.asset'}).role,'working');
   assert.equal(selectExecutionTarget({op:'interface.asset',inventory:['codex','claude','qwen']}).selected.target,'gpt-5.6-sol');
+  // Growing the grammar is a code-and-publish job: the strongest coding runtimes, and never the image model.
+  assert.deepEqual(resolveExecutionChain({op:'grammar.update'}).candidates.map(x=>x.target),['claude-opus','gpt-5.6-sol']);
+  assert.equal(resolveExecutionChain({op:'grammar.update'}).role,'working');
+  assert.deepEqual(resolveExecutionChain({op:'grammar.update'}).candidates.map(x=>x.profile),['opus','gpt-5.6-sol']);
   assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates.map(x=>x.target),['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
   assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates[0].orcaLaunch,qwenLaunch);
   assert.equal(registry.orchestration.defaultOperationTarget,'qwen3.8-flash');

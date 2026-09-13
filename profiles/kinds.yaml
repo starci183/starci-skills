@@ -17,7 +17,9 @@ vocabularies:
   # declare before the kernel can launch it, and `brand.decide` authors the one brand record. `asset` is bytes
   # beside such a record - the artwork a design record declares and the build then wires in, or a generated
   # mascot or logo file under the brand record's own `assets/` - which only `interface.asset` and `brand.decide` produce.
-  mutates: [code, sds, srs, decision, design, asset, runtime, record]
+  # `grammar` is the installed design language itself - the published grammar package and the canon that names its
+  # units - which lives in its own repository and which only `grammar.update` may grow.
+  mutates: [code, sds, srs, decision, design, asset, runtime, record, grammar]
   # Why an operation exists, as the kernel records it on the op.
   origins: [ledger, shared, repair, gate, verify, architecture]
   # The report outcomes of execution/reports.mjs.
@@ -27,8 +29,11 @@ vocabularies:
   # that same distinction one layer earlier: a drawing with no settled identity to draw inside - no colour token,
   # no typography, no mascot rule - is missing the brand record, not a screen and not a design decision; artwork
   # the brand record does not permit is the same gap seen from the asset side, and no operation may close it by
-  # inventing an image. Keep this list in step with `BLOCKER_KINDS` of `execution/reports.mjs`.
-  blockers: [shared-change, sds-gap, interface-gap, brand-gap, environment, authority]
+  # inventing an image. `grammar-gap` is the third gap and the deepest one: the accepted requirement needs a shape
+  # the installed grammar cannot render and that no composition of existing contracts covers, so the language itself
+  # is short a word - grown once in the grammar package, never invented beside it in a page.
+  # Keep this list in step with `BLOCKER_KINDS` of `execution/reports.mjs`.
+  blockers: [shared-change, sds-gap, interface-gap, brand-gap, grammar-gap, environment, authority]
   # Verdicts the kernel computes about a report (never the reporter's own claim) and routes on.
   verdicts: [pass, findings, rejected, gate-failed]
   # What happens to the operation that produced the report:
@@ -101,7 +106,7 @@ kinds:
     purpose: Draw the interface before any interface code exists - screens, contracts, states, empty and error.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
-      blockers: [sds-gap, brand-gap, shared-change, authority]
+      blockers: [sds-gap, brand-gap, grammar-gap, shared-change, authority]
   interface.asset:
     family: design
     role: write
@@ -121,7 +126,7 @@ kinds:
     purpose: Build the interface the drawing settled, against that drawing and nothing invented beside it.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
-      blockers: [shared-change, sds-gap, interface-gap, brand-gap, environment, authority]
+      blockers: [shared-change, sds-gap, interface-gap, brand-gap, grammar-gap, environment, authority]
   backend.implement:
     family: build
     role: implement
@@ -142,6 +147,19 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, sds-gap, environment, authority]
+  # The language itself, grown by one word. Like `architecture.revise` it belongs to no lane: nothing schedules it,
+  # a reported `grammar-gap` creates it, and it changes a repository of its own - the grammar package, its stories
+  # and tests, its published version and the canon that names its units - never a product page.
+  grammar.update:
+    family: build
+    role: implement
+    operator: grammar.update
+    readOnly: false
+    mutates: [code, grammar]
+    purpose: "Grow the installed grammar by one semantic unit the product needs and no composition of existing contracts renders: implement it in the grammar package with its stories and tests, publish it, bump the consumer, and record it in the canon."
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, environment, authority]
   uat.verify:
     family: prove
     role: verify
@@ -328,6 +346,16 @@ routes:
       An operation with no settled identity to work inside waits for the brand record and then reads it. A
       colour token, a typeface or a mascot rule is settled once, in one place; it is never invented by the
       operation that happened to need it first.
+  - id: grammar-gap-grows-the-grammar
+    on: {blocker: grammar-gap}
+    from: any
+    to: {kind: grammar.update, origin: architecture}
+    limit: 2
+    then: reopen
+    purpose: |-
+      A shape the grammar cannot render is grown into the grammar once, as a semantic unit, never invented
+      beside it in a page. The operation that found the word missing waits for the published version and reads
+      the canon again; past two rounds for one node the workflow asks the user.
   - id: shared-change-from-an-api-proof-is-a-backend-build
     on: {blocker: shared-change}
     from: e2e.verify

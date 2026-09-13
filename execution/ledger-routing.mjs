@@ -29,6 +29,14 @@ export const LEDGER_SOURCES=['option','workspace','local'];
 export const ROLE_SIDES={be:'backend',backend:'backend',api:'backend',server:'backend',
   fe:'frontend',frontend:'frontend',web:'frontend',app:'frontend',landing:'frontend'};
 /**
+ * The optional repository role that owns the installed design grammar - the published package and the canon that
+ * names its units - declared like every other role (`{pathFromSource, gitRepository, package?}`). It delivers no
+ * side of the product, so it constrains no layout and takes no Work node; it exists so a reported `grammar-gap`
+ * has a repository to be grown in. A binding that declares none is not a defect, it is a product whose grammar
+ * this workflow may not change, and the kernel says so instead of routing the gap somewhere else.
+ */
+export const GRAMMAR_ROLE='grammar';
+/**
  * Paths inside a ledger the kernel writes itself: a node's `index.yaml`, everything under an `evidence/`
  * folder, and the `_local` runtime tree. A pending change anywhere else under a shared ledger is somebody
  * else's authored work, and a kernel that committed over it would be committing what it never read.
@@ -81,14 +89,28 @@ function routeDirectory(route,source){
   return relative?path.resolve(source,relative):null;
 }
 
-/** The repositories of one binding as routes: role, declared directory and declared origin. */
+/** The repositories of one binding as routes: role, declared directory, declared origin and declared package. */
 export function bindingRoutes(binding,{source}={}){
   const base=path.resolve(required(source,'source directory'));
   return Object.entries(plain(binding?.repositories)?binding.repositories:{})
     .filter(([,route])=>plain(route))
     .map(([role,route])=>({role,directory:routeDirectory(route,base),
-      origin:normalizeOrigin(route.gitRepository??route.origin??null),declared:route.gitRepository??route.origin??null}))
+      origin:normalizeOrigin(route.gitRepository??route.origin??null),declared:route.gitRepository??route.origin??null,
+      // Only a package-bearing role declares one today (`grammar`); for every other role it stays null.
+      package:typeof route.package==='string'&&route.package.trim()?route.package.trim():null}))
     .filter(route=>route.directory);
+}
+
+/**
+ * The grammar repository of a resolved binding, or `null`. `roles` is the role -> route map `resolveLedgerRoot`
+ * carries on a workspace-routed binding; a binding that declares no `grammar` role answers null, which is what
+ * the kernel turns into a question for the user rather than a guessed repository.
+ */
+export function grammarRepository(roles){
+  const route=plain(roles)?roles[GRAMMAR_ROLE]:null;
+  if(!plain(route)||!route.directory)return null;
+  return {role:GRAMMAR_ROLE,root:path.resolve(route.directory),origin:route.origin??null,
+    package:typeof route.package==='string'&&route.package.trim()?route.package.trim():null};
 }
 
 /** The origin a repository actually has, normalized the way a Work record names one. */
@@ -128,13 +150,14 @@ function fromOption(named){
   const nested=path.join(target,LEDGER_DIRECTORY);
   const ledgerRoot=hasFeatures(target)?target:hasFeatures(nested)?nested:null;
   need(ledgerRoot,`--ledger-root ${slash(target)} is not a Work ledger: neither ${slash(path.join(target,'features'))} nor ${slash(path.join(nested,'features'))} exists`);
-  return {source:'option',ledgerRoot,ownerRepoRoot:ownerOf(ledgerRoot),project:null,role:null,ownerRole:null,binding:null};
+  return {source:'option',ledgerRoot,ownerRepoRoot:ownerOf(ledgerRoot),project:null,role:null,ownerRole:null,roles:null,binding:null};
 }
 
 function enrich(option,{code,host,git}){
   let routed=null;try{routed=fromWorkspace({code,host,git});}catch{routed=null;}
   if(!routed)return option;
-  return {...option,project:routed.project??null,role:routed.role??null,ownerRole:routed.ownerRole??null,binding:routed.binding??null};
+  return {...option,project:routed.project??null,role:routed.role??null,ownerRole:routed.ownerRole??null,
+    roles:routed.roles??null,binding:routed.binding??null};
 }
 function fromWorkspace({code,host,git}){
   const projects=registryRoot(host);
@@ -155,6 +178,9 @@ function fromWorkspace({code,host,git}){
     matched.push({source:'workspace',project,role:mine.role,ownerRole,
       ownerRepoRoot:owner.directory,
       ledgerRoot:path.resolve(owner.directory,typeof work.pathFromRepository==='string'&&work.pathFromRepository.trim()?work.pathFromRepository.trim():LEDGER_DIRECTORY),
+      // Every role the binding declares, by name: the kernel reads the optional ones (`grammar`) from here, so a
+      // role that is not the code and not the ledger owner still reaches the operation that needs it.
+      roles:Object.fromEntries(routes.map(route=>[route.role,route])),
       binding:file});
   }
   if(!matched.length)return null;
@@ -175,7 +201,7 @@ export function resolveLedgerRoot({repoRoot,host=null,options={},git=spawnSync}=
   const resolved=named?enrich(fromOption(named),{code,host,git}):fromWorkspace({code,host,git});
   if(!resolved){
     const ledgerRoot=path.join(code,LEDGER_DIRECTORY);
-    return settle({source:'local',ledgerRoot,ownerRepoRoot:code,project:null,role:null,ownerRole:null,binding:null},code,hasFeatures(ledgerRoot));
+    return settle({source:'local',ledgerRoot,ownerRepoRoot:code,project:null,role:null,ownerRole:null,roles:null,binding:null},code,hasFeatures(ledgerRoot));
   }
   // A worktree of the owner repository itself (a branch of the backend) works its OWN copy of the tree: the
   // route names the repository, not one checkout of it, and the branch's tree is the one this job authored.
@@ -207,6 +233,7 @@ function settle(resolved,code,exists){
     ownerRepository:repositoryName(ownerRepoRoot),
     sharedLedger:!samePath(ownerRepoRoot,code),
     side:ROLE_SIDES[String(resolved.role??'').toLowerCase()]??null,
+    roles:plain(resolved.roles)?resolved.roles:null,
     exists};
 }
 

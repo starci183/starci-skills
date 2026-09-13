@@ -55,6 +55,7 @@ roleOfKind:
   backend.implement: implement
   frontend.implement: implement
   interface.implement: implement
+  grammar.update: implement
   architecture.revise: decide
   content.generate: write
   release.deliver: implement
