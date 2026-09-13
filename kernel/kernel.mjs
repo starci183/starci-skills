@@ -32,7 +32,7 @@ import {renderChecksFor} from '../checks/render.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
 import {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
-import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
+import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,openConflictDecision,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
   openOwnerAsk,provisionalLines,settleOwnerAsk,stopReasonFor} from './owner.mjs';
 import {BRAND_PAYLOAD,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
@@ -750,7 +750,9 @@ function retryOp(store,state,op,findings,ctx,reason){
   op.repairs+=1;
   if(op.repairs>retryLimitFor(reason)){
     const chosen=ctx.decide({situation:`${op.kind} ${op.id} is still failing after ${op.repairs-1} retries (${reason})`,
-      options:['retry-other-runtime','split','escalate-to-user'],
+      // A record author (an intake, a migration, a node author) is one operation over one record set: splitting it
+      // by allowlist entry made four half-intakes of one feature. Only a build is ever split.
+      options:op.intake||authorsRecord(op.kind)?['retry-other-runtime','escalate-to-user']:['retry-other-runtime','split','escalate-to-user'],
       context:{goal:firstLine(op.goal),allowlist:op.allowlist,findings,runtime:op.runtime},cwd:ctx.cwd});
     const option=chosen?.ok?chosen.value.option:'escalate-to-user';
     store.appendEvent({event:'decide',op:op.id,option,rationale:chosen?.ok?chosen.value.rationale:'decide produced no valid option'});
@@ -2148,6 +2150,18 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     if(op.kind===kind)continue;
     store.appendEvent({event:'kind-renamed',op:op.id,from:op.kind,to:kind,...(hidden?{hidden:true}:{})});
     op.kind=kind;
+  }
+  // Split children an older rule made of a record author are withdrawn: half an intake is not an operation.
+  for(const op of state.ops.filter(item=>item.origin==='repair'&&authorsRecord(item.kind)&&!item.nodeId&&/ - only \`/.test(String(item.goal??''))&&['pending','ready','blocked'].includes(item.status)&&item.refusal!=='superseded')){
+    op.status='blocked';op.refusal='superseded';op.dispatch=null;op.terminal=null;
+    store.appendEvent({event:'split-withdrawn',op:op.id,kind:op.kind,reason:'a record author is never split'});
+  }
+  // A conflict an older rule parked for the owner is taken provisionally now: the decision record the intake wrote
+  // is read by one detached decision.prepare, and the line leaves the owner's list.
+  for(const item of state.needUser.filter(entry=>entry.kind==='decision'&&entry.record&&entry.op&&byId(state,entry.op)?.intake)){
+    const intake=byId(state,item.op);
+    const ask=openConflictDecision(store,state,intake,{record:null,decision:item.record,detail:String(item.detail??'').replace(/ - answer with workflow-answer.*$/,''),options:item.options??[]},ctx);
+    if(ask){state.needUser=state.needUser.filter(entry=>entry!==item);store.appendEvent({event:'conflict-taken-provisionally',op:intake.id,record:item.record,ask:ask.id});}
   }
   // An op the validator exhausted gets one more round on a fresh kernel start: the validator's rules may have changed.
   for(const op of state.ops)if(op.status==='blocked'&&!op.refusal&&(op.validatorRejects??0)>=validatorRejectLimit()&&!op.validatorReset){op.status='ready';op.validatorRejects=0;op.validatorReset=true;op.dispatch=null;op.terminal=null;state.needUser=state.needUser.filter(item=>!(item.op===op.id&&item.kind==='validator'));}

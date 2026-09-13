@@ -1,5 +1,6 @@
 import {describeNode,grammarReferences,plain,slash,unique,validateCommandAt} from './common.mjs';
 import {decisionKindFor,intakeKindFor} from './io.mjs';
+import {openConflictDecision} from './owner.mjs';
 
 /**
  * The intake: the one operation that exists because the tree does NOT hold what the job is about.
@@ -144,13 +145,11 @@ function reconcileIntake(store,state,op,ctx,tree,scope){
   const counts=plain(result.counts)?result.counts:{};
   store.appendEvent({event:'reconciled',op:op.id,scope,...counts});
   for(const conflict of (Array.isArray(result.conflicts)?result.conflicts:[]).filter(plain)){
-    // The owner settles a conflict, exactly as they settle a `decision.prepare`: the same item shape, the same
-    // command, the same answer path. The kernel never picks a side and never averages two decided records.
-    if(state.needUser.some(item=>item.kind==='decision'&&item.op===op.id&&item.record===(conflict.decision??null)))continue;
-    state.needUser.push({op:op.id,kind:'decision',
-      detail:`${conflict.detail??`${conflict.record} conflicts with what ${scope} needs`} - answer with workflow-answer --id ${state.id} --op ${op.id} --choice <n> [--note "..."]`,
-      record:conflict.decision??null,options:[...(conflict.options??[])],requesters:[op.id]});
-    store.appendEvent({event:'reconciliation-conflict',op:op.id,record:conflict.record??null,decision:conflict.decision??null});
+    // A conflict is a decision like every other: the runtime takes the recommendation the intake wrote into the
+    // decision record, provisionally, through one detached decision.prepare, and the owner overturns it later.
+    // The kernel never picks a side itself and never averages two decided records; the work is not held.
+    const ask=openConflictDecision(store,state,op,conflict,ctx);
+    store.appendEvent({event:'reconciliation-conflict',op:op.id,record:conflict.record??null,decision:conflict.decision??null,ask:ask?.id??null,provisional:Boolean(ask)});
   }
   return null;
 }
