@@ -538,8 +538,9 @@ node <skill>/bin/starci.mjs workflow-answer --host <skill> --id <id> --op <intak
 The goal page carries the critique with `### Conflicts for the owner` when the critic finds one; after
 approval the intake op runs (`intake-planned {mode: reconcile}`), its report is checked mechanically
 (`reconciled {reference, conflict, new}`), every `conflict` row is listed for the owner as a `decision` item
-(`reconciliation-conflict`) and answered with `workflow-answer` naming the intake op, and `workflow-status`
-shows the table under `## Reconciliation`. The unit version of the proof is `tests/reconciliation.spec.mjs`
+(`reconciliation-conflict`) and answered with `workflow-answer` naming the intake op. `workflow-status` lists
+that conflict under `## Needs you`; the table itself is read from the feature's module record, because the
+status page prints `## Integrations` and not a reconciliation section. The unit version of the proof is `tests/reconciliation.spec.mjs`
 (the seven findings, one test each, plus "a full pass counts the three cases and hands the conflict to the
 owner with its numbered options") and the kernel test **"an accepted intake settles by what the tree holds
 under its scope and the workflow finishes done, asking nothing about a node called null"** in
