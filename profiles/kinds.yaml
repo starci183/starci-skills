@@ -24,6 +24,12 @@ vocabularies:
   origins: [ledger, shared, repair, gate, verify, architecture]
   # The report outcomes of execution/reports.mjs.
   outcomes: [done, partial, failed, ask, blocked]
+  # What a host may offer beyond a worktree and a runtime. A kind lists what it `needs` from this vocabulary and
+  # runs only on a host that declares it: the Orca IDE declares `design-tool` (the drawing tooling behind
+  # `interface.draw`), the headless host - a chat driving the kernel through `claude -p` / `codex exec` processes -
+  # declares nothing. A kind without `needs` runs on every host. Keep this list in step with `CAPABILITIES` of
+  # `execution/kind-graph.mjs` and the host descriptors of `execution/orca-calls.mjs` / `execution/orca-headless.mjs`.
+  capabilities: [design-tool]
   # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
   # walk that finds the interface design silent is not an SDS gap and must not be routed as one. `brand-gap` is
   # that same distinction one layer earlier: a drawing with no settled identity to draw inside - no colour token,
@@ -103,6 +109,9 @@ kinds:
     operator: interface.draw
     readOnly: false
     mutates: [design]
+    # Drawing needs the host's design tooling; a host without it refuses the op (`host-unsupported`) and the
+    # frontend lanes behind the ui node keep waiting, which is the design gate doing its job.
+    needs: [design-tool]
     purpose: Draw the interface before any interface code exists - screens, contracts, states, empty and error.
     reports:
       outcomes: [done, partial, failed, ask, blocked]

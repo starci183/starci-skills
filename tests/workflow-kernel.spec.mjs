@@ -5,7 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {resolveExecutionChain} from '../profiles/select.mjs';
-import {createOrcaCalls} from '../execution/orca-calls.mjs';
+import {ORCA_HOST,createOrcaCalls} from '../execution/orca-calls.mjs';
+import {HEADLESS_HOST,createHeadlessHost} from '../execution/orca-headless.mjs';
+import {reportOutcome} from '../execution/orca-protocol.mjs';
 import {buildReport} from '../execution/reports.mjs';
 import {spawnSync} from 'node:child_process';
 import {validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
@@ -15,7 +17,7 @@ import {loadsFileFor} from '../execution/runtime-loads.mjs';
 import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,rebindRunIfNeeded,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,rebindRunIfNeeded,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -214,7 +216,7 @@ const critique=(value={})=>()=>({ok:true,schema:'starci/goal-critique@1',verdict
   required:[],alternatives:[],question:null,provider:'stub-critic',attempt:0,attempts:[],usage:null,...value});
 const soundCritique=critique();
 
-function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,allocator=fakeAllocator(),gates=[],critiqueGoal}){
+function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,allocator=fakeAllocator(),gates=[],critiqueGoal,orca=null}){
   const repo=tmp();
   const store=createStore({repoRoot:repo,id:'20260912-104251-kernel-spec'});
   const state=createWorkflowState({job,inputs:['sds:.starciwork/features/sales/sds.md'],worktree:cwd,
@@ -223,7 +225,8 @@ function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,alloc
     critiqueGoal:critiqueGoal??soundCritique,
     renderGoalMarkdown:(value,{job:title})=>`# ${title}\n\n${value.ledger.map(item=>`- ${item.title}`).join('\n')}\n`,
     extractMaterial:()=>[{file:'sds.md',text:'design'}],cwd});
-  const fake=scriptedOrca({reportsDir:store.paths.reports,scripts});
+  // `orca` is a factory for another host (the headless one); the scripted Orca is the default.
+  const fake=orca?orca({store,scripts}):scriptedOrca({reportsDir:store.paths.reports,scripts});
   const git=fakeGit(dirty);
   const runs=[];
   const run=(options={})=>runLoop(fake.orca,store,state,{cwd,allocator,template,wait:noWait,
@@ -2679,3 +2682,135 @@ test('a critic no provider could answer is recorded as unavailable and the workf
     assert.doesNotMatch(contract,/## Goal critique/);
     assert.equal(approve(harness.store,harness.state).approved,true,'a dead provider is never a veto over the owner\'s job');
   }finally{harness.cleanup();}});
+
+/* ------------------------------------------------------------------ hosts */
+
+/**
+ * The headless host with processes that never run a provider: `spawn` records each child, and the host's own
+ * blocking wait is where a pending child "finishes" - it writes the next report scripted for its op through the
+ * launcher's `report` on a host built from nothing but the environment the kernel gave it, then its pid is gone -
+ * exactly the way the scripted Orca's check finishes a live operation.
+ */
+function headlessFake({store,scripts}){
+  const root=path.join(store.dir,'headless');
+  const children=[];const alive=new Set();let pid=7000;
+  const opOf=text=>(String(text).match(/op `([^`]+)`/)??[null,'unknown'])[1];
+  const spawn=(executable,args,options)=>{const child={pid:++pid,executable,args,options,input:'',stdin:{write(text){child.input+=text;},end(){}},on(){},unref(){}};alive.add(child.pid);children.push(child);return child;};
+  const finish=()=>{
+    for(const child of children.filter(item=>alive.has(item.pid))){
+      const queue=scripts[opOf(child.input)];
+      if(!queue?.length)continue;
+      const {effect,...script}=queue.shift();
+      if(typeof effect==='function')effect();
+      const [,run]=/of run (\S+),/.exec(child.input),[,task]=/Task id: (\S+)\./.exec(child.input),[,dispatch]=/Dispatch id: (\S+)\./.exec(child.input),[,terminal]=/terminal handle: (\S+) /.exec(child.input);
+      const reporter=createHeadlessHost({cwd,calls,env:child.options.env});
+      const reported=reportOutcome(reporter,{cwd,run,from:terminal,task,dispatch,...script,reportsDir:store.paths.reports});
+      if(!reported.ok)throw Error(`the fake child could not report: ${reported.reason}`);
+      alive.delete(child.pid);
+    }
+  };
+  const orca=createHeadlessHost({cwd,root,calls,spawn,alive:id=>alive.has(id),kill:id=>alive.delete(id),sleep:finish,env:{}});
+  return {orca,children,root,dispatches:{get size(){return children.length;}}};
+}
+
+test('on the headless host a workflow runs end to end one operation at a time: each op is one headless process whose report arrives through the mailbox, and the next launches only after the previous is done',()=>{
+  const file=name=>`apps/agentos-controlplane/src/${name}/index.ts`;
+  const plan={definitionOfDone:['both slices work'],ledger:[{id:'goal-1',title:'Sales slice',inputRef:'sds:SDS-FR-SALES-03',status:'absent'}],
+    ops:['intake','catalog'].map(name=>({id:`op-${name}`,kind:'backend.implement',goal:`Implement ${name}.`,ledgerIds:['goal-1'],
+      allowlist:[file(name)],references:['sds.md'],checks:[{name:'unit',command:`npx vitest run ${name}`}],acceptance:[`${name} works`],dependsOn:[]}))};
+  const done=name=>({outcome:'done',summary:`${name} implemented.`,files:[file(name)],checks:[passing('unit',`npx vitest run ${name}`)]});
+  const harness=setup({plan,dirty:[file('intake'),file('catalog')],allocator:createAllocator({sequential:true}),
+    scripts:{'op-intake':[done('intake')],'op-catalog':[done('catalog')],'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('review','npx vitest run intake')]}]},
+    orca:headlessFake});
+  try{
+    approve(harness.store,harness.state);
+    // The kernel binds its run on the host it runs on; here the test does what workflow-run does.
+    const created=harness.fake.orca.invoke('run-create',{objective:`Workflow ${harness.state.id}`,from:'term_kernel'});
+    harness.state.run=created.receipt.result.run.id;harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:30});
+    assert.equal(state.finished?.outcome,'done',JSON.stringify(state.needUser));
+    const log=events(harness.store);
+    const host=log.find(event=>event.event==='host');
+    assert.deepEqual([host.name,host.sequential,host.maxParallelOps,host.capabilities],['headless',true,1,[]]);
+    const launches=log.filter(event=>event.event==='launched');
+    assert.deepEqual(launches.map(event=>event.op).slice(0,2).sort(),['op-catalog','op-intake']);
+    assert.equal(launches.length,3,'two implementations and the review');
+    // Strictly one after the other: the second launch follows the first acceptance, and no tick ever saw two running.
+    assert.ok(log.indexOf(launches[1])>log.findIndex(event=>event.event==='op-done'),'the second op launched only after the first was done');
+    for(const tick of log.filter(event=>event.event==='tick'))assert.ok(tick.ops.filter(item=>item.endsWith('=running')).length<=1,`two operations ran at once: ${tick.ops}`);
+    // Every op was one detached process in the worktree, told which host it is on, with its log beside the store.
+    assert.equal(harness.fake.children.length,3);
+    for(const child of harness.fake.children){
+      assert.equal(child.options.cwd,cwd);
+      assert.equal(child.options.detached,true);
+      assert.equal(child.options.env.STARCI_HOST,'headless');
+      assert.equal(child.options.env.STARCI_HEADLESS_ROOT,harness.fake.root);
+      assert.match(child.input,/=== HEADLESS PREAMBLE ===[\s\S]*# Operation contract/);
+    }
+    assert.equal(fs.readdirSync(harness.fake.root).filter(name=>name.endsWith('.log')).length,3);
+    assert.equal(fs.readFileSync(path.join(harness.fake.root,'mailbox.jsonl'),'utf8').trim().split('\n').length,3);
+    assert.deepEqual(state.ops.map(op=>[op.id,op.status]),[['op-intake','done'],['op-catalog','done'],['verify-1','done']]);
+    // Accepted ops released their processes: nothing is listed on the host any more.
+    assert.deepEqual(harness.fake.orca.invoke('worker-list',{run:state.run}).receipt.result.workers,[]);
+  }finally{harness.cleanup();}
+});
+
+test('an interface.draw op on a host without the design tool is host-unsupported: one host item, the frontend lane behind it keeps waiting, the rest finishes, and an approval from a host that has the tool re-admits it',()=>{
+  const intake='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED,WORK_NODES[0],WORK_NODES[1]],dirty:[file],ledgerApi:brandLedger,
+    scripts:{[intake]:[{outcome:'done',summary:'Intake implemented.',files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      [`${intake}-verify`]:[{outcome:'done',summary:'The intake scenarios pass through the API.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({host:HEADLESS_HOST,maxIterations:30});
+    const ui=state.ops.find(op=>op.id===UI);
+    assert.equal(ui.status,'blocked');
+    assert.equal(ui.refusal,'host-unsupported');
+    assert.deepEqual(state.needUser.filter(item=>item.kind==='host').map(item=>[item.op,item.kind]),[[UI,'host']]);
+    assert.match(state.needUser.find(item=>item.kind==='host').detail,/needs design-tool, which the headless host does not have/);
+    const log=events(harness.store);
+    assert.deepEqual(log.filter(event=>event.event==='op-host-unsupported').map(event=>[event.op,event.kind,event.host,event.missing]),[[UI,'interface.draw','headless',['design-tool']]]);
+    // Nothing of the drawing ever reached the host; the build behind it is still held by the design gate - correctly, there is no drawing to build from.
+    assert.equal([...harness.fake.dispatches.values()].some(item=>item.op===UI),false);
+    assert.deepEqual(log.filter(event=>event.event==='lane-waits-design').map(event=>[event.node,event.design]),[[CART,UI]]);
+    assert.equal(state.ops.some(op=>op.nodeId===CART),false);
+    // The backend slice ran and finished on this same host; the workflow ends blocked on the one host item.
+    assert.equal(state.ops.find(op=>op.id===intake).status,'done');
+    assert.equal(harness.read(intake).state,'done');
+    assert.equal(state.finished.outcome,'blocked');
+    assert.ok(state.needUser.some(item=>item.kind==='host'),'the final report names the host item');
+    // Approving again from a host without the tool changes nothing; from Orca the op is ready and its item is gone.
+    approve(harness.store,harness.state,{host:HEADLESS_HOST});
+    assert.equal(harness.state.ops.find(op=>op.id===UI).status,'blocked');
+    assert.equal(harness.state.ops.find(op=>op.id===UI).refusal,'host-unsupported');
+    assert.equal(harness.state.needUser.some(item=>item.kind==='host'),true);
+    approve(harness.store,harness.state,{host:ORCA_HOST});
+    const readmitted=harness.state.ops.find(op=>op.id===UI);
+    assert.equal(readmitted.status,'ready');
+    assert.equal(readmitted.refusal,null);
+    assert.equal(harness.state.needUser.some(item=>item.kind==='host'),false);
+    assert.deepEqual(events(harness.store).filter(event=>event.event==='op-readmitted'&&event.op===UI).map(event=>event.host),['orca']);
+    assert.equal(harness.state.finished,null,'the blocked finish is cleared for the next kernel');
+    // One rule decides both the refusal and the re-admission.
+    assert.deepEqual(hostMissing(HEADLESS_HOST,'interface.draw'),['design-tool']);
+    assert.deepEqual(hostMissing(ORCA_HOST,'interface.draw'),[]);
+    assert.deepEqual(hostMissing(HEADLESS_HOST,'backend.implement'),[]);
+    assert.deepEqual(hostDescriptorOf({}),{...ORCA_HOST,capabilities:[...ORCA_HOST.capabilities]});
+    assert.deepEqual(hostDescriptorOf({host:HEADLESS_HOST}),{name:'headless',capabilities:[],sequential:true});
+  }finally{harness.cleanup();}
+});
+
+test('the answer the kernel gave to an op\'s question travels in the contract of its next attempt',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    const state=harness.store.loadState();
+    const op=state.ops[0];
+    const before=renderContract({template,op,state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
+    assert.doesNotMatch(before,/## Answer to the question you asked earlier/);
+    op.answer='Use the existing intake table; do not add a migration.';
+    const after=renderContract({template,op,state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
+    assert.match(after,/## Answer to the question you asked earlier\nUse the existing intake table; do not add a migration\.\nAct on it; do not ask the same question again\.\n\n## Acceptance/);
+  }finally{harness.cleanup();}
+});

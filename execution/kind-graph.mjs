@@ -31,6 +31,13 @@ export const OUTCOMES=Object.freeze(['done','partial','failed','ask','blocked'])
 export const BLOCKERS=Object.freeze(['shared-change','sds-gap','interface-gap','brand-gap','grammar-gap','environment','authority']);
 export const VERDICTS=Object.freeze(['pass','findings','rejected','gate-failed']);
 export const THEN=Object.freeze(['retry','reopen','pause','settle','needUser']);
+/**
+ * What a host may have to offer beyond a worktree and a runtime: `design-tool` is the design tooling the Orca
+ * IDE gives an `interface.draw` operation. A kind that `needs` one runs only on a host that declares it; a
+ * host without it refuses the operation at schedule time instead of launching it into a process that cannot
+ * do the work.
+ */
+export const CAPABILITIES=Object.freeze(['design-tool']);
 /** Route targets that are resolved from the reporter's context instead of naming a kind outright. */
 export const SAME='same';
 export const LANE_BUILD='lane.build';
@@ -93,6 +100,8 @@ export function isReadOnly(kind,{profile=null}={}){return kindRecord(kind,{profi
 export function mutationsOf(kind,{profile=null}={}){return listOf(kindRecord(kind,{profile}).mutates);}
 /** The launchable operator contract behind a kind: `frontend.implement` is carried by `interface.implement`. */
 export function operatorOf(kind,{profile=null}={}){return kindRecord(kind,{profile}).operator??kind;}
+/** The host capabilities a kind needs before it may be launched; `[]` for every kind that runs anywhere. */
+export function needsOf(kind,{profile=null}={}){return listOf(kindRecord(kind,{profile}).needs);}
 /** What a kind may report: outcomes it may end with and blocker kinds it may raise. */
 export function reportsOf(kind,{profile=null}={}){
   const reports=kindRecord(kind,{profile}).reports;
@@ -280,6 +289,7 @@ export function validateGraph(given=null,{runtimes=null,operators=null}={}){
   const mutations=vocabulary(profile,'mutates',MUTATIONS),origins=vocabulary(profile,'origins',ORIGINS);
   const outcomes=vocabulary(profile,'outcomes',OUTCOMES),blockers=vocabulary(profile,'blockers',BLOCKERS);
   const verdicts=vocabulary(profile,'verdicts',VERDICTS),thens=vocabulary(profile,'then',THEN);
+  const capabilities=vocabulary(profile,'capabilities',CAPABILITIES);
   const catalogue=Object.keys(profile.kinds);
   const predicates=plain(profile.predicates)?Object.keys(profile.predicates):[];
 
@@ -297,6 +307,9 @@ export function validateGraph(given=null,{runtimes=null,operators=null}={}){
     for(const entry of mutates)if(!mutations.includes(entry))fail(errors,'unknown-mutation',`Kind ${kind} may not mutate the unknown thing ${entry}`,{kind,mutates:entry});
     if(record.readOnly===true&&mutates.length)fail(errors,'readonly-mutates',`Kind ${kind} is readOnly and may not declare mutates`,{kind,mutates});
     if(record.readOnly===false&&!mutates.length)fail(errors,'mutates-nothing',`Kind ${kind} is not readOnly but changes nothing; declare what it mutates`,{kind});
+    // A need the vocabulary does not know is a typo no host could ever satisfy: the kind would be refused everywhere.
+    if(record.needs!==undefined&&!Array.isArray(record.needs))fail(errors,'needs-shape',`Kind ${kind} must declare needs as a list of capabilities`,{kind});
+    for(const entry of listOf(record.needs))if(!capabilities.includes(entry))fail(errors,'unknown-capability',`Kind ${kind} needs the unknown capability ${entry}`,{kind,capability:entry});
     const reports=plain(record.reports)?record.reports:null;
     if(!reports){fail(errors,'missing-reports',`Kind ${kind} must declare the outcomes it may report`,{kind});continue;}
     const reported=listOf(reports.outcomes);

@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {readDistJson} from '../core/runtime-root.mjs';
 import {resolveExecutionChain} from '../profiles/select.mjs';
 import {createOrcaCalls,defaultOrcaExecutable,getPath} from './orca-calls.mjs';
+import {HOST_ENV,createHeadlessHost,headlessRoot} from './orca-headless.mjs';
 import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} from './supervision.mjs';
 import {protocolMain} from './orca-protocol.mjs';
 import {kernelMain} from './workflow-kernel.mjs';
@@ -19,6 +20,23 @@ import {repositoryRoot} from './workflow-store.mjs';
  */
 export {defaultOrcaExecutable};
 export const supervisedQwenModel='qwen3.8-flash';
+/**
+ * The hosts a launcher command may run against. `orca` is the runner every command always had; `headless` is
+ * `execution/orca-headless.mjs`, the same call surface answered with child processes and files, selected with
+ * `--host-adapter headless` or with `STARCI_HOST=headless` in the environment - which is what the kernel sets on
+ * every operation process it spawns, so a child's own `report` lands in the host mailbox without a flag.
+ */
+export const HOST_ADAPTERS=Object.freeze(['orca','headless']);
+export function hostAdapterOf(options={},env=process.env){
+  const named=options['host-adapter']??(env?.[HOST_ENV]==='headless'?'headless':'orca');
+  need(HOST_ADAPTERS.includes(named),`--host-adapter must be one of ${HOST_ADAPTERS.join(', ')}: ${named}`);
+  return named;
+}
+/** The runner for one command: Orca's typed CLI runner, or the headless host rooted where its files belong. */
+export function createHostRunner({adapter,cwd=process.cwd(),env=process.env,reportsDir=null}={}){
+  if(adapter==='headless')return createHeadlessHost({cwd,env,root:headlessRoot({cwd,env,reportsDir})});
+  return createOrcaCalls();
+}
 export const qwenLaunchMode='command-terminal';
 const OP_LAUNCH='starci/orca-supervised-op-launch@2';
 const SETTLEMENT='starci/orca-supervised-settlement@1';
@@ -512,7 +530,11 @@ function usage(){return `Usage:
     removes the merged lane worktree from Orca and from git and keeps its branch. Refused while the kernel is
     alive (workflow-stop first) and while the lane has not been merged into its base branch.
   node orca-supervised-launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000] [--worktree <repo>]
-  node orca-supervised-launch.mjs verify`;}
+  node orca-supervised-launch.mjs verify
+  Every command accepts --host-adapter orca|headless (default orca; headless when STARCI_HOST=headless). The
+  headless host runs the same kernel without Orca: operations are one-at-a-time claude -p / codex exec
+  processes in the worktree, reports reach the kernel through a mailbox file, and a kind that needs a host
+  capability the headless host lacks (interface.draw needs design-tool) is refused as host-unsupported.`;}
 
 const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-run','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
@@ -524,7 +546,7 @@ const VIEW_COMMANDS=['workflow-list'];
  */
 const printed=(schema,command,print,rest={})=>({schema,command,...rest,print});
 
-export function main(argv=process.argv.slice(2),{orca,wait}={}){
+export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
   const {command,options}=parseArgs(argv);
   need(['start-op','settle','sweep','verify','notify','report','wait',...KERNEL_COMMANDS,...VIEW_COMMANDS].includes(command),usage());
   if(VIEW_COMMANDS.includes(command)){
@@ -532,10 +554,11 @@ export function main(argv=process.argv.slice(2),{orca,wait}={}){
     const workflows=buildList({repoRoot:repositoryRoot(options.worktree?exactWorktree(options.worktree).path:process.cwd())});
     return options.json==='true'?{schema:WORKFLOW_LIST,command,workflows}:printed(WORKFLOW_LIST,command,renderList(workflows),{workflows:workflows.length});
   }
-  const runner=orca??createOrcaCalls();
+  const adapter=hostAdapterOf(options,env);
+  const runner=orca??createHostRunner({adapter,cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),env,reportsDir:options['reports-dir']??null});
   if(KERNEL_COMMANDS.includes(command)){
     const cwd=options.worktree?exactWorktree(options.worktree).path:process.cwd();
-  if(command==='workflow-supervise')return supervisorMain(options,{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd()});
+  if(command==='workflow-supervise')return supervisorMain(options,{cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),runner});
     if(command==='workflow-status'){
       // The kernel's own status record stays the machine shape; the view is the page a human reads.
       const status=kernelMain(command,options,{orca:runner,cwd,wait});

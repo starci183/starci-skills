@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator} from '../execution/runtime-allocator.mjs';
+import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../execution/runtime-allocator.mjs';
 import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../execution/runtime-loads.mjs';
 
 const profile=parseYaml(fs.readFileSync(new URL('../profiles/runtimes.yaml',import.meta.url),'utf8'));
@@ -408,4 +408,21 @@ test('two kernels write the one ledger under a lock and both their launches surv
   assert.equal(open(second).allocate('architecture.decide').runtime,'gpt-6-astra');
   one.release('claude-fable-5.1',{op:'op-first'});
   assert.deepEqual(shared.read().runtimes['claude-fable-5.1'].live.map(item=>item.op),['op-second']);
+});
+
+test('a sequential allocator hands out one operation at a time whatever the profile or the quota says',()=>{
+  const allocator=createAllocator({runtimes:profile,now:()=>0,sequential:true,quota:{order:['gpt-5.6-sol','claude-opus'],slots:{'gpt-5.6-sol':5,'claude-opus':3}}});
+  assert.equal(allocator.maxParallelOps,1);
+  assert.equal(allocator.sequential,true);
+  assert.ok(Object.values(allocator.snapshot().runtimes).every(pool=>pool.slots<=1),'no pool keeps more than one slot');
+  const first=allocator.allocate('backend.implement');
+  assert.equal(first.ok,true);
+  const second=allocator.allocate('backend.implement');
+  assert.equal(second.ok,false);
+  assert.match(second.reason,/maxParallelOps 1 is already in flight/);
+  allocator.release(first.runtime);
+  assert.equal(allocator.allocate('review.verify',{avoid:[first.runtime]}).ok,true,'a freed slot takes the next operation');
+  // The cap never opens a pool the quota closed, and the default allocator is not sequential.
+  assert.deepEqual(sequentialRuntimes({maxParallelOps:10,runtimes:{a:{maxParallel:4},b:{maxParallel:0}}}),{maxParallelOps:1,runtimes:{a:{maxParallel:1},b:{maxParallel:0}}});
+  assert.equal(createAllocator({runtimes:profile,now:()=>0}).sequential,false);
 });

@@ -43,6 +43,7 @@ execution/kind-graph.mjs
 execution/work-ledger.mjs
 execution/ledger-routing.mjs
 execution/orca-adapter.mjs
+execution/orca-headless.mjs
 providers/validate.mjs
 scripts/config.mjs
 scripts/plan.mjs

@@ -9,6 +9,13 @@ import {readDistJson} from '../core/runtime-root.mjs';
  */
 export const RESULT_SCHEMA='starci/orca-call-result@1';
 export const defaultOrcaExecutable=process.platform==='win32'?'orca.exe':'orca';
+/**
+ * What the Orca host is to the kernel: its name, the capabilities an operation kind may `need` (Orca carries
+ * the design tooling `interface.draw` draws with), and that it runs operations in parallel. The headless host
+ * (`execution/orca-headless.mjs`) declares the same shape with no capability and sequential execution, and the
+ * kernel reads nothing else about a host.
+ */
+export const ORCA_HOST=Object.freeze({name:'orca',capabilities:Object.freeze(['design-tool']),sequential:false});
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
@@ -186,7 +193,7 @@ export function createOrcaCalls({executable=defaultOrcaExecutable,calls=loadOrca
     if(context.outcome!=='ok')return {ok:false,errors:[`agent-context failed: ${context.reason}`],commandCount:0,result:context};
     return {...verifyLiveSchema(calls,context.receipt),result:context};
   }
-  return {calls,executable,invoke,verify};
+  return {calls,executable,invoke,verify,host:ORCA_HOST};
 }
 
 /** Return the receipt of an ok result or throw an error that carries the typed envelope. */

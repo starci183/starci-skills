@@ -120,8 +120,23 @@ function budgetReaderOf(budget){
   if(plain(budget.providers))return ()=>budget;
   return null;
 }
-export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null,shared=null,budget=null}={}){
+/**
+ * One operation at a time, whatever the profile or the quota says: `maxParallelOps` becomes 1 and every pool
+ * keeps at most one slot. The headless host needs this because its operations are detached `claude -p` /
+ * `codex exec` processes in one worktree with no terminal to supervise them from - two of them would race on
+ * the same index and the same allowlist arbitration a chat cannot see - and because one chat drives one
+ * workflow: the owner reads one operation's outcome at a time. A pool the quota closed (0 slots) stays closed.
+ */
+export function sequentialRuntimes(runtimes){
+  const copy=structuredClone(runtimes);
+  copy.maxParallelOps=1;
+  for(const pool of Object.values(plain(copy.runtimes)?copy.runtimes:{}))if(plain(pool))pool.maxParallel=Math.min(1,Math.max(0,finite(pool.maxParallel,1)));
+  return copy;
+}
+export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null,shared=null,budget=null,sequential=false}={}){
   runtimes=applyQuota(runtimes,quota);
+  // The cap is applied after the quota on purpose: a quota widens slots, and a sequential host never lets it.
+  if(sequential)runtimes=sequentialRuntimes(runtimes);
   need(plain(runtimes)&&plain(runtimes.runtimes),'Runtime allocation needs a runtimes profile with a runtimes map');
   const pools=runtimes.runtimes,ids=Object.keys(pools),allocation=plain(runtimes.allocation)?runtimes.allocation:{};
   need(ids.length,'Runtime allocation needs at least one runtime pool');
@@ -233,6 +248,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     schema:ALLOCATION,
     policy,
     maxParallelOps,
+    sequential:Boolean(sequential),
     runtimeIds:[...ids],
     roleFor,
     review,
