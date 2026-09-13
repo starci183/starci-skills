@@ -1407,6 +1407,125 @@ test('a reported SDS gap routes to architecture.revise on the architecture node 
   }finally{harness.cleanup();}
 });
 
+/**
+ * The owner's ruling of 2026-09-14, on the tree. A requirement the SRS does not settle is not a reason to stop
+ * and not a design question either: the business node that owns the record is reopened, the requirement is
+ * revised towards its most reasonable reading with the reason in its decision log, its `rev` is bumped, and the
+ * operation that could not derive its work from it reads the settled record behind it.
+ */
+const SALES_SRS=`schema: work/node@2
+id: demo.sales.business.srs.intake
+kind: business
+required: true
+state: done
+description: What order intake must do.
+`;
+const SALES_BUSINESS={id:'demo.sales.business.srs.intake',path:'features/sales/business/srs/intake/index.yaml',
+  kind:'business',state:'done',eligible:false,inputDigest:DIGEST('s'),dependsOn:[],refs:[],blockedBy:[],children:[],
+  completion:{inputDigest:DIGEST('s')},authored:SALES_SRS};
+
+test('a reported requirement gap routes to business.revise on the business node, reopens the requester and bumps the rev',()=>{
+  const file='apps/agentos-controlplane/src/sales/intake.ts';
+  const requirement='.starciwork/features/sales/business/srs/intake/index.yaml';
+  const harness=setupWork({nodes:[...WORK_NODES,SALES_BUSINESS],dirty:[file,requirement],
+    scripts:{'demo.sales.implementation.backend.intake':[
+      {outcome:'blocked',summary:'The SRS says both that a partial order is billable and that it is not.',files:[],checks:[],
+        blocker:{kind:'srs-gap',detail:'features/sales/business/srs/intake/index.yaml does not settle whether a partial order is billable'}},
+      {outcome:'done',summary:'Intake implemented against the settled requirement.',files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      'business-1':[{outcome:'done',summary:'rev 1: a partial order is billable for the fulfilled lines only.',files:[requirement],
+        checks:[passing('work-tree-validates','starci validate')]}],
+      [`${'demo.sales.implementation.backend.intake'}-verify`]:[{outcome:'done',summary:'The intake scenarios pass through the API on the real stack.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      ...receiptAuthor()}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:20});
+    const gap=harness.store.readEvents().find(event=>event.event==='srs-gap');
+    assert.equal(gap.business,'demo.sales.business.srs.intake');
+    assert.equal(gap.revise,'business-1');
+    const revise=state.ops.find(item=>item.id==='business-1');
+    // The route names the kind and the origin: a requirement gap is a requirement repair, never a design one.
+    assert.equal(revise.kind,'business.revise');
+    assert.equal(revise.origin,'business');
+    assert.equal(revise.nodeId,'demo.sales.business.srs.intake');
+    assert.deepEqual(revise.allowlist,[requirement,'.starciwork/features/sales/business/srs/intake/**']);
+    assert.match(revise.goal,/State the readings the record admits/);
+    assert.match(revise.goal,/say why in the decision log and bump its rev/);
+    assert.equal(revise.status,'done');
+    const route=harness.store.readEvents().find(event=>event.event==='routed'&&event.on==='srs-gap');
+    assert.deepEqual([route.op,route.to,route.origin,route.kind,route.then],
+      ['demo.sales.implementation.backend.intake','business-1','business','business.revise','reopen']);
+    // The implementation waited for the revision, then read the settled requirement.
+    const implement=state.ops.find(item=>item.id==='demo.sales.implementation.backend.intake');
+    assert.ok(implement.dependsOn.includes('business-1'));
+    assert.equal(implement.status,'done');
+    assert.ok(harness.store.readEvents().some(event=>event.event==='op-reopened'&&event.op===implement.id&&event.waitingFor==='business-1'));
+    // Accepting the revision settles the node as a decision WITH a bumped rev: a reopened requirement is not
+    // read as the first one, and everything built on the old reading is bound to the rev it was built under.
+    const business=harness.read('demo.sales.business.srs.intake');
+    assert.equal(business.extensions.work3.kernel.rev,1);
+    assert.equal(business.state,'done');
+    assert.equal(business.extensions.work3.kernel.reopened.length,1);
+    assert.match(business.extensions.work3.kernel.reopened[0].reason,/reported a requirement gap/);
+    assert.equal(business.completion.review.schema,'starci/design-review@1');
+    // A kernel-origin repair counts against nothing: the owner approved the goal, not this repair.
+    assert.equal(state.ops.filter(item=>item.refusal==='dynamic-op').length,0);
+  }finally{harness.cleanup();}
+});
+
+/**
+ * The other half of the same ruling, one phase earlier. A hidden decision the critic marked decisive is the
+ * owner's and is prepared before any operation of its feature runs; one it marked non-decisive costs nobody a
+ * question here at all, because the record repair settles it towards the most reasonable reading when an
+ * operation actually hits it.
+ */
+test('a decisive hidden decision is planned as an owner question before the work of its feature; a non-decisive one is not',()=>{
+  const objections=[
+    {kind:'hidden-decision',claim:'The goal decides that a support agent may refund an order',
+      evidence:'features/sales/business/srs/intake/index.yaml',consequence:'Money leaves without a manager.',decisive:true},
+    {kind:'hidden-decision',claim:'The goal names the receipt column "total_vat"',
+      evidence:'features/sales/architecture/sds/intake/index.yaml',consequence:'Two spellings of one column.',decisive:false}];
+  const harness=setupWork({nodes:[...WORK_NODES,SALES_BUSINESS],
+    critiqueGoal:critique({verdict:'revise',objections,required:['name who may refund an order']})});
+  try{
+    const state=harness.state,events=harness.store.readEvents();
+    const ask=state.ops.find(op=>op.kind==='owner.ask');
+    assert.ok(ask,'the decisive hidden decision became one owner question');
+    assert.equal(ask.question.kind,'decision','the provisional kind: the ask writes a decision record and the work goes on');
+    assert.match(ask.question.text,/a support agent may refund an order/);
+    assert.match(ask.question.text,/Money leaves without a manager/);
+    // Exactly one: the non-decisive objection is deferred to the record repair, not asked about.
+    assert.equal(state.ops.filter(op=>op.kind==='owner.ask').length,1);
+    const planned=events.filter(event=>event.event==='decision-planned');
+    assert.equal(planned.length,1);
+    assert.equal(planned[0].op,ask.id);
+    assert.equal(planned[0].feature,'sales');
+    assert.ok(events.some(event=>event.event==='hidden-decision-deferred'&&/total_vat/.test(event.claim)));
+    // It stands in front of every operation of its feature: the question is prepared before the work, not after.
+    const sales=state.ops.filter(op=>op.id!==ask.id&&/\.sales\./.test(op.id));
+    assert.ok(sales.length,JSON.stringify(state.ops.map(op=>op.id)));
+    for(const op of sales)assert.ok(op.dependsOn.includes(ask.id)||op.waitingFor===ask.id,op.id);
+    assert.deepEqual(planned[0].ops,sales.map(op=>op.id));
+    // And the owner reads on the goal page what each hidden decision costs them.
+    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    assert.match(page,/This one moves money, authority or customer data, so it is put to you before the work of its feature starts/);
+    assert.match(page,/the runtime settles it towards the most reasonable reading when an operation hits it/);
+  }finally{harness.cleanup();}
+  // A decisive decision about a feature no operation of this goal touches is reported, never turned into a
+  // question nobody is waiting for: the kernel does not invent work for a feature it is not doing.
+  const elsewhere=setupWork({nodes:[...WORK_NODES,SALES_BUSINESS],
+    critiqueGoal:critique({verdict:'revise',required:['name who may refund'],objections:[{kind:'hidden-decision',
+      claim:'The goal decides who may read a stored card',evidence:'features/billing/business/srs/cards/index.yaml',
+      consequence:'Customer data is shown to more people.',decisive:true}]})});
+  try{
+    assert.equal(elsewhere.state.ops.some(op=>op.kind==='owner.ask'),false);
+    const unplanned=elsewhere.store.readEvents().find(event=>event.event==='decision-unplanned');
+    assert.equal(unplanned.feature,'billing');
+    assert.match(unplanned.reason,/no operation of this goal touches it/);
+  }finally{elsewhere.cleanup();}
+});
+
 /* ------------------------------------------------------------------ lanes and routes */
 
 const CART='demo.sales.implementation.frontend.cart';

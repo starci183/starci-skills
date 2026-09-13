@@ -408,6 +408,53 @@ test('workflow-status prints the reconciliation of every intake: the counts the 
   assert.match(page,/## Reconciliation \(2\)\n- collab \(collab-intake\): reference 2, conflict 1, new 3; open for the owner: demo\.collab\.business\.srs\.decision\.d-intake-contract\n- brand \(brand-1\): not checked yet/);
 });
 
+/**
+ * What only the owner can provide is read once from the whole product, before anything is planned, and the
+ * status page says how far each one has got. The view is read-only and asks nothing: the operation that needs a
+ * credential, a sandbox account, a dataset or an authority asks for it in its own tab at the moment it needs it.
+ */
+test('workflow-status prints what the owner provides, with each one open, asked or provided',t=>{
+  const repoRoot=tmp(t);
+  const id='20260101-000007-provisions';
+  const dir=path.join(workflows(repoRoot),id);
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id,
+    job:'Settle transactions against the gateway',phase:'run',approved:true,ledger:[],
+    provisions:[
+      {kind:'credential',name:'VNPAY_SANDBOX_SECRET',feature:'payments',why:'no live charge can be proven without it'},
+      {kind:'account',name:'VNPay sandbox merchant',feature:'payments',why:'the gateway will not answer without one'},
+      {kind:'dataset',name:'three real bank statements',feature:'accounting',why:'reconciliation cannot be proven on invented rows'}],
+    ops:[
+      // Answered: the owner said the credential is there, so the provision is `provided`.
+      {id:'ask-1',kind:'owner.ask',status:'done',question:{kind:'credential',text:'Which value does VNPAY_SANDBOX_SECRET carry?'},
+        answer:'The owner decided on "VNPAY_SANDBOX_SECRET": credential: VNPAY_SANDBOX_SECRET present',reports:[]},
+      // Asked and still open: the question names the account, no answer yet.
+      {id:'ask-2',kind:'owner.ask',status:'ready',question:{kind:'authority',text:'Is there a VNPay sandbox merchant we may use?'},reports:[]},
+      {id:'x',kind:'backend.implement',status:'ready'}],
+    needUser:[]}));
+  writeLines(path.join(dir,'events.jsonl'),[{at:ago(5),seq:1,event:'goal-critiqued',verdict:'sound',provisions:3}]);
+  const view=buildView({repoRoot,id,now:NOW});
+  assert.deepEqual(view.provisions.map(entry=>[entry.kind,entry.name,entry.feature,entry.status,entry.asks]),[
+    ['credential','VNPAY_SANDBOX_SECRET','payments','provided',['ask-1']],
+    ['account','VNPay sandbox merchant','payments','asked',['ask-2']],
+    ['dataset','three real bank statements','accounting','open',[]]]);
+  assert.deepEqual(view.provisions[0].questionKinds,['credential']);
+  const page=renderView(view);
+  assert.match(page,/## The owner provides \(3\)/);
+  assert.match(page,/\| credential \| VNPAY_SANDBOX_SECRET \| payments \| provided \(ask-1\) \|/);
+  assert.match(page,/\| account \| VNPay sandbox merchant \| payments \| asked \(ask-2\) \|/);
+  assert.match(page,/\| dataset \| three real bank statements \| accounting \| open \|/);
+  // A workflow whose critique named none prints no section at all, rather than an empty heading.
+  const bareId='20260101-000008-no-provisions';
+  const bareDir=path.join(workflows(repoRoot),bareId);
+  fs.mkdirSync(bareDir,{recursive:true});
+  fs.writeFileSync(path.join(bareDir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',
+    id:bareId,job:'x',phase:'run',approved:true,ledger:[],ops:[],needUser:[]}));
+  const bare=buildView({repoRoot,id:bareId,now:NOW});
+  assert.deepEqual(bare.provisions,[]);
+  assert.doesNotMatch(renderView(bare),/The owner provides/);
+});
+
 test('the view prints the lane of a workflow: its worktree, its branch and the base it merged into',t=>{
   const repoRoot=tmp(t);
   const dir=path.join(workflows(repoRoot),'20260101-000000-laned');
