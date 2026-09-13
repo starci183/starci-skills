@@ -6,7 +6,7 @@ import {settleDispatch} from '../hosts/orca/launch.mjs';
 import * as graph from './graph.mjs';
 import {AUTHOR_KIND,PLAN_KIND,authorsRecord,BRAND_DECIDE,KERNEL_CHECK,RECORD_OWNED,WORK_LEDGER,WORK_OPERATION,allowRoot,describeNode,firstLine,
   gateDynamicOp,grammarReferences,inside,kernelGuards,kindRole,ledgerItem,liveStatus,locateSharedTreePaths,normalize,pathsIn,plain,
-  slash,tail,toOp,unique,UI_KIND,workModule,workOpId,workValidateCommand,byId,ledgerAccess,workRootOf} from './common.mjs';
+  slash,tail,toOp,unique,UI_KIND,validateCommandAt,workModule,workOpId,workValidateCommand,byId,ledgerAccess,workRootOf} from './common.mjs';
 import {kindsReadingBrand} from './io.mjs';
 import {brandReferencesOf,kernelProof,noteBrand,provenChecks,rereadBrand} from './verify.mjs';
 import {retemplateIntakeOps} from './intake.mjs';
@@ -524,33 +524,40 @@ export function cutReason(ctx,node,loaded=null){
  * the requirement and design it rests on, and the code its own allowlist names. It is bounded exactly as the
  * record-authoring op is: one per node per workflow (`lane.cut`), whatever it leaves behind.
  */
-export function cutOp(store,state,node,ctx,taken=new Set()){
-  const lane=laneOf(state,node);
-  if(lane.cut||ctx.work.shared&&!ctx.work.ledger?.repoRoot)return null;
-  const found=cutReason(ctx,node,ctx.work.loaded);
-  if(!found)return null;
+export function cutOpFor(node,{workRoot,found,id=`${node.id}-cut`}){
   const dir=`.starciwork/${slash(path.dirname(String(node.path??'')))}`;
-  const id=workOpId(`${node.id}-cut`,taken);
-  const op=toOp({id,nodeId:node.id,kind:PLAN_KIND,
+  return {id,nodeId:node.id,kind:PLAN_KIND,cut:{node:node.id,reason:found.reason},
     goal:`Cut the Work node ${node.id} into child nodes that can be built in parallel: ${found.reason}. Name the SEAM first - the one child that owns what every other child would otherwise touch (module wiring, DI registration, migrations, shared contracts and types) - then cut the rest by acceptance, one observable behaviour each, disjoint from every sibling and from the seam. A node that really is one behaviour is not split: report \`done\` with \`cut: none\`.`,
     // No ledger item and no ledger id: the cut closes no node - the children it writes are the nodes the tree has after it.
     ledgerIds:[],allowlist:[`${dir}/**`],
     references:unique([node.path,...(node.refs??[]),...(node.dependsOn??[]),...(node.allowlist??[])]),
-    checks:[{name:'work-valid',command:workValidateCommand(ctx)}],
+    // Named as the intake's check is, not `work-valid`: a cut may be planned at goal time, and the kernel strips
+    // its own `work-valid` from every op it loads. The kernel still validates the tree itself at acceptance.
+    checks:[{name:'work-tree-validates',command:validateCommandAt(workRoot)}],
     acceptance:[`${node.id} is a derived parent: no state, no completion, no write scope, its assertions kept as the group's acceptance under extensions.work3.groupAssertions`,
       `every child is written at ${dir}/<part>/index.yaml as work/node@2, kind implementation, state todo, required true, one observable behaviour, an allowlist of at most ${CUT_FILES} files disjoint from every sibling and from the seam, and one runnable check per assertion`,
       'exactly one child is the seam, and every other child dependsOn it',
       `every child assertion traces to the same SRS/SDS ids ${node.id} traced to`,
       'the tree validates'],
-    origin:'ledger'},state.ops.length);
+    origin:'ledger'};
+}
+/** The `cut-planned` line every planner writes, so the goal page and the run name the same measurement. */
+export const cutPlanned=(store,op,found)=>store.appendEvent({event:'cut-planned',op:op.id,node:op.nodeId,
+  reason:found.reason,files:found.files,assertions:found.assertions,components:found.components.length});
+export function cutOp(store,state,node,ctx,taken=new Set()){
+  const lane=laneOf(state,node);
+  if(lane.cut||ctx.work.shared&&!ctx.work.ledger?.repoRoot)return null;
+  const found=cutReason(ctx,node,ctx.work.loaded);
+  if(!found)return null;
+  const op=toOp(cutOpFor(node,{found,workRoot:ctx.work.ledger?.workRoot??path.join(ctx.work.repoRoot,'.starciwork'),
+    id:workOpId(`${node.id}-cut`,taken)}),state.ops.length);
   op.cut={node:node.id,reason:found.reason};
   op.difficulty='hard';
   op.createdIteration=state.iterations;
   lane.cut=op.id;
   locateSharedTreePaths(op,ctx);
   state.ops.push(op);
-  store.appendEvent({event:'cut-planned',op:op.id,node:node.id,reason:found.reason,
-    files:found.files,assertions:found.assertions,components:found.components.length});
+  cutPlanned(store,op,found);
   gateDynamicOp(store,state,op);
   return op;
 }

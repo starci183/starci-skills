@@ -1735,7 +1735,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     const ledger={repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot,
       repository:binding.ownerRepository??ledgerApi.repositoryName?.(binding.ownerRepoRoot)??null};
     const shared=binding.sharedLedger?{owner:ledger.repository??slash(ledger.repoRoot),root:slash(ledger.workRoot)}:null;
-    ctx.work={api:ledgerApi,loaded,validate,digest,node:id=>loaded.nodes.get(id)??null,
+    // The tree is re-read every iteration, so the node reader must answer over the CURRENT read and not over the
+    // one this run started with: a node a cut authored mid-run is a node the kernel has to be able to write to.
+    ctx.work={api:ledgerApi,loaded,validate,digest,node:id=>(ctx.work?.loaded??loaded).nodes.get(id)??null,
       code,ledger,at,shared:Boolean(shared),side:binding.side??null,source:binding.source,
       // The repositories of the product by role, and the one optional role the kernel routes to itself: the
       // grammar. Null when the binding declares none, which is a question for the user, never a guessed root.
