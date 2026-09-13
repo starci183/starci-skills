@@ -17,7 +17,8 @@ import {loadsFileFor} from '../execution/runtime-loads.mjs';
 import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,rebindRunIfNeeded,reportAllowlist,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
+import {machineVerify} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -1090,6 +1091,18 @@ test('a report on a shared tree is checked against both spellings of its allowli
   assert.deepEqual(reportAllowlist({allowlist:['C:/owner/backend/.starciwork/features/sales/ui/**','apps/x/**']},ctx),
     ['C:/owner/backend/.starciwork/features/sales/ui/**','.starciwork/features/sales/ui/**','apps/x/**']);
   assert.deepEqual(reportAllowlist({allowlist:['.starciwork/features/sales/ui/**']},{work:{shared:false}}),['.starciwork/features/sales/ui/**'],'a local tree is left as it is');
+});
+
+test('a check re-run for a shared-ledger op names the tree at its owner: the bare .starciwork argument becomes the absolute work root',()=>{
+  const ctx={work:{shared:true,ledger:{repoRoot:'C:/owner/backend',workRoot:'C:/owner/backend/.starciwork'}}};
+  assert.equal(sharedCheckCommand('node starci.mjs validate .starciwork',ctx),'node starci.mjs validate C:/owner/backend/.starciwork');
+  assert.equal(sharedCheckCommand('node starci.mjs validate .starciwork/features/sales',ctx),'node starci.mjs validate C:/owner/backend/.starciwork/features/sales');
+  assert.equal(sharedCheckCommand('npm run test:unit -- .starciwork-ish',ctx),'npm run test:unit -- .starciwork-ish','a longer word is not the tree');
+  assert.equal(sharedCheckCommand('node starci.mjs validate .starciwork',{work:{shared:false}}),'node starci.mjs validate .starciwork','a local tree is left as it is');
+  const seen=[];
+  const verified=machineVerify({worktree:'C:/fe'},{checks:[{name:'tree',command:'node starci.mjs validate .starciwork'}]},{exec:command=>{seen.push(command);return {status:0,stdout:'',stderr:''};},work:ctx.work});
+  assert.deepEqual(seen,['node starci.mjs validate C:/owner/backend/.starciwork']);
+  assert.equal(verified.ok,true);
 });
 
 test('a contract longer than a task can carry is handed over as its head plus the file it lives in',()=>{

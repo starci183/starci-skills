@@ -2012,7 +2012,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
     avoidRuntime(op,allocated.runtime,clockOf(ctx));
     // The attempts travel with the event: a launch that failed is only diagnosable from what Orca said at each step.
     store.appendEvent({event:'launch-failed',op:op.id,runtime:allocated.runtime,stopReason:launched?.stopReason??null,attempts:launched?.attempts?.length??0,
-      detail:(launched?.attempts??[]).slice(0,4).map(attempt=>({target:attempt.target??null,stage:attempt.stage??null,effectState:attempt.effectState??null,reason:String(attempt.reason??'').slice(0,240),...(attempt.recovery?{recovery:attempt.recovery}:{})}))});
+      detail:(launched?.attempts??[]).slice(0,4).map(attempt=>({target:attempt.target??null,stage:attempt.stage??null,effectState:attempt.effectState??null,reason:String(attempt.reason??'').slice(0,240),...(attempt.trust?{trust:attempt.trust}:{}),...(attempt.recovery?{recovery:attempt.recovery}:{})}))});
     if(op.launchFailures>=LAUNCH_LIMIT){
       op.status='blocked';
       state.needUser.push({op:op.id,kind:'environment',detail:`no runtime could launch ${op.id} (${op.launchFailures} attempts, last ${launched?.stopReason??'unknown'})`});
@@ -2223,11 +2223,21 @@ function avoidForVerify(state,op){
 /* ------------------------------------------------------------------ machine verification */
 
 /** Re-run the operation's own checks. A `done` the kernel cannot reproduce is not a `done`. */
-export function machineVerify(state,op,{exec,cwd=state.worktree}={}){
+/**
+ * A check a Work node declares names the tree the way the tree names itself (`... validate .starciwork`); on a
+ * shared ledger that tree is in the owner repository, not in this worktree, so the bare `.starciwork` argument
+ * is the owner's absolute path when the kernel re-runs it here (the sales drawing was retried for `ENOENT`).
+ */
+export function sharedCheckCommand(command,ctx){
+  const workRoot=ctx?.work?.shared?slash(ctx.work.ledger?.workRoot??''):'';
+  if(!workRoot)return command;
+  return String(command??'').replace(/(^|\s)\.starciwork(?=\s|$|\/)/g,`$1${workRoot}`);
+}
+export function machineVerify(state,op,{exec,cwd=state.worktree,work=null}={}){
   const checks=[];
   // The whole-tree validator is the kernel's own gate at acceptance, never an operation check.
   for(const check of (op.checks??[]).filter(check=>!KERNEL_CHECK.test(check.name??''))){
-    const result=exec(check.command,{cwd,timeoutMs:op.timeoutMs??CHECK_TIMEOUT_MS});
+    const result=exec(sharedCheckCommand(check.command,{work}),{cwd,timeoutMs:op.timeoutMs??CHECK_TIMEOUT_MS});
     const exitCode=Number.isInteger(result?.status)?result.status:1;
     checks.push({name:check.name,command:check.command,exitCode,evidence:tail(`${result?.stdout??''}${result?.stderr??''}`)});
   }
