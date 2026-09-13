@@ -111,6 +111,25 @@ test('legacy audit never follows junctions or symlinks to external content', t =
   assert.equal(run('audit-legacy', path.join(root, 'escape')).status, 1);
 });
 
+test('--help names every command of the one entry, the forwarded kernel commands included', () => {
+  const help = run('--help');
+  assert.equal(help.status, 0, help.stderr);
+  // `bin/starci.mjs` forwards these to the kernel launcher before this module is loaded, so nothing here
+  // answers them - but the one command line a person types is `starci <command>`, and a help page that names
+  // only half of it teaches the wrong entry. One line each, so a reader can copy the one they need.
+  const forwarded = ['workflow-goal', 'workflow-approve', 'workflow-answer', 'workflow-run', 'workflow-status',
+    'workflow-list', 'workflow-stop', 'workflow-lane-close', 'workflow-supervise',
+    'start-op', 'settle', 'sweep', 'notify', 'report', 'wait', 'verify'];
+  const lines = help.stdout.split('\n').map(line => line.trim());
+  for (const command of forwarded) assert.ok(lines.some(line => line.startsWith(`starci ${command} `) || line === `starci ${command}`), command);
+  // The checks the CLI itself owns stay on the same page, named the same way.
+  assert.ok(lines.some(line => line.startsWith('starci brand check ')), 'brand check');
+  // Every forwarded name is a command the entry really forwards; a help page may not invent one.
+  const entry = fs.readFileSync(new URL('../bin/starci.mjs', import.meta.url), 'utf8');
+  const declared = JSON.parse(entry.match(/const LAUNCHER_COMMANDS=(\[[\s\S]*?\])/)[1].replaceAll("'", '"').replace(/,\s*\]/, ']'));
+  assert.deepEqual([...forwarded].sort(), [...declared].sort());
+});
+
 test('argument errors cannot silently execute other commands', t => {
   const root = temporary(t);
   const before = snapshot(root);

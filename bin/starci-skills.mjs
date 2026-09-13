@@ -249,8 +249,15 @@ function checkMajorUpgrade(manifest, opts) {
   }
 }
 
-// Upgrade ownership only: these names are not executable legacy routing.
-const RETIRED_ROOTS = new Set(['v3', 'legacy', 'ops', 'profiles', 'contracts', 'core', 'schemas', 'specifications', 'cli', '.dist', 'alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'tests', 'workflows', 'skills', 'bin']);
+// Upgrade ownership only: these names are not executable legacy routing. A root belongs here as soon as the
+// installer owns files under it, live or retired: it is what lets an update delete an installed file the new
+// payload no longer ships, having first proved the file is unchanged since we wrote it. `profiles` is the
+// folder 5-plus renamed away and sheds on the next update; `model`, `kernel`, `hosts`, `models` and `checks`
+// are the roots it renamed it into, and they are listed for exactly the same reason every other live root
+// (`ops`, `cli`, `core`, `schemas`, `skills`, `bin`) is - so a file dropped from a later payload does not
+// linger forever beside the runtime that replaced it. `execution` stays off this list: it still carries the
+// 4.x Plan-route execution modes, which are live and are not renamed by this release.
+const RETIRED_ROOTS = new Set(['v3', 'legacy', 'ops', 'profiles', 'model', 'kernel', 'hosts', 'models', 'checks', 'contracts', 'core', 'schemas', 'specifications', 'cli', '.dist', 'alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'tests', 'workflows', 'skills', 'bin']);
 const PRESERVED_DOCUMENTATION_ROOTS = new Set(['docs','sites']);
 function retirementPlan(target, manifest) {
   const current = new Set(payloadFiles(packageRoot));

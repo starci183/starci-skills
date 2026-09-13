@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawn as spawnChild,spawnSync} from 'node:child_process';
 import {RESULT_SCHEMA,buildArgs,classifyReceipt,loadOrcaCalls,verifyLiveSchema} from '../orca/calls.mjs';
+import {hostDescriptor} from '../index.mjs';
 import {HEADLESS_PROVIDERS} from '../../models/functions.mjs';
 import {repositoryRoot} from '../../kernel/reports.mjs';
 
@@ -25,12 +26,19 @@ import {repositoryRoot} from '../../kernel/reports.mjs';
  *
  * What this host cannot do it says so: `account list` (the provider quota Orca reads) is `unsupported`, never a
  * throw, and the host declares no capability, so an operation kind whose catalog entry `needs` one (the design
- * tool behind `interface.draw`) is refused at schedule time instead of being launched into a process that has
+ * tool behind `interface.asset`) is refused at schedule time instead of being launched into a process that has
  * no tool to draw with. The host also runs strictly sequentially - see `sequential` - because one chat drives
  * one workflow and there is no terminal to supervise a second process from.
  */
 export const HEADLESS_TABLE='starci/headless-table@1';
-export const HEADLESS_HOST=Object.freeze({name:'headless',capabilities:Object.freeze([]),sequential:true});
+/**
+ * The three facts the kernel reads about this host, declared in `model/hosts.yaml` and read here through
+ * `hostDescriptor` so this adapter and `hosts/orca/calls.mjs` describe the host model from one source. It is
+ * read once at module load and frozen: a descriptor that changed under a running kernel would change what
+ * `host-unsupported` means halfway through a workflow. When no profile can be read the built-in values answer,
+ * because a host must be able to describe itself before a build exists.
+ */
+export const HEADLESS_HOST=Object.freeze({...hostDescriptor('headless'),capabilities:Object.freeze(hostDescriptor('headless').capabilities)});
 /** The environment the kernel sets on every child it spawns, so the child's own `report` finds the same host. */
 export const HOST_ENV='STARCI_HOST';
 export const HEADLESS_ROOT_ENV='STARCI_HEADLESS_ROOT';

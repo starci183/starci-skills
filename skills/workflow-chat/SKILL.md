@@ -20,11 +20,13 @@ writes. The chat is a monitor, never an agent layer above the kernel and never a
 
 - `<skill root>` is the `.claude` directory that holds the `SKILL.md` you were sent to; `<repo>` is the
   repository worktree the job is about, on the branch the owner wants the work cut from.
-- Every command below is run from `<repo>` in this form, and `--host` is what lets a repository that
-  shares another repository's Work tree resolve its ledger:
+- Every command below is run from `<repo>` in this form - `bin/starci.mjs` is the one command entry of the
+  runtime, so you never name a module path - and `--host` is what lets a repository that shares another
+  repository's Work tree resolve its ledger (without it the ledger is looked for in `<repo>/.claude`, which
+  is not where a frontend's Work lives):
 
   ```
-  node <skill root>/.dist/hosts/orca/launch.mjs <command> --host <skill root> ...
+  node <skill root>/bin/starci.mjs <command> --host <skill root> ...
   ```
 
   Run `node <skill root>/scripts/ensure-build.mjs` first when `.dist` is missing or stale, because the
@@ -74,13 +76,19 @@ writes. The chat is a monitor, never an agent layer above the kernel and never a
   window (25 min) the supervisor restarts the kernel, and without a supervisor you start
   `workflow-run --id <id> --host-adapter headless` again, which resumes the same workflow.
 - Relay every `Needs you` item and every `ask` question verbatim (kind, op or node, detail, options),
-  then say what answering it takes: a `ledger` item wants an allowlist or checks authored on the named
-  node; a `dynamic-op` item wants `workflow-approve --id <id> --allow-dynamic N`; a `merge` item wants
-  the owner to merge the lane branch into the base worktree; `authority`, `environment` and every other
-  kind want the owner's decision, which lands in a Work record, in the goal's wording or on the machine,
-  never in your hands. After the owner acted, `workflow-approve --id <id>` re-admits what was blocked.
-- Relay an operation reported `host-unsupported` as "this needs the Orca host": the same workflow can
-  be resumed in Orca with `workflow-run --id <id>` there, because the store is shared.
+  then say what answering it takes: a `decision` item wants the owner's pick, which you pass on with
+  `workflow-answer --id <id> --op <ask op> --choice <n> [--note "..."]` - the option number the owner
+  named and their own words, never a choice of yours; a `ledger` item wants an allowlist or checks
+  authored on the named node; a `dynamic-op` item wants `workflow-approve --id <id> --allow-dynamic N`;
+  a `merge` item wants the owner to merge the lane branch into the base worktree; `authority`,
+  `environment` and every other kind want the owner's decision, which lands in a Work record, in the
+  goal's wording or on the machine, never in your hands. After the owner acted,
+  `workflow-approve --id <id>` re-admits what was blocked.
+- Relay an operation reported `host-unsupported` as "this needs the Orca host". Its `host` needUser item
+  names the capability the operation's kind needs and this host does not offer - a capability declared in
+  `model/hosts.yaml`, so the item says which host has it and which does not, and there is nothing to
+  arrange locally. The same workflow can be resumed in Orca with `workflow-run --id <id>` there, because
+  the store is shared.
 - Report `finished` with its outcome and the path `<dir>/final-report.json`; a `blocked` finish with
   green gates is the owner's open questions, not a defect.
 
