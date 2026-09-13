@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DONE_HEADING,SEQUENCES,STEPS_HEADING,sequenceFor,stepsFor} from '../kernel/contract.mjs';
+import {CUT_ASSERTIONS,CUT_FILES} from '../kernel/sync.mjs';
 
 /** A minimal operation the way `toOp` shapes one; every field an agent's steps interpolate is present. */
 const op=(over={})=>({id:'op-1',kind:'backend.implement',origin:'ledger',nodeId:null,allowlist:['src/sales/intake.ts'],
@@ -440,6 +441,64 @@ test('work.author completes the record from real material, keeps the kernel fiel
   // A frontend node, a repair origin or a migration-looking allowlist never reroutes it.
   assert.equal(sequenceFor(op({kind:'work.author',origin:'repair',findings:['a']}),{node:{kind:'ui'}}),'work.author');
   assert.equal(sequenceFor(op({kind:'work.author',allowlist:['db/migrations/1.sql']}),{node:{kind:'uat'}}),'work.author');
+});
+
+/**
+ * The cut is the one sequence whose ORDER is the whole point: the seam is named before anything else is, because
+ * two builds that both edit the module wiring are not parallel work, they are one merge conflict with two
+ * authors. The contract has to say that in numbers the kernel actually applies - the same twelve files and eight
+ * assertions `kernel/sync.mjs` measured - and it has to say what the node it cuts becomes afterwards.
+ */
+test('work.cut names the seam first, cuts the rest by acceptance into disjoint children, and leaves a derived parent',()=>{
+  const node='demo.sales.implementation.backend.checkout';
+  const folder='.starciwork/features/sales/implementation/backend/checkout/**';
+  const cut=op({kind:'implementation.plan',origin:'ledger',nodeId:node,
+    cut:{node,reason:'its write scope names 21 files, past the 12 one operation may hold'},
+    allowlist:[folder],
+    references:['features/sales/implementation/backend/checkout/index.yaml','features/sales/architecture/sds/checkout/index.yaml'],
+    acceptance:['exactly one child is the seam, and every other child dependsOn it','the tree validates'],
+    checks:[{name:'work-tree-validates',command:'node bin/starci.mjs validate .'}]});
+  const text=stepsFor(cut,{node:{kind:'implementation'}});
+  const order=steps(text);
+  assert.equal(sequenceFor(cut,{node:{kind:'implementation'}}),'work.cut');
+  assert.match(text,/Sequence `work\.cut`/);
+  // It reads the node and its design, then the real code, before it draws a single boundary.
+  assert.match(order[0],/features\/sales\/architecture\/sds\/checkout\/index\.yaml/);
+  assert.match(order[0],/the kernel measured it as too big because its write scope names 21 files/);
+  assert.match(order[1],/Open the actual code the node's write scope names/);
+  assert.match(order[1],/A boundary you have not read is not a boundary you may draw/);
+  // The seam, first and by name - and what it owns is stated, not left to taste.
+  assert.match(order[2],/Name the SEAM first, before any other part/);
+  assert.match(order[2],/module wiring and registration, dependency-injection setup, database migrations, shared contracts, shared types and shared fixtures/);
+  assert.match(order[2],/It is built first and alone/);
+  // Then the rest, by acceptance, disjoint, each traced back to the same accepted records.
+  assert.match(order[3],/Cut the rest by acceptance, never by file/);
+  assert.match(order[3],/at most 12 files that is disjoint from every sibling AND from the seam/);
+  assert.match(order[3],/every non-seam child carries the seam's node id in `dependsOn`/);
+  assert.match(order[4],new RegExp(`\`${folder.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\``));
+  assert.match(order[4],/`work\/node@2`, `kind: implementation`, `state: todo`, `required: true`/);
+  // The node it cut becomes a derived parent, and its assertions become the group's acceptance.
+  assert.match(order[5],/Turn demo\.sales\.implementation\.backend\.checkout into a derived parent/);
+  assert.match(order[5],/`extensions\.work3\.groupAssertions`/);
+  assert.match(order[5],/A parent with children authors no state/);
+  assert.match(order[6],/work-tree-validates: `node bin\/starci\.mjs validate \.`/);
+  assert.match(order[7],/report `done` with `cut: none`/);
+  // It precedes every child's lane: nothing is built here and no red-spec rule applies.
+  assert.doesNotMatch(text,/MUST fail now/);
+  assert.match(text,/no product code changed: this operation precedes the children's lanes/);
+  assert.match(text,/the seam first, then the rest at once, and one proof for the whole group/);
+  // The definition of done carries both bounds and the one alternative outcome.
+  assert.ok(done(text).some(line=>/no child states more than 8 assertions/.test(line)));
+  assert.ok(done(text).some(line=>/or the report says `cut: none` and nothing under .* changed/.test(line)));
+  // Neither the node kind nor a repair origin nor a migration-looking allowlist reroutes it.
+  assert.equal(sequenceFor(op({kind:'implementation.plan',origin:'repair',allowlist:['db/migrations/1.sql']}),{node:{kind:'ui'}}),'work.cut');
+  // And the record-authoring modes stay apart: a cut is never read as an intake or as a record completion.
+  assert.equal(sequenceFor(op({kind:'work.author',cut:{node,reason:'x'}}),{node:{kind:'implementation'}}),'work.cut');
+  assert.equal(sequenceFor(op({kind:'work.author',intake:{scope:'collab'}}),{node:null}),'work.intake');
+  // The bounds in the contract are the bounds the kernel measured. A contract that states a limit the kernel
+  // does not apply is worse than no contract: the agent would cut to a rule nobody enforces.
+  assert.ok(text.includes(`at most ${CUT_FILES} files`),`the contract states CUT_FILES (${CUT_FILES})`);
+  assert.ok(text.includes(`more than ${CUT_ASSERTIONS} assertions`),`the contract states CUT_ASSERTIONS (${CUT_ASSERTIONS})`);
 });
 
 /**

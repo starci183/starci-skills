@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
+import {validateWorkspace} from '../core/index.mjs';
+import {nodeAllowlist} from '../kernel/ledger.mjs';
 import {
   DECISION_KINDS,EXECUTABLE_KINDS,decisionCandidates,disjoint,executableCandidates,layoutOf,layoutSide,ledgerSummary,nodeRepository,
   brandReferences,buildSourceIdentity,checkAssertions,loadLedger,markDecided,markDone,markInProgress,markReopened,
@@ -794,4 +796,108 @@ test('a tree with no brand record exposes none and offers no brand references',(
     assert.deepEqual(brandReferences(ledger),[]);
     assert.ok(!ledgerSummary(ledger).decisionEligible.includes('product.brand'));
   }finally{cleanup(root);}
+});
+
+/* ------------------------------------------------------------------ the shape a cut leaves behind */
+
+/**
+ * What `implementation.plan` writes, judged by the real validator rather than by an injected projection: the node
+ * it cut is a derived parent - no `state`, no `completion`, no write scope - whose assertions stay as the group's
+ * acceptance under `extensions.work3.groupAssertions`, and its children are ordinary launchable nodes with
+ * disjoint write scopes, the seam first. It is the shape the tree has to accept for heavy work to fan out at all.
+ */
+const cutTree=()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-work-cut-'));
+  const write=(relative,content)=>{
+    const file=path.join(root,'.starciwork',relative);
+    fs.mkdirSync(path.dirname(file),{recursive:true});
+    fs.writeFileSync(file,content);
+  };
+  fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({name:'@demo/backend'}));
+  write('workspace.yaml','schema: work/workspace@1\nid: demo\n');
+  const at='features/sales/implementation/backend/checkout';
+  write(`${at}/index.yaml`,`schema: work/node@2
+id: demo.sales.implementation.backend.checkout
+kind: implementation
+required: true
+description: Check a cart out end to end.
+extensions:
+  work3:
+    groupAssertions:
+      - checkout-completes
+`);
+  const child=(part,dependsOn=[])=>write(`${at}/${part}/index.yaml`,`schema: work/node@2
+id: demo.sales.implementation.backend.checkout.${part}
+kind: implementation
+required: true
+state: todo
+description: The ${part} part of checkout.
+assertions:
+  - ${part}-works
+${dependsOn.length?`dependsOn:\n${dependsOn.map(entry=>`  - ${entry}`).join('\n')}\n`:''}implementation:
+  status: mixed
+  gaps:
+    - The ${part} part does not exist yet.
+  changes:
+    - what: Build ${part}.
+      why: It does not exist.
+      repository: demo-backend
+      directory: .
+      revision: HEAD
+      verification:
+        - npm run test:unit -- src/checkout/${part}
+      files:
+        - src/checkout/${part}.ts
+extensions:
+  work3:
+    checks:
+      - assertion: ${part}-works
+        command: npm run test:unit -- src/checkout/${part}
+`);
+  child('wiring');
+  child('payment',['demo.sales.implementation.backend.checkout.wiring']);
+  child('shipping',['demo.sales.implementation.backend.checkout.wiring']);
+  return {root,workRoot:path.join(root,'.starciwork'),at};
+};
+
+test('a cut leaves a derived parent whose assertions are the group acceptance, and children the kernel can launch',()=>{
+  const {root,workRoot}=cutTree();
+  try{
+    const result=validateWorkspace(workRoot);
+    assert.deepEqual(result.errors.map(error=>`${error.code} ${error.path}: ${error.message}`),[],'the shape a cut writes is a valid tree');
+    const parent=result.nodes.find(node=>node.id==='demo.sales.implementation.backend.checkout');
+    // A parent with children authors no state and derives one from them: that is why the cut removes it.
+    assert.equal(parent.state,null);
+    assert.equal(parent.completion,null);
+    assert.deepEqual([...parent.children].sort(),
+      ['demo.sales.implementation.backend.checkout.payment','demo.sales.implementation.backend.checkout.shipping',
+        'demo.sales.implementation.backend.checkout.wiring']);
+    assert.equal(parent.effectiveState,'todo','it derives todo from the children that are still to be built');
+    // The group's acceptance survived the cut as a record of its own, not as an assertion nobody can reach.
+    const raw=readNode(root,parent);
+    assert.deepEqual(raw.extensions.work3.groupAssertions,['checkout-completes']);
+    assert.equal(raw.state,undefined);
+    assert.deepEqual(nodeAllowlist(raw),[],'a derived parent declares no write scope of its own');
+    // The parent is no candidate at all; the children are, and only the seam is eligible right now.
+    const ledger=loadLedger({repoRoot:root,validate:()=>result});
+    const candidates=executableCandidates(ledger,{});
+    assert.deepEqual(candidates.map(node=>node.id),['demo.sales.implementation.backend.checkout.wiring'],
+      'the seam is built first; its siblings wait on it through dependsOn');
+    assert.equal(candidates[0].schedulable,true);
+    assert.deepEqual(candidates[0].allowlist,['src/checkout/wiring.ts']);
+    // Disjoint write scopes are the whole point of the cut: no two children can be running the same file.
+    const scopes=['wiring','payment','shipping'].map(part=>[`src/checkout/${part}.ts`]);
+    for(const [index,left] of scopes.entries())
+      for(const right of scopes.slice(index+1))assert.equal(disjoint(left,right),true,`${left} vs ${right}`);
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('a cut that left the parent its own state is refused: a branch may not author one',()=>{
+  const {root,workRoot,at}=cutTree();
+  try{
+    const file=path.join(workRoot,at,'index.yaml');
+    fs.writeFileSync(file,`${fs.readFileSync(file,'utf8')}state: todo\n`);
+    assert.deepEqual(validateWorkspace(workRoot).errors.map(error=>error.code),['BRANCH_STATE'],
+      'the derived parent is the one thing the cut must leave behind');
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
