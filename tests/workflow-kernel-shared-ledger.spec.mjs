@@ -5,9 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {parseYaml} from '../core/yaml.mjs';
-import {createStore} from '../execution/workflow-store.mjs';
-import {approve,createWorkflowState,detectLedgerMode,goalPhase,kernelMain,runLoop,validateWorkTree} from '../execution/workflow-kernel.mjs';
+import {createStore} from '../kernel/store.mjs';
+import {approve,createWorkflowState,detectLedgerMode,goalPhase,kernelMain,runLoop,validateWorkTree} from '../kernel/kernel.mjs';
 import {fakeAllocator,passing,scriptedOrca} from './helpers/kernel-harness.mjs';
+import {encodePng,screen} from './helpers/png.mjs';
 
 /**
  * A frontend workflow on the Work tree its backend owns. Everything here is real except the runtimes: two git
@@ -133,7 +134,9 @@ assets:
     description: Candidate for receipt resting, narrow.
 `;
 /** Bytes the validator reads as a PNG: the signature and a little padding. */
-const PNG_BYTES=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(24)]);
+// The drawing's candidate is a real capture painted in the brand's primary: the kernel now reads every accepted
+// drawing's bytes against the brand, so a placeholder header would be refused as a render with no primary in it.
+const PNG_BYTES=encodePng(screen({width:24,height:24,bands:[{hex:'#c0203c',rows:12}]}));
 
 const node=({id,directory,files,check,repository=null})=>`schema: work/node@2
 id: ${id}

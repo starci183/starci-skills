@@ -43,7 +43,7 @@ may re-plan an operation inside it, never widen it.
 **A node is a lane, not an operation.** What must happen to a piece of work is a property of the work, not of
 the agent that picks it up: backend work is built and then independently reviewed; frontend work is drawn,
 then built against that drawing, then proved by a UAT run. 5.0 declares those templates in
-`profiles/kinds.yaml` (`execution/kind-graph.mjs`) and the kernel walks them: one lane step is one operation,
+`model/kinds.yaml` (`kernel/graph.mjs`) and the kernel walks them: one lane step is one operation,
 a node yields its next step only when the previous one is accepted, and the Work ledger is told `done` only
 when the last step of the lane is. The same profile carries the **routes** - which kind answers an `sds-gap`
 (`architecture.revise`), an `interface-gap` (`interface.draw`), a shared change, a review finding or a red UAT
@@ -86,7 +86,7 @@ one final report: goal, ledger status, every operation with its runtime, commits
 
 **The process itself is data.** Which operation kinds exist, the mandatory lane a ledger node walks
 (`interface.draw -> interface.asset -> frontend.implement -> uat.verify`, the artwork step retired only by a design record that declares no slot, never a step skipped otherwise) and the bounded route an outcome
-may take live in `profiles/kinds.yaml`, read by the pure `execution/kind-graph.mjs`: see
+may take live in `model/kinds.yaml`, read by the pure `kernel/graph.mjs`: see
 [kinds.md](kinds.md). The model fills an operation and picks among closed options; it never picks the process.
 
 ## 3. Runtime allocation instead of chains
@@ -94,7 +94,7 @@ may take live in `profiles/kinds.yaml`, read by the pure `execution/kind-graph.m
 4.x resolved an ordered provider chain and walked it. Ten parallel operations cannot walk one ordered
 list; they all pick the same head, exhaust its rate limit, and fall through together.
 
-5.0 treats every runtime as a pool, declared in `profiles/runtimes.yaml`:
+5.0 treats every runtime as a pool, declared in `model/runtimes.yaml`:
 
 - **Roles.** A runtime advertises the roles it may take (`implement`, `verify`, `write`, `decide`,
   `plan`); an operation kind maps to one role. Allocation never offers a runtime a role it lacks.
@@ -142,7 +142,7 @@ attested managed agents; it does not gain a different model.
 
 ## 6. The launcher surface
 
-`execution/orca-supervised-launch.mjs` keeps the supervised-launch and evidence commands and gains the
+`hosts/orca/launch.mjs` keeps the supervised-launch and evidence commands and gains the
 kernel's four:
 
 | Command | Owner | What it does |

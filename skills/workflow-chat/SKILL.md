@@ -20,11 +20,13 @@ writes. The chat is a monitor, never an agent layer above the kernel and never a
 
 - `<skill root>` is the `.claude` directory that holds the `SKILL.md` you were sent to; `<repo>` is the
   repository worktree the job is about, on the branch the owner wants the work cut from.
-- Every command below is run from `<repo>` in this form, and `--host` is what lets a repository that
-  shares another repository's Work tree resolve its ledger:
+- Every command below is run from `<repo>` in this form - `bin/starci.mjs` is the one command entry of the
+  runtime, so you never name a module path - and `--host` is what lets a repository that shares another
+  repository's Work tree resolve its ledger (without it the ledger is looked for in `<repo>/.claude`, which
+  is not where a frontend's Work lives):
 
   ```
-  node <skill root>/.dist/execution/orca-supervised-launch.mjs <command> --host <skill root> ...
+  node <skill root>/bin/starci.mjs <command> --host <skill root> ...
   ```
 
   Run `node <skill root>/scripts/ensure-build.mjs` first when `.dist` is missing or stale, because the
@@ -74,13 +76,38 @@ writes. The chat is a monitor, never an agent layer above the kernel and never a
   window (25 min) the supervisor restarts the kernel, and without a supervisor you start
   `workflow-run --id <id> --host-adapter headless` again, which resumes the same workflow.
 - Relay every `Needs you` item and every `ask` question verbatim (kind, op or node, detail, options),
-  then say what answering it takes: a `ledger` item wants an allowlist or checks authored on the named
-  node; a `dynamic-op` item wants `workflow-approve --id <id> --allow-dynamic N`; a `merge` item wants
-  the owner to merge the lane branch into the base worktree; `authority`, `environment` and every other
-  kind want the owner's decision, which lands in a Work record, in the goal's wording or on the machine,
-  never in your hands. After the owner acted, `workflow-approve --id <id>` re-admits what was blocked.
-- Relay an operation reported `host-unsupported` as "this needs the Orca host": the same workflow can
-  be resumed in Orca with `workflow-run --id <id>` there, because the store is shared.
+  then say what answering it takes.
+  - A `decision` item wants the owner's pick, which you pass on with
+    `workflow-answer --id <id> --op <op> --choice <n> [--note "..."]` - the option number the owner named
+    and their own words, never a choice of yours. `--op` is **the op the item names**, and it is one of
+    two things. An `owner.ask` op prepared the question (a business rule, a design choice, an authority, a
+    credential the environment lacks), and the answer reaches every paused requester in its next contract.
+    Or the item is a **reconciliation conflict**: the intake found the new feature cannot hold together
+    with what a decided record settled and wrote the decision record under its own feature, so `--op` is
+    the intake op's id and the answer is recorded on that decision record. Never re-run the intake to
+    settle a conflict; the owner's answer is what settles it.
+  - `## Provisional decisions (n)` is **not** something the workflow is waiting on. The owner is stopped for
+    exactly two things - something only they can provide (a credential, an account on an outside system, a
+    real dataset, a legal authority) and an effect nobody can undo (a message to real customers, a payment,
+    a deletion of real data, a publish); every other open question is taken on the runtime's own
+    recommendation so the work continues, and a workflow can finish `done` still owing the owner a page of
+    them. Relay each one as "here is what the runtime decided for you, and here is how to change it", with
+    the same `workflow-answer --id <id> --op <ask op> --choice <n>`, and say the part that matters: **the
+    same option confirms what was built, a different one reopens every node that was built on it.** The
+    owner may also answer by typing the number in the operation's own terminal while its ask op is open.
+    For a credential the op asks them to run `starci identity set <slug> --name <VAR>` - stdin only, never
+    printed - and to reply `set`; it then checks presence alone. Never ask for a credential value in the
+    chat, never accept one if it is pasted, and never write one anywhere.
+  - A `ledger` item wants an allowlist or checks authored on the named node; a `dynamic-op` item wants
+    `workflow-approve --id <id> --allow-dynamic N`; a `merge` item wants the owner to merge the lane
+    branch into the base worktree; `authority`, `environment` and every other kind want the owner's
+    decision, which lands in a Work record, in the goal's wording or on the machine, never in your hands.
+    After the owner acted, `workflow-approve --id <id>` re-admits what was blocked.
+- Relay an operation reported `host-unsupported` as "this needs the Orca host". Its `host` needUser item
+  names the capability the operation's kind needs and this host does not offer - a capability declared in
+  `model/hosts.yaml`, so the item says which host has it and which does not, and there is nothing to
+  arrange locally. The same workflow can be resumed in Orca with `workflow-run --id <id>` there, because
+  the store is shared.
 - Report `finished` with its outcome and the path `<dir>/final-report.json`; a `blocked` finish with
   green gates is the owner's open questions, not a defect.
 

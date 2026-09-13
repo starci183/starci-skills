@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {parseYaml} from '../core/yaml.mjs';
-import {createStore} from '../execution/workflow-store.mjs';
-import {approve,kernelMain,laneRowTitle,runLoop,validateWorkTree} from '../execution/workflow-kernel.mjs';
+import {createStore} from '../kernel/store.mjs';
+import {approve,kernelMain,laneRowTitle,runLoop,validateWorkTree} from '../kernel/kernel.mjs';
 import {fakeAllocator,passing,scriptedOrca} from './helpers/kernel-harness.mjs';
 
 /**

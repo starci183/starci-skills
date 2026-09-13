@@ -2,7 +2,7 @@
 
 The product ledger is the canonical Work tree: `<repo>/.starciwork/features/**/index.yaml`, schema
 `work/node@2`, laid out by [work-layout.yaml](../schemas/work-layout.yaml). There is no second list
-of things to do. `execution/work-ledger.mjs` is the kernel's only door to it: it reads the tree
+of things to do. `kernel/ledger.mjs` is the kernel's only door to it: it reads the tree
 through `starci validate`, decides what may be scheduled, and writes back four things and nothing
 else. The authored specification — SRS, SDS, the implementation record, gaps, assets — belongs to the
 workflows that author it, and a kernel write preserves every one of those lines byte for byte.
@@ -14,7 +14,7 @@ decision is settled by a collocated `completion.review`: a reviewer, actual auth
 one passing observation per authored assertion. Nothing is launched into a worktree and no agent
 writes code. `decisionCandidates(ledger,{scope})` returns the todo, eligible ones.
 
-`EXECUTABLE_KINDS` (`implementation`, `uat`, `operations`, `ui`) are done by an operation agent in a
+`EXECUTABLE_KINDS` (`implementation`, `uat`, `e2e`, `operations`, `ui`, `integration`) are done by an operation agent in a
 worktree. `executableCandidates(ledger,{scope})` returns the todo, eligible ones enriched with the
 two things an operation contract cannot be written without:
 
@@ -195,7 +195,7 @@ completion:
 | --- | --- | --- |
 | `state` | `markDone`, `markReopened`, `markDecided` | operational; excluded from the semantic digest |
 | `completion` | `markDone` (evidence), `markDecided` (review) | operational proof binding |
-| `extensions.work3.kernel` | every transition | the kernel's own receipt: opId, dispatch, head, checks, verifiedBy, at, reopened[] |
+| `extensions.work3.kernel` | every transition | the kernel's own receipt: opId, dispatch, head, checks, verifiedBy, at, reopened[], and - on a completion - `contractDigest` with the `contractKind` it was taken for |
 | `<node>/evidence/<opId>/manifest.yaml` | `writeEvidence` | the `work/evidence@1` record `completion.evidence` names |
 
 Nothing else. There is no kernel-owned prose, no status sentence appended to a description, no
@@ -222,6 +222,85 @@ validator would reject is never the thing the kernel leaves behind.
 `ledgerSummary(ledger,{scope})` is the status view: counts per kind and state, what is eligible, and
 the ids a run could pick up.
 
+## External integrations: proven live, or not proven
+
+An external system is a record, not a remark in a description. A business (SRS) or design (SDS) record
+that talks to one declares it as data:
+
+```yaml
+extensions:
+  work3:
+    integrations:
+      - id: telegram
+        provider: telegram-bot-api
+        credential:
+          name: TELEGRAM_BOT_TOKEN     # the exact variable, never the value
+          providedBy: owner            # a credential is the owner's; nothing else is a declaration
+          custody: identity:telegram   # where the value lives: _resources/identity/telegram/secrets.enc.yaml
+        sandbox: https://api.telegram.org
+```
+
+`custody` is required, and `identity:<slug>` is the only custody a credential has. An environment variable
+is not one: it belongs to whichever terminal exported it, it is gone on the next machine, and the tree
+cannot say who set it or when. The value lives under `_resources/identity/<slug>/` — a readable
+`resource.yaml` (`work/resource@1`, `kind: identity`: the alias, who the identity is on the provider, what
+it may do, and the variable **names** it holds) beside `secrets.enc.yaml`, encrypted with sops under the
+host's own age or GPG key. The owner fills it with `starci identity set <slug> --name <VAR>`, which reads
+the value from stdin and never prints it, and every operation reads it through `sops exec-env` at the moment
+of use, so the value exists in one process and is copied into no file, log or report.
+
+`declaredIntegrations(ledger)` reads those entries from every `business`, `business-overview`, `module`
+and `architecture` node and answers `{list, problems}`. Each listed entry carries `declaredBy` — the
+record that declared it. `problems` is what the runtime cannot act on: `credential-missing` (no variable
+to ask the owner for), `credential-not-owner` (somebody else is supposed to provide the key),
+`credential-custody-missing` (no `custody`, or only the retired 5.1 `where`, which named a place rather
+than a custody) and `integration-shape` (no id, no provider, or not a list at all). They are findings
+rather than silent skips, because a vague declaration is exactly what a faked proof hides behind. An entry
+with an id is still listed even when its credential is a finding, so the tree still owes it a node.
+
+The tree owes one node per declared id, at `features/<feature>/integration/<id>/index.yaml` with
+`kind: integration`. `integrationNodes(ledger)` lists them and `missingIntegrationNodes(ledger)` returns
+the declared ids with none — which the kernel lists as *ledger incomplete* and closes with `work.author`.
+An `integration` node is executable work with its own lane, `integration.verify`, whose sequence lives in
+[contract.mjs](../kernel/contract.mjs): read the declaration, take the credential from the named
+environment variable and nowhere else (a missing one is `blocked` `environment` with that variable and
+nothing else), run the scenario against the real provider's sandbox with no fake, stub, recording or skip,
+keep the output with the secret masked, and report `done` only on a green live run.
+
+**Evidence says what it proved against.** `writeEvidence` accepts `proof: {boundary: 'api'|'live', fakes:
+[ids]}` and writes it into the manifest; `boundary` is required once a proof is given at all and `fakes`
+defaults to the empty list. `e2e.verify` writes `boundary: api` and names every provider it faked;
+`integration.verify` writes `boundary: live` and names none. `integrationProofStatus(ledger)` turns that
+into the one answer the status page prints, per declared integration:
+
+| `proven` | when | `workflow-status` prints |
+| --- | --- | --- |
+| `live` | a passing manifest on its own integration node carries `boundary: live` | proven live |
+| `fake` | it appears only in some other run's `proof.fakes` | proven against a fake, not live |
+| `none` | nothing proved it, or the only live run failed | not proven |
+
+There is no fourth state. A failed live run is `none`: it ran, it did not prove.
+
+**A proof remembers the rules it was proven under.** `markDone` accepts `contractDigest` and `contractKind`
+and stores both in `extensions.work3.kernel` — the digest, and the name of the operation kind it was taken
+for, so a later comparison computes the current digest for the same declaration rather than guessing at one
+from the node's lane. Only a block written by an older build carries no `contractKind`, and there the kernel
+falls back to the last step of the node's lane and then to the node kind.
+`contractDigestOf({kind, kindRecord, operator, rules})` is its canonical
+sha-256, with stable key order at every depth (list order is part of the declaration, key order is not).
+The kernel supplies the three inputs — the `model/kinds.yaml` entry, the operator contract and the
+validator rules of that kind. `staleProofs(ledger,{digestOf,kindOf})` then answers `[{node, stored,
+current}]` for every done node the kernel itself completed (its kernel block names an `opId`) whose stored
+digest differs from `digestOf(kind)`. A node the kernel completed and that stored no digest reads as
+`stored: null` — a proof that does not remember its rules is exactly the one to reopen. `kindOf(node,
+{raw,kernel})` is how the kernel names the operation kind that ran; either callback answering nothing
+leaves the node alone.
+
+`readLedgerTree(workRoot,{limit})` is the bounded filesystem read of the tree — `index.yaml` records only,
+`_local` and `assets/**` skipped, stopping at `limit` nodes — for a reader that must not spawn the
+validator. `workflow-status` uses it against `state.ledgerRoot` to print `## Integrations`, and leaves the
+section out rather than guessing when the workflow names no tree.
+
 ## Repository rule
 
 A node may say which repository delivers it: `extensions.work3.scope.repository`. `executableCandidates(ledger,{repository})` drops nodes whose declared repository differs from the one asked for (the kernel asks with its own `package.json` name), so a frontend leaf inside a backend job is never launched. An operation the kernel created for such a node before the rule existed is settled and blocked with refusal `out-of-repository` on the next ledger sync.
@@ -238,7 +317,7 @@ decides on its own; only a node that declares none is filtered by side — and a
 
 A product has exactly one canonical `.starciwork`, owned by its backend. Its frontend is a different
 repository with no Work tree of its own, so a frontend workflow reads and writes the backend's tree.
-`execution/ledger-routing.mjs` is the only thing that decides which tree that is:
+`kernel/routing.mjs` is the only thing that decides which tree that is:
 
 | order | source | how |
 | --- | --- | --- |

@@ -4,25 +4,25 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {resolveExecutionChain} from '../profiles/select.mjs';
-import {ORCA_HOST,createOrcaCalls} from '../execution/orca-calls.mjs';
-import {HEADLESS_HOST,createHeadlessHost} from '../execution/orca-headless.mjs';
-import {reportOutcome} from '../execution/orca-protocol.mjs';
-import {buildReport} from '../execution/reports.mjs';
+import {resolveExecutionChain} from '../kernel/chains.mjs';
+import {ORCA_HOST,createOrcaCalls} from '../hosts/orca/calls.mjs';
+import {HEADLESS_HOST,createHeadlessHost} from '../hosts/headless/host.mjs';
+import {reportOutcome} from '../hosts/orca/protocol.mjs';
+import {buildReport} from '../kernel/reports.mjs';
 import {spawnSync} from 'node:child_process';
-import {validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
-import {createStore} from '../execution/workflow-store.mjs';
-import {createAllocator} from '../execution/runtime-allocator.mjs';
-import {loadsFileFor} from '../execution/runtime-loads.mjs';
-import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
-import * as work from '../execution/work-ledger.mjs';
-import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {machineVerify} from '../execution/workflow-kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,decisionAllowlistFor,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
+import {validateGoalPlan,validateOp} from '../models/functions.mjs';
+import {createStore} from '../kernel/store.mjs';
+import {createAllocator} from '../kernel/schedule.mjs';
+import {loadsFileFor} from '../kernel/loads.mjs';
+import {resolveLedgerRoot} from '../kernel/routing.mjs';
+import * as work from '../kernel/ledger.mjs';
+import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
+import {machineVerify} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
-const runtimeProfile=parseYaml(fs.readFileSync(new URL('../profiles/runtimes.yaml',import.meta.url),'utf8'));
+const runtimeProfile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';
 const cwd=path.resolve(worktree);
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
@@ -158,6 +158,12 @@ function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','clau
       busy.add(free[0]);
       return {ok:true,runtime:free[0],target:free[0],role,alternatives:free.slice(1)};
     },
+    // A read-only preview of the same order, which the kernel asks for when it wants to NAME a runtime without
+    // taking a slot (the review escalation records which runtime the group will get next).
+    review(kind,{avoid=[]}={}){
+      const role=roleOf(kind);
+      return {role,ready:(pools[role]??[]).filter(id=>!busy.has(id)&&!avoid.includes(id)).map(id=>({runtime:id,target:id})),blocked:[]};
+    },
     release(runtime){busy.delete(runtime);},
     failed(runtime){busy.delete(runtime);},
     snapshot(){return {busy:[...busy]};},
@@ -185,7 +191,7 @@ function fakeGit(dirty){
 }
 
 /**
- * The `execution/kernel-guards.mjs` surface, stubbed so each test owns exactly what the path protection, the
+ * The `kernel/guards.mjs` surface, stubbed so each test owns exactly what the path protection, the
  * resource locks, the git queue and the preflight do. The kernel defaults to the real module; these tests
  * inject the contract instead, because a fake worktree git cannot check anything out.
  */
@@ -454,32 +460,54 @@ test('the four launcher commands drive one workflow directory: goal, approve, st
   }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
 });
 
-test('the review loop is bounded: three rounds of findings end in needUser instead of a fourth review',()=>{
+// Before the 5-plus ruling this test ended with a `review` item on the owner's list after three rounds. The
+// owner could do nothing with it - "decide whether the last findings stand" is not a decision anyone can take
+// from a terminal - so a spent review bound now escalates INSIDE the runtime: one more repair on a runtime that
+// has not worked the group, and, because these findings cite no decided record, the rule they are arguing about
+// is settled as a PROVISIONAL decision the work carries on with. The bound itself is still a bound: the
+// escalations are capped per group per day, and a group that spends them is parked exactly as before.
+test('a spent review bound escalates inside the runtime: one more repair on an unused runtime, and findings that cite no decided record become a provisional decision',()=>{
   const file='apps/agentos-controlplane/src/sales/intake.ts';
   const done=summary=>({outcome:'done',summary,files:[file],checks:[passing('unit','npx vitest run sales')]});
   const finding=round=>({outcome:'partial',summary:`Review round ${round} rejected the work.`,files:[],
     checks:[passing('review','npx vitest run sales')],open:[`${file} still does not persist the receipt (round ${round})`]});
   const harness=setup({plan:salesPlan,dirty:[file],
     scripts:{'op-intake':[done('Intake implemented.')],'verify-1':[finding(1)],'repair-1':[done('Receipt added.')],
-      'verify-2':[finding(2)],'repair-2':[done('Receipt fixed.')],'verify-3':[finding(3)]}});
+      'verify-2':[finding(2)],'repair-2':[done('Receipt fixed.')],'verify-3':[finding(3)],
+      'ask-1':[{outcome:'done',files:[],checks:[passing('work-tree-validates','node starci.mjs validate')],
+        summary:'decision: demo.sales.business.srs.policy-decision.d-receipt\nrecommended: 2\n1. keep the receipt in memory\n2. persist the receipt with the order'}],
+      'repair-3':[done('Receipt persisted with the order, as the ruling says.')],
+      'verify-4':[{outcome:'done',summary:'The receipt is persisted.',files:[],checks:[passing('review','npx vitest run sales')]}]}});
   try{
-    approve(harness.store,harness.state);
+    approve(harness.store,harness.state,{allowDynamic:9});
     harness.state.run='run_wf';harness.state.from='term_kernel';
-    const state=harness.run({maxIterations:20});
-    assert.deepEqual(state.ops.map(op=>op.id),['op-intake','verify-1','repair-1','verify-2','repair-2','verify-3']);
-    assert.deepEqual(state.ops.filter(op=>op.kind==='review.verify').map(op=>op.verdict),['fail','fail','fail']);
+    const state=harness.run({maxIterations:24});
+    assert.deepEqual(state.ops.map(op=>op.id),['op-intake','verify-1','repair-1','verify-2','repair-2','verify-3','repair-3','ask-1','verify-4']);
     // Each repair is scoped to the file the finding named, inside the reviewed group's allowlist.
     assert.deepEqual(state.ops.find(op=>op.id==='repair-1').allowlist,[file]);
-    assert.equal(state.verifyRounds['goal-1'],3);
-    assert.equal(state.ledger[0].status,'review-exhausted','the group is parked, not re-planned every tick');
-    assert.equal(state.finished.outcome,'blocked');
-    assert.match(state.needUser.find(item=>item.kind==='review').detail,/still fails review after 3 rounds/);
     const log=events(harness.store);
+    // The bound fired once, escalated once, and the escalation named the runtime the group had not used.
+    const escalated=log.find(event=>event.event==='verify-escalated');
+    assert.deepEqual([escalated.group,escalated.round,escalated.cap,escalated.hidden,escalated.cited,escalated.op],
+      ['goal-1',1,6,true,[],'repair-3']);
+    assert.ok(escalated.avoid.includes(state.ops.find(op=>op.id==='repair-2').runtime),'the runtimes that already built it are avoided');
+    assert.ok(escalated.runtime&&!escalated.avoid.includes(escalated.runtime),'the escalation names the runtime the group has not had');
     assert.equal(log.filter(event=>event.event==='verify-limit').length,1);
-    assert.equal(log.filter(event=>event.event==='op-created'&&event.kind==='review.verify').length,3);
+    assert.ok(log.some(event=>event.event==='verify-hidden-decision'&&event.group==='goal-1'));
+    // The escalation repair waited for the ruling and carried it; nothing was asked of the owner.
+    assert.deepEqual(state.ops.find(op=>op.id==='repair-3').provisional,['demo.sales.business.srs.policy-decision.d-receipt']);
+    assert.match(String(state.ops.find(op=>op.id==='repair-3').answer),/provisional: option 2 - persist the receipt with the order/);
+    assert.equal(state.needUser.some(item=>item.kind==='review'),false,'a mechanical bound is never the owner\'s item');
+    assert.deepEqual(state.provisional.map(entry=>[entry.decision,entry.op,entry.recommended,entry.answered]),
+      [['demo.sales.business.srs.policy-decision.d-receipt','ask-1',2,null]]);
+    // One escalation bought one repair AND the review that judges it, and that review passed.
+    assert.equal(state.verifyRounds['goal-1'],4);
+    assert.equal(state.ledger[0].status,'verified');
+    assert.equal(state.finished.outcome,'done','a provisional decision does not block the workflow');
     const final=JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8'));
-    assert.equal(final.outcome,'blocked');
-    assert.deepEqual(final.ledger.map(item=>item.status),['review-exhausted']);
+    assert.equal(final.outcome,'done');
+    assert.match(final.provisionalReport,/^## Provisional decisions \(1\)/);
+    assert.match(final.provisionalReport,/workflow-answer --id .* --op ask-1 --choice <n>/);
   }finally{harness.cleanup();}
 });
 
@@ -683,7 +711,7 @@ const brandSpec=rev=>({name:'Aurora',family:'aurora',rev,
   mascotAssets:[MASCOT],forbidden:['the bare word white inside a style tag'],
   imageryPromptRules:['every imagery prompt names the mascot sheet and the accent token']});
 /**
- * What `execution/work-ledger.mjs` will answer once the brand node kind lands: `loadLedger` carries
+ * What `kernel/ledger.mjs` will answer once the brand node kind lands: `loadLedger` carries
  * `brand = {node, rev, file, spec} | null`, `brandReferences` names the record and every asset beside it, and a
  * `brand` node is a decision candidate. The rev is read from the record on disk, so an accepted `brand.decide`
  * moves it exactly as the real loader would.
@@ -771,7 +799,8 @@ test('a scope entry that names nothing in the tree begins with an intake operati
     assert.deepEqual(op.checks.map(check=>check.name),['work-tree-validates']);
     assert.match(op.goal,/Author the Work records of the feature collab from the job: Finish the sales slice/);
     assert.match(op.goal,/A new feature is not appended beside the decided ones/);
-    assert.ok(op.acceptance.some(line=>/reconciliation table/.test(line)),'the acceptance demands the reconciliation');
+    assert.ok(op.acceptance.some(line=>line.includes('extensions.work3.reconciliation: one row {case, record, decision, reads, hands, detail}')),'the acceptance demands the typed reconciliation');
+    assert.doesNotMatch(op.goal+op.acceptance.join(' '),/sds-gap/,'an intake never reports a gap against another feature');
     assert.ok(op.references.includes('features/sales/architecture/sds/intake/index.yaml'),'the decided records of the other features are references');
     assert.equal(op.intake.mode,'author');
     assert.deepEqual(events(collab.store).filter(event=>event.event==='intake-planned').map(event=>[event.op,event.scope,event.kind,event.mode]),[['collab-intake','collab','work.author','author']]);
@@ -830,6 +859,37 @@ test('an op the restart limit blocked for a rate limit cools down and is re-admi
     const later=state3.ops.find(item=>item.id===op.id);
     assert.deepEqual(later.avoidRuntimes,[]);
     assert.deepEqual(store.readEvents().filter(event=>event.event==='avoid-expired').map(event=>[event.op,event.runtimes]),[[op.id,['gpt-5.6-sol']]]);
+  }finally{harness.cleanup();}
+});
+
+// "no runtime could launch op-3 (3 attempts, last chain-exhausted)" was an item on the owner's list, and there
+// was nothing the owner could do with it: a launcher that will not start is time, not a decision. The op cools
+// for the same window a provider limit uses and comes back by itself - capped, because an environment that
+// still refuses it after six re-admissions in one day really is broken, and that IS the owner's.
+test('a spent launch bound cools the op and re-admits it, and only the daily cap reaches the owner',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    const op=state.ops[0];
+    op.status='blocked';op.refusal='launch-cooling';op.coolUntil=0;op.launchFailures=3;op.runtime='gpt-5.6-sol';
+    op.coolReason=`no runtime could launch ${op.id} (3 attempts, last chain-exhausted)`;
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    const before=store.readEvents().length;
+    const after=harness.run({maxIterations:1});
+    const readmitted=store.readEvents().slice(before).filter(event=>event.event==='launch-readmitted');
+    assert.deepEqual(readmitted.map(event=>[event.op,event.readmissions,event.cap]),[[op.id,1,LAUNCH_DAILY_CAP]]);
+    const back=after.ops.find(item=>item.id===op.id);
+    assert.deepEqual([back.refusal,back.launchFailures,back.restarts],[null,0,0]);
+    assert.equal(after.needUser.some(item=>item.kind==='environment'),false,'a mechanical bound is never the owner\'s item');
+    // Past the cap the environment is the owner's after all, and the item says exactly what kept failing.
+    back.status='blocked';back.refusal='launch-cooling';back.coolUntil=0;
+    back.launchReadmissions={day:new Date().toISOString().slice(0,10),count:LAUNCH_DAILY_CAP};
+    const spent=harness.run({maxIterations:1});
+    assert.deepEqual(store.readEvents().filter(event=>event.event==='launch-cap-reached').map(event=>[event.op,event.readmissions]),
+      [[op.id,LAUNCH_DAILY_CAP]]);
+    assert.match(spent.needUser.find(item=>item.kind==='environment').detail,
+      /no runtime could launch .* it was re-admitted 6 times today and the environment still refuses it/);
   }finally{harness.cleanup();}
 });
 
@@ -1057,7 +1117,7 @@ test('an accepted intake settles by what the tree holds under its scope and the 
   const file='.starciwork/features/collab/index.yaml';
   const harness=setupWork({scope:['collab'],dirty:[file],scripts:{'collab-intake':[{outcome:'done',summary:'Authored the collab drafts.',files:[file],
     checks:[passing('work-tree-validates','node starci.mjs validate')],
-    effect:()=>{fs.mkdirSync(path.dirname(path.join(activeRepo,file)),{recursive:true});fs.writeFileSync(path.join(activeRepo,file),['schema: work/node@2','id: demo.collab','kind: module',''].join(String.fromCharCode(10)));}}]}});
+    effect:()=>{fs.mkdirSync(path.dirname(path.join(activeRepo,file)),{recursive:true});fs.writeFileSync(path.join(activeRepo,file),['schema: work/node@2','id: demo.collab','kind: module','extensions:','  work3:','    reconciliation:','      - case: reference','        record: demo.sales.architecture.sds.intake','        detail: collab admits through the intake contract sales decided',''].join(String.fromCharCode(10)));}}]}});
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
@@ -1120,7 +1180,9 @@ test('a question only the owner can answer pauses the op and opens an owner.ask 
     let after=harness.run({maxIterations:1});
     const requester=after.ops.find(op=>op.id===nodeId),ask=after.ops.find(op=>op.kind==='owner.ask');
     assert.ok(ask,'an owner.ask op was opened');
+    // The decision lands where the tree keeps its policy decisions, under the feature folder read from the tree.
     assert.deepEqual([ask.id,ask.origin,ask.allowlist,ask.requesters,ask.question.kind,ask.question.from],['ask-1','ask',['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],[nodeId],'credential',nodeId]);
+    assert.equal(ask.question.stop,'credential','a credential is one of the two stop reasons: the requester waits');
     assert.deepEqual([requester.status,requester.waitingFor],['paused','ask-1']);
     assert.ok(events(store).some(event=>event.event==='owner-ask-opened'&&event.op===nodeId&&event.ask==='ask-1'));
     const contract=renderContract({template,op:ask,state:after,store,launcher:'L.mjs',run:'run_wf'});
@@ -1159,6 +1221,9 @@ test('an environment blocker that names a credential is the question of the owne
   assert.equal(credentialNeed('TELEGRAM_BOT_TOKEN is not set; the delivery worker reads it in delivery.module.ts'),true);
   assert.equal(credentialNeed('the Zalo OA api key the owner has not provided'),true);
   assert.equal(credentialNeed('docker is not installed on this host'),false);
+  // A credential is one member of a class: whatever the runtime cannot obtain for itself stops the requester.
+  assert.deepEqual(ownerProvisionNeed('the e-invoice provider sandbox account the owner must open'),{kind:'account'});
+  assert.deepEqual(ownerProvisionNeed('no real bank statement to reconcile against'),{kind:'dataset'});
   const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
   const harness=setupWork({dirty:[file],scripts:{[nodeId]:[{outcome:'blocked',summary:'Cannot deliver without the bot token.',files:[],checks:[],blocker:{kind:'environment',detail:'TELEGRAM_BOT_TOKEN is not provided; apps/agentos-controlplane/src/chatbot/delivery.module.ts reads it at boot'}}]}});
   try{
@@ -1166,10 +1231,45 @@ test('an environment blocker that names a credential is the question of the owne
     const after=harness.run({maxIterations:1});
     const ask=after.ops.find(op=>op.kind==='owner.ask');
     assert.ok(ask,'the credential need became the question of the owner');
-    assert.deepEqual([ask.question.kind,ask.question.from],['credential',nodeId]);
+    assert.deepEqual([ask.question.kind,ask.question.from,ask.question.stop],['credential',nodeId,'credential']);
     assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused');
     assert.equal(after.needUser.some(item=>item.kind==='environment'),false,'no bare environment line nobody answers');
   }finally{harness.cleanup();}
+  // The second stop reason: an effect nobody can take back. The requester waits, exactly as for a credential.
+  const undoable=setupWork({dirty:[file],scripts:{[nodeId]:[{outcome:'blocked',summary:'This would reach real people.',files:[],checks:[],blocker:{kind:'authority',detail:'completing the slice sends the overdue notice to real customers, which cannot be recalled'}}]}});
+  try{
+    approve(undoable.store,undoable.state);undoable.state.run='run_wf';undoable.state.from='term_kernel';
+    const after=undoable.run({maxIterations:1});
+    const ask=after.ops.find(op=>op.kind==='owner.ask');
+    assert.deepEqual([ask.question.kind,ask.question.stop],['irreversible','irreversible']);
+    assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused','only the owner performs an effect nobody can undo');
+    assert.equal(irreversibleEffect('the run publishes the release to production'),true);
+  }finally{undoable.cleanup();}
+  // An `authority` block that names nothing the owner must provide is a decision, and the work carries on.
+  const open=setupWork({dirty:[file],scripts:{[nodeId]:[{outcome:'blocked',summary:'Two rules are possible here.',files:[],checks:[],blocker:{kind:'authority',detail:'the design does not say whether a supervisor may approve their own request'}}]}});
+  try{
+    approve(open.store,open.state);open.state.run='run_wf';open.state.from='term_kernel';
+    const after=open.run({maxIterations:1});
+    const ask=after.ops.find(op=>op.kind==='owner.ask');
+    assert.deepEqual([ask.question.kind,ask.question.stop],['decision',null]);
+    const requester=after.ops.find(op=>op.id===nodeId);
+    assert.deepEqual([requester.status,requester.waitingFor,requester.dependsOn.includes(ask.id)],['pending',null,true]);
+    assert.equal(after.needUser.some(item=>item.kind==='authority'),false);
+  }finally{open.cleanup();}
+});
+
+// The first owner questions were written under `features/shared/` and `features/workspace/` - folders that do
+// not exist, because the id segment is not a path - and the whole tree went red. The feature FOLDER is read
+// from the node's own path, and the decision is an SRS policy-decision leaf where the tree keeps them.
+test('the decision folder of an owner question comes from the feature folder in the tree, never from the id segment',()=>{
+  const ctx={work:{node:id=>id==='nivo.shared.implementation.backend.platform-isolation'
+    ?{path:'features/shared-lifecycle/implementation/backend/platform-isolation/index.yaml'}:null,loaded:{list:[]}}};
+  assert.deepEqual(decisionAllowlistFor({},{nodeId:'nivo.shared.implementation.backend.platform-isolation',ledgerIds:[],allowlist:['src/x/**']},ctx),
+    ['.starciwork/features/shared-lifecycle/business/srs/business-rules/policy-decisions/**']);
+  assert.deepEqual(decisionAllowlistFor({},{nodeId:null,ledgerIds:[],allowlist:['C:/owner/.starciwork/features/workspace-dashboard/ui/**']},ctx),
+    ['.starciwork/features/workspace-dashboard/business/srs/business-rules/policy-decisions/**']);
+  assert.deepEqual(decisionAllowlistFor({},{nodeId:null,ledgerIds:[],allowlist:['apps/x/**']},ctx),
+    ['.starciwork/decisions/**'],'no feature known: the tree-level folder');
 });
 
 test('a launch Orca refuses because the coordinator pane is gone replaces the kernel tab, re-binds the Run and tries again without counting a runtime failure',()=>{
@@ -1192,45 +1292,6 @@ test('a launch Orca refuses because the coordinator pane is gone replaces the ke
     const log=events(store);
     assert.deepEqual(log.filter(event=>event.event==='coordinator-tab-recovered').map(event=>[event.was,event.terminal===after.from]),[['term_dead',true]]);
     assert.equal(log.some(event=>event.event==='launch-failed'),false);
-  }finally{harness.cleanup();}
-});
-
-test('a red tree counts against an op only where the op could have caused it: foreign errors are evidence, not a rejection',()=>{
-  const errors=[{code:'NODE_ASSET_UNREADABLE',path:'features/sales/ui/index.yaml',message:'asset missing'},{code:'SRS_LAYOUT',path:'features/shared/business/srs/decisions/x/index.yaml',message:'layout'}];
-  const ctx={work:{ledger:{repoRoot:'C:/owner',workRoot:'C:/owner/.starciwork'},validate:()=>({ok:false,errors}),node:()=>({path:'features/sales/implementation/backend/intake/index.yaml'})}};
-  const backend={nodeId:'demo.sales.implementation.backend.intake',allowlist:['apps/agentos-controlplane/src/sales/**'],files:['apps/agentos-controlplane/src/sales/intake.ts']};
-  const verdict=treeVerdictFor(ctx,backend);
-  assert.deepEqual([verdict.ok,verdict.own.length,verdict.foreign.length],[true,0,2],'a backend slice is not failed by a drawing\'s missing assets');
-  const drawing={nodeId:null,allowlist:['C:/owner/.starciwork/features/sales/ui/**'],files:[]};
-  const judged=treeVerdictFor(ctx,drawing);
-  assert.deepEqual([judged.ok,judged.own.map(e=>e.code),judged.foreign.length],[false,['NODE_ASSET_UNREADABLE'],1],'the op that wrote the ui record owns its error');
-  assert.equal(treeVerdictFor({work:{...ctx.work,validate:()=>({ok:true,errors:[]})}},backend).ok,true);
-});
-
-test('the decision folder of an owner question comes from the feature folder in the tree, never from the id segment',()=>{
-  const ctx={work:{node:id=>id==='nivo.shared.implementation.backend.platform-isolation'?{path:'features/shared-lifecycle/implementation/backend/platform-isolation/index.yaml'}:null,loaded:{list:[]}}};
-  assert.deepEqual(decisionAllowlistFor({},{nodeId:'nivo.shared.implementation.backend.platform-isolation',ledgerIds:[],allowlist:['src/x/**']},ctx),['.starciwork/features/shared-lifecycle/business/srs/business-rules/policy-decisions/**']);
-  assert.deepEqual(decisionAllowlistFor({},{nodeId:null,ledgerIds:[],allowlist:['C:/owner/.starciwork/features/workspace-dashboard/ui/**']},ctx),['.starciwork/features/workspace-dashboard/business/srs/business-rules/policy-decisions/**']);
-  assert.deepEqual(decisionAllowlistFor({},{nodeId:null,ledgerIds:[],allowlist:['apps/x/**']},ctx),['.starciwork/decisions/**'],'no feature known: the tree-level folder');
-});
-
-test('an op the validator exhausted on the whole-tree check is re-admitted while the tree is still red, once every remaining error is foreign to it',()=>{
-  const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
-  const done=n=>({outcome:'done',summary:`Intake implemented, attempt ${n}.`,files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]});
-  const harness=setupWork({dirty:[file],scripts:{[nodeId]:[done(1),done(2),done(3),done(4)]}});
-  try{
-    const {store,state}=harness;
-    approve(store,state);state.run='run_wf';state.from='term_kernel';
-    // The tree stays red on a record another lane wrote; nothing of it is under this op. The validator keeps
-    // rejecting on the whole-tree check (as it did on the real backend), so the op is exhausted mid-run.
-    const foreign=()=>({ok:false,errors:[{code:'NODE_ASSET_UNREADABLE',path:'features/sales/ui/index.yaml',message:'asset missing'}],warnings:[],nodes:[],resources:[]});
-    const reject=()=>({ok:true,verdict:'reject',summary:'red tree',findings:[{file,detail:'The required `work-valid` check (`starci.mjs validate`) exits 1'}],dropped:[],provider:'stub',usage:null});
-    const after=harness.run({maxIterations:8,validate:foreign,validateOp:reject,ledgerApi:{...work,loadLedger:where=>work.loadLedger({...where,validate:foreign})}});
-    const log=events(store);
-    assert.ok(log.some(event=>event.event==='validator-exhausted'&&event.op===nodeId),'the validator exhausted the op on the red tree');
-    const readmitted=log.filter(event=>event.event==='op-readmitted'&&event.op===nodeId&&/outside this operation/.test(event.reason));
-    assert.ok(readmitted.length>=1,'the op is judged again while the tree is still red, because its errors are foreign');
-    assert.ok(log.some(event=>event.event==='ledger-invalid'),'the foreign error is still reported');
   }finally{harness.cleanup();}
 });
 
@@ -1445,6 +1506,125 @@ test('a reported SDS gap routes to architecture.revise on the architecture node 
   }finally{harness.cleanup();}
 });
 
+/**
+ * The owner's ruling of 2026-09-14, on the tree. A requirement the SRS does not settle is not a reason to stop
+ * and not a design question either: the business node that owns the record is reopened, the requirement is
+ * revised towards its most reasonable reading with the reason in its decision log, its `rev` is bumped, and the
+ * operation that could not derive its work from it reads the settled record behind it.
+ */
+const SALES_SRS=`schema: work/node@2
+id: demo.sales.business.srs.intake
+kind: business
+required: true
+state: done
+description: What order intake must do.
+`;
+const SALES_BUSINESS={id:'demo.sales.business.srs.intake',path:'features/sales/business/srs/intake/index.yaml',
+  kind:'business',state:'done',eligible:false,inputDigest:DIGEST('s'),dependsOn:[],refs:[],blockedBy:[],children:[],
+  completion:{inputDigest:DIGEST('s')},authored:SALES_SRS};
+
+test('a reported requirement gap routes to business.revise on the business node, reopens the requester and bumps the rev',()=>{
+  const file='apps/agentos-controlplane/src/sales/intake.ts';
+  const requirement='.starciwork/features/sales/business/srs/intake/index.yaml';
+  const harness=setupWork({nodes:[...WORK_NODES,SALES_BUSINESS],dirty:[file,requirement],
+    scripts:{'demo.sales.implementation.backend.intake':[
+      {outcome:'blocked',summary:'The SRS says both that a partial order is billable and that it is not.',files:[],checks:[],
+        blocker:{kind:'srs-gap',detail:'features/sales/business/srs/intake/index.yaml does not settle whether a partial order is billable'}},
+      {outcome:'done',summary:'Intake implemented against the settled requirement.',files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      'business-1':[{outcome:'done',summary:'rev 1: a partial order is billable for the fulfilled lines only.',files:[requirement],
+        checks:[passing('work-tree-validates','starci validate')]}],
+      [`${'demo.sales.implementation.backend.intake'}-verify`]:[{outcome:'done',summary:'The intake scenarios pass through the API on the real stack.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
+      ...receiptAuthor()}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:20});
+    const gap=harness.store.readEvents().find(event=>event.event==='srs-gap');
+    assert.equal(gap.business,'demo.sales.business.srs.intake');
+    assert.equal(gap.revise,'business-1');
+    const revise=state.ops.find(item=>item.id==='business-1');
+    // The route names the kind and the origin: a requirement gap is a requirement repair, never a design one.
+    assert.equal(revise.kind,'business.revise');
+    assert.equal(revise.origin,'business');
+    assert.equal(revise.nodeId,'demo.sales.business.srs.intake');
+    assert.deepEqual(revise.allowlist,[requirement,'.starciwork/features/sales/business/srs/intake/**']);
+    assert.match(revise.goal,/State the readings the record admits/);
+    assert.match(revise.goal,/say why in the decision log and bump its rev/);
+    assert.equal(revise.status,'done');
+    const route=harness.store.readEvents().find(event=>event.event==='routed'&&event.on==='srs-gap');
+    assert.deepEqual([route.op,route.to,route.origin,route.kind,route.then],
+      ['demo.sales.implementation.backend.intake','business-1','business','business.revise','reopen']);
+    // The implementation waited for the revision, then read the settled requirement.
+    const implement=state.ops.find(item=>item.id==='demo.sales.implementation.backend.intake');
+    assert.ok(implement.dependsOn.includes('business-1'));
+    assert.equal(implement.status,'done');
+    assert.ok(harness.store.readEvents().some(event=>event.event==='op-reopened'&&event.op===implement.id&&event.waitingFor==='business-1'));
+    // Accepting the revision settles the node as a decision WITH a bumped rev: a reopened requirement is not
+    // read as the first one, and everything built on the old reading is bound to the rev it was built under.
+    const business=harness.read('demo.sales.business.srs.intake');
+    assert.equal(business.extensions.work3.kernel.rev,1);
+    assert.equal(business.state,'done');
+    assert.equal(business.extensions.work3.kernel.reopened.length,1);
+    assert.match(business.extensions.work3.kernel.reopened[0].reason,/reported a requirement gap/);
+    assert.equal(business.completion.review.schema,'starci/design-review@1');
+    // A kernel-origin repair counts against nothing: the owner approved the goal, not this repair.
+    assert.equal(state.ops.filter(item=>item.refusal==='dynamic-op').length,0);
+  }finally{harness.cleanup();}
+});
+
+/**
+ * The other half of the same ruling, one phase earlier. A hidden decision the critic marked decisive is the
+ * owner's and is prepared before any operation of its feature runs; one it marked non-decisive costs nobody a
+ * question here at all, because the record repair settles it towards the most reasonable reading when an
+ * operation actually hits it.
+ */
+test('a decisive hidden decision is planned as an owner question before the work of its feature; a non-decisive one is not',()=>{
+  const objections=[
+    {kind:'hidden-decision',claim:'The goal decides that a support agent may refund an order',
+      evidence:'features/sales/business/srs/intake/index.yaml',consequence:'Money leaves without a manager.',decisive:true},
+    {kind:'hidden-decision',claim:'The goal names the receipt column "total_vat"',
+      evidence:'features/sales/architecture/sds/intake/index.yaml',consequence:'Two spellings of one column.',decisive:false}];
+  const harness=setupWork({nodes:[...WORK_NODES,SALES_BUSINESS],
+    critiqueGoal:critique({verdict:'revise',objections,required:['name who may refund an order']})});
+  try{
+    const state=harness.state,events=harness.store.readEvents();
+    const ask=state.ops.find(op=>op.kind==='owner.ask');
+    assert.ok(ask,'the decisive hidden decision became one owner question');
+    assert.equal(ask.question.kind,'decision','the provisional kind: the ask writes a decision record and the work goes on');
+    assert.match(ask.question.text,/a support agent may refund an order/);
+    assert.match(ask.question.text,/Money leaves without a manager/);
+    // Exactly one: the non-decisive objection is deferred to the record repair, not asked about.
+    assert.equal(state.ops.filter(op=>op.kind==='owner.ask').length,1);
+    const planned=events.filter(event=>event.event==='decision-planned');
+    assert.equal(planned.length,1);
+    assert.equal(planned[0].op,ask.id);
+    assert.equal(planned[0].feature,'sales');
+    assert.ok(events.some(event=>event.event==='hidden-decision-deferred'&&/total_vat/.test(event.claim)));
+    // It stands in front of every operation of its feature: the question is prepared before the work, not after.
+    const sales=state.ops.filter(op=>op.id!==ask.id&&/\.sales\./.test(op.id));
+    assert.ok(sales.length,JSON.stringify(state.ops.map(op=>op.id)));
+    for(const op of sales)assert.ok(op.dependsOn.includes(ask.id)||op.waitingFor===ask.id,op.id);
+    assert.deepEqual(planned[0].ops,sales.map(op=>op.id));
+    // And the owner reads on the goal page what each hidden decision costs them.
+    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    assert.match(page,/This one moves money, authority or customer data, so it is put to you before the work of its feature starts/);
+    assert.match(page,/the runtime settles it towards the most reasonable reading when an operation hits it/);
+  }finally{harness.cleanup();}
+  // A decisive decision about a feature no operation of this goal touches is reported, never turned into a
+  // question nobody is waiting for: the kernel does not invent work for a feature it is not doing.
+  const elsewhere=setupWork({nodes:[...WORK_NODES,SALES_BUSINESS],
+    critiqueGoal:critique({verdict:'revise',required:['name who may refund'],objections:[{kind:'hidden-decision',
+      claim:'The goal decides who may read a stored card',evidence:'features/billing/business/srs/cards/index.yaml',
+      consequence:'Customer data is shown to more people.',decisive:true}]})});
+  try{
+    assert.equal(elsewhere.state.ops.some(op=>op.kind==='owner.ask'),false);
+    const unplanned=elsewhere.store.readEvents().find(event=>event.event==='decision-unplanned');
+    assert.equal(unplanned.feature,'billing');
+    assert.match(unplanned.reason,/no operation of this goal touches it/);
+  }finally{elsewhere.cleanup();}
+});
+
 /* ------------------------------------------------------------------ lanes and routes */
 
 const CART='demo.sales.implementation.frontend.cart';
@@ -1644,7 +1824,8 @@ test('a design operation carries the brand record and its assets, prints the Bra
     assert.doesNotMatch(renderContract({template,op:{...op,kind:'backend.implement'},state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'}),/## Brand/);
     // `grammar.update` is in the list from the other end: it grows the language every drawing reads, so it gets
     // the whole canon and the identity the new unit has to live inside before it adds a word to either.
-    assert.deepEqual(DESIGN_KINDS,['interface.draw','interface.asset','frontend.implement','uat.verify','grammar.update']);
+    // The set is what the catalog derives from `reads: [brand]`, in catalog order, so only membership is pinned here.
+    assert.deepEqual([...DESIGN_KINDS].sort(),['frontend.implement','grammar.update','interface.asset','interface.draw','uat.verify']);
     assert.match(renderContract({template,op:{...op,kind:'grammar.update'},state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'}),/## Brand/);
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
@@ -2176,12 +2357,15 @@ test('a shared change must name its paths, is deduped by path set, is capped per
       return applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,ctx);
     };
     const op=id=>harness.state.ops.find(item=>item.id===id);
-    // The Work tree is never delegated: a shared change naming a ledger path is refused and reaches the user.
+    // The Work tree is never delegated: a shared change naming ONLY ledger paths is refused in the operation's own
+    // terminal and is never an item on the owner's list - there is nothing for the owner to decide, because the
+    // answer is a rule of the runtime. (Before the 5-plus ruling this blocked the op with a `ledger-path` item.)
     harness.state.ops.push({...structuredClone(harness.state.ops[0]),id:'op-ledger',status:'pending',dispatch:null,terminal:null,runtime:null});
     assert.equal(block('op-ledger','.starciwork/features/sales/migration/index.yaml must drop its source identity'),'shared-change-refused');
-    assert.equal(op('op-ledger').status,'blocked');
-    assert.match(harness.state.needUser.find(item=>item.kind==='ledger-path').detail,/\.starciwork\/features\/sales\/migration\/index\.yaml/);
-    assert.equal(events(harness.store).at(-1).event,'shared-change-refused');
+    assert.equal(op('op-ledger').status,'answering');
+    assert.match(op('op-ledger').answer,/the kernel's own record/);
+    assert.equal(harness.state.needUser.some(item=>item.kind==='ledger-path'),false,'a mechanical refusal is never the owner\'s item');
+    assert.deepEqual(events(harness.store).slice(-2).map(event=>event.event),['ledger-path-refused','shared-change-refused']);
     assert.equal(harness.state.ops.some(item=>item.origin==='shared'),false,'no shared op was created for a ledger path');
     // One concrete path set becomes one shared op, and the requester is paused - never pending, never rescheduled.
     assert.equal(block('op-a','packages/contracts/widget.ts must register the entity'),'shared-change');
@@ -2231,6 +2415,70 @@ test('a shared change must name its paths, is deduped by path set, is capped per
     const log=events(harness.store).map(event=>event.event);
     for(const name of ['shared-change-merged','shared-change-deferred','op-paused','shared-change-unnamed','shared-change-resumed','shared-change-blocked'])
       assert.ok(log.includes(name),`the log records ${name}`);
+  }finally{harness.cleanup();}
+});
+
+// One bad path used to cost an operation its whole request: a shared change that named the Work tree AND the
+// code it actually needed was refused outright and became a `ledger-path` item nobody could answer. The ruling
+// splits it - the record paths are refused with one event, the code paths carry on - and the refusal is
+// mechanical, so it is never on the owner's list either way.
+test('a shared change that asks for record paths and code paths is split: the record paths are refused, the code paths continue',()=>{
+  const harness=setup({plan:sharedPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state,{allowDynamic:9});
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    harness.state.iterations=1;
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,exec:()=>({status:0,stdout:'',stderr:''}),
+      now:()=>0,work:null,wait:noWait,decide:()=>{throw Error('a shared change is not a decision');}};
+    const op=harness.state.ops.find(item=>item.id==='op-a');
+    Object.assign(op,{status:'running',dispatch:'disp_mixed',terminal:'term_mixed',runtime:'qwen3.8-flash'});
+    const report=buildReport({outcome:'blocked',run:'run_wf',task:'task_a',dispatch:'disp_mixed',from:'term_mixed',
+      summary:'op-a cannot make the change alone.',
+      blocker:{kind:'shared-change',detail:'.starciwork/features/sales/index.yaml and packages/contracts/widget.ts must both name the span'}});
+    report.sent={messageId:'msg_a',sentAt:1,type:report.signal.type};
+    assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,ctx),'shared-change');
+    const refused=events(harness.store).find(event=>event.event==='ledger-path-refused');
+    assert.deepEqual([refused.op,refused.paths,refused.continued],
+      ['op-a',['.starciwork/features/sales/index.yaml'],['packages/contracts/widget.ts']]);
+    const shared=harness.state.ops.find(item=>item.id===op.waitingFor);
+    assert.deepEqual(shared.allowlist,['packages/contracts/widget.ts'],'only the code path is delegated');
+    assert.equal(harness.state.needUser.some(item=>item.kind==='ledger-path'),false,'a mechanical refusal is never the owner\'s item');
+  }finally{harness.cleanup();}
+});
+
+// A shared change two levels deep used to be a `shared-depth` item on the owner's list, and there was nothing
+// the owner could do with it: the depth is the runtime's own bound, and the change is work nobody wrote down.
+// It becomes one Work node now, authored by a `work.author` op and scheduled like any other node.
+test('a shared change too deep to delegate again becomes one Work node the kernel authors, not a question for the owner',()=>{
+  const harness=setup({plan:sharedPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state,{allowDynamic:9});
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    harness.state.iterations=1;
+    const node={id:'demo.sales.implementation.backend.intake',path:'features/sales/implementation/backend/intake/index.yaml'};
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,exec:()=>({status:0,stdout:'',stderr:''}),
+      now:()=>0,wait:noWait,decide:()=>{throw Error('a depth bound is not a decision');},
+      work:{at:{repoRoot:cwd,workRoot:`${cwd}/.starciwork`},loaded:{list:[node]},node:id=>id===node.id?node:null}};
+    const deep=harness.state.ops.find(item=>item.id==='op-a');
+    Object.assign(deep,{status:'running',dispatch:'disp_deep',terminal:'term_deep',runtime:'qwen3.8-flash',
+      sharedDepth:2,nodeId:node.id});
+    const report=buildReport({outcome:'blocked',run:'run_wf',task:'task_a',dispatch:'disp_deep',from:'term_deep',
+      summary:'op-a cannot make the change alone.',
+      blocker:{kind:'shared-change',detail:'packages/platform/runtime.ts must expose the span before anything else can'}});
+    report.sent={messageId:'msg_a',sentAt:1,type:report.signal.type};
+    assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,deep,report,ctx),'shared-authored');
+    const authored=events(harness.store).find(event=>event.event==='shared-authored');
+    assert.deepEqual([authored.op,authored.node,authored.depth,authored.paths],
+      ['op-a','.starciwork/features/sales/implementation/shared-op-a/index.yaml',2,['packages/platform/runtime.ts']]);
+    const author=harness.state.ops.find(item=>item.id===authored.author);
+    assert.deepEqual([author.kind,author.origin,author.allowlist],
+      ['work.author','ledger',['.starciwork/features/sales/implementation/shared-op-a/index.yaml','.starciwork/features/sales/implementation/shared-op-a/**']]);
+    assert.deepEqual(author.sharedAuthored,['packages/platform/runtime.ts']);
+    assert.match(author.goal,/do not make the change/);
+    // The requester waits for that node's record exactly as it waits for any shared op, and nothing is asked.
+    assert.deepEqual([deep.status,deep.waitingFor],['paused',author.id]);
+    assert.equal(harness.state.needUser.some(item=>item.kind==='shared-depth'),false,'a mechanical bound is never the owner\'s item');
+    assert.equal(events(harness.store).some(event=>event.event==='shared-change-depth'),false);
   }finally{harness.cleanup();}
 });
 
@@ -2810,6 +3058,63 @@ test('a revise verdict lists what it requires on the goal page and in the contra
   }finally{harness.cleanup();}
 });
 
+test('the overlaps the critic finds are the three cases: a conflict is listed for the owner on the goal page, a reference is a record to cite, and the intake contract carries both',()=>{
+  const overlaps=[
+    {record:'demo.sales.architecture.sds.intake',case:'conflict',evidence:'sales decided a synchronous intake contract; collab needs an asynchronous one'},
+    {record:'demo.sales.business.overview',case:'reference',evidence:'the refund window collab follows is already decided there'},
+    // A case outside the closed two is not a case: the kernel drops it instead of inventing a fourth.
+    {record:'demo.sales.business.overview',case:'change',evidence:'x'}];
+  const harness=setupWork({scope:['collab'],critiqueGoal:critique({verdict:'revise',objections:[objection()],required:['reconcile against the sales records'],overlaps})});
+  try{
+    assert.deepEqual(harness.state.critique.overlaps.map(item=>[item.record,item.case]),
+      [['demo.sales.architecture.sds.intake','conflict'],['demo.sales.business.overview','reference']]);
+    assert.deepEqual(events(harness.store).filter(event=>event.event==='goal-critiqued').map(event=>event.overlaps),[2]);
+    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    assert.match(page,/### Conflicts for the owner\n\n- `demo\.sales\.architecture\.sds\.intake` - sales decided a synchronous intake contract/);
+    assert.match(page,/the owner decides it with `workflow-answer`/);
+    assert.match(page,/### Records to cite\n\n- `demo\.sales\.business\.overview` - the refund window/);
+    // The intake is the one operation whose job the overlaps describe, so its contract carries them as rows to write.
+    const intake=harness.state.ops.find(op=>op.intake);
+    const contract=renderContract({template,op:intake,state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
+    assert.match(contract,/## Reconciliation the critic found\n- `demo\.sales\.architecture\.sds\.intake` conflicts with this feature[^\n]*write a `conflict` row naming it and a todo decision record under `collab`/);
+    assert.match(contract,/- `demo\.sales\.business\.overview` already holds part of this feature[^\n]*`reference` row citing it by id/);
+    // The dropped 'change' overlap produced no row: the overview is named exactly once, as the reference it is.
+    assert.equal((contract.match(/^- `demo.sales.business.overview`/gm)??[]).length,1);
+  }finally{harness.cleanup();}
+});
+
+test('a red tree counts against an op only where the op could have caused it: foreign errors are evidence, not a rejection',()=>{
+  const errors=[{code:'NODE_ASSET_UNREADABLE',path:'features/sales/ui/index.yaml',message:'asset missing'},{code:'SRS_LAYOUT',path:'features/shared/business/srs/decisions/x/index.yaml',message:'layout'}];
+  const ctx={work:{ledger:{repoRoot:'C:/owner',workRoot:'C:/owner/.starciwork'},validate:()=>({ok:false,errors}),node:()=>({path:'features/sales/implementation/backend/intake/index.yaml'})}};
+  const backend={nodeId:'demo.sales.implementation.backend.intake',allowlist:['apps/agentos-controlplane/src/sales/**'],files:['apps/agentos-controlplane/src/sales/intake.ts']};
+  const verdict=treeVerdictFor(ctx,backend);
+  assert.deepEqual([verdict.ok,verdict.own.length,verdict.foreign.length],[true,0,2],'a backend slice is not failed by the missing assets of a drawing');
+  const drawing={nodeId:null,allowlist:['C:/owner/.starciwork/features/sales/ui/**'],files:[]};
+  const judged=treeVerdictFor(ctx,drawing);
+  assert.deepEqual([judged.ok,judged.own.map(e=>e.code),judged.foreign.length],[false,['NODE_ASSET_UNREADABLE'],1],'the op that wrote the ui record owns its error');
+  assert.equal(treeVerdictFor({work:{...ctx.work,validate:()=>({ok:true,errors:[]})}},backend).ok,true);
+});
+
+test('an op the validator exhausted on the whole-tree check is re-admitted while the tree is still red, once every remaining error is foreign to it',()=>{
+  const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
+  const done=n=>({outcome:'done',summary:`Intake implemented, attempt ${n}.`,files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]});
+  const harness=setupWork({dirty:[file],scripts:{[nodeId]:[done(1),done(2),done(3),done(4)]}});
+  try{
+    const {store,state}=harness;
+    approve(store,state);state.run='run_wf';state.from='term_kernel';
+    // The tree stays red on a record another lane wrote; nothing of it is under this op. The validator keeps
+    // rejecting on the whole-tree check (as it did on a real backend), so the op is exhausted mid-run.
+    const foreign=()=>({ok:false,errors:[{code:'NODE_ASSET_UNREADABLE',path:'features/sales/ui/index.yaml',message:'asset missing'}],warnings:[],nodes:[],resources:[]});
+    const reject=()=>({ok:true,verdict:'reject',summary:'red tree',findings:[{file,detail:'The required `work-valid` check (`starci.mjs validate`) exits 1'}],dropped:[],provider:'stub',usage:null});
+    const after=harness.run({maxIterations:8,validate:foreign,validateOp:reject,ledgerApi:{...work,loadLedger:where=>work.loadLedger({...where,validate:foreign})}});
+    const log=events(store);
+    assert.ok(log.some(event=>event.event==='validator-exhausted'&&event.op===nodeId),'the validator exhausted the op on the red tree');
+    const readmitted=log.filter(event=>event.event==='op-readmitted'&&event.op===nodeId&&/outside this operation/.test(event.reason));
+    assert.ok(readmitted.length>=1,'the op is judged again while the tree is still red, because its errors are foreign');
+    assert.ok(log.some(event=>event.event==='ledger-invalid'),'the foreign error is still reported');
+  }finally{harness.cleanup();}
+});
+
 test('a refuse verdict refuses the approval with its one question, and --accept-critique records the owner override once',()=>{
   const question='Which component owns the receipt write, the backend ledger or the frontend surface?';
   const harness=setupWork({critiqueGoal:critique({verdict:'refuse',objections:[objection()],question})});
@@ -2987,5 +3292,263 @@ test('the answer the kernel gave to an op\'s question travels in the contract of
     op.answer='Use the existing intake table; do not add a migration.';
     const after=renderContract({template,op,state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
     assert.match(after,/## Answer to the question you asked earlier\nUse the existing intake table; do not add a migration\.\nAct on it; do not ask the same question again\.\n\n## Acceptance/);
+  }finally{harness.cleanup();}
+});
+
+/* ------------------------------------------------------------------ heavy work is cut and fanned out */
+
+/**
+ * The owner's ruling, as one workflow: a big node is cut by a planning operation into many small nodes with
+ * disjoint write scopes, the seam everyone shares is built first and alone, the rest fan out, and the proof runs
+ * once for the whole group on another runtime - never once per piece.
+ */
+const CHECKOUT='demo.sales.implementation.backend.checkout';
+const CHECKOUT_DIR='features/sales/implementation/backend/checkout';
+const CHECKOUT_RECORD=`.starciwork/${CHECKOUT_DIR}/index.yaml`;
+const CHECKOUT_CUT=`${CHECKOUT}-cut`;
+const SEAM=`${CHECKOUT}.wiring`,PAY=`${CHECKOUT}.payment`,SHIP=`${CHECKOUT}.shipping`;
+const childRecord=id=>`.starciwork/${CHECKOUT_DIR}/${id.split('.').at(-1)}/index.yaml`;
+const codeOf=id=>`apps/agentos-controlplane/src/sales/checkout/${id.split('.').at(-1)}.ts`;
+/** Thirteen files is one past CUT_FILES, which is the whole reason this node is not one operation. */
+const BIG_FILES=Array.from({length:13},(_,index)=>`apps/agentos-controlplane/src/sales/checkout/part-${index+1}.ts`);
+const BIG=`schema: work/node@2
+id: ${CHECKOUT}
+kind: implementation
+required: true
+state: todo
+description: Check a cart out end to end.
+assertions:
+  - checkout-completes
+implementation:
+  status: mixed
+  changes:
+    - what: Build checkout.
+      why: The flow does not exist.
+      repository: demo-backend
+      directory: .
+      files:
+${BIG_FILES.map(file=>`        - ${file}`).join('\n')}
+extensions:
+  work3:
+    checks:
+      - assertion: checkout-completes
+        command: npx vitest run checkout
+`;
+/** What the cut leaves behind on the parent: a derived parent, its assertions kept as the group's acceptance. */
+const DERIVED=`schema: work/node@2
+id: ${CHECKOUT}
+kind: implementation
+required: true
+description: Check a cart out end to end.
+extensions:
+  work3:
+    groupAssertions:
+      - checkout-completes
+`;
+/** One child the cut wrote: one observable behaviour, its own small write scope, one check per assertion. */
+const childText=(id,dependsOn=[])=>{
+  const part=id.split('.').at(-1);
+  return `schema: work/node@2
+id: ${id}
+kind: implementation
+required: true
+state: todo
+description: The ${part} part of checkout.
+assertions:
+  - ${part}-works
+${dependsOn.length?`dependsOn:\n${dependsOn.map(entry=>`  - ${entry}`).join('\n')}\n`:''}implementation:
+  status: mixed
+  changes:
+    - what: Build ${part}.
+      why: It does not exist.
+      repository: demo-backend
+      directory: .
+      files:
+        - ${codeOf(id)}
+extensions:
+  work3:
+    checks:
+      - assertion: ${part}-works
+        command: npx vitest run ${part}
+`;
+};
+const BIG_NODE={id:CHECKOUT,path:`${CHECKOUT_DIR}/index.yaml`,kind:'implementation',state:'todo',eligible:true,
+  inputDigest:DIGEST('k'),dependsOn:[],refs:[],blockedBy:[],children:[],completion:null,authored:BIG};
+const childNode=(id,dependsOn=[])=>({id,path:`${CHECKOUT_DIR}/${id.split('.').at(-1)}/index.yaml`,kind:'implementation',
+  state:'todo',eligible:dependsOn.length===0,inputDigest:DIGEST('k'),dependsOn:[...dependsOn],refs:[],blockedBy:[],
+  children:[],completion:null,authored:childText(id,dependsOn)});
+const CHILDREN=[SEAM,PAY,SHIP];
+const cutReport=summary=>({outcome:'done',summary,files:[CHECKOUT_RECORD,...CHILDREN.map(childRecord)],
+  checks:[passing('work-tree-validates','node starci.mjs validate .starciwork')]});
+const buildReportOf=id=>({outcome:'done',summary:`${id} is built.`,files:[codeOf(id)],
+  checks:[passing(`${id.split('.').at(-1)}-works`,`npx vitest run ${id.split('.').at(-1)}`)]});
+
+/**
+ * One workflow over the too-big node. The projection array is mutable on purpose: the injected validator is read
+ * again on every tick, so the test makes the children appear exactly as the operation would - the parent derived
+ * (no state, so it is no candidate at all), the seam schedulable, the rest waiting behind it.
+ */
+function runCut({scripts,cut=true,maxIterations=24,allocator=fakeAllocator({maxParallelOps:10}),exec}={}){
+  const nodes=[{...BIG_NODE}];
+  const harness=setupWork({nodes,scripts,allocator,exec,
+    dirty:[CHECKOUT_RECORD,...CHILDREN.map(childRecord),...CHILDREN.map(codeOf)]});
+  approve(harness.store,harness.state);
+  harness.state.run='run_wf';harness.state.from='term_kernel';
+  const write=(where,text)=>{const file=path.join(harness.repo,where);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
+  const tick=()=>{
+    // While the cut runs: the children are written and the parent becomes derived.
+    if(cut&&!fs.existsSync(path.join(harness.repo,childRecord(SEAM)))&&harness.state.ops.some(op=>op.id===CHECKOUT_CUT&&op.status==='running')){
+      write(CHECKOUT_RECORD,DERIVED);
+      for(const id of CHILDREN)write(childRecord(id),childText(id,id===SEAM?[]:[SEAM]));
+      nodes[0]={...nodes[0],state:null,children:[...CHILDREN]};
+      nodes.push(...CHILDREN.map(id=>childNode(id,id===SEAM?[]:[SEAM])));
+    }
+    // Once the seam's build is accepted its siblings become eligible, exactly as the validator would report.
+    if(harness.state.ops.some(op=>op.id===SEAM&&op.status==='done'))
+      for(const node of nodes)if(node.dependsOn?.includes(SEAM))node.eligible=true;
+  };
+  const orca={...harness.fake.orca,invoke:(name,params,options)=>{
+    const result=harness.fake.orca.invoke(name,params,options);
+    if(name==='check')tick();
+    return result;
+  }};
+  const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:noWait,
+    // The projection is answered from the array as it stands: every re-read of the tree sees what the operations
+    // have written by then, which is what makes a child authored mid-run a schedulable node on the next tick.
+    validateOp:acceptAll,validate:(...args)=>{tick();return harness.validate(...args);},
+    exec:exec??(command=>({status:0,stdout:`${command} ok`,stderr:''})),
+    git:harness.git.git,waitTimeoutMs:2000,tickMs:1000,maxIterations});
+  return {harness,state,nodes,log:events(harness.store)};
+}
+const cutScripts=(extra={})=>({[CHECKOUT_CUT]:[cutReport('Cut into a seam and two parts.')],
+  ...Object.fromEntries(CHILDREN.map(id=>[id,[buildReportOf(id)]])),...extra});
+
+test('a node too big for one operation gets a cut op before its lane, and its children fan out behind the seam',()=>{
+  const {harness,state,log}=runCut({scripts:cutScripts({
+    'verify-1':[{outcome:'done',summary:'Every scenario of the group is green.',files:[],
+      checks:[passing('payment-works','npx vitest run payment')]}],
+    'verify-2':[{outcome:'done',summary:'The group holds together.',files:[],open:[],
+      checks:[passing('payment-works','npx vitest run payment')]}]})});
+  try{
+    // The cut precedes the lane: no build op of the parent was ever created.
+    const planned=log.find(event=>event.event==='cut-planned');
+    assert.equal(planned.node,CHECKOUT);
+    assert.equal(planned.files,13);
+    assert.equal(planned.assertions,1);
+    assert.equal(planned.reason,'its write scope names 13 files, past the 12 one operation may hold');
+    const cut=state.ops.find(op=>op.id===CHECKOUT_CUT);
+    assert.equal(cut.kind,'implementation.plan','the cut is a kind of its own, carried by the work.author contract');
+    assert.equal(cut.nodeId,CHECKOUT);
+    assert.deepEqual(cut.ledgerIds,[],'a cut closes no node: the children it writes are the nodes');
+    assert.deepEqual(cut.allowlist,[`.starciwork/${CHECKOUT_DIR}/**`],'its write scope is the node\'s own folder');
+    assert.deepEqual(cut.checks.map(check=>check.name),['work-tree-validates']);
+    assert.deepEqual(cut.cut,{node:CHECKOUT,reason:planned.reason});
+    assert.ok(cut.references.includes(`${CHECKOUT_DIR}/index.yaml`)&&cut.references.includes(BIG_FILES[0]),
+      'the node, its design and the code its allowlist names are the references');
+    assert.equal(state.ops.some(op=>op.nodeId===CHECKOUT&&op.kind==='backend.implement'),false,
+      'the parent never walked a lane step of its own');
+    // Its contract is the cut sequence, and it says the parent loses its state on purpose.
+    const contract=fs.readFileSync(harness.store.contractPath(CHECKOUT_CUT),'utf8');
+    assert.match(contract,/Sequence `work\.cut`/);
+    assert.match(contract,/## Work node you cut/);
+    assert.match(contract,/removing its `state` is the job \(a parent authors no state\)/);
+    assert.match(contract,/Name the SEAM first/);
+    // On acceptance the tree is re-read: the children are the nodes now, and the seam is named from the records.
+    const authored=log.find(event=>event.event==='cut-authored');
+    assert.equal(authored.node,CHECKOUT);
+    assert.deepEqual([...authored.children].sort(),[...CHILDREN].sort());
+    assert.equal(authored.seam,SEAM);
+    assert.equal(authored.groupAssertions,1);
+    assert.deepEqual([...state.cuts[CHECKOUT].children].sort(),[...CHILDREN].sort());
+    assert.deepEqual(state.cuts[CHECKOUT].assertions,['checkout-completes'],'the parent\'s assertions are the group\'s acceptance');
+    // Seam first: its build is accepted before either sibling is even launched.
+    const launched=log.filter(event=>event.event==='launched').map(event=>event.op);
+    assert.ok(launched.indexOf(SEAM)>=0&&launched.indexOf(SEAM)<launched.indexOf(PAY)&&launched.indexOf(SEAM)<launched.indexOf(SHIP),'the seam is built first');
+    for(const id of CHILDREN){
+      const build=state.ops.find(op=>op.id===id);
+      assert.equal(build.kind,'backend.implement','a child is ordinary build work, never a new kind');
+      assert.deepEqual(build.allowlist,[codeOf(id)]);
+      assert.equal(build.status,'done');
+    }
+    // One proof per parent, in order, and neither is a step any child planned for itself.
+    const proofs=state.ops.filter(op=>op.origin==='verify');
+    assert.deepEqual(proofs.map(op=>op.kind),['e2e.verify','review.verify'],
+      'one API proof and one review for the whole group, never one per piece');
+    for(const proof of proofs){
+      assert.deepEqual([...proof.ledgerIds].sort(),[...CHILDREN].sort(),'the group is the unit that is proven');
+      assert.equal(proof.nodeId,null);
+      assert.ok(proof.acceptance.includes('checkout-completes'),'the parent\'s group acceptance is the proof\'s acceptance');
+      assert.deepEqual([...proof.allowlist].sort(),CHILDREN.map(codeOf).sort());
+      assert.equal(CHILDREN.map(id=>state.ops.find(op=>op.id===id).runtime).includes(proof.runtime),false,
+        'the proof runs on a runtime none of the children used');
+    }
+    assert.equal(state.ops.filter(op=>op.kind==='e2e.verify').length,1);
+    assert.equal(state.ops.filter(op=>op.kind==='review.verify').length,1);
+    // Each child's prove steps were recorded when the parent's proof was accepted.
+    for(const id of CHILDREN){
+      assert.deepEqual(state.lanes[id].lane,['backend.implement','e2e.verify','review.verify']);
+      assert.deepEqual(state.lanes[id].done,['backend.implement','e2e.verify','review.verify']);
+      assert.equal(harness.read(id).state,'done');
+      assert.equal(state.ledger.find(item=>item.id===id).status,'verified');
+    }
+    for(const kind of ['e2e.verify','review.verify'])
+      assert.deepEqual(log.filter(event=>event.event==='lane-step'&&event.kind===kind).map(event=>event.node).sort(),
+        [...CHILDREN].sort(),'one group proof is one lane step of every child');
+    assert.equal(state.ledger.some(item=>item.id===CHECKOUT),false,'the derived parent is no goal item of its own');
+  }finally{harness.cleanup();}
+});
+
+test('a group proof that found something repairs the child whose write scope holds the file, not the whole group',()=>{
+  const {harness,state,log}=runCut({scripts:cutScripts({
+    'verify-1':[{outcome:'done',summary:'green',files:[],checks:[passing('payment-works','npx vitest run payment')]}],
+    'verify-2':[{outcome:'partial',summary:'One finding.',files:[],
+      open:[`${codeOf(PAY)}:31 the refund path never rolls the authorisation back, which breaks payment-works`],
+      checks:[passing('payment-works','npx vitest run payment')]}],
+    'repair-1':[buildReportOf(PAY)],
+    'verify-3':[{outcome:'done',summary:'The finding is fixed.',files:[],open:[],
+      checks:[passing('payment-works','npx vitest run payment')]}]})});
+  try{
+    const findings=log.find(event=>event.event==='verify-findings');
+    assert.equal(findings.child,PAY,'the finding named a file of exactly one child');
+    const repair=state.ops.find(op=>op.origin==='repair');
+    assert.equal(repair.kind,'backend.implement','the repair is the lane\'s build step');
+    assert.equal(repair.nodeId,PAY);
+    assert.deepEqual(repair.ledgerIds,[PAY],'the other children are not reopened by a finding that is not theirs');
+    assert.deepEqual(repair.allowlist,[codeOf(PAY)]);
+  }finally{harness.cleanup();}
+});
+
+test('a node the planning operation did not split reports cut: none and the kernel runs it as it is',()=>{
+  const {harness,state,log}=runCut({cut:false,maxIterations:3,
+    scripts:{[CHECKOUT_CUT]:[{outcome:'done',summary:'cut: none - checkout is one observable behaviour.',
+      files:[],checks:[passing('work-tree-validates','node starci.mjs validate .starciwork')]}]}});
+  try{
+    const none=log.find(event=>event.event==='cut-none');
+    assert.equal(none.node,CHECKOUT);
+    assert.equal(none.op,CHECKOUT_CUT);
+    assert.equal(log.some(event=>event.event==='cut-authored'),false);
+    assert.equal(state.lanes[CHECKOUT].cutNone,true);
+    // The node starts its own lane, with its own id, and no second cut is ever planned for it.
+    assert.deepEqual(state.ops.filter(op=>op.kind==='implementation.plan').map(op=>op.id),[CHECKOUT_CUT]);
+    const build=state.ops.find(op=>op.id===CHECKOUT);
+    assert.equal(build.kind,'backend.implement');
+    assert.deepEqual(build.allowlist,BIG_FILES);
+    assert.deepEqual(state.lanes[CHECKOUT].lane,['backend.implement','e2e.verify','review.verify']);
+    assert.deepEqual(state.lanes[CHECKOUT].done,[],'the cut walked no step of the lane');
+  }finally{harness.cleanup();}
+});
+
+test('the fan-out cap and the seam rule are read from the allocation profile, never guessed',()=>{
+  const allocator={...fakeAllocator({maxParallelOps:10}),fanOut:{seamFirst:true,maxPerGroup:1}};
+  const {harness,state,log}=runCut({allocator,scripts:cutScripts({
+    'verify-1':[{outcome:'done',summary:'green',files:[],checks:[passing('payment-works','npx vitest run payment')]}],
+    'verify-2':[{outcome:'done',summary:'green',files:[],open:[],checks:[passing('payment-works','npx vitest run payment')]}]})});
+  try{
+    const deferred=log.filter(event=>event.event==='schedule-deferred'&&event.parent===CHECKOUT);
+    assert.ok(deferred.length,'a child past the cap waits instead of taking a free slot');
+    assert.ok(deferred.every(event=>/already run \(allocation\.fanOut\.maxPerGroup\)|runs alone/.test(event.reason)));
+    // Capped at one, the two siblings still finish - one after the other, never at the same time.
+    for(const id of CHILDREN)assert.equal(state.ops.find(op=>op.id===id).status,'done',id);
+    assert.deepEqual(state.ops.filter(op=>op.origin==='verify').map(op=>op.kind),['e2e.verify','review.verify']);
   }finally{harness.cleanup();}
 });

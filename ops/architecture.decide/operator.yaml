@@ -51,7 +51,7 @@ reads:
         input bindings, requested output JSON shapes and required criteria. Standalone execution
         needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
-    path: profiles/registry.json + selected runtime execution profile + actual host tools/model
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
@@ -190,6 +190,27 @@ steps:
         validity alone is not review.
         Implementation owns source mapping and test execution. Done means current reviewed design,
         never an edit lock.
+  - reads:
+      - target
+      - business
+      - constraints
+    writes:
+      - node
+    action:
+      en: "Repair mode (the `architecture.revise` kind this operator also carries) is not a second decision: a
+        design section a builder found silent, confusing or self-contradictory is revised here, never
+        escalated and never left for the build to invent a mechanism around. Read the reported gap, state the
+        two or three readings the recorded design actually admits, and choose the most reasonable one from the
+        accepted requirement it realises, the rest of the design it must stay consistent with, the decided
+        records of the other features and the product's own conventions. Write that reading into the section
+        with the contract and the acceptance an implementer derives code from, bump the record's rev, and
+        append EXACTLY ONE extensions.work3.decisionLog entry {rev, at, gap, chosen, why, alternatives},
+        never rewriting or deleting an earlier one. One exception: when the readings differ in an observable
+        outcome about money, authority or customer data, do not choose silently - report ask with
+        question.kind decision, one numbered option per reading with what each costs and who it affects, and
+        one recommendation; the kernel writes that decision record for the owner and carries the work on the
+        recommendation until they answer. Never ask for anything else. A gap that is really a missing or
+        self-contradictory REQUIREMENT is blocked with srs-gap back to the business record that owns it."
 proofs:
   - id: binding
     requirement:
@@ -211,6 +232,14 @@ proofs:
       en: SRS outcomes map to owned contracts, runtime scenarios and design checks. Assess relevant
         threats/failures and limitations. Structural validation does not establish semantic approval
         or executed behavior.
+  - id: revision-decision-log
+    requirement:
+      en: "Every revision of an already-decided record leaves three things together or it is a defect: the
+        record changed, its rev higher than it was, and exactly one new extensions.work3.decisionLog entry
+        naming the gap, the chosen reading, why it is the most reasonable one by the records it was read from,
+        and the alternatives that were not taken. A changed record with no entry is a defect. A reading that
+        changes an observable outcome about money, authority or customer data and was taken without a decision
+        record with numbered options and one recommendation is a defect, whatever else the revision gets right."
 blockers:
   - code: OWNERSHIP_UNKNOWN
     condition:

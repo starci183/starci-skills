@@ -1,0 +1,587 @@
+schema: starci/kinds@2
+purpose: |-
+  The process is data, not a judgement call. This catalog is the complete, closed list of operation kinds a
+  workflow may run, the mandatory lane (an ordered template) every ledger node walks, and the bounded routes
+  that an outcome may take. A model fills the content of one operation and picks among the closed options an
+  operation offers; it never decides which step comes next, which kind repairs what, or how many rounds a
+  repair may take. The kernel asks `kernel/graph.mjs`, and `kernel/graph.mjs` only reads this
+  file: changing the process means editing this profile, never prompting harder.
+
+  Input and output are explicit. Every kind declares `reads` and `writes` over the record catalog of
+  `model/records.yaml` - the single list of 5-plus that replaced the `mutates` list of 5.1 - so the
+  contract, the validator and the kernel are held to one declaration instead of each keeping a set of its
+  own. `validateGraph` refuses a kind that writes a record it is blind to, a lane whose prove step cannot
+  read what its build step wrote, and a route to a kind that writes nothing its requesters read.
+vocabularies:
+  # What an operation is for. `design` settles intent, `build` changes the product, `prove` only inspects it,
+  # `repair` puts an authored record back in agreement with what was found.
+  families: [design, build, prove, repair]
+  # The allocator role of model/runtimes.yaml; `roleOfKind` there must agree with `role` here.
+  roles: [decide, plan, implement, verify, write]
+  # What a kind may read and what it may produce are both record kinds of `model/records.yaml`, which is the
+  # vocabulary for `reads` and `writes` and is not restated here: one catalog, one place to change it.
+  # `readOnly: true` means `writes` is empty, and a kind that is not read-only writes at least one record.
+  # Why an operation exists, as the kernel records it on the op.
+  # `architecture` is a gap in the DESIGN record sending the work back to the design; `business` is the same
+  # move one layer earlier - a gap in the REQUIREMENT record. They are two origins rather than one because the
+  # origin says WHY an operation exists, and a requirement repair labelled `architecture` would say the wrong
+  # thing in every log, every status view and every budget decision the kernel makes from it.
+  origins: [ledger, shared, repair, gate, verify, architecture, business]
+  # The report outcomes of kernel/reports.mjs.
+  outcomes: [done, partial, failed, ask, blocked]
+  # What a host may offer beyond a worktree and a runtime. A kind lists what it `needs` from this vocabulary and
+  # runs only on a host that declares it: the Orca IDE declares `design-tool` (the drawing tooling behind
+  # `interface.draw`), the headless host - a chat driving the kernel through `claude -p` / `codex exec` processes -
+  # declares nothing. A kind without `needs` runs on every host. Keep this list in step with `CAPABILITIES` of
+  # `kernel/graph.mjs` and the host descriptors of `hosts/orca/calls.mjs` / `hosts/headless/host.mjs`.
+  capabilities: [design-tool]
+  # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
+  # walk that finds the interface design silent is not an SDS gap and must not be routed as one. `brand-gap` is
+  # that same distinction one layer earlier: a drawing with no settled identity to draw inside - no colour token,
+  # no typography, no mascot rule - is missing the brand record, not a screen and not a design decision; artwork
+  # the brand record does not permit is the same gap seen from the asset side, and no operation may close it by
+  # inventing an image. `grammar-gap` is the third gap and the deepest one: the accepted requirement needs a shape
+  # the installed grammar cannot render and that no composition of existing contracts covers, so the language itself
+  # is short a word - grown once in the grammar package, never invented beside it in a page.
+  # `srs-gap` is the deepest of the record gaps and the one that was missing until 5-plus: the REQUIREMENT the
+  # work is derived from does not settle the case, or settles it twice in two ways. It is not an `sds-gap` -
+  # revising the design would invent the product rule the design is supposed to realise - and it is not an
+  # `authority` block either, because a confusing, contradictory or silent record is not a reason to stop: the
+  # runtime revises the record towards its most reasonable reading, says why, bumps the rev and moves on. Only a
+  # reading that changes an observable outcome about money, authority or customer data is taken provisionally on
+  # the runtime's recommendation instead of silently.
+  # Keep this list in step with `BLOCKER_KINDS` of `kernel/reports.mjs`.
+  blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, environment, authority]
+  # Verdicts the kernel computes about a report (never the reporter's own claim) and routes on.
+  verdicts: [pass, findings, rejected, gate-failed]
+  # What happens to the operation that produced the report:
+  #   retry    - no new operation; the same op runs again
+  #   reopen   - the op returns to pending and depends on the routed op
+  #   pause    - the op is parked until the routed op is done
+  #   settle   - the op is finished; only the routed op carries the work forward
+  #   needUser - nothing is routed automatically; the workflow stops for the user
+  then: [retry, reopen, pause, settle, needUser]
+predicates:
+  node.hasInterfaceDesign: |-
+    The interface design record the node reads - the `ui` node of its feature: itself when it is one, else the
+    ui node it references, else the one beside it under `features/<feature>/ui` - names its surfaces and the
+    candidate images that drew them, so drawing it again would produce nothing.
+  node.hasNoArtworkSlots: |-
+    That design record is drawn and declares no artwork slot, or every slot it declares already names the file
+    generated for it: the approved candidate embeds no illustration, no brand mascot, no decorative image and no
+    chart placeholder that is still missing, so there is no asset left for an asset operation to generate. A
+    record that was never drawn has declared nothing, and the step stays.
+kinds:
+  # The runtime never decides for the owner; it prepares the decision. This op writes the owner's decision
+  # draft: the question, why it matters, the options with what each means for architecture, user stories,
+  # security and business, and exactly one recommendation.
+  #
+  # What happens to the op that asked depends on the question. Something only the owner can provide (a
+  # credential, an account on an outside system, a real dataset, a legal authority) and an effect nobody can
+  # undo (a message to real customers, a payment, a deletion of real data, a publish) PAUSE it: there is
+  # nothing honest to do until the owner acts. Every other question leaves it running - the kernel takes this
+  # op's own recommendation provisionally so the work continues, and tells the owner it did. The owner answers
+  # in this op's own terminal with the option number, or later with `workflow-answer`; a different answer then
+  # reopens what was built on the recommendation.
+  owner.ask:
+    family: design
+    role: decide
+    operator: owner.ask
+    readOnly: false
+    # It reads what the question touches and writes the one thing the owner owns: the decision record.
+    reads: [srs, sds, decision]
+    writes: [decision]
+    purpose: Prepare one decision for the owner - question, analysis per side, options, recommendation - or answer it from the decided records when they already settle it.
+    reports:
+      outcomes: [done, failed]
+  business.decide:
+    family: design
+    role: decide
+    operator: business.decide
+    readOnly: false
+    # A requirement is settled from what the owner already decided, never from what the code happens to do.
+    reads: [srs, decision]
+    writes: [srs, decision]
+    purpose: Settle what the product must do, in the business record, before anything is designed against it.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [authority]
+  # The requirement repair, and the mirror of `architecture.revise` one layer earlier. Like it, it belongs to no
+  # lane: nothing schedules it, a reported `srs-gap` creates it, and it edits the record a builder could not
+  # derive its behaviour from. It reads the same records the decision did and it may not write a new `decision`
+  # of its own - except the one exception both revise sequences state, where the readings differ in an
+  # observable outcome about money, authority or customer data: then it does not choose silently, it reports
+  # `ask` with `question.kind: decision`, the numbered options and one recommendation, and the kernel's
+  # `owner.ask` writes that decision record and continues on the recommendation until the owner overturns it.
+  business.revise:
+    family: repair
+    role: decide
+    operator: business.decide
+    readOnly: false
+    reads: [srs, decision]
+    writes: [srs]
+    purpose: Repair a requirement record a builder found silent, confusing or self-contradictory - edit the requirement, rule or journey itself and bump its rev.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [authority]
+  architecture.decide:
+    family: design
+    role: decide
+    operator: architecture.decide
+    readOnly: false
+    # A design is derived from the requirement it realises and the decisions around it - never from source.
+    reads: [srs, sds, decision]
+    writes: [sds, decision]
+    purpose: Settle how the product realises a requirement, as a new design decision in the design record.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [srs-gap, shared-change, authority]
+  architecture.revise:
+    family: repair
+    role: decide
+    operator: architecture.decide
+    readOnly: false
+    # The repair reads the same three records the decision did; it may not open a new decision for the owner.
+    reads: [srs, sds, decision]
+    writes: [sds]
+    purpose: Repair a design record that a builder found silent or wrong - edit the text and bump its rev.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [srs-gap, shared-change, authority]
+  # The identity every drawing and every build reads: one record, one spec, done with a `rev`. It is a decision
+  # kind and not a build one - it settles what the product looks like, it never renders a product screen - and it
+  # is the only kind that writes the `brand` record, because that record IS its decision.
+  brand.decide:
+    family: design
+    role: write  # it generates the placeholder mascot with the image model, so it runs where image generation is: the Codex working profile
+    operator: brand.decide
+    readOnly: false
+    # Every token is read out of the real style and token files of the interface and out of the installed
+    # grammar that names them; an untraceable value is a question for the owner, never an invented entry.
+    reads: [code, grammar]
+    writes: [brand, asset]
+    purpose: Settle the product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one brand record every drawing and build reads.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [environment, authority]
+  interface.draw:
+    family: design
+    role: write
+    operator: interface.draw
+    readOnly: false
+    # It renders the installed grammar inside the brand against the accepted requirement and design, and it
+    # reads the design record it is extending so a second drawing does not restate the first.
+    reads: [srs, sds, brand, grammar, design]
+    # Deviation from the 5-plus design table, which names `design` alone: the drawing captures one image per
+    # screen and viewport into the ui node's `assets/` (design §7) and its operator has always declared that
+    # write, so `asset` belongs here or `IO_DRIFT` refuses the shipped operator catalog.
+    writes: [design, asset]
+    # Drawing needs the host's design tooling; a host without it refuses the op (`host-unsupported`) and the
+    # frontend lanes behind the ui node keep waiting, which is the design gate doing its job.
+    purpose: Draw the interface before any interface code exists - screens, contracts, states, empty and error.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [srs-gap, sds-gap, brand-gap, grammar-gap, shared-change, authority]
+  interface.asset:
+    # The artwork the drawing declared is generated by an image model, which only the Orca host carries.
+    needs: [design-tool]
+    family: design
+    role: write
+    operator: interface.asset
+    readOnly: false
+    reads: [design, brand]
+    # Deviation from the 5-plus design table, which names `asset, design`: the generated artwork lands in the
+    # bound source repository at the path the design record declares, and a bound repository is `code` in the
+    # record catalog. The files are asset bytes and they are product source at the same time.
+    writes: [asset, design, code]
+    purpose: Generate the artwork the approved candidate embeds as real repository assets, at the size and format the design record declares.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [brand-gap, interface-gap, shared-change, authority]
+  frontend.implement:
+    family: build
+    role: implement
+    operator: interface.implement
+    readOnly: false
+    # The whole design side is an input: the drawing and its generated artwork, the identity they sit inside,
+    # the grammar the markup is written in, and the source it is being added to. `srs` is the 5-plus addition and
+    # the reason is the blocker: an operation may only report `srs-gap` about a requirement it actually had in
+    # front of it, and a build that never reads the requirement cannot say the requirement is unsettled.
+    reads: [srs, sds, design, asset, brand, grammar, code]
+    writes: [code]
+    purpose: Build the interface the drawing settled, against that drawing and nothing invented beside it.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, environment, authority]
+  backend.implement:
+    family: build
+    role: implement
+    operator: backend.implement
+    readOnly: false
+    reads: [srs, sds, decision, code]
+    writes: [code]
+    purpose: Build one slice of behind-the-interface behaviour under the node's own allowlist.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, srs-gap, sds-gap, environment, authority]
+  runtime.operate:
+    family: build
+    role: implement
+    operator: runtime.operate
+    readOnly: false
+    reads: [sds, code, runtime]
+    writes: [runtime, code]
+    purpose: Operate the runtime the product needs - migrations, environment, deployment, infrastructure.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, sds-gap, environment, authority]
+  # The language itself, grown by one word. Like `architecture.revise` it belongs to no lane: nothing schedules it,
+  # a reported `grammar-gap` creates it, and it changes a repository of its own - the grammar package, its stories
+  # and tests, its published version and the canon that names its units - never a product page.
+  grammar.update:
+    family: build
+    role: implement
+    operator: grammar.update
+    readOnly: false
+    # It reads the drawing that found the word missing, the grammar it is growing and the identity the new
+    # unit must render inside; it writes the grammar package and the consumer bump, which is product code.
+    reads: [design, grammar, brand]
+    writes: [grammar, code]
+    purpose: "Grow the installed grammar by one semantic unit the product needs and no composition of existing contracts renders: implement it in the grammar package with its stories and tests, publish it, bump the consumer, and record it in the canon."
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, environment, authority]
+  uat.verify:
+    family: prove
+    role: verify
+    operator: uat.verify
+    readOnly: false
+    # Deviation from the 5-plus design table, which omits `brand`: `kindsReadingBrand()` replaces the
+    # kernel's hard-coded DESIGN_KINDS, and a walk that judges the rendered surface is given the brand
+    # payload exactly like the drawing and the build are.
+    reads: [srs, design, asset, brand, code]
+    # Deviation from the design table, which names `evidence` alone: the walk authors its scenario and its
+    # scripts inside the bound repository, which is `code`.
+    writes: [evidence, code]
+    purpose: Walk one end-to-end scenario on the running product and leave the scenario and its evidence.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, srs-gap, interface-gap, environment, authority]
+  e2e.verify:
+    family: prove
+    role: verify
+    operator: e2e.verify
+    readOnly: false
+    reads: [srs, sds, code]
+    # Deviation from the 5-plus design table, which names `evidence` alone: the proof authors one scenario
+    # spec per assertion inside the bound repository, which is `code`. What it may never write is product
+    # code - that ceiling is the operator's allowlist, not the record catalog.
+    writes: [evidence, code]
+    purpose: Prove one delivered slice through its public API on the real stack, never a screen, and leave the scenario spec and its run output.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, srs-gap, sds-gap, environment, authority]
+  # An external system is proven live or it is not proven. A faked provider inside this scenario is a defect,
+  # and a credential the environment lacks is reported `blocked` `environment` with the exact variable name -
+  # which is the owner's question, never an invented key. Its evidence carries `proof: {boundary: live}`,
+  # which is what tells a status view that a chatbot delivery was proven against the real channel.
+  integration.verify:
+    family: prove
+    role: verify
+    operator: integration.verify
+    readOnly: false
+    reads: [integration, sds, code]
+    writes: [evidence]
+    purpose: Prove one declared external integration against the real provider with the credential the owner supplies, and leave the live run as evidence.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [environment, authority, shared-change]
+  review.verify:
+    family: prove
+    role: verify
+    operator: review.verify
+    readOnly: true
+    # Deviation from the 5-plus design table, which omits `runtime`: the operations lane proves
+    # `runtime.operate` with this kind, and a prover that cannot read the runtime record its build wrote is
+    # `lane-proof-blind`.
+    reads: [srs, sds, code, evidence, runtime]
+    writes: []
+    purpose: Read the delivered slice against its acceptance and report findings, repairing nothing.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [authority]
+  # The one kind that runs BEFORE a lane rather than inside one, in three modes. A node whose record declares no
+  # write scope or no check cannot be launched, and completing that record is work, not a question for the user;
+  # an intake authors a whole feature the tree does not hold; a cut splits a node too big for one operation into
+  # children with disjoint write scopes, the seam first, so the rest fan out and are proven once as a group. It
+  # is the only kind allowed to write its own node's `index.yaml`, and the kernel creates it itself - once per
+  # node per mode - so no route and no lane names it.
+  work.author:
+    family: design
+    role: plan
+    operator: work.author
+    readOnly: false
+    # An intake reads the decided records of the whole product before it authors anything, which is what
+    # makes the three reconciliation cases checkable against ids rather than against wording.
+    reads: [srs, sds, decision, code, record]
+    writes: [record, srs, sds, decision]
+    purpose: Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it; an intake authors a feature's records and reconciles them against the decided ones as three typed cases (reference, conflict, new), editing no record of another feature and reporting no gap against one; a cut splits a node too big for one operation into child nodes with disjoint write scopes, the seam first, and leaves the node a derived parent whose assertions become the group's acceptance.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [srs-gap, sds-gap, shared-change, authority]
+  # Heavy work runs in parallel, and this is the operation that makes it possible. A node too big to be one
+  # operation - a write scope past twelve files, more than eight assertions, or a design of three or more
+  # components - is not built as one long slice: this kind cuts it into child nodes with disjoint write scopes,
+  # names the SEAM every other child would otherwise touch (module wiring, DI registration, migrations, shared
+  # contracts and types; on the frontend the app shell and routing, the theme and grammar version, the shared
+  # store and the API client) and makes the node a derived parent whose assertions become the group's acceptance.
+  # It carries the `work.author` operator contract under its `work.cut` sequence, so no second operator exists;
+  # it writes records only, and it builds nothing - the children are ordinary `backend.implement` /
+  # `frontend.implement` work with small allowlists, and the group is proven once at the parent. Like
+  # `work.author` it belongs to no lane and to no route: the kernel plans it itself, once per node.
+  implementation.plan:
+    family: design
+    role: plan
+    operator: work.author
+    readOnly: false
+    reads: [srs, sds, code, record]
+    writes: [record]
+    purpose: Cut one Work node that is too big for a single operation into child nodes with disjoint write scopes - the seam first, then one observable behaviour per child - and leave the node a derived parent whose assertions are the group's acceptance.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [sds-gap, authority]
+# The mandatory sequence per ledger node. `match` is the node shape (`kind`, and `role` for the
+# backend/frontend side a node is delivered on, from its layout or its repository); the first lane whose
+# match fits wins, so the list runs from the most specific to the least. A step is mandatory unless it
+# carries `optionalWhen`, and `optionalWhen` names a predicate the kernel evaluates - never a judgement.
+lanes:
+  - id: design/ui
+    match:
+      - {kind: ui}
+    purpose: |-
+      A `ui` node is the interface design record itself: it is drawn as image-model candidates inside the grammar
+      and the brand, then the artwork those candidates embed is generated as real assets. It builds nothing; the
+      implementation nodes of its feature are built and walked against it.
+    steps:
+      - kind: interface.draw
+      - kind: interface.asset
+        optionalWhen: node.hasNoArtworkSlots
+  - id: implementation/frontend
+    match:
+      - {kind: implementation, role: frontend}
+    purpose: |-
+      Interface code is built against the drawing of its feature - the kernel holds the build until that `ui`
+      node is done and asks the user when the feature has none - and it is walked end to end before it is believed.
+    steps:
+      - kind: frontend.implement
+      - kind: uat.verify
+  - id: implementation/backend
+    match:
+      - {kind: implementation, role: backend}
+      - {kind: implementation}
+    purpose: A node that names no frontend side is behind-the-interface work, built, proven through its API on the real stack, then independently read.
+    steps:
+      - kind: backend.implement
+      - kind: e2e.verify
+      - kind: review.verify
+  - id: uat/frontend
+    match:
+      - {kind: uat, role: frontend}
+    purpose: A frontend UAT node is the walk itself; there is nothing to build first.
+    steps:
+      - kind: uat.verify
+  - id: e2e
+    match:
+      - {kind: e2e}
+    purpose: An API scenario node is proven through the public API on the real stack; there is nothing to build first.
+    steps:
+      - kind: e2e.verify
+  - id: uat
+    match:
+      - {kind: uat}
+    purpose: A backend scenario node is proven through the API on the real stack; there is nothing to build first.
+    steps:
+      - kind: e2e.verify
+  - id: operations
+    match:
+      - {kind: operations}
+    purpose: Runtime work is operated, then read back by someone who did not operate it.
+    steps:
+      - kind: runtime.operate
+      - kind: review.verify
+  - id: architecture
+    match:
+      - {kind: architecture}
+    purpose: A design node is settled once; builders depend on it, they do not re-decide it.
+    steps:
+      - kind: architecture.decide
+  - id: business
+    match:
+      - {kind: business}
+      - {kind: business-overview}
+    purpose: A business node is settled once, before any design is drawn against it.
+    steps:
+      - kind: business.decide
+  - id: integration
+    match:
+      - {kind: integration}
+    purpose: |-
+      One declared external system, one node, one live proof. There is nothing to build first: the product
+      code that calls the provider is built by the feature's implementation node, and this node exists to
+      show that the call reaches the real provider with the owner's own credential.
+    steps:
+      - kind: integration.verify
+  - id: brand
+    match:
+      - {kind: brand}
+    purpose: The product's identity is settled once, in one record; a drawing reads it instead of inventing a colour.
+    steps:
+      - kind: brand.decide
+# Bounded outcome routing. `on` is the report shape the kernel observed, `from` the kind that produced it
+# (`any` for every kind), `to` the operation the graph creates - `same` is the reporter's own kind and
+# `lane.build` the build step of the reporter's lane, so a frontend repair is never a backend op. `limit`
+# bounds how many times one route may fire for the same node group; past it the workflow asks the user.
+# Ordered: the first matching route wins, and a route with an explicit `from` stands before the `any` one.
+routes:
+  - id: uat-red-repairs-the-build
+    on: {outcome: failed}
+    from: uat.verify
+    to: {kind: lane.build, origin: repair}
+    limit: 3
+    then: reopen
+    purpose: A red end-to-end scenario is a defect in the build it walked, not in the walk.
+  - id: e2e-red-repairs-the-build
+    on: {outcome: failed}
+    from: e2e.verify
+    to: {kind: lane.build, origin: repair}
+    limit: 3
+    then: reopen
+    purpose: A red API scenario is a defect in the slice it exercised, not in the scenario.
+  - id: review-findings-repair-the-build
+    on: {verdict: findings}
+    from: review.verify
+    to: {kind: lane.build, origin: repair}
+    limit: 3
+    then: settle
+    purpose: A read-only review never repairs; its findings become one repair of the kind that built the slice.
+  - id: rejected-report-retries
+    on: {verdict: rejected}
+    from: any
+    to: {kind: same}
+    limit: 2
+    then: retry
+    purpose: A report the kernel could not reproduce is the same operation again, with what it got told back.
+  - id: red-gate-repairs-the-build
+    on: {verdict: gate-failed}
+    from: any
+    to: {kind: lane.build, origin: gate}
+    limit: 3
+    then: settle
+    purpose: A failing workflow gate is one repair operation, never a relaxed gate.
+  - id: srs-gap-revises-the-requirement
+    on: {blocker: srs-gap}
+    from: any
+    to: {kind: business.revise, origin: business}
+    limit: 2
+    then: reopen
+    purpose: |-
+      A requirement the SRS does not settle, or settles twice in two ways, is a gap in the requirement record and
+      nowhere else: the design may not invent the product rule it is supposed to realise, and the build may not
+      pick a reading in code. The record is revised once - the most reasonable reading by the accepted records,
+      the other feature's decided records and the product's own conventions, written into the requirement with
+      its acceptance, the reason stated in the decision log and the `rev` bumped - and the requester reads it
+      again behind it. Past two rounds for one node the workflow asks the user.
+  - id: sds-gap-revises-the-design
+    on: {blocker: sds-gap}
+    from: any
+    to: {kind: architecture.revise, origin: architecture}
+    limit: 2
+    then: reopen
+    purpose: A builder that found the design silent waits for the design to be revised, then reads it again.
+  - id: interface-gap-redraws-the-interface
+    on: {blocker: interface-gap}
+    from: any
+    to: {kind: interface.draw, origin: architecture}
+    limit: 2
+    then: reopen
+    purpose: A missing screen, state or contract is drawn first; it is never improvised in the build.
+  - id: brand-gap-settles-the-brand
+    on: {blocker: brand-gap}
+    from: any
+    to: {kind: brand.decide, origin: architecture}
+    limit: 2
+    then: reopen
+    purpose: |-
+      An operation with no settled identity to work inside waits for the brand record and then reads it. A
+      colour token, a typeface or a mascot rule is settled once, in one place; it is never invented by the
+      operation that happened to need it first.
+  - id: grammar-gap-grows-the-grammar
+    on: {blocker: grammar-gap}
+    from: any
+    to: {kind: grammar.update, origin: architecture}
+    limit: 2
+    then: reopen
+    purpose: |-
+      A shape the grammar cannot render is grown into the grammar once, as a semantic unit, never invented
+      beside it in a page. The operation that found the word missing waits for the published version and reads
+      the canon again; past two rounds for one node the workflow asks the user.
+  - id: shared-change-from-an-api-proof-is-a-backend-build
+    on: {blocker: shared-change}
+    from: e2e.verify
+    to: {kind: backend.implement, origin: shared}
+    limit: 3
+    then: pause
+    purpose: |-
+      A proof that needs a path outside its allowlist needs code, not another proof: the change it found missing
+      is one scoped backend build, and the proof waits for it, then runs again against what was built.
+  - id: shared-change-from-a-walk-is-a-frontend-build
+    on: {blocker: shared-change}
+    from: uat.verify
+    to: {kind: frontend.implement, origin: shared}
+    limit: 3
+    then: pause
+    purpose: A walk that needs a path outside its allowlist needs a scoped frontend build, never a second walk.
+  - id: shared-change-is-a-scoped-build
+    on: {blocker: shared-change}
+    from: any
+    to: {kind: same, origin: shared}
+    limit: 3
+    then: pause
+    purpose: A path outside the allowlist becomes one scoped operation of the same kind; the requester waits.
+  - id: environment-needs-the-user
+    on: {blocker: environment}
+    from: any
+    to: {needUser: true}
+    limit: 1
+    then: needUser
+    purpose: A runtime that cannot start is not an operation's to fix; the workflow says so and stops.
+  - id: authority-needs-the-user
+    on: {blocker: authority}
+    from: any
+    to: {needUser: true}
+    limit: 1
+    then: needUser
+    purpose: A decision the goal does not authorise belongs to the user, not to a model.
+  - id: question-needs-the-user
+    on: {outcome: ask}
+    from: any
+    to: {needUser: true}
+    limit: 1
+    then: needUser
+    purpose: |-
+      A question the kernel cannot answer from the operation's own closed options reaches the user. The
+      kernel may answer it in place once, from those options; it never invents an answer it was not offered.
+  - id: partial-resumes-the-same-op
+    on: {outcome: partial}
+    from: any
+    to: {kind: same}
+    limit: 5
+    then: retry
+    purpose: Unfinished work is the same operation once more, carrying its own open items forward.
+  - id: failed-retries-the-same-op
+    on: {outcome: failed}
+    from: any
+    to: {kind: same}
+    limit: 3
+    then: retry
+    purpose: A failing check is retried with the failure named; past the limit the workflow asks the user.

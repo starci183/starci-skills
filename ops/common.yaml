@@ -74,7 +74,7 @@ sections:
         remain read-only. Unmatched/ad hoc jobs use direct-task → task.execute; unknown explicit
         workflow names are not silently substituted.
       - In Orca, keep that workflow common to the resolved workspace and modules. Each emitted cell
-        binds one ordered external-agent chain from profiles/registry.json. The operator chain is
+        binds one ordered external-agent chain from model/registry.json. The operator chain is
         explicit and overrides the owning skill default; otherwise it inherits that default. Select
         the first observed ready candidate. Fall through only for an allowed failure after verified
         no effects; never duplicate partial or unknown effects across providers.

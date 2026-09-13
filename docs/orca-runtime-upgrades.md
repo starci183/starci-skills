@@ -133,7 +133,7 @@ The following observations are now handled by the runtime itself; the regression
 
 - **Native Qwen branding can succeed while supervised prompt delivery fails** and **Dispatch injection cannot adopt an agent that is already working**: `start-op` proves prompt delivery from the `worker-show` receipt, classifies a stall as `effectState: none`, settles the attempt and falls through to the next managed candidate inside the same invocation (`tests/orca-supervised-launch.spec.mjs`: "a Qwen prompt stall is classified as no-effect and the launcher falls through to Claude in the same invocation"; `tests/orca-calls.spec.mjs`: "worker-start receipts classify into ok, failed-none, failed-partial and unknown"). The Orca-side prompt-injection defect remains an Orca upgrade candidate.
 - **Terminal stop and reset need observable settlement**: `settle` reports `none` only when `worker-release` returns `released` or `already_released`; `stop_unknown` and `release_unknown` stay `unknown` and block fallback (`tests/orca-supervised-launch.spec.mjs`: "settlement reports unknown when stop cannot be confirmed").
-- **Workflow Monitors ending in `process_exited` with retained `identity_unproven` terminals** (observed on `run_4f84cba16322`): `replace-monitor` proves the Monitor is not live, settles it and relaunches with `--retry-of` from the supervisor chain (`tests/orca-supervised-launch.spec.mjs`: "a dead Workflow Monitor is settled and replaced"). Monitor and Coordinator providers now come from `profiles/registry.yaml` `supervisors`, not from a hardcoded Codex launch.
+- **Workflow Monitors ending in `process_exited` with retained `identity_unproven` terminals** (observed on `run_4f84cba16322`): `replace-monitor` proves the Monitor is not live, settles it and relaunches with `--retry-of` from the supervisor chain (`tests/orca-supervised-launch.spec.mjs`: "a dead Workflow Monitor is settled and replaced"). Monitor and Coordinator providers now come from `model/registry.yaml` `supervisors`, not from a hardcoded Codex launch.
 - **Untyped Orca failures**: every call is declared in `providers/orca/calls.yaml`, verified against the live `agent-context` (`verify`), replayed once with `--retry-request` on an unknown mutation result, and returned as `starci/orca-call-result@1` (`tests/orca-calls.spec.mjs`).
 
 ## Recording rules
@@ -177,7 +177,7 @@ those failures lived in.
 
 - **The Plan Coordinator and the per-workflow Workflow Manager are gone**, with `supervise`, `coordinate`,
   `start-monitor`, `replace-monitor` and `start-coordinator`. One workflow is one goal in one worktree, run
-  by one local process (`execution/workflow-kernel.mjs`). The only names left are `[Workflow] <Workflow>`,
+  by one local process (`kernel/kernel.mjs`). The only names left are `[Workflow] <Workflow>`,
   `[Kernel] <Workflow>` and `[Op] <operation> - <scope>`.
 - **No supervisor mailbox.** The kernel reads and writes files. An operation receives its whole contract at
   launch and answers with exactly one report file; the Orca signal is only the wake-up. That closes OBS-28

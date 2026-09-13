@@ -8,13 +8,34 @@ import {inspectStorage,assertNewStoragePath,isLocalOnlyWorkspace} from '../workf
 import { distPath, requireDist, readDistJson, skillRoot } from '../core/runtime-root.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+// The workflow commands are not this module's: `bin/starci.mjs` forwards them to the kernel launcher before
+// the CLI is ever loaded. They are listed here all the same, one line each, because the one command line a
+// person types is `starci <command>` and a help page that hides half of it teaches the wrong entry.
 const help = `StarCi 3.0 — bounded, local operations
 Usage:
+  starci workflow-goal --job <text> [--scope f1,f2] [--lane [<name>]] [--host <skill root>]
+  starci workflow-approve --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
+  starci workflow-answer --id <id> --op <ask op> [--choice <n>] [--note "<answer>"]
+  starci workflow-run --id <id> [--host-adapter orca|headless] [--max-iterations N]
+  starci workflow-status --id <id> [--json true]
+  starci workflow-list [--json true]
+  starci workflow-stop --id <id>
+  starci workflow-lane-close --id <id>
+  starci workflow-supervise --host <skill root> [--once true] [--poll-ms 60000]
+  starci start-op --run <run> --workflow-task <task> --from <terminal> --worktree <path> --operation <op> --scope <scope> --spec-file <file>
+  starci settle --dispatch <dispatch> [--terminal <terminal>] [--close true]
+  starci sweep --worktree <path> --from <monitor terminal> [--keep <handle,handle>]
+  starci notify --terminal <monitor terminal> (--file <message-file> | --text <text>)
+  starci report --run <run> --from <own terminal> --task <task> --dispatch <dispatch> --outcome <outcome> --summary <text>
+  starci wait --run <run> --from <own terminal> [--timeout-ms 900000] [--tick-ms 120000]
+  starci verify
   starci workspace init <work-root> --id <workspace-id>
   starci storage <backend-root>
   starci source-layout <backend-root> <frontend-root>
   starci validate <work-root>
+  starci identity set <slug> --name <VAR> [--work-root <path>]   (the value is read from stdin, never printed)
   starci brand check <work-root> [--source <repository-root>] [--json]
+  starci render check <ui-node-dir> --brand <work-root> [--family <id>] [--json]
   starci tree <work-root>
   starci impact <work-root> <node-or-resource-id>
   starci stale <work-root>
@@ -163,7 +184,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const {createWorkflowReceipt,validateWorkflowRequest}=await import('../execution/contracts.mjs');
       const {planWorkflowExecution,inspectWorkflowExecution,createSharedConflictEscalation}=await import('../execution/api.mjs');
       if(action==='map'){
-        exactArgs(input,0);const registry=readDistJson('profiles','registry.json');
+        exactArgs(input,0);const registry=readDistJson('model','registry.json');
         emit({schema:'starci/execution-map@1',modes:registry.executionModes,skills:registry.skills,operators:registry.operators,targets:registry.targets,fallback:registry.fallback,approvals:readDistJson('approvals','policy.json'),secondaryRoutes:secondaryRoutes()});return 0;
       }
       if(action==='create'){
@@ -171,11 +192,11 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       }
       if(action==='plan'){
         exactArgs(input,2);const request=dataFile(input[0]);const inventory=csv(input[1],'Ready runtimes');
-        emit(planWorkflowExecution({request,registry:readDistJson('profiles','registry.json'),inventory}));return 0;
+        emit(planWorkflowExecution({request,registry:readDistJson('model','registry.json'),inventory}));return 0;
       }
       if(action==='resolve'){
         exactArgs(input,3);const request=dataFile(input[0]);const {resolveOperationExecution}=await import('../execution/resolve.mjs');
-        emit(resolveOperationExecution({workflowRequest:request,operationId:input[1],registry:readDistJson('profiles','registry.json'),inventory:csv(input[2],'Ready runtimes')}));return 0;
+        emit(resolveOperationExecution({workflowRequest:request,operationId:input[1],registry:readDistJson('model','registry.json'),inventory:csv(input[2],'Ready runtimes')}));return 0;
       }
       if(action==='show'||action==='resume'){
         exactArgs(input,2);const result=inspectWorkflowExecution({request:dataFile(input[0]),receipt:dataFile(input[1])});
@@ -198,9 +219,59 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
         rest.splice(at,2);
       }
       exactArgs(rest,1);
-      const {runBrandChecks,formatBrandChecks}=await import('../execution/brand-checks.mjs');
+      const {runBrandChecks,formatBrandChecks}=await import('../checks/brand.mjs');
       const result=runBrandChecks({tree:directory(rest[0]),sourceRoot:source?directory(source):null});
       emit(json?result:formatBrandChecks(result));
+      return result.ok?0:1;
+    }
+    if(command==='render'){
+      // Read-only: re-derives the drawing's two canon rules from the captured bytes and the markup kept beside them.
+      const [action,...input]=args;
+      if(action!=='check')throw Error('Use starci render check <ui-node-dir> --brand <work-root> [--family <id>] [--json].');
+      const json=input.includes('--json');
+      const rest=input.filter(value=>value!=='--json');
+      const option=name=>{
+        const at=rest.indexOf(`--${name}`);
+        if(at===-1)return null;
+        const value=rest[at+1];
+        if(!value||value.startsWith('--'))throw Error(`--${name} needs one value.`);
+        rest.splice(at,2);
+        return value;
+      };
+      const brand=option('brand'),family=option('family');
+      if(!brand)throw Error('--brand needs the Work tree (or repository root) that owns the brand record.');
+      exactArgs(rest,1);
+      const {runRenderChecks,formatRenderChecks}=await import('../checks/render.mjs');
+      const result=runRenderChecks({uiDir:directory(rest[0]),brandTree:directory(brand),family});
+      emit(json?result:formatRenderChecks(result));
+      return result.ok?0:1;
+    }
+    if(command==='identity'){
+      // The owner's own hands: this is how a credential value gets into the tree's custody, and the only way.
+      // The value comes from stdin - never an argument, because an argument is in the process table, the shell
+      // history and every log of the launch - and nothing here ever prints it back.
+      const [action,...input]=args;
+      if(action!=='set')throw Error('Use starci identity set <slug> --name <VAR> [--work-root <path>]; the value is piped in on stdin.');
+      const rest=[...input];
+      const option=name=>{
+        const at=rest.indexOf(`--${name}`);
+        if(at===-1)return null;
+        const value=rest[at+1];
+        if(!value||value.startsWith('--'))throw Error(`--${name} needs one value.`);
+        rest.splice(at,2);
+        return value;
+      };
+      const name=option('name'),given=option('work-root');
+      if(!name)throw Error('--name needs the exact variable the code reads, for example STRIPE_SECRET_KEY.');
+      // Exactly one positional, and it is the slug: a second word on this command line could only be a value,
+      // and a value on a command line is the thing this whole custody exists to prevent.
+      exactArgs(rest,1);
+      const {findWorkRoot,readStdin,setIdentitySecret}=await import('../core/identity.mjs');
+      const workRoot=findWorkRoot(process.cwd(),given);
+      const value=(await readStdin(io.in??process.stdin)).replace(/\r?\n$/,'');
+      const result=setIdentitySecret({workRoot,slug:rest[0],name,value});
+      // `result` carries paths, variable names and a next step - never the value, and never a part of it.
+      emit(result);
       return result.ok?0:1;
     }
     if(command==='storage'){exactArgs(args,1);const result=inspectStorage(directory(args[0]));emit(result);return result.newWorkAllowed?0:1;}
@@ -236,7 +307,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       exactArgs(args,3);
       const inventory=args[2].split(',').map(runtime=>runtime.trim()).filter(Boolean);
       if(!inventory.length)throw Error('At least one observed ready runtime is required');
-      const {selectExecutionTarget}=await import('../profiles/select.mjs');
+      const {selectExecutionTarget}=await import('../kernel/chains.mjs');
       emit(selectExecutionTarget({skill:args[0],op:args[1],inventory}));
       return 0;
     }

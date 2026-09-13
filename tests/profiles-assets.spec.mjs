@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {resolveExecutionChain,selectExecutionTarget,selectProfile} from '../profiles/select.mjs';
+import {resolveExecutionChain,selectExecutionTarget,selectProfile} from '../kernel/chains.mjs';
 import {readPublicJson} from './helpers/read-public.mjs';
 import {validateAssets} from '../contracts/assets.mjs';
 
@@ -26,7 +26,7 @@ test('active roles select Codex, Claude or Qwen without reviving retired profile
   assert.throws(()=>selectProfile({runtime:'unknown',op:'interface.implement'}));
 });
 test('every operator has an ordered external-agent chain and skill-level defaults remain usable',()=>{
-  const registry=readPublicJson('profiles/registry.json'),ops=readPublicJson('ops/catalog.json').ops.map(x=>x.id);
+  const registry=readPublicJson('model/registry.json'),ops=readPublicJson('ops/catalog.json').ops.map(x=>x.id);
   assert.equal(registry.schema,'starci/profile-registry@3');
   assert.deepEqual(registry.agentArchitecture.levels,['plan','coordinator','workflow-wrapper','operation-wrapper-agent','concrete-operation-agent']);
   assert.equal(registry.agentArchitecture.isolationBoundary,'operation');
@@ -47,7 +47,9 @@ test('every operator has an ordered external-agent chain and skill-level default
   // re-renders the artwork the candidates embed, so it needs the same image model and the same one link as interface.draw.
   // grammar.update writes code, stories, tests and a published version, so it drops the image model entirely and
   // carries the two runtimes that read a whole repository's conventions before changing one.
-  const expectedCounts={'business.decide':3,'architecture.decide':3,'brand.decide':2,'review.verify':5,'interface.draw':3,'interface.asset':1,'grammar.update':2,'work.author':2};
+  // integration.verify runs code against a real provider exactly as e2e.verify runs it against a real stack,
+  // so it carries the same three verify-role runtimes.
+  const expectedCounts={'business.decide':3,'architecture.decide':3,'brand.decide':2,'review.verify':5,'interface.draw':3,'interface.asset':1,'grammar.update':2,'work.author':2,'integration.verify':3};
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
     const expectedCount=expectedCounts[op]??3;
@@ -84,6 +86,9 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.deepEqual(resolveExecutionChain({op:'e2e.verify'}).candidates.map(x=>x.target),['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
   // It runs code rather than reasoning about it, so the working profile applies, not the reviewer one.
   assert.equal(resolveExecutionChain({op:'e2e.verify'}).candidates[0].profile,'gpt-5.6-sol');
+  // A live call to a declared provider is the same work against a different surface, so it is the same chain.
+  assert.deepEqual(resolveExecutionChain({op:'integration.verify'}).candidates.map(x=>x.target),['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
+  assert.equal(resolveExecutionChain({op:'integration.verify'}).candidates[0].profile,'gpt-5.6-sol');
   // Completing a Work record is reading work, so it runs on the plan-role runtimes with the reasoning profiles.
   // Authoring records runs on the strongest reasoning runtimes only.
   assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.target),['claude-fable-5.1','gpt-6-astra']);
@@ -138,7 +143,7 @@ test('Qwen Flash executes then Opus then Sol, Sol draws, Fable then Astra reason
   assert.equal(review[0].target,'qwen3.8-flash');
   assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus']);
   assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus']);
-  const ops=Object.keys(readPublicJson('profiles/registry.json').operators);
+  const ops=Object.keys(readPublicJson('model/registry.json').operators);
   for(const op of ops){
     const chain=resolveExecutionChain({op}).candidates;
     assert.ok(!chain.some(candidate=>['qwen3.8-max','deepseek-v4-pro'].includes(candidate.model)),op);

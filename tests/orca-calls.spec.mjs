@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../core/yaml.mjs';
 import {readPublicJson} from './helpers/read-public.mjs';
-import {buildArgs,classifyReceipt,createOrcaCalls,retryRequestId,unwrap,verifyLiveSchema} from '../execution/orca-calls.mjs';
+import {buildArgs,classifyReceipt,createOrcaCalls,retryRequestId,unwrap,verifyLiveSchema} from '../hosts/orca/calls.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const fixture=name=>JSON.parse(fs.readFileSync(new URL(`./fixtures/orca/live-1.4.188/${name}`,import.meta.url),'utf8'));

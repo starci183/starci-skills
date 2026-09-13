@@ -16,6 +16,36 @@ const fresh=()=>structuredClone(catalogue);
 const errors=cat=>validateCatalog(cat,{root,repositoryRoot:repository,documents:outputs()}).errors.map(e=>e.code);
 const resolvePublicKnowledge=rel=>[path.join(repository,rel),path.join(repository,'.dist',rel)].find(candidate=>fs.existsSync(candidate));
 
+test('the record-authoring operator carries the cut mode: it writes child nodes, names the seam and builds nothing',()=>{
+  const contract=catalogue.ops.find(op=>op.id==='work.author').contract;
+  // One operator contract, three modes - a node's own record, a feature intake, and the cut - so
+  // `implementation.plan` needs no second operator and the catalogue stays the closed list it was.
+  assert.equal(catalogue.ops.some(op=>op.id==='implementation.plan'),false,'the cut is a kind, never a second operator');
+  assert.match(contract.goal.en,/in cut mode the child nodes a node too big for one operation is split into, seam first/);
+  const parts=contract.writes.find(row=>row.id==='parts');
+  assert.ok(parts,'the cut writes child records of its own');
+  assert.equal(parts.path,'.starciwork/<node-dir>/<part>/index.yaml');
+  assert.ok(['node-dir','part'].every(name=>String(contract.placeholders?.[name]??'').trim()),'both placeholders are declared');
+  for(const field of ['schema','id','kind','required','state','assertions','dependsOn','extensions.work3.allowlist','extensions.work3.checks'])
+    assert.ok(parts.fields.includes(field),field);
+  assert.match(parts.content.en,/Exactly one child is the seam/);
+  assert.match(parts.content.en,/every other child names the seam in dependsOn/);
+  assert.match(parts.content.en,/never write product code/);
+  // Its steps are reachable and its proof is the one thing a cut can get wrong twice: overlap.
+  const writing=contract.steps.filter(step=>step.writes.includes('parts'));
+  assert.equal(writing.length,1,'one step authors the children');
+  assert.match(writing[0].action.en,/NAME THE SEAM FIRST/);
+  const derived=contract.steps.find(step=>/derived parent/.test(step.action.en));
+  assert.match(derived.action.en,/groupAssertions/);
+  const proof=contract.proofs.find(item=>item.id==='seam-first-disjoint-parts');
+  assert.ok(proof,'the cut declares its own proof');
+  assert.match(proof.requirement.en,/disjoint from every sibling and from the seam/);
+  assert.match(proof.requirement.en,/cut: none left the tree byte-identical/);
+  assert.ok(contract.blockers.some(item=>item.code==='SEAM_UNDETERMINED'),'an undeterminable seam is refused, never invented');
+  // And the whole catalogue still validates with the mode in it.
+  assert.deepEqual(errors(fresh()),[]);
+});
+
 test('implementation and code review route to the same resolvable coding convention contract',()=>{
   const generated=JSON.parse(outputs().get('catalog.json'));
   for(const id of ['backend.implement','interface.implement','review.verify']) {
@@ -55,6 +85,19 @@ test('decide operator dispatch selects split SRS and SDS authoring while legacy 
   assert.deepEqual(business.specificationPolicy.sectionSchemas,Object.values(srsContract.sections).map(section=>section.schema));
   assert.ok(business.writes.find(write=>write.id==='node').fields.includes('extensions.work3.srs'));
   assert.ok(!business.writes.find(write=>write.id==='node').fields.includes('extensions.work3.specification'));
+  // Both decide operators also carry their repair kind, and the repair rule is in the contract the agent reads:
+  // an unclear record is revised to its most reasonable reading with one decision-log entry, and only a reading
+  // that moves money, authority or customer data is put to the owner as numbered options with one recommendation.
+  for(const id of ['business.decide','architecture.decide']){
+    const contract=generated.ops.find(op=>op.id===id).contract;
+    assert.ok(contract.proofs.some(proof=>proof.id==='revision-decision-log'),id);
+    const revise=contract.steps.filter(step=>/decisionLog/.test(step.action.en));
+    assert.equal(revise.length,1,id);
+    assert.match(revise[0].action.en,/\{rev, at, gap, chosen, why, alternatives\}/,id);
+    assert.match(revise[0].action.en,/money, authority or customer data/,id);
+    assert.match(revise[0].action.en,/question\.kind decision/,id);
+    assert.match(revise[0].action.en,/Never ask for anything else/,id);
+  }
   const architecture=generated.ops.find(op=>op.id==='architecture.decide').contract;
   assert.equal(architecture.specificationPolicy.payloadSchema,'starci/sds-map@1');
   assert.equal(architecture.specificationPolicy.payloadField,'extensions.work3.sds');
@@ -134,6 +177,86 @@ test('the API end-to-end operator proves through the stack and the API only, and
   // Its blockers refuse rather than improvise: no missing check is replaced, no ceiling widened.
   const codes=catalogue.ops.find(op=>op.id==='e2e.verify').contract.blockers.map(blocker=>blocker.code);
   assert.deepEqual(codes.sort(),['ASSERTION_REQUEST_INCOMPLETE','CHECK_UNRUNNABLE','DECLARED_DEPENDENCY_UNMET','PROOF_SURFACE_UNAVAILABLE','SCOPE_OUTSIDE_ALLOWLIST','STACK_UNAVAILABLE']);
+});
+
+test('the live integration operator proves through the real provider with the owner\'s own credential, and refuses without it',()=>{
+  const document=fs.readFileSync(path.join(root,'integration.verify','operator.yaml'),'utf8');
+  const summary=catalogue.ops.find(op=>op.id==='integration.verify');
+  assert.ok(summary,'the live proof operator is in the catalogue');
+  assert.deepEqual(summary.nodeKinds,['integration']);
+  assert.equal(summary.completionProfile,'integration');
+  const contract=summary.contract;
+  for(const text of [document,JSON.stringify(contract)]) {
+    // A stand-in for the declared provider is the defect this operation exists to catch, not a fallback.
+    for(const required of [/real provider|the real provider/i,/sandbox/,/No mock, stub, fake, spy/,
+      /blocked` with reason `environment`|`blocked` `environment`|reason `environment`/,/redact/i]) {
+      assert.match(text,required,String(required));
+    }
+    // The credential is the owner's: never invented, and its value never written down anywhere.
+    assert.match(text,/never invented, defaulted, substituted or silently skipped|never invented, never defaulted/);
+  }
+  // The policy block is the machine-readable half of the same six rules.
+  assert.deepEqual(contract.integrationPolicy,{proofSurface:'real-provider',fakes:'none',
+    credential:'owner-provided-named-variable-in-identity-custody',
+    credentialCustody:'identity-resource-sops-exec-env',
+    missingCredential:'blocked-environment-with-custody-slug-and-variable-name',
+    secretValues:'never-written',evidenceProof:'live'});
+  // Custody, not a place: the value is read through sops at the moment of use and exists in one process only.
+  assert.match(document,/sops exec-env/);
+  assert.match(document,/_resources\/identity\/<slug>\/secrets\.enc\.yaml/);
+  assert.doesNotMatch(document,/named environment variable/,'an environment variable is not custody');
+  // It reads the declaration that named the provider and the variable, and the client that actually calls it.
+  for(const id of ['target','integration','architecture','repo','credential','effects'])
+    assert.ok(contract.reads.some(read=>read.id===id),id);
+  // Its whole write ceiling: the node's kernel fields, its own evidence, the workflow handoff. No source.
+  assert.deepEqual(contract.writes.map(write=>write.id),['node','evidence','handoff']);
+  assert.equal(contract.writes.some(write=>String(write.path).startsWith('repository:')),false,'it proves the client, it never repairs it');
+  assert.ok(contract.writes.find(write=>write.id==='evidence').fields.includes('proof'),'the manifest says what it proved against');
+  for(const id of ['binding','declaration','live','credential','readback','cleanup'])
+    assert.ok(contract.proofs.some(proof=>proof.id===id),id);
+  // Its blockers refuse rather than improvise: no key is invented and no provider is replaced to proceed.
+  assert.deepEqual(contract.blockers.map(blocker=>blocker.code).sort(),
+    ['CLIENT_UNAVAILABLE','CREDENTIAL_MISSING','DECLARED_DEPENDENCY_UNMET','INTEGRATION_UNDECLARED','PROVIDER_UNREACHABLE','SCOPE_OUTSIDE_ALLOWLIST']);
+  assert.deepEqual(validateCatalog(catalogue,{root,repositoryRoot:repository,documents:outputs()}).errors,[]);
+});
+
+/**
+ * The operator is the half of the owner loop an agent reads before it reads its contract, so the two rules
+ * that keep the owner's time and the owner's secrets have to be in it: the question is put in the op's own
+ * terminal before any report, and a credential is put into the tree's encrypted custody by the owner's own
+ * command - this operation only ever checks that it is there.
+ */
+test('the owner.ask operator asks in its own terminal and never asks for a credential value',()=>{
+  const document=fs.readFileSync(path.join(root,'owner.ask','operator.yaml'),'utf8');
+  const contract=catalogue.ops.find(op=>op.id==='owner.ask').contract;
+  assert.deepEqual(contract.writes.map(write=>write.id),['decision']);
+  // The decision is a policy-decision leaf where the tree already keeps them, never a folder the tree lacks.
+  assert.match(contract.writes[0].path,/business\/srs\/business-rules\/policy-decisions\/<slug>\/index\.yaml$/);
+  for(const text of [document,JSON.stringify(contract)]){
+    assert.match(text,/srs-policy-decision section with decisionStatus\s*\n?\s*open/);
+    assert.match(text,/answer here with the number, or later with workflow-answer/);
+    assert.match(text,/answered-by-owner: <n>/);
+    assert.match(text,/recommended: <n>/);
+    assert.match(text,/identity set <slug>\s*\n?\s*--name <VAR>/);
+    assert.match(text,/never prints it/);
+    assert.match(text,/never asks for the value/);
+  }
+  assert.ok(contract.proofs.some(proof=>proof.id==='asked-in-the-terminal'),'asking in the tab is a proof, not a hope');
+  assert.match(contract.proofs.find(proof=>proof.id==='no-secret').requirement.en,/verifies only that it is present/);
+});
+
+test('an operator cannot write a record its kind never declared',()=>{
+  // The kind graph says what each operation produces; the operator contract is held to the same declaration,
+  // so a widened write ceiling cannot slip in as a path nobody compared against the catalog.
+  const business=fresh(),node=business.ops.find(op=>op.id==='business.decide').contract.writes.find(w=>w.id==='node');
+  node.path='.starciwork/<business>/architecture/sds/**/index.yaml';
+  assert.ok(errors(business).includes('IO_DRIFT'),'settling a requirement may not rewrite the design it is realised by');
+  const proof=fresh(),source=proof.ops.find(op=>op.id==='integration.verify').contract.writes.find(w=>w.id==='node');
+  source.path='.starciwork/<business>/business/**/index.yaml';
+  source.fields=['acceptance'];
+  assert.ok(errors(proof).includes('IO_DRIFT'),'a live proof may not author the requirement it proved');
+  // The attempt's own report is the kernel's, whatever its kind: every operation writes one.
+  assert.deepEqual(errors(fresh()),[]);
 });
 
 test('the brand operator traces every value to a real source file, writes one record plus its own assets, and refuses instead of choosing',()=>{

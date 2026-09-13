@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../../core/yaml.mjs';
-import {resolveExecutionChain} from '../../profiles/select.mjs';
-import {createOrcaCalls} from '../../execution/orca-calls.mjs';
-import {buildReport} from '../../execution/reports.mjs';
+import {resolveExecutionChain} from '../../kernel/chains.mjs';
+import {createOrcaCalls} from '../../hosts/orca/calls.mjs';
+import {buildReport} from '../../kernel/reports.mjs';
 
 /**
  * The kernel test harness: a scripted Orca, a pool allocator and the small helpers a workflow test needs.

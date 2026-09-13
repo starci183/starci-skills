@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DONE_HEADING,SEQUENCES,STEPS_HEADING,sequenceFor,stepsFor} from '../execution/contract-steps.mjs';
+import {DONE_HEADING,SEQUENCES,STEPS_HEADING,sequenceFor,stepsFor} from '../kernel/contract.mjs';
+import {CUT_ASSERTIONS,CUT_FILES} from '../kernel/sync.mjs';
 
 /** A minimal operation the way `toOp` shapes one; every field an agent's steps interpolate is present. */
 const op=(over={})=>({id:'op-1',kind:'backend.implement',origin:'ledger',nodeId:null,allowlist:['src/sales/intake.ts'],
@@ -16,7 +17,12 @@ test('every sequence renders a numbered working order and a definition of done, 
       acceptance:['the node declares an allowlist and checks that name its assertions','the tree validates']}),{kind:'implementation'}],
     'work.intake':[op({kind:'work.author',origin:'ledger',intake:{scope:'collab',example:'features/sales'},allowlist:['.starciwork/features/collab/**'],
       references:['workspace.yaml','features/sales/index.yaml'],acceptance:['features/collab has a module record, a business overview, SRS records and an architecture skeleton, all todo and valid']}),null],
-    'owner.ask':[op({kind:'owner.ask',origin:'ask',question:{kind:'credential',text:'Which Telegram bot token does the chatbot use, and where is it provided?',options:[],from:'op-intake'},allowlist:['.starciwork/features/chatbot/business/srs/decisions/**'],references:['features/chatbot/business/overview/index.yaml'],acceptance:['the question is answered from a decided record or drafted as one decision record']}),null],
+    'work.cut':[op({kind:'implementation.plan',origin:'ledger',nodeId:'demo.sales.implementation.backend.checkout',
+      cut:{node:'demo.sales.implementation.backend.checkout',reason:'its write scope names 21 files, past the 12 one operation may hold'},
+      allowlist:['.starciwork/features/sales/implementation/backend/checkout/**'],
+      references:['features/sales/implementation/backend/checkout/index.yaml','features/sales/architecture/sds/checkout/index.yaml'],
+      acceptance:['exactly one child is the seam, and every other child dependsOn it','the tree validates']}),{kind:'implementation'}],
+    'owner.ask':[op({kind:'owner.ask',origin:'ask',question:{kind:'credential',text:'Which Telegram bot token does the chatbot use, and where is it provided?',options:[],from:'op-intake'},allowlist:['.starciwork/features/chatbot/business/srs/business-rules/policy-decisions/**'],references:['features/chatbot/business/overview/index.yaml'],acceptance:['the question is answered from a decided record or drafted as one decision record']}),null],
     'implement.ledger':[op(),{kind:'implementation'}],
     'implement.shared':[op({origin:'shared',requesters:['op-catalog']}),null],
     'implement.repair':[op({origin:'repair',findings:['intake.ts:12 breaks unit-tests-pass']}),null],
@@ -27,10 +33,14 @@ test('every sequence renders a numbered working order and a definition of done, 
     'frontend.implement':[op({kind:'frontend.implement',allowlist:['src/screens/intake/page.tsx']}),{kind:'implementation',inputRef:'features/sales/implementation/frontend/intake/index.yaml'}],
     uat:[op({kind:'task.execute',allowlist:['e2e/checkout.spec.ts'],resources:['e2e-runtime']}),{kind:'uat'}],
     'e2e.verify':[op({kind:'e2e.verify',allowlist:['src/tests/e2e/checkout.e2e-spec.ts'],resources:['e2e-runtime'],acceptance:['order-persisted']}),{kind:'uat'}],
+    'integration.verify':[op({kind:'integration.verify',origin:'ledger',allowlist:['src/tests/integration/telegram.live-spec.ts'],
+      references:['features/sales/integration/telegram/index.yaml','features/sales/architecture/sds/delivery/index.yaml'],
+      acceptance:['a message reaches the telegram sandbox chat']}),{kind:'integration',path:'features/sales/integration/telegram/index.yaml'}],
     'uat.verify':[op({kind:'uat.verify',allowlist:['uat/checkout/runs/1/run.md'],resources:['e2e-runtime']}),{kind:'uat'}],
     operations:[op({kind:'runtime.operate',allowlist:['ops/rotate.sh'],resources:['postgres']}),{kind:'operations'}],
     migration:[op({allowlist:['src/migrations/0007-orders.ts'],resources:['postgres']}),{kind:'implementation'}],
     'architecture.revise':[op({kind:'architecture.revise',origin:'sds-gap',allowlist:['features/sales/architecture/sds/intake/index.yaml'],findings:['intake has no rule for an expired cart']}),null],
+    'business.revise':[op({kind:'business.revise',origin:'business',allowlist:['features/sales/business/srs/intake/index.yaml'],findings:['the intake requirement does not say whether a partial order is billable']}),{kind:'business'}],
     'grammar.update':[op({kind:'grammar.update',origin:'architecture',allowlist:['/grammars/starci/**'],
       findings:['no contract renders a stepped progress rail'],acceptance:['the grammar renders a stepped progress rail']}),{kind:'implementation'}],
     decide:[op({kind:'architecture.decide',origin:'architecture',allowlist:['features/sales/architecture/sds/intake/index.yaml'],checks:[]}),null],
@@ -119,6 +129,9 @@ test('interface.draw enumerates every screen state and writes the design record 
   assert.match(text,/Render ONE candidate per screen and viewport \(desktop and mobile\) - the main state only - FROM THE INSTALLED GRAMMAR ITSELF/);
   assert.match(text,/Never an image model for a surface/);assert.match(text,/never a capture of a working feature/);
   assert.match(text,/loading, empty and error are the grammar's own state contracts and the build renders them from code/);
+  // The markup the browser rendered is kept beside the picture, so the render can be checked from its source.
+  assert.match(drawn[4],/KEEPING THE MARKUP IT RENDERED beside each PNG as `<candidate>\.html`/);
+  assert.match(drawn[4],/a candidate that is not the grammar rendering the screen is a defect, and so is one with no markup beside it/);
   // The artwork the chosen candidate embeds is declared, so nothing of the approved picture is lost at build time.
   assert.match(drawn[5],/List every artwork the chosen candidate embeds/);
   for(const part of ['each illustration','each appearance of the brand mascot','each decorative image','each chart or media placeholder'])assert.ok(drawn[5].includes(part),part);
@@ -127,6 +140,13 @@ test('interface.draw enumerates every screen state and writes the design record 
     assert.match(drawn[5],new RegExp(field),field);
   assert.match(drawn[5],/A candidate whose embedded artwork the record does not list is an incomplete record/);
   assert.match(drawn[6],/every artwork visible in the chosen candidate has its `artworkSlots` entry with a crop that locates it/);
+  // The self-check names the two canon rules of 2026-09-13 and the command that reads them from the bytes.
+  assert.match(drawn[6],/NO CANDIDATE PLACES A LIST OF ENTITIES INSIDE A CARD \(a collection is a page section with a heading; a card is one item\)/);
+  assert.match(drawn[6],/EVERY COLOUR THE CAPTURE IS LARGELY MADE OF IS A BRAND TOKEN and the brand's primary is present/);
+  assert.match(drawn[6],/THE MASCOT APPEARS ONLY WHERE THE BRAND RECORD ALLOWS IT/);
+  assert.match(drawn[6],/`starci render check <ui node dir> --brand <work root>`/);
+  assert.match(text,/the two canon rules hold in the candidates themselves and `starci render check` says so/);
+  assert.match(text,/with the markup it was rendered from kept beside it as `<candidate>\.html`/);
   assert.match(text,/every artwork the chosen candidate embeds is declared as an `artworkSlots` entry with its region, purpose, brief, size, format, brand references and candidate crop; a candidate with artwork the record does not list is incomplete/);
   assert.match(text,/every assertion \(`intake-screen-shows-every-state`\) maps to a named screen state/);
   assert.match(text,/`blocked` with blocker `sds-gap` and the exact question, never a guess/);
@@ -222,24 +242,59 @@ test('uat.verify walks the rendered surface with a screenshot per step, compares
   assert.match(text,/Lane: the feature's `ui` node is its interface design record and walks `interface\.draw` -> `interface\.asset`/);
 });
 
-test('architecture.revise edits one SDS section, bumps rev, keeps the decision log and writes no code',()=>{
-  const text=stepsFor(op({kind:'architecture.revise',origin:'sds-gap',allowlist:['features/sales/architecture/sds/intake/index.yaml'],
+test('both revise sequences state the readings, choose one, log why and move on - and ask only about money, authority or customer data',()=>{
+  const design=op({kind:'architecture.revise',origin:'architecture',allowlist:['features/sales/architecture/sds/intake/index.yaml'],
     references:['features/sales/business/srs/intake/index.yaml'],findings:['intake has no rule for an expired cart'],
-    checks:[{name:'work-valid',command:'node bin/starci.mjs validate .'}]}));
-  const revised=steps(text);
-  assert.match(text,/Sequence `architecture\.revise`/);
-  assert.match(revised[0],/gap report that opened this operation \(1 finding\)/);
-  assert.match(revised[1],/Edit only that section inside the allowlist \(`features\/sales\/architecture\/sds\/intake\/index\.yaml`\)/);
-  assert.match(revised[1],/no code file/);
-  assert.match(revised[2],/Bump that section's `rev`/);assert.match(revised[2],/never rewrite or delete an earlier entry/);
-  assert.match(revised[3],/work-valid: `node bin\/starci\.mjs validate \.`/);
-  assert.match(revised[4],/`rev` is higher than it was/);assert.match(revised[4],/no product code/);
-  assert.match(revised[5],/with the new `rev` and the sections you changed/);
-  assert.match(revised[5],/`ask` with the exact question/);
-  // A design revision never writes a spec or product code, so it carries no red-spec rule and no lane hint.
-  assert.doesNotMatch(text,/MUST fail now/);
-  assert.doesNotMatch(text,/Lane: the feature's `ui` node/);
-  assert.match(text,/no product code changed and no other design section moved/);
+    checks:[{name:'work-valid',command:'node bin/starci.mjs validate .'}]});
+  const requirement=op({kind:'business.revise',origin:'business',allowlist:['features/sales/business/srs/intake/index.yaml'],
+    references:['features/payments/business/srs/refund/index.yaml'],findings:['the intake requirement does not say whether a partial order is billable'],
+    checks:[{name:'work-valid',command:'node bin/starci.mjs validate .'}]});
+  const cases=[{key:'architecture.revise',operation:design,record:'design (SDS)',where:'the SDS section'},
+    {key:'business.revise',operation:requirement,record:'requirement (SRS)',where:'the requirement, rule or journey'}];
+  for(const {key,operation,record,where} of cases){
+    const text=stepsFor(operation);
+    const revised=steps(text);
+    assert.ok(text.includes(`Sequence \`${key}\``),key);
+    assert.equal(revised.length,8,key);
+    // 1: the gap itself. 2: the readings the record admits - and a record that admits one reading is not a gap.
+    assert.match(revised[0],/gap report that opened this operation \(1 finding\)/,key);
+    assert.ok(revised[0].includes(`exact ${record} passage it names`),key);
+    assert.ok(revised[1].includes('readings that passage actually admits'),key);
+    assert.ok(revised[1].includes('admits exactly one reading is not a gap'),key);
+    // 3: the runtime chooses, from the accepted records, the other features' decided records and the conventions.
+    assert.ok(revised[2].includes('most reasonable reading'),key);
+    assert.ok(revised[2].includes("decided records of the OTHER features"),key);
+    assert.ok(revised[2].includes('is not a reason to stop'),key);
+    // The one exception, stated identically in both sequences: money, authority or customer data is never silent.
+    assert.ok(revised[2].includes('UNLESS the readings differ in an observable outcome about MONEY'),key);
+    assert.ok(revised[2].includes('AUTHORITY'),key);assert.ok(revised[2].includes('CUSTOMER DATA'),key);
+    assert.ok(revised[2].includes('report `ask` exactly once with `question.kind: decision`'),key);
+    assert.ok(revised[2].includes('ONE recommendation'),key);
+    assert.ok(revised[2].includes('ONLY thing this operation may ever `ask` about'),key);
+    // 4: the chosen reading goes into the record the allowlist names, and nothing else moves.
+    assert.ok(revised[3].includes(`Write the chosen reading into ${where}`),key);
+    assert.ok(revised[3].includes(`\`${operation.allowlist[0]}\``),key);
+    assert.ok(revised[3].includes('no code file'),key);
+    // 5: the rev and exactly one decision-log entry, in the shape schemas/work.schema.yaml documents.
+    assert.ok(revised[4].includes("Bump that record's `rev`"),key);
+    assert.ok(revised[4].includes('EXACTLY ONE entry to `extensions.work3.decisionLog`'),key);
+    assert.ok(revised[4].includes('{rev, at, gap, chosen, why, alternatives}'),key);
+    assert.ok(revised[4].includes('Never rewrite and never delete an earlier entry'),key);
+    // 6-8: validate, self-audit, report the rev and the entry - and never ask for anything else.
+    assert.match(revised[5],/work-valid: `node bin\/starci\.mjs validate \.`/,key);
+    assert.ok(revised[6].includes('`rev` is higher than it was'),key);
+    assert.ok(revised[6].includes('exactly one new entry naming this gap'),key);
+    assert.ok(revised[7].includes('with the new `rev` and the decision-log entry'),key);
+    assert.ok(revised[7].includes('an unclear record is revised, not asked about'),key);
+    // A record revision never writes a spec or product code, so it carries no red-spec rule and no lane hint.
+    assert.doesNotMatch(text,/MUST fail now/,key);
+    assert.doesNotMatch(text,/Lane: the feature's `ui` node/,key);
+    assert.ok(text.includes('no product code changed and no other passage of this record, and no other record, moved'),key);
+    assert.ok(text.includes('exactly one new `{rev, at, gap, chosen, why, alternatives}` entry'),key);
+  }
+  // Each sequence escapes to the OTHER record's gap rather than answering it in the wrong layer.
+  assert.match(stepsFor(design),/really a missing or self-contradictory REQUIREMENT is `blocked` `srs-gap`/);
+  assert.match(stepsFor(requirement),/really a missing DESIGN[\s\S]*is `blocked` `sds-gap`/);
 });
 
 test('grammar.update tries the composition of existing contracts first and publishes only behind green gates',()=>{
@@ -386,7 +441,7 @@ test('brand.decide reads every value out of a real source file, bumps the rev, a
 
 test('the module carries no product path or repository name',async()=>{
   const fs=await import('node:fs');
-  const source=fs.readFileSync(new URL('../execution/contract-steps.mjs',import.meta.url),'utf8');
+  const source=fs.readFileSync(new URL('../kernel/contract.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(source,/starci-academy|agentos|nivo|apps\/|\.starciwork/i);
 });
 
@@ -424,6 +479,107 @@ test('work.author completes the record from real material, keeps the kernel fiel
   assert.equal(sequenceFor(op({kind:'work.author',allowlist:['db/migrations/1.sql']}),{node:{kind:'uat'}}),'work.author');
 });
 
+/**
+ * The cut is the one sequence whose ORDER is the whole point: the seam is named before anything else is, because
+ * two builds that both edit the module wiring are not parallel work, they are one merge conflict with two
+ * authors. The contract has to say that in numbers the kernel actually applies - the same twelve files and eight
+ * assertions `kernel/sync.mjs` measured - and it has to say what the node it cuts becomes afterwards.
+ */
+test('work.cut names the seam first, cuts the rest by acceptance into disjoint children, and leaves a derived parent',()=>{
+  const node='demo.sales.implementation.backend.checkout';
+  const folder='.starciwork/features/sales/implementation/backend/checkout/**';
+  const cut=op({kind:'implementation.plan',origin:'ledger',nodeId:node,
+    cut:{node,reason:'its write scope names 21 files, past the 12 one operation may hold'},
+    allowlist:[folder],
+    references:['features/sales/implementation/backend/checkout/index.yaml','features/sales/architecture/sds/checkout/index.yaml'],
+    acceptance:['exactly one child is the seam, and every other child dependsOn it','the tree validates'],
+    checks:[{name:'work-tree-validates',command:'node bin/starci.mjs validate .'}]});
+  const text=stepsFor(cut,{node:{kind:'implementation'}});
+  const order=steps(text);
+  assert.equal(sequenceFor(cut,{node:{kind:'implementation'}}),'work.cut');
+  assert.match(text,/Sequence `work\.cut`/);
+  // It reads the node and its design, then the real code, before it draws a single boundary.
+  assert.match(order[0],/features\/sales\/architecture\/sds\/checkout\/index\.yaml/);
+  assert.match(order[0],/the kernel measured it as too big because its write scope names 21 files/);
+  assert.match(order[1],/Open the actual code the node's write scope names/);
+  assert.match(order[1],/A boundary you have not read is not a boundary you may draw/);
+  // The seam, first and by name - and what it owns is stated, not left to taste.
+  assert.match(order[2],/Name the SEAM first, before any other part/);
+  assert.match(order[2],/module wiring and registration, dependency-injection setup, database migrations, shared contracts, shared types and shared fixtures/);
+  assert.match(order[2],/It is built first and alone/);
+  // Then the rest, by acceptance, disjoint, each traced back to the same accepted records.
+  assert.match(order[3],/Cut the rest by acceptance, never by file/);
+  assert.match(order[3],/at most 12 files that is disjoint from every sibling AND from the seam/);
+  assert.match(order[3],/every non-seam child carries the seam's node id in `dependsOn`/);
+  assert.match(order[4],new RegExp(`\`${folder.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\``));
+  assert.match(order[4],/`work\/node@2`, `kind: implementation`, `state: todo`, `required: true`/);
+  // The node it cut becomes a derived parent, and its assertions become the group's acceptance.
+  assert.match(order[5],/Turn demo\.sales\.implementation\.backend\.checkout into a derived parent/);
+  assert.match(order[5],/`extensions\.work3\.groupAssertions`/);
+  assert.match(order[5],/A parent with children authors no state/);
+  assert.match(order[6],/work-tree-validates: `node bin\/starci\.mjs validate \.`/);
+  assert.match(order[7],/report `done` with `cut: none`/);
+  // It precedes every child's lane: nothing is built here and no red-spec rule applies.
+  assert.doesNotMatch(text,/MUST fail now/);
+  assert.match(text,/no product code changed: this operation precedes the children's lanes/);
+  assert.match(text,/the seam first, then the rest at once, and one proof for the whole group/);
+  // The definition of done carries both bounds and the one alternative outcome.
+  assert.ok(done(text).some(line=>/no child states more than 8 assertions/.test(line)));
+  assert.ok(done(text).some(line=>/or the report says `cut: none` and nothing under .* changed/.test(line)));
+  // Neither the node kind nor a repair origin nor a migration-looking allowlist reroutes it.
+  assert.equal(sequenceFor(op({kind:'implementation.plan',origin:'repair',allowlist:['db/migrations/1.sql']}),{node:{kind:'ui'}}),'work.cut');
+  // And the record-authoring modes stay apart: a cut is never read as an intake or as a record completion.
+  assert.equal(sequenceFor(op({kind:'work.author',cut:{node,reason:'x'}}),{node:{kind:'implementation'}}),'work.cut');
+  assert.equal(sequenceFor(op({kind:'work.author',intake:{scope:'collab'}}),{node:null}),'work.intake');
+  // The bounds in the contract are the bounds the kernel measured. A contract that states a limit the kernel
+  // does not apply is worse than no contract: the agent would cut to a rule nobody enforces.
+  assert.ok(text.includes(`at most ${CUT_FILES} files`),`the contract states CUT_FILES (${CUT_FILES})`);
+  assert.ok(text.includes(`more than ${CUT_ASSERTIONS} assertions`),`the contract states CUT_ASSERTIONS (${CUT_ASSERTIONS})`);
+});
+
+/**
+ * An intake is a reconciliation with exactly three cases, written as data. The contract has to say so in the
+ * words the kernel then checks mechanically: the table key, the row fields, and what each case obliges. The
+ * two rulings it must NOT carry any more are the old "fit, change or conflict" vocabulary and the `sds-gap`
+ * report against another feature's record - a change a decided record needs is the owner's decision or new
+ * work this feature declares, never an edit and never a gap filed against someone else's record.
+ */
+test('work.intake determines every side, then reconciles it as three typed cases, and edits no other feature',()=>{
+  const intake=op({kind:'work.author',origin:'ledger',intake:{scope:'collab',example:'features/sales'},
+    allowlist:['work/features/collab/**'],references:['workspace.yaml','features/sales/index.yaml'],
+    acceptance:['features/collab has a module record, a business overview, SRS records and an architecture skeleton'],
+    checks:[{name:'work-valid',command:'node bin/starci.mjs validate .'}]});
+  const text=stepsFor(intake);
+  const listed=steps(text),closed=done(text);
+  assert.equal(sequenceFor(intake),'work.intake');
+  // The sides come first: the feature is determined as checkable claims before anything is reconciled.
+  assert.match(listed[1],/Determine the feature, do not just describe it/);
+  for(const side of ['ARCHITECTURE','USER STORIES','SECURITY AND AUTHORITY','BUSINESS RULES','QUALITY','EXTERNAL INTEGRATIONS AND CREDENTIALS','OPEN DECISIONS'])
+    assert.ok(listed[1].includes(side),`the sides sentence still names ${side}`);
+  // The table is named by its key and by its row fields, exactly as the kernel reads them.
+  assert.match(listed[2],/`extensions\.work3\.reconciliation`/);
+  assert.match(listed[2],/`\{case, record, decision, reads, hands, detail\}`/);
+  assert.match(listed[2],/There are exactly three cases and no fourth/);
+  // reference: cited by id, never restated.
+  assert.match(listed[2],/`case: reference`.*cite it by its `record` id and never restate, re-word or redefine a line of it/);
+  // conflict: never overwritten, never averaged; the decision record is this feature's and the owner answers it.
+  assert.match(listed[2],/`case: conflict`.*never overwrite it and never average the two/);
+  assert.match(listed[2],/decision record under THIS feature \(`state: todo`\) stating both sides, the consequences of each, the numbered options and exactly one recommendation/);
+  assert.match(listed[2],/name that record in `decision`/);
+  assert.match(listed[2],/the kernel puts the question to the owner/);
+  // new: authored here, declaring what it reads and what it hands on.
+  assert.match(listed[2],/`case: new`.*declare in `reads` the decided records it rests on and in `hands` the records of this feature it hands on to/);
+  // The definition of done repeats the table and the untouched neighbour, and the report carries the counts.
+  assert.ok(closed.some(item=>/one row `\{case, record, decision, reads, hands, detail\}` per decided record/.test(item)));
+  assert.ok(closed.some(item=>/every `reference` row cites a decided record by id and no record of this feature restates it/.test(item)));
+  assert.ok(closed.some(item=>/no record of another feature changed by a single byte/.test(item)));
+  assert.match(listed.at(-1),/the reconciliation table with its count per case/);
+  // The two withdrawn rulings are gone from the whole sequence: no old vocabulary, no formula, no sds-gap.
+  assert.doesNotMatch(text,/fit, a change or a conflict|fit, change or conflict/);
+  assert.doesNotMatch(text,/sds-gap/);
+  assert.doesNotMatch(text,/A'|A, B \+ C/);
+});
+
 test('e2e.verify proves a backend slice through the API on the real stack, never a screen, and a backend uat node resolves to it while a frontend one walks the surface',()=>{
   const e2e=op({kind:'e2e.verify',allowlist:['src/tests/e2e/checkout.e2e-spec.ts'],resources:['e2e-runtime'],acceptance:['order-persisted'],checks:[{name:'e2e',command:'npm run test:e2e -- checkout'}]});
   const rendered=stepsFor(e2e,{node:{kind:'uat'}});
@@ -436,4 +592,86 @@ test('e2e.verify proves a backend slice through the API on the real stack, never
   assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'uat',path:'features/sales/uat/checkout/index.yaml'}}),'uat');
   assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'e2e',path:'features/sales/e2e/checkout/index.yaml'}}),'e2e.verify');
   assert.equal(sequenceFor(op({kind:'task.execute'}),{node:{kind:'uat',path:'features/sales/implementation/frontend/checkout/index.yaml'}}),'uat.verify');
+});
+
+/**
+ * The owner is at a keyboard, in front of this tab. Before 5-plus the ask op only drafted a record and left,
+ * and a one-word answer waited a day for someone to type a command somewhere else. It asks here now, and the
+ * two ways to answer are printed side by side. And a credential is never asked for as a value at all: the
+ * owner puts it into the tree's own encrypted custody with one command and says `set`; the op checks presence.
+ */
+test('the owner.ask sequence asks in its own terminal, and a credential is put into custody by the owner, never handed over',()=>{
+  const ask=op({kind:'owner.ask',origin:'ask',checks:[{name:'work-tree-validates',command:'node starci.mjs validate .starciwork'}],
+    question:{kind:'credential',text:'Which key does the payment client use?',options:[],from:'op-intake'},
+    allowlist:['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],
+    references:['features/sales/business/overview/index.yaml'],
+    acceptance:['the question is answered from a decided record or drafted as one decision record']});
+  const rendered=stepsFor(ask,{node:null});
+  // A decided record still answers first, and nothing is written when one does.
+  assert.match(rendered,/`answered-from: <record id>`/);
+  // The question is put in this terminal, with both doors, before any report.
+  assert.match(rendered,/ASK IN THIS TERMINAL, before you report/);
+  assert.match(rendered,/the owner may answer here with the number, or later with workflow-answer/);
+  assert.match(rendered,/`answered-by-owner: <n>`/);
+  // The recommendation is what the kernel takes provisionally, so it has to be reported as a number.
+  assert.match(rendered,/`decision: <record id>`, then a line `recommended: <n>`/);
+  assert.match(rendered,/takes your recommendation provisionally so the work continues/);
+  // Custody, not a value: the owner's own command, presence only, and nothing printed.
+  assert.match(rendered,/identity set <slug> --name <VAR>/);
+  assert.match(rendered,/reads the value from stdin, never from the command line, and never prints it/);
+  assert.match(rendered,/verify only PRESENCE and never the value/);
+  assert.match(rendered,/`credential: <VAR> present in identity:<slug>`/);
+  assert.match(rendered,/An environment variable is not custody/);
+  assert.match(rendered,/Never print, echo, log, copy or paste the value/);
+  assert.match(done(rendered).join('\n'),/no value of any credential or secret appears anywhere/);
+  // The record is a policy decision where the tree keeps them, never a folder the tree does not have.
+  assert.match(rendered,/srs-policy-decision` section with `decisionStatus: open`/);
+  assert.match(rendered,/`\.starciwork\/features\/sales\/business\/srs\/business-rules\/policy-decisions\/\*\*`/);
+});
+
+/**
+ * The sequence that closes the hole four faked chatbot channels went through: `e2e.verify` may still fake
+ * an outside provider, but it must now name it in the evidence, and the only operation that can call a
+ * declared provider proven is one that actually calls it.
+ */
+test('an integration is proven live or it is not proven: the credential is the owner\'s, no fake stands in, and e2e names what it faked',()=>{
+  const live=op({kind:'integration.verify',origin:'ledger',allowlist:['src/tests/integration/telegram.live-spec.ts'],
+    references:['features/sales/integration/telegram/index.yaml'],acceptance:['a message reaches the telegram sandbox chat'],
+    checks:[{name:'integration',command:'npm run test:integration -- telegram'}]});
+  const node={kind:'integration',path:'features/sales/integration/telegram/index.yaml'};
+  const rendered=stepsFor(live,{node});
+  assert.match(rendered,/Sequence `integration\.verify`/);
+  // Every kind, origin and allowlist shape routes an integration node to this one sequence and no other.
+  assert.equal(sequenceFor(live,{node}),'integration.verify');
+  assert.equal(sequenceFor(op({kind:'task.execute',origin:'repair',allowlist:['db/migrations/9.sql']}),{node}),'integration.verify');
+  assert.equal(sequenceFor(op({kind:'integration.verify'}),{node:null}),'integration.verify');
+
+  // The credential: one named variable, out of the tree's own encrypted custody, read through sops at the
+  // moment of use so the value lives in one process - never an environment variable the op exported, which
+  // belongs to whichever terminal set it and is gone on the next machine. A custody that cannot give it stops
+  // the work by name, with the slug and the variable.
+  assert.match(rendered,/the encrypted identity resource the declaration's `custody` names/);
+  assert.match(rendered,/_resources\/identity\/<slug>\/secrets\.enc\.yaml/);
+  assert.match(rendered,/sops exec-env <work tree>\/_resources\/identity\/<slug>\/secrets\.enc\.yaml '<check>'/);
+  assert.match(rendered,/Never an environment variable you export, never a file you create/);
+  assert.match(rendered,/`blocked` with blocker `environment` naming the slug and that exact variable and nothing else/);
+  assert.match(rendered,/never copy it into a file, a fixture, an environment file, a log, the report or this contract/);
+  // The module is product-agnostic: it names the tree's layout, never a repository or a product path.
+  assert.doesNotMatch(rendered,/\.starciwork/);
+  // No double of any spelling may stand in for the provider, and the secret never leaves the variable name.
+  assert.match(rendered,/No fake, no stub, no mock, no recorded or replayed response, no local double/);
+  assert.match(rendered,/calling the real provider's own sandbox over the network/);
+  assert.match(rendered,/every secret masked/);
+  assert.match(rendered,/`proof: \{boundary: live, fakes: \[\]\}`/);
+  assert.match(rendered,/only on a green live run/);
+  assert.match(rendered,/a provider outage, a sandbox that will not answer or a rate limit is `failed`/);
+  assert.match(rendered,/`npm run test:integration -- telegram`/);
+  assert.match(rendered,/`src\/tests\/integration\/telegram\.live-spec\.ts`/);
+
+  // The other half of the rule: an API proof may fake a provider, but the evidence has to name it.
+  const api=stepsFor(op({kind:'e2e.verify',allowlist:['src/tests/e2e/checkout.e2e-spec.ts'],resources:['e2e-runtime'],
+    acceptance:['order-persisted'],checks:[{name:'e2e',command:'npm run test:e2e -- checkout'}]}),{node:{kind:'e2e'}});
+  assert.match(api,/`proof: \{boundary: api, fakes: \[<provider ids>\]\}`/);
+  assert.match(api,/a provider the diff fakes that the evidence does not list is a defect/);
+  assert.match(api,/its own `integration` node walking `integration\.verify`/);
 });

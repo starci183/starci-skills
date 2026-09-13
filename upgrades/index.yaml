@@ -1,0 +1,15 @@
+schema: starci/upgrades@1
+purpose: |-
+  One entry per version an operator of an installed runtime has to do something about. This is not a
+  changelog: a version appears here only when updating to it requires a person to know or to run something
+  beyond `starci update`. The note beside each entry is the page that says what.
+
+  `starci update` prints the note of the version it installed whenever the installed version changed, so an
+  operator who only ever runs the installer is still told where to read.
+upgrades:
+  - version: 5.0.0-plus
+    note: upgrades/5.0.0-plus.md
+    summary: >-
+      The runtime tree is laid out by concept and every command is one entry. A running supervisor must be
+      stopped and started once with the new command line, because the old launcher path no longer exists.
+      Existing workflow stores and product records are unchanged and resume.

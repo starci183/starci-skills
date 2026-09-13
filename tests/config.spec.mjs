@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {loadConfig,validateConfig} from '../scripts/config.mjs';
-import {selectProfile} from '../profiles/select.mjs';
+import {selectProfile} from '../kernel/chains.mjs';
 test('local config initializes once, preserves preferences and rejects invalid data',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-'));
  try {

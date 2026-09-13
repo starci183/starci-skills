@@ -11,7 +11,12 @@ folders:
   skills: Companion skills a host discovers beside the entry (workflow chat, Orca stubs); routing stays in SKILL.md
   ops: Operator JSON and authority
   workflows: Matrices, contracts and runtime gates
-  profiles: Host profiles
+  model: Declared data the runtime runs on - record kinds, operation kinds, lanes, routes, hosts, runtimes, the operator registry and the provider profiles; no code
+  kernel: The workflow control loop, one file per concern - the graph, the record catalog, the goal, the intake, the reconciliation, the owner loop, the ledger and its sync, contracts, scheduling, guards, terminals and the status view
+  hosts: The host model as data and the adapters the kernel launches operations through, behind one call surface
+  models: The model functions the runtime calls with a typed form - assess, critique, plan, decide and validate - and their headless providers
+  checks: Machine checks that read bytes rather than claims - the brand record against its sources, a drawing against its capture and kept markup, a proof bundle
+  upgrades: What an operator of an installed runtime must know and run after each version, one note per version
   providers: Provider capabilities, full API inventories, adapters, recipes and fail-closed validation
   knowledge: Lazy-loaded JSON guidance
   contracts: Validation code
@@ -30,7 +35,7 @@ limits:
 counts:
   skills: 1
   publicWorkflows: 16
-  operators: 16
+  operators: 21
 gates: workflows/gates.json
 work:
   format: yaml-1.2

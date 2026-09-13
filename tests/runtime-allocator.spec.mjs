@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../execution/runtime-allocator.mjs';
-import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../execution/runtime-loads.mjs';
+import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../kernel/schedule.mjs';
+import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../kernel/loads.mjs';
 
-const profile=parseYaml(fs.readFileSync(new URL('../profiles/runtimes.yaml',import.meta.url),'utf8'));
+const profile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
 const clock=start=>{const box={at:start};return {now:()=>box.at,advance:ms=>{box.at+=ms;}};};
 /**
  * A throwaway workflows root: the shared runtime ledger beside the workflow directories, each of which may hold
@@ -425,4 +425,24 @@ test('a sequential allocator hands out one operation at a time whatever the prof
   // The cap never opens a pool the quota closed, and the default allocator is not sequential.
   assert.deepEqual(sequentialRuntimes({maxParallelOps:10,runtimes:{a:{maxParallel:4},b:{maxParallel:0}}}),{maxParallelOps:1,runtimes:{a:{maxParallel:1},b:{maxParallel:0}}});
   assert.equal(createAllocator({runtimes:profile,now:()=>0}).sequential,false);
+});
+
+test('fan-out is bounded per cut group: the seam runs alone and one parent never takes every slot',()=>{
+  // The shipped numbers: ten slots in flight, nine of them at most for the children of one cut parent, so a
+  // heavy node fans out wide and still leaves the rest of the tree a slot to run in.
+  assert.deepEqual(profile.allocation.fanOut,{seamFirst:true,maxPerGroup:9});
+  assert.equal(profile.maxParallelOps,10);
+  assert.deepEqual(profile.allocation.preference.implement,['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
+  const allocator=createAllocator({runtimes:profile,now:()=>0});
+  assert.deepEqual(allocator.fanOut,{seamFirst:true,maxPerGroup:9});
+  assert.equal(allocator.maxParallelOps,10);
+  // A profile that declares no policy still bounds a group: one slot is kept for everything that is not it.
+  const bare={...profile,allocation:{...profile.allocation,fanOut:undefined}};
+  assert.deepEqual(createAllocator({runtimes:bare,now:()=>0}).fanOut,{seamFirst:true,maxPerGroup:9});
+  // A profile that turns the seam rule off says so, and it is read rather than assumed.
+  const loose={...profile,allocation:{...profile.allocation,fanOut:{seamFirst:false,maxPerGroup:3}}};
+  assert.deepEqual(createAllocator({runtimes:loose,now:()=>0}).fanOut,{seamFirst:false,maxPerGroup:3});
+  // The cut's planning kind allocates on the plan role, like every other record-authoring operation.
+  assert.equal(allocator.roleFor('implementation.plan'),'plan');
+  assert.equal(profile.roleOfKind['implementation.plan'],'plan');
 });

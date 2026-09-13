@@ -6,7 +6,7 @@ An operation that writes `assert.equal(typeof double,'function')` and wires it i
 forever, on the old code as well as the new. The missing half of the proof is the contrast: the spec the
 operation added must **fail before the change and pass after it**.
 
-`execution/verify-proof.mjs` supplies that half. It never edits the operation's worktree, never commits, and
+`checks/proof.mjs` supplies that half. It never edits the operation's worktree, never commits, and
 never checks anything out there.
 
 ## The plan

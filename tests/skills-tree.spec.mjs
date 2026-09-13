@@ -24,16 +24,29 @@ test('every companion skill declares its directory name and a description, and t
 
 test('the workflow-chat skill names only launcher commands that exist and the flags the headless host takes',()=>{
   const skill=read('skills/workflow-chat/SKILL.md');
-  const launcher=read('execution/orca-supervised-launch.mjs');
-  const list=name=>JSON.parse(launcher.match(new RegExp(`const ${name}=(\\[[^\\]]*\\])`))[1].replaceAll("'",'"'));
-  const known=new Set([...list('KERNEL_COMMANDS'),...list('VIEW_COMMANDS')]);
+  const launcher=read('hosts/orca/launch.mjs');
+  const entry=read('bin/starci.mjs');
+  const list=(text,name)=>JSON.parse(text.match(new RegExp(`const ${name}=(\\[[\\s\\S]*?\\])`))[1].replaceAll("'",'"').replace(/,\s*\]/,']'));
+  const known=new Set([...list(launcher,'KERNEL_COMMANDS'),...list(launcher,'VIEW_COMMANDS')]);
   // Every backticked `workflow-<x>` the skill tells a chat to run must be a command the launcher dispatches,
   // because a chat cannot recover from a usage error the way an Orca monitor could read the sidebar.
   const named=new Set([...skill.matchAll(/`(workflow-[a-z-]+)(?:[ `])/g)].map(match=>match[1]));
-  for(const command of ['workflow-goal','workflow-approve','workflow-run','workflow-status','workflow-stop'])assert.ok(named.has(command),`the skill names ${command}`);
+  for(const command of ['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status','workflow-stop'])assert.ok(named.has(command),`the skill names ${command}`);
   for(const command of named)assert.ok(known.has(command),`${command} is a launcher command`);
+  // A chat is told one command line and no module path: `bin/starci.mjs` forwards argv to the launcher, so
+  // every command the skill names must also be one the entry forwards, or the chat's own form would fail.
+  const forwarded=new Set(list(entry,'LAUNCHER_COMMANDS'));
+  assert.ok(skill.includes('node <skill root>/bin/starci.mjs <command>'),'the skill runs the entry');
+  assert.equal(skill.includes('hosts/orca/launch.mjs'),false,'the skill never names a module path inside the runtime');
+  for(const command of named)assert.ok(forwarded.has(command),`${command} is forwarded by bin/starci.mjs`);
+  for(const command of known)assert.ok(forwarded.has(command),`the entry forwards the launcher command ${command}`);
+  // `--host` stays on the command lines: the kernel resolves an absent one against `<repo>/.claude`, never
+  // against the entry's own location, so a repository that shares another repository's tree needs the flag.
   for(const flag of ['--host-adapter headless','STARCI_HOST=headless','--accept-critique','--allow-dynamic','--lane','--scope','--host <skill root>'])assert.ok(skill.includes(flag),flag);
   for(const flag of ['--accept-critique','--allow-dynamic','--lane','--scope','--host'])assert.ok(launcher.includes(flag),`${flag} is a launcher flag`);
+  // The usage block teaches the entry first and names the direct path once underneath, for spawn logs.
+  const usage=launcher.slice(launcher.indexOf('function usage()'));
+  assert.ok(usage.indexOf('bin/starci.mjs')<usage.indexOf('.dist/hosts/orca/launch.mjs'),'the entry is printed first');
 });
 
 test('the workflow-chat skill is product-agnostic, forbids writing the store and is routed from the entry for both hosts',()=>{

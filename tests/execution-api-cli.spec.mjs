@@ -12,7 +12,7 @@ import {
 import {main} from '../cli/main.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const registry = () => parseYaml(fs.readFileSync(path.join(root, 'profiles/registry.yaml'), 'utf8'));
+const registry = () => parseYaml(fs.readFileSync(path.join(root, 'model/registry.yaml'), 'utf8'));
 const request = (mode = 'solo') => ({
   apiVersion: 'starci.workflow/v1',
   kind: 'WorkflowRequest',

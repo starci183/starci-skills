@@ -21,7 +21,7 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.match(contract.workflowKernel.calls.attestWorktree.cli,/worktree show/);
   assert.match(contract.workflowKernel.calls.waitOperationBoundary.cli,/orchestration check --wait/);
   assert.match(contract.workflowKernel.calls.answerOperation.cli,/terminal send .*--enter/);
-  assert.equal(contract.operationAgent.canonicalLauncher.module,'execution/orca-supervised-launch.mjs');
+  assert.equal(contract.operationAgent.canonicalLauncher.module,'hosts/orca/launch.mjs');
   assert.equal(contract.operationAgent.canonicalLauncher.command,'start-op');
   assert.equal(contract.operationAgent.canonicalLauncher.authority,'exclusive-effectful-construction-path');
   assert.equal(contract.operationAgent.qwen38Flash.launch,'command-terminal');

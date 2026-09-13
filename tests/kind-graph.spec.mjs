@@ -2,13 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {parseYaml} from '../core/yaml.mjs';
-import {BLOCKERS,CAPABILITIES,KINDS,KIND_GRAPH,LANE_BUILD,OUTCOMES,SAME,assertGraph,describeLane,familyOf,isReadOnly,
-  kindList,laneById,laneFor,laneRecordFor,mutationsOf,needsOf,nextKind,operatorOf,predicatesOf,reportsOf,roleOf,
-  routeFor,routeList,validateGraph} from '../execution/kind-graph.mjs';
+import {BLOCKERS,CAPABILITIES,KINDS,KIND_GRAPH,LANE_BUILD,OUTCOMES,RECORDS,SAME,assertGraph,describeLane,familyOf,
+  isReadOnly,kindList,kindsReading,kindsWriting,laneById,laneFor,laneRecordFor,needsOf,nextKind,operatorOf,
+  predicatesOf,readsOf,reportsOf,roleOf,routeFor,routeList,validateGraph,writesOf} from '../kernel/graph.mjs';
+import {RECORD_KINDS} from '../kernel/io.mjs';
 
-const read=name=>parseYaml(fs.readFileSync(new URL(`../profiles/${name}`,import.meta.url),'utf8'));
+const read=name=>parseYaml(fs.readFileSync(new URL(`../model/${name}`,import.meta.url),'utf8'));
 const profile=read('kinds.yaml');
 const runtimes=read('runtimes.yaml');
+const records=read('records.yaml');
 const operators=fs.readdirSync(new URL('../ops/',import.meta.url),{withFileTypes:true})
   .filter(entry=>entry.isDirectory()).map(entry=>entry.name);
 const codes=errors=>errors.map(error=>error.code);
@@ -16,9 +18,9 @@ const clone=()=>structuredClone(profile);
 const lane=id=>laneFor(id==='frontend'?{kind:'implementation',layout:'frontend'}:id==='ui'?{kind:'ui',layout:null}:{kind:'implementation',layout:'backend'},{profile});
 
 test('the shipped catalog validates against the allocator profile and the operator catalog',()=>{
-  assert.deepEqual(validateGraph(profile,{runtimes,operators}),[]);
-  assert.equal(assertGraph(profile,{runtimes,operators}),profile);
-  assert.equal(profile.schema,'starci/kinds@1');
+  assert.deepEqual(validateGraph(profile,{runtimes,operators,records}),[]);
+  assert.equal(assertGraph(profile,{runtimes,operators,records}),profile);
+  assert.equal(profile.schema,'starci/kinds@2');
   // The catalog is the closed list: the profile and the compiled constant agree in both directions.
   assert.deepEqual(kindList({profile}).sort(),[...KINDS].sort());
   for(const kind of KINDS){
@@ -35,30 +37,67 @@ test('the shipped catalog validates against the allocator profile and the operat
   }
   // The prover is the only read-only kind, and the only one that may change nothing.
   assert.equal(isReadOnly('review.verify',{profile}),true);
-  assert.deepEqual(mutationsOf('review.verify',{profile}),[]);
-  assert.deepEqual(mutationsOf('architecture.revise',{profile}),['sds']);
+  assert.deepEqual(writesOf('review.verify',{profile}),[]);
+  assert.deepEqual(writesOf('architecture.revise',{profile}),['sds']);
   assert.equal(familyOf('architecture.revise',{profile}),'repair');
+  // The requirement repair is the mirror of the design one, one layer earlier: same family, same role, the
+  // operator of the kind that decided the record in the first place, and the record itself as its only output.
+  assert.equal(familyOf('business.revise',{profile}),'repair');
+  assert.equal(roleOf('business.revise',{profile}),'decide');
+  assert.equal(isReadOnly('business.revise',{profile}),false);
+  assert.equal(operatorOf('business.revise',{profile}),'business.decide');
+  assert.deepEqual(readsOf('business.revise',{profile}),['srs','decision']);
+  assert.deepEqual(writesOf('business.revise',{profile}),['srs']);
+  assert.deepEqual(reportsOf('business.revise',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['authority']});
+  assert.equal(runtimes.roleOfKind['business.revise'],'decide');
+  // It never raises the gap it answers, and like `architecture.revise` no lane walks it: a report creates it.
+  assert.equal(reportsOf('business.revise',{profile}).blockers.includes('srs-gap'),false);
+  for(const entry of profile.lanes)assert.equal(entry.steps.some(step=>step.kind==='business.revise'),false,entry.id);
+  // Exactly the design and build kinds that READ the requirement may say the requirement is unsettled: an
+  // operation may only report a gap in a record it actually had in front of it.
+  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>reportsOf(kind,{profile}).blockers.includes('srs-gap')),
+    ['architecture.decide','architecture.revise','interface.draw','frontend.implement','backend.implement','uat.verify','e2e.verify','work.author']);
+  for(const kind of Object.keys(profile.kinds))
+    if(reportsOf(kind,{profile}).blockers.includes('srs-gap'))assert.ok(readsOf(kind,{profile}).includes('srs'),kind);
   assert.equal(operatorOf('frontend.implement',{profile}),'interface.implement');
   // The API prove step launches under its own contract, not the frontend walk's.
   assert.equal(operatorOf('e2e.verify',{profile}),'e2e.verify');
   assert.equal(operatorOf('uat.verify',{profile}),'uat.verify');
   assert.equal(roleOf('architecture.revise',{profile}),'decide');
   // The record-authoring kind completes the fields a node needs before its lane may start, and no lane walks it.
-  assert.deepEqual(mutationsOf('work.author',{profile}),['record']);
+  // An intake authors the feature's own records too, which is why it writes more than the node's fields.
+  assert.deepEqual(writesOf('work.author',{profile}),['record','srs','sds','decision']);
   assert.equal(familyOf('work.author',{profile}),'design');
   assert.equal(roleOf('work.author',{profile}),'plan');
   assert.equal(operatorOf('work.author',{profile}),'work.author');
-  assert.deepEqual(reportsOf('work.author',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['sds-gap','shared-change','authority']},'an intake reports what a decided record must become as sds-gap');
-  // The identity kind is the other one that writes an authored record, because that record IS its decision, and
-  // the only kind that may produce asset bytes: a placeholder mascot the product does not have yet.
+  assert.deepEqual(reportsOf('work.author',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['srs-gap','sds-gap','shared-change','authority']},'a per-node author op may report the missing requirement or design of its own node; an intake never reports one against another feature');
+  // The identity kind writes the one brand record, because that record IS its decision, and it produces the
+  // placeholder mascot the product does not have yet.
   assert.equal(familyOf('brand.decide',{profile}),'design');
   assert.equal(roleOf('brand.decide',{profile}),'write');
   assert.equal(isReadOnly('brand.decide',{profile}),false);
   assert.equal(operatorOf('brand.decide',{profile}),'brand.decide');
-  assert.deepEqual(mutationsOf('brand.decide',{profile}),['record','asset']);
+  assert.deepEqual(writesOf('brand.decide',{profile}),['brand','asset']);
+  assert.deepEqual(kindsWriting('brand',{profile}),['brand.decide'],'one identity, one record, one kind that settles it');
   assert.deepEqual(reportsOf('brand.decide',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['environment','authority']});
-  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('asset')),['brand.decide','interface.asset'],'asset bytes come from the brand decision (a placeholder mascot) or the artwork step, nowhere else');
-  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('record')),['brand.decide','work.author']);
+  // Asset bytes come from the identity (a placeholder mascot), from the capture the drawing took, or from the
+  // artwork step that re-renders the slots that capture declared - nowhere else.
+  assert.deepEqual(kindsWriting('asset',{profile}),['brand.decide','interface.draw','interface.asset']);
+  // The node's own authored fields are written by the two kinds that stand before every lane: one completes the
+  // record a node needs to be launchable at all, the other cuts a node too big for one operation into children.
+  assert.deepEqual(kindsWriting('record',{profile}),['work.author','implementation.plan']);
+  // The cut is a kind of its own - that is what the goal page, the status view and the events show - but it
+  // carries the record-authoring operator contract, so no second operator exists for it.
+  assert.equal(familyOf('implementation.plan',{profile}),'design');
+  assert.equal(roleOf('implementation.plan',{profile}),'plan');
+  assert.equal(isReadOnly('implementation.plan',{profile}),false);
+  assert.equal(operatorOf('implementation.plan',{profile}),'work.author');
+  assert.equal(runtimes.roleOfKind['implementation.plan'],'plan');
+  assert.deepEqual(writesOf('implementation.plan',{profile}),['record'],'it writes records and builds nothing');
+  assert.deepEqual(reportsOf('implementation.plan',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['sds-gap','authority']});
+  // Like the record author it belongs to no lane and to no route: the kernel plans it itself, once per node.
+  for(const entry of profile.lanes)assert.equal(entry.steps.some(step=>step.kind==='implementation.plan'),false,entry.id);
+  for(const route of profile.routes)assert.notEqual(route.to?.kind,'implementation.plan');
   // A drawing that finds no settled identity says so with its own blocker; it never invents a colour instead.
   assert.ok(reportsOf('interface.draw',{profile}).blockers.includes('brand-gap'));
   // The language itself is grown by one kind, which belongs to no lane and is the only one that may change it.
@@ -68,8 +107,8 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.equal(operatorOf('grammar.update',{profile}),'grammar.update');
   assert.ok(operators.includes('grammar.update'));
   assert.equal(runtimes.roleOfKind['grammar.update'],'implement');
-  assert.deepEqual(mutationsOf('grammar.update',{profile}),['code','grammar']);
-  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('grammar')),['grammar.update'],'only one kind may grow the installed grammar');
+  assert.deepEqual(writesOf('grammar.update',{profile}),['grammar','code']);
+  assert.deepEqual(kindsWriting('grammar',{profile}),['grammar.update'],'only one kind may grow the installed grammar');
   assert.deepEqual(reportsOf('grammar.update',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['shared-change','environment','authority']});
   // It never raises the gap it answers, and it is not part of any lane - like `architecture.revise`, a report creates it.
   assert.equal(reportsOf('grammar.update',{profile}).blockers.includes('grammar-gap'),false);
@@ -173,12 +212,13 @@ test('the artwork kind writes assets and the design record, runs on the image-mo
   assert.equal(roleOf('interface.asset',{profile}),'write');
   assert.equal(runtimes.roleOfKind['interface.asset'],'write');
   assert.equal(isReadOnly('interface.asset',{profile}),false);
-  assert.deepEqual(mutationsOf('interface.asset',{profile}),['asset','design']);
+  // The artwork lands in the bound source repository at the path the design record declares, so it is asset
+  // bytes and product source at once, and the record it binds each file back to is the design one.
+  assert.deepEqual(writesOf('interface.asset',{profile}),['asset','design','code']);
   assert.equal(operatorOf('interface.asset',{profile}),'interface.asset');
   assert.ok(operators.includes('interface.asset'));
-  // It never writes the authored Work record; asset bytes come from it or from the brand decision, nowhere else.
-  assert.equal(mutationsOf('interface.asset',{profile}).includes('record'),false);
-  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>mutationsOf(kind,{profile}).includes('asset')),['brand.decide','interface.asset']);
+  // It never writes the authored Work record: the node's own fields stay `work.author`'s.
+  assert.equal(writesOf('interface.asset',{profile}).includes('record'),false);
   // A brief the brand rules cannot satisfy means the brand record is missing or silent: the brand is settled first,
   // then the reporting step reads it again. The build may raise the same blocker.
   assert.ok(reportsOf('interface.asset',{profile}).blockers.includes('brand-gap'));
@@ -209,6 +249,15 @@ test('every declared route resolves, carries a limit and says what happens to th
     assert.ok(routed,blocker);
     assert.equal(routed.schema,KIND_GRAPH);
   }
+  // A requirement the SRS does not settle is revised in the requirement record, bounded, and the requester
+  // reads it again behind it - the design is never asked to invent the product rule it is supposed to realise.
+  assert.ok(BLOCKERS.includes('srs-gap'));
+  const srsGap=routeFor({outcome:'blocked',blocker:'srs-gap',kind:'backend.implement',lane:lane('backend')},{profile});
+  assert.deepEqual({route:srsGap.route,kind:srsGap.kind,origin:srsGap.origin,then:srsGap.then,limit:srsGap.limit},
+    {route:'srs-gap-revises-the-requirement',kind:'business.revise',origin:'business',then:'reopen',limit:2});
+  // Declared from `any`, so whichever operation reads the requirement and finds it unsettled waits for the same repair.
+  for(const kind of ['interface.draw','frontend.implement','uat.verify','e2e.verify','work.author','architecture.decide'])
+    assert.equal(routeFor({outcome:'blocked',blocker:'srs-gap',kind,lane:lane('frontend')},{profile}).kind,'business.revise',kind);
   const sdsGap=routeFor({outcome:'blocked',blocker:'sds-gap',kind:'backend.implement',lane:lane('backend')},{profile});
   assert.deepEqual({kind:sdsGap.kind,origin:sdsGap.origin,then:sdsGap.then,limit:sdsGap.limit},
     {kind:'architecture.revise',origin:'architecture',then:'reopen',limit:2});
@@ -276,12 +325,24 @@ test('an invalid profile is rejected with a named error, never silently repaired
   unknownRouteKind.routes[4].to.kind='architecture.rewrite';
   assert.ok(codes(validateGraph(unknownRouteKind)).includes('route-unknown-kind'));
   const extra=clone();
-  extra.kinds['content.generate']={family:'build',role:'write',readOnly:false,mutates:['code'],purpose:'x',
+  extra.kinds['content.generate']={family:'build',role:'write',readOnly:false,reads:['sds'],writes:['code'],purpose:'x',
     reports:{outcomes:['done'],blockers:[]}};
   assert.ok(codes(validateGraph(extra)).includes('catalog-drift'));
   const dropped=clone();
   delete dropped.kinds['interface.draw'];
   assert.ok(codes(validateGraph(dropped)).includes('catalog-drift'));
+  // The requirement repair is in the closed list in both directions, exactly like every other kind.
+  const withoutRevise=clone();
+  delete withoutRevise.kinds['business.revise'];
+  assert.ok(codes(validateGraph(withoutRevise)).includes('catalog-drift'));
+  // And the gap it answers is in the blocker vocabulary: drop the route and the profile says so by name.
+  const unroutedRequirement=clone();
+  unroutedRequirement.routes=unroutedRequirement.routes.filter(route=>route.on.blocker!=='srs-gap');
+  assert.ok(codes(validateGraph(unroutedRequirement)).includes('unrouted-blocker'));
+  // A requirement gap answered by a kind that writes no requirement would settle it where no requester looks.
+  const blindRequirement=clone();
+  blindRequirement.routes.find(route=>route.on.blocker==='srs-gap').to.kind='architecture.revise';
+  assert.ok(codes(validateGraph(blindRequirement)).includes('route-target-blind'));
   // A lane is a sequence, not a loop, and it never builds without proving afterwards.
   const looping=clone();
   looping.lanes[2].steps.push({kind:'backend.implement'});
@@ -324,10 +385,13 @@ test('an invalid profile is rejected with a named error, never silently repaired
   const unrouted=clone();
   unrouted.routes=unrouted.routes.filter(route=>route.on.blocker!=='environment');
   assert.ok(codes(validateGraph(unrouted)).includes('unrouted-blocker'));
-  // A read-only kind that mutates, and a kind the allocator cannot place.
-  const mutatingProver=clone();
-  mutatingProver.kinds['review.verify'].mutates=['code'];
-  assert.ok(codes(validateGraph(mutatingProver)).includes('readonly-mutates'));
+  // A read-only kind that produces something, and a kind the allocator cannot place.
+  const writingProver=clone();
+  writingProver.kinds['review.verify'].writes=['code'];
+  assert.ok(codes(validateGraph(writingProver,{records})).includes('readonly-writes'));
+  const idleBuilder=clone();
+  idleBuilder.kinds['backend.implement'].writes=[];
+  assert.ok(codes(validateGraph(idleBuilder,{records})).includes('writes-nothing'));
   const misrouted=clone();
   misrouted.kinds['architecture.revise'].role='implement';
   assert.ok(codes(validateGraph(misrouted,{runtimes})).includes('role-mismatch'));
@@ -340,11 +404,103 @@ test('an invalid profile is rejected with a named error, never silently repaired
 });
 
 test('the compiled profile is the one the kernel will read at run time',()=>{
-  const dist=new URL('../.dist/profiles/kinds.json',import.meta.url);
+  const dist=new URL('../.dist/model/kinds.json',import.meta.url);
   if(!fs.existsSync(dist))return;
   const compiled=JSON.parse(fs.readFileSync(dist,'utf8'));
   assert.deepEqual(compiled,profile);
-  assert.deepEqual(validateGraph(compiled,{runtimes,operators}),[]);
+  assert.deepEqual(validateGraph(compiled,{runtimes,operators,records}),[]);
+});
+
+test('every kind declares what it reads and what it produces, over the one record catalog',()=>{
+  // The vocabulary for both lists is `model/records.yaml`; the profile does not keep a second copy of it.
+  assert.deepEqual([...RECORDS],[...RECORD_KINDS]);
+  assert.equal(Object.hasOwn(profile.vocabularies,'mutates'),false,'`mutates` was replaced by reads and writes');
+  for(const kind of KINDS){
+    assert.ok(readsOf(kind,{profile}).length,`${kind} must declare what it reads`);
+    for(const record of [...readsOf(kind,{profile}),...writesOf(kind,{profile})])
+      assert.ok(RECORD_KINDS.includes(record),`${kind}/${record}`);
+    assert.equal(writesOf(kind,{profile}).length===0,isReadOnly(kind,{profile}),kind);
+  }
+  // The declaration of the 5-plus design, kind by kind: what settles intent, what changes the product, what
+  // only inspects it. These are the values the contract, the validator and the kernel are all held to.
+  assert.deepEqual(readsOf('owner.ask',{profile}),['srs','sds','decision']);
+  assert.deepEqual(writesOf('owner.ask',{profile}),['decision']);
+  assert.deepEqual(writesOf('business.decide',{profile}),['srs','decision']);
+  assert.deepEqual(writesOf('architecture.decide',{profile}),['sds','decision']);
+  assert.deepEqual(readsOf('brand.decide',{profile}),['code','grammar'],'every token is read out of the real token files');
+  assert.deepEqual(readsOf('interface.draw',{profile}),['srs','sds','brand','grammar','design']);
+  assert.deepEqual(readsOf('interface.asset',{profile}),['design','brand']);
+  assert.deepEqual(writesOf('frontend.implement',{profile}),['code']);
+  assert.deepEqual(readsOf('backend.implement',{profile}),['srs','sds','decision','code']);
+  assert.deepEqual(writesOf('runtime.operate',{profile}),['runtime','code']);
+  assert.deepEqual(readsOf('grammar.update',{profile}),['design','grammar','brand']);
+  assert.deepEqual(readsOf('e2e.verify',{profile}),['srs','sds','code']);
+  assert.deepEqual(readsOf('integration.verify',{profile}),['integration','sds','code']);
+  assert.deepEqual(writesOf('integration.verify',{profile}),['evidence']);
+  assert.deepEqual(readsOf('work.author',{profile}),['srs','sds','decision','code','record']);
+  // Evidence is what a prove kind produces, and the three prove kinds are the only ones that produce it.
+  assert.deepEqual(kindsWriting('evidence',{profile}),['uat.verify','e2e.verify','integration.verify']);
+  // Which kinds read the identity is the kernel's DESIGN_KINDS, now answered from the catalog.
+  assert.deepEqual(kindsReading('brand',{profile}).sort(),
+    ['frontend.implement','grammar.update','interface.asset','interface.draw','uat.verify']);
+  // The read-only prover reads every side of the slice it reads back, and repairs none of them.
+  assert.deepEqual(readsOf('review.verify',{profile}),['srs','sds','code','evidence','runtime']);
+  assert.deepEqual(writesOf('review.verify',{profile}),[]);
+});
+
+test('a declaration the records catalog cannot support is rejected with its named error',()=>{
+  // A record kind nobody declares would silently widen or narrow what an operation may touch.
+  const unknownRead=clone();unknownRead.kinds['backend.implement'].reads.push('telemetry');
+  assert.ok(codes(validateGraph(unknownRead,{records})).includes('unknown-record'));
+  const unknownWrite=clone();unknownWrite.kinds['backend.implement'].writes=['telemetry'];
+  assert.ok(codes(validateGraph(unknownWrite,{records})).includes('unknown-record'));
+  // A kind that writes a record while sharing none of its derivation sources is authoring it blind.
+  const blindWriter=clone();
+  blindWriter.kinds['interface.draw'].reads=['code'];
+  const blind=validateGraph(blindWriter,{records});
+  assert.ok(codes(blind).includes('writer-blind'));
+  assert.equal(blind.find(error=>error.code==='writer-blind').record,'design');
+  // Authoring a record the kind itself writes is not blindness: `brand.decide` writes the brand its own
+  // mascot is derived from, and that is exactly why the shipped catalog passes.
+  assert.deepEqual(codes(validateGraph(profile,{records})).filter(code=>code==='writer-blind'),[]);
+  // A prove step that cannot read what its lane's build step wrote is signing off on something it never saw.
+  const blindProof=clone();
+  blindProof.kinds['e2e.verify'].reads=['srs','sds'];
+  const proof=validateGraph(blindProof,{records});
+  assert.ok(codes(proof).includes('lane-proof-blind'));
+  assert.deepEqual(proof.find(error=>error.code==='lane-proof-blind').records,['code']);
+  // A blocker answered by a kind that writes nothing its requesters read would settle the gap out of sight.
+  const blindRoute=clone();
+  blindRoute.kinds['brand.decide'].writes=['asset'];
+  assert.ok(codes(validateGraph(blindRoute,{records})).includes('route-target-blind'));
+  // The symbolic targets are exempt: `same` is the requester itself, `lane.build` is held by the lane rule.
+  const sameTarget=validateGraph(profile,{records}).filter(error=>error.code==='route-target-blind');
+  assert.deepEqual(sameTarget,[]);
+});
+
+test('a declared external integration is proven live on a lane of its own',()=>{
+  assert.ok(KINDS.includes('integration.verify'));
+  assert.equal(familyOf('integration.verify',{profile}),'prove');
+  assert.equal(roleOf('integration.verify',{profile}),'verify');
+  assert.equal(operatorOf('integration.verify',{profile}),'integration.verify');
+  assert.ok(operators.includes('integration.verify'));
+  assert.equal(runtimes.roleOfKind['integration.verify'],'verify');
+  assert.equal(isReadOnly('integration.verify',{profile}),false);
+  assert.deepEqual(reportsOf('integration.verify',{profile}),
+    {outcomes:['done','partial','failed','ask','blocked'],blockers:['environment','authority','shared-change']});
+  // One declared integration, one node, one live proof: nothing is built first, because the client that
+  // calls the provider is built by the feature's implementation node.
+  assert.deepEqual(laneFor({kind:'integration',layout:null},{profile}),['integration.verify']);
+  assert.equal(laneRecordFor({kind:'integration',layout:null},{profile}).id,'integration');
+  assert.equal(nextKind(laneFor({kind:'integration',layout:null},{profile}),[],{profile}),'integration.verify');
+  assert.equal(nextKind(laneFor({kind:'integration',layout:null},{profile}),['integration.verify'],{profile}),null);
+  assert.equal(describeLane('integration',{profile}),'integration: `integration.verify`');
+  // A credential the environment lacks is the owner's question, and it is the only kind that reads the
+  // integration record the business or design side declared.
+  assert.deepEqual(kindsReading('integration',{profile}),['integration.verify']);
+  const missing=routeFor({outcome:'blocked',blocker:'environment',kind:'integration.verify',
+    lane:laneFor({kind:'integration',layout:null},{profile})},{profile});
+  assert.deepEqual({kind:missing.kind,needUser:missing.needUser,then:missing.then},{kind:null,needUser:true,then:'needUser'});
 });
 
 test('a kind may need a host capability from the closed vocabulary: the drawing needs the design tool and every other kind runs on any host',()=>{

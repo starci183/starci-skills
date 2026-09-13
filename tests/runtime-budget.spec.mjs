@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {BUDGET_FILE,RUNTIME_BUDGET,budgetVerdict,normalizeBudget,probeRuntimeBudget,readRuntimeBudget,runtimeWindows,writeRuntimeBudget} from '../execution/runtime-budget.mjs';
-import {superviseForever} from '../execution/kernel-supervisor.mjs';
+import {BUDGET_FILE,RUNTIME_BUDGET,budgetVerdict,normalizeBudget,probeRuntimeBudget,readRuntimeBudget,runtimeWindows,writeRuntimeBudget} from '../kernel/budget.mjs';
+import {superviseForever} from '../kernel/supervisor.mjs';
 
 /** The receipt Orca prints for `account list --json`, trimmed to the rate-limit block the status bar shows. */
 const RECEIPT={ok:true,result:{rateLimits:{

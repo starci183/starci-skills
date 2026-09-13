@@ -1,6 +1,6 @@
 # Workflow store: one directory per workflow, one append-only log
 
-In runtime 5.0 the only runtime state of a product lives under the main
+In runtime 5-plus the only runtime state of a product lives under the main
 repository's `.starciwork/_local/workflows/<workflowId>/`. A workflow id is
 `yyyymmdd-hhmmss-slug`, so the directory name sorts by time and reads as its
 title. `repositoryRoot(cwd)` resolves a linked worktree to the main repository,
@@ -24,6 +24,10 @@ so every terminal of one product writes into the same workflows root.
   contracts/<opId>.md       the operation contract handed to a worker
   checks/<opId>.json        the checks a worker actually ran
   inbox/                    messages and hand-offs addressed to the workflow
+  validator/                the one validator's memory page and its verdict log
+  headless/                 the headless host's mailbox, prompts and process logs
+  strays/<timestamp>/       what an abandoned operation left behind, moved out of the tree
+  kernel.lock, stop.flag    the live kernel's pid, and the pause a person writes
 ```
 
 The two files in the workflows root itself belong to the repository, not to one
@@ -34,7 +38,7 @@ provider limit (see
 and [runtime-allocation.md](runtime-allocation.md#one-ledger-per-repository)),
 and `supervisor.log` is the supervisor's round log.
 
-`createStore({repoRoot, id})` creates the directory and the four
+`kernel/store.mjs` owns the whole of it. `createStore({repoRoot, id})` creates the directory and the four
 subdirectories, then exposes those paths plus `appendEvent`, `readEvents`,
 `saveState`, `loadState`, `reportPath`, `readReports`, `contractPath` and
 `checksPath`. `listWorkflows(repoRoot)` lists every workflow newest first with

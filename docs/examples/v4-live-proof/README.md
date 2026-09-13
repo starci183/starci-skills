@@ -6,7 +6,7 @@ acceptance: no product source was changed and no operation agent was started.
 
 | File | What it proves |
 | --- | --- |
-| `verify.json` | `orca-supervised-launch.mjs verify` compared every declared call and flag in `providers/orca/calls.yaml` with the live `agent-context` (232 commands) and found no drift. |
+| `verify.json` | `hosts/orca/launch.mjs verify` compared every declared call and flag in `providers/orca/calls.yaml` with the live `agent-context` (232 commands) and found no drift. |
 | `settle-core-monitor.json`, `settle-chatbot-monitor.json`, `settle-sales-monitor.json` | `settle --dispatch` on the three Workflow Monitors that had ended in `process_exited`. `worker-stop` reported `alreadySettled: true`; `worker-release` reported `retained` with reason `identity_unproven` and `processAction: none`. The settlement classifies this honestly as `effectState: none` with a recorded `residualTerminal`, because no process remains and Orca refuses to close a terminal whose identity it cannot prove. |
 
 The first live settle before the receipt-shape fix had reported `release.state: null` and `ok`,

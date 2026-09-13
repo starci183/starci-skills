@@ -31,6 +31,13 @@ test('the complete jobs replace the old catalogue, each is classified once, and 
   assert.ok(registry.consolidation.supporting.includes('brand.decide'));
   assert.equal(registry.consolidation.basic.includes('brand.decide'),false);
   assert.ok(registry.consolidation.added.includes('brand.decide'));
+  // The live integration proof is the other added supporting operator, registered and classified once each.
+  assert.equal(registry.ops.filter(id=>id==='integration.verify').length,1);
+  assert.ok(registry.consolidation.supporting.includes('integration.verify'));
+  assert.equal(registry.consolidation.basic.includes('integration.verify'),false);
+  assert.ok(registry.consolidation.added.includes('integration.verify'));
+  assert.equal(registry.consolidation.supporting.length,15);
+  assert.equal(registry.ops.length,21);
   assert.match(JSON.stringify(contract('uat.verify')),/No plan\/account\/seed predecessor/);
 });
 test('English-only YAML is the maintained operator source with no runtime mirrors',()=>{

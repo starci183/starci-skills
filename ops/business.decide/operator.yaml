@@ -44,7 +44,7 @@ reads:
         input bindings, requested output JSON shapes and required criteria. Standalone execution
         needs no fabricated matrix request. A template is not authority for extra effects.
   - id: profile
-    path: profiles/registry.json + selected runtime execution profile + actual host tools/model
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
     purpose:
       en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
         profiles. Use current host model configuration; historical model names are not availability
@@ -180,6 +180,26 @@ steps:
         Connect semantic IDs to exact owning Work refs.
   - reads:
       - target
+      - intent
+      - repo
+    writes:
+      - node
+    action:
+      en: "Repair mode (the `business.revise` kind this operator also carries) is not a second decision: a
+        requirement that is silent, ambiguous or settled twice in two ways is revised here, never escalated
+        and never left for a builder to read a meaning into. Read the reported gap, state the two or three
+        readings the recorded requirement actually admits, and choose the most reasonable one from the
+        accepted records of this feature, the decided records of the other features and the product's own
+        conventions. Write that reading into the requirement, rule or journey with the acceptance an
+        implementer derives code from, bump the record's rev, and append EXACTLY ONE
+        extensions.work3.decisionLog entry {rev, at, gap, chosen, why, alternatives}, never rewriting or
+        deleting an earlier one. One exception: when the readings differ in an observable outcome about
+        money, authority or customer data, do not choose silently - report ask with question.kind decision,
+        one numbered option per reading with what each costs and who it affects, and one recommendation; the
+        kernel writes that decision record for the owner and carries the work on the recommendation until
+        they answer. Never ask for anything else."
+  - reads:
+      - target
       - repo
       - intent
       - matrix
@@ -210,6 +230,14 @@ proofs:
         and postconditions, and security has observable negative acceptance. Validate nested
         ownership and every split SRS section contract; no code/service inventory is required in
         Business. Legacy specification@2 and srs@3 are compatibility inputs, never new output.
+  - id: revision-decision-log
+    requirement:
+      en: "Every revision of an already-decided record leaves three things together or it is a defect: the
+        record changed, its rev higher than it was, and exactly one new extensions.work3.decisionLog entry
+        naming the gap, the chosen reading, why it is the most reasonable one by the records it was read from,
+        and the alternatives that were not taken. A changed record with no entry is a defect. A reading that
+        changes an observable outcome about money, authority or customer data and was taken without a decision
+        record with numbered options and one recommendation is a defect, whatever else the revision gets right."
 blockers:
   - code: BUSINESS_UNKNOWN
     condition:
@@ -217,7 +245,10 @@ blockers:
         decision.
   - code: BUSINESS_CONTRADICTION
     condition:
-      en: Accepted sources conflict; preserve both citations and ask the actual owner, never average them.
+      en: Accepted sources conflict on an observable outcome about money, authority or customer data;
+        preserve both citations and put the numbered options with one recommendation to the actual owner,
+        never average them. A conflict that changes no such outcome is not this blocker - it is revised to
+        the most reasonable reading with the reason in the decision log.
   - code: DECLARED_DEPENDENCY_UNMET
     condition:
       en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.

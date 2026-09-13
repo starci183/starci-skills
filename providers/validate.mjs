@@ -50,7 +50,7 @@ export function validateProviderContracts(){
   add(errors,orca.index?.operationAgent?.admission?.afterWorkerStart?.runtimeTitleDrift?.whenImmutableIdentityRemainsExact==='recanonicalize-without-fencing'&&orca.index?.operationAgent?.admission?.afterWorkerStart?.runtimeTitleDrift?.effectDecision==='never-reject-solely-for-title-drift','Orca runtime title-drift policy is invalid');
   add(errors,orca.index?.operationAgent?.admission?.architectureSidearm?.onlyTrigger==='active implementation secondary_request','Architecture sidearm trigger is too broad');
   add(errors,orca.index?.operationAgent?.admission?.architectureSidearm?.exactReason==='sds-technical-gap','Architecture sidearm reason is invalid');
-  add(errors,orca.index?.operationAgent?.canonicalLauncher?.module==='execution/orca-supervised-launch.mjs'&&orca.index?.operationAgent?.canonicalLauncher?.command==='start-op'&&orca.index?.operationAgent?.canonicalLauncher?.authority==='exclusive-effectful-construction-path','Orca operation launcher contract is invalid');
+  add(errors,orca.index?.operationAgent?.canonicalLauncher?.module==='hosts/orca/launch.mjs'&&orca.index?.operationAgent?.canonicalLauncher?.command==='start-op'&&orca.index?.operationAgent?.canonicalLauncher?.authority==='exclusive-effectful-construction-path','Orca operation launcher contract is invalid');
   add(errors,/terminal send/.test(orca.index?.routing?.kernelToOperation?.cli||'')&&orca.index?.routing?.kernelToOperation?.forbiddenType==='status'&&orca.index?.routing?.kernelToOperation?.proveDeliveryFrom==='terminal-screen-not-send-receipt','Kernel-to-operation control must be a proven terminal send, never a status message');
   add(errors,orca.index?.routing?.operationToKernel?.authority==='report-file-then-signal'&&orca.index?.routing?.operationToKernel?.onceOnly===true,'An operation must answer exactly once, in its report file');
   add(errors,orca.index?.routing?.operationToOperation==='forbidden','An operation must never control another operation');
@@ -86,7 +86,7 @@ export function validateProviderContracts(){
   add(errors,qwen?.forbidden?.includes('qwen-agent-tool')&&qwen?.forbidden?.includes('dispatch-inject')&&qwen?.forbidden?.includes('reuse-existing-terminal'),'Qwen adapter does not forbid nested agents, inject or terminal reuse');
   add(errors,orca.index?.operationAgent?.qwen38Flash?.launch==='command-terminal','Orca index must launch Qwen as a command terminal');
   add(errors,orca.index?.operationAgent?.qwen38Flash?.agent===qwen?.agent&&orca.index?.operationAgent?.qwen38Flash?.model===qwen?.model,'Orca index and Qwen adapter identities disagree');
-  for(const [name,target] of Object.entries(readDistJson('profiles','registry.json').targets||{})){
+  for(const [name,target] of Object.entries(readDistJson('model','registry.json').targets||{})){
     if(target?.orcaLaunch?.kind==='command-terminal')add(errors,/--exclude-tools agent\b/.test(target.orcaLaunch.command||''),`Command terminal ${name} must exclude the provider agent tool`);
   }
   const workerStartTemplates=[

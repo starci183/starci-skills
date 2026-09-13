@@ -26,6 +26,10 @@ operations:
 # An API-level end-to-end scenario node: proven by a run on the real stack, no capture, no UAT provenance.
 e2e:
   assertions: true
+# One declared external integration: proven by a live call to the real provider with the owner's credential.
+# Assertions only - the proof is the recorded run against the provider, not a capture and not a UAT walk.
+integration:
+  assertions: true
 ui:
   assertions: true
   image: true

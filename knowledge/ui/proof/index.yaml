@@ -27,6 +27,10 @@ topics:
     path: accessibility.yaml
     decides: Whether names, relationships, targets and contrast reach every reader
     rules: A11Y-1 to A11Y-5
+  - title: Brand
+    path: brand.yaml
+    decides: Whether the rendered surface wears the brand the product decided
+    rules: BRAND-1 to BRAND-3
   - title: Contrast
     path: contrast.yaml
     decides: Whether distinctions and text survive measurement in every theme and state

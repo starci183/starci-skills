@@ -1,15 +1,15 @@
 # Orca execution adapter
 
 This is the Orca realization of the shared [execution agent model](execution-agent-model.md).
-In runtime 5.0 the topology is two layers, not five: **one workflow kernel** and **a pool of operation
-agents**. A workflow is one goal in one worktree; the kernel is an ordinary local process
-(`execution/workflow-kernel.mjs`) that owns the loop in that worktree, and each operation instance is the
+In runtime 5-plus the topology is two layers, not five: **one workflow kernel** and **a pool of operation
+agents**. A workflow is one goal in one worktree; the kernel is an ordinary local process (the `kernel/`
+folder, entered through `bin/starci.mjs`) that owns the loop in that worktree, and each operation instance is the
 mandatory agent boundary and maps one-to-one to one concrete provider agent. Operations never create
 worktrees and never create nested agents.
 
 There is no Plan Coordinator and no per-workflow Workflow Manager. A model is no longer asked to run a
 control loop: the loop is code, and a model is called only as a typed function for a decision a model is
-actually better at (`assessGoal`, `planOp`, `decide`). Orca supplies exactly two things - worktrees, and
+actually better at (`assessGoal`, `critiqueGoal`, `planOp`, `decide`, `validateOp`). Orca supplies exactly two things - worktrees, and
 terminals in which an agent can be launched and attested - so the same kernel runs in a Codex or Claude host
 session with no Orca present. `supervise`, `coordinate`, `start-monitor`, `replace-monitor` and
 `start-coordinator` are gone with the layers they served; see [v5-plan.md](v5-plan.md) for why each 4.x
@@ -134,14 +134,14 @@ The display contract is mandatory at creation time:
 - isolated operation agent: `[Op] <operation> - <scope>`.
 
 The executable call contract is `providers/orca/calls.yaml` (compiled to `calls.json`); `index.yaml`
-documents the same calls per role. `execution/orca-calls.mjs` builds every argv from that contract,
+documents the same calls per role. `hosts/orca/calls.mjs` builds every argv from that contract,
 verifies each declared command and flag against the live `orca agent-context` before the first effect,
 replays an unknown mutation once with `--retry-request`, and returns every exit code as a
 `starci/orca-call-result@1` envelope with `outcome` (`ok`, `failed`, `unknown`) and `effectState`
 (`committed`, `none`, `partial`, `unknown`). An Orca failure is a classified result; only a contract
 violation throws.
 
-The kernel starts an operation only through `execution/orca-supervised-launch.mjs start-op`;
+The kernel starts an operation only through `hosts/orca/launch.mjs start-op`;
 it never assembles `task-create`, `worker-start`, candidate fallback or terminal naming commands itself.
 Inside one invocation the launcher attests the Run, creates the canonical Task once, then tries the one
 candidate the allocator supplied (`startOperation({candidates})`) or, when none was supplied, walks the
@@ -158,7 +158,7 @@ that was never tried is never recorded as having failed. Companion commands are
 `settle --dispatch`, `sweep` (close dead terminals in the workflow worktree after settlement) and
 `verify`; the workflow control loop itself is the kernel's (`workflow-goal`, `workflow-approve`,
 `workflow-run`, `workflow-status`).
-`execution/orca-adapter.mjs` is the concrete adapter for `execution/orca.mjs` on the same runner,
+`hosts/orca/adapter.mjs` is the concrete adapter for `execution/orca.mjs` on the same runner,
 including `waitBoundary` (keepalive-filtered `check --wait` with `--ack`). A visible
 `Bash: ...` subtitle is only the native agent's current tool activity; identity comes from the native
 immutable Task display name and supervised worker/provider receipt. The terminal title is mutable UI
@@ -166,7 +166,7 @@ metadata: native activity may change it while the agent works. The kernel restor
 `[Op] ...` title without fencing the worker when the immutable identities still match, and restores it once
 more before release. Title drift alone never invalidates otherwise valid operation effects.
 
-## Workflow kernel (5.0)
+## Workflow kernel (5-plus)
 
 The control loop above the launcher is code, not an agent. `workflow-goal` turns a job into a goal and prints it
 for exactly one user approval. In a repository that owns a Work tree (`<repo>/.starciwork/features`) the
@@ -178,9 +178,9 @@ the risks and questions. Without a Work tree, `assessGoal` assesses the whole le
 itself. Either way the goal is frozen by the approval; `workflow-approve` records that approval and freezes the goal; `workflow-run` runs the loop;
 `workflow-status` reads one workflow's own directory. A workflow is one goal in one worktree with a pool
 of up to ten operation agents, parallel whenever their allowlists are disjoint, so there is no shared
-file to arbitrate. `execution/runtime-allocator.mjs` assigns each ready operation to the
+file to arbitrate. `kernel/schedule.mjs` assigns each ready operation to the
 first runtime of that role's preference order that has a free slot, remaining budget and no cooldown
-(`prefer-then-overflow`, declared in `profiles/runtimes.yaml` and explained in
+(`prefer-then-overflow`, declared in `model/runtimes.yaml` and explained in
 `docs/runtime-allocation.md`); a launch failure or rate-limit releases the slot, parks that runtime for a
 classified cooldown and the operation overflows to the next preference, and a verify operation is allocated
 with the implementing runtime in `avoid`. The launcher is handed that one resolved candidate through
@@ -191,7 +191,7 @@ the Orca message only as the wake-up) is evidence, and the kernel itself re-runs
 computes the changed files from git rather than from the report, refuses anything outside the allowlist,
 then commits that one operation. On the Work ledger that commit carries a
 `Work: <node id>` trailer and the accepted slice is written back into its node - `state`, `completion` and an
-evidence manifest - through `execution/work-ledger.mjs`, which owns those fields and nothing else; a refused
+evidence manifest - through `kernel/ledger.mjs`, which owns those fields and nothing else; a refused
 write restores the node's original bytes and becomes a `needUser` item rather than a green report over a
 ledger that does not agree. `report`, `wait` and `notify` remain the operation-side evidence and boundary
 commands. All runtime state lives in `.starciwork/_local/workflows/<id>/`, where

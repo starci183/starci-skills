@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {RATE_WINDOW_MS,buildList,buildView,featureOf,renderJson,renderList,renderView} from '../execution/workflow-view.mjs';
+import {RATE_WINDOW_MS,buildList,buildView,featureOf,renderJson,renderList,renderView} from '../kernel/view.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 const NOW=1_700_000_000_000;
@@ -53,6 +53,14 @@ function richStore(repoRoot,id='20260101-000000-rich'){
     verifyRounds:{'prod.alpha.one+prod.alpha.two':3,'prod.beta.one':1},
     reviewFindings:[{op:'verify-1',finding:'the migration is not reversible'}],
     needUser:[{kind:'dynamic-op',op:'shared-1',detail:'shared-1 was created beyond the dynamic-op budget'}],
+    // Decisions the runtime took on its own recommendation: nothing waits on them, so they are not "needs you"
+    // - but the owner is still owed the question, and a workflow that finished done may owe them all of these.
+    provisional:[
+      {decision:'prod.alpha.business.srs.policy-decision.d-refund',op:'ask-1',recommended:2,
+        options:['reopen the order','close it and issue a credit note'],at:NOW-60000,answered:null},
+      {decision:'prod.alpha.business.srs.policy-decision.d-retry',op:'ask-2',recommended:1,
+        options:['retry twice','retry five times'],at:NOW-60000,answered:{choice:'1',note:null,at:NOW}}
+    ],
     anomalies:{'settled:r1:stalled-idle':{count:4,firstAt:ago(60),lastAt:ago(5),triaged:{option:'settle-op'}},
       'launch-failed:r2':{count:1,firstAt:ago(20),lastAt:ago(20),triaged:null}},
     ledgerSummary:{total:50,eligible:40},gateResults:[],finished:null
@@ -197,6 +205,11 @@ test('the render is a plain terminal page with tables and no control codes',t=>{
   assert.match(page,/\| prod\.alpha\.one\+prod\.alpha\.two \| 3 \| yes \|/);
   assert.match(page,/## Validator {2}accepted 2, rejected 1, unavailable 0 \(from verdicts\)/);
   assert.match(page,/## Needs you \(1\)\n- dynamic-op shared-1: shared-1 was created beyond the dynamic-op budget/);
+  // Separate from "needs you": nothing is blocked on these, and only the ones the owner has not answered show.
+  assert.match(page,/## Provisional decisions \(1\)\n- prod\.alpha\.business\.srs\.policy-decision\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on\./);
+  assert.match(page,new RegExp(`workflow-answer --id ${id} --op ask-1 --choice <n>`));
+  assert.match(page,/a different option reopens what was built on it/);
+  assert.doesNotMatch(page,/d-retry/,'a decision the owner has answered is not still owed');
   assert.match(page,/## Anomalies \(5 in 2 signatures, 1 untriaged\)/);
   assert.match(page,/## Recent events \(12\)/);
   assert.equal(page.endsWith('\n'),true);
@@ -234,6 +247,109 @@ test('a store with no validator, no lanes, no supervisor log and no events still
   assert.match(page,/## Recent events \(0\)\nno events/);
   assert.throws(()=>buildView({repoRoot,id:'20260101-000003-absent',now:NOW}),/No workflow state/);
   assert.throws(()=>buildView({repoRoot,id:'nested/id',now:NOW}),/./);
+  assert.deepEqual(view.integrations,[],'a workflow that names no tree simply has no integrations section');
+  assert.doesNotMatch(page,/## Integrations/);
+});
+
+/**
+ * The status page tells the truth about every external system the tree declares. A page that prints an
+ * integration proven only by a faked run as anything but that is the page that let four chatbot channels
+ * read as verified; here it is one line each, and the section is skipped rather than guessed when the
+ * workflow names no tree or the tree is gone.
+ */
+test('workflow-status prints one line per declared integration and what each is actually proven by',t=>{
+  const repoRoot=tmp(t);
+  const id='20260101-000004-integrations';
+  const dir=path.join(workflows(repoRoot),id);
+  const ledgerRoot=path.join(repoRoot,'.starciwork');
+  const write=(relative,body)=>{const file=path.join(ledgerRoot,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,body);};
+  write('features/sales/business/srs/delivery/index.yaml',`schema: work/node@2
+id: demo.sales.business.srs.fr.delivery
+kind: business
+required: true
+state: done
+extensions:
+  work3:
+    integrations:
+      - id: telegram
+        provider: telegram-bot-api
+        credential:
+          name: TELEGRAM_BOT_TOKEN
+          providedBy: owner
+          where: the workflow environment
+        sandbox: https://api.telegram.org/bot<token>/getMe
+      - id: zalo
+        provider: zalo-oa-api
+        credential:
+          name: ZALO_OA_TOKEN
+          providedBy: owner
+      - id: viber
+        provider: viber-bot-api
+        credential:
+          name: VIBER_TOKEN
+          providedBy: owner
+`);
+  write('features/sales/integration/telegram/index.yaml',`schema: work/node@2
+id: demo.sales.integration.telegram
+kind: integration
+required: true
+state: done
+`);
+  write('features/sales/integration/telegram/evidence/op-telegram-evidence/manifest.yaml',`schema: work/evidence@1
+id: op-telegram-evidence
+nodeId: demo.sales.integration.telegram
+inputDigest: ${'a'.repeat(64)}
+outcome: pass
+assertions: []
+assets: []
+proof:
+  boundary: live
+  fakes: []
+`);
+  write('features/sales/e2e/checkout/index.yaml',`schema: work/node@2
+id: demo.sales.e2e.checkout
+kind: e2e
+required: true
+state: done
+`);
+  write('features/sales/e2e/checkout/evidence/op-checkout-evidence/manifest.yaml',`schema: work/evidence@1
+id: op-checkout-evidence
+nodeId: demo.sales.e2e.checkout
+inputDigest: ${'b'.repeat(64)}
+outcome: pass
+assertions: []
+assets: []
+proof:
+  boundary: api
+  fakes:
+    - zalo
+`);
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',
+    kernel:'starci/workflow-kernel@1',id,job:'Deliver the chatbot',phase:'run',approved:true,ops:[],ledger:[],ledgerRoot}));
+
+  const view=buildView({repoRoot,id,now:NOW});
+  assert.deepEqual(view.integrations.map(entry=>[entry.id,entry.node,entry.proven,entry.evidence]),[
+    ['telegram','demo.sales.integration.telegram','live',1],
+    ['zalo',null,'fake',1],
+    ['viber',null,'none',0]
+  ]);
+  const page=renderView(view);
+  assert.match(page,/## Integrations \(3\)/);
+  assert.match(page,/- telegram \(telegram-bot-api\): proven live/);
+  assert.match(page,/- zalo \(zalo-oa-api\): proven against a fake, not live - no integration node in the tree/);
+  assert.match(page,/- viber \(viber-bot-api\): not proven - no integration node in the tree/);
+
+  // A tree that is not there leaves the page complete and the section out, rather than failing the view.
+  const absent='20260101-000005-no-tree';
+  const absentDir=path.join(workflows(repoRoot),absent);
+  fs.mkdirSync(absentDir,{recursive:true});
+  fs.writeFileSync(path.join(absentDir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',
+    kernel:'starci/workflow-kernel@1',id:absent,phase:'run',approved:true,ops:[],ledger:[],
+    ledgerRoot:path.join(repoRoot,'gone','.starciwork')}));
+  const gone=buildView({repoRoot,id:absent,now:NOW});
+  assert.deepEqual(gone.integrations,[]);
+  assert.doesNotMatch(renderView(gone),/## Integrations/);
 });
 
 test('workflow-list is one row per workflow of the repository, newest first',t=>{
@@ -266,12 +382,12 @@ test('workflow-list is one row per workflow of the repository, newest first',t=>
   assert.equal(renderList([]),'no workflows in this repository\n');
 
   // The CLI prints the page itself: a text view must never reach a terminal as an escaped JSON string.
-  const cli=spawnSync(process.execPath,[path.join(root,'execution','orca-supervised-launch.mjs'),'workflow-list'],
+  const cli=spawnSync(process.execPath,[path.join(root,'hosts','orca','launch.mjs'),'workflow-list'],
     {cwd:repoRoot,encoding:'utf8'});
   assert.equal(cli.status,0,cli.stderr);
   assert.match(cli.stdout,/\| 20260101-000000-rich \| run \| - \| 1\/6 \|/);
   assert.equal(cli.stdout.includes('\\n'),false);
-  const json=spawnSync(process.execPath,[path.join(root,'execution','orca-supervised-launch.mjs'),'workflow-list','--json','true'],
+  const json=spawnSync(process.execPath,[path.join(root,'hosts','orca','launch.mjs'),'workflow-list','--json','true'],
     {cwd:repoRoot,encoding:'utf8'});
   assert.equal(json.status,0,json.stderr);
   assert.equal(JSON.parse(json.stdout).workflows.length,2);
@@ -281,6 +397,77 @@ test('workflow-list is one row per workflow of the repository, newest first',t=>
  * A workflow that owns a lane says so on its page: which worktree it runs in, which branch, and whether that
  * branch went home. A reader never has to open state.json to learn where the workflow actually is.
  */
+/**
+ * The reconciliation of an intake is read from the log and the state, so the page says what the kernel counted
+ * and which conflict still waits for the owner without opening the tree - the same page the owner answers from.
+ */
+test('workflow-status prints the reconciliation of every intake: the counts the kernel checked and the conflicts still open',t=>{
+  const repoRoot=tmp(t);
+  const id='20260101-000006-reconciliation';
+  const dir=path.join(workflows(repoRoot),id);
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id,job:'Add collab',phase:'run',approved:true,ledger:[],
+    ops:[{id:'collab-intake',kind:'work.author',status:'done',intake:{scope:'collab',mode:'author'}},{id:'brand-1',kind:'brand.decide',status:'ready',intake:{scope:'brand'}},{id:'x',kind:'backend.implement',status:'ready'}],
+    needUser:[{op:'collab-intake',kind:'decision',record:'demo.collab.business.srs.decision.d-intake-contract',options:['keep the synchronous contract','make it asynchronous'],detail:'sales decided a synchronous contract'}]}));
+  writeLines(path.join(dir,'events.jsonl'),[
+    {at:ago(9),seq:1,event:'reconciled',op:'collab-intake',scope:'collab',reference:1,conflict:0,new:2},
+    // The last event per op is the one that counts: the intake ran again after a rejected table.
+    {at:ago(8),seq:2,event:'reconciled',op:'collab-intake',scope:'collab',reference:2,conflict:1,new:3}]);
+  const view=buildView({repoRoot,id,now:NOW});
+  assert.deepEqual(view.reconciliation,[
+    {op:'collab-intake',scope:'collab',checked:true,reference:2,conflict:1,new:3,open:['demo.collab.business.srs.decision.d-intake-contract']},
+    {op:'brand-1',scope:'brand',checked:false,reference:0,conflict:0,new:0,open:[]}]);
+  const page=renderView(view);
+  assert.match(page,/## Reconciliation \(2\)\n- collab \(collab-intake\): reference 2, conflict 1, new 3; open for the owner: demo\.collab\.business\.srs\.decision\.d-intake-contract\n- brand \(brand-1\): not checked yet/);
+});
+
+/**
+ * What only the owner can provide is read once from the whole product, before anything is planned, and the
+ * status page says how far each one has got. The view is read-only and asks nothing: the operation that needs a
+ * credential, a sandbox account, a dataset or an authority asks for it in its own tab at the moment it needs it.
+ */
+test('workflow-status prints what the owner provides, with each one open, asked or provided',t=>{
+  const repoRoot=tmp(t);
+  const id='20260101-000007-provisions';
+  const dir=path.join(workflows(repoRoot),id);
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id,
+    job:'Settle transactions against the gateway',phase:'run',approved:true,ledger:[],
+    provisions:[
+      {kind:'credential',name:'VNPAY_SANDBOX_SECRET',feature:'payments',why:'no live charge can be proven without it'},
+      {kind:'account',name:'VNPay sandbox merchant',feature:'payments',why:'the gateway will not answer without one'},
+      {kind:'dataset',name:'three real bank statements',feature:'accounting',why:'reconciliation cannot be proven on invented rows'}],
+    ops:[
+      // Answered: the owner said the credential is there, so the provision is `provided`.
+      {id:'ask-1',kind:'owner.ask',status:'done',question:{kind:'credential',text:'Which value does VNPAY_SANDBOX_SECRET carry?'},
+        answer:'The owner decided on "VNPAY_SANDBOX_SECRET": credential: VNPAY_SANDBOX_SECRET present',reports:[]},
+      // Asked and still open: the question names the account, no answer yet.
+      {id:'ask-2',kind:'owner.ask',status:'ready',question:{kind:'authority',text:'Is there a VNPay sandbox merchant we may use?'},reports:[]},
+      {id:'x',kind:'backend.implement',status:'ready'}],
+    needUser:[]}));
+  writeLines(path.join(dir,'events.jsonl'),[{at:ago(5),seq:1,event:'goal-critiqued',verdict:'sound',provisions:3}]);
+  const view=buildView({repoRoot,id,now:NOW});
+  assert.deepEqual(view.provisions.map(entry=>[entry.kind,entry.name,entry.feature,entry.status,entry.asks]),[
+    ['credential','VNPAY_SANDBOX_SECRET','payments','provided',['ask-1']],
+    ['account','VNPay sandbox merchant','payments','asked',['ask-2']],
+    ['dataset','three real bank statements','accounting','open',[]]]);
+  assert.deepEqual(view.provisions[0].questionKinds,['credential']);
+  const page=renderView(view);
+  assert.match(page,/## The owner provides \(3\)/);
+  assert.match(page,/\| credential \| VNPAY_SANDBOX_SECRET \| payments \| provided \(ask-1\) \|/);
+  assert.match(page,/\| account \| VNPay sandbox merchant \| payments \| asked \(ask-2\) \|/);
+  assert.match(page,/\| dataset \| three real bank statements \| accounting \| open \|/);
+  // A workflow whose critique named none prints no section at all, rather than an empty heading.
+  const bareId='20260101-000008-no-provisions';
+  const bareDir=path.join(workflows(repoRoot),bareId);
+  fs.mkdirSync(bareDir,{recursive:true});
+  fs.writeFileSync(path.join(bareDir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',
+    id:bareId,job:'x',phase:'run',approved:true,ledger:[],ops:[],needUser:[]}));
+  const bare=buildView({repoRoot,id:bareId,now:NOW});
+  assert.deepEqual(bare.provisions,[]);
+  assert.doesNotMatch(renderView(bare),/The owner provides/);
+});
+
 test('the view prints the lane of a workflow: its worktree, its branch and the base it merged into',t=>{
   const repoRoot=tmp(t);
   const dir=path.join(workflows(repoRoot),'20260101-000000-laned');
@@ -314,5 +501,5 @@ test('a feature is the first two segments of a Work node id, and nothing is inve
 });
 
 test('the module is listed as a runtime module',()=>{
-  assert.match(fs.readFileSync(path.join(root,'scripts','runtime-modules.txt'),'utf8'),/^execution\/workflow-view\.mjs$/m);
+  assert.match(fs.readFileSync(path.join(root,'scripts','runtime-modules.txt'),'utf8'),/^kernel\/view\.mjs$/m);
 });

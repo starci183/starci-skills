@@ -2,7 +2,7 @@
  * Unified StarCi runtime build → `.dist`.
  *
  * Mapping (authored → public `.dist` path):
- * - workflows|profiles|providers|schemas|specifications|examples|docs catalogs `*.yaml` → `…/*.json`
+ * - workflows|model|providers|schemas|specifications|examples|docs catalogs `*.yaml` → `…/*.json`
  *   (no authored JSON fallback or duplicate YAML/JSON authority)
  * - knowledge/** via scripts/compile-knowledge.mjs → knowledge JSON under .dist (no JSON fallback)
  * - ops authored: secondary.yaml → ops/<id>/secondary.json; common.yaml → policy/common.json
@@ -61,7 +61,12 @@ export function buildFiles(skillRoot = root) {
 
   const generated = generatedOpsOutputs();
   const catalogue = JSON.parse(generated.get('catalog.json'));
-  const checked = validateCatalog(catalogue, { root: path.join(skillRoot, 'ops'), repositoryRoot: skillRoot, documents: generated });
+  // The operator catalog is held to the kinds and records profiles of THIS build, read from the authored
+  // tree; a published `.dist` from the previous build would answer for a declaration that no longer exists.
+  const checked = validateCatalog(catalogue, {
+    root: path.join(skillRoot, 'ops'), repositoryRoot: skillRoot, documents: generated,
+    kinds: loadDeclarative(skillRoot, 'model/kinds.json'), records: loadDeclarative(skillRoot, 'model/records.json')
+  });
   if (!checked.ok) throw Error('Invalid operator catalog: ' + JSON.stringify(checked.errors));
 
   const jobs = loadDeclarative(skillRoot, 'workflows/jobs.json');
@@ -140,7 +145,7 @@ export function buildFiles(skillRoot = root) {
       entry:'starci',layout:readBuilt('schemas/work-layout.json'),gates:readBuilt('workflows/gates.json'),limits:compiledDiscovery.limits,
       workflows:compiledDiscovery.workflows.map(w=>({...w,definition:w.id==='implement-frontend'?readBuilt('workflows/matrix.json'):jobs.workflows.find(j=>j.id===w.id)})),
       operators:entries.map(o=>({id:o.id,goal:o.goal,contract:readBuilt('ops/'+o.operator),authority:readBuilt('ops/'+o.authority),secondary:files.has('ops/'+o.id+'/secondary.json')?readBuilt('ops/'+o.id+'/secondary.json'):null})),
-      profiles:readBuilt('profiles/registry.json')};
+      profiles:readBuilt('model/registry.json')};
     files.set('docs/catalog.json',compactJsonBuffer(docs));
     files.set('docs/site-catalog.json',compactJsonBuffer({...docs,
       operators:docs.operators.map(o=>({id:o.id,goal:o.goal,contract:{steps:o.contract.steps}})),

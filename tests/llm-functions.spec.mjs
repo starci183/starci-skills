@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {CRITIQUE,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
+import {CRITIQUE,CRITIQUE_FORM,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,OVERLAP_CASES,PROVISION_KINDS,VALIDATOR_IO_RULE,VALIDATOR_RULES,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../models/functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
   references:['.starciwork/features/sales/sds.md#3'],checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:[`${id} works`],dependsOn:[],...extra});
@@ -171,7 +171,7 @@ test('a call charges every attempt it paid for, and a plain string runner simply
 test('the goal-plan schema file documents the form the runtime validates',()=>{
   const schema=parseYaml(fs.readFileSync(new URL('../schemas/goal-plan.yaml',import.meta.url),'utf8'));
   assert.equal(schema.describes,GOAL_PLAN);
-  assert.equal(schema.module,'execution/llm-functions.mjs');
+  assert.equal(schema.module,'models/functions.mjs');
   for(const key of Object.keys(GOAL_FORM))assert.ok(key in schema.fields,`schemas/goal-plan.yaml does not document ${key}`);
   assert.ok(schema.rules.some(rule=>/disjoint/.test(rule)));
 });
@@ -222,6 +222,26 @@ test('validateOp frames the op, the diff, the checks and the memory; drops a fin
 });
 
 /**
+ * The rule that answers the four chatbot nodes of 2026-09-13: a prove operation may still fake an outside
+ * provider, but only where the contract allows it and only when the evidence names it. The rule travels in
+ * the payload of every verdict, so neither kind can be judged without it.
+ */
+test('validateOp carries the rule that an integration is proven live or it is not proven',()=>{
+  const prompts=[];
+  const op={id:'op-telegram',kind:'integration.verify',goal:'Prove the Telegram delivery live.',
+    acceptance:['a message reaches the sandbox chat'],allowlist:['src/tests/integration/telegram.live-spec.ts'],attempt:1};
+  validateOp({op,diff:{files:['src/tests/integration/telegram.live-spec.ts'],text:'+const token=process.env.TELEGRAM_BOT_TOKEN;\n',truncated:false},
+    checks:[],references:['features/sales/integration/telegram/index.yaml'],providers:['gpt-5.6-sol'],
+    runHeadless:(provider,prompt)=>{prompts.push(prompt);return JSON.stringify({verdict:'accept',summary:'the run reached the sandbox'});}});
+  for(const rule of ['an external integration is proven live or it is not proven',
+    'whose scenario fakes, stubs, mocks, records, replays or skips the declared provider',
+    'reads the credential from anywhere but the identity custody the declaration names',
+    'prints, logs or commits a secret value, is a defect',
+    'an `e2e.verify` evidence whose `proof.fakes` omits a provider the diff fakes is a defect'])
+    assert.ok(prompts[0].includes(rule),`the rules bind the integration: ${rule}`);
+});
+
+/**
  * The brand travels with every verdict, as data beside the diff and as rules the validator is held to: a colour,
  * a font, an icon, a forbidden element or an artwork slot outside the record is a defect, not a preference.
  */
@@ -242,6 +262,9 @@ test('validateOp carries the brand record into the prompt, with the rules that m
     assert.ok(prompt.includes(needle),`the prompt carries ${needle}`);
   for(const rule of ['when a `brand` record is given it is binding',
     'outside the brand colour tokens (each with the role the record gives it) and the installed grammar is a defect',
+    'the markup kept beside each candidate as `<candidate>.html` is the render\'s source and is what the candidate is judged from',
+    'a list of entities wrapped in a card surface is a defect (a collection is a page section with a heading, a card is one item)',
+    'as is a palette outside the brand colour tokens and the grammar\'s own',
     'an interface.asset result is the artwork of the slots the design record declared',
     'artwork that ignores the brand mascot and logo references the record names, is a defect',
     'a frontend.implement result that substitutes its own image for a declared artwork slot, or omits a declared slot altogether, is a defect'])
@@ -251,6 +274,57 @@ test('validateOp carries the brand record into the prompt, with the rules that m
   call();
   assert.doesNotMatch(prompts[0],/"brand"/);
   assert.match(prompts[0],/when a `brand` record is given it is binding/,'the rule still says what happens when there is one');
+});
+
+/**
+ * An operation's kind declares which record kinds it may read and which it may produce. When the kernel hands
+ * that declaration over, it becomes a rule the validator is held to instead of a feeling about scope; when it
+ * does not, neither the data nor the rule is in the prompt, so no operation is judged against a declaration
+ * nobody gave it.
+ */
+test('validateOp carries the declared reads and writes of the kind, with the rule that makes them binding, and omits both when none is given',()=>{
+  const prompts=[];
+  const op={id:'op-draw',kind:'interface.draw',goal:'Draw the cart.',acceptance:['the cart is drawn'],allowlist:['features/sales/ui/cart/index.yaml'],attempt:1};
+  const diff={files:['features/sales/ui/cart/index.yaml'],text:'diff --git a/features/sales/ui/cart/index.yaml b/features/sales/ui/cart/index.yaml\n+screens: []\n',truncated:false};
+  const call=extra=>validateOp({op,diff,checks:[],references:[],providers:['gpt-5.6-sol'],
+    runHeadless:(provider,prompt)=>{prompts.push(prompt);return JSON.stringify({verdict:'accept',summary:'inside the declaration'});},...extra});
+  call({io:{reads:['srs','sds','brand','grammar','design','srs'],writes:['design']}});
+  const prompt=prompts[0];
+  assert.match(prompt,/"io": \{/);
+  // The record kinds travel as data, deduplicated, exactly as the kind declares them.
+  assert.match(prompt,/"reads": \[\s*"srs",\s*"sds",\s*"brand",\s*"grammar",\s*"design"\s*\]/);
+  assert.match(prompt,/"writes": \[\s*"design"\s*\]/);
+  assert.ok(prompt.includes(VALIDATOR_IO_RULE),'the rule that makes the declaration binding travels with it');
+  assert.match(VALIDATOR_IO_RULE,/a record cited outside `io\.reads` or written outside `io\.writes` is a defect/);
+  // No declaration, no data and no rule: the kind's own contract is the only thing that was given.
+  prompts.length=0;
+  call();
+  assert.doesNotMatch(prompts[0],/"io"/);
+  assert.ok(!prompts[0].includes(VALIDATOR_IO_RULE));
+});
+
+/**
+ * An intake is judged as a reconciliation of three cases, and the mechanical half of it is already done: the
+ * kernel checked every id before the validator was called. What is left for a reader is exactly three things,
+ * and the rule has to say so, or the validator re-does the kernel's work and misses its own.
+ */
+test('the intake rule tells the validator what the kernel already checked and what only a reader can judge',()=>{
+  const prompts=[];
+  const op={id:'op-intake',kind:'work.author',goal:'Author the collab records.',acceptance:['collab is authored'],allowlist:['features/collab/**'],attempt:1};
+  validateOp({op,diff:{files:['features/collab/index.yaml'],text:'+case: reference\n',truncated:false},checks:[],
+    providers:['gpt-5.6-sol'],runHeadless:(provider,prompt)=>{prompts.push(prompt);return JSON.stringify({verdict:'accept',summary:'reconciled'});}});
+  const prompt=prompts[0];
+  for(const phrase of ["a reconciliation of three cases - `reference`, `conflict`, `new`",
+    "the kernel has ALREADY checked every id of its table",
+    "that a referenced one is decided, that each conflict names an open decision record under this feature, and that no decided record was edited",
+    "whether a `reference` row's cited record really covers the claim it is cited for",
+    "whether a record the table calls `new` restates a decided record in other words",
+    "whether a `conflict` row's decision record states both sides, the consequences of each, the numbered options and exactly one recommendation",
+    "A record of another feature that this operation edited, and a side of the feature the table leaves out altogether, are defects"])
+    assert.ok(prompt.includes(phrase),`the intake rule says: ${phrase}`);
+  // The two withdrawn rulings are gone: no sds-gap against another feature's record, no formula anywhere.
+  assert.doesNotMatch(prompt,/sds-gap/);
+  assert.doesNotMatch(prompt,/A, B \+ C/);
 });
 
 /**
@@ -317,8 +391,8 @@ test('a critique that costs work must carry something to act on: evidence, requi
     required:['name the component that owns the order write'],alternatives:['extend the ledger writer instead']})]);
   assert.equal(revised.result.verdict,'revise');
   assert.deepEqual(revised.result.objections,[{kind:'consistency',claim:'The goal writes the order outside the ledger writer',
-    evidence:'demo.sales.architecture.sds.ledger',consequence:'Two components would own one write path.'}]);
-  assert.deepEqual(revised.result.dropped,[{kind:'premise',claim:'I would not build it this way',evidence:'',consequence:'none'}]);
+    evidence:'demo.sales.architecture.sds.ledger',consequence:'Two components would own one write path.',decisive:false}]);
+  assert.deepEqual(revised.result.dropped,[{kind:'premise',claim:'I would not build it this way',evidence:'',consequence:'none',decisive:false}]);
   assert.match(revised.result.reason,/1 objection\(s\) named no evidence and were dropped/);
   assert.deepEqual(revised.result.required,['name the component that owns the order write']);
   // A revise or a refuse with no objection at all, or with no evidenced one, is sent back to the model.
@@ -363,4 +437,109 @@ test('a critique that costs work must carry something to act on: evidence, requi
   assert.deepEqual(withPrereqs.result.prerequisites,[{kind:'sds',feature:'chat',why:'the goal extends a module the tree has no architecture record for'},{kind:'brand',feature:null,why:'the design needs tokens'}]);
   assert.throws(()=>critiqueGoal({job:'  ',runHeadless:()=>'{}'}),/critiqueGoal needs the job text/);
   assert.equal(critiqueGoal({job:'x',providers:[],runHeadless:()=>'{}'}).verdict,'unavailable');
+});
+
+/**
+ * The owner's ruling of 2026-09-14, seen from the critic's side. A hidden decision is not one thing: a naming,
+ * a shape or a default is settled by the record repair when an operation hits it and costs nobody a question,
+ * while a decision about money, authority or customer data is the owner's and is put to them before the work.
+ * The critic is what tells those two apart, so `decisive` travels on the objection.
+ */
+test('a hidden decision says whether it is decisive, and the critic names what only the owner can provide',()=>{
+  const hidden=(extra={})=>({kind:'hidden-decision',claim:'The goal picks who may refund an order',
+    evidence:'demo.sales.business.srs.policy.refund',consequence:'A support agent could refund without a manager.',...extra});
+  const decisive=critiqueCall([JSON.stringify({verdict:'revise',required:['name who may refund'],
+    objections:[hidden({decisive:true}),
+      // Not decisive: a naming the product can live either way with, settled by the record repair when it is hit.
+      {kind:'hidden-decision',claim:'The goal names the endpoint /orders/refund',evidence:'demo.sales.architecture.sds.ledger',
+        consequence:'Two spellings of one route.',decisive:false}]})]);
+  assert.deepEqual(decisive.result.objections.map(item=>[item.kind,item.decisive]),[['hidden-decision',true],['hidden-decision',false]]);
+  // `decisive` is read as leniently as everything else: a model that answers a word instead of a boolean means it.
+  for(const answer of [true,'yes','TRUE','money','authority','customer-data'])
+    assert.equal(critiqueCall([JSON.stringify({verdict:'revise',required:['x'],objections:[hidden({decisive:answer})]})]).result.objections[0].decisive,true,String(answer));
+  for(const answer of [false,'no','',null,undefined,'maybe'])
+    assert.equal(critiqueCall([JSON.stringify({verdict:'revise',required:['x'],objections:[hidden({decisive:answer})]})]).result.objections[0].decisive,false,String(answer));
+  // The rule the critic is held to names the three things that make a decision the owner's.
+  const {seen}=critiqueCall([JSON.stringify({verdict:'sound',objections:[]})]);
+  const prompt=seen[0][1];
+  for(const needle of ['`decisive: true`','MONEY','AUTHORITY','CUSTOMER DATA','the record repair settles it',
+    'name the provisions','credential | account | dataset | authority','Read the WHOLE product for these'])
+    assert.ok(prompt.includes(needle),`the critic is told: ${needle}`);
+
+  // The provisions: everything only the owner can provide for the proofs of this goal to be real.
+  assert.deepEqual(PROVISION_KINDS,['credential','account','dataset','authority']);
+  assert.equal(CRITIQUE_FORM.provisions.type,'list','provisions are read as leniently as the objections are');
+  assert.equal(CRITIQUE_FORM.provisions.optional,true);
+  const provided=critiqueCall([JSON.stringify({verdict:'sound',objections:[],provisions:[
+    {kind:'credential',name:'VNPAY_SANDBOX_SECRET',feature:'payments',why:'no live charge can be proven without it'},
+    {kind:'account',name:'VNPay sandbox merchant',feature:'payments',why:'the gateway will not answer without one'},
+    {kind:'dataset',name:'three real bank statements',feature:'accounting',why:'reconciliation cannot be proven on invented rows'},
+    {kind:'authority',name:'consent to message real users',feature:'chat',why:'a live send touches real people'},
+    // Dropped and counted: an unknown kind, an entry with no name, a bare sentence.
+    {kind:'vibes',name:'x',why:'no'},{kind:'credential',why:'nameless'},'the gateway key'
+  ]})]);
+  assert.deepEqual(provided.result.provisions.map(item=>[item.kind,item.name,item.feature]),
+    [['credential','VNPAY_SANDBOX_SECRET','payments'],['account','VNPay sandbox merchant','payments'],
+      ['dataset','three real bank statements','accounting'],['authority','consent to message real users','chat']]);
+  assert.equal(provided.result.provisionsDropped,3);
+  assert.match(provided.result.reason,/3 provision\(s\) named no known kind or no name and were dropped/);
+  // A critique that answers none is simply a goal that needs nothing of the owner, never a form error.
+  assert.deepEqual(critiqueCall([JSON.stringify({verdict:'sound',objections:[]})]).result.provisions,[]);
+  assert.deepEqual(critiqueGoal({job:'x',providers:[],runHeadless:()=>'{}'}).provisions,[]);
+
+  // And the validator holds the record repair to the log it must leave and to the decision it may not take alone.
+  const rules=VALIDATOR_RULES.join('\n');
+  assert.match(rules,/EXACTLY ONE new `extensions\.work3\.decisionLog` entry/);
+  assert.match(rules,/A changed record with no entry, a bumped rev with no changed passage, a second entry, or an earlier entry rewritten or deleted\s+is a defect/);
+  assert.match(rules,/may not settle one about money, authority or customer data silently/);
+  assert.match(rules,/names no decision record with numbered options and one recommendation, is a defect/);
+});
+
+/**
+ * A goal that adds to a product with decided records is a reconciliation, and the critic is where the runtime
+ * first sees it. It answers the two cases it can see from the goal text - `reference` and `conflict` - and the
+ * three of them are stated as rules instead of as the formula the owner once used to explain the thinking.
+ */
+test('the critic answers the overlaps with the decided records as the three cases, and the formula is gone',()=>{
+  assert.deepEqual(OVERLAP_CASES,['reference','conflict']);
+  assert.equal(CRITIQUE_FORM.overlaps.type,'list','overlaps is read as leniently as the objections are');
+  assert.equal(CRITIQUE_FORM.overlaps.optional,true);
+  const objection={kind:'consistency',claim:'The goal writes the order outside the ledger writer',
+    evidence:'demo.sales.architecture.sds.ledger',consequence:'Two components would own one write path.'};
+  const {result,seen}=critiqueCall([JSON.stringify({verdict:'revise',objections:[objection],required:['reconcile against the sales records'],
+    overlaps:[
+      {record:'demo.sales.business.srs.policy.refund',case:'reference',evidence:'the refund window is already decided there'},
+      {record:'demo.sales.architecture.sds.ledger',case:'CONFLICT',evidence:'collab needs an asynchronous write'},
+      // Dropped and counted: a case the runtime does not know, an entry that names no record, a bare sentence.
+      {record:'demo.sales.business.srs.policy.refund',case:'new',evidence:'nothing decided covers it'},
+      {case:'reference',evidence:'some record somewhere'},
+      'the refund policy is related'
+    ]})]);
+  assert.equal(result.verdict,'revise');
+  assert.deepEqual(result.overlaps,[
+    {record:'demo.sales.business.srs.policy.refund',case:'reference',evidence:'the refund window is already decided there'},
+    {record:'demo.sales.architecture.sds.ledger',case:'conflict',evidence:'collab needs an asynchronous write'}]);
+  assert.equal(result.overlapsDropped,3);
+  assert.match(result.reason,/3 overlap\(s\) named no decided record or no known case and were dropped by the kernel/);
+  // The rules that replaced the formula: the three cases, and the instruction to fill `overlaps` with them.
+  const prompt=seen[0][1];
+  for(const rule of ['fill `overlaps` with one entry per decided record the goal touches',
+    '{record: <id of a decided record below>, case: reference | conflict, evidence: the statement of that record the goal meets}',
+    '`reference` is an overlap the goal repeats',
+    'cites that record by its id and restates, re-words or redefines nothing of it',
+    '`conflict` is an overlap that cannot hold together with what the decided record settled',
+    'it is never overwritten and never averaged',
+    'the OWNER answers it - never you and never the operation',
+    'what no decided record covers is new work, not an overlap: leave it out of `overlaps` entirely'])
+    assert.ok(prompt.includes(rule),`the critic is held to: ${rule}`);
+  assert.doesNotMatch(prompt,/A, B \+ C/,'the illustrative formula is not runtime content');
+  assert.doesNotMatch(prompt,/=> A'/);
+  // A critique that names no overlap at all answers an empty list, and says nothing about dropping any.
+  const none=critiqueCall([JSON.stringify({verdict:'sound',objections:[]})]);
+  assert.deepEqual(none.result.overlaps,[]);
+  assert.equal(none.result.overlapsDropped,undefined);
+  assert.equal(none.result.reason,undefined);
+  // An unavailable critique still answers the shape, so the kernel never reads `overlaps` off undefined.
+  assert.deepEqual(critiqueGoal({job:'x',providers:[],runHeadless:()=>'{}'}).overlaps,[]);
+  assert.deepEqual(critiqueCall(['nonsense','nonsense',Error('gpt-6-astra headless exited 1')]).result.overlaps,[]);
 });

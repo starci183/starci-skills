@@ -1,7 +1,7 @@
 # Runtime allocation: prefer, then overflow
 
-In runtime 5.0 the kernel no longer walks an ordered list of providers. Every
-runtime is a pool declared in `profiles/runtimes.yaml` with the roles it may
+In runtime 5-plus the kernel no longer walks an ordered list of providers. Every
+runtime is a pool declared in `model/runtimes.yaml` with the roles it may
 take, how many operations it can run at once and what it may spend in a day.
 For each ready operation the kernel calls `allocate(kind, {avoid})` and receives
 one eligible pool — one that has the role, a free slot, budget left and no
@@ -9,9 +9,23 @@ cooldown — plus the role the worker will play. `maxParallelOps: 10` caps the
 whole workflow, so ten ready operations can be in flight across Codex, Claude
 and Qwen at the same time instead of queueing behind one provider.
 
-The role of an operation kind comes from the kind graph (`profiles/kinds.yaml`
-through `execution/kind-graph.mjs`), which is the one place a kind is defined;
-`roleOfKind` in `profiles/runtimes.yaml` stays the fallback for a kind the graph
+`allocation.fanOut` is the one bound the allocator answers but does not apply
+itself: `{seamFirst: true, maxPerGroup: 9}`. When a heavy node has been cut into
+children with disjoint write scopes, the scheduler reads that policy from
+`allocator.fanOut` and holds the group to it — the **seam** (the one child that
+owns the module wiring, the migrations and the shared contracts every other
+child would otherwise touch) runs alone in its group, and at most nine of one
+parent's children run at once. Against `maxParallelOps: 10` that means eight or
+nine builds of a single heavy node in flight while the rest of the tree still has
+a slot to run in: one parent can never take the whole pool and leave everything
+else queueing behind it. The rule itself lives in `fanOutDeferral`
+(`kernel/sync.mjs`), because it is a fact of the cut group rather than of the
+pools, and a profile that declares no `fanOut` still gets it with
+`maxPerGroup` defaulting to one below `maxParallelOps`.
+
+The role of an operation kind comes from the kind graph (`model/kinds.yaml`
+through `kernel/graph.mjs`), which is the one place a kind is defined;
+`roleOfKind` in `model/runtimes.yaml` stays the fallback for a kind the graph
 does not carry, which is every 4.x operator id the graph never adopted.
 
 ## The policy: prefer, then overflow
@@ -85,7 +99,7 @@ the other pools keep working.
 
 A workflow is not alone on its runtimes. Every kernel of a repository shares one
 file beside the workflow directories - `.starciwork/_local/workflows/runtime-loads.json`,
-schema `starci/runtime-loads@1`, written by `execution/runtime-loads.mjs` - and
+schema `starci/runtime-loads@1`, written by `kernel/loads.mjs` - and
 `createAllocator({shared:{path, workflow}})` reads it before it chooses. Another
 kernel's live operations on a runtime are load here too, so `maxParallel` holds
 across kernels; a rate limit or an exhausted quota one kernel ran into cools the
@@ -116,8 +130,8 @@ launch shape still comes from the operator's environments:
 throws by name when a target is not in that operation's environments, so the
 kernel passes `restrictTo: launchableTargets(kind)` to keep allocation inside
 the launchable set. That is why every runtime carrying a role in
-`profiles/runtimes.yaml` must also be declared in the `environments` of the
-operations of that role in `profiles/registry.yaml`; a runtime whose role has no
+`model/runtimes.yaml` must also be declared in the `environments` of the
+operations of that role in `model/registry.yaml`; a runtime whose role has no
 profile for that operation (Astra has no working profile, so it cannot take a
 `uat.verify`) is excluded by `restrictTo` instead of failing at launch.
 

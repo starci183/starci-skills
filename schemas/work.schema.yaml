@@ -293,6 +293,70 @@ $defs:
     type: array
     items:
       $ref: "#/$defs/string"
+  integrationDeclaration:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - provider
+      - credential
+    properties:
+      id:
+        $ref: "#/$defs/id"
+        description: Stable id of this external system inside the product; the integration node that proves
+          it lives at features/<feature>/integration/<id>/index.yaml and the evidence of any proof that
+          fakes it names this same id in proof.fakes.
+      provider:
+        $ref: "#/$defs/string"
+        description: The outside system itself, as the product names it; example telegram-bot-api.
+      credential:
+        type: object
+        additionalProperties: false
+        required:
+          - name
+          - providedBy
+          - custody
+        properties:
+          name:
+            $ref: "#/$defs/string"
+            description: The exact variable name the code reads at the moment of use. The name only; a
+              credential value is never written into a record, a report, a log or a chat.
+          providedBy:
+            const: owner
+            description: A credential is the owner's. The runtime asks for it by name and never invents,
+              stubs, defaults or silently skips one.
+          custody:
+            $ref: "#/$defs/string"
+            pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
+            description: "identity:<slug> - the encrypted identity resource of this Work tree that holds the
+              value (see identityResource). That is the only custody a credential has: an environment
+              variable belongs to whichever terminal exported it, is gone on the next machine, and the tree
+              cannot say who set it."
+          where:
+            $ref: "#/$defs/string"
+            description: "Retired in 5-plus and kept only so an older tree is told what to change: it named
+              a place, not a custody. Declare custody instead; a declaration with neither is the problem
+              credential-custody-missing."
+      sandbox:
+        $ref: "#/$defs/string"
+        description: The provider's own test or sandbox endpoint the live proof runs against, when it
+          offers one.
+    description: "One external system a business (SRS) or design (SDS) record declares as data under
+      extensions.work3.integrations[]. The declaration is what makes the integration a record: the tree
+      owes it one integration node, that node walks integration.verify against the real provider, and an
+      evidence manifest that only fakes it is read as proven against a fake, not live."
+  identityResource:
+    type: object
+    description: "The custody of a credential, at .starciwork/_resources/identity/<slug>/resource.yaml
+      (schema work/resource@1, kind identity) beside secrets.enc.yaml. The resource record is readable and
+      carries the alias the product calls this identity by, the subject on the provider (the account, the
+      sender, the merchant - the WHO, never the what), the role it is allowed to play, and the variable
+      NAMES it holds. It never carries a value: every value lives in secrets.enc.yaml, encrypted with sops
+      under the host's own age or GPG key (the product repositories already carry a .sops.yaml), and is read
+      only at the moment of use - `sops exec-env <secrets.enc.yaml> '<command>'` - so it exists inside one
+      process and is never copied into a file, a log, a report or a contract. An operation that cannot reach
+      sops, the key or the resource reports blocked environment naming the slug and the variable; it never
+      invents, stubs or defaults a value, and it never prints one."
   sourceRef:
     type: object
     additionalProperties: false
@@ -1005,6 +1069,46 @@ $defs:
           present a gap as already implemented.
     description: One executable UAT flow with direct environment details, collocated fixture paths,
       steps, evidence and observed result.
+  reconciliationRow:
+    type: object
+    additionalProperties: false
+    required:
+      - case
+      - record
+    properties:
+      case:
+        enum:
+          - reference
+          - conflict
+          - new
+        description: "Which of the three reconciliation cases this row is. reference: the decided record
+          already holds what this feature repeats, so it is cited by id and never restated. conflict: this
+          feature cannot hold together with what that record decided, so it is neither overwritten nor
+          averaged - a decision record under this feature states both sides and the owner answers it. new:
+          no decided record covers it, so it is authored under this feature."
+      record:
+        $ref: "#/$defs/id"
+        description: The record this row is about - the decided record of another feature for reference and
+          conflict, and the newly authored record of this feature for new.
+      decision:
+        $ref: "#/$defs/id"
+        description: Required by a conflict row - the todo decision record authored under this feature that
+          states both sides, the consequences, the numbered options and one recommendation. The kernel puts
+          it to the owner and the workflow does not finish over an unanswered one.
+      reads:
+        $ref: "#/$defs/ids"
+        description: Declared by a new row - the decided records it rests on, each of a record kind its own
+          record kind is derived from.
+      hands:
+        $ref: "#/$defs/ids"
+        description: Declared by a new row - the records of this feature it hands work on to.
+      detail:
+        $ref: "#/$defs/string"
+        description: One line saying what this feature shares with, conflicts with, or adds beyond the
+          named record; it is the claim the validator judges the row against.
+    description: One typed row of a feature's reconciliation against the records the product already decided.
+      The list of these rows lives at extensions.work3.reconciliation of the feature's module record; the
+      kernel checks it mechanically when an intake reports done and before the validator reads it.
   node:
     type: object
     additionalProperties: false
@@ -1025,7 +1129,9 @@ $defs:
           login.business.
       kind:
         $ref: "#/$defs/string"
-        description: Owner category such as business, architecture, implementation or uat.
+        description: Owner category such as business, architecture, implementation, uat, e2e or
+          integration. An integration node carries the live proof of one system its feature's records
+          declared under extensions.work3.integrations.
       required:
         type: boolean
         description: Whether this node must complete for its parent to complete.
@@ -1076,6 +1182,23 @@ $defs:
         x-operational: true
       extensions:
         type: object
+        description: "Free-form namespaced payloads the validator preserves and hashes but does not
+          constrain, so a runtime adds keys here without a schema change. The runtime authors these under
+          work3: extensions.work3.integrations is a list of integrationDeclaration entries - every external
+          system this record talks to, its provider, the exact credential variable the owner provides and
+          the sandbox a live proof runs against; extensions.work3.reconciliation is the list of
+          reconciliationRow entries a feature module record carries after an intake, one row per decided
+          record the feature touches, checked by the kernel itself; extensions.work3.checks and
+          extensions.work3.allowlist are what the kernel may launch the node with;
+          extensions.work3.decisionLog is the append-only log a revise operation writes, one entry per
+          revision of this record, each {rev (the rev this entry settled, an integer), at (ISO-8601), gap
+          (the blocker detail that opened the revision), chosen (the reading that was written into the
+          record), why (why that reading is the most reasonable one by the accepted records, the other
+          features' decided records and the product's own conventions), alternatives (the other readings the
+          record admitted, one line each)} - an entry is never rewritten and never deleted, so the owner can
+          read what the runtime decided for them and overturn it; and
+          extensions.work3.kernel is the kernel own receipt, including the contractDigest of the kind
+          declaration the proof was taken under."
       description:
         type: string
         description: Concise specification prose for a small unstructured node; module SRS/SDS nodes use
@@ -1337,6 +1460,26 @@ $defs:
         type: array
         items:
           $ref: "#/$defs/asset"
+      proof:
+        type: object
+        additionalProperties: false
+        required:
+          - boundary
+        properties:
+          boundary:
+            enum:
+              - api
+              - live
+            description: "What this run actually exercised: api is the product's own surface on a real
+              stack, live is the outside system itself. e2e.verify writes api, integration.verify writes
+              live."
+          fakes:
+            $ref: "#/$defs/stringList"
+            description: The declared integration ids this run did not call for real - each one it mocked,
+              stubbed, recorded or pointed at a local double. A live proof names none. An integration whose
+              only evidence lists it here is proven against a fake, not live.
+        description: What the evidence was proven against. An evidence record that carries no proof block
+          makes no claim about the boundary it ran at; one that does is binding.
       provenance:
         $ref: "#/$defs/provenance"
       sourceIdentity:
@@ -1484,7 +1627,13 @@ $defs:
         type: array
         description: Any number of design/reference assets under this UI node's assets/**. Explain covered
           screens, states and viewports in role; record origin in provenance. Each path also appears
-          in node.assets. Multiple images do not imply alternative design directions.
+          in node.assets. Multiple images do not imply alternative design directions. A drawn candidate is
+          one PNG per screen and viewport of that screen's main state, captured by a headless browser from
+          the installed grammar's own renderers, and the markup it was rendered from is kept beside it as
+          <candidate>.html under the same assets/ folder - the picture is what a reader sees, the markup is
+          what it was rendered from, so the render can be checked from its source rather than from an
+          opinion about it. Its provenance is that capture (browser, viewport, grammar package and version,
+          brand rev), not a generation prompt.
         items:
           type: object
           additionalProperties: false

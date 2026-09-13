@@ -111,6 +111,25 @@ test('legacy audit never follows junctions or symlinks to external content', t =
   assert.equal(run('audit-legacy', path.join(root, 'escape')).status, 1);
 });
 
+test('--help names every command of the one entry, the forwarded kernel commands included', () => {
+  const help = run('--help');
+  assert.equal(help.status, 0, help.stderr);
+  // `bin/starci.mjs` forwards these to the kernel launcher before this module is loaded, so nothing here
+  // answers them - but the one command line a person types is `starci <command>`, and a help page that names
+  // only half of it teaches the wrong entry. One line each, so a reader can copy the one they need.
+  const forwarded = ['workflow-goal', 'workflow-approve', 'workflow-answer', 'workflow-run', 'workflow-status',
+    'workflow-list', 'workflow-stop', 'workflow-lane-close', 'workflow-supervise',
+    'start-op', 'settle', 'sweep', 'notify', 'report', 'wait', 'verify'];
+  const lines = help.stdout.split('\n').map(line => line.trim());
+  for (const command of forwarded) assert.ok(lines.some(line => line.startsWith(`starci ${command} `) || line === `starci ${command}`), command);
+  // The checks the CLI itself owns stay on the same page, named the same way.
+  assert.ok(lines.some(line => line.startsWith('starci brand check ')), 'brand check');
+  // Every forwarded name is a command the entry really forwards; a help page may not invent one.
+  const entry = fs.readFileSync(new URL('../bin/starci.mjs', import.meta.url), 'utf8');
+  const declared = JSON.parse(entry.match(/const LAUNCHER_COMMANDS=(\[[\s\S]*?\])/)[1].replaceAll("'", '"').replace(/,\s*\]/, ']'));
+  assert.deepEqual([...forwarded].sort(), [...declared].sort());
+});
+
 test('argument errors cannot silently execute other commands', t => {
   const root = temporary(t);
   const before = snapshot(root);
@@ -318,4 +337,92 @@ test('installed review.verify can inspect synthetic producer gate proof without 
   assert.equal(fs.readFileSync(nodeFile, 'utf8').split('\n---\n')[1], frozenBody);
   assert.equal(fs.readFileSync(repoResource, 'utf8'), frozenResource, 'post-proof resource pointer would invalidate evidence');
   assert.ok(!snapshot(workRoot).some(item => /request\.json|response\.json|sessions|runs/.test(item.path)));
+});
+
+/**
+ * A credential used to live in an environment variable: whoever exported it owned it, it was gone on the next
+ * machine, and the tree could not say who had set it. `identity set` is the owner's own hands putting a value
+ * into the tree's encrypted custody - and the two rules that make it safe are testable from outside: the value
+ * comes from stdin and from nowhere else, and it appears in nothing this command writes or prints.
+ *
+ * The fake `sops` on PATH is what lets the test drive the real spawn: it encrypts by prefixing a marker, so the
+ * file on disk is provably not the plaintext, and the CLI's own refusals (no sops, no key) are real refusals.
+ */
+function fakeSops(t, { encryptStatus = 0 } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'work-v3-sops-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const script = fileURLToPath(new URL('./helpers/fake-sops.mjs', import.meta.url));
+  const windows = process.platform === 'win32';
+  fs.writeFileSync(path.join(dir, windows ? 'sops.cmd' : 'sops'),
+    windows ? `@echo off\r\n"${process.execPath}" "${script}" %*\r\n` : `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`,
+    { mode: 0o755 });
+  return { PATH: `${dir}${path.delimiter}${process.env.PATH}`, FAKE_SOPS_ENCRYPT_STATUS: String(encryptStatus) };
+}
+const SYNTHETIC = 'SYNTHETIC-NOT-A-REAL-KEY-0123456789';
+
+test('identity set puts a value into the tree\'s encrypted custody from stdin alone, and echoes it nowhere', t => {
+  const parent = temporary(t);
+  const root = path.join(parent, '.starciwork');
+  assert.equal(run('init', root, '--id', 'workspace:test').status, 0);
+  const env = { ...process.env, ...fakeSops(t) };
+  const result = spawnSync(process.execPath, [cli, 'identity', 'set', 'payments', '--name', 'PAY_API_KEY'],
+    { encoding: 'utf8', cwd: parent, env, input: `${SYNTHETIC}\n` });
+  assert.equal(result.status, 0, result.stderr);
+  const answer = JSON.parse(result.stdout);
+  assert.deepEqual([answer.ok, answer.custody, answer.variables, answer.created],
+    [true, 'identity:payments', ['PAY_API_KEY'], true]);
+
+  // The readable half names who the identity is and which variables it holds - and never a value.
+  const folder = path.join(root, '_resources', 'identity', 'payments');
+  const resource = parseYaml(fs.readFileSync(path.join(folder, 'resource.yaml'), 'utf8'));
+  assert.deepEqual([resource.schema, resource.kind, resource.id], ['work/resource@1', 'identity', 'identity.payments']);
+  assert.deepEqual(resource.details.variables, ['PAY_API_KEY']);
+  assert.equal(resource.details.secrets, 'secrets.enc.yaml');
+  // The encrypted half went through sops, and the plaintext staging file it needed is gone.
+  const secrets = fs.readFileSync(path.join(folder, 'secrets.enc.yaml'), 'utf8');
+  assert.match(secrets, /^# sops-encrypted/, 'what lands on disk is what sops produced, never the plaintext');
+  assert.deepEqual(fs.readdirSync(folder).sort(), ['resource.yaml', 'secrets.enc.yaml']);
+  // Everything the CLI itself writes or says is free of the value: only what sops produced holds it, which with
+  // a real sops is ciphertext and with this fake is a marker the test can recognise.
+  const said = `${result.stdout}${result.stderr}${fs.readFileSync(path.join(folder, 'resource.yaml'), 'utf8')}`;
+  assert.equal(said.includes(SYNTHETIC), false, 'a credential value never reaches stdout, stderr or the readable record');
+  assert.equal(secrets, `# sops-encrypted\nPAY_API_KEY: ${SYNTHETIC}\n`, 'the file is sops output written verbatim, never the plaintext the CLI held');
+
+  // A second variable joins the same custody; the file is decrypted, extended and encrypted again.
+  const second = spawnSync(process.execPath, [cli, 'identity', 'set', 'payments', '--name', 'PAY_WEBHOOK_SECRET'],
+    { encoding: 'utf8', cwd: parent, env, input: `${SYNTHETIC}-2\n` });
+  assert.equal(second.status, 0, second.stderr);
+  assert.deepEqual(JSON.parse(second.stdout).variables, ['PAY_API_KEY', 'PAY_WEBHOOK_SECRET']);
+  assert.deepEqual(parseYaml(fs.readFileSync(path.join(folder, 'resource.yaml'), 'utf8')).details.variables,
+    ['PAY_API_KEY', 'PAY_WEBHOOK_SECRET']);
+
+  // The value is never an argument: a second positional is refused before anything is read or written.
+  const onCommandLine = spawnSync(process.execPath, [cli, 'identity', 'set', 'payments', SYNTHETIC, '--name', 'PAY_API_KEY'],
+    { encoding: 'utf8', cwd: parent, env, input: '' });
+  assert.equal(onCommandLine.status, 1);
+  assert.match(onCommandLine.stderr, /Invalid arguments/);
+});
+
+test('identity set refuses with the exact reason when sops or its key is not there, and writes nothing', t => {
+  const parent = temporary(t);
+  const root = path.join(parent, '.starciwork');
+  assert.equal(run('init', root, '--id', 'workspace:test').status, 0);
+  const folder = path.join(root, '_resources', 'identity', 'payments');
+
+  // No sops on PATH at all: the owner is told what to install, and no custody folder is created behind it.
+  const bare = spawnSync(process.execPath, [cli, 'identity', 'set', 'payments', '--name', 'PAY_API_KEY'],
+    { encoding: 'utf8', cwd: parent, env: { ...process.env, PATH: fs.mkdtempSync(path.join(os.tmpdir(), 'work-v3-nosops-')) }, input: `${SYNTHETIC}\n` });
+  assert.equal(bare.status, 1);
+  assert.match(bare.stdout, /sops is not on PATH/);
+  assert.equal(bare.stdout.includes(SYNTHETIC), false);
+  assert.equal(fs.existsSync(folder), false, 'a refusal creates nothing');
+
+  // sops is there but has no key for this tree: the reason says so, and the staging plaintext is still cleaned up.
+  const noKey = spawnSync(process.execPath, [cli, 'identity', 'set', 'payments', '--name', 'PAY_API_KEY'],
+    { encoding: 'utf8', cwd: parent, env: { ...process.env, ...fakeSops(t, { encryptStatus: 1 }) }, input: `${SYNTHETIC}\n` });
+  assert.equal(noKey.status, 1);
+  assert.match(noKey.stdout, /no age or GPG key is configured for it/);
+  assert.equal(noKey.stdout.includes(SYNTHETIC), false);
+  assert.equal(fs.existsSync(path.join(folder, 'secrets.enc.yaml')), false, 'nothing was written');
+  assert.deepEqual(fs.readdirSync(folder), [], 'the plaintext sops needed is gone, whatever happened');
 });
