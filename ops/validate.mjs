@@ -7,6 +7,8 @@ import { recordKindOfPath } from '../kernel/io.mjs';
 // Operator validation must run while bootstrapping a source package before .dist exists.
 // Keep these authoring identities explicit here and regression-check them against the
 // published specification contracts; importing runtime readers would create a build cycle.
+// The two kernel imports below are the exception and are safe because they are pure: the profiles they
+// answer over are handed in by the caller (or read from the authored YAML), never loaded out of `.dist`.
 const PRESERVED_ENGLISH=Object.freeze(['yaml-schema-keys','stable-ids-and-refs','enum-literals','protocol-identifiers','api-fields','variables','types','operation-names','source-symbols']);
 const AUTHORING_POLICIES=Object.freeze({
   'business.decide':Object.freeze({
