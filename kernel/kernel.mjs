@@ -579,15 +579,34 @@ function cleanStrayFiles(store,state,op,ctx){
   return op.strayFiles;
 }
 
-/* ------------------------------------------------------------------ the design routes */
+/* ------------------------------------------------------------------ the record routes */
 
 /**
- * A reported SDS gap reopens the design, it does not repair it in place: the architecture node the operation
- * names - or, failing that, the one in its own module - returns to `todo` and gets the kind the `sds-gap`
- * route names (`architecture.revise`: fix the SDS text, bump its rev), which the blocked operation waits for.
+ * The two record gaps the kernel routes the same way, one layer apart. `sds-gap` is a design that does not say
+ * how; `srs-gap` is a requirement that does not say what, or says it twice in two ways. Both reopen the node
+ * that OWNS the record - never the operation that tripped over it - create the repair kind the route names on
+ * that node's own file and folder, and put the requester behind it. Everything that differs between them is
+ * here as data, so the two routes cannot drift apart in the parts that are supposed to be identical.
  */
-function architectureNodeFor(ctx,op,detail){
-  const nodes=ctx.work.loaded.list.filter(node=>node.kind==='architecture');
+const RECORD_GAPS=Object.freeze({
+  'sds-gap':Object.freeze({nodeKinds:['architecture'],fallback:{kind:'architecture.revise',origin:'architecture',then:'reopen'},
+    reason:'reported an SDS gap',nodeField:'architecture',opField:'decide',
+    goal:(op,node,detail)=>`Revise the design ${op.id} found incomplete, in the architecture node ${node.id}: ${detail}. Fix the SDS text itself and bump its rev.`,
+    acceptance:(node,detail)=>`${node.id} records the decision for: ${detail}`,
+    note:(created,node)=>`the design gap is settled by ${created.id} in ${node.path}; read the updated design first`}),
+  'srs-gap':Object.freeze({nodeKinds:['business','business-overview','module'],fallback:{kind:'business.revise',origin:'business',then:'reopen'},
+    reason:'reported a requirement gap',nodeField:'business',opField:'revise',
+    goal:(op,node,detail)=>`Revise the requirement ${op.id} could not derive its work from, in the business node ${node.id}: ${detail}. State the readings the record admits, write the most reasonable one into the requirement, rule or journey with the acceptance an implementer derives code from, say why in the decision log and bump its rev.`,
+    acceptance:(node,detail)=>`${node.id} settles the requirement for: ${detail}`,
+    note:(created,node)=>`the requirement gap is settled by ${created.id} in ${node.path}; read the updated requirement first`})
+});
+
+/**
+ * The node that owns the record a gap names: the one the detail names by path, or - failing that - the one of
+ * the reporting operation's own module. `null` when the tree carries none, which the caller must not paper over.
+ */
+function recordNodeFor(ctx,op,detail,nodeKinds){
+  const nodes=ctx.work.loaded.list.filter(node=>nodeKinds.includes(node.kind));
   const named=pathsIn(detail);
   const byPath=nodes.find(node=>named.some(file=>slash(node.path).includes(file)||file.includes(slash(path.dirname(node.path)))));
   if(byPath)return byPath;
@@ -595,6 +614,7 @@ function architectureNodeFor(ctx,op,detail){
   const key=own?workModule(own):null;
   return nodes.find(node=>key&&workModule(node)===key)??null;
 }
+function architectureNodeFor(ctx,op,detail){return recordNodeFor(ctx,op,detail,RECORD_GAPS['sds-gap'].nodeKinds);}
 
 /** `then: reopen` - the reporter waits for the op the route created and runs again with the settled material. */
 function reopenRequester(store,state,op,open,created,note){
@@ -604,26 +624,38 @@ function reopenRequester(store,state,op,open,created,note){
   store.appendEvent({event:'op-reopened',op:op.id,waitingFor:created.id,note});
 }
 
-function reopenArchitecture(store,state,op,report,ctx,blocker){
-  const architecture=architectureNodeFor(ctx,op,blocker.detail);
-  if(!architecture)return null;
-  const route=routeOf({blocker:'sds-gap',kind:op.kind})??{kind:'architecture.revise',origin:'architecture',then:'reopen'};
-  ledgerWrite(store,state,op,ctx,'reopened',()=>ctx.work.api.markReopened(ctx.work.at,architecture,
-    {reason:`${op.id} reported an SDS gap: ${blocker.detail}`,by:'starci-kernel'}));
-  const designFile=`.starciwork/${slash(architecture.path)}`;
-  // The revision owns the node file and the SDS folder around it: a design fix is text, and its text is there.
-  const designFolder=`.starciwork/${slash(path.dirname(architecture.path))}/**`;
-  const decide=addOp(store,state,{kind:routeKind(route,state,op)??'architecture.revise',nodeId:architecture.id,
-    goal:`Revise the design ${op.id} found incomplete, in the architecture node ${architecture.id}: ${blocker.detail}. Fix the SDS text itself and bump its rev.`,
-    ledgerIds:op.ledgerIds,allowlist:unique([designFile,designFolder]),references:unique([architecture.path,...op.references]),
+/**
+ * One record gap, routed on the Work tree. The node that owns the record is reopened and gets the repair kind
+ * the route names, on its own record file and the folder around it - a record fix is text, and its text is
+ * there - and the requester waits behind it and reads the settled record on its next attempt.
+ */
+function reopenRecordOwner(store,state,op,report,ctx,blocker,blockerKind){
+  const gap=RECORD_GAPS[blockerKind];
+  const owner=recordNodeFor(ctx,op,blocker.detail,gap.nodeKinds);
+  if(!owner)return null;
+  const route=routeOf({blocker:blockerKind,kind:op.kind})??gap.fallback;
+  ledgerWrite(store,state,op,ctx,'reopened',()=>ctx.work.api.markReopened(ctx.work.at,owner,
+    {reason:`${op.id} ${gap.reason}: ${blocker.detail}`,by:'starci-kernel'}));
+  const file=`.starciwork/${slash(owner.path)}`;
+  const folder=`.starciwork/${slash(path.dirname(owner.path))}/**`;
+  const repair=addOp(store,state,{kind:routeKind(route,state,op)??gap.fallback.kind,nodeId:owner.id,
+    goal:gap.goal(op,owner,blocker.detail),
+    ledgerIds:op.ledgerIds,allowlist:unique([file,folder]),references:unique([owner.path,...op.references]),
     checks:[{name:'work-tree-validates',command:workValidateCommand(ctx)}],
-    acceptance:[`${architecture.id} records the decision for: ${blocker.detail}`],origin:route.origin??'architecture'},
-    `sds-gap reported by ${op.id}`);
-  reopenRequester(store,state,op,report.open,decide,`the design gap is settled by ${decide.id} in ${architecture.path}; read the updated design first`);
-  store.appendEvent({event:'sds-gap',op:op.id,node:op.nodeId,architecture:architecture.id,decide:decide.id});
-  routed(store,op,'sds-gap',decide.id,decide.origin,{kind:decide.kind,node:architecture.id,then:route.then});
-  return decide;
+    acceptance:[gap.acceptance(owner,blocker.detail)],origin:route.origin??gap.fallback.origin},
+    `${blockerKind} reported by ${op.id}`);
+  reopenRequester(store,state,op,report.open,repair,gap.note(repair,owner));
+  store.appendEvent({event:blockerKind,op:op.id,node:op.nodeId,[gap.nodeField]:owner.id,[gap.opField]:repair.id});
+  routed(store,op,blockerKind,repair.id,repair.origin,{kind:repair.kind,node:owner.id,then:route.then});
+  return repair;
 }
+function reopenArchitecture(store,state,op,report,ctx,blocker){return reopenRecordOwner(store,state,op,report,ctx,blocker,'sds-gap');}
+/**
+ * `srs-gap`: the requirement itself is silent, confusing or self-contradictory. The business node that owns the
+ * SRS is reopened and revised - the runtime states the readings, takes the most reasonable one and says why -
+ * rather than the design inventing the product rule it was supposed to realise.
+ */
+function reopenBusiness(store,state,op,report,ctx,blocker){return reopenRecordOwner(store,state,op,report,ctx,blocker,'srs-gap');}
 
 /**
  * `interface-gap`: a frontend implementation found the accepted design silent about what it must build. The
@@ -931,6 +963,16 @@ function handleBlocked(store,state,op,report,ctx){
   }
   // A shape the installed grammar cannot render is grown into the grammar, once, never invented beside it.
   if(blocker.kind==='grammar-gap')return growGrammar(store,state,op,report,blocker,ctx);
+  // A requirement the SRS does not settle is revised in the business record - the runtime states the readings,
+  // takes the most reasonable one and says why - never guessed at in a design or in code.
+  if(blocker.kind==='srs-gap'){
+    if(ctx.work&&reopenBusiness(store,state,op,report,ctx,blocker))return 'srs-gap';
+    // No Work tree, or no business node to revise: the requirement is the owner's and the kernel says so.
+    op.status='blocked';
+    state.needUser.push({op:op.id,kind:'srs-gap',detail:`${blocker.detail} (no requirement record to revise)`});
+    routed(store,op,'srs-gap','needUser',null,{then:routeOf({blocker:'srs-gap',kind:op.kind})?.then??null});
+    return 'escalate-to-user';
+  }
   if(blocker.kind==='sds-gap'){
     if(ctx.work&&reopenArchitecture(store,state,op,report,ctx,blocker))return 'sds-gap';
     const design=unique([...state.inputs.filter(item=>item.kind==='sds').map(item=>item.ref),

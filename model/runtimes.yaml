@@ -63,6 +63,7 @@ roleOfKind:
   interface.implement: implement
   grammar.update: implement
   architecture.revise: decide
+  business.revise: decide
   content.generate: write
   release.deliver: implement
   runtime.operate: implement

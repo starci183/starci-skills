@@ -25,7 +25,7 @@ import {RECORD_KINDS, loadRecords, recordReads} from './io.mjs';
  */
 export const KIND_GRAPH='starci/kind-graph@1';
 /** The closed catalog. `validateGraph` refuses a profile that adds to it or drops from it. */
-export const KINDS=Object.freeze(['owner.ask','business.decide','architecture.decide','architecture.revise','brand.decide','interface.draw','interface.asset','e2e.verify',
+export const KINDS=Object.freeze(['owner.ask','business.decide','business.revise','architecture.decide','architecture.revise','brand.decide','interface.draw','interface.asset','e2e.verify',
   'frontend.implement','backend.implement','runtime.operate','grammar.update','uat.verify','integration.verify','review.verify','work.author']);
 export const FAMILIES=Object.freeze(['design','build','prove','repair']);
 export const ROLES=Object.freeze(['decide','plan','implement','verify','write']);
@@ -35,9 +35,9 @@ export const ROLES=Object.freeze(['decide','plan','implement','verify','write'])
  * is re-exported rather than copied, so a caller that has the graph never needs a second name for it.
  */
 export {RECORD_KINDS as RECORDS} from './io.mjs';
-export const ORIGINS=Object.freeze(['ledger','shared','repair','gate','verify','architecture']);
+export const ORIGINS=Object.freeze(['ledger','shared','repair','gate','verify','architecture','business']);
 export const OUTCOMES=Object.freeze(['done','partial','failed','ask','blocked']);
-export const BLOCKERS=Object.freeze(['shared-change','sds-gap','interface-gap','brand-gap','grammar-gap','environment','authority']);
+export const BLOCKERS=Object.freeze(['shared-change','srs-gap','sds-gap','interface-gap','brand-gap','grammar-gap','environment','authority']);
 export const VERDICTS=Object.freeze(['pass','findings','rejected','gate-failed']);
 export const THEN=Object.freeze(['retry','reopen','pause','settle','needUser']);
 /**

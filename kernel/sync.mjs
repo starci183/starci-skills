@@ -653,13 +653,14 @@ export function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op
   if(ctx.work&&!nodeId&&op.kind===BRAND_DECIDE){rereadBrand(store,state,op,ctx);return;}
   if(!ctx.work||!nodeId)return;
   verified={...verified,checks:[...(verified?.checks??[]),...kernelProof(ctx,nodeId)]};
-  const decision=['architecture.decide','architecture.revise','business.decide',BRAND_DECIDE].includes(op.kind)||kindRole(op.kind)==='decide';
+  const decision=['architecture.decide','architecture.revise','business.decide','business.revise',BRAND_DECIDE].includes(op.kind)||kindRole(op.kind)==='decide';
   if(decision){
     ledgerWrite(store,state,op,ctx,'decided',node=>ctx.work.api.markDecided(ctx.work.at,node,{
       by:'starci-kernel',
-      // A revision of an accepted design bumps its rev, so a reopened decision is not read as the first one.
-      // A brand decision always does: every surface already built from the old brand is bound to that rev.
-      rev:['architecture.revise',BRAND_DECIDE].includes(op.kind)?nextRev(ctx,node):null,
+      // A revision of an accepted record bumps its rev, so a reopened decision is not read as the first one -
+      // the design for `architecture.revise`, the requirement for `business.revise`. A brand decision always
+      // does: every surface already built from the old brand is bound to that rev.
+      rev:['architecture.revise','business.revise',BRAND_DECIDE].includes(op.kind)?nextRev(ctx,node):null,
       digest:ctx.work.digest,
       review:{reviewer:op.runtime??'starci-kernel',
         authority:`the kernel accepted ${op.id} after re-running its checks itself`,
