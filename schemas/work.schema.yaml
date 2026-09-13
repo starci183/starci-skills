@@ -1599,7 +1599,13 @@ $defs:
         type: array
         description: Any number of design/reference assets under this UI node's assets/**. Explain covered
           screens, states and viewports in role; record origin in provenance. Each path also appears
-          in node.assets. Multiple images do not imply alternative design directions.
+          in node.assets. Multiple images do not imply alternative design directions. A drawn candidate is
+          one PNG per screen and viewport of that screen's main state, captured by a headless browser from
+          the installed grammar's own renderers, and the markup it was rendered from is kept beside it as
+          <candidate>.html under the same assets/ folder - the picture is what a reader sees, the markup is
+          what it was rendered from, so the render can be checked from its source rather than from an
+          opinion about it. Its provenance is that capture (browser, viewport, grammar package and version,
+          brand rev), not a generation prompt.
         items:
           type: object
           additionalProperties: false

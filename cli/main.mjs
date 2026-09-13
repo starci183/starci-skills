@@ -34,6 +34,7 @@ Usage:
   starci source-layout <backend-root> <frontend-root>
   starci validate <work-root>
   starci brand check <work-root> [--source <repository-root>] [--json]
+  starci render check <ui-node-dir> --brand <work-root> [--family <id>] [--json]
   starci tree <work-root>
   starci impact <work-root> <node-or-resource-id>
   starci stale <work-root>
@@ -220,6 +221,28 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const {runBrandChecks,formatBrandChecks}=await import('../checks/brand.mjs');
       const result=runBrandChecks({tree:directory(rest[0]),sourceRoot:source?directory(source):null});
       emit(json?result:formatBrandChecks(result));
+      return result.ok?0:1;
+    }
+    if(command==='render'){
+      // Read-only: re-derives the drawing's two canon rules from the captured bytes and the markup kept beside them.
+      const [action,...input]=args;
+      if(action!=='check')throw Error('Use starci render check <ui-node-dir> --brand <work-root> [--family <id>] [--json].');
+      const json=input.includes('--json');
+      const rest=input.filter(value=>value!=='--json');
+      const option=name=>{
+        const at=rest.indexOf(`--${name}`);
+        if(at===-1)return null;
+        const value=rest[at+1];
+        if(!value||value.startsWith('--'))throw Error(`--${name} needs one value.`);
+        rest.splice(at,2);
+        return value;
+      };
+      const brand=option('brand'),family=option('family');
+      if(!brand)throw Error('--brand needs the Work tree (or repository root) that owns the brand record.');
+      exactArgs(rest,1);
+      const {runRenderChecks,formatRenderChecks}=await import('../checks/render.mjs');
+      const result=runRenderChecks({uiDir:directory(rest[0]),brandTree:directory(brand),family});
+      emit(json?result:formatRenderChecks(result));
       return result.ok?0:1;
     }
     if(command==='storage'){exactArgs(args,1);const result=inspectStorage(directory(args[0]));emit(result);return result.newWorkAllowed?0:1;}

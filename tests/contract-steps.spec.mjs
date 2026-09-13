@@ -122,6 +122,9 @@ test('interface.draw enumerates every screen state and writes the design record 
   assert.match(text,/Render ONE candidate per screen and viewport \(desktop and mobile\) - the main state only - FROM THE INSTALLED GRAMMAR ITSELF/);
   assert.match(text,/Never an image model for a surface/);assert.match(text,/never a capture of a working feature/);
   assert.match(text,/loading, empty and error are the grammar's own state contracts and the build renders them from code/);
+  // The markup the browser rendered is kept beside the picture, so the render can be checked from its source.
+  assert.match(drawn[4],/KEEPING THE MARKUP IT RENDERED beside each PNG as `<candidate>\.html`/);
+  assert.match(drawn[4],/a candidate that is not the grammar rendering the screen is a defect, and so is one with no markup beside it/);
   // The artwork the chosen candidate embeds is declared, so nothing of the approved picture is lost at build time.
   assert.match(drawn[5],/List every artwork the chosen candidate embeds/);
   for(const part of ['each illustration','each appearance of the brand mascot','each decorative image','each chart or media placeholder'])assert.ok(drawn[5].includes(part),part);
@@ -130,6 +133,13 @@ test('interface.draw enumerates every screen state and writes the design record 
     assert.match(drawn[5],new RegExp(field),field);
   assert.match(drawn[5],/A candidate whose embedded artwork the record does not list is an incomplete record/);
   assert.match(drawn[6],/every artwork visible in the chosen candidate has its `artworkSlots` entry with a crop that locates it/);
+  // The self-check names the two canon rules of 2026-09-13 and the command that reads them from the bytes.
+  assert.match(drawn[6],/NO CANDIDATE PLACES A LIST OF ENTITIES INSIDE A CARD \(a collection is a page section with a heading; a card is one item\)/);
+  assert.match(drawn[6],/EVERY COLOUR THE CAPTURE IS LARGELY MADE OF IS A BRAND TOKEN and the brand's primary is present/);
+  assert.match(drawn[6],/THE MASCOT APPEARS ONLY WHERE THE BRAND RECORD ALLOWS IT/);
+  assert.match(drawn[6],/`starci render check <ui node dir> --brand <work root>`/);
+  assert.match(text,/the two canon rules hold in the candidates themselves and `starci render check` says so/);
+  assert.match(text,/with the markup it was rendered from kept beside it as `<candidate>\.html`/);
   assert.match(text,/every artwork the chosen candidate embeds is declared as an `artworkSlots` entry with its region, purpose, brief, size, format, brand references and candidate crop; a candidate with artwork the record does not list is incomplete/);
   assert.match(text,/every assertion \(`intake-screen-shows-every-state`\) maps to a named screen state/);
   assert.match(text,/`blocked` with blocker `sds-gap` and the exact question, never a guess/);

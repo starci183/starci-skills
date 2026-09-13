@@ -17,6 +17,7 @@ specifications/v2.mjs
 kernel/chains.mjs
 approvals/policy.mjs
 checks/brand.mjs
+checks/render.mjs
 execution/contracts.mjs
 execution/api.mjs
 execution/resolve.mjs

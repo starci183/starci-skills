@@ -133,10 +133,69 @@ applied while the product looked untouched. The grammar root defaults to the hos
 built `.dist` copy, as ordinary runtime does. The check skips, with the reason, when the brand declares no
 family or the host carries no DNA snapshot for it — an unreadable canon proves nothing either way.
 
+## Render checks
+
+The six checks above read the record and the source. They cannot see a drawing. `checks/render.mjs` reads
+the two artefacts an `interface.draw` leaves behind — the PNG a headless browser captured and the markup it
+was rendered from, kept beside it as `<candidate>.html` — and answers the two canon rules of 2026-09-13 from
+them.
+
+```
+starci render check <ui node dir> --brand <work root> [--family <id>] [--json]
+```
+
+`<ui node dir>` is the design node that owns the captures (its `index.yaml` carries the `ui:` spec, its
+`assets/` the candidates). `--brand` is the Work tree, or a repository root, whose `brand/index.yaml` the
+render was drawn against; it is not optional, because nothing binds a palette without it. `--family`
+overrides the grammar family the brand declares. One line per check, exit 1 on a failing check or a broken
+input — no design record, a node with no `ui:` spec, no brand record.
+
+```
+runRenderChecks({uiDir, brandTree, family=null, grammarRoot=<host>/knowledge/grammars})
+  → {schema, ok, checks:[{id, outcome, detail, evidence}], candidates, node, brand, grammar}
+```
+
+| check | reads | fails when |
+| --- | --- | --- |
+| `palette-off-brand` | the capture's pixels | a colour bucket over 2% of the saturated pixels is farther than deltaE 6 from every brand colour token and every scale step |
+| `primary-absent` | the capture's pixels | the brand's `role: primary` token appears in no bucket at all |
+| `entity-list-in-card` | the kept markup | three or more repeated rows (`li`/`tr`, or siblings sharing one class) sit inside a card surface of the family |
+| `mascot-slot-missing` | the design record | `brand.mascot.allowedIn` names a surface whose `ui.artworkSlots` declares no slot for the mascot |
+
+**The decoder.** `decodePng` is implemented in the module on `node:zlib`: signature, IHDR, concatenated
+IDAT, the five scanline filters, 8-bit greyscale, greyscale+alpha, RGB and RGBA, non-interlaced. A palette
+image, a 16-bit image, an interlaced one or a file the decoder cannot follow throws
+`unsupported png: <why>`, and the run records the reason as a `skip` rather than reporting colours the file
+does not have.
+
+**The colours.** `dominantColours` drops every pixel under half opaque, every lightness outside 0.12–0.95
+(the page's paper and its ink) and every OKLab chroma under 0.04 (its greys), then buckets what remains on a
+fixed OKLab grid of eight steps per axis and reports each bucket's mean. The comparison tolerance is
+`PALETTE_TOLERANCE` = `TOKEN_TOLERANCE` × 12 = **deltaE 6** on the same x100 scale the brand checks use: a
+capture is antialiased, composited and quantised again by the bucket mean, so the half-unit tolerance that
+binds a token to a stylesheet is far too tight here, while six — about three just-noticeable differences —
+still leaves a different hue a different hue. A bucket under **2%** of the saturated pixels is not judged:
+that is the fringe of an antialiased glyph, not a filled button.
+
+**The markup.** `checkEntityListInCard` scans tags, class attributes and nesting with a tolerant scanner
+rather than a DOM library, which the runtime does not install. The card classes come from the family's own
+`DNA.yaml` — the classes of its card renderers that name the card surface itself — and fall back to
+`starci-core-surface` / `starci-core-surface-card` when the host carries no snapshot. A collection outside
+every card passes, whether a `<section>` holds it or a heading introduces it.
+
+`renderChecksFor({op, state, ctx, files})` is the kernel's hook: it finds the ui node from the operation's
+allowlist or the files its diff touched, runs the same checks, and returns **null** — not a green result —
+for an operation that wrote no design record, so an operation that drew nothing is never reported as a
+drawing that passed. The knowledge these checks enforce is `COLLECTION-1`/`COLLECTION-2`
+(`knowledge/ui/composition/collection.yaml`) and `BRAND-1` to `BRAND-3`
+(`knowledge/ui/proof/brand.yaml`).
+
 ## What is not proven here
 
-`typography`, `logo`, `imagery`, `color.scales`, `color.dark`, `mascot.allowedIn`/`forbiddenIn` and
-`brand.forbidden` are read as part of the record but no check re-derives them yet. A dark palette, a mascot
-placement rule and a forbidden treatment are claims about rendered surfaces; proving them needs a walk with
-screenshots, not a file read. Until then they are stated, and this document says so rather than letting a
-green run imply otherwise.
+`typography`, `logo`, `imagery` and `brand.forbidden` are read as part of the record but no check
+re-derives them. `mascot.forbiddenIn` is not read from the pixels either: the render checks prove that a
+slot exists where the mascot is allowed, not that the character is absent where it is forbidden — that
+needs recognising the mascot in the capture, which reading bytes does not do. A dark palette is compared
+only when a capture is of the dark theme and the record declares `color.dark`; nothing here decides which
+theme a given capture is of. Until those are proven they are stated, and this document says so rather than
+letting a green run imply otherwise.
