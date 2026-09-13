@@ -363,6 +363,8 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     definitionOfDone:[],risks:[],questions:[],ledger:[],ops:[],needUser:[],gateResults:[],verifyRounds:{},gateRounds:0,
     lanes:{},
     decisions:[],ledgerSummary:null,brand:null,
+    // The critique of the goal (`critiqueGoal`) and, when its verdict was `refuse`, the owner's own override of it.
+    critique:null,critiqueOverride:null,
     dynamicOps:0,dynamicOpsBudget:DYNAMIC_OPS_BUDGET,sharedQueue:[],silences:{},preflight:null,
     head:null,iterations:0,counters:{},stalls:0,allocation:null,finished:null,createdAt:Date.now()};
 }
@@ -596,10 +598,12 @@ function gateDynamicOp(store,state,op){
  */
 export function goalPhase(store,state,options={}){
   const phased=state.ledgerMode===WORK_LEDGER?workGoalPhase(store,state,options):planGoalPhase(store,state,options);
-  // goal.md is written by the phase (a model renders the plan one), so the lane header is spliced in afterwards:
-  // whatever else the page says, the first thing a reader sees is which worktree this workflow owns.
+  // goal.md is written by the phase (a model renders the plan one), so the critique section and the lane header
+  // are spliced in afterwards: whatever else the page says, a reader sees the objections to the goal before the
+  // definition of done, and the worktree this workflow owns before anything else.
+  if(phased?.ok&&plain(state.critique))noteCritiqueInGoal(store,state);
   if(phased?.ok&&plain(state.lane))noteLaneInGoal(store,state);
-  return plain(state.lane)?{...phased,lane:laneView(state)}:phased;
+  return {...phased,...(plain(state.lane)?{lane:laneView(state)}:{}),...(plain(state.critique)?{critique:critiqueView(state)}:{})};
 }
 
 /** The two lines of goal.md that name the lane and the base it goes home to, under the title. */
@@ -619,11 +623,186 @@ function noteLaneInGoal(store,state){
   fs.writeFileSync(store.paths.goal,lines.join('\n'));
 }
 
+/* ------------------------------------------------------------------ the critique of the goal */
+
+/**
+ * Every goal a person writes is critiqued by the runtime before anything is planned from it. The critique is a
+ * phase of the kernel, not a helper session: `critiqueGoal` is called in both ledger modes after the assessment
+ * and before the approval page is written, its verdict is recorded in `state.critique`, in goal.json and in
+ * goal.md above the definition of done, and the verdict has consequences - `revise` binds every operation
+ * through its contract, `refuse` refuses the approval until the question is answered or the owner overrides it.
+ * A provider that cannot answer never blocks a workflow: that is one event and one line on the page.
+ */
+/** Decision kinds whose accepted record is the product's own law: what a goal is critiqued against. */
+const DECIDED_KINDS=['business','business-overview','architecture'];
+/** Keys of an srs/sds payload that carry what the record states and what it was accepted against. */
+const STATEMENT_KEYS=['statements','acceptanceCriteria','acceptance','criteria','closureCriteria','invariants','requirement','goal','question'];
+/**
+ * The statements of one decided record: the strings under a statement key of its `extensions.work3.srs` or
+ * `.sds` payload, flattened, trimmed and capped, so the critic reads what the record states and not its tree.
+ */
+export function recordStatements(payload,{max=12,maxChars=300}={}){
+  const found=[];
+  const collect=(value,depth)=>{
+    if(found.length>=max||depth>6)return;
+    if(typeof value==='string'){const line=String(value).replace(/\s+/g,' ').trim();if(line)found.push(line.slice(0,maxChars));return;}
+    if(Array.isArray(value)){for(const item of value)collect(item,depth+1);return;}
+    if(plain(value))for(const item of Object.values(value))collect(item,depth+1);
+  };
+  const walk=(value,depth)=>{
+    if(found.length>=max||depth>6)return;
+    if(Array.isArray(value)){for(const item of value)walk(item,depth+1);return;}
+    if(!plain(value))return;
+    for(const [key,item] of Object.entries(value))STATEMENT_KEYS.includes(key)?collect(item,depth+1):walk(item,depth+1);
+  };
+  walk(payload,0);
+  return unique(found).slice(0,max);
+}
+/**
+ * The records the product has already accepted in scope: every decided business or architecture node with the
+ * statements and acceptance criteria of its authored payload. This is the evidence the critic names, so an
+ * objection that contradicts one of them is actionable and one that names none is dropped.
+ */
+export function decidedRecords(api,at,loaded,{scope=[],max=40}={}){
+  const list=Array.isArray(loaded?.list)?loaded.list:[];
+  const chosen=scope.length?list.filter(node=>scope.some(entry=>scopeNames(node,entry))):list;
+  const records=[];
+  for(const node of chosen){
+    if(records.length>=max)break;
+    if(!DECIDED_KINDS.includes(node.kind)||node.state!=='done')continue;
+    let raw=null;
+    try{raw=typeof api?.readNode==='function'?api.readNode(at,node):null;}catch{raw=null;}
+    const work3=raw?.extensions?.work3??null;
+    records.push({id:node.id,kind:node.kind,
+      title:[raw?.description,raw?.title,raw?.name].map(value=>String(value??'').trim()).find(Boolean)||String(node.id),
+      statements:recordStatements(work3?.srs??work3?.sds??work3??null)});
+  }
+  return records;
+}
+
+/**
+ * Run the critique and record it. The providers are the host's supervisor runtimes (`supervisor.runtimes` in
+ * config.json, astra then fable) unless the caller names its own chain. An unanswered critique is
+ * `goal-critique-unavailable` and the workflow carries on: a dead provider is not a veto over the owner's job.
+ */
+export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,providers=null,cwd=state.worktree,runHeadless,
+  ledger=[],decisions=[],records=[],material=[],constraints=[]}={}){
+  const chain=providers??critiqueRuntimes(state.host??'');
+  const critiqued=typeof critiqueGoal==='function'?critiqueGoal({job:state.job,scope:state.scope??[],ledger,decisions,
+    records,material,brand:state.brand??null,constraints,providers:chain,cwd,runHeadless}):null;
+  if(!critiqued?.ok){
+    state.critique={verdict:'unavailable',objections:[],required:[],alternatives:[],question:null,prerequisites:[],provider:null,
+      at:Date.now(),reason:critiqued?.reason??'critiqueGoal was not available'};
+    store.appendEvent({event:'goal-critique-unavailable',reason:state.critique.reason,
+      attempts:critiqued?.attempts?.length??0,providers:chain});
+    return state.critique;
+  }
+  state.critique={verdict:critiqued.verdict,objections:(critiqued.objections??[]).map(item=>({...item})),
+    required:[...(critiqued.required??[])],alternatives:[...(critiqued.alternatives??[])],
+    question:critiqued.question??null,prerequisites:(critiqued.prerequisites??[]).filter(plain).map(item=>({...item})),
+    provider:critiqued.provider??null,at:Date.now(),
+    ...((critiqued.dropped??[]).length?{dropped:critiqued.dropped.length}:{})};
+  store.appendEvent({event:'goal-critiqued',verdict:state.critique.verdict,objections:state.critique.objections.length,
+    provider:state.critique.provider,...(state.critique.prerequisites.length?{prerequisites:state.critique.prerequisites.length}:{}),
+    ...(state.critique.dropped?{dropped:state.critique.dropped}:{})});
+  return state.critique;
+}
+/**
+ * A prerequisite the critique names is acted on, not only printed. "Add X to the backend" with no record of X
+ * is the common case: the goal phase plans the intake that authors X's records first (`work.author` for a
+ * feature, `brand.decide` for the brand) and holds every other operation of the goal behind it, so the build
+ * starts from a record and never from the prompt. A prerequisite the tree already holds changes nothing; a
+ * `decision` is the owner's and stays on the page (`prerequisite-owner`).
+ */
+function planCritiquePrerequisites(store,state,{loaded,workRoot,repositories={},ctx=null}){
+  const listed=(state.critique?.prerequisites??[]).filter(plain);
+  const planned=[];
+  for(const item of listed){
+    const entry=item.kind==='brand'?'brand':slash(String(item.feature??'')).replace(/\/+$/,'');
+    if(!entry)continue;
+    if(item.kind==='decision'){store.appendEvent({event:'prerequisite-owner',kind:item.kind,feature:item.feature??null,why:item.why});continue;}
+    const held=entry==='brand'?Boolean(state.brand):loaded.list.some(node=>scopeNames(node,entry));
+    if(held){store.appendEvent({event:'prerequisite-held',kind:item.kind,feature:entry,why:item.why});continue;}
+    const existing=state.ops.find(op=>op.intake?.scope===entry);
+    if(existing){planned.push(existing);continue;}
+    const raw=intakeOp(state,{workRoot,loaded,index:state.ops.filter(op=>op.intake?.scope==='brand').length,entry,repositories});
+    const op=toOp(raw,state.ops.length);op.intake=raw.intake;op.difficulty='hard';op.prerequisite={kind:item.kind,why:item.why};
+    if(ctx)locateSharedTreePaths(op,ctx);
+    state.ops.push(op);planned.push(op);
+    store.appendEvent({event:'intake-planned',op:op.id,scope:op.intake.scope,kind:op.kind,allowlist:op.allowlist,prerequisite:item.kind,why:item.why});
+  }
+  const ids=unique(planned.map(op=>op.id));
+  if(ids.length)for(const op of state.ops){if(!ids.includes(op.id))op.dependsOn=unique([...(op.dependsOn??[]),...ids]);}
+  return planned;
+}
+const critiqueView=state=>({verdict:state.critique?.verdict??null,objections:(state.critique?.objections??[]).length,
+  required:(state.critique?.required??[]).length,provider:state.critique?.provider??null,
+  ...((state.critique?.prerequisites??[]).length?{prerequisites:state.critique.prerequisites.length}:{}),
+  ...(plain(state.critiqueOverride)?{overridden:state.critiqueOverride.reason}:{})});
+
+export const CRITIQUE_HEADING='## Phản biện (critique)';
+const sentence=value=>{const line=firstLine(value);return !line?'(not stated)':/[.!?]$/.test(line)?line:`${line}.`;};
+/** The critique as the user reads it on the approval page: the verdict, the objections with their evidence, then what it demands. */
+export function critiqueLines(state){
+  const critique=plain(state.critique)?state.critique:{verdict:'unavailable'};
+  const by=critique.provider?` (critic \`${critique.provider}\`)`:'';
+  const lines=[CRITIQUE_HEADING,``];
+  if(critique.verdict==='unavailable'){
+    lines.push(`Phản biện: chưa chạy được - no critic runtime answered (${critique.reason??'unavailable'}), so this goal`,
+      `was never challenged. The approval is not blocked by that, and nothing here binds an operation.`);
+    return [...lines,``];
+  }
+  lines.push({
+    sound:`Verdict: \`sound\`${by} - the critique found nothing that blocks this goal; proceed as written.`,
+    revise:`Verdict: \`revise\`${by} - proceed only under the required changes below. They are part of the goal you approve here, and every operation of this workflow carries them in its contract.`,
+    refuse:`Verdict: \`refuse\`${by} - this goal contradicts an accepted record or cannot be verified at all, so the approval is refused. Answer the question below and run the goal again, or accept the critique with \`workflow-approve --id ${state.id} --accept-critique "<reason>"\`.`
+  }[critique.verdict]??`Verdict: \`${critique.verdict}\`${by}.`);
+  if((critique.objections??[]).length){
+    lines.push(``);
+    for(const objection of critique.objections)
+      lines.push(`- **${objection.kind}** - ${sentence(objection.claim)} Evidence: ${sentence(objection.evidence)} Consequence: ${sentence(objection.consequence)}`);
+  }
+  if(critique.dropped)lines.push(``,`${critique.dropped} objection(s) named no evidence and were dropped by the kernel.`);
+  if(['revise','refuse'].includes(critique.verdict)&&(critique.required??[]).length)
+    lines.push(``,`### Required changes`,``,...critique.required.map((item,index)=>`${index+1}. ${firstLine(item)}`));
+  if((critique.alternatives??[]).length)lines.push(``,`### Alternatives`,``,...critique.alternatives.map(item=>`- ${firstLine(item)}`));
+  if(critique.verdict==='refuse'&&critique.question)lines.push(``,`### Question`,``,firstLine(critique.question));
+  if((critique.prerequisites??[]).length){
+    const opOf=item=>state.ops?.find(op=>op.intake?.scope===(item.kind==='brand'?'brand':slash(String(item.feature??'')).replace(/\/+$/,'')))?.id??null;
+    lines.push(``,`### Prerequisites`,``,...critique.prerequisites.map(item=>{
+      const op=opOf(item);
+      return `- **${item.kind}**${item.feature?` of \`${item.feature}\``:''} - ${sentence(item.why)}${item.kind==='decision'?' The owner decides it.':op?` Planned first as \`${op}\`; every other operation waits for it.`:' The tree already holds it.'}`;
+    }));
+  }
+  if(plain(state.critiqueOverride))lines.push(``,
+    `Override: the owner accepted this critique - "${firstLine(state.critiqueOverride.reason)}". An override is the owner's decision, so the kernel does not ask again.`);
+  return [...lines,``];
+}
+/** Write the section into goal.md above the definition of done, replacing the one that is already there. */
+function noteCritiqueInGoal(store,state){
+  let page='';
+  try{page=fs.readFileSync(store.paths.goal,'utf8');}catch{page='';}
+  const lines=page.split('\n');
+  const section=critiqueLines(state);
+  const at=lines.findIndex(line=>line.trim()===CRITIQUE_HEADING);
+  if(at>=0){
+    let end=at+1;
+    while(end<lines.length&&!lines[end].startsWith('## '))end+=1;
+    lines.splice(at,end-at,...section);
+  }else{
+    const heading=lines.findIndex(line=>line.startsWith('## '));
+    const title=lines.findIndex(line=>line.startsWith('# '));
+    lines.splice(heading>=0?heading:title<0?lines.length:title+1,0,...section);
+  }
+  const text=lines.join('\n');
+  fs.writeFileSync(store.paths.goal,text.endsWith('\n')?text:`${text}\n`);
+}
+
 /**
  * Plan ledger: one model call fills the whole plan form (definition of done, ledger, operations), the
  * kernel writes goal.md and goal.json and stops. Nothing is launched before the user approves.
  */
-export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,renderGoalMarkdown=llm.renderGoalMarkdown,extractMaterial=llm.extractMaterial,cwd=state.worktree,providers,runHeadless}={}){
+export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,renderGoalMarkdown=llm.renderGoalMarkdown,extractMaterial=llm.extractMaterial,cwd=state.worktree,providers,runHeadless}={}){
   need(!state.approved,`Workflow ${state.id} is already approved; run workflow-run`);
   need(typeof assessGoal==='function','assessGoal is not available yet in execution/llm-functions.mjs');
   const material=typeof extractMaterial==='function'?extractMaterial(state.inputs.map(item=>item.ref),{cwd}):[];
@@ -660,8 +839,14 @@ export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,renderGoalM
   for(const [index,op] of state.ops.entries())for(const other of state.ops.slice(index+1)){
     if(allowlistsOverlap(op.allowlist,other.allowlist)&&!other.dependsOn.includes(op.id)&&!op.dependsOn.includes(other.id))overlaps.push([op.id,other.id]);
   }
+  // The goal is critiqued before the page that asks for the approval is written: the plan the model assessed is
+  // exactly what the critic reads, so an objection to it is an objection to what the user is about to approve.
+  critiqueGoalPhase(store,state,{critiqueGoal,providers,cwd,runHeadless,material,
+    ledger:state.ledger.map(item=>({id:item.id,kind:null,title:item.title})),
+    constraints:[`the ledger of this goal was assessed by a model, not authored: a ledger item the plan calls done is approved by the user and never verified by the kernel`,
+      ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)]});
   writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,job:state.job,inputs:state.inputs,ledgerMode:state.ledgerMode,
-    definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,
+    definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,critique:state.critique??null,
     ledger:state.ledger,ops:state.ops.map(op=>({id:op.id,kind:op.kind,goal:op.goal,
       ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
     gates:state.gates,serializedOverlaps:overlaps,assessedBy:assessed.provider??null});
@@ -1140,7 +1325,7 @@ function intakeOp(state,{workRoot,loaded,index,entry=null,repositories={}}){
     references:unique(['workspace.yaml',...exampleRefs]),checks:[check],
     acceptance:[`features/${name} has a module record, a business overview, SRS records and an architecture skeleton, all todo and valid`,'no existing feature changed','the Work tree still validates'],origin:'ledger'};
 }
-export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless,
+export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless,
   ledgerRoot=null,git=spawnSync,resolveLedger=resolveLedgerRoot}={}){
   need(!state.approved,`Workflow ${state.id} is already approved; run workflow-run`);
   // The Work ledger is the branch content of the worktree; only the workflow history lives in the main repository.
@@ -1212,10 +1397,23 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
     state.questions=incomplete.map(node=>`${node.id}: ${node.reason}`);
     store.appendEvent({event:'goal-assessment-failed',reason:assessed?.reason??'assessGoal was not available',attempts:assessed?.attempts?.length??0});
   }
+  // The critique runs whether or not the assessment answered: the job text is the goal, and the records the
+  // product already accepted are what it is challenged against. An unanswered critique is an event, never a stop.
+  critiqueGoalPhase(store,state,{critiqueGoal,providers,cwd,runHeadless,
+    ledger:state.ledger.map(item=>({id:item.id,kind:item.kind,title:item.title})),
+    decisions:state.decisions.map(item=>({id:item.id,kind:item.kind,title:item.title})),
+    records:decidedRecords(ledgerApi,at,loaded,{scope:state.scope}),
+    constraints:[
+      `the ledger is the authored Work tree under ${slash(binding.ledgerRoot)}: the goal may not add, drop or rewrite a node, so an objection to the ledger is an objection to the scope of this goal`,
+      `the Work tree ${loaded.ok?'validates':'does NOT validate'}, and ${state.ledgerSummary?.eligible??0} of ${state.ledgerSummary?.total??0} nodes in scope are eligible`,
+      ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)]});
+  planCritiquePrerequisites(store,state,{loaded,workRoot:binding.ledgerRoot,repositories,
+    ctx:{work:{shared:binding.sharedLedger,ledger:{repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot}}}});
+  need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
   writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,job:state.job,inputs:state.inputs,
     ledgerMode:state.ledgerMode,scope:state.scope,workRoot:slash(loaded.workRoot),ledgerValid:loaded.ok,
     ledgerSource:binding.source,ledgerShared:binding.sharedLedger,ledgerOwner:state.ledgerOwner,codeRepository:repository,codeSide:binding.side??null,
-    definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,
+    definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,critique:state.critique??null,
     ledger:state.ledger,decisions:state.decisions,ledgerSummary:state.ledgerSummary,brand:state.brand??null,
     lanes:Object.fromEntries(Object.entries(state.lanes??{}).map(([node,entry])=>[node,[...entry.lane]])),
     ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
@@ -1342,7 +1540,20 @@ export function proposeQuota(state,{runtimes=null,shared=undefined}={}){
   return proposal;
 }
 
-export function approve(store,state,{allocation=null,allowDynamic=null}={}){
+export function approve(store,state,{allocation=null,allowDynamic=null,acceptCritique=null}={}){
+  // A goal the critique refused is not approvable as it stands: either the question is answered and the goal is
+  // written again, or the owner overrides the critique on the record. An override is the owner's own decision, so
+  // it is taken once and never asked for again.
+  const refused=state.critique?.verdict==='refuse'&&!plain(state.critiqueOverride);
+  const accepted=String(acceptCritique??'').trim();
+  if(refused){
+    need(accepted,`The critique of goal ${state.id} returned \`refuse\`: ${state.critique.question??'it named no question'} `+
+      `Answer that and run workflow-goal again, or accept the critique with workflow-approve --id ${state.id} --accept-critique "<reason>".`);
+    state.critiqueOverride={reason:accepted,at:Date.now()};
+    store.appendEvent({event:'critique-overridden',reason:accepted,question:state.critique.question??null,
+      objections:(state.critique.objections??[]).length});
+    noteCritiqueInGoal(store,state);
+  }
   if(allocation)state.quota=parseQuota(allocation);
   // `--allow-dynamic N` is the user raising the run-time op budget; ops the gate refused are reinstated with it.
   if(allowDynamic!==null&&allowDynamic!==undefined&&String(allowDynamic).trim()){
@@ -1371,10 +1582,12 @@ export function approve(store,state,{allocation=null,allowDynamic=null}={}){
   need(state.ops.length||toAuthor,`Workflow ${state.id} has no plan to approve; run workflow-goal first`);
   state.approved=true;
   if(state.phase!=='finished')state.phase='run';
-  store.appendEvent({event:'approved',ops:state.ops.length,toAuthor,quota:state.quota,dynamicOpsBudget:dynamicBudget(state)});
+  store.appendEvent({event:'approved',ops:state.ops.length,toAuthor,quota:state.quota,dynamicOpsBudget:dynamicBudget(state),
+    critique:state.critique?.verdict??null});
   store.saveState(state);
   return {ok:true,id:state.id,phase:state.phase,approved:true,ops:state.ops.length,ledger:state.ledger.length,
-    quota:state.quota,dynamicOpsBudget:dynamicBudget(state)};
+    quota:state.quota,dynamicOpsBudget:dynamicBudget(state),
+    ...(plain(state.critique)?{critique:critiqueView(state)}:{})};
 }
 
 /* ------------------------------------------------------------------ contract */
@@ -1423,8 +1636,20 @@ function brandBlock(op,brand){
     `Every colour, font, icon and illustration you produce comes from this record and the installed grammar; you never invent one beside them.`,``];
 }
 
+/**
+ * What the critique of the goal demanded, in the contract of every operation of that goal. A `revise` verdict is
+ * not advice the kernel filed away: the changes the critic required are part of the goal the user approved, so
+ * they travel under the goal of every op and bind it as the goal itself does. Any other verdict renders nothing.
+ */
+function critiqueBlock(critique){
+  const required=critique?.verdict==='revise'?(critique.required??[]).map(item=>firstLine(item)).filter(Boolean):[];
+  if(!required.length)return [];
+  return [`## Goal critique - required`,...required.map(item=>`- ${item}`),
+    `The critique of this workflow's goal returned \`revise\`: these changes are part of the goal the user approved and bind this operation exactly as the goal above does.`,``];
+}
+
 export function renderContract({template,op,state,store,launcher=state.launcher,run=state.run,
-  guards=kernelGuards,protectedPaths=null,brand=state.brand??null}){
+  guards=kernelGuards,protectedPaths=null,brand=state.brand??null,critique=state.critique??null}){
   const text=String(template??'');
   for(const heading of ['## Cook until done','## Ping (mandatory)','## Never'])
     need(text.includes(heading),`The operation template has no "${heading}" section`);
@@ -1441,6 +1666,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `Runtime StarCi 5.0. One worktree \`${slash(state.worktree)}\` on branch \`${state.branch}\`. Other operations are running beside you in this same worktree: never touch a path outside your allowlist, never commit, never switch branches. Your Task id, Dispatch id and terminal handle are in the dispatch preamble.`,``,
     ...(laneLine(state,op)?[laneLine(state,op),``]:[]),
     `## Goal`,op.goal,``,
+    ...critiqueBlock(critique),
     ...(op.nodeId?(op.kind===AUTHOR_KIND
       ?[`## Work node you author`,`- \`${op.nodeId}\` - you complete this record so the kernel can launch the node's own work; you do not do that work. Its \`index.yaml\` is in your allowlist, and inside that file \`${RECORD_OWNED.join('`, `')}\` stay the kernel's: it reads them back, reverts the file if they moved and downgrades your report to \`failed\`. Never edit another node's \`index.yaml\`.`,``]
       :[`## Work node you close`,`- \`${op.nodeId}\` - the kernel writes its \`state\`, \`completion\` and evidence itself after it has reproduced your checks. Never edit a Work \`index.yaml\` unless it is in your allowlist.`,``]):[]),
@@ -3341,6 +3567,15 @@ export function withSupervisorPreference(profile,runtimes){
   return copy;
 }
 export const DEFAULT_SUPERVISOR_RUNTIMES=['claude-fable-5.1','gpt-6-astra'];
+/** `<host>/config.json` may set `critique.runtimes`: the critics every goal is challenged on, first answer wins. Astra first by default: one call per goal, and Fable's week is the scarcer window. */
+export function critiqueRuntimes(host){
+  try{
+    const config=JSON.parse(fs.readFileSync(path.join(host,'config.json'),'utf8'));
+    const listed=Array.isArray(config?.critique?.runtimes)?config.critique.runtimes:typeof config?.critique==='string'?[config.critique]:null;
+    const runtimes=(listed??[]).filter(item=>typeof item==='string'&&item.trim()).map(item=>item.trim());
+    return runtimes.length?runtimes:llm.DEFAULT_CRITIC_RUNTIMES;
+  }catch{return llm.DEFAULT_CRITIC_RUNTIMES;}
+}
 /** `<host>/config.json` may set `supervisor.runtimes`: the models triage and decide operations prefer, strongest first. */
 export function supervisorRuntimes(host){
   try{
@@ -3710,7 +3945,7 @@ function applyInbox(store,state,ctx){
     if(!plain(command))continue;
     if(command.kind==='approve'){
       const before={budget:dynamicBudget(state),quota:JSON.stringify(state.quota??null)};
-      approve(store,state,{allocation:command.allocation??null,allowDynamic:command.allowDynamic??null});
+      approve(store,state,{allocation:command.allocation??null,allowDynamic:command.allowDynamic??null,acceptCritique:command.acceptCritique??null});
       const quotaChanged=JSON.stringify(state.quota??null)!==before.quota;
       store.appendEvent({event:'inbox-applied',kind:'approve',allocation:command.allocation??null,allowDynamic:command.allowDynamic??null,budget:{from:before.budget,to:dynamicBudget(state)},quotaChanged});
       // The allocator was built from the quota at start: a new allocation takes effect at the next kernel start,
@@ -3814,12 +4049,14 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const {store,state}=open(options.id);
     // A live kernel owns the state: the command is queued in its inbox and applied at its next tick.
     if(state.approved&&kernelAlive(store)){
-      const file=queueInbox(store,{kind:'approve',allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null});
+      const file=queueInbox(store,{kind:'approve',allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null,
+        acceptCritique:options['accept-critique']??null});
       return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,queued:true,inbox:file,
         next:'the running kernel applies this at its next iteration (event inbox-applied); a new allocation restarts the kernel through the supervisor'};
     }
     return {schema:WORKFLOW_KERNEL,command,dir:store.dir,
-      ...approve(store,state,{allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null})};
+      ...approve(store,state,{allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null,
+        acceptCritique:options['accept-critique']??null})};
   }
   if(command==='workflow-status'){
     const {store,state}=open(options.id);
@@ -3829,6 +4066,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       ledgerRoot:state.ledgerRoot?slash(state.ledgerRoot):null,ledgerSource:state.ledgerSource??null,
       ledgerShared:Boolean(state.ledgerShared),ledgerOwner:state.ledgerOwner??null,codeSide:state.codeSide??null,
       ledgerSummary:state.ledgerSummary,decisions:state.decisions,brand:state.brand??null,preflight:state.preflight??null,
+      critique:state.critique??null,critiqueOverride:state.critiqueOverride??null,
       dynamicOps:state.dynamicOps??0,dynamicOpsBudget:dynamicBudget(state),sharedQueue:state.sharedQueue??[],
       ledger:state.ledger.map(item=>({id:item.id,status:item.status,title:item.title,evidence:item.evidence})),
       ops:state.ops.map(op=>({id:op.id,kind:op.kind,status:op.status,runtime:op.runtime,attempt:op.attempt})),

@@ -486,7 +486,9 @@ function usage(){return `Usage:
     then live in the owner repository, while code, checks and code commits stay in this worktree. A node that
     names no repository belongs to the side its layout sits in, so implementation/frontend/** is never a
     backend job's work and implementation/backend/** is never a frontend's.
-  node orca-supervised-launch.mjs workflow-approve --id <workflow-id> [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node orca-supervised-launch.mjs workflow-approve --id <workflow-id> [--allocation <runtime=slots,...>] [--allow-dynamic N] [--accept-critique "<reason>"] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+    --accept-critique is the owner overriding a goal critique that answered refuse: the reason is recorded and
+    the kernel never asks for it again.
   node orca-supervised-launch.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--allocation <runtime=slots,...>] [--max-iterations N] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     runs the kernel loop: up to 10 operation agents in one worktree, machine-verified acceptance, gates, final report.
     On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and

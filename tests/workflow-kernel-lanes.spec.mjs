@@ -112,6 +112,8 @@ function fixture(t){
 }
 
 const assessGoal=({ledger})=>({ok:true,provider:'fake',value:{definitionOfDone:[`the ${ledger.length} listed nodes are done`],risks:[],questions:[]}});
+/** The critic stands in too: every goal is critiqued by the runtime, and a real call here would be a different claim. */
+const critiqueGoal=()=>({ok:true,verdict:'sound',objections:[],dropped:[],required:[],alternatives:[],question:null,provider:'stub-critic',attempts:[],usage:null});
 /** The validator stands in: this spec is about the lane, and a real provider call would be a different claim. */
 const acceptAll=()=>({ok:true,verdict:'accept',summary:'stub validator: accepted',findings:[],dropped:[],provider:'stub',usage:null});
 
@@ -120,7 +122,7 @@ function openedLane(t,{lane=true,id=null}={}){
   const fixed=fixture(t);
   const fake=scriptedOrca({reportsDir:path.join(fixed.root,'unused-reports'),scripts:{},worktree:fixed.repo,worktrees:fixed.worktrees});
   const goal=kernelMain('workflow-goal',{job:'Persist an order on intake',host:fixed.host,lane,...(id?{id}:{})},
-    {orca:fake.orca,cwd:fixed.repo,functions:{assessGoal}});
+    {orca:fake.orca,cwd:fixed.repo,functions:{assessGoal,critiqueGoal}});
   return {...fixed,fake,goal};
 }
 
@@ -172,9 +174,9 @@ test('a lane never opens a lane of its own, and a taken lane name is Orca refusa
   const run=openedLane(t,{id:'20260913-090001-intake'});
   const laneDir=path.join(run.workspaces,'20260913-090001-intake');
   assert.throws(()=>kernelMain('workflow-goal',{job:'Another job from inside the lane',host:run.host,lane:true},
-    {orca:run.fake.orca,cwd:laneDir,functions:{assessGoal}}),/is already the lane of workflow 20260913-090001-intake/);
+    {orca:run.fake.orca,cwd:laneDir,functions:{assessGoal,critiqueGoal}}),/is already the lane of workflow 20260913-090001-intake/);
   assert.throws(()=>kernelMain('workflow-goal',{job:'A second workflow on the same name',host:run.host,
-    lane:'20260913-090001-intake'},{orca:run.fake.orca,cwd:run.repo,functions:{assessGoal}}),/worktree_name_taken/);
+    lane:'20260913-090001-intake'},{orca:run.fake.orca,cwd:run.repo,functions:{assessGoal,critiqueGoal}}),/worktree_name_taken/);
   // Neither refusal left a second workflow behind in the store.
   assert.deepEqual(fs.readdirSync(path.join(run.repo,'.starciwork','_local','workflows')),['20260913-090001-intake']);
 });

@@ -223,6 +223,9 @@ function fixture(t){
     evidence:(id,opId=id)=>path.join(work,'features/sales/implementation',id===RECEIPT?'frontend/receipt':'backend/intake','evidence',`${opId}-evidence`,'manifest.yaml')};
 }
 
+/** The critic stands in: every goal is critiqued by the runtime, and a real provider call here would be a different claim. */
+const critiqueGoal=()=>({ok:true,verdict:'sound',objections:[],dropped:[],required:[],alternatives:[],question:null,provider:'stub-critic',attempts:[],usage:null});
+
 /** The goal phase of a frontend workflow against the routed tree, stopping before any approval. */
 function started(t){
   const fixed=fixture(t);
@@ -232,6 +235,7 @@ function started(t){
   const state=createWorkflowState({job:'Render the receipt page',worktree:fixed.code,branch:'session/receipt',
     store,host:fixed.host,launcher:'L.mjs',ledgerMode:'work',repoRoot:fixed.code});
   const goal=goalPhase(store,state,{validate:validateWorkTree,cwd:fixed.code,
+    critiqueGoal,
     assessGoal:({ledger})=>({ok:true,provider:'fake',value:{definitionOfDone:[`the ${ledger.length} listed nodes are done`],risks:[],questions:[]}})});
   return {...fixed,store,state,goal};
 }
@@ -382,7 +386,7 @@ test('the launcher commands reach one workflow directory in the owner, from the 
   const fixed=fixture(t);
   const assessGoal=({ledger})=>({ok:true,provider:'fake',value:{definitionOfDone:[`the ${ledger.length} nodes are done`],risks:[],questions:[]}});
   const goal=kernelMain('workflow-goal',{job:'Render the receipt page',host:fixed.host},
-    {orca:null,cwd:fixed.code,functions:{assessGoal}});
+    {orca:null,cwd:fixed.code,functions:{assessGoal,critiqueGoal}});
   assert.equal(goal.ledgerShared,true);
   assert.equal(goal.ledgerOwner,'demo-backend');
   assert.equal(goal.ops,1);

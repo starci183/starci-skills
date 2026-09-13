@@ -19,7 +19,8 @@ export const HEADLESS_PROVIDERS={
   'claude-opus':{command:['claude','-p','--output-format','json','--model','opus'],extract:extractClaude,usage:usageClaude},
   'claude-fable-5.1':{command:['claude','-p','--output-format','json','--model','claude-fable-5-1'],extract:extractClaude,usage:usageClaude},
   'qwen3.8-flash':{command:['qwen','--model','qwen3.8-flash','--approval-mode','yolo','--output-format','json','--exclude-tools','agent'],extract:extractQwen,usage:usageQwen},
-  'gpt-5.6-sol':{command:['codex','exec','--json','--model','gpt-5.6-sol'],extract:extractCodex,usage:usageCodex}
+  'gpt-5.6-sol':{command:['codex','exec','--json','--model','gpt-5.6-sol'],extract:extractCodex,usage:usageCodex},
+  'gpt-6-astra':{command:['codex','exec','--json','--model','gpt-6-astra'],extract:extractCodex,usage:usageCodex}
 };
 /** A provider that refuses with a quota signal is not broken: the chain moves on without retrying it. */
 export const RATE_LIMITED=/429|rate.?limit|too many requests|overloaded/i;
@@ -470,4 +471,125 @@ export function validateOp({op,node=null,diff,checks=[],references=[],brand=null
   return {ok:true,schema:VALIDATION,verdict,summary:String(answer.summary??'').trim(),findings,dropped,
     provider:result.provider,attempt:result.attempt,attempts:result.attempts,usage:result.usage,
     ...(verdict==='unavailable'?{reason:'every finding named a file outside the diff'}:{})};
+}
+
+/* ------------------------------------------------------------------ the critic of the goal */
+
+/**
+ * critiqueGoal: every goal a person writes is challenged before anything is planned from it. The critique is
+ * the runtime's own step, not a helper session: one headless call per goal phase, the same call shape as
+ * `assessGoal`, answering one closed verdict. `sound` proceeds as written, `revise` proceeds only under the
+ * `required` changes - which the kernel renders into the contract of every operation - and `refuse` stops the
+ * approval until the one question is answered or the owner overrides it. An objection that names no evidence is
+ * dropped here, so a critique can never cost work on the strength of an opinion alone.
+ */
+export const CRITIQUE='starci/goal-critique@1';
+export const CRITIQUE_VERDICTS=['sound','revise','refuse'];
+export const OBJECTION_KINDS=['premise','scope','testability','hidden-decision','consistency'];
+/** Fable first, Astra as the fallback: the host's supervisor runtimes, overridable by `supervisor.runtimes` in config.json. */
+/** Astra first: the critique is one call per goal and Fable's own weekly window is the scarcer one. `critique.runtimes` in config.json overrides it. */
+export const DEFAULT_CRITIC_RUNTIMES=['gpt-6-astra','claude-fable-5.1'];
+/** What a goal can rest on that the tree may not hold yet: the records the runtime authors first (`srs`, `sds`, `brand`) and the one it cannot (`decision`). */
+export const PREREQUISITE_KINDS=['srs','sds','brand','decision'];
+export const CRITIQUE_FORM={
+  verdict:{type:'string',enum:CRITIQUE_VERDICTS},
+  objections:{type:'object[]',optional:true,each:{kind:{type:'string',enum:OBJECTION_KINDS},claim:{type:'string'},
+    // Evidence is optional in the form and mandatory in the result: an objection without it is dropped rather
+    // than sent back, so one unevidenced line never invalidates the objections that do name their record.
+    evidence:{type:'string',optional:true},consequence:{type:'string'}}},
+  required:{type:'string[]',optional:true},alternatives:{type:'string[]',optional:true},question:{type:'string',optional:true},
+  // A prerequisite of a kind the kernel does not know is dropped, never a reason to send the whole critique back.
+  prerequisites:{type:'object[]',optional:true,each:{kind:{type:'string'},feature:{type:'string',optional:true},why:{type:'string'}}}
+};
+const CRITIC_ROLE='the critic of one workflow goal: your job is to find what is wrong with the goal before anyone works from it - never to restate it, never to praise it';
+const CRITIC_RULES=[
+  'every objection names its evidence: a record id of the decided records below, a rule statement of one of them, or a fact of the job text - an objection without evidence is dropped by the kernel',
+  'challenge the premises: what the goal assumes about the product that the accepted records contradict or do not support',
+  'challenge the scope: too wide to finish, too narrow to matter, or one goal that mixes a decision with a build',
+  'challenge the testability: what in the goal no check could ever prove, and what would make it provable',
+  'name the hidden decisions: what the goal silently decides that the owner should decide as a record',
+  'offer the alternatives: a cheaper or a safer way to the same outcome, one sentence each',
+  'check the consistency with the accepted records and name the record you checked against',
+  'the verdict is closed: `sound` proceeds as written, `revise` proceeds only under the changes you list in `required`, `refuse` is for a goal that contradicts an accepted record or that cannot be verified at all - and then `question` is the one question whose answer would unblock it',
+  'name the prerequisites: a record the goal builds on that the decided records and the ledger do not hold - the srs or sds of the feature it extends ("add X to the backend" with no record of X), the brand a design needs, a decision nobody took - goes to `prerequisites` with the feature it belongs to and why; the kernel authors those records first and holds the build behind them, so a missing record is a prerequisite, never a reason to refuse',
+  'never restate the goal and never praise it: a line that is not a defect is not an objection'
+];
+/** What this runtime can prove and what it cannot: the critic weighs testability against exactly this. */
+export const CRITIQUE_CONSTRAINTS=[
+  'the kernel verifies by command only: the checks declared per operation (re-run by the kernel itself), the job gates, and the one validator that reads each diff against the acceptance statements and the node assertions',
+  'the kernel cannot verify taste, desirability, market fit, or anything a person has to look at and judge: a goal that rests on one of those is untestable by this runtime unless it names who judges it and on what evidence'
+];
+const strings=value=>(Array.isArray(value)?value:[]).map(item=>String(item??'').trim()).filter(Boolean);
+const summarize=list=>(Array.isArray(list)?list:[]).filter(plain).map(item=>({id:item.id??null,kind:item.kind??null,title:item.title??null}));
+/**
+ * A verdict that costs work must carry something to act on: `revise` and `refuse` need at least one evidenced
+ * objection, `revise` the changes the operations must honour, `refuse` the one question that would unblock it.
+ */
+const critiqueRules=answer=>{
+  const errors=[];
+  const evidenced=(Array.isArray(answer.objections)?answer.objections:[]).filter(item=>plain(item)&&String(item.evidence??'').trim());
+  if(['revise','refuse'].includes(answer.verdict)&&!evidenced.length)
+    errors.push(`a ${answer.verdict} must carry at least one objection, and every objection must name its evidence (a record id, a rule statement, a fact of the job text)`);
+  if(answer.verdict==='revise'&&!strings(answer.required).length)
+    errors.push('a revise must list in `required` the changes every operation of this goal has to honour');
+  if(answer.verdict==='refuse'&&!String(answer.question??'').trim())
+    errors.push('a refuse must state in `question` the one question whose answer would unblock the goal');
+  return {errors};
+};
+
+/**
+ * The decided records the critic is held to, bounded: at most `maxRecords` records and `maxChars` of statement
+ * text across all of them. A goal is critiqued against what the product already accepted, not against the tree.
+ */
+export function boundRecords(records,{maxRecords=40,maxChars=12000}={}){
+  const list=(Array.isArray(records)?records:[]).filter(plain);
+  const kept=[];let total=0;
+  for(const record of list.slice(0,maxRecords)){
+    const statements=[];
+    for(const statement of strings(record.statements)){
+      if(total+statement.length>maxChars)continue;
+      total+=statement.length;statements.push(statement);
+    }
+    kept.push({id:String(record.id??''),kind:record.kind??null,title:String(record.title??'').trim(),statements});
+  }
+  return {records:kept,truncated:list.length>kept.length||total>=maxChars};
+}
+
+export function critiqueGoal({job,scope=[],ledger=[],decisions=[],records=[],material=[],brand=null,constraints=[],
+  providers=DEFAULT_CRITIC_RUNTIMES,cwd,runHeadless:run}){
+  need(String(job??'').trim(),'critiqueGoal needs the job text: the goal it is asked to critique');
+  const chain=(Array.isArray(providers)?providers:[providers]).filter(item=>typeof item==='string'&&item.trim());
+  if(!chain.length)return {ok:false,verdict:'unavailable',reason:'no critic provider was given',attempts:[],usage:null,
+    objections:[],dropped:[],required:[],alternatives:[],question:null,prerequisites:[]};
+  const bounded=boundRecords(records);
+  const payload={
+    job:String(job),
+    scope:(Array.isArray(scope)?scope:[scope]).map(item=>String(item??'').trim()).filter(Boolean),
+    ledger:summarize(ledger),
+    openDecisions:summarize(decisions),
+    decidedRecords:bounded.records,
+    ...(bounded.truncated?{decidedRecordsTruncated:true}:{}),
+    ...(Array.isArray(material)&&material.length?{material}:{}),
+    ...(plain(brand)?{brand:{name:brand.name??null,family:brand.family??null,rev:brand.rev??null,file:brand.file??null}}:{}),
+    constraints:unique([...CRITIQUE_CONSTRAINTS,...strings(constraints)]),
+    rules:CRITIC_RULES
+  };
+  const result=callFunction({kind:'critiqueGoal',payload,form:CRITIQUE_FORM,providers:chain,cwd,runHeadless:run,
+    extra:critiqueRules,role:CRITIC_ROLE});
+  if(!result.ok)return {ok:false,verdict:'unavailable',reason:result.reason??'no provider produced a valid critique',
+    attempts:result.attempts??[],usage:result.usage??null,objections:[],dropped:[],required:[],alternatives:[],question:null,prerequisites:[]};
+  const answer=result.value;
+  const objections=[],dropped=[];
+  for(const raw of (Array.isArray(answer.objections)?answer.objections:[]).filter(plain)){
+    const item={kind:String(raw.kind??'').trim(),claim:String(raw.claim??'').trim(),
+      evidence:String(raw.evidence??'').trim(),consequence:String(raw.consequence??'').trim()};
+    (item.evidence?objections:dropped).push(item);
+  }
+  return {ok:true,schema:CRITIQUE,verdict:answer.verdict,objections,dropped,
+    required:strings(answer.required),alternatives:strings(answer.alternatives),
+    question:String(answer.question??'').trim()||null,
+    prerequisites:(Array.isArray(answer.prerequisites)?answer.prerequisites:[]).filter(plain).map(raw=>({kind:String(raw.kind??'').trim(),
+      feature:String(raw.feature??'').trim()||null,why:String(raw.why??'').trim()})).filter(item=>PREREQUISITE_KINDS.includes(item.kind)&&(item.kind==='brand'||item.feature)),
+    provider:result.provider,attempt:result.attempt,attempts:result.attempts,usage:result.usage,
+    ...(dropped.length?{reason:`${dropped.length} objection(s) named no evidence and were dropped by the kernel`}:{})};
 }

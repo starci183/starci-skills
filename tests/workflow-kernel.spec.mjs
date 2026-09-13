@@ -15,7 +15,7 @@ import {loadsFileFor} from '../execution/runtime-loads.mjs';
 import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,operationSpec,queueInbox,rebindRunIfNeeded,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,rebindRunIfNeeded,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -205,13 +205,22 @@ const running=(state,id,dispatch,runtime='qwen3.8-flash')=>{
 };
 /** The validator as a stub: every result is accepted, so the tests above judge the kernel, not a model. */
 const acceptAll=()=>({ok:true,verdict:'accept',summary:'stub validator: accepted',findings:[],dropped:[],provider:'stub',usage:null});
+/**
+ * The critic as a stub. Every goal is critiqued by the runtime, so every test that runs a goal phase hands one
+ * in: `sound` with no objection, which changes no page and binds no operation. The verdicts that do are the
+ * subject of their own tests below.
+ */
+const critique=(value={})=>()=>({ok:true,schema:'starci/goal-critique@1',verdict:'sound',objections:[],dropped:[],
+  required:[],alternatives:[],question:null,provider:'stub-critic',attempt:0,attempts:[],usage:null,...value});
+const soundCritique=critique();
 
-function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,allocator=fakeAllocator(),gates=[]}){
+function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,allocator=fakeAllocator(),gates=[],critiqueGoal}){
   const repo=tmp();
   const store=createStore({repoRoot:repo,id:'20260912-104251-kernel-spec'});
   const state=createWorkflowState({job,inputs:['sds:.starciwork/features/sales/sds.md'],worktree:cwd,
     branch:'starci183/agentos-r14-sales',gates,store,host:path.resolve('.'),launcher:'L.mjs'});
   const goal=goalPhase(store,state,{assessGoal:()=>({ok:true,provider:'fake',value:plan}),
+    critiqueGoal:critiqueGoal??soundCritique,
     renderGoalMarkdown:(value,{job:title})=>`# ${title}\n\n${value.ledger.map(item=>`- ${item.title}`).join('\n')}\n`,
     extractMaterial:()=>[{file:'sds.md',text:'design'}],cwd});
   const fake=scriptedOrca({reportsDir:store.paths.reports,scripts});
@@ -248,7 +257,7 @@ test('the goal phase writes goal.md and goal.json and stops: nothing is launched
     assert.equal(validateGoalPlan(salesPlan).ok,true);
     assert.deepEqual(recorded.ledger.map(item=>[item.id,item.assessed,item.status]),[['goal-1','absent','planned']]);
     assert.deepEqual(recorded.ops.map(op=>op.id),['op-intake']);
-    assert.deepEqual(events(harness.store).map(event=>event.event),['goal']);
+    assert.deepEqual(events(harness.store).map(event=>event.event),['goal-critiqued','goal'],'the goal was critiqued before the page that asks for the approval was written');
     assert.deepEqual(fs.readdirSync(harness.store.paths.contracts),[]);
     // The loop refuses to run an unapproved plan, and no Orca call was ever made.
     assert.throws(()=>harness.run(),/not approved/);
@@ -414,7 +423,7 @@ test('the loop is resumable: a run that stops after one iteration continues from
 test('the four launcher commands drive one workflow directory: goal, approve, status',()=>{
   const repo=tmp();
   spawnSync('git',['init','--quiet'],{cwd:repo,encoding:'utf8',windowsHide:true});
-  const functions={assessGoal:()=>({ok:true,provider:'fake',value:salesPlan}),extractMaterial:()=>[]};
+  const functions={assessGoal:()=>({ok:true,provider:'fake',value:salesPlan}),critiqueGoal:soundCritique,extractMaterial:()=>[]};
   const orca={invoke:()=>{throw Error('no Orca call belongs to the goal phase');}};
   try{
     const goal=kernelMain('workflow-goal',{job:'Implement the sales slice',inputs:'sds:.starciwork/features/sales/sds.md',
@@ -433,7 +442,7 @@ test('the four launcher commands drive one workflow directory: goal, approve, st
     assert.equal(approved.approved,true);assert.equal(approved.phase,'run');
     const after=kernelMain('workflow-status',{id:goal.id},{orca,cwd:repo});
     assert.equal(after.approved,true);
-    assert.deepEqual(after.events.map(event=>event.event),['created','goal','approved']);
+    assert.deepEqual(after.events.map(event=>event.event),['created','goal-critiqued','goal','approved']);
     assert.throws(()=>kernelMain('workflow-status',{id:'20260912-000000-missing'},{orca,cwd:repo}),/No workflow kernel state/);
     assert.throws(()=>kernelMain('workflow-nope',{},{orca,cwd:repo}),/Unsupported workflow kernel command/);
   }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
@@ -714,7 +723,7 @@ const receiptAuthor=()=>({'demo.sales.implementation.frontend.receipt-author':[{
 const bindingRoles=roles=>input=>({...resolveLedgerRoot(input),roles});
 
 function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator=fakeAllocator(),gates=[],assessGoal,
-  ledgerApi,validateOp=acceptAll,binding=null}={}){
+  critiqueGoal,ledgerApi,validateOp=acceptAll,binding=null}={}){
   const tree=workRepo(nodes);
   activeRepo=tree.repo;
   const store=createStore({repoRoot:tree.repo,id:'20260912-110000-work-ledger'});
@@ -722,6 +731,7 @@ function setupWork({nodes=WORK_NODES,scope=[],scripts={},dirty=[],exec,allocator
     gates,store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'work',scope,repoRoot:tree.repo});
   const api=ledgerApi?ledgerApi(tree):undefined;
   const goal=goalPhase(store,state,{validate:tree.validate,cwd,...(api?{ledgerApi:api}:{}),
+    critiqueGoal:critiqueGoal??soundCritique,
     assessGoal:assessGoal??(({ledger})=>({ok:true,provider:'fake',value:{definitionOfDone:[`the ${ledger.length} listed nodes are done`],risks:[],questions:[]}}))});
   const fake=scriptedOrca({reportsDir:store.paths.reports,scripts});
   const git=fakeGit(dirty);
@@ -2071,7 +2081,7 @@ test('the preflight runs once at the start, its problems become needUser items, 
 test('a kernel that already has its run records run-resumed; only a real bind records run-bound',()=>{
   const repo=tmp();
   spawnSync('git',['init','--quiet'],{cwd:repo,encoding:'utf8',windowsHide:true});
-  const functions={assessGoal:()=>({ok:true,provider:'fake',value:salesPlan}),extractMaterial:()=>[]};
+  const functions={assessGoal:()=>({ok:true,provider:'fake',value:salesPlan}),critiqueGoal:soundCritique,extractMaterial:()=>[]};
   const {orca}=scriptedOrca({reportsDir:path.join(repo,'reports'),scripts:{}});
   try{
     const host=path.resolve('.');
@@ -2406,3 +2416,159 @@ test('the quota proposal opens the next chain runtime when the first one is busy
   // A lane is added, never taken away: the busy runtime keeps the slot this workflow's own quota gives it.
   assert.equal(shared.rows.find(row=>row.runtime==='claude-fable-5.1').slots,1);
 });
+
+/* ------------------------------------------------------------------ the critique of the goal */
+
+/**
+ * Every goal a person writes is critiqued by the runtime before anything is planned from it, and the verdict has
+ * consequences: `sound` changes nothing, `revise` binds every operation through its contract, `refuse` refuses
+ * the approval until the owner answers the question or overrides the critique on the record. A critic that
+ * cannot answer is an event, never a stop.
+ */
+const objection=(extra={})=>({kind:'consistency',claim:'The goal writes the receipt in the backend',
+  evidence:'demo.billing.architecture.sds.ledger',consequence:'Two components would own one write path.',...extra});
+
+test('the goal is critiqued before the approval: a sound verdict stands above the definition of done and the approval passes',()=>{
+  const asked=[];
+  const harness=setupWork({critiqueGoal:payload=>{asked.push(payload);return critique()();}});
+  try{
+    assert.equal(harness.goal.ok,true);
+    // What the critic is given: the job, the TODO nodes, the decisions still open, and the records the product
+    // already accepted - the evidence an objection has to name.
+    assert.equal(asked.length,1);
+    assert.equal(asked[0].job,'Finish the sales slice');
+    assert.deepEqual(asked[0].ledger.map(item=>[item.id,item.kind]),[['demo.sales.implementation.backend.intake','implementation']]);
+    assert.deepEqual(asked[0].decisions.map(item=>item.id),['demo.payments.business.overview']);
+    assert.deepEqual(asked[0].records,[{id:'demo.sales.architecture.sds.intake',kind:'architecture',
+      title:'The accepted intake design.',statements:[]}]);
+    assert.deepEqual(asked[0].providers,['gpt-6-astra','claude-fable-5.1'],'the critic runs on the host critics: astra first, then fable');
+    assert.ok(asked[0].constraints.some(item=>/may not add, drop or rewrite a node/.test(item)));
+    assert.deepEqual(harness.goal.critique,{verdict:'sound',objections:0,required:0,provider:'stub-critic'});
+    assert.equal(harness.state.critique.verdict,'sound');
+    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    assert.ok(page.includes('## Phản biện (critique)'),'the critique is a section of the page the user approves');
+    assert.ok(page.indexOf('## Phản biện (critique)')<page.indexOf('## Definition of done'),
+      'the objections to the goal are read before the definition of done derived from it');
+    assert.match(page,/Verdict: `sound` \(critic `stub-critic`\) - the critique found nothing that blocks this goal/);
+    assert.equal(/### Required changes/.test(page),false);
+    // The verdict is on the record in goal.json and as one event, and nothing about it binds an operation.
+    assert.equal(JSON.parse(fs.readFileSync(harness.store.paths.goalJson,'utf8')).critique.verdict,'sound');
+    const critiqued=events(harness.store).filter(event=>event.event==='goal-critiqued');
+    assert.deepEqual(critiqued.map(event=>[event.verdict,event.objections,event.provider]),[['sound',0,'stub-critic']]);
+    const contract=renderContract({template,op:harness.state.ops[0],state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
+    assert.doesNotMatch(contract,/## Goal critique/);
+    assert.equal(approve(harness.store,harness.state).approved,true);
+  }finally{harness.cleanup();}
+});
+
+test('a prerequisite the critique names and the tree lacks is planned as the intake that authors it first, and every other operation waits for it',()=>{
+  const asked=[];
+  const harness=setupWork({critiqueGoal:payload=>{asked.push(payload);return critique({verdict:'revise',objections:[objection()],
+    required:['author the chat records before touching the backend'],
+    prerequisites:[{kind:'sds',feature:'chat',why:'the goal extends the chat module and the tree holds no record of it'},
+      {kind:'srs',feature:'sales',why:'already there'},
+      {kind:'decision',feature:'chat',why:'who owns the message write'}]})();}});
+  try{
+    const {state,store}=harness;
+    const intake=state.ops.find(op=>op.intake?.scope==='chat');
+    assert.ok(intake,'the intake of the missing feature is an operation of the goal');
+    assert.equal(intake.id,'chat-intake');assert.equal(intake.kind,'work.author');assert.deepEqual(intake.allowlist,['.starciwork/features/chat/**']);
+    assert.deepEqual(intake.prerequisite,{kind:'sds',why:'the goal extends the chat module and the tree holds no record of it'});
+    for(const op of state.ops.filter(op=>op.id!==intake.id))assert.ok(op.dependsOn.includes(intake.id),`${op.id} waits for the intake`);
+    assert.equal(intake.dependsOn.includes(intake.id),false);
+    assert.equal(state.ops.filter(op=>op.intake?.scope==='sales').length,0,'a prerequisite the tree holds plans nothing');
+    const log=events(store);
+    assert.deepEqual(log.filter(event=>event.event==='intake-planned').map(event=>[event.op,event.prerequisite]),[['chat-intake','sds']]);
+    assert.deepEqual(log.filter(event=>event.event==='prerequisite-held').map(event=>event.feature),['sales']);
+    assert.deepEqual(log.filter(event=>event.event==='prerequisite-owner').map(event=>event.why),['who owns the message write']);
+    assert.equal(log.find(event=>event.event==='goal-critiqued').prerequisites,3);
+    const page=fs.readFileSync(store.paths.goal,'utf8');
+    assert.match(page,/### Prerequisites\n\n- \*\*sds\*\* of `chat` - the goal extends the chat module and the tree holds no record of it\. Planned first as `chat-intake`; every other operation waits for it\./);
+    assert.match(page,/- \*\*srs\*\* of `sales` - already there\. The tree already holds it\./);
+    assert.match(page,/- \*\*decision\*\* of `chat` - who owns the message write\. The owner decides it\./);
+    assert.equal(harness.goal.critique.prerequisites,3);
+    assert.equal(JSON.parse(fs.readFileSync(store.paths.goalJson,'utf8')).ops.find(op=>op.id==='chat-intake').kind,'work.author');
+  }finally{harness.cleanup();}
+});
+
+test('the critics are read from config.json `critique.runtimes`, astra then fable by default, and a bad file falls back',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-critics-'));
+  try{
+    assert.deepEqual(critiqueRuntimes(root),['gpt-6-astra','claude-fable-5.1']);
+    fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({critique:{runtimes:['claude-opus']}}));
+    assert.deepEqual(critiqueRuntimes(root),['claude-opus']);
+    fs.writeFileSync(path.join(root,'config.json'),'{not json');
+    assert.deepEqual(critiqueRuntimes(root),['gpt-6-astra','claude-fable-5.1']);
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('a revise verdict lists what it requires on the goal page and in the contract of every operation',()=>{
+  const harness=setupWork({critiqueGoal:critique({verdict:'revise',
+    objections:[objection(),objection({kind:'testability',claim:'"the receipt feels fast" is in the goal',
+      evidence:'the job text',consequence:'No check can ever prove it.'})],
+    dropped:[{kind:'premise',claim:'I would not do it this way',evidence:'',consequence:'none'}],
+    required:['render the receipt in the frontend node, not in the backend one','state the latency the receipt is measured against'],
+    alternatives:['reuse the existing receipt renderer instead of writing a second one']})});
+  try{
+    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    assert.match(page,/Verdict: `revise` \(critic `stub-critic`\) - proceed only under the required changes below\./);
+    assert.match(page,/- \*\*consistency\*\* - The goal writes the receipt in the backend\. Evidence: demo\.billing\.architecture\.sds\.ledger\. Consequence: Two components would own one write path\./);
+    assert.match(page,/- \*\*testability\*\* - "the receipt feels fast" is in the goal\. Evidence: the job text\./);
+    assert.match(page,/1 objection\(s\) named no evidence and were dropped by the kernel\./);
+    assert.match(page,/### Required changes\n\n1\. render the receipt in the frontend node, not in the backend one\n2\. state the latency the receipt is measured against/);
+    assert.match(page,/### Alternatives\n\n- reuse the existing receipt renderer instead of writing a second one/);
+    assert.deepEqual(harness.goal.critique,{verdict:'revise',objections:2,required:2,provider:'stub-critic'});
+    // Every operation of the workflow carries the required changes under its goal and above its allowlist.
+    for(const op of harness.state.ops){
+      const contract=renderContract({template,op,state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
+      assert.match(contract,/## Goal critique - required\n- render the receipt in the frontend node, not in the backend one\n- state the latency the receipt is measured against/);
+      assert.ok(contract.indexOf('## Goal critique - required')>contract.indexOf('## Goal'));
+      assert.ok(contract.indexOf('## Goal critique - required')<contract.indexOf('## Allowlist'));
+    }
+    assert.equal(approve(harness.store,harness.state).approved,true);
+  }finally{harness.cleanup();}
+});
+
+test('a refuse verdict refuses the approval with its one question, and --accept-critique records the owner override once',()=>{
+  const question='Which component owns the receipt write, the backend ledger or the frontend surface?';
+  const harness=setupWork({critiqueGoal:critique({verdict:'refuse',objections:[objection()],question})});
+  try{
+    assert.equal(harness.state.critique.verdict,'refuse');
+    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    assert.match(page,/Verdict: `refuse` \(critic `stub-critic`\) - this goal contradicts an accepted record or cannot be verified at all/);
+    assert.match(page,new RegExp(`### Question\\n\\n${question.replace(/[?]/g,'\\?')}`));
+    assert.match(page,/--accept-critique "<reason>"/);
+    // The approval is refused, and the refusal is the question itself: there is nothing else to answer it with.
+    assert.throws(()=>approve(harness.store,harness.state),new RegExp(question.replace(/[?]/g,'\\?')));
+    assert.equal(harness.store.loadState().approved,false);
+    assert.equal(events(harness.store).some(event=>event.event==='approved'),false);
+    // The override is the owner's decision: it is recorded with its reason, rendered on the page, and never asked for again.
+    const accepted=approve(harness.store,harness.state,{acceptCritique:'the receipt write is mine to move later; ship the slice'});
+    assert.equal(accepted.approved,true);
+    assert.equal(accepted.critique.overridden,'the receipt write is mine to move later; ship the slice');
+    assert.deepEqual(events(harness.store).filter(event=>event.event==='critique-overridden')
+      .map(event=>[event.reason,event.question,event.objections]),
+      [['the receipt write is mine to move later; ship the slice',question,1]]);
+    assert.match(fs.readFileSync(harness.store.paths.goal,'utf8'),
+      /Override: the owner accepted this critique - "the receipt write is mine to move later; ship the slice"\./);
+    assert.equal(approve(harness.store,harness.state).approved,true,'an override is taken once, never asked for again');
+    assert.equal(events(harness.store).filter(event=>event.event==='critique-overridden').length,1);
+  }finally{harness.cleanup();}
+});
+
+test('a critic no provider could answer is recorded as unavailable and the workflow carries on',()=>{
+  const harness=setupWork({critiqueGoal:()=>({ok:false,verdict:'unavailable',
+    reason:'no provider produced a valid critique',attempts:[{provider:'claude-fable-5.1',attempt:0,errors:['rate-limited']}],usage:null})});
+  try{
+    assert.equal(harness.goal.ok,true);
+    assert.equal(harness.state.critique.verdict,'unavailable');
+    assert.deepEqual(events(harness.store).filter(event=>event.event==='goal-critique-unavailable')
+      .map(event=>[event.reason,event.attempts]),[['no provider produced a valid critique',1]]);
+    assert.equal(events(harness.store).some(event=>event.event==='goal-critiqued'),false);
+    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    assert.match(page,/Phản biện: chưa chạy được - no critic runtime answered \(no provider produced a valid critique\)/);
+    assert.ok(page.indexOf('Phản biện: chưa chạy được')<page.indexOf('## Definition of done'));
+    const contract=renderContract({template,op:harness.state.ops[0],state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
+    assert.doesNotMatch(contract,/## Goal critique/);
+    assert.equal(approve(harness.store,harness.state).approved,true,'a dead provider is never a veto over the owner\'s job');
+  }finally{harness.cleanup();}});

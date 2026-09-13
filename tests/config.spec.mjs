@@ -11,8 +11,10 @@ test('local config initializes once, preserves preferences and rejects invalid d
  fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));
  const supervisor={runtimes:['claude-fable-5.1','gpt-6-astra']};
  const validator={runtimes:['gpt-5.6-sol','claude-opus']};
- assert.deepEqual(loadConfig(root,{initialize:true}),{language:'vi',model:null,effort:'medium',supervisor,validator});
- assert.equal(fs.readFileSync(path.join(root,'config.json'),'utf8'),JSON.stringify({language:'vi',model:null,effort:'medium',supervisor,validator},null,2)+'\n');
+ const critique={runtimes:['gpt-6-astra','claude-fable-5.1']};
+ assert.deepEqual(loadConfig(root,{initialize:true}),{language:'vi',model:null,effort:'medium',supervisor,validator,critique});
+ assert.equal(fs.readFileSync(path.join(root,'config.json'),'utf8'),JSON.stringify({language:'vi',model:null,effort:'medium',supervisor,validator,critique},null,2)+'\n');
+ assert.throws(()=>validateConfig({language:'vi',model:null,effort:'medium',critique:{runtimes:[]}}),/critique/,'an empty critic list is rejected');
  assert.throws(()=>validateConfig({language:'vi',model:null,effort:'medium',supervisor:{runtimes:[]}}),/supervisor/,'an empty supervisor list is rejected');
  assert.throws(()=>validateConfig({language:'vi',model:null,effort:'medium',validator:{runtimes:[]}}),/validator/,'an empty validator list is rejected');
  assert.throws(()=>validateConfig({language:'vi',model:null,effort:'medium',validator:{runtimes:['gpt-5.6-sol'],model:'x'}}),/validator/,'validator carries only runtimes');

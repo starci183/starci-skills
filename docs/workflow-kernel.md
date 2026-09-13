@@ -9,7 +9,7 @@ Entry points are the canonical launcher's commands, which route straight into `k
 
 ```
 orca-supervised-launch.mjs workflow-goal    --job <text> [--lane [<name>]] [--inputs a,b] [--gates name=command,...] [--ledger work|plan] [--scope f1,f2] [--id <id>]
-orca-supervised-launch.mjs workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>],...] [--allow-dynamic N]
+orca-supervised-launch.mjs workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
 orca-supervised-launch.mjs workflow-run     --id <id> [--from <own terminal> --run <run>] [--launch-file <f>] [--max-iterations N]
 orca-supervised-launch.mjs workflow-status  --id <id>
 orca-supervised-launch.mjs workflow-lane-close --id <id>
@@ -17,6 +17,7 @@ orca-supervised-launch.mjs workflow-lane-close --id <id>
 
 `--allow-dynamic N` raises this workflow's run-time operation budget (default `DYNAMIC_OPS_BUDGET` = 64) and
 reinstates the operations the dynamic-op gate refused. Re-approving is how a user answers that gate.
+`--accept-critique "<reason>"` is how a user approves a goal whose critique returned `refuse` (see **Phases**).
 
 All runtime state of one workflow lives in one directory (`execution/workflow-store.mjs`):
 `state.json` (atomic snapshot), `events.jsonl` (append-only audit), `goal.md` / `goal.json`, `contracts/`,
@@ -160,7 +161,40 @@ and a dynamic list of **ops** with `dependsOn` and disjoint allowlists. Either w
 `goal.md` and `goal.json` and stops. An item the plan reports as already `done` is carried as `preexisting`:
 approved by the user, never verified by the kernel, and named as such in the final report.
 
-**approval.** `approve` sets `state.approved`. This is the only human gate; nothing is launched before it.
+**critique.** Every goal a person writes is challenged by the runtime before anything is planned from it, and
+that challenge is a step of the goal phase, never a helper session. After the assessment and before the approval
+page is written, `critiqueGoal` is called on the host's critics (`critique.runtimes` in config.json, astra then
+fable by default: one call per goal, and Fable's week is the scarcer window) with the job text, the scope, the ledger items, the **decided** business and architecture records in scope
+with the statements and acceptance criteria of their `srs`/`sds` payload (bounded to 40 records and 12k
+characters), the brand when the tree has one, and what this runtime can and cannot verify. It answers one closed
+verdict, and every objection must name its evidence - a record id, a rule statement, a fact of the job text -
+because an objection without one is dropped by the kernel. The verdict lands in `state.critique`, in `goal.json`
+and in the `## Phản biện (critique)` section of `goal.md` above the definition of done, with the event
+`goal-critiqued`:
+
+- **`sound`** - proceed as written. Nothing else follows from it.
+- **`revise`** - proceed only under the changes in `required`. They are part of the goal the user approves, so
+  `renderContract` renders them as `## Goal critique - required` under the goal of **every** operation of the
+  workflow, above its allowlist: the operations honour the critique without anyone re-typing it.
+- **`refuse`** - the goal contradicts an accepted record or cannot be verified at all, and the critique states
+  the one question whose answer would unblock it. `approve` refuses until either the question is answered and the
+  goal is written again, or the owner overrides the critique with
+  `workflow-approve --id <id> --accept-critique "<reason>"`. The reason is recorded as `state.critiqueOverride`
+  with the event `critique-overridden` and rendered on the goal page. An override is the owner's own decision, so
+  the kernel never asks for it again.
+
+- **`prerequisites`** - what the goal builds on that the tree does not hold: the `srs`/`sds` of the feature it
+  extends ("add X to the backend" with no record of X), the `brand` a design needs, a `decision` nobody took.
+  The kernel acts on them: a feature or brand record the tree lacks becomes the intake operation that authors
+  it (`intake-planned` with `prerequisite`), and **every other operation of the goal waits for it** - the build
+  starts from a record, never from the prompt. One the tree holds is `prerequisite-held` and changes nothing;
+  a `decision` is the owner's (`prerequisite-owner`) and stays on the page under `### Prerequisites`.
+
+A critic no provider could answer is `goal-critique-unavailable`: the goal page says `Phản biện: chưa chạy được`,
+nothing binds an operation, and the workflow carries on - a dead provider is never a veto over the owner's job.
+
+**approval.** `approve` sets `state.approved`. This is the only human gate; nothing is launched before it, and a
+goal whose critique returned `refuse` is not approvable until the override above is given.
 
 **`run`.** `runLoop` first runs the worktree **preflight** once (`kernel-guards.preflight`: `core.longpaths`,
 the hooks environment for the kernel's own commits, the recorded `autocrlf` state, the branch) and appends one
@@ -205,6 +239,7 @@ The model is asked for forms only, never for control flow:
 | function | what it fills |
 | --- | --- |
 | `assessGoal` | a plan ledger: definition of done, ledger, ops (`starci/goal-plan@1`); on the Work ledger only the definition of done, risks and questions (`starci/work-goal@1`) |
+| `critiqueGoal` | the objections to the goal itself (`starci/goal-critique@1`): one closed verdict `sound` / `revise` / `refuse`, evidenced objections, the required changes, the alternatives and the one question (see **Phases**) |
 | `planOp` | the input form of one op that must be planned again after a design decision |
 | `decide` | one option of a closed set when a bounded policy cell ran out |
 | `validateOp` | the closed verdict of the workflow's one validator on a `done` the kernel already reproduced: `accept`, or `reject` with findings inside the diff (see **Validator**) |

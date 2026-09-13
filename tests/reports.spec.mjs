@@ -171,7 +171,7 @@ test('a worker that neither pings nor prints inside the grace window is reported
 
 test('an allowlist folder written with a glob tail covers every file beneath it, and a file entry covers only itself',()=>{
   const report=buildReport({outcome:'done',summary:'drawn',files:['.starciwork/brand/assets/logo/mark.svg','.starciwork/brand/index.yaml'],checks:[{name:'work-tree-validates',command:'node starci.mjs validate .starciwork',exitCode:0,evidence:'ok'}],run:'run_wf',task:'task_1',dispatch:'ctx_1',from:'term_1'});
-  assert.deepEqual(validateReport(report,{allowlist:['.starciwork/brand/index.yaml','.starciwork/brand/**']}).filter(error=>/outside/.test(error)),[]);
-  assert.deepEqual(validateReport(report,{allowlist:['.starciwork/brand/index.yaml']}).filter(error=>/outside/.test(error)),['File outside the allowlist: .starciwork/brand/assets/logo/mark.svg']);
-  assert.deepEqual(validateReport({...report,files:['src/x/y.ts']},{allowlist:['src/*']}).filter(error=>/outside/.test(error)),[]);
+  assert.deepEqual(validateReport(report,{allowlist:['.starciwork/brand/index.yaml','.starciwork/brand/**']}).errors.filter(error=>/outside/.test(error)),[]);
+  assert.deepEqual(validateReport(report,{allowlist:['.starciwork/brand/index.yaml']}).errors.filter(error=>/outside/.test(error)),['File outside the allowlist: .starciwork/brand/assets/logo/mark.svg']);
+  assert.deepEqual(validateReport({...report,files:['src/x/y.ts']},{allowlist:['src/*']}).errors.filter(error=>/outside/.test(error)),[]);
 });

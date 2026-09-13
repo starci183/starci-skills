@@ -6,7 +6,7 @@ fills the form; the kernel decides what happens next. Everything procedural — 
 retries, how long to wait, who reports to whom, when to commit — is fixed by `execution/llm-functions.mjs`
 and the supervisor, and is not reachable from the prompt.
 
-There are four functions.
+There are five functions.
 
 **`assessGoal({job, inputs, material, constraints, providers, cwd, runHeadless})`** reads a job once, together
 with whatever it came with, and answers with one `starci/goal-plan@1`: a definition of done, a ledger of the
@@ -21,6 +21,23 @@ goes back to the model as the next attempt's correction, so the model re-plans. 
 turns the accepted plan into the deterministic one-pager the user approves, and `extractMaterial(files, {cwd, maxChars})`
 prepares the material payload: each readable file relative to `cwd`, missing files skipped, the total capped and
 marked `truncated`.
+
+**`critiqueGoal({job, scope, ledger, decisions, records, material, brand, constraints, providers, cwd, runHeadless})`**
+is the objection to the goal itself, and it is mandatory: no goal reaches the approval page without it. It reads
+the job text, the ledger items, the **decided** business and architecture records in scope with the statements and
+acceptance criteria of their `srs`/`sds` payload (`boundRecords`: 40 records, 12k characters of statements), the
+brand when there is one, and what the kernel can and cannot verify — checks, gates and the validator on one side,
+taste and market on the other. It answers `starci/goal-critique@1`: one closed verdict (`sound`, `revise`,
+`refuse`), objections typed `premise | scope | testability | hidden-decision | consistency` that each name their
+evidence, the `required` changes, the `alternatives`, and the one `question` a refusal hangs on. An objection
+without evidence is dropped and said so in the result; a `revise` or `refuse` with nothing evidenced to act on,
+a `revise` with no required change, or a `refuse` with no question is an invalid form and goes back to the model.
+It also names the `prerequisites` the goal rests on and the tree lacks (`srs | sds | brand | decision`, with the
+feature and why), which the kernel plans as intake first. Default providers are the host's `critique.runtimes`,
+`gpt-6-astra` then `claude-fable-5.1` (one call per goal, and Fable's week is the scarcer window); an exhausted chain is
+`{ok:false, verdict:'unavailable'}`, exactly as `validateOp`'s is. What the kernel does with the verdict — the
+`goal.md` section, the contract of every operation, and the refused approval — is in
+[workflow-kernel.md](workflow-kernel.md#phases).
 
 **`planOp({node, workflow, ownership, sdsMaterial, priorReports, ...})`** fills the input form of one operation
 node — goal, allowlist, references, checks, acceptance, outputs — from the material and the reports that came
