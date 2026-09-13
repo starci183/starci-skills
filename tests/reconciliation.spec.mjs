@@ -170,26 +170,31 @@ test('conflict-without-decision: the decision record must exist under C, be a de
   assert.match(run(absent).findings[0].detail,/is not in the tree/);
   // Held, but under the other feature: a conflict is decided under the feature that raised it.
   const elsewhere=collab(tree(t),[{...base(),decision:'demo.sales.business.srs.decision.d-intake-contract'}]);
-  elsewhere.write('features/sales/business/srs/decisions/d-intake-contract/index.yaml',
-    {id:'demo.sales.business.srs.decision.d-intake-contract',kind:'decision',state:'todo',description:'Which intake contract?'});
+  elsewhere.write('features/sales/business/srs/business-rules/policy-decisions/d-intake-contract/index.yaml',
+    {id:'demo.sales.business.srs.decision.d-intake-contract',kind:'business',state:'todo',description:'Which intake contract?'});
   assert.match(run(elsewhere).findings[0].detail,/is not under collab; a conflict is decided under the feature that raised it/);
-  // Held under collab, but it is an ordinary business record rather than a decision.
+  // Held under collab, but it is an ordinary business record outside the policy-decisions folder rather than a decision.
   const wrongKind=collab(tree(t),[{...base(),decision:'demo.collab.business.srs.decision.d-intake-contract'}]);
   wrongKind.write('features/collab/business/srs/decisions/d-intake-contract/index.yaml',
     {id:'demo.collab.business.srs.decision.d-intake-contract',kind:'business',state:'todo',description:'Which intake contract?'});
-  assert.match(run(wrongKind).findings[0].detail,/is a business, not a decision record/);
+  assert.match(run(wrongKind).findings[0].detail,/is a business record outside business\/srs\/business-rules\/policy-decisions, not a decision record/);
+  // A record of kind decision is not the shape the tree holds either: the validator's SRS layout refuses it.
+  const wrongShape=collab(tree(t),[{...base(),decision:'demo.collab.business.srs.decision.d-intake-contract'}]);
+  wrongShape.write('features/collab/business/srs/business-rules/policy-decisions/d-intake-contract/index.yaml',
+    {id:'demo.collab.business.srs.decision.d-intake-contract',kind:'decision',state:'todo',description:'Which intake contract?'});
+  assert.match(run(wrongShape).findings[0].detail,/is a decision, not a decision record/);
   // Held, a decision, but already done: the owner's answer is not this intake's to assume.
   const answered=collab(tree(t),[{...base(),decision:'demo.collab.business.srs.decision.d-intake-contract'}]);
-  answered.write('features/collab/business/srs/decisions/d-intake-contract/index.yaml',
-    {id:'demo.collab.business.srs.decision.d-intake-contract',kind:'decision',state:'done',description:'Which intake contract?'});
+  answered.write('features/collab/business/srs/business-rules/policy-decisions/d-intake-contract/index.yaml',
+    {id:'demo.collab.business.srs.decision.d-intake-contract',kind:'business',state:'done',description:'Which intake contract?'});
   assert.match(run(answered).findings[0].detail,/is done, not `todo`: the owner has not answered it/);
 });
 
 test('conflict-edited: the decided record the conflict names was changed while the intake ran',t=>{
   const fixture=collab(tree(t),[{case:'conflict',record:'demo.sales.architecture.sds.contract.intake-command',
     decision:'demo.collab.business.srs.decision.d-intake-contract',detail:'synchronous against asynchronous'}]);
-  fixture.write('features/collab/business/srs/decisions/d-intake-contract/index.yaml',
-    {id:'demo.collab.business.srs.decision.d-intake-contract',kind:'decision',state:'todo',
+  fixture.write('features/collab/business/srs/business-rules/policy-decisions/d-intake-contract/index.yaml',
+    {id:'demo.collab.business.srs.decision.d-intake-contract',kind:'business',state:'todo',
       description:'Which intake contract does collab use?\n1. Keep the synchronous contract and queue inside collab.\n2. Make the intake asynchronous for both features.'});
   const loaded=fixture.loaded();
   // The digests the kernel captures at launch, before the op runs.
@@ -267,8 +272,8 @@ test('a full pass counts the three cases and hands the conflict to the owner wit
   ]);
   fixture.write('features/collab/architecture/sds/flow/share/index.yaml',
     {id:'demo.collab.architecture.sds.flow.share',kind:'architecture',state:'todo',description:'The share flow'});
-  fixture.write('features/collab/business/srs/decisions/d-intake-contract/index.yaml',
-    {id:'demo.collab.business.srs.decision.d-intake-contract',kind:'decision',state:'todo',
+  fixture.write('features/collab/business/srs/business-rules/policy-decisions/d-intake-contract/index.yaml',
+    {id:'demo.collab.business.srs.decision.d-intake-contract',kind:'business',state:'todo',
       description:['Which intake contract holds once collab exists?',
         'Sales decided a synchronous command; collab cannot answer inside one request.',
         '1. Keep the synchronous contract and let collab queue behind it.',

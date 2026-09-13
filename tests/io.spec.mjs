@@ -63,7 +63,7 @@ test('a record catalog that is wrong is rejected with its named error, never sil
 test('every path a workflow touches maps to the record kind the catalog says it is',()=>{
   const table=[
     // The Work tree, most specific first: a decision lives inside the business tree it decides.
-    ['features/collab/business/srs/decisions/d-intake/index.yaml','decision'],
+    ['features/collab/business/srs/business-rules/policy-decisions/d-intake/index.yaml','decision'],
     ['features/collab/business/srs/fr/share-thread/index.yaml','srs'],
     ['features/collab/business/overview/index.yaml','srs'],
     ['features/collab/architecture/sds/flows/share/index.yaml','sds'],

@@ -75,7 +75,7 @@ own `index.yaml` is.
 | `record` | `**/index.yaml` | - (the node's own declaration) | `implementation`, `uat`, `e2e`, `operations` |
 | `srs` | `features/*/business/**` | `decision` | `business`, `business-overview`, `module` |
 | `sds` | `features/*/architecture/**` | `srs`, `decision` | `architecture` |
-| `decision` | `features/*/business/srs/decisions/**` | - (the owner's) | `decision` |
+| `decision` | `features/*/business/srs/business-rules/policy-decisions/**` | - (the owner's) | `business` (with the `srs-policy-decision` section) |
 | `brand` | `brand/index.yaml`, `brand/**` | `code` | `brand` |
 | `design` | `features/*/ui/**` | `srs`, `sds`, `brand`, `grammar` | `ui` |
 | `asset` | `**/assets/**` | `design`, `brand` | - |

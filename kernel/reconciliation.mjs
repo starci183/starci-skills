@@ -47,6 +47,17 @@ const strings=value=>(Array.isArray(value)?value:[]).map(text).filter(Boolean);
  * Whether a scope entry names this node, read exactly as the kernel's own scope filter reads it: by id prefix
  * or by tree path, so `collab`, `features/collab` and a full id prefix all name the same feature.
  */
+/** The policy-decision record shape the tree already holds: kind business, under policy-decisions, with the typed section. */
+export const POLICY_DECISION_FOLDER=/(^|\/)business\/srs\/business-rules\/policy-decisions\//;
+export function isPolicyDecision(node){
+  if(!node||text(node.kind)!=='business')return false;
+  const where=String(node.path??'').replace(/\\/g,'/');
+  if(!POLICY_DECISION_FOLDER.test(where))return false;
+  const section=node.extensions?.work3?.srs;
+  return !section||/srs-policy-decision/.test(String(section.schema??''));
+}
+const describeNotDecision=node=>text(node?.kind)!=='business'?`a ${text(node?.kind)||'record of no kind'}`
+  :!POLICY_DECISION_FOLDER.test(String(node?.path??'').replace(/\\/g,'/'))?'a business record outside business/srs/business-rules/policy-decisions':'a business record without the srs-policy-decision section';
 export function inScope(node,entry){
   const key=slash(entry).replace(/\/+$/,''),id=text(node?.id),where=slash(node?.path??'');
   if(!key)return false;
@@ -291,7 +302,11 @@ export function checkReconciliation(rows,{tree,scope,readNode,decidedIds=null,di
       const decision=byId.get(row.decision);
       if(!decision)findings.push(finding('conflict-without-decision',row.record,`the decision record ${row.decision} is not in the tree`));
       else if(!inScope(decision,scope))findings.push(finding('conflict-without-decision',row.record,`the decision record ${row.decision} is not under ${scope}; a conflict is decided under the feature that raised it`));
-      else if(text(decision.kind)!=='decision')findings.push(finding('conflict-without-decision',row.record,`${row.decision} is a ${text(decision.kind)||'record of no kind'}, not a decision record`));
+      // A decision record is the policy decision this tree already holds: a business record under
+      // business/srs/business-rules/policy-decisions with the srs-policy-decision section, exactly what an owner.ask
+      // writes and what the SRS layout rule of the validator accepts (kind business under business/srs). A record of
+      // any other kind, or under another folder, is not one.
+      else if(!isPolicyDecision(decision))findings.push(finding('conflict-without-decision',row.record,`${row.decision} is ${describeNotDecision(decision)}, not a decision record (a business record under business/srs/business-rules/policy-decisions with the srs-policy-decision section)`));
       else if(text(decision.state)!=='todo')findings.push(finding('conflict-without-decision',row.record,`the decision record ${row.decision} is ${text(decision.state)||'stateless'}, not \`todo\`: the owner has not answered it`));
     }
     // The decided record itself must be exactly as the intake found it: a conflict is put to the owner, never resolved by an edit.
