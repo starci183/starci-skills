@@ -995,6 +995,48 @@ test('a mechanical line about an op that moved on is dropped from the owner\'s l
   }finally{harness.cleanup();}
 });
 
+/**
+ * A red corner of the tree another workflow owns is not the op's failure: a report that failed only on the
+ * whole-tree validator is read as done and judged by the kernel's scoped verdict, and an op an older rule parked
+ * for spending its retries on that validator comes back with its retries cleared.
+ */
+test('a report that failed only on the whole-tree validator is read as done, and retries spent on it are a cooldown, not the owner\'s',()=>{
+  const harness=setup({plan:sharedPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state,{allowDynamic:9});
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,exec:()=>({status:0,stdout:'',stderr:''}),
+      now:()=>0,work:null,wait:noWait,decide:()=>{throw Error('a foreign validator error is not a decision');},validateOp:null};
+    const op=running(harness.state,'op-a','ctx_a');
+    const report=buildReport({outcome:'failed',run:'run_wf',task:'task_a',dispatch:'ctx_a',from:'term_ctx_a',
+      summary:'my files pass; the whole-tree validator exits 1 on six Sales UI assets another workflow has not landed',
+      checks:[{name:'unit',command:'npx vitest run a',exitCode:0,evidence:'ok'},{name:'work-tree-validates',command:'node starci.mjs validate .starciwork',exitCode:1,evidence:'NODE_ASSET_UNREADABLE features/sales/ui/index.yaml'}]});
+    report.sent={messageId:'msg_a',sentAt:1,type:report.signal.type};
+    const before=events(harness.store).length;
+    applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,ctx);
+    const log=events(harness.store).slice(before);
+    assert.deepEqual(log.filter(event=>event.event==='validator-only-block').map(event=>[event.op,event.from,event.to]),[['op-a','failed','done']]);
+    assert.equal(log.some(event=>event.event==='retry'&&event.op==='op-a'),false,'the foreign error costs no round: '+JSON.stringify(log.filter(event=>event.event==='retry').map(event=>[event.reason,event.findings])));
+  }finally{harness.cleanup();}
+  const parked=setupWork();
+  try{
+    const store=parked.store,state=parked.state;
+    const op=state.ops[0];
+    op.status='blocked';op.repairs=4;
+    state.needUser.push({op:op.id,kind:'authority',detail:`${op.id} exhausted its retries: work-tree-validates failed (exit 1): NODE_ASSET_UNREADABLE features/sales/ui/index.yaml`});
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    const before=store.readEvents().length;
+    const state2=parked.run({maxIterations:1});
+    const log=store.readEvents().slice(before);
+    assert.ok(log.some(event=>event.event==='launch-cooling'&&event.op===op.id&&event.migrated===true));
+    assert.ok(log.some(event=>event.event==='launch-readmitted'&&event.op===op.id));
+    const back=state2.ops.find(item=>item.id===op.id);
+    assert.equal(back.repairs,0,'the retries spent on the validator are cleared');
+    assert.equal(state2.needUser.some(item=>item.kind==='authority'),false,'a validator bound is never the owner\'s');
+  }finally{parked.cleanup();}
+});
+
 test('an op that lost its agent past the restart limit cools down and comes back, and the owner is not asked',()=>{
   const harness=setupWork();
   try{
