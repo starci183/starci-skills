@@ -324,7 +324,8 @@ function launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName,expec
   let started=orca.invoke('worker-start',params,{cwd});
   const dispatchId=dispatchIdFromReceipt(started.receipt);
   let recovery=null;
-  if(started.outcome!=='ok'&&dispatchId&&/agent_prompt_stalled/.test(`${started.reason??''} ${getPath(started.receipt,'error.code')??''}`)){
+  // The stall is read from the whole receipt: the reason field alone missed the flat `result.lastError` Orca prints.
+  if(started.outcome!=='ok'&&dispatchId&&/agent_prompt_stalled/.test(`${started.reason??''} ${getPath(started.receipt,'error.code')??''} ${JSON.stringify(started.receipt?.result??{})}`)){
     recovery=recoverStagedPrompt(orca,{cwd,started,dispatchId,wait});
     if(recovery.ok)started=recovery.started;
   }

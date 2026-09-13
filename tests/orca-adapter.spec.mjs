@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {parseYaml} from '../core/yaml.mjs';
-import {createOrcaCalls} from '../execution/orca-calls.mjs';
+import {classifyReceipt,createOrcaCalls,loadOrcaCalls,receiptError} from '../execution/orca-calls.mjs';
 import {boundaryMessages,createOrcaAdapter} from '../execution/orca-adapter.mjs';
 import {planOrcaExecution,startOrcaExecution} from '../execution/orca.mjs';
 
@@ -69,6 +69,16 @@ test('a failed worker-start is settled and surfaces the effect state instead of 
     return true;
   });
   assert.ok(fake.spawned.some(args=>args[1]==='worker-stop'&&has(args,'--dispatch','ctx_stalled')));
+});
+
+test('a flat 1.4.188 failure receipt keeps its lastError as the reason, so a stalled prompt is recognised',()=>{
+  const flat={ok:false,result:{runId:'run_1',taskId:'task_1',dispatchId:'ctx_flat',state:'failed',stage:'dispatch_input',lastError:'agent_prompt_stalled',effects:[],residualResources:[{kind:'terminal',role:'agent',id:'term_flat'}]}};
+  const classified=classifyReceipt(loadOrcaCalls(),'worker-start',{exitCode:1,receipt:flat});
+  assert.equal(classified.outcome,'failed');
+  assert.equal(classified.reason,'agent_prompt_stalled');
+  assert.equal(receiptError({error:{message:'nested'}}),'nested');
+  assert.equal(receiptError({result:{dispatch:{last_failure:'agent_prompt_stalled'}}}),'agent_prompt_stalled');
+  assert.equal(receiptError({result:{state:'failed'}}),null);
 });
 
 test('boundary wait filters keepalive rows, reports a timeout as an empty ok batch and acknowledges by delivery id',async()=>{

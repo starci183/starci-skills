@@ -107,6 +107,19 @@ function matches(when,{exitCode,receipt}){
   return true;
 }
 
+/**
+ * The error a receipt carries, wherever this Orca puts it: nested (`error.message`, `result.worker.last_error`)
+ * or flat as 1.4.188 prints worker-start (`result.lastError`, `result.dispatch.last_failure`). A classification
+ * that loses the reason loses the recovery keyed on it: `agent_prompt_stalled` went unread as "worker-start
+ * failed" and the staged prompt was never submitted, so no drawing op launched all afternoon.
+ */
+export function receiptError(receipt){
+  for(const path of ['error.message','error.code','result.worker.last_error','result.worker.lastError','result.lastError','result.last_error','result.lastFailure','result.dispatch.last_failure']){
+    const value=getPath(receipt,path);
+    if(typeof value==='string'&&value.trim())return value;
+  }
+  return null;
+}
 /** Classify one completed process into outcome/effectState using the call's declared rules. */
 export function classifyReceipt(calls,name,{exitCode,receipt,spawnError=null,parseError=null}){
   const call=callOf(calls,name);
@@ -119,7 +132,7 @@ export function classifyReceipt(calls,name,{exitCode,receipt,spawnError=null,par
   if(spawnError)return finish(mutation?'unknown':'failed',mutation?'unknown':'none',`Unable to execute Orca: ${spawnError}`);
   if(parseError)return finish(mutation?'unknown':'failed',mutation?'unknown':'none',`Orca returned non-JSON output: ${parseError}`);
   for(const rule of call.classify??[]){
-    if(matches(rule.when,{exitCode,receipt}))return finish(rule.outcome,rule.effectState,rule.reason??getPath(receipt,'error.message')??getPath(receipt,'result.worker.last_error')??null);
+    if(matches(rule.when,{exitCode,receipt}))return finish(rule.outcome,rule.effectState,rule.reason??receiptError(receipt));
   }
   const ok=exitCode===0&&receipt?.ok!==false;
   if(ok){
@@ -127,7 +140,7 @@ export function classifyReceipt(calls,name,{exitCode,receipt,spawnError=null,par
     if(missing.length)return finish(mutation?'unknown':'failed',mutation?'unknown':'none',`Receipt is missing ${missing.join(', ')}`);
     return finish('ok',mutation?'committed':'none',null);
   }
-  const message=getPath(receipt,'error.message')??getPath(receipt,'result.worker.last_error')??`Orca exited ${exitCode}`;
+  const message=receiptError(receipt)??`Orca exited ${exitCode}`;
   if(base.residualResources.length)return finish('failed','partial',message);
   if(mutation&&!plain(receipt?.error)&&!plain(receipt?.result))return finish('unknown','unknown',message);
   return finish('failed','none',message);
