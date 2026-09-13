@@ -1401,6 +1401,7 @@ moved under a running kernel; `kernel-error` the loop caught something it could 
 **Budget, cooldowns and the shared ledger** - `rate-limit-cooling` a provider was parked; `rate-limit-parked`
 an operation was moved off it; `rate-limit-inferred` two silent settlements of one runtime inside thirty
 minutes were read as a quota refusal; `rate-limit-readmitted` the cooldown passed; `launch-cooling` /
+`need-user-stale-dropped` a mechanical line (triage, environment, shared-change, ledger-path, shared-depth, validator) about an op that has since moved on was dropped from the owner's list - every tick, so a stale line never finishes a workflow `blocked` over nothing;
 `parked-rejudged` the owner's list was judged again under the current rule on kernel start, once per rule (its `routed` names every item and where it went);
 `launch-cooling {migrated: true}` an environment line an older build or the terminal reconciliation parked (a lost agent, an idle restart, a launch nobody could take) was migrated to a cooldown by `readmitCooled`;
 an ask op holding a provision or an irreversible effect (`STOP_KINDS`) is waiting for the owner in its tab by design and is never nudged or restarted as `stalled-idle`; an ask op on any other question reports `decision` at once and never waits;

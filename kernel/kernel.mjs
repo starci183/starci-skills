@@ -1846,7 +1846,25 @@ function avoidRuntime(op,runtime,now){
  * today; what the current rule still parks stays parked, and the list shrinks to what is genuinely the owner's.
  * The stamp changes when the parking rules do, never with the build.
  */
-export const PARK_RULE='5.0.0-plus.2';
+/** The kinds of line on the owner's list that describe a mechanical state of an op, never a decision of the owner's. */
+const MECHANICAL_LINES=['shared-depth','ledger-path','environment','shared-change','validator','triage'];
+/**
+ * A mechanical line about an op that has since moved on - it runs, waits, or finished - is stale, and a stale line
+ * would finish the workflow `blocked` over nothing. Every tick, such lines go; a line about an op still blocked
+ * without a refusal stays until the rule that re-admits it runs.
+ */
+function sweepStaleLines(store,state){
+  const dropped=[];
+  state.needUser=state.needUser.filter(item=>{
+    if(!item.op||!MECHANICAL_LINES.includes(item.kind))return true;
+    const op=byId(state,item.op);
+    if(!op||op.status==='blocked')return true;
+    dropped.push({kind:item.kind,op:op.id,status:op.status});return false;
+  });
+  if(dropped.length)store.appendEvent({event:'need-user-stale-dropped',dropped});
+  return dropped;
+}
+export const PARK_RULE='5.0.0-plus.3';
 export function rejudgeParked(store,state,ctx){
   if(state.parkRule===PARK_RULE)return [];
   const routed=[];
@@ -1865,7 +1883,7 @@ export function rejudgeParked(store,state,ctx){
     const stuck=Boolean(op&&op.status==='blocked'&&!op.refusal);
     let route=null;
     // A mechanical line about an op that is no longer blocked - it ran again, finished, or waits - is stale.
-    if(op&&!stuck&&['shared-depth','ledger-path','environment','shared-change','validator'].includes(item.kind)){drop(item);route=`stale:${op.status}`;}
+    if(op&&!stuck&&MECHANICAL_LINES.includes(item.kind)){drop(item);route=`stale:${op.status}`;}
     else if(item.kind==='ledger'&&/^never verified:/.test(String(item.detail??''))){drop(item);route='recomputed-at-finish';}
     else if(item.kind==='review'){
       // The parked review of a group is escalated as the current rule escalates a spent review; its companion
@@ -2194,6 +2212,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     // A provisional decision travels to everything built behind it, and the owner's list carries one line per
     // question - not the same line once per iteration.
     inheritProvisional(state);
+    sweepStaleLines(store,state);
     const merged=dedupeNeedUser(state);
     if(merged)store.appendEvent({event:'need-user-deduplicated',dropped:merged,items:state.needUser.length});
     if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);planVerifyOps(store,state,ctx);})==='stop')break;

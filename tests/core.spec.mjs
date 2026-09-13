@@ -45,6 +45,36 @@ test('the reconciliation and integration declarations of a module record are out
   assert.ok(codes(f.run()).includes('STALE_COMPLETION'),'a real change to the module stales its children');
 });
 
+/**
+ * A question put to the owner is not yet a requirement. An open policy decision written beside a decided branch
+ * changes no digest and no rollup - the branch stays done and its dependents stay bound - and only its answer
+ * (state done) makes it part of the requirement everything downstream is re-verified against.
+ */
+test('an open policy decision beside a decided branch binds nothing and derives nothing until it is decided',t=>{
+  const f=fixture(t);
+  // A branch stores no state of its own: it derives one from its children.
+  f.node('feat',{state:undefined});
+  f.node('feat/leaf',{state:'todo'});
+  f.done('feat/leaf');
+  f.node('client',{state:'todo',dependsOn:['feat']});
+  f.done('client');
+  const before=f.run();
+  assert.equal(before.nodes.find(n=>n.id==='feat').effectiveState,'done');
+  assert.equal(codes(before).includes('STALE_COMPLETION'),false);
+  const featDigest=before.nodes.find(n=>n.id==='feat').inputDigest;
+  f.node('feat/d-open',{state:'todo',extensions:{work3:{srs:{schema:'starci/srs-policy-decision@1',decisionStatus:'open',id:'D-OPEN'}}}});
+  const open=f.run();
+  assert.equal(open.nodes.find(n=>n.id==='feat').effectiveState,'done','an open decision does not un-do the branch');
+  assert.equal(open.nodes.find(n=>n.id==='feat').inputDigest,featDigest,'an open decision is not an input of the branch');
+  assert.equal(codes(open).includes('STALE_COMPLETION'),false);
+  assert.equal(codes(open).includes('DEPENDENCY_NOT_DONE'),false,'a dependent of the branch is still satisfied');
+  assert.ok(open.warnings.some(w=>w.code==='OPEN_DECISION'),'the open decision is visible as a warning');
+  f.done('feat/d-open');
+  const decided=f.run();
+  assert.notEqual(decided.nodes.find(n=>n.id==='feat').inputDigest,featDigest,'the answer is part of the requirement');
+  assert.ok(codes(decided).includes('STALE_COMPLETION'),'what rested on the requirement is re-verified');
+});
+
 test('canonical hashes are order independent, array order sensitive and SHA-256 exact',()=>{
   assert.equal(canonicalJSON({z:2,a:{b:1}}),canonicalJSON({a:{b:1},z:2}));
   assert.notEqual(sha256(canonicalJSON([1,2])),sha256(canonicalJSON([2,1])));
