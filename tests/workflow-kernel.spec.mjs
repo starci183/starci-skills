@@ -911,7 +911,12 @@ test('an accepted op closes its terminal, and the reconcile sweep closes stale k
     harness.fake.terminals.set('term_foreign_op',{handle:'term_foreign_op',title:'[Op] backend.implement - other.workflow.op',status:'running',sent:true,worktreePath:cwd});
     // A blocked op of this workflow still holding the tab of its last attempt: nobody reads it, it goes too.
     const blocked={...harness.state.ops[0],id:'shared-9',kind:'e2e.verify',status:'blocked',terminal:'term_blocked_op',dispatch:null,requesters:['x']};harness.state.ops.push(blocked);
-    harness.fake.terminals.set('term_blocked_op',{handle:'term_blocked_op',title:`[Op] ${blocked.kind} - ${blocked.id}`,status:'running',sent:true,worktreePath:cwd});
+    // Its rename never landed: the tab carries the agent's default title and is matched by the handle the op holds.
+    harness.fake.terminals.set('term_blocked_op',{handle:'term_blocked_op',title:'Qwen - agentos',status:'running',sent:true,worktreePath:cwd});
+    // A sibling workflow of this store root that finished, and its kernel tab left behind.
+    const siblingDir=path.join(path.dirname(harness.store.dir),'sibling-done');fs.mkdirSync(siblingDir,{recursive:true});
+    fs.writeFileSync(path.join(siblingDir,'state.json'),JSON.stringify({id:'sibling-done',finished:{outcome:'done'}}));
+    harness.fake.terminals.set('term_sibling',{handle:'term_sibling',title:'[Kernel] sibling-done',status:'running',sent:false,worktreePath:cwd});
     const state=harness.run({maxIterations:8});
     const op=state.ops.find(item=>item.id===nodeId);
     assert.equal(op.status,'done');
@@ -920,6 +925,8 @@ test('an accepted op closes its terminal, and the reconcile sweep closes stale k
     assert.deepEqual(log.filter(event=>event.event==='op-terminal-closed').map(event=>event.op),[nodeId]);
     assert.ok(log.some(event=>event.event==='terminals-swept'&&event.closed.some(item=>item.terminal==='term_blocked_op'&&item.reason==='op blocked')),'the blocked op tab was swept');
     assert.equal(harness.fake.terminals.has('term_blocked_op'),false);
+    assert.equal(harness.fake.terminals.has('term_sibling'),false,'the kernel tab of the finished sibling workflow was swept');
+    assert.ok(harness.fake.terminals.has('term_other'),'a kernel tab of a workflow this store root does not know is left alone');
     assert.equal(state.ops.find(item=>item.id===blocked.id).terminal,null);
     assert.ok(typeof state.lastSweepAt==='number');
     assert.ok(log.some(event=>event.event==='terminals-swept'&&event.closed.some(item=>item.terminal==='term_stale_kernel'&&item.reason==='stale kernel tab')),'the stale kernel tab of this workflow was swept');

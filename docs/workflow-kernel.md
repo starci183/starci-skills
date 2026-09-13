@@ -654,8 +654,10 @@ and done-op tabs of this workflow (`terminals-swept`) - and never touches anothe
 ## A tab exists only while its op runs
 
 Every five minutes (and at every reconcile) the kernel closes every tab of this workflow that nobody reads:
-a stale kernel tab, and the tab of any op that is not on it right now - done, blocked, retried or pending
-alike (`terminals-swept` with the op's status as the reason). Tabs of other workflows and tabs the owner
+a stale kernel tab, the kernel tab of a sibling workflow of the same store root that finished or whose kernel
+is gone, and the tab of any op that is not on it right now - matched by the handle the op holds as much as
+by its title, so a tab whose rename never landed is found too - done, blocked, retried or pending alike
+(`terminals-swept` with the op's status as the reason). Tabs of other workflows and tabs the owner
 opened are never touched. A kernel paused by `stop.flag` closes its own tab too (`kernel-terminal-closed`
 with the reason); the next start opens one and re-binds the Run.
 

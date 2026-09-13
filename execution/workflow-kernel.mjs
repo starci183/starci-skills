@@ -3634,11 +3634,20 @@ export const SWEEP_MS=5*60*1000;
 export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Date.now}={}){
   const closed=[];
   const ours=new Map(state.ops.map(op=>[op.id,op]));
+  // A tab is an op's by the handle the op holds, whatever its title: a command-terminal launch whose rename
+  // never landed keeps the agent's default title, and those were the tabs nobody could match.
+  const byHandle=new Map(state.ops.filter(op=>op.terminal).map(op=>[op.terminal,op]));
   for(const item of listTerminals(orca,cwd)){
     const title=String(item.title??'');
     if(title===`[Kernel] ${state.id}`&&item.handle!==state.from){if(closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,reason:'stale kernel tab'});continue;}
+    // The kernel tab of a sibling workflow of this repository that finished, or whose kernel is gone, has no reader.
+    const sibling=title.startsWith('[Kernel] ')?title.slice(9).trim():null;
+    if(sibling&&sibling!==state.id){
+      if(siblingKernelGone(store,sibling)&&closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,workflow:sibling,reason:'kernel tab of a workflow that is not running'});
+      continue;
+    }
     const opId=title.startsWith('[Op] ')?title.slice(title.lastIndexOf(' - ')+3).trim():null;
-    const op=opId?ours.get(opId):null;
+    const op=(opId?ours.get(opId):null)??byHandle.get(item.handle)??null;
     if(!op)continue;
     const inUse=op.terminal===item.handle&&TAB_STATUSES.includes(op.status);
     if(inUse)continue;
@@ -3647,6 +3656,15 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
   state.lastSweepAt=now();
   if(closed.length)store.appendEvent({event:'terminals-swept',closed});
   return closed;
+}
+/** Whether a sibling workflow of this store root is finished or has no live kernel: its `[Kernel]` tab is then nobody's. */
+function siblingKernelGone(store,id){
+  const dir=path.join(path.dirname(store.dir),id);
+  let sibling=null;
+  // A workflow this store root does not know is not this kernel's to judge: its tab is left alone.
+  try{sibling=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));}catch{return false;}
+  if(sibling?.finished)return true;
+  try{const lock=JSON.parse(fs.readFileSync(path.join(dir,'kernel.lock'),'utf8'));process.kill(Number(lock.pid),0);return false;}catch{return true;}
 }
 /** The kernel's own tab is released when the kernel leaves without finishing: the next start opens one and re-binds the Run. */
 function releaseKernelTab(orca,store,state,{cwd,reason}){
