@@ -46,6 +46,49 @@ sections:
         .starciwork/.worktrees contents. Preserve custom bootstrap instructions; if they conflict
         with the new protocol, stop before payload writes and explain the conflict. Audit and
         preserve canonical Git/evidence/secret ownership before any separate data migration.
+  - title: 5-plus
+    blocks:
+      - The runtime tree is laid out by concept. The declared data the runtime runs on is `model/`
+        (it was `profiles/`), and the one `execution/` folder became four - `kernel/` for the control
+        loop, one file per concern, `hosts/` for the host adapters and the host model, `models/` for
+        the model functions, `checks/` for the machine checks that read bytes. `execution/` itself
+        stays and still carries the 4.x Plan-route execution modes. `.dist` mirrors the source tree,
+        so a compiled path moves with its source. Add a new root to `package.json` `files` and to
+        `INDEX.yaml` `folders` together; add it to the installer's owned-roots set only when a file
+        dropped from a later payload should be cleaned out of an installed tree.
+      - There is one entry, `bin/starci.mjs`. It forwards every workflow command to the launcher with
+        its argv untouched and answers everything else from the CLI, so no document, contract, prompt
+        or instruction names a module path inside the runtime. When a command is added, add it to the
+        forwarded list and to the help block of that entry in the same change; a person reading the
+        help must see the whole command line, not half of it.
+      - Restarting a running supervisor is part of shipping a tree move. The supervisor is the only
+        long-running process, and it was started from a module path the move deletes, so an operator
+        has to stop it and start it once with the new command. Kernels need no hand - they notice the
+        runtime's modules moved, end cleanly and are started again. Say so in the version's upgrade
+        note rather than assuming it is obvious.
+      - Three declarations are versioned, and a change to one is a schema change with a migration
+        story, never a silent edit. `kinds@2` replaced the single `mutates` list per operation kind
+        with `reads` and `writes` over `records@1`, the closed catalog of what a thing in the tree
+        or the product IS. `hosts@1` declares what a host offers and whether it runs operations in
+        parallel, which two adapters used to hold as constants of their own. Keep the closed
+        constants in `kernel/graph.mjs`, `kernel/io.mjs` and `hosts/index.mjs` in step with the
+        profiles they close; the validators refuse a drift in either direction on purpose.
+      - The node kind `integration` has a completion profile of its own - one declared external
+        system, one node, one live proof. A tree that declares an integration and holds no node for
+        it reads as incomplete. When a declaration gains a node kind, the completion profile, the
+        lane, the record catalog entry and the layout pattern all change together, or the graph
+        refuses the catalog.
+      - Records may carry `extensions.work3.integrations` (the external systems a business or design
+        record talks to, each naming the environment variable the owner provides its credential in -
+        never the value), `extensions.work3.reconciliation` (one typed row per decided record a
+        feature touches) and `extensions.work3.kernel.contractDigest` with the kind it was taken for
+        (the rules a completion was accepted under). An evidence manifest may carry `proof`, which
+        says what a run actually proved against. All are written by the runtime; none is authored by
+        hand, and none is migrated onto records that predate it.
+      - A completion recorded before the contract digest existed carries none, and is left exactly as
+        it is rather than reopened. Reopening every earlier proof is a whole product's work nobody
+        asked for; those are reopened only when the owner asks. A rule that reopens existing accepted
+        work needs that same treatment - a forward-only default, and the owner's request for the rest.
   - title: Current documentation and sites
     blocks:
       - Docs and sites use the current operator/workflow catalogs. Regenerate and build both sites

@@ -257,6 +257,9 @@ function checkMajorUpgrade(manifest, opts) {
 // (`ops`, `cli`, `core`, `schemas`, `skills`, `bin`) is - so a file dropped from a later payload does not
 // linger forever beside the runtime that replaced it. `execution` stays off this list: it still carries the
 // 4.x Plan-route execution modes, which are live and are not renamed by this release.
+// `upgrades` is deliberately absent: an upgrade note is the record of what one version asked of an operator,
+// and a later payload that stops shipping an old note must not delete it from a tree that was upgraded
+// through that version. Notes accumulate; nothing there is ever superseded by a newer payload.
 const RETIRED_ROOTS = new Set(['v3', 'legacy', 'ops', 'profiles', 'model', 'kernel', 'hosts', 'models', 'checks', 'contracts', 'core', 'schemas', 'specifications', 'cli', '.dist', 'alias', 'helpers', 'knowledge', 'operators', 'readiness', 'resources', 'scripts', 'templates', 'tests', 'workflows', 'skills', 'bin']);
 const PRESERVED_DOCUMENTATION_ROOTS = new Set(['docs','sites']);
 function retirementPlan(target, manifest) {
@@ -388,6 +391,31 @@ export function init(opts, log = console.log) {
   return { ...written, ...retired };
 }
 
+/**
+ * The upgrade note of one version, as the path an operator would open, or null when that version asks
+ * nothing of them. `upgrades/index.yaml` is the catalog - one entry per version that needs a person to know
+ * or to run something beyond the update itself - and the entry's own `note` is the answer, so a note that
+ * moves moves in one place. The scan is deliberately small rather than a YAML parse: the installer carries no
+ * dependency on the runtime it installs, and a catalog it cannot read is simply a version with no note.
+ */
+function upgradeNote(target, version) {
+  const index = path.join(target, 'upgrades', 'index.yaml');
+  if (!existsSync(index) || !statSync(index).isFile()) return null;
+  const lines = readFileSync(index, 'utf8').split(/\r?\n/);
+  const wanted = String(version ?? '').trim();
+  if (!wanted) return null;
+  for (let i = 0; i < lines.length; i += 1) {
+    const named = /^\s*-\s*version:\s*['"]?([^'"\s#]+)/.exec(lines[i]);
+    if (!named || named[1] !== wanted) continue;
+    for (let j = i + 1; j < lines.length && !/^\s*-\s/.test(lines[j]); j += 1) {
+      const note = /^\s*note:\s*['"]?([^'"\s#]+)/.exec(lines[j]);
+      if (note && existsSync(path.join(target, note[1]))) return note[1];
+    }
+    return null;
+  }
+  return null;
+}
+
 export function update(opts, log = console.log) {
   const target = path.resolve(opts.dir, '.claude');
   safePayloadTarget(target);
@@ -420,6 +448,12 @@ export function update(opts, log = console.log) {
   buildInstalledRuntime(target);
   const written = writeManifest(target, kept, profile, hostPlan ? profile : manifest.bootstrapProfile ?? null);
   log(`updated ${manifest.name}@${manifest.version} -> ${pkg.name}@${pkg.version} in ${target}`);
+  // A version that asks something of the operator says so once, here, where they are looking. An update that
+  // installed the version already present asks nothing new, so it stays quiet.
+  if (manifest.version !== pkg.version) {
+    const note = upgradeNote(target, pkg.version);
+    if (note) log(`upgrade notes: ${path.posix.join('.claude', note.split(path.sep).join('/'))}`);
+  }
   for (const rel of kept) log(`kept ${rel} (changed locally; pass --force to take the package version)`);
   if (opts.force) log(`replaced ${Object.keys(saved).filter(rel => currentFiles.has(rel)).length} local current-payload file(s); unowned and modified retired files retained`);
   if (hostPlan) writeBootstraps(opts.dir, log, hostPlan);
