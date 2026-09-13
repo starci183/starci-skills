@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {parseYaml} from '../core/yaml.mjs';
 
 /**
  * Reconciliation: adding a feature to a product that already decided records is three cases, as data.
@@ -200,13 +201,27 @@ export function scopeReconciliation(tree,scope,readNode){
   const nodes=(Array.isArray(tree?.list)?tree.list:[]).filter(node=>inScope(node,scope))
     .sort((a,b)=>slash(a.path??'').split('/').length-slash(b.path??'').split('/').length||slash(a.path??'').localeCompare(slash(b.path??'')));
   const rows=[],findings=[];let carrier=null;
+  const take=(node,record)=>{
+    const read=readReconciliation(record);
+    if(!read.table)return;
+    carrier=carrier??node;
+    rows.push(...read.rows);findings.push(...read.findings);
+  };
   for(const node of nodes){
     let record=null;
     try{record=readNode(node);}catch{continue;}
-    const read=readReconciliation(record);
-    if(!read.table)continue;
-    carrier=carrier??node;
-    rows.push(...read.rows);findings.push(...read.findings);
+    take(node,record);
+  }
+  // The tree listing is the validator's projection, and the records an intake just authored may not be in it
+  // yet (a validator run before the op, a projection that lists only what it could bind). The feature's module
+  // record on disk is the one place the table lives, so it is read from the tree root when the listing holds
+  // nothing under the scope - a table that exists is never reported missing for being newer than the listing.
+  if(!carrier&&tree?.workRoot){
+    const file=path.join(String(tree.workRoot),'features',...slash(scope).split('/').filter(Boolean),'index.yaml');
+    try{
+      const record=parseYaml(fs.readFileSync(file,'utf8'));
+      if(record&&typeof record==='object')take({id:text(record.id)||scope,path:slash(path.relative(String(tree.workRoot),file)),kind:text(record.kind)||'module'},record);
+    }catch{/* no module record on disk either: the table is missing, and the check below says so */}
   }
   return {rows,findings,carrier};
 }

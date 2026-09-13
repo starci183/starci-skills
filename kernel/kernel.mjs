@@ -26,6 +26,9 @@ import {AUTHOR_KIND,BRAND_DECIDE,BRAND_KIND,CHECK_TIMEOUT_MS,DYNAMIC_OPS_BUDGET,
   parseRef,pathsIn,plain,readJson,reportAllowlist,required,routeKind,routeOf,routed,rulingsText,slash,sleepSync,runCommand,
   tail,toOp,unique,validateCommandAt,workModule,workOpId,workValidateCommand,writeJson} from './common.mjs';
 import {ioBlock,kindsReadingBrand,undeclaredWrites} from './io.mjs';
+import {readDistJson} from '../core/runtime-root.mjs';
+import {recordDigests,reconcileIntake} from './reconciliation.mjs';
+import {renderChecksFor} from '../checks/render.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
 import {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
@@ -270,6 +273,8 @@ function launchOp(orca,store,state,op,allocated,ctx){
     const brand=brandReferencesOf(ctx.work?.api,ctx.work?.loaded);
     if(brand.length)op.references=unique([...op.references,...brand]);
   }
+  // A reconciliation is judged against what the tree held BEFORE the intake ran: the digests are taken here.
+  if(op.intake?.scope&&ctx.work?.loaded)op.intakeDigests=(()=>{try{return recordDigests(ctx.work.loaded);}catch{return null;}})();
   op.kernelOwned=kernelOwnedPaths(state,op,ctx);
   const contract=renderContract({template:ctx.template,op,state,store,guards:ctx.guards,protectedPaths:op.kernelOwned});
   fs.writeFileSync(store.contractPath(op.id),contract);
@@ -1579,10 +1584,34 @@ export function triageAnomaly(store,state,signature,ctx){
  * `reconcile`, `renderChecks` and `contractDigest` are the three seams other modules plug into and each is
  * `null` by default: a kernel that was given none behaves exactly as it did before the rule they carry existed.
  */
+/**
+ * The reconciliation seam, as the kernel runs it: the typed rows the intake wrote are checked against the tree
+ * with the node reader of the ledger and the digests the launch captured (`op.intakeDigests`), so a decided
+ * record the intake edited is caught against what the tree held before the op. A test hands `runLoop` its own
+ * `reconcile` instead; `null` runs without the check, as a kernel did before the rule existed.
+ */
+function reconcileIntakeSeam({op,state,tree,scope}){
+  const at=tree?.at??{repoRoot:tree?.repoRoot,workRoot:tree?.workRoot};
+  return reconcileIntake({op,state,tree,scope,readNode:node=>work.readNode(at,node),digests:op?.intakeDigests??null});
+}
+/**
+ * The digest of everything a proof of one kind rests on: the kind's declaration in the catalog, the operator
+ * contract it launches through, and the validator rules. `markDone` stores it and the ledger sync compares it,
+ * so a rule that moves reopens the proofs taken under the old one instead of leaving them verified by habit.
+ * A kind the catalog does not carry (a plan-ledger kind) has no declaration to bind and answers `null`.
+ */
+function contractDigestFor(kind){
+  let kindRecord=null;
+  try{kindRecord=graph.kindRecord(kind);}catch{return null;}
+  let operator=null;
+  try{operator=readDistJson('ops',launchOperator(kind),'operator.json');}catch{operator=null;}
+  return work.contractDigestOf({kind,kindRecord,operator,rules:llm.VALIDATOR_RULES});
+}
+
 export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,validateOp=llm.validateOp,template,supervisor=null,validator=null,
   wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
   ledgerApi=work,validate=validateWorkTree,ledgerRoot=null,resolveLedger=resolveLedgerRoot,
-  reconcile=null,renderChecks=null,contractDigest=null,kindsProfile=null,
+  reconcile=reconcileIntakeSeam,renderChecks=renderChecksFor,contractDigest=contractDigestFor,kindsProfile=null,
   waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now,host=hostDescriptorOf(orca)}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   need(plain(allocator),'A runtime allocator is required');

@@ -1057,7 +1057,7 @@ test('an accepted intake settles by what the tree holds under its scope and the 
   const file='.starciwork/features/collab/index.yaml';
   const harness=setupWork({scope:['collab'],dirty:[file],scripts:{'collab-intake':[{outcome:'done',summary:'Authored the collab drafts.',files:[file],
     checks:[passing('work-tree-validates','node starci.mjs validate')],
-    effect:()=>{fs.mkdirSync(path.dirname(path.join(activeRepo,file)),{recursive:true});fs.writeFileSync(path.join(activeRepo,file),['schema: work/node@2','id: demo.collab','kind: module',''].join(String.fromCharCode(10)));}}]}});
+    effect:()=>{fs.mkdirSync(path.dirname(path.join(activeRepo,file)),{recursive:true});fs.writeFileSync(path.join(activeRepo,file),['schema: work/node@2','id: demo.collab','kind: module','extensions:','  work3:','    reconciliation:','      - case: reference','        record: demo.sales.architecture.sds.intake','        detail: collab admits through the intake contract sales decided',''].join(String.fromCharCode(10)));}}]}});
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';

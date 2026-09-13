@@ -527,7 +527,7 @@ export function markInProgress(repoRoot,node,{opId,dispatch=null,startedAt=null,
  * node's authored assertions are not all proven by a passing check, so a green receipt always
  * names what proved it.
  */
-export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,bindSource=true,contractDigest=null,proof=null,parse=parseYaml}={}){
+export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='starci-kernel',at=null,repository=null,assertions=null,sourceIdentity=null,evidence=null,inputDigest=null,digest=null,bindSource=true,contractDigest=null,contractKind=null,proof=null,parse=parseYaml}={}){
   const id=text(opId,'operation id'),evidenceId=evidenceIdFor(id);
   // A proof remembers the rules it was proven under: the digest of the kind's declaration travels into the
   // kernel block, so a node completed under a rule that has since moved is reopened rather than trusted.
@@ -538,7 +538,7 @@ export function markDone(repoRoot,node,{opId,head=null,checks=[],verifiedBy='sta
     const verified=checkList(checks);
     coverAssertions(raw,verified,assertions);
     const repo=repository?sanitizeId(repository):repositoryName(repoRoot);
-    writeNode(repoRoot,node,{kernel:{...kernel,opId:id,head:head??null,checks:verified,verifiedBy:text(verifiedBy,'verifier'),at:at??nowIso(),...(boundRules?{contractDigest:boundRules}:{})},parse});
+    writeNode(repoRoot,node,{kernel:{...kernel,opId:id,head:head??null,checks:verified,verifiedBy:text(verifiedBy,'verifier'),at:at??nowIso(),...(boundRules?{contractDigest:boundRules,...(typeof contractKind==='string'&&contractKind.trim()?{contractKind:contractKind.trim()}:{})}:{})},parse});
     const bound=settledDigest(repoRoot,node,{inputDigest,digest});
     // The manifest has to bind the same settled digest, so write it here rather than before pass one.
     const folder=path.join(nodeDirectory(repoRoot,node),'evidence',evidenceId),fresh=evidence&&!fs.existsSync(folder);

@@ -378,8 +378,11 @@ function reopenStaleProofs(store,state,ctx,loaded){
     let raw=null;try{raw=ctx.work.api.readNode(ctx.work.at,node);}catch{continue;}
     const stored=raw?.extensions?.work3?.kernel?.contractDigest;
     if(typeof stored!=='string'||!stored)continue;
+    // The kind whose declaration the proof was bound to is the kind of the op that wrote `done`, which the kernel
+    // block records beside the digest; an older block that names none is read as the last step of the node's lane.
+    const named=raw?.extensions?.work3?.kernel?.contractKind;
     const lane=(()=>{try{return graph.laneFor({kind:node.kind,layout:nodeLayout(node),repositoryRole:node.repository??null});}catch{return [];}})();
-    const kind=lane.at(-1)??node.kind;
+    const kind=(typeof named==='string'&&named.trim())?named.trim():(lane.at(-1)??node.kind);
     let current=null;try{current=ctx.contractDigest(kind);}catch{current=null;}
     if(typeof current!=='string'||!current||current===stored)continue;
     try{ctx.work.api.markReopened(ctx.work.at,node,{reason:`proof-under-old-rule: ${node.id} was proven under an older declaration of ${kind}`,by:'starci-kernel'});}
@@ -681,7 +684,7 @@ export function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op
   // fact the next sync can see (`proof-under-old-rule`) instead of a proof nobody dares to trust or to reopen.
   const contractDigest=typeof ctx.contractDigest==='function'?(()=>{try{return ctx.contractDigest(op.kind);}catch{return null;}})():null;
   ledgerWrite(store,state,op,ctx,'done',node=>ctx.work.api.markDone(ctx.work.at,node,{
-    opId:op.id,head:head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,repository,bindSource:bindsCode(node),...(identity&&bindsCode(node)?{sourceIdentity:identity}:{}),...(contractDigest?{contractDigest}:{}),
+    opId:op.id,head:head??null,checks:provenChecks(verified.checks),verifiedBy:'starci-kernel',digest:ctx.work.digest,repository,bindSource:bindsCode(node),...(identity&&bindsCode(node)?{sourceIdentity:identity}:{}),...(contractDigest?{contractDigest,contractKind:op.kind}:{}),
     evidence:{outcome:'pass',environment:'local',actor:'starci-kernel',tool:'starci-kernel',
       // A ui node's completion carries its candidates as hashed captures: what the drawing produced is what is proven.
       assets:designEvidenceAssets({api:ctx.work.api,at:ctx.work.at,loaded:ctx.work.loaded},node),

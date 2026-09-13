@@ -420,7 +420,7 @@ export const VALIDATION_FORM={
   findings:{type:'object[]',optional:true,each:{file:{type:'string'},line:{optional:true},assertion:{type:'string',optional:true},detail:{type:'string'}}}
 };
 const VALIDATOR_ROLE='the acceptance validator of one StarCi workflow: you judge whether an operation result satisfies its goal, its acceptance statements and its Work assertions, from the diff and the machine check results alone';
-const VALIDATOR_RULES=[
+export const VALIDATOR_RULES=[
   'judge only what the diff shows against the goal, the acceptance statements and the assertions; never assume work the diff does not contain and never ask for work outside the goal',
   'the checks list is the complete machine evidence: a check named `work-valid` is the kernel\'s own whole-tree validation and proves the acceptance statement of that name; an acceptance statement that no listed check names is judged from the diff itself, and is never rejected merely because no check carries its name',
   'every finding must name a file of the diff (the `files` list); a finding on any other file is dropped by the kernel, so put the defect where the diff is',

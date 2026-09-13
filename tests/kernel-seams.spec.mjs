@@ -362,6 +362,23 @@ test('a done node proven under an older declaration is reopened; one that stores
   }
 });
 
+test('a proof records the kind it was bound to, and a lane whose last step is optional is not reopened for that step',()=>{
+  const dir=tmp();
+  try{
+    const workRoot=path.join(dir,'.starciwork');
+    const node={id:'demo.sales.ui',path:'features/sales/ui/index.yaml',kind:'ui'};
+    fs.mkdirSync(path.join(workRoot,'features/sales/ui'),{recursive:true});
+    fs.writeFileSync(path.join(workRoot,'features/sales/ui/index.yaml'),['schema: work/node@2','id: demo.sales.ui','kind: ui','required: true','state: todo','assertions:','  - the screens are drawn',''].join(String.fromCharCode(10)));
+    markInProgress(dir,node,{opId:'draw-1'});
+    const digest='a'.repeat(64);
+    markDone(dir,node,{opId:'draw-1',checks:[{name:'the screens are drawn',command:'x',exitCode:0}],assertions:['the screens are drawn'],bindSource:false,contractDigest:digest,contractKind:'interface.draw'});
+    const kernel=readNode(dir,node).extensions.work3.kernel;
+    // The ui lane ends in the optional artwork step; a proof written by the drawing is compared against the drawing's
+    // declaration, never against the artwork's, or every drawn node would be reopened on the next sync.
+    assert.deepEqual([kernel.contractDigest,kernel.contractKind],[digest,'interface.draw']);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
 test('a kernel given no digest function reopens nothing',()=>{
   const dir=tmp();
   try{
