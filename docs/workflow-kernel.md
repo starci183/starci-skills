@@ -1004,13 +1004,25 @@ with its counters at zero, the runtimes it had learned to avoid open to it again
 (superseded, out of the repository, a dynamic op over budget) stays refused: approving again changes nothing
 it was refused for. The supervisor then starts the kernel, which carries on from where it stopped.
 
+## A red tree counts against an op only where the op could have caused it
+
+The whole-tree check the kernel proves for an op (`work-valid`) is scoped (`treeVerdictFor`): an error under the
+op's allowlist, in the files it reported or on the node it closes is the op's; every other error is foreign -
+reported as `ledger-invalid`, listed in the check's evidence, never the reason the op is rejected. Ops the
+validator exhausted on the whole-tree check are judged again as soon as every remaining error is foreign to them
+(`op-readmitted`), inside the sync's red branch, which is where a live tree is actually red. A triage
+`restart-kernel` is a restart request of the loop (`stopped: restart: triage restart`), never a stop flag, which
+the supervisor would honour as a pause until someone removed it. On a shared ledger every contract says where the
+one tree lives (`## Where the Work tree lives`), so a `.starciwork` folder created in the code worktree is named a
+defect before it is made.
+
 ## Strays that break the tree are quarantined
 
 An invalid tree whose every error sits under an untracked path that no live operation owns is what an
 abandoned operation left behind - never the owner's draft, which would be tracked or owned. The kernel moves
 those paths whole to `<store>/strays/<timestamp>/` (`stray-quarantined`), reads the tree again, and when it is
 valid again (`ledger-valid-again`) re-admits the ops the validator had exhausted only for a red whole-tree
-check (`op-readmitted`). One error on a tracked or owned path and nothing moves.
+check (`op-readmitted`). Every untracked stray that carries an error and that no live op owns is moved, whether or not other errors sit on tracked paths: what the kernel can clean it cleans, and the rest is reported as it is.
 
 ## Hosts: Orca and headless (one chat = one workflow)
 

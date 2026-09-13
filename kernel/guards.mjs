@@ -22,7 +22,8 @@ export const LOCK_RULES=[
 export const SECRETS_GUARD=/secrets-guard|ALLOW_SECRET_SCAN/;
 const SHARED_PREFIXES=['apps/','src/','packages/','libs/','.starciwork/'];
 const URL_LIKE=/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
-const PATH_TOKEN=/[A-Za-z0-9_@.][A-Za-z0-9_@.*/-]*/g;
+// A Windows drive prefix belongs to the path: `C:/Users/...` used to split at the colon and lose its drive.
+const PATH_TOKEN=/(?:[A-Za-z]:\/)?[A-Za-z0-9_@.][A-Za-z0-9_@.*/-]*/g;
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const slash=value=>String(value).replaceAll('\\','/').replace(/^\.\//,'');

@@ -149,16 +149,43 @@ export const provenChecks=checks=>checks.map(check=>({name:check.name,command:ch
  * proves them itself when it records a node done: it validates the tree now and adds one passing check per
  * kernel-owned assertion the node declares. A tree that does not validate proves nothing and the write is refused.
  */
-export function kernelProof(ctx,nodeId){
+export function kernelProof(ctx,nodeId,op=null){
   if(!ctx.work||typeof ctx.work.api.readNode!=='function')return [];
   const node=ctx.work.node(nodeId);
   if(!node)return [];
   let owned=[];
   try{owned=ctx.work.api.nodeChecks(ctx.work.api.readNode(ctx.work.at,node)).filter(check=>KERNEL_CHECK.test(check.assertion??''));}catch{owned=[];}
   if(!owned.length)return [];
-  let ok=false;
-  try{ok=Boolean(ctx.work.validate({repoRoot:ctx.work.ledger?.repoRoot??ctx.work.repoRoot,workRoot:ctx.work.ledger?.workRoot??null}).ok);}catch{ok=false;}
-  return owned.map(check=>({name:check.assertion,command:workValidateCommand(ctx),exitCode:ok?0:1,assertion:check.assertion}));
+  // A red tree fails the op only where the op could have caused it: an error under a path another workflow
+  // owns (a drawing's missing assets, a decision another lane wrote in the wrong folder) is foreign, reported
+  // as `ledger-invalid`, and never the reason a backend slice is rejected twice and blocked.
+  const verdict=treeVerdictFor(ctx,op??null);
+  return owned.map(check=>({name:check.assertion,command:workValidateCommand(ctx),exitCode:verdict.ok?0:1,assertion:check.assertion,
+    evidence:verdict.ok?(verdict.foreign.length?`${verdict.foreign.length} error(s) elsewhere in the tree are outside this operation`:''):verdict.own.map(error=>`${error.code} ${error.path??''}`).join('; ')}));
+}
+/**
+ * The errors of the whole tree split by whether this op could have caused them: under its allowlist, in the
+ * files it reported, or on the node it closes. Only its own errors count against it.
+ */
+export function treeVerdictFor(ctx,op){
+  let result=null;
+  try{result=ctx.work.validate({repoRoot:ctx.work.ledger?.repoRoot??ctx.work.repoRoot,workRoot:ctx.work.ledger?.workRoot??null});}catch(error){return {ok:false,own:[{code:'VALIDATOR',path:'',message:String(error?.message??error)}],foreign:[]};}
+  const errors=Array.isArray(result?.errors)?result.errors:[];
+  if(result?.ok||!errors.length)return {ok:true,own:[],foreign:[]};
+  if(!op)return {ok:false,own:errors,foreign:[]};
+  const owned=unique([...(op.allowlist??[]),...(op.files??[]),...(op.kernelOwned??[])].map(entry=>slash(String(entry))));
+  const root=slash(ctx.work.ledger?.workRoot??'');
+  const treePath=file=>{const value=slash(String(file??''));return root&&value.startsWith(`${root}/`)?`.starciwork/${value.slice(root.length+1)}`:value;};
+  const within=(file,entry)=>{const e=treePath(entry).replace(/\/?\*+$/,'').replace(/\/+$/,'');return file===e||file.startsWith(`${e}/`);};
+  const node=op.nodeId?ctx.work.node?.(op.nodeId):null;
+  const nodePath=node?.path?`.starciwork/${slash(node.path)}`:null;
+  const own=[],foreign=[];
+  for(const error of errors){
+    const file=`.starciwork/${slash(String(error.path??''))}`;
+    const mine=owned.some(entry=>within(file,entry))||(nodePath&&(file===nodePath||file.startsWith(path.posix.dirname(nodePath)+'/')));
+    (mine?own:foreign).push(error);
+  }
+  return {ok:own.length===0,own,foreign};
 }
 
 /* ------------------------------------------------------------------ the validator */
@@ -266,7 +293,7 @@ export function validateAccepted(store,state,op,ctx,{files,verified}){
   let result;
   // The kernel's own check (`work-valid`) is proven by the kernel, not by the agent: it goes to the validator with the
   // re-run checks, so an acceptance statement naming it is never rejected as unproven (repair-5 was, four times).
-  const proven=[...verified.checks,...kernelProof(ctx,op.nodeId??op.ledgerIds?.[0]??null)];
+  const proven=[...verified.checks,...kernelProof(ctx,op.nodeId??op.ledgerIds?.[0]??null,op)];
   try{result=ctx.validateOp({op,node:validatorNode(ctx,op),diff,checks:proven,references:op.references,
     // What the kind declares it reads and produces travels with the verdict: a record cited outside `reads` or
     // written outside `writes` is a defect the validator can only name if it was told the declaration.

@@ -76,7 +76,7 @@ export {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,recoverCoordinatorTab,reconcileWit
   sweepStaleTerminals} from './terminals.mjs';
 export {OWNER_ASK,credentialNeed,openOwnerAsk,answerOwnerQuestion} from './owner.mjs';
 export {BRAND_PAYLOAD,brandFields,brandPayload,brandSummary,changedFiles,machineVerify,opDiff,readValidatorMemory,
-  renderValidatorMemory,sharedCheckCommand,treeForVerdict,validatorRejectLimit} from './verify.mjs';
+  renderValidatorMemory,sharedCheckCommand,treeForVerdict,treeVerdictFor,validatorRejectLimit} from './verify.mjs';
 export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,designRecord,deriveWorkOp,syncLedgerOps,
   kernelOwnedPaths,protectedFingerprint} from './sync.mjs';
 export {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,goalPhase,
@@ -225,6 +225,8 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
       `The kernel owns the node's \`state\`, \`completion\`, \`extensions.work3.kernel\` and its evidence. It reverts anything you write here and downgrades your report to \`failed\`.`,``]:[]),
     `## Resources`,...(locks.length?locks.map(entry=>`- \`${entry}\``):['- none: this operation claims no shared resource']),
     `Two operations that share a resource never run at the same time; never start, stop or reset one you did not declare.`,``,
+    ...(state.ledgerShared&&(state.ledgerRoot||state.ledgerOwner?.repoRoot)?[`## Where the Work tree lives`,
+      `This repository shares the Work tree of ${state.ledgerOwner?.repository??'its backend'}: the one tree is \`${slash(state.ledgerRoot??path.join(state.ledgerOwner.repoRoot,'.starciwork'))}\`. Every record, candidate and asset goes there, at the absolute paths the allowlist names; a \`.starciwork\` folder created in this worktree is the wrong tree and is a defect.`,``]:[]),
     `## Credentials and configuration`,
     `A key, token, credential or configuration the environment does not provide is never invented, stubbed, defaulted or silently skipped. Report \`blocked\` with blocker \`environment\` naming the exact variable or secret name and where the code reads it; the owner provides the value out of band. Never write a secret value into a record, a report, a chat or a file the owner did not name.`,``,
     `## References`,...(op.references.length?op.references.map(entry=>`- ${entry}`):['- the goal and the allowlist above']),``,
@@ -1582,7 +1584,9 @@ export function triageAnomaly(store,state,signature,ctx){
   if(option==='resume-ops'){for(const op of state.ops)if(op.status==='blocked'&&!op.refusal){op.status='ready';op.dispatch=null;op.terminal=null;}}
   else if(option==='park-runtime'){const runtime=entry.detail?.runtime;if(runtime)ctx.allocator.failed(runtime,{reason:`triage: ${signature}`});}
   else if(option==='settle-op'){const op=state.ops.find(item=>item.id===entry.detail?.op&&item.status==='running');if(op){settleDispatch(ctx.orca,op.dispatch,{cwd:state.worktree,reason:'triage',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});op.status='ready';op.dispatch=null;op.terminal=null;}}
-  else if(option==='restart-kernel'){fs.writeFileSync(path.join(store.dir,'stop.flag'),'triage restart');}
+  // A restart is asked of the loop, never written as a stop flag: a stop flag is a pause the supervisor honours until
+  // someone removes it, and a triage restart of a drawing once sat paused for an hour that way.
+  else if(option==='restart-kernel'){state.restartRequested='triage restart';}
   else state.needUser.push({kind:'triage',detail:`${signature}: ${JSON.stringify(entry.detail).slice(0,300)}`});
   return option;
 }

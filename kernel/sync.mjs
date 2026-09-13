@@ -8,7 +8,7 @@ import {AUTHOR_KIND,BRAND_DECIDE,KERNEL_CHECK,RECORD_OWNED,WORK_LEDGER,WORK_OPER
   gateDynamicOp,grammarReferences,inside,kernelGuards,kindRole,ledgerItem,liveStatus,locateSharedTreePaths,normalize,plain,
   slash,tail,toOp,unique,UI_KIND,workModule,workOpId,workValidateCommand,byId,ledgerAccess,workRootOf} from './common.mjs';
 import {kindsReadingBrand} from './io.mjs';
-import {brandReferencesOf,kernelProof,noteBrand,provenChecks,rereadBrand} from './verify.mjs';
+import {brandReferencesOf,kernelProof,noteBrand,provenChecks,rereadBrand,treeVerdictFor} from './verify.mjs';
 import {retemplateIntakeOps} from './intake.mjs';
 
 /**
@@ -280,6 +280,18 @@ export function syncLedgerOps(store,state,ctx){
       state.ledgerInvalid=signature;
       store.appendEvent({event:'ledger-invalid',errors:loaded.errors.slice(0,8).map(error=>({code:error.code,path:error.path??null,message:String(error.message??'').slice(0,160)}))});
     }
+    // A tree still red only outside an op's reach is green for that op: the ops the validator exhausted on the
+    // whole-tree check are judged again when every remaining error is foreign to them - here, where the tree is
+    // actually red, not after a return that never ran on a live backend.
+    if(ctx.work){
+      for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&state.needUser.some(entry=>entry.op===item.id&&entry.kind==='validator'&&/work-valid/.test(String(entry.detail??''))))){
+        const verdict=treeVerdictFor(ctx,op);
+        if(!verdict.ok)continue;
+        op.status='ready';op.validatorRejects=0;op.dispatch=null;op.terminal=null;
+        state.needUser=state.needUser.filter(entry=>!(entry.op===op.id&&entry.kind==='validator'));
+        store.appendEvent({event:'op-readmitted',op:op.id,reason:`the ${verdict.foreign.length} error(s) of the tree are outside this operation`});
+      }
+    }
     return [];
   }
   if(state.ledgerInvalid||quarantined){
@@ -497,10 +509,10 @@ export function quarantineStrays(store,state,ctx,loaded){
   const live=state.ops.filter(item=>liveStatus.includes(item.status)).flatMap(item=>item.allowlist??[]).map(normalize);
   const treePaths=loaded.errors.map(error=>normalize(`.starciwork/${String(error.path??'')}`));
   const owns=(stray,file)=>file===stray||file.startsWith(stray.endsWith('/')?stray:`${stray}/`);
-  // Every error must sit under a stray nobody owns; one error on a tracked or owned path and nothing moves.
-  const culprits=unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))).filter(Boolean));
-  if(!culprits.length||culprits.length!==unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))??'∅')).length)return [];
-  if(culprits.some(stray=>inside(stray,live)))return [];
+  // Every untracked stray that carries an error and that no live op owns is moved, whether or not other errors
+  // sit on tracked paths: what the kernel can clean it cleans, and the rest is reported as it is.
+  const culprits=unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))).filter(Boolean)).filter(stray=>!inside(stray,live));
+  if(!culprits.length)return [];
   const stamp=new Date().toISOString().replace(/[:.]/g,'-');
   const moved=[];
   for(const stray of culprits){
@@ -652,7 +664,7 @@ export function ledgerWrite(store,state,op,ctx,step,action,nodeId=op.nodeId){
 export function recordDone(store,state,op,ctx,verified,{nodeId=op.nodeId,head=op.head}={}){
   if(ctx.work&&!nodeId&&op.kind===BRAND_DECIDE){rereadBrand(store,state,op,ctx);return;}
   if(!ctx.work||!nodeId)return;
-  verified={...verified,checks:[...(verified?.checks??[]),...kernelProof(ctx,nodeId)]};
+  verified={...verified,checks:[...(verified?.checks??[]),...kernelProof(ctx,nodeId,op)]};
   const decision=['architecture.decide','architecture.revise','business.decide',BRAND_DECIDE].includes(op.kind)||kindRole(op.kind)==='decide';
   if(decision){
     ledgerWrite(store,state,op,ctx,'decided',node=>ctx.work.api.markDecided(ctx.work.at,node,{

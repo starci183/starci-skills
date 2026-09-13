@@ -18,7 +18,7 @@ import {resolveLedgerRoot} from '../kernel/routing.mjs';
 import * as work from '../kernel/ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
 import {machineVerify} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -2795,6 +2795,38 @@ test('the overlaps the critic finds are the three cases: a conflict is listed fo
     assert.match(contract,/- `demo\.sales\.business\.overview` already holds part of this feature[^\n]*`reference` row citing it by id/);
     // The dropped 'change' overlap produced no row: the overview is named exactly once, as the reference it is.
     assert.equal((contract.match(/^- `demo.sales.business.overview`/gm)??[]).length,1);
+  }finally{harness.cleanup();}
+});
+
+test('a red tree counts against an op only where the op could have caused it: foreign errors are evidence, not a rejection',()=>{
+  const errors=[{code:'NODE_ASSET_UNREADABLE',path:'features/sales/ui/index.yaml',message:'asset missing'},{code:'SRS_LAYOUT',path:'features/shared/business/srs/decisions/x/index.yaml',message:'layout'}];
+  const ctx={work:{ledger:{repoRoot:'C:/owner',workRoot:'C:/owner/.starciwork'},validate:()=>({ok:false,errors}),node:()=>({path:'features/sales/implementation/backend/intake/index.yaml'})}};
+  const backend={nodeId:'demo.sales.implementation.backend.intake',allowlist:['apps/agentos-controlplane/src/sales/**'],files:['apps/agentos-controlplane/src/sales/intake.ts']};
+  const verdict=treeVerdictFor(ctx,backend);
+  assert.deepEqual([verdict.ok,verdict.own.length,verdict.foreign.length],[true,0,2],'a backend slice is not failed by the missing assets of a drawing');
+  const drawing={nodeId:null,allowlist:['C:/owner/.starciwork/features/sales/ui/**'],files:[]};
+  const judged=treeVerdictFor(ctx,drawing);
+  assert.deepEqual([judged.ok,judged.own.map(e=>e.code),judged.foreign.length],[false,['NODE_ASSET_UNREADABLE'],1],'the op that wrote the ui record owns its error');
+  assert.equal(treeVerdictFor({work:{...ctx.work,validate:()=>({ok:true,errors:[]})}},backend).ok,true);
+});
+
+test('an op the validator exhausted on the whole-tree check is re-admitted while the tree is still red, once every remaining error is foreign to it',()=>{
+  const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
+  const done=n=>({outcome:'done',summary:`Intake implemented, attempt ${n}.`,files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]});
+  const harness=setupWork({dirty:[file],scripts:{[nodeId]:[done(1),done(2),done(3),done(4)]}});
+  try{
+    const {store,state}=harness;
+    approve(store,state);state.run='run_wf';state.from='term_kernel';
+    // The tree stays red on a record another lane wrote; nothing of it is under this op. The validator keeps
+    // rejecting on the whole-tree check (as it did on a real backend), so the op is exhausted mid-run.
+    const foreign=()=>({ok:false,errors:[{code:'NODE_ASSET_UNREADABLE',path:'features/sales/ui/index.yaml',message:'asset missing'}],warnings:[],nodes:[],resources:[]});
+    const reject=()=>({ok:true,verdict:'reject',summary:'red tree',findings:[{file,detail:'The required `work-valid` check (`starci.mjs validate`) exits 1'}],dropped:[],provider:'stub',usage:null});
+    const after=harness.run({maxIterations:8,validate:foreign,validateOp:reject,ledgerApi:{...work,loadLedger:where=>work.loadLedger({...where,validate:foreign})}});
+    const log=events(store);
+    assert.ok(log.some(event=>event.event==='validator-exhausted'&&event.op===nodeId),'the validator exhausted the op on the red tree');
+    const readmitted=log.filter(event=>event.event==='op-readmitted'&&event.op===nodeId&&/outside this operation/.test(event.reason));
+    assert.ok(readmitted.length>=1,'the op is judged again while the tree is still red, because its errors are foreign');
+    assert.ok(log.some(event=>event.event==='ledger-invalid'),'the foreign error is still reported');
   }finally{harness.cleanup();}
 });
 
