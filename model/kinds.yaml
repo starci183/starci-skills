@@ -1,4 +1,4 @@
-schema: starci/kinds@1
+schema: starci/kinds@2
 purpose: |-
   The process is data, not a judgement call. This catalog is the complete, closed list of operation kinds a
   workflow may run, the mandatory lane (an ordered template) every ledger node walks, and the bounded routes
@@ -6,20 +6,21 @@ purpose: |-
   operation offers; it never decides which step comes next, which kind repairs what, or how many rounds a
   repair may take. The kernel asks `kernel/graph.mjs`, and `kernel/graph.mjs` only reads this
   file: changing the process means editing this profile, never prompting harder.
+
+  Input and output are explicit. Every kind declares `reads` and `writes` over the record catalog of
+  `model/records.yaml` - the single list of 5-plus that replaced the `mutates` list of 5.1 - so the
+  contract, the validator and the kernel are held to one declaration instead of each keeping a set of its
+  own. `validateGraph` refuses a kind that writes a record it is blind to, a lane whose prove step cannot
+  read what its build step wrote, and a route to a kind that writes nothing its requesters read.
 vocabularies:
   # What an operation is for. `design` settles intent, `build` changes the product, `prove` only inspects it,
   # `repair` puts an authored record back in agreement with what was found.
   families: [design, build, prove, repair]
   # The allocator role of model/runtimes.yaml; `roleOfKind` there must agree with `role` here.
   roles: [decide, plan, implement, verify, write]
-  # What a kind is allowed to change. `readOnly: true` means this list is empty. `design` is the interface
-  # design record and `record` is an authored Work record itself: `work.author` completes the fields a node must
-  # declare before the kernel can launch it, and `brand.decide` authors the one brand record. `asset` is bytes
-  # beside such a record - the artwork a design record declares and the build then wires in, or a generated
-  # mascot or logo file under the brand record's own `assets/` - which only `interface.asset` and `brand.decide` produce.
-  # `grammar` is the installed design language itself - the published grammar package and the canon that names its
-  # units - which lives in its own repository and which only `grammar.update` may grow.
-  mutates: [code, sds, srs, decision, design, asset, runtime, record, grammar]
+  # What a kind may read and what it may produce are both record kinds of `model/records.yaml`, which is the
+  # vocabulary for `reads` and `writes` and is not restated here: one catalog, one place to change it.
+  # `readOnly: true` means `writes` is empty, and a kind that is not read-only writes at least one record.
   # Why an operation exists, as the kernel records it on the op.
   origins: [ledger, shared, repair, gate, verify, architecture]
   # The report outcomes of kernel/reports.mjs.
@@ -70,7 +71,9 @@ kinds:
     role: decide
     operator: owner.ask
     readOnly: false
-    mutates: [decision]
+    # It reads what the question touches and writes the one thing the owner owns: the decision record.
+    reads: [srs, sds, decision]
+    writes: [decision]
     purpose: Prepare one decision for the owner - question, analysis per side, options, recommendation - or answer it from the decided records when they already settle it.
     reports:
       outcomes: [done, failed]
@@ -79,7 +82,9 @@ kinds:
     role: decide
     operator: business.decide
     readOnly: false
-    mutates: [srs, decision]
+    # A requirement is settled from what the owner already decided, never from what the code happens to do.
+    reads: [srs, decision]
+    writes: [srs, decision]
     purpose: Settle what the product must do, in the business record, before anything is designed against it.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -89,7 +94,9 @@ kinds:
     role: decide
     operator: architecture.decide
     readOnly: false
-    mutates: [sds, decision]
+    # A design is derived from the requirement it realises and the decisions around it - never from source.
+    reads: [srs, sds, decision]
+    writes: [sds, decision]
     purpose: Settle how the product realises a requirement, as a new design decision in the design record.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -99,7 +106,9 @@ kinds:
     role: decide
     operator: architecture.decide
     readOnly: false
-    mutates: [sds]
+    # The repair reads the same three records the decision did; it may not open a new decision for the owner.
+    reads: [srs, sds, decision]
+    writes: [sds]
     purpose: Repair a design record that a builder found silent or wrong - edit the text and bump its rev.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -112,7 +121,10 @@ kinds:
     role: write  # it generates the placeholder mascot with the image model, so it runs where image generation is: the Codex working profile
     operator: brand.decide
     readOnly: false
-    mutates: [record, asset]
+    # Every token is read out of the real style and token files of the interface and out of the installed
+    # grammar that names them; an untraceable value is a question for the owner, never an invented entry.
+    reads: [code, grammar]
+    writes: [brand, asset]
     purpose: Settle the product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one brand record every drawing and build reads.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -122,7 +134,13 @@ kinds:
     role: write
     operator: interface.draw
     readOnly: false
-    mutates: [design]
+    # It renders the installed grammar inside the brand against the accepted requirement and design, and it
+    # reads the design record it is extending so a second drawing does not restate the first.
+    reads: [srs, sds, brand, grammar, design]
+    # Deviation from the 5-plus design table, which names `design` alone: the drawing captures one image per
+    # screen and viewport into the ui node's `assets/` (design §7) and its operator has always declared that
+    # write, so `asset` belongs here or `IO_DRIFT` refuses the shipped operator catalog.
+    writes: [design, asset]
     # Drawing needs the host's design tooling; a host without it refuses the op (`host-unsupported`) and the
     # frontend lanes behind the ui node keep waiting, which is the design gate doing its job.
     purpose: Draw the interface before any interface code exists - screens, contracts, states, empty and error.
@@ -136,7 +154,11 @@ kinds:
     role: write
     operator: interface.asset
     readOnly: false
-    mutates: [asset, design]
+    reads: [design, brand]
+    # Deviation from the 5-plus design table, which names `asset, design`: the generated artwork lands in the
+    # bound source repository at the path the design record declares, and a bound repository is `code` in the
+    # record catalog. The files are asset bytes and they are product source at the same time.
+    writes: [asset, design, code]
     purpose: Generate the artwork the approved candidate embeds as real repository assets, at the size and format the design record declares.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -146,7 +168,10 @@ kinds:
     role: implement
     operator: interface.implement
     readOnly: false
-    mutates: [code]
+    # The whole design side is an input: the drawing and its generated artwork, the identity they sit inside,
+    # the grammar the markup is written in, and the source it is being added to.
+    reads: [sds, design, asset, brand, grammar, code]
+    writes: [code]
     purpose: Build the interface the drawing settled, against that drawing and nothing invented beside it.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -156,7 +181,8 @@ kinds:
     role: implement
     operator: backend.implement
     readOnly: false
-    mutates: [code]
+    reads: [srs, sds, decision, code]
+    writes: [code]
     purpose: Build one slice of behind-the-interface behaviour under the node's own allowlist.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -166,7 +192,8 @@ kinds:
     role: implement
     operator: runtime.operate
     readOnly: false
-    mutates: [runtime, code]
+    reads: [sds, code, runtime]
+    writes: [runtime, code]
     purpose: Operate the runtime the product needs - migrations, environment, deployment, infrastructure.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -179,7 +206,10 @@ kinds:
     role: implement
     operator: grammar.update
     readOnly: false
-    mutates: [code, grammar]
+    # It reads the drawing that found the word missing, the grammar it is growing and the identity the new
+    # unit must render inside; it writes the grammar package and the consumer bump, which is product code.
+    reads: [design, grammar, brand]
+    writes: [grammar, code]
     purpose: "Grow the installed grammar by one semantic unit the product needs and no composition of existing contracts renders: implement it in the grammar package with its stories and tests, publish it, bump the consumer, and record it in the canon."
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -189,7 +219,13 @@ kinds:
     role: verify
     operator: uat.verify
     readOnly: false
-    mutates: [code]
+    # Deviation from the 5-plus design table, which omits `brand`: `kindsReadingBrand()` replaces the
+    # kernel's hard-coded DESIGN_KINDS, and a walk that judges the rendered surface is given the brand
+    # payload exactly like the drawing and the build are.
+    reads: [srs, design, asset, brand, code]
+    # Deviation from the design table, which names `evidence` alone: the walk authors its scenario and its
+    # scripts inside the bound repository, which is `code`.
+    writes: [evidence, code]
     purpose: Walk one end-to-end scenario on the running product and leave the scenario and its evidence.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -199,17 +235,40 @@ kinds:
     role: verify
     operator: e2e.verify
     readOnly: false
-    mutates: [code]
+    reads: [srs, sds, code]
+    # Deviation from the 5-plus design table, which names `evidence` alone: the proof authors one scenario
+    # spec per assertion inside the bound repository, which is `code`. What it may never write is product
+    # code - that ceiling is the operator's allowlist, not the record catalog.
+    writes: [evidence, code]
     purpose: Prove one delivered slice through its public API on the real stack, never a screen, and leave the scenario spec and its run output.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, sds-gap, environment, authority]
+  # An external system is proven live or it is not proven. A faked provider inside this scenario is a defect,
+  # and a credential the environment lacks is reported `blocked` `environment` with the exact variable name -
+  # which is the owner's question, never an invented key. Its evidence carries `proof: {boundary: live}`,
+  # which is what tells a status view that a chatbot delivery was proven against the real channel.
+  integration.verify:
+    family: prove
+    role: verify
+    operator: integration.verify
+    readOnly: false
+    reads: [integration, sds, code]
+    writes: [evidence]
+    purpose: Prove one declared external integration against the real provider with the credential the owner supplies, and leave the live run as evidence.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [environment, authority, shared-change]
   review.verify:
     family: prove
     role: verify
     operator: review.verify
     readOnly: true
-    mutates: []
+    # Deviation from the 5-plus design table, which omits `runtime`: the operations lane proves
+    # `runtime.operate` with this kind, and a prover that cannot read the runtime record its build wrote is
+    # `lane-proof-blind`.
+    reads: [srs, sds, code, evidence, runtime]
+    writes: []
     purpose: Read the delivered slice against its acceptance and report findings, repairing nothing.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -223,7 +282,10 @@ kinds:
     role: plan
     operator: work.author
     readOnly: false
-    mutates: [record]
+    # An intake reads the decided records of the whole product before it authors anything, which is what
+    # makes the three reconciliation cases checkable against ids rather than against wording.
+    reads: [srs, sds, decision, code, record]
+    writes: [record, srs, sds, decision]
     purpose: Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it; an intake authors a feature's records and reports as sds-gap what a decided record must become.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -300,6 +362,15 @@ lanes:
     purpose: A business node is settled once, before any design is drawn against it.
     steps:
       - kind: business.decide
+  - id: integration
+    match:
+      - {kind: integration}
+    purpose: |-
+      One declared external system, one node, one live proof. There is nothing to build first: the product
+      code that calls the provider is built by the feature's implementation node, and this node exists to
+      show that the call reaches the real provider with the owner's own credential.
+    steps:
+      - kind: integration.verify
   - id: brand
     match:
       - {kind: brand}
