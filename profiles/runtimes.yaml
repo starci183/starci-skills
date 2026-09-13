@@ -43,7 +43,7 @@ runtimes:
     budget: {opsPerDay: 40, tokensPerDay: 8000000}
   gpt-6-astra:
     target: gpt-6-astra
-    roles: [decide, verify]
+    roles: [decide, verify, plan]
     maxParallel: 1
     budget: {opsPerDay: 20, tokensPerDay: 4000000}
   qwen3.8-flash:

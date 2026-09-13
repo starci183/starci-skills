@@ -10,6 +10,7 @@ import {validateReport} from './reports.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} from './workflow-store.mjs';
 import {resolveLedgerRoot,sharedLedgerStatus} from './ledger-routing.mjs';
 import {createAllocator,loadRuntimes} from './runtime-allocator.mjs';
+import {resolveExecutionChain} from '../profiles/select.mjs';
 import {proofFinding,proofPlan,runAtBase} from './verify-proof.mjs';
 import {stepsFor} from './contract-steps.mjs';
 import {parseYaml} from '../core/yaml.mjs';
@@ -69,7 +70,9 @@ export const kindRole=kind=>{try{return graph.roleOf(kind);}catch{return null;}}
 export const AUTHOR_KIND='work.author';
 /** What stays the kernel's inside a record an author op may otherwise write. Compared before and after, never reverted field by field. */
 export const RECORD_OWNED=['state','completion','extensions.work3.kernel'];
-const RESUME_LIMIT=5,RETRY_LIMIT=3,RESTART_LIMIT=3,VERIFY_ROUNDS=3,GATE_ROUNDS=3,LAUNCH_LIMIT=3,STALL_LIMIT=3;
+const RESUME_LIMIT=5,RETRY_LIMIT=3,RESTART_LIMIT=3,VERIFY_ROUNDS=3,GATE_ROUNDS=3,LAUNCH_LIMIT=3;
+/** A workflow with nothing running and nothing launchable waits this long before it stops for the user: a runtime that is cooling for five minutes is not a dead environment. */
+export const STALL_MS=30*60*1000;
 /** Run-time growth is bounded too: ops nobody approved, shared changes per iteration, inferred rate limits. */
 export const DYNAMIC_OPS_BUDGET=64;
 const SHARED_OPS_PER_ITERATION=3,SILENCE_LIMIT=2,RATE_LIMIT_WINDOW_MS=30*60*1000;
@@ -1118,6 +1121,16 @@ export function proposeQuota(state,{runtimes=null}={}){
     const id=Object.keys(profile?.runtimes??{}).find(candidate=>rolesOf(candidate).includes(role));
     if(id)rows.push({runtime:id,slots:1,tags:'hard+medium',why:`the ${role} role: no runtime in the preference order has it`});
   }
+  // ... and every kind's launch chain: a kind whose chain is [fable, astra] cannot run on a quota that names
+  // only Sol, Opus and Qwen, whatever their roles. The first runtime of the chain gets a slot.
+  for(const kind of unique(ops.map(op=>op.kind).filter(Boolean))){
+    let targets=[];
+    try{targets=resolveExecutionChain({skill:'starci',op:launchOperator(kind)}).candidates.map(candidate=>candidate.target);}catch{targets=[];}
+    if(!targets.length||rows.some(row=>row.slots>0&&targets.includes(row.runtime)))continue;
+    const row=rows.find(item=>targets.includes(item.runtime));
+    if(row){row.slots=Math.max(1,row.slots);row.why=`${row.why}; in the launch chain of ${kind}`;continue;}
+    rows.push({runtime:targets[0],slots:1,tags:'hard+medium',why:`first of the launch chain of ${kind}`});
+  }
   const text=rows.map(row=>`${row.runtime}=${row.slots}:${row.tags}`).join(',');
   const proposal={rows,text,summary:`${hard} hard, ${medium} medium, ${easy} easy of ${ops.length} operations; up to ${total} in parallel`};
   state.quotaProposal=proposal;
@@ -1141,7 +1154,7 @@ export function approve(store,state,{allocation=null,allowDynamic=null}={}){
   // decision, so the finish is cleared and the supervisor starts a kernel that carries on from where it stopped.
   if(state.finished&&state.finished.outcome==='blocked'&&state.approved){
     const before=state.finished;
-    state.finished=null;state.phase='run';state.stalls=0;state.kernelErrors=0;
+    state.finished=null;state.phase='run';state.stalls=0;state.stalledSince=null;state.kernelErrors=0;
     store.appendEvent({event:'resumed-after-block',reason:before.reason??null,budget:dynamicBudget(state)});
   }
   // The user sets the runtime allocation at approval; without --allocation the proposal from goal.md is used and recorded.
@@ -1622,7 +1635,7 @@ function scheduleOps(orca,store,state,ctx){
     const result=launchOp(orca,store,state,op,{...allocated,candidate},ctx);
     if(result.ok)launched.push(op.id);
   }
-  if(launched.length)state.stalls=0;
+  if(launched.length){state.stalls=0;state.stalledSince=null;}
   return launched;
 }
 
@@ -3195,9 +3208,10 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     if(state.ops.some(op=>liveStatus.includes(op.status))){
       // Nothing could be launched and nothing is running: every runtime is busy, cooling or out of budget.
       state.stalls+=1;
-      store.appendEvent({event:'stalled',stalls:state.stalls,allocation:state.allocation});
-      if(state.stalls>=STALL_LIMIT){
-        state.needUser.push({kind:'environment',detail:`no runtime accepted an operation in ${state.stalls} iterations`});
+      state.stalledSince=state.stalledSince??now();
+      store.appendEvent({event:'stalled',stalls:state.stalls,since:state.stalledSince,allocation:state.allocation});
+      if(now()-state.stalledSince>=STALL_MS){
+        state.needUser.push({kind:'environment',detail:`no runtime accepted an operation for ${Math.round((now()-state.stalledSince)/60000)} minutes (${state.stalls} attempts)`});
         finish(store,state,'blocked','no runtime accepted an operation',ctx);
         break;
       }

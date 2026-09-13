@@ -130,7 +130,7 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
 }
 
 /** Pools instead of a chain: least-index-free runtime per role, honouring `avoid`. */
-function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','claude-opus','gpt-5.6-sol'],verify:['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol'],decide:['claude-fable-5.1','gpt-6-astra'],write:['gpt-5.6-sol','claude-opus','qwen3.8-flash'],plan:['claude-opus','claude-fable-5.1']}}={}){
+function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','claude-opus','gpt-5.6-sol'],verify:['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol'],decide:['claude-fable-5.1','gpt-6-astra'],write:['gpt-5.6-sol','claude-opus','qwen3.8-flash'],plan:['claude-fable-5.1','gpt-6-astra']}}={}){
   const busy=new Set(),requests=[];
   // The kind graph is the role authority, exactly as the real allocator reads it; the rest is the 4.x guess.
   // A kind the graph does not carry yet is not fatal for the allocator, exactly as in the real one: the role is
@@ -1366,7 +1366,7 @@ test('a tree that knows about brands and carries no brand node asks the user onc
       [{kind:'brand',detail:'no brand record: author .starciwork/brand/index.yaml (a work.author or brand.decide op)'}],
       'the question is asked exactly once, however many iterations defer');
     assert.equal(state.ops.some(op=>op.kind===BRAND_DECIDE),false,'there is no node to decide');
-    assert.equal(state.finished.outcome,'blocked');
+    assert.equal(state.finished,null,'a missing brand is a question the workflow waits on; nothing ran and nothing stopped it within the stall window');
   }finally{harness.cleanup();}
 });
 

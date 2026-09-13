@@ -284,10 +284,12 @@ operators:
       - {environment: codex, profiles: [gpt-5.6-sol]}
   work.author:
     skill: starci
-    chain: [claude-opus, claude-fable-5.1, gpt-5.6-sol]
+    # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is the work that every
+    # later operation is measured against: it runs on the strongest reasoning runtimes only, never a cheap one.
+    chain: [claude-fable-5.1, gpt-6-astra]
     environments:
-      - {environment: claude, profiles: [claude-opus, claude-fable-5.1]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: claude, profiles: [claude-fable-5.1]}
+      - {environment: codex, profiles: [gpt-6-astra]}
   workspace.manage:
     skill: starci
     chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]

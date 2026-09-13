@@ -45,7 +45,7 @@ test('every operator has an ordered external-agent chain and skill-level default
   // interface.draw generates PNG candidates with the image model, which only the Codex runtime carries: one link, no overflow.
   // brand.decide also generates a placeholder mascot, so it runs on the working chain (Codex, then Opus); interface.asset
   // re-renders the artwork the candidates embed, so it needs the same image model and the same one link as interface.draw.
-  const expectedCounts={'business.decide':3,'architecture.decide':3,'brand.decide':2,'review.verify':5,'interface.draw':1,'interface.asset':1};
+  const expectedCounts={'business.decide':3,'architecture.decide':3,'brand.decide':2,'review.verify':5,'interface.draw':1,'interface.asset':1,'work.author':2};
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
     const expectedCount=expectedCounts[op]??3;
@@ -79,9 +79,10 @@ test('every operator has an ordered external-agent chain and skill-level default
   // It runs code rather than reasoning about it, so the working profile applies, not the reviewer one.
   assert.equal(resolveExecutionChain({op:'e2e.verify'}).candidates[0].profile,'gpt-5.6-sol');
   // Completing a Work record is reading work, so it runs on the plan-role runtimes with the reasoning profiles.
-  assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.target),['claude-opus','claude-fable-5.1','gpt-5.6-sol']);
+  // Authoring records runs on the strongest reasoning runtimes only.
+  assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.target),['claude-fable-5.1','gpt-6-astra']);
+  assert.match(resolveExecutionChain({op:'work.author'}).candidates[1].profile,/astra/);
   assert.equal(resolveExecutionChain({op:'work.author'}).role,'reasoning');
-  assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.profile),['opus-reviewer','fable-5.1','gpt-5.6-sol-reviewer']);
   // Settling an identity is reasoning, so the chain carries the reasoning profiles; the Codex target leads it
   // because only that runtime carries an image generator for the placeholder mascot, and the decide-role
   // runtimes follow as the candidates the allocator actually prefers.
