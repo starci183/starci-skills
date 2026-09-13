@@ -296,6 +296,10 @@ An intake op's goal and acceptance are re-derived from the current build at ever
 the validator reads the acceptance literally, so a wording the build corrected must reach the ops planned before
 the correction; the allowlist and references stay what the owner approved.
 
+An accepted intake is settled by what the tree holds under its scope (`intake-authored {records, decisions}`),
+never measured as an incomplete record: the drafts are the owner's to read and the open decisions are the
+owner's to take, so the workflow finishes `done` with them in its report.
+
 **The design record is the feature's `ui` node.** Its `ui:` spec - surfaces, states, the candidate images under
 its own `assets/` and the `artworkSlots` the drawing declared - is the authority for the interface lanes, and
 `lanePredicates` reads it from disk (`designRecord`): a `ui` node reads itself, an implementation node reads
@@ -643,6 +647,13 @@ re-binds the Run to its own tab once (`run-rebound`), which fences the old tab's
 is closed when its report is accepted (`op-terminal-closed`); a blocked or failed op keeps its tab, which is
 where its last words are. Every reconcile also sweeps what an older build left behind - stale `[Kernel]` tabs
 and done-op tabs of this workflow (`terminals-swept`) - and never touches another workflow's tabs.
+
+## The validator judges by the record on disk
+
+The brand payload the validator receives is read again from disk when the op wrote the brand record itself:
+the summary the last sync read is what the op was told to change, not what it is judged by. A retry closes
+the failed attempt's tab and a validator-exhausted block closes the op's tab (`op-terminal-closed`): a tab
+without a reader is not left idle in the sidebar.
 
 ## A command reaches a running kernel within one tick
 

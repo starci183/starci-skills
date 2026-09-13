@@ -15,7 +15,7 @@ import {loadsFileFor} from '../execution/runtime-loads.mjs';
 import {resolveLedgerRoot} from '../execution/ledger-routing.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,rebindRunIfNeeded,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,rebindRunIfNeeded,treeForVerdict,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -988,6 +988,57 @@ test('an intake op planned by an older build carries the current goal and accept
     assert.match(fresh.goal,/every leaf record todo/);
     assert.deepEqual(fresh.allowlist,allowlist);
     assert.deepEqual(events(store).filter(event=>event.event==='intake-retemplated').map(event=>[event.op,event.changed]),[[op.id,['goal','acceptance']]]);
+  }finally{harness.cleanup();}
+});
+
+test('an op that wrote the brand record is judged by the record on disk, not by the summary the sync read before it ran',()=>{
+  const fresh={brand:{rev:1},list:[]},stale={brand:{rev:4},list:[]};
+  const ctx={work:{loaded:stale,at:{repoRoot:'r',workRoot:'w'},validate:null,api:{loadLedger:()=>fresh}}};
+  assert.equal(treeForVerdict(ctx,['apps/x.ts']),stale,'an op elsewhere is judged by the tree as last read');
+  assert.equal(treeForVerdict(ctx,['.starciwork/brand/index.yaml']),fresh,'the brand op is judged by what it wrote');
+  assert.equal(ctx.work.loaded,fresh,'and the kernel reads on from there');
+  assert.equal(treeForVerdict({work:{...ctx.work,api:{loadLedger:()=>{throw Error('gone');}}}},['.starciwork/brand/index.yaml']),fresh,'an unreadable tree falls back to the last read');
+  assert.equal(treeForVerdict(null,['.starciwork/brand/index.yaml']),null);
+});
+
+test('a rejected attempt closes its tab before the next one opens, and a validator-exhausted block leaves no idle tab',()=>{
+  const nodeId='demo.sales.implementation.backend.intake';
+  const done=summary=>({outcome:'done',summary,files:['apps/agentos-controlplane/src/sales/intake.ts'],checks:[passing('unit-tests-pass','npx vitest run intake')]});
+  const harness=setupWork({dirty:['apps/agentos-controlplane/src/sales/intake.ts'],scripts:{[nodeId]:[done('first'),done('second')]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const reject=()=>({ok:true,verdict:'reject',summary:'not yet',findings:[{file:'apps/agentos-controlplane/src/sales/intake.ts',detail:'the receipt is not rendered'}],dropped:[],provider:'stub',usage:null});
+    const state=harness.run({maxIterations:8,validateOp:reject});
+    const op=state.ops.find(item=>item.id===nodeId);
+    assert.equal(op.status,'blocked');
+    assert.equal(op.terminal,null,'a blocked op holds no tab');
+    const log=events(harness.store);
+    const closed=log.filter(event=>event.event==='op-terminal-closed').map(event=>event.op);
+    assert.deepEqual(closed,[nodeId,nodeId],'the retried attempt and the exhausted one each closed their tab');
+    assert.ok(log.findIndex(event=>event.event==='op-terminal-closed')<log.findIndex(event=>event.event==='retry'),'the tab closes before the retry is announced');
+    assert.deepEqual([...harness.fake.terminals.values()].filter(term=>term.title?.startsWith('[Op]')&&term.title.includes(nodeId)&&!term.title.includes('-author')).map(term=>[term.handle,term.title]),[],'no tab of the blocked op is left');
+  }finally{harness.cleanup();}
+});
+
+test('an accepted intake settles by what the tree holds under its scope and the workflow finishes done, asking nothing about a node called null',()=>{
+  const file='.starciwork/features/collab/index.yaml';
+  const harness=setupWork({scope:['collab'],dirty:[file],scripts:{'collab-intake':[{outcome:'done',summary:'Authored the collab drafts.',files:[file],
+    checks:[passing('work-tree-validates','node starci.mjs validate')],
+    effect:()=>{fs.mkdirSync(path.dirname(path.join(activeRepo,file)),{recursive:true});fs.writeFileSync(path.join(activeRepo,file),['schema: work/node@2','id: demo.collab','kind: module',''].join(String.fromCharCode(10)));}}]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    // An older build's question about the intake, left in the state: it goes with the first sync.
+    harness.state.needUser.push({node:null,kind:'ledger',detail:'ledger incomplete: null is still not launchable after collab-intake completed its record'});
+    const state=harness.run({maxIterations:8});
+    const log=events(harness.store);
+    assert.equal(state.ops[0].status,'done');
+    assert.equal(log.some(event=>event.event==='record-still-incomplete'),false,'an intake is never an incomplete record');
+    assert.deepEqual(log.filter(event=>event.event==='intake-authored').map(event=>[event.op,event.scope]),[['collab-intake','collab']]);
+    assert.deepEqual(log.filter(event=>event.event==='need-user-answered').map(event=>event.reason),['an intake authors records, not a node']);
+    assert.deepEqual(state.needUser,[]);
+    assert.equal(state.finished?.outcome,'done',JSON.stringify(state.finished));
   }finally{harness.cleanup();}
 });
 

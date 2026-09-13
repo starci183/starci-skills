@@ -2378,7 +2378,29 @@ function advanceLanes(store,state,op,ctx,verified){
  * The node keeps `state: todo` throughout, because authoring a record is not completing work: no `markDone`,
  * no completion, no evidence manifest - only the kernel's own `in-progress` receipt from the launch.
  */
+/**
+ * An intake op authored records, not a node: it is settled by what the tree holds under its scope now and is
+ * never measured as an incomplete record (srs-sds and command-context finished blocked with their drafts
+ * accepted, asking the owner about a node called null). The records are listed, the open decisions among them
+ * are the owner's and go to the report, and nothing asks the user.
+ */
+function settleIntake(store,state,op,ctx){
+  const scope=op.intake.scope;
+  let loaded=null;
+  try{loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});if(loaded.ok)ctx.work.loaded=loaded;}
+  catch(error){store.appendEvent({event:'ledger-sync-failed',op:op.id,reason:error.message});}
+  const tree=loaded?.ok?loaded:ctx.work.loaded;
+  const records=(tree?.list??[]).filter(node=>scopeNames(node,scope)).map(node=>node.id);
+  try{
+    state.decisions=(ctx.work.api.decisionCandidates?.(tree,{scope:state.scope.length?state.scope:null})??[]).map(node=>({id:node.id,kind:node.kind,path:node.path,
+      operation:DECISION_OPERATION[node.kind]??'business.decide',title:describeNode(ctx.work.api,ctx.work.at,node)}));
+  }catch{/* the decisions the goal listed stand */}
+  state.needUser=state.needUser.filter(item=>!(item.kind==='ledger'&&!item.node&&String(item.detail??'').includes(`after ${op.id} completed`)));
+  store.appendEvent({event:'intake-authored',op:op.id,scope,records:records.length,decisions:state.decisions.map(item=>item.id)});
+  return 'intake-authored';
+}
 function settleAuthoredRecord(store,state,op,ctx){
+  if(op.intake?.scope&&!op.nodeId)return settleIntake(store,state,op,ctx);
   const nodeId=op.nodeId;
   let candidate=null;
   try{
@@ -2431,6 +2453,10 @@ function pruneAnsweredQuestions(store,state,loaded){
       if(shared&&shared.status!=='blocked'){store.appendEvent({event:'need-user-answered',op:item.op??null,kind:item.kind,reason:`${named} is ${shared.status}`});continue;}
     }
     if(item?.kind!=='ledger'){kept.push(item);continue;}
+    // An older build asked about "null" after an intake completed: an intake authors records, not a node.
+    const intakeOf=(String(item.detail??'').match(/after (\S+) completed its record/)??[])[1];
+    const intake=intakeOf?state.ops.find(candidate=>candidate.id===intakeOf):null;
+    if(!item.node&&intake?.intake?.scope){store.appendEvent({event:'need-user-answered',op:intake.id,kind:item.kind,reason:'an intake authors records, not a node'});continue;}
     // Keyed by node, or by the op whose write was refused: the nodes that op closes (its own, or the set a review names).
     const op=item.op?state.ops.find(candidate=>candidate.id===item.op):null;
     const nodes=item.node?[item.node]:op?unique([...(op.nodeId?[op.nodeId]:[]),...(op.ledgerIds??[])]):[];
@@ -2667,6 +2693,15 @@ const findingText=finding=>`validator: ${finding.file}${finding.line?`:${finding
  * VALIDATOR_UNAVAILABLE_LIMIT in a row it is a needUser item. With `validateOp:null` the step is skipped once,
  * on the record.
  */
+/**
+ * The brand the validator judges by is the one on disk now. An op that wrote the brand record itself is judged
+ * by its own record, never by the summary the last sync read before it ran: brand-1 set rev 1 and was rejected
+ * twice for the rev 4 the sync had seen. Any other op is judged by the tree as last read.
+ */
+export function treeForVerdict(ctx,files){
+  if(!ctx?.work||!(files??[]).some(file=>/(^|\/)brand\/index\.yaml$/.test(slash(String(file)))))return ctx?.work?.loaded??null;
+  try{const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});ctx.work.loaded=loaded;return loaded;}catch{return ctx.work.loaded??null;}
+}
 function validateAccepted(store,state,op,ctx,{files,verified}){
   if(ctx.validateOp===null||ctx.validateOp===undefined){
     if(!state.validatorSkipped){state.validatorSkipped=true;store.appendEvent({event:'validator-skipped',reason:'no validator function was given to this kernel'});}
@@ -2683,7 +2718,7 @@ function validateAccepted(store,state,op,ctx,{files,verified}){
   try{result=ctx.validateOp({op,node:validatorNode(ctx,op),diff,checks:proven,references:op.references,
     // The brand travels with every verdict: a colour, a font, an icon or an artwork slot outside it is a defect,
     // and the validator can only say so if it was given the record the operation was supposed to read.
-    brand:brandPayload(ctx.work?.loaded),
+    brand:brandPayload(treeForVerdict(ctx,files)),
     memory:readValidatorMemory(store),providers,skip:coolingRuntimes(ctx.allocator),cwd:ctx.cwd});}
   catch(error){result={ok:false,verdict:'unavailable',reason:error.message};}
   const verdict=llm.VALIDATOR_VERDICTS.includes(result?.verdict)?result.verdict:'unavailable';
@@ -2806,6 +2841,8 @@ function retryOp(store,state,op,findings,ctx,reason){
     avoidRuntime(op,op.runtime,clockOf(ctx));
     op.repairs=retryLimitFor(reason);
   }
+  // The tab of the attempt that failed has no reader any more: the next attempt opens its own.
+  if(ctx?.orca)closeOpTerminal(ctx.orca,store,state,op);
   op.status='ready';op.attempt+=1;op.findings=findings;op.priorOpen=[];op.dispatch=null;op.terminal=null;op.nudged=false;
   store.appendEvent({event:'retry',op:op.id,attempt:op.attempt,reason,findings:findings.slice(0,3)});
   return 'retry';
@@ -3127,6 +3164,8 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       op.validatorRejects=(op.validatorRejects??0)+1;
       if(op.validatorRejects>=VALIDATOR_REJECT_LIMIT){
         op.status='blocked';
+        // A blocked op's tab would sit idle in the sidebar until someone closed it by hand.
+        if(ctx.orca)closeOpTerminal(ctx.orca,store,state,op);
         state.needUser.push({op:op.id,kind:'validator',detail:`${op.id} was rejected by the validator ${op.validatorRejects} times: ${validation.findings[0]}`});
         store.appendEvent({event:'validator-exhausted',op:op.id,rejects:op.validatorRejects,findings:validation.findings.slice(0,3)});
         return 'validator-exhausted';
