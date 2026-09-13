@@ -490,6 +490,24 @@ node .claude/.dist/execution/orca-supervised-launch.mjs workflow-supervise --hos
 
 A review round is counted per reviewed node set (`verifyRounds[<ids joined by +>]`), never per feature: counting per module burned a feature's three rounds on three different nodes. After the last round the group is parked as `review-exhausted` with one needUser item instead of being re-planned every tick. Ops the kernel derives itself (origins `ledger`, `verify`, `gate`, `architecture`) never count against `--allow-dynamic`; only `shared` and `repair` ops do, and `--allow-dynamic 0` forbids them.
 
+## Operating a running workflow
+
+Everything an operator does is a command or a file the kernel reads; nothing is a write to `state.json`, which
+the kernel holds in memory and saves over at every tick.
+
+| you want | do | the kernel |
+| --- | --- | --- |
+| raise the run-time op budget or change the allocation of a running workflow | `workflow-approve --id <w> --allow-dynamic N` / `--allocation ...` | queued in `<store>/inbox/`, applied at the next tick (`inbox-applied`); a new allocation ends the loop with `stopped: restart: allocation changed` and the supervisor starts the kernel again within a minute |
+| resume a workflow that finished `blocked` after you answered its questions | `workflow-approve --id <w>` (with `--allow-dynamic` / `--allocation` as needed) | `resumed-after-block`: the finish is cleared, the supervisor starts a kernel |
+| ship a new runtime build | `npm run build` | every running kernel notices its module changed (`build-changed`), ends cleanly and is restarted by the supervisor on the new code |
+| pause a workflow | `workflow-stop --id <w>` (writes `stop.flag`) | `stopped: stop flag` at the next tick; the supervisor leaves it while the flag exists; delete the flag to let it start again |
+| read a workflow | `workflow-status --id <w>` | read-only |
+
+Two things that look like defects and are not: Orca groups agent terminals by worktree, so the ops of several
+workflows running in one worktree all hang under the first run's node in the sidebar - each workflow still has
+its own run, kernel and reconcile; and a workflow finishes `blocked` with every gate green when questions for
+the user remain - the gates say the code holds, the questions say what the owner still decides.
+
 ## Reading a workflow
 
 A workflow has no monitor agent to ask, so the one way to know where it stands is its own files.

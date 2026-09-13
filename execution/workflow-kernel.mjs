@@ -930,14 +930,15 @@ function scopeNames(node,entry){
  * `todo`, so the owner reads drafts and the decisions stay the owner's. Neither op closes a Work node: the records
  * it writes are the nodes the tree has afterwards.
  */
-function intakeOp(state,{workRoot,loaded,index,entry=null}){
+function intakeOp(state,{workRoot,loaded,index,entry=null,repositories={}}){
   const name=slash(String(entry??'')).replace(/\/+$/,'');
   const check={name:'work-tree-validates',command:validateCommandAt(workRoot)};
   if(name==='brand'){
     return {id:`brand-${index+1}`,kind:BRAND_DECIDE,nodeId:null,intake:{scope:'brand'},
       goal:`Author and decide the brand record .starciwork/brand/index.yaml of this product from the job: ${state.job}. The name, the design family, every colour token with the role it plays and the source file it is traced to, the fonts, the mascot and logo assets (generate a placeholder mascot with the image model when the product has none), what is forbidden and the rules every imagery prompt must carry.`,
       ledgerIds:[],allowlist:['.starciwork/brand/index.yaml','.starciwork/brand/**'],
-      references:unique(['workspace.yaml',...grammarReferences()]),checks:[check],
+      // The frontend repository the tokens are traced to is a read-only reference here, never a place to write.
+      references:unique(['workspace.yaml',...Object.entries(repositories).filter(([role])=>role!=='be').map(([,root])=>slash(root)),...grammarReferences()]),checks:[check],
       acceptance:['.starciwork/brand/index.yaml is a valid brand node: name, family, colour tokens with their roles and sources, the mascot and logo assets, the forbidden list and the imagery prompt rules','the Work tree still validates'],origin:'ledger'};
   }
   // The example the drafts mirror: the first feature module the tree already has, with its business and architecture roots.
@@ -972,7 +973,12 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,ledgerApi=w
   // then begins with one intake operation that writes those records from the job, and the tree, once it has them,
   // says what follows: decisions the owner takes, lanes the kernel walks. Nothing is invented by the kernel itself.
   const absent=(scope??[]).filter(entry=>!loaded.list.some(node=>scopeNames(node,entry)));
-  const intake=absent.map((entry,index)=>intakeOp(state,{workRoot:binding.ledgerRoot,loaded,index,entry}));
+  const repositories=(()=>{try{return Object.fromEntries(bindingRoutes(binding.binding,{source:path.dirname(path.resolve(state.host??''))}).map(route=>[route.role,route.directory]));}catch{return {};}})();
+  // The folders of the other bound repositories, and the folder they all live in, so a path naming one of them
+  // is never mistaken for a path of this worktree.
+  state.otherRepositories=unique(Object.values(repositories).map(root=>path.basename(String(root))).filter(name=>name&&name!==path.basename(repoRoot)));
+  state.repositoriesRoot=state.host?path.basename(path.dirname(path.dirname(path.resolve(state.host)))):null;
+  const intake=absent.map((entry,index)=>intakeOp(state,{workRoot:binding.ledgerRoot,loaded,index,entry,repositories}));
   state.decisions=ledgerApi.decisionCandidates(loaded,{scope}).map(node=>({id:node.id,kind:node.kind,path:node.path,
     operation:DECISION_OPERATION[node.kind]??'business.decide',title:describeNode(ledgerApi,at,node)}));
   state.ledgerSummary=ledgerApi.ledgerSummary(loaded,{scope});
@@ -1102,6 +1108,16 @@ export function proposeQuota(state,{runtimes=null}={}){
   let rows=order.map((id,index)=>({runtime:id,slots:Math.max(index===0?1:0,Math.round(total*weights[index]/sum)),tags:index===0?'hard+medium':index===1?'hard+medium':'easy+medium',why:index===0?'strongest tier: hard and most medium operations':index===1?'second tier: medium operations and overflow':'cheapest tier: easy operations and overflow'}));
   const cap=id=>profile?.runtimes?.[id]?.maxParallel;
   rows=rows.map(row=>({...row,slots:Number.isFinite(cap(row.runtime))&&cap(row.runtime)>0?Math.min(row.slots,cap(row.runtime)):row.slots}));
+  // Every role the plan needs has a runtime with a slot: a `work.author` op needs the plan role, and a proposal
+  // that gave its only slot to a runtime without it left a workflow stalled at its first tick.
+  const rolesOf=id=>Array.isArray(profile?.runtimes?.[id]?.roles)?profile.runtimes[id].roles:[];
+  for(const role of unique(ops.map(op=>kindRole(op.kind)).filter(Boolean))){
+    if(rows.some(row=>row.slots>0&&rolesOf(row.runtime).includes(role)))continue;
+    const able=rows.find(row=>rolesOf(row.runtime).includes(role));
+    if(able){able.slots=Math.max(1,able.slots);able.why=`${able.why}; the only proposed runtime with the ${role} role`;continue;}
+    const id=Object.keys(profile?.runtimes??{}).find(candidate=>rolesOf(candidate).includes(role));
+    if(id)rows.push({runtime:id,slots:1,tags:'hard+medium',why:`the ${role} role: no runtime in the preference order has it`});
+  }
   const text=rows.map(row=>`${row.runtime}=${row.slots}:${row.tags}`).join(',');
   const proposal={rows,text,summary:`${hard} hard, ${medium} medium, ${easy} easy of ${ops.length} operations; up to ${total} in parallel`};
   state.quotaProposal=proposal;
@@ -2307,11 +2323,57 @@ function createSharedOp(store,state,op,detail,paths){
   return created;
 }
 
+/**
+ * Whether a path names this worktree and not another repository: relative, no escape, and no segment that is
+ * the folder of another bound repository or the folder every repository lives in (a `Repositories/other/...`
+ * path is Source-relative, which an operation inside one worktree cannot reach). A new top-level folder is fine.
+ */
+function insideWorktree(state,entry){
+  const relative=normalize(entry);
+  if(!relative||path.isAbsolute(relative)||/^[A-Za-z]:/.test(relative))return false;
+  const parts=relative.split('/').filter(Boolean);
+  if(!parts.length||parts.includes('..'))return false;
+  const others=new Set([...(state?.otherRepositories??[]),...(state?.repositoriesRoot?[state.repositoriesRoot]:[])].map(name=>String(name).toLowerCase()));
+  return !parts.some(part=>others.has(part.toLowerCase()));
+}
+/**
+ * A shared op an older build created for paths outside this worktree is settled: blocked as out-of-repository,
+ * and every requester waiting on it is answered the way a fresh request now is.
+ */
+function refuseForeignShared(store,state,ctx){
+  for(const op of state.ops){
+    if(op.origin!=='shared'||!['pending','ready','running','paused','blocked'].includes(op.status)||op.refusal)continue;
+    const allowlist=op.allowlist??[];
+    if(!allowlist.length||allowlist.some(entry=>insideWorktree(state,entry)))continue;
+    if(op.status==='running'&&op.dispatch&&ctx?.orca)settleDispatch(ctx.orca,op.dispatch,{cwd:state.worktree,reason:'out-of-repository',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+    if(op.runtime&&op.status==='running')ctx.allocator?.release?.(op.runtime);
+    op.status='blocked';op.refusal='out-of-repository';op.dispatch=null;op.terminal=null;
+    store.appendEvent({event:'shared-change-refused',op:op.id,kind:op.kind,paths:allowlist,reason:'outside this repository',settled:true});
+    for(const id of op.requesters??[]){
+      const requester=state.ops.find(candidate=>candidate.id===id);
+      if(!requester||!['paused','pending'].includes(requester.status))continue;
+      requester.priorOpen=unique([...(requester.priorOpen??[]),`the shared change ${op.id} named ${allowlist.join(', ')}, which is not in this repository; a shared change reaches only this worktree - record what you need from another repository as a source or an open gap in your own record, never as a change`]);
+      requester.status='ready';requester.attempt=(requester.attempt??1)+1;requester.waitingFor=null;requester.dispatch=null;requester.terminal=null;
+      store.appendEvent({event:'op-resumed',op:requester.id,reason:`${op.id} was out of this repository`});
+    }
+  }
+}
 /** One shared request: merge into an existing shared op, create one, or queue it for the next iteration. */
 function requestSharedChange(store,state,op,{paths,detail,open=[]}){
   // The Work tree is the kernel's record, never an operation's: a shared change that names a ledger path is
   // refused and carried to the user as a finding. A read-only kind may not request one at all.
   const ledgerPaths=paths.filter(entry=>/^\.?\/?\.starciwork\//.test(slash(entry)));
+  // A path of another repository is not a shared change: a shared change reaches only this worktree. The op is
+  // told so and reports again - what it needs from another repository is a source or an open gap in its record.
+  const foreign=paths.filter(entry=>!insideWorktree(state,entry));
+  if(foreign.length&&!ledgerPaths.length){
+    const file=store.reportPath(op.dispatch);
+    if(fs.existsSync(file))fs.renameSync(file,`${file}.answered-${op.reports.length}`);
+    op.answer=`The path(s) ${foreign.join(', ')} are not in this repository (${slash(state.worktree)}); a shared change reaches only this worktree. Record what you need from another repository in your own record - as a source it is traced to, or as an open gap - and report again without naming it as a change.`;
+    op.status='answering';
+    store.appendEvent({event:'shared-change-refused',op:op.id,kind:op.kind,paths:foreign,reason:'outside this repository'});
+    return 'shared-change-foreign';
+  }
   if(ledgerPaths.length||graph.isReadOnly?.(op.kind)){
     op.status='blocked';
     state.needUser.push({op:op.id,kind:'ledger-path',detail:`${op.id} (${op.kind}) asked for a change the kernel will not delegate: ${ledgerPaths.length?ledgerPaths.join(', '):'a read-only kind requested a shared change'}: ${detail}`});
@@ -3096,13 +3158,18 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
   reconcileWithOrca(orca,store,state,{cwd,wait,allocator});
   sweepTreeStrays(store,state,ctx);
+  state.buildStamp=buildStamp();
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
     if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});sweepTreeStrays(store,state,ctx);}
     if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});store.saveState(state);return state;}
+    applyInbox(store,state,ctx);
+    if(state.restartRequested){const reason=state.restartRequested;state.restartRequested=null;store.appendEvent({event:'stopped',reason:`restart: ${reason}`});store.saveState(state);return state;}
+    if(state.buildStamp&&buildStamp()&&buildStamp()!==state.buildStamp){store.appendEvent({event:'build-changed',from:state.buildStamp,to:buildStamp()});store.appendEvent({event:'stopped',reason:'build changed'});store.saveState(state);return state;}
     state.iterations+=1;
     store.appendEvent({event:'tick',iteration:state.iterations,
       ops:state.ops.map(op=>`${op.id}=${op.status}`),ledger:state.ledger.map(item=>`${item.id}=${item.status}`)});
     answerQuestions(orca,store,state,ctx);
+    refuseForeignShared(store,state,{...ctx,orca});
     readmitCooled(store,state,ctx);
     resumePaused(store,state);
     drainSharedQueue(store,state);
@@ -3217,6 +3284,50 @@ function acquireKernelLock(store){
   return ()=>{try{const now=JSON.parse(fs.readFileSync(lock,'utf8'));if(now.pid===process.pid)fs.rmSync(lock);}catch{}};
 }
 export function stopRequested(store){return fs.existsSync(path.join(store.dir,'stop.flag'));}
+/** Whether the kernel of this store is a live process, by its lock. */
+export function kernelAlive(store){
+  const lock=readJson(path.join(store.dir,'kernel.lock'),null);
+  const pid=Number(lock?.pid);
+  if(!Number.isInteger(pid)||pid<=0)return false;
+  try{process.kill(pid,0);return true;}catch{return false;}
+}
+/**
+ * A command for a running kernel is a file in the store's inbox, never a write to its state: the kernel holds
+ * the state in memory and would save over the change at its next tick. The kernel applies inbox commands at the
+ * start of every iteration, in order, and records each (`inbox-applied`).
+ */
+export function queueInbox(store,command){
+  const file=path.join(store.paths.inbox,`${Date.now()}-${Math.random().toString(16).slice(2,8)}.json`);
+  fs.writeFileSync(file,JSON.stringify({...command,at:new Date().toISOString()}));
+  return file;
+}
+function applyInbox(store,state,ctx){
+  let files=[];
+  try{files=fs.readdirSync(store.paths.inbox).filter(name=>name.endsWith('.json')).sort();}catch{return;}
+  for(const name of files){
+    const file=path.join(store.paths.inbox,name);
+    let command=null;
+    try{command=JSON.parse(fs.readFileSync(file,'utf8'));}catch{command=null;}
+    try{fs.rmSync(file,{force:true});}catch{}
+    if(!plain(command))continue;
+    if(command.kind==='approve'){
+      const before={budget:dynamicBudget(state),quota:JSON.stringify(state.quota??null)};
+      approve(store,state,{allocation:command.allocation??null,allowDynamic:command.allowDynamic??null});
+      const quotaChanged=JSON.stringify(state.quota??null)!==before.quota;
+      store.appendEvent({event:'inbox-applied',kind:'approve',allocation:command.allocation??null,allowDynamic:command.allowDynamic??null,budget:{from:before.budget,to:dynamicBudget(state)},quotaChanged});
+      // The allocator was built from the quota at start: a new allocation takes effect at the next kernel start,
+      // which the supervisor gives within a minute once this loop returns.
+      if(quotaChanged)state.restartRequested='allocation changed';
+    }else store.appendEvent({event:'inbox-ignored',kind:command.kind??null});
+  }
+}
+/**
+ * The kernel loads its code once; a rebuild of the runtime is a new kernel. Every tick compares the module's
+ * modification time with the one recorded at start, and a change ends the loop cleanly (`build-changed`) so the
+ * supervisor starts the new code within a minute - no stop flag, no hand restart.
+ */
+const KERNEL_MODULE=(()=>{try{return new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1');}catch{return null;}})();
+export function buildStamp(){try{return KERNEL_MODULE?Math.round(fs.statSync(KERNEL_MODULE).mtimeMs):null;}catch{return null;}}
 
 export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleepSync,functions={}}={}){
   const worktree=path.resolve(cwd);
@@ -3272,6 +3383,12 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   }
   if(command==='workflow-approve'){
     const {store,state}=open(options.id);
+    // A live kernel owns the state: the command is queued in its inbox and applied at its next tick.
+    if(state.approved&&kernelAlive(store)){
+      const file=queueInbox(store,{kind:'approve',allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null});
+      return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,queued:true,inbox:file,
+        next:'the running kernel applies this at its next iteration (event inbox-applied); a new allocation restarts the kernel through the supervisor'};
+    }
     return {schema:WORKFLOW_KERNEL,command,dir:store.dir,
       ...approve(store,state,{allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null})};
   }

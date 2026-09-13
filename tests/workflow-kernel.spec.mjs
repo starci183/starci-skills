@@ -12,7 +12,7 @@ import {validateGoalPlan,validateOp} from '../execution/llm-functions.mjs';
 import {createStore} from '../execution/workflow-store.mjs';
 import * as work from '../execution/work-ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../execution/kind-graph.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,operationSpec,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,operationSpec,queueInbox,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId} from '../execution/workflow-kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -804,6 +804,55 @@ test('approving a workflow that finished blocked resumes it, and questions whose
     state.run='run_wf';state.from='term_kernel';
     const after=harness.run({maxIterations:1});
     assert.deepEqual(after.needUser.filter(item=>['ledger-path','shared-change'].includes(item.kind)),[],'a superseded op and an unblocked shared change ask nothing');
+  }finally{harness.cleanup();}
+});
+
+test('the quota proposal gives every role the plan needs a runtime with a slot',()=>{
+  const harness=setupWork({scope:['collab']});
+  try{
+    // The one op is a work.author (plan role); the strongest runtime has no plan role, so the proposal must not stop there.
+    const proposal=harness.state.quotaProposal;
+    const opus=proposal.rows.find(row=>row.runtime==='claude-opus');
+    assert.ok(opus&&opus.slots>=1,`a runtime with the plan role has a slot: ${proposal.text}`);
+    assert.match(opus.why,/plan role/);
+  }finally{harness.cleanup();}
+});
+
+test('a shared change naming a path of another repository is refused and the op is answered, never delegated',()=>{
+  const nodeId='demo.sales.implementation.backend.intake';
+  const foreign={outcome:'blocked',summary:'The token must be added in the frontend.',files:[],checks:[],
+    blocker:{kind:'shared-change',detail:'../demo-frontend/src/app/globals.css'}};
+  const harness=setupWork({dirty:['apps/agentos-controlplane/src/sales/intake.ts'],
+    scripts:{[nodeId]:[foreign,{outcome:'done',summary:'Recorded the source gap in the record instead.',files:['apps/agentos-controlplane/src/sales/intake.ts'],checks:[passing('unit-tests-pass','npx vitest run intake')]}]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({maxIterations:12});
+    const log=events(harness.store);
+    assert.deepEqual(log.filter(event=>event.event==='shared-change-refused').map(event=>[event.op,event.reason,event.paths]),
+      [[nodeId,'outside this repository',['../demo-frontend/src/app/globals.css']]]);
+    assert.equal(state.ops.some(op=>op.origin==='shared'),false,'no shared op was created for a foreign path');
+    assert.equal(state.ops.find(op=>op.id===nodeId).status,'done','the op reported again with the gap recorded');
+  }finally{harness.cleanup();}
+});
+
+test('a command for a running kernel is an inbox file the loop applies at its next tick; a new allocation ends the loop for a restart',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    queueInbox(store,{kind:'approve',allowDynamic:'64'});
+    const after=harness.run({maxIterations:1});
+    assert.equal(after.dynamicOpsBudget,64,'the budget was raised from the inbox, never by a write to the state file');
+    const applied=events(store).filter(event=>event.event==='inbox-applied');
+    assert.deepEqual(applied.map(event=>[event.kind,event.budget.to,event.quotaChanged]),[['approve',64,false]]);
+    assert.equal(fs.readdirSync(store.paths.inbox).length,0,'the command was consumed');
+    // A new allocation cannot take effect in the running allocator: the loop ends and says why.
+    queueInbox(store,{kind:'approve',allocation:'claude-opus=2:hard+medium,gpt-5.6-sol=1:hard+medium'});
+    const restarted=harness.run({maxIterations:3});
+    assert.deepEqual(events(store).filter(event=>event.event==='stopped').map(event=>event.reason).slice(-1),['restart: allocation changed']);
+    assert.equal(restarted.quota.slots['claude-opus'],2);
   }finally{harness.cleanup();}
 });
 
