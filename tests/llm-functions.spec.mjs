@@ -222,6 +222,26 @@ test('validateOp frames the op, the diff, the checks and the memory; drops a fin
 });
 
 /**
+ * The rule that answers the four chatbot nodes of 2026-09-13: a prove operation may still fake an outside
+ * provider, but only where the contract allows it and only when the evidence names it. The rule travels in
+ * the payload of every verdict, so neither kind can be judged without it.
+ */
+test('validateOp carries the rule that an integration is proven live or it is not proven',()=>{
+  const prompts=[];
+  const op={id:'op-telegram',kind:'integration.verify',goal:'Prove the Telegram delivery live.',
+    acceptance:['a message reaches the sandbox chat'],allowlist:['src/tests/integration/telegram.live-spec.ts'],attempt:1};
+  validateOp({op,diff:{files:['src/tests/integration/telegram.live-spec.ts'],text:'+const token=process.env.TELEGRAM_BOT_TOKEN;\n',truncated:false},
+    checks:[],references:['features/sales/integration/telegram/index.yaml'],providers:['gpt-5.6-sol'],
+    runHeadless:(provider,prompt)=>{prompts.push(prompt);return JSON.stringify({verdict:'accept',summary:'the run reached the sandbox'});}});
+  for(const rule of ['an external integration is proven live or it is not proven',
+    'whose scenario fakes, stubs, mocks, records, replays or skips the declared provider',
+    'reads the credential from anywhere but the environment variable the declaration names',
+    'prints, logs or commits a secret value, is a defect',
+    'an `e2e.verify` evidence whose `proof.fakes` omits a provider the diff fakes is a defect'])
+    assert.ok(prompts[0].includes(rule),`the rules bind the integration: ${rule}`);
+});
+
+/**
  * The brand travels with every verdict, as data beside the diff and as rules the validator is held to: a colour,
  * a font, an icon, a forbidden element or an artwork slot outside the record is a defect, not a preference.
  */
