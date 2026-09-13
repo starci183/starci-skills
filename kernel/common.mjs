@@ -269,7 +269,7 @@ export const dynamicBudget=state=>Number.isFinite(state?.dynamicOpsBudget)?state
  * (so the graph and the final report still name it) but it is `blocked` and becomes a `needUser` item. A node
  * derived op is scope-checked by the Work ledger itself, so only its budget is counted here.
  */
-const KERNEL_ORIGINS=['ledger','verify','gate','architecture'];
+const KERNEL_ORIGINS=['ledger','verify','gate','architecture','business'];
 /** Ops the kernel itself derives from the ledger or its own rules: counted against nothing but their own bounds. */
 export const countsAgainstBudget=op=>!KERNEL_ORIGINS.includes(op.origin);
 export function gateDynamicOp(store,state,op){

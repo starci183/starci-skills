@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {CRITIQUE,CRITIQUE_FORM,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,OVERLAP_CASES,VALIDATOR_IO_RULE,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../models/functions.mjs';
+import {CRITIQUE,CRITIQUE_FORM,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,OVERLAP_CASES,PROVISION_KINDS,VALIDATOR_IO_RULE,VALIDATOR_RULES,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../models/functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
   references:['.starciwork/features/sales/sds.md#3'],checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:[`${id} works`],dependsOn:[],...extra});
@@ -391,8 +391,8 @@ test('a critique that costs work must carry something to act on: evidence, requi
     required:['name the component that owns the order write'],alternatives:['extend the ledger writer instead']})]);
   assert.equal(revised.result.verdict,'revise');
   assert.deepEqual(revised.result.objections,[{kind:'consistency',claim:'The goal writes the order outside the ledger writer',
-    evidence:'demo.sales.architecture.sds.ledger',consequence:'Two components would own one write path.'}]);
-  assert.deepEqual(revised.result.dropped,[{kind:'premise',claim:'I would not build it this way',evidence:'',consequence:'none'}]);
+    evidence:'demo.sales.architecture.sds.ledger',consequence:'Two components would own one write path.',decisive:false}]);
+  assert.deepEqual(revised.result.dropped,[{kind:'premise',claim:'I would not build it this way',evidence:'',consequence:'none',decisive:false}]);
   assert.match(revised.result.reason,/1 objection\(s\) named no evidence and were dropped/);
   assert.deepEqual(revised.result.required,['name the component that owns the order write']);
   // A revise or a refuse with no objection at all, or with no evidenced one, is sent back to the model.
@@ -437,6 +437,62 @@ test('a critique that costs work must carry something to act on: evidence, requi
   assert.deepEqual(withPrereqs.result.prerequisites,[{kind:'sds',feature:'chat',why:'the goal extends a module the tree has no architecture record for'},{kind:'brand',feature:null,why:'the design needs tokens'}]);
   assert.throws(()=>critiqueGoal({job:'  ',runHeadless:()=>'{}'}),/critiqueGoal needs the job text/);
   assert.equal(critiqueGoal({job:'x',providers:[],runHeadless:()=>'{}'}).verdict,'unavailable');
+});
+
+/**
+ * The owner's ruling of 2026-09-14, seen from the critic's side. A hidden decision is not one thing: a naming,
+ * a shape or a default is settled by the record repair when an operation hits it and costs nobody a question,
+ * while a decision about money, authority or customer data is the owner's and is put to them before the work.
+ * The critic is what tells those two apart, so `decisive` travels on the objection.
+ */
+test('a hidden decision says whether it is decisive, and the critic names what only the owner can provide',()=>{
+  const hidden=(extra={})=>({kind:'hidden-decision',claim:'The goal picks who may refund an order',
+    evidence:'demo.sales.business.srs.policy.refund',consequence:'A support agent could refund without a manager.',...extra});
+  const decisive=critiqueCall([JSON.stringify({verdict:'revise',required:['name who may refund'],
+    objections:[hidden({decisive:true}),
+      // Not decisive: a naming the product can live either way with, settled by the record repair when it is hit.
+      {kind:'hidden-decision',claim:'The goal names the endpoint /orders/refund',evidence:'demo.sales.architecture.sds.ledger',
+        consequence:'Two spellings of one route.',decisive:false}]})]);
+  assert.deepEqual(decisive.result.objections.map(item=>[item.kind,item.decisive]),[['hidden-decision',true],['hidden-decision',false]]);
+  // `decisive` is read as leniently as everything else: a model that answers a word instead of a boolean means it.
+  for(const answer of [true,'yes','TRUE','money','authority','customer-data'])
+    assert.equal(critiqueCall([JSON.stringify({verdict:'revise',required:['x'],objections:[hidden({decisive:answer})]})]).result.objections[0].decisive,true,String(answer));
+  for(const answer of [false,'no','',null,undefined,'maybe'])
+    assert.equal(critiqueCall([JSON.stringify({verdict:'revise',required:['x'],objections:[hidden({decisive:answer})]})]).result.objections[0].decisive,false,String(answer));
+  // The rule the critic is held to names the three things that make a decision the owner's.
+  const {seen}=critiqueCall([JSON.stringify({verdict:'sound',objections:[]})]);
+  const prompt=seen[0][1];
+  for(const needle of ['`decisive: true`','MONEY','AUTHORITY','CUSTOMER DATA','the record repair settles it',
+    'name the provisions','credential | account | dataset | authority','Read the WHOLE product for these'])
+    assert.ok(prompt.includes(needle),`the critic is told: ${needle}`);
+
+  // The provisions: everything only the owner can provide for the proofs of this goal to be real.
+  assert.deepEqual(PROVISION_KINDS,['credential','account','dataset','authority']);
+  assert.equal(CRITIQUE_FORM.provisions.type,'list','provisions are read as leniently as the objections are');
+  assert.equal(CRITIQUE_FORM.provisions.optional,true);
+  const provided=critiqueCall([JSON.stringify({verdict:'sound',objections:[],provisions:[
+    {kind:'credential',name:'VNPAY_SANDBOX_SECRET',feature:'payments',why:'no live charge can be proven without it'},
+    {kind:'account',name:'VNPay sandbox merchant',feature:'payments',why:'the gateway will not answer without one'},
+    {kind:'dataset',name:'three real bank statements',feature:'accounting',why:'reconciliation cannot be proven on invented rows'},
+    {kind:'authority',name:'consent to message real users',feature:'chat',why:'a live send touches real people'},
+    // Dropped and counted: an unknown kind, an entry with no name, a bare sentence.
+    {kind:'vibes',name:'x',why:'no'},{kind:'credential',why:'nameless'},'the gateway key'
+  ]})]);
+  assert.deepEqual(provided.result.provisions.map(item=>[item.kind,item.name,item.feature]),
+    [['credential','VNPAY_SANDBOX_SECRET','payments'],['account','VNPay sandbox merchant','payments'],
+      ['dataset','three real bank statements','accounting'],['authority','consent to message real users','chat']]);
+  assert.equal(provided.result.provisionsDropped,3);
+  assert.match(provided.result.reason,/3 provision\(s\) named no known kind or no name and were dropped/);
+  // A critique that answers none is simply a goal that needs nothing of the owner, never a form error.
+  assert.deepEqual(critiqueCall([JSON.stringify({verdict:'sound',objections:[]})]).result.provisions,[]);
+  assert.deepEqual(critiqueGoal({job:'x',providers:[],runHeadless:()=>'{}'}).provisions,[]);
+
+  // And the validator holds the record repair to the log it must leave and to the decision it may not take alone.
+  const rules=VALIDATOR_RULES.join('\n');
+  assert.match(rules,/EXACTLY ONE new `extensions\.work3\.decisionLog` entry/);
+  assert.match(rules,/A changed record with no entry, a bumped rev with no changed passage, a second entry, or an earlier entry rewritten or deleted\s+is a defect/);
+  assert.match(rules,/may not settle one about money, authority or customer data silently/);
+  assert.match(rules,/names no decision record with numbered options and one recommendation, is a defect/);
 });
 
 /**

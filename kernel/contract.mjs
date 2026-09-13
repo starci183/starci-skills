@@ -7,7 +7,7 @@
  * `stepsFor` renders a mandatory, numbered sequence per operation kind, interpolated from the operation's own
  * values (allowlist, checks, acceptance, references, resources, requesters, findings), so the contract tells
  * the agent what to do first, what must be red before code, and how to report exactly once with the real
- * report vocabulary (`done|partial|failed|ask|blocked`; blockers `shared-change|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority`).
+ * report vocabulary (`done|partial|failed|ask|blocked`; blockers `shared-change|srs-gap|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority`).
  *
  * The frontend lane is four operations, never one: `interface.draw` writes the interface design record
  * (screens, every state, blueprint, contract slots, copy) and declares every artwork the chosen candidate
@@ -28,7 +28,7 @@
 
 export const STEPS_HEADING='## Working order (mandatory, in this order)';
 export const DONE_HEADING='## Definition of done for this kind';
-export const SEQUENCES=['work.author','work.intake','owner.ask','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','integration.verify','uat','uat.verify','operations','migration','architecture.revise','grammar.update','decide','brand.decide','generic'];
+export const SEQUENCES=['work.author','work.intake','owner.ask','implement.ledger','implement.shared','implement.repair','implement.gate','interface.draw','interface.asset','frontend.implement','review.verify','e2e.verify','integration.verify','uat','uat.verify','operations','migration','architecture.revise','business.revise','grammar.update','decide','brand.decide','generic'];
 
 const IMPLEMENT_KINDS=['backend.implement','interface.implement','frontend.implement'];
 const IMPLEMENT_NODES=['implementation','ui'];
@@ -71,6 +71,9 @@ export function sequenceFor(op,{node=null}={}){
   // image files, so neither the node kind nor a repair origin may reroute it into a build sequence.
   if(kind==='interface.asset')return 'interface.asset';
   if(kind==='architecture.revise')return 'architecture.revise';
+  // A requirement repair is its own sequence, whatever business node it sits on: the `business` lane's decide
+  // sequence settles a requirement from scratch, this one settles a reading of one already written.
+  if(kind==='business.revise')return 'business.revise';
   // Growing the installed grammar happens in the grammar's own repository, so no node kind, origin or allowlist
   // may reroute it into a product build: it is the one sequence that tries NOT to change anything first.
   if(kind==='grammar.update')return 'grammar.update';
@@ -116,6 +119,43 @@ function values(op,node){
     node:node?.id??op?.nodeId??null
   };
 }
+
+/**
+ * The one exception to "revise it and move on", stated identically in both revise sequences because it is one
+ * rule and not two. A record that is confusing, contradictory or silent is not a reason to stop: the runtime
+ * takes the most reasonable reading, says why, bumps the rev and carries on, and the owner reads the log and
+ * overturns it if they disagree. Only a reading whose alternatives differ in an OBSERVABLE outcome about money,
+ * authority or customer data is not the runtime's to take silently - and even then the work does not stop: the
+ * operation reports `ask` with `question.kind: decision`, the numbered options and one recommendation, the
+ * kernel writes that decision record for the owner and continues provisionally on the recommendation.
+ */
+const DECISIVE='the readings differ in an observable outcome about MONEY (what is charged, paid, refunded, taxed or owed, and to whom), AUTHORITY (who may do or see a thing) or CUSTOMER DATA (what is stored, shown, shared or deleted about a person)';
+/**
+ * Both repair sequences: `architecture.revise` on the design record and `business.revise` on the requirement
+ * record. The move is the same at both layers - read the gap, state the readings the record admits, choose the
+ * most reasonable one by the accepted records, the other features' decided records and the product's own
+ * conventions, write it in with its acceptance, bump the `rev`, log exactly one decision entry, validate - so
+ * it is written once here and specialised by what the record is called and what "written" means in it.
+ */
+const REVISE=({record,where,silent,written,escape})=>v=>({
+  steps:[
+    `Read the gap report that opened this operation (${v.findings}) and ${v.references}: the exact ${record} passage it names and ${silent}.`,
+    `State the readings that passage actually admits - two or three, one line each, each one a behaviour someone could build. A record that admits exactly one reading is not a gap: say so, change nothing, and report \`done\` with that reading. ${escape}.`,
+    `Choose the most reasonable reading, and choose it from evidence rather than from preference: the accepted records of this feature, the decided records of the OTHER features (the same case is usually already settled somewhere), and the product's own conventions. A confusing, contradictory or silent record is not a reason to stop - it is this operation's job to settle it. UNLESS ${DECISIVE}: then you do not choose silently - report \`ask\` exactly once with \`question.kind: decision\`, the numbered options (one per reading, with what each one costs and who it affects) and ONE recommendation with its reasoning. The kernel writes that decision record for the owner and carries the work on your recommendation until they answer. That case is the ONLY thing this operation may ever \`ask\` about.`,
+    `Write the chosen reading into ${where} inside the allowlist (${v.allowlist}): ${written}. Edit that passage and nothing else - no other section, no other record, no code file - and never delete what the record already settled.`,
+    `Bump that record's \`rev\` and append EXACTLY ONE entry to \`extensions.work3.decisionLog\`: \`{rev, at, gap, chosen, why, alternatives}\` - the new rev, the ISO-8601 time, the gap detail you were given, the reading you wrote, why it is the most reasonable one and which records you read it from, and the readings you did not take. Never rewrite and never delete an earlier entry: the log is how the owner sees what the runtime decided for them.`,
+    `Run the listed validator check verbatim: ${v.declared}.`,
+    `Self-audit: the gap is answered in the text, \`rev\` is higher than it was, the log has exactly one new entry naming this gap, and \`git status\` shows only ${v.allowlist} - no product code.`,
+    `Report \`done\` exactly once with the new \`rev\` and the decision-log entry you appended. Never report \`ask\` for anything but the money/authority/customer-data case above: an unclear record is revised, not asked about.`
+  ],
+  done:[
+    `the named gap is answered in ${v.allowlist}: the chosen reading is written into ${where} with ${written}`,
+    `\`rev\` is higher than it was and \`extensions.work3.decisionLog\` has exactly one new \`{rev, at, gap, chosen, why, alternatives}\` entry, with every earlier entry untouched`,
+    `the validator check exits 0: ${v.declared}`,
+    `no product code changed and no other passage of this record, and no other record, moved`,
+    `the operation asked the owner only where ${DECISIVE} - and then with numbered options and one recommendation, never with a bare question`
+  ]
+});
 
 const SEQUENCE_STEPS={
   // Before a node can travel its lane its record must say what may be written and what proves it. That is this
@@ -373,21 +413,14 @@ const SEQUENCE_STEPS={
       LANE
     ]
   }),
-  'architecture.revise':v=>({
-    steps:[
-      `Read the gap report that opened this operation (${v.findings}) and ${v.references}: the exact design (SDS) section it names and the behavior the implementation could not derive from it.`,
-      `Edit only that section inside the allowlist (${v.allowlist}): state the behavior, its contract and its acceptance so an implementer derives the code from the text alone; touch no other section and no code file.`,
-      `Bump that section's \`rev\` and append one decision-log entry - what changed, why, and which gap report asked for it; never rewrite or delete an earlier entry.`,
-      `Run the listed validator check verbatim: ${v.declared}.`,
-      `Self-audit: the gap is answered in the text, \`rev\` is higher than it was, the log has exactly one new entry, and \`git status\` shows only ${v.allowlist} - no product code.`,
-      `Report \`done\` exactly once with the new \`rev\` and the sections you changed; a gap that needs a product decision rather than a design edit is \`ask\` with the exact question (or \`blocked\` \`sds-gap\` when the requirement itself is missing), never a silent invention.`
-    ],
-    done:[
-      `the named gap is answered in ${v.allowlist}, its \`rev\` is bumped and the decision log has one new entry`,
-      `the validator check exits 0: ${v.declared}`,
-      `no product code changed and no other design section moved`
-    ]
-  }),
+  'architecture.revise':REVISE({record:'design (SDS)',where:'the SDS section',
+    silent:'the behavior the implementation could not derive from it',
+    written:'the behavior, its contract and its acceptance so an implementer derives the code from the text alone',
+    escape:'a gap that is really a missing or self-contradictory REQUIREMENT is `blocked` `srs-gap` back to the business record that owns it, never answered with a design decision'}),
+  'business.revise':REVISE({record:'requirement (SRS)',where:'the requirement, rule or journey',
+    silent:'the outcome the operation could not derive from it - silent, ambiguous, or settled twice in two ways',
+    written:'what the product must do, with the acceptance an implementer derives code from and a test can fail on',
+    escape:'a gap that is really a missing DESIGN - the requirement is clear and only the realisation is not - is `blocked` `sds-gap` back to the architecture record, never answered with a new product rule'}),
   // The language itself, grown by one word. Its first move is an attempt NOT to grow it: a shape that composes
   // out of existing contracts is not a missing word, and a grammar that gains a unit per screen is no grammar.
   // What it changes lives in another repository with its own gates and its own published version, so the

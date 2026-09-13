@@ -16,10 +16,11 @@ fields:
   checks: "checks that were actually run, each {name, command, exitCode, evidence}"
   open: items the next operation must pick up (required for partial)
   question: "{text, options[]} (required for ask)"
-  blocker: "{kind: shared-change | sds-gap | interface-gap | brand-gap | grammar-gap | environment |
+  blocker: "{kind: shared-change | srs-gap | sds-gap | interface-gap | brand-gap | grammar-gap | environment |
     authority, detail} (required for blocked); the list is BLOCKER_KINDS of kernel/reports.mjs and the
-    blockers vocabulary of model/kinds.yaml, and the three gaps are three different questions - the design is
-    silent, the identity is unsettled, the grammar lacks the word"
+    blockers vocabulary of model/kinds.yaml, and the four gaps are four different questions - the requirement
+    is unsettled or self-contradictory, the design is silent, the identity is unsettled, the grammar lacks the
+    word"
   observations: reproducible Orca or runtime behavior worth recording
   signal: "{type, orcaOutcome} derived from the outcome, never chosen by the agent"
   sent: "null before the signal is sent, then {messageId, sentAt}"
@@ -27,7 +28,7 @@ rules:
   - done requires at least one check, no failing check and no open item; anything less is partial or failed.
   - partial requires open items.
   - ask requires a question; the operation waits for the Monitor's reply and reports again afterwards.
-  - blocked requires a blocker; the Monitor forwards shared-change and sds-gap blockers to the Coordinator as one normalized escalation.
+  - blocked requires a blocker; the Monitor forwards shared-change, srs-gap and sds-gap blockers to the Coordinator as one normalized escalation.
   - A report is written once; a second report for the same dispatch is refused by the launcher.
 signals:
   done: worker_done (--outcome succeeded)

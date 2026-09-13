@@ -40,6 +40,25 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.deepEqual(writesOf('review.verify',{profile}),[]);
   assert.deepEqual(writesOf('architecture.revise',{profile}),['sds']);
   assert.equal(familyOf('architecture.revise',{profile}),'repair');
+  // The requirement repair is the mirror of the design one, one layer earlier: same family, same role, the
+  // operator of the kind that decided the record in the first place, and the record itself as its only output.
+  assert.equal(familyOf('business.revise',{profile}),'repair');
+  assert.equal(roleOf('business.revise',{profile}),'decide');
+  assert.equal(isReadOnly('business.revise',{profile}),false);
+  assert.equal(operatorOf('business.revise',{profile}),'business.decide');
+  assert.deepEqual(readsOf('business.revise',{profile}),['srs','decision']);
+  assert.deepEqual(writesOf('business.revise',{profile}),['srs']);
+  assert.deepEqual(reportsOf('business.revise',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['authority']});
+  assert.equal(runtimes.roleOfKind['business.revise'],'decide');
+  // It never raises the gap it answers, and like `architecture.revise` no lane walks it: a report creates it.
+  assert.equal(reportsOf('business.revise',{profile}).blockers.includes('srs-gap'),false);
+  for(const entry of profile.lanes)assert.equal(entry.steps.some(step=>step.kind==='business.revise'),false,entry.id);
+  // Exactly the design and build kinds that READ the requirement may say the requirement is unsettled: an
+  // operation may only report a gap in a record it actually had in front of it.
+  assert.deepEqual(Object.keys(profile.kinds).filter(kind=>reportsOf(kind,{profile}).blockers.includes('srs-gap')),
+    ['architecture.decide','architecture.revise','interface.draw','frontend.implement','backend.implement','uat.verify','e2e.verify','work.author']);
+  for(const kind of Object.keys(profile.kinds))
+    if(reportsOf(kind,{profile}).blockers.includes('srs-gap'))assert.ok(readsOf(kind,{profile}).includes('srs'),kind);
   assert.equal(operatorOf('frontend.implement',{profile}),'interface.implement');
   // The API prove step launches under its own contract, not the frontend walk's.
   assert.equal(operatorOf('e2e.verify',{profile}),'e2e.verify');
@@ -51,7 +70,7 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.equal(familyOf('work.author',{profile}),'design');
   assert.equal(roleOf('work.author',{profile}),'plan');
   assert.equal(operatorOf('work.author',{profile}),'work.author');
-  assert.deepEqual(reportsOf('work.author',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['sds-gap','shared-change','authority']},'a per-node author op may report the missing design of its own node as sds-gap; an intake never reports one against another feature');
+  assert.deepEqual(reportsOf('work.author',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['srs-gap','sds-gap','shared-change','authority']},'a per-node author op may report the missing requirement or design of its own node; an intake never reports one against another feature');
   // The identity kind writes the one brand record, because that record IS its decision, and it produces the
   // placeholder mascot the product does not have yet.
   assert.equal(familyOf('brand.decide',{profile}),'design');
@@ -217,6 +236,15 @@ test('every declared route resolves, carries a limit and says what happens to th
     assert.ok(routed,blocker);
     assert.equal(routed.schema,KIND_GRAPH);
   }
+  // A requirement the SRS does not settle is revised in the requirement record, bounded, and the requester
+  // reads it again behind it - the design is never asked to invent the product rule it is supposed to realise.
+  assert.ok(BLOCKERS.includes('srs-gap'));
+  const srsGap=routeFor({outcome:'blocked',blocker:'srs-gap',kind:'backend.implement',lane:lane('backend')},{profile});
+  assert.deepEqual({route:srsGap.route,kind:srsGap.kind,origin:srsGap.origin,then:srsGap.then,limit:srsGap.limit},
+    {route:'srs-gap-revises-the-requirement',kind:'business.revise',origin:'business',then:'reopen',limit:2});
+  // Declared from `any`, so whichever operation reads the requirement and finds it unsettled waits for the same repair.
+  for(const kind of ['interface.draw','frontend.implement','uat.verify','e2e.verify','work.author','architecture.decide'])
+    assert.equal(routeFor({outcome:'blocked',blocker:'srs-gap',kind,lane:lane('frontend')},{profile}).kind,'business.revise',kind);
   const sdsGap=routeFor({outcome:'blocked',blocker:'sds-gap',kind:'backend.implement',lane:lane('backend')},{profile});
   assert.deepEqual({kind:sdsGap.kind,origin:sdsGap.origin,then:sdsGap.then,limit:sdsGap.limit},
     {kind:'architecture.revise',origin:'architecture',then:'reopen',limit:2});
@@ -290,6 +318,18 @@ test('an invalid profile is rejected with a named error, never silently repaired
   const dropped=clone();
   delete dropped.kinds['interface.draw'];
   assert.ok(codes(validateGraph(dropped)).includes('catalog-drift'));
+  // The requirement repair is in the closed list in both directions, exactly like every other kind.
+  const withoutRevise=clone();
+  delete withoutRevise.kinds['business.revise'];
+  assert.ok(codes(validateGraph(withoutRevise)).includes('catalog-drift'));
+  // And the gap it answers is in the blocker vocabulary: drop the route and the profile says so by name.
+  const unroutedRequirement=clone();
+  unroutedRequirement.routes=unroutedRequirement.routes.filter(route=>route.on.blocker!=='srs-gap');
+  assert.ok(codes(validateGraph(unroutedRequirement)).includes('unrouted-blocker'));
+  // A requirement gap answered by a kind that writes no requirement would settle it where no requester looks.
+  const blindRequirement=clone();
+  blindRequirement.routes.find(route=>route.on.blocker==='srs-gap').to.kind='architecture.revise';
+  assert.ok(codes(validateGraph(blindRequirement)).includes('route-target-blind'));
   // A lane is a sequence, not a loop, and it never builds without proving afterwards.
   const looping=clone();
   looping.lanes[2].steps.push({kind:'backend.implement'});

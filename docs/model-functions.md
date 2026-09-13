@@ -45,6 +45,28 @@ The `overlaps` list is kept by the kernel (`state.critique.overlaps`), printed o
 for the owner`, `### Records to cite`) and handed to the intake in its contract (`## Reconciliation the critic
 found`); the intake still reconciles from the decided records themselves, and the kernel checks its table by id.
 
+A `hidden-decision` objection carries one more field, and it is the field that turns an objection into an
+operation: **`decisive`**. It is `true` when the decision the goal takes silently changes an observable outcome
+about money (what is charged, paid, refunded, taxed or owed, and to whom), authority (who may do or see a
+thing) or customer data (what is stored, shown, shared or deleted about a person); `false` for a naming, a
+shape, an ordering or a default the product can live either way with. It is read leniently like everything
+else on a critique - `true`, `"yes"`, `"money"`, `"authority"` all mean true - and the kernel acts on it in
+`planCritiqueDecisions`: a non-decisive hidden decision becomes **nothing**, because the record repair
+(`business.revise`, `architecture.revise`) settles it towards the most reasonable reading when an operation
+hits it; a decisive one becomes one `owner.ask` of `question.kind: decision` planned before every operation
+that touches its feature.
+
+Beside all that it answers **`provisions`**: everything only the OWNER can provide for the proofs of this goal
+to be real, as `{kind, name, feature, why}` over `PROVISION_KINDS = [credential, account, dataset, authority]`
+— a key or token, a sandbox or test account on an external system (a payment gateway, a bank, e-invoice, tax,
+SMS or email, identity, storage), a real dataset or sample (transaction statements, invoices), or the legal and
+consent authority to act for real (messaging real users, charging real cards). The rule is that the critic
+reads the WHOLE product for them rather than the job text alone: an accounting feature that settles
+transactions implies the gateway sandbox and the statement samples even when nobody wrote that down. Entries
+are read leniently — an unknown kind or a missing name is dropped and counted — and the kernel keeps them as
+`state.provisions`, renders them on the goal page under `### The owner provides` and prints them in
+`workflow-status`. Nothing waits on them: the operation that needs one asks in its own tab when it gets there.
+
 It also names the `prerequisites` the goal rests on and the tree lacks (`srs | sds | brand | decision`, with the
 feature and why), which the kernel plans as intake first. Default providers are the host's `critique.runtimes`,
 `gpt-6-astra` then `claude-fable-5.1` (one call per goal, and Fable's week is the scarcer window); an exhausted chain is
@@ -86,6 +108,15 @@ font or icon outside the brand tokens and the installed grammar is a defect; an 
 slot files are missing, or whose artwork ignores the brand's mascot and logo references, is a defect; and a
 `frontend.implement` result that substitutes its own image for a declared slot, or omits one, is a defect. A
 tree with no brand record sends neither the payload nor the rules.
+
+**The record-repair rules** are always in `VALIDATOR_RULES` too, because they are what holds the owner's
+ruling of 2026-09-14 at the other end. A repair (`architecture.revise`, `business.revise`) that changed the
+record must leave three things together: the changed passage, a `rev` higher than it was, and exactly one new
+`extensions.work3.decisionLog` entry `{rev, at, gap, chosen, why, alternatives}` naming the gap it answered. A
+changed record with no entry, a bumped rev with no changed passage, a second entry, or an earlier entry
+rewritten or deleted is a defect. And the runtime may settle an unclear record but not one about money,
+authority or customer data silently: a revision whose chosen reading changes such an outcome and names no
+decision record with numbered options and one recommendation is a defect whatever else the diff gets right.
 
 **The reconciliation and integration rules** are always in `VALIDATOR_RULES`, because they are about what a
 report may claim rather than about what the tree happens to hold. The **intake** rule names what the kernel

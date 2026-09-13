@@ -12,6 +12,7 @@ import {GOAL_RECORD,WORK_LEDGER,allowlistsOverlap,byId,describeNode,dynamicBudge
   launchOperator,ledgerBinding,ledgerItem,locateSharedTreePaths,need,parseGate,parseQuota,plain,required,slash,tail,toOp,
   unique,workModule,workOpId,writeJson} from './common.mjs';
 import {decisionKindFor} from './io.mjs';
+import {OWNER_ASK,openOwnerAsk} from './owner.mjs';
 import {laneView} from './lanes.mjs';
 import {intakeOp,scopeNames} from './intake.mjs';
 import {deriveWorkOp,designGate,laneOf,laneText,laneWalked} from './sync.mjs';
@@ -138,6 +139,7 @@ export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,pro
   if(!critiqued?.ok){
     state.critique={verdict:'unavailable',objections:[],required:[],alternatives:[],question:null,prerequisites:[],overlaps:[],provider:null,
       at:Date.now(),reason:critiqued?.reason??'critiqueGoal was not available'};
+    state.provisions=[];
     // The form errors of the attempts travel with the event: an unavailable critique is only diagnosable from them.
     store.appendEvent({event:'goal-critique-unavailable',reason:state.critique.reason,
       attempts:critiqued?.attempts?.length??0,providers:chain,errors:(critiqued?.attempts??[]).slice(-2).map(item=>({provider:item.provider,errors:(item.errors??[]).slice(0,3)}))});
@@ -153,9 +155,16 @@ export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,pro
       .filter(item=>item.record&&['reference','conflict'].includes(item.case)),
     provider:critiqued.provider??null,at:Date.now(),
     ...((critiqued.dropped??[]).length?{dropped:critiqued.dropped.length}:{})};
+  // What only the owner can provide, read once from the WHOLE product rather than discovered one stuck
+  // operation at a time. It is state of its own, not part of the critique verdict: the goal page renders it,
+  // `workflow-status` prints it, and the operation that needs one asks for it in its own tab when it gets there.
+  state.provisions=(critiqued.provisions??[]).filter(plain).map(item=>({kind:String(item.kind??'').trim(),
+    name:String(item.name??'').trim(),feature:item.feature?String(item.feature).trim():null,why:String(item.why??'').trim()}))
+    .filter(item=>item.kind&&item.name);
   store.appendEvent({event:'goal-critiqued',verdict:state.critique.verdict,objections:state.critique.objections.length,
     provider:state.critique.provider,...(state.critique.prerequisites.length?{prerequisites:state.critique.prerequisites.length}:{}),
     ...(state.critique.overlaps.length?{overlaps:state.critique.overlaps.length}:{}),
+    ...((state.provisions??[]).length?{provisions:state.provisions.length}:{}),
     ...(state.critique.dropped?{dropped:state.critique.dropped}:{})});
   return state.critique;
 }
@@ -190,6 +199,58 @@ export function planCritiquePrerequisites(store,state,{loaded,workRoot,repositor
   if(ids.length)for(const op of state.ops){if(!ids.includes(op.id))op.dependsOn=unique([...(op.dependsOn??[]),...ids]);}
   return planned;
 }
+/** The feature a critique line is about: the `features/<name>` of a record id, a path or the sentence itself. */
+const featureIn=(...values)=>{
+  for(const value of values){
+    const text=slash(String(value??''));
+    const path=text.match(/features\/([A-Za-z0-9][A-Za-z0-9._-]*)/);
+    if(path)return path[1];
+    const id=text.match(/^[A-Za-z0-9_-]+\.([A-Za-z0-9_-]+)\./);
+    if(id)return id[1];
+  }
+  return null;
+};
+/** Whether one operation touches a feature: its node, its ledger items, its allowlist or its references say so. */
+const opTouches=(op,feature)=>[op.nodeId,...(op.ledgerIds??[]),...(op.allowlist??[]),...(op.references??[])]
+  .some(value=>featureIn(value)===feature);
+/**
+ * The hidden decisions the critic found, acted on rather than only printed - and acted on differently depending
+ * on what kind of decision it is. This is the owner's ruling of 2026-09-14 as code: a hidden decision that
+ * changes nothing observable about money, authority or customer data costs nobody a question here, because the
+ * record repair (`business.revise`, `architecture.revise`) settles it the moment an operation actually hits it,
+ * towards the most reasonable reading and with the reason in the decision log. A DECISIVE one is the opposite:
+ * it is put to the owner as one `owner.ask` of kind `decision` before any operation of its feature runs, which
+ * WP8a then takes provisionally on its recommendation so the work is prepared rather than stopped.
+ */
+export function planCritiqueDecisions(store,state,{ctx=null}={}){
+  const hidden=(state.critique?.objections??[]).filter(item=>plain(item)&&item.kind==='hidden-decision');
+  const planned=[];
+  for(const objection of hidden){
+    if(!objection.decisive){
+      store.appendEvent({event:'hidden-decision-deferred',claim:firstLine(objection.claim),evidence:firstLine(objection.evidence)});
+      continue;
+    }
+    const feature=featureIn(objection.evidence,objection.claim);
+    // The ops this decision stands in front of: the ones that touch its feature, or - when no feature can be
+    // read out of the objection at all - every op of the goal, because the kernel may not guess which are safe.
+    const touching=state.ops.filter(op=>op.kind!==OWNER_ASK&&(feature?opTouches(op,feature):true));
+    const requester=touching[0]??null;
+    if(!requester){
+      store.appendEvent({event:'decision-unplanned',claim:firstLine(objection.claim),feature,reason:'no operation of this goal touches it'});
+      continue;
+    }
+    const text=`${objection.claim}${objection.consequence?` - ${objection.consequence}`:''} (critique evidence: ${objection.evidence})`;
+    // `question.kind: decision` is what makes this the provisional kind: the ask op writes the decision record
+    // with numbered options and one recommendation, and the work continues on that recommendation.
+    openOwnerAsk(store,state,requester,{kind:'decision',text,options:[]},ctx);
+    const ask=state.ops.find(op=>op.kind===OWNER_ASK&&op.question?.text===text)??null;
+    if(!ask)continue;
+    for(const op of touching)if(op.id!==ask.id&&op.id!==requester.id)op.dependsOn=unique([...(op.dependsOn??[]),ask.id]);
+    planned.push(ask);
+    store.appendEvent({event:'decision-planned',op:ask.id,feature,claim:firstLine(objection.claim),ops:touching.map(op=>op.id)});
+  }
+  return planned;
+}
 export const critiqueView=state=>({verdict:state.critique?.verdict??null,objections:(state.critique?.objections??[]).length,
   required:(state.critique?.required??[]).length,provider:state.critique?.provider??null,
   ...((state.critique?.prerequisites??[]).length?{prerequisites:state.critique.prerequisites.length}:{}),
@@ -197,6 +258,21 @@ export const critiqueView=state=>({verdict:state.critique?.verdict??null,objecti
   ...(plain(state.critiqueOverride)?{overridden:state.critiqueOverride.reason}:{})});
 
 export const CRITIQUE_HEADING='## Phản biện (critique)';
+export const PROVISIONS_HEADING='### The owner provides';
+/**
+ * What only the owner can provide, read once from the whole product before anything is planned. It is on the
+ * goal page for one reason: so the owner knows what is coming, not so they go and gather it now. Nothing waits
+ * on this list - the operation that needs a credential, a sandbox account, a dataset or an authority asks for it
+ * in its own tab at the moment it needs it, and every other operation carries on.
+ */
+export function provisionLines(state){
+  const provisions=(state?.provisions??[]).filter(plain);
+  if(!provisions.length)return [];
+  return [``,PROVISIONS_HEADING,``,
+    ...provisions.map(item=>`- **${item.kind}** \`${item.name}\`${item.feature?` (feature \`${item.feature}\`)`:''} - ${sentence(item.why)}`),
+    ``,`These are yours to provide and nobody else can: the operation that needs one asks for it in its own tab`,
+    `at the moment it needs it, with the exact name. Nothing else in this workflow waits for that answer.`];
+}
 const sentence=value=>{const line=firstLine(value);return !line?'(not stated)':/[.!?]$/.test(line)?line:`${line}.`;};
 /** The critique as the user reads it on the approval page: the verdict, the objections with their evidence, then what it demands. */
 export function critiqueLines(state){
@@ -215,8 +291,13 @@ export function critiqueLines(state){
   }[critique.verdict]??`Verdict: \`${critique.verdict}\`${by}.`);
   if((critique.objections??[]).length){
     lines.push(``);
-    for(const objection of critique.objections)
-      lines.push(`- **${objection.kind}** - ${sentence(objection.claim)} Evidence: ${sentence(objection.evidence)} Consequence: ${sentence(objection.consequence)}`);
+    for(const objection of critique.objections){
+      // A hidden decision says what happens to it, because the two cases cost the owner very different things.
+      const decided=objection.kind!=='hidden-decision'?''
+        :objection.decisive?' This one moves money, authority or customer data, so it is put to you before the work of its feature starts.'
+        :' This one changes no observable outcome about money, authority or customer data, so the runtime settles it towards the most reasonable reading when an operation hits it, states why in the record decision log, and you overturn it there if you disagree.';
+      lines.push(`- **${objection.kind}** - ${sentence(objection.claim)} Evidence: ${sentence(objection.evidence)} Consequence: ${sentence(objection.consequence)}${decided}`);
+    }
   }
   if(critique.dropped)lines.push(``,`${critique.dropped} objection(s) named no evidence and were dropped by the kernel.`);
   if(['revise','refuse'].includes(critique.verdict)&&(critique.required??[]).length)
@@ -237,6 +318,7 @@ export function critiqueLines(state){
     `- \`${item.record}\` - ${sentence(item.evidence)} The intake writes this as a \`conflict\` row with a decision record under the feature; the owner decides it with \`workflow-answer\`.`));
   if(cites.length)lines.push(``,`### Records to cite`,``,...cites.map(item=>
     `- \`${item.record}\` - ${sentence(item.evidence)} The intake cites it by id as a \`reference\` row and never restates it.`));
+  lines.push(...provisionLines(state));
   if(plain(state.critiqueOverride))lines.push(``,
     `Override: the owner accepted this critique - "${firstLine(state.critiqueOverride.reason)}". An override is the owner's decision, so the kernel does not ask again.`);
   return [...lines,``];
@@ -310,11 +392,13 @@ export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
     ledger:state.ledger.map(item=>({id:item.id,kind:null,title:item.title})),
     constraints:[`the ledger of this goal was assessed by a model, not authored: a ledger item the plan calls done is approved by the user and never verified by the kernel`,
       ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)]});
+  // The decisive hidden decisions are planned on a plan ledger too: the owner is asked before the work, not after.
+  planCritiqueDecisions(store,state,{});
   writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,job:state.job,inputs:state.inputs,ledgerMode:state.ledgerMode,
     definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,critique:state.critique??null,
     ledger:state.ledger,ops:state.ops.map(op=>({id:op.id,kind:op.kind,goal:op.goal,
       ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
-    gates:state.gates,serializedOverlaps:overlaps,assessedBy:assessed.provider??null});
+    gates:state.gates,serializedOverlaps:overlaps,assessedBy:assessed.provider??null,provisions:state.provisions??[]});
   const markdown=typeof renderGoalMarkdown==='function'?renderGoalMarkdown(plan,{job:state.job}):null;
   fs.writeFileSync(store.paths.goal,markdown??fallbackGoalMarkdown(state));
   state.phase='awaiting-approval';
@@ -447,8 +531,13 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
       `the ledger is the authored Work tree under ${slash(binding.ledgerRoot)}: the goal may not add, drop or rewrite a node, so an objection to the ledger is an objection to the scope of this goal`,
       `the Work tree ${loaded.ok?'validates':'does NOT validate'}, and ${state.ledgerSummary?.eligible??0} of ${state.ledgerSummary?.total??0} nodes in scope are eligible`,
       ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)]});
-  planCritiquePrerequisites(store,state,{loaded,workRoot:binding.ledgerRoot,repositories,
-    ctx:{work:{shared:binding.sharedLedger,ledger:{repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot}}}});
+  const critiqueCtx={work:{shared:binding.sharedLedger,ledger:{repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot},
+    at:{workRoot:binding.ledgerRoot}}};
+  planCritiquePrerequisites(store,state,{loaded,workRoot:binding.ledgerRoot,repositories,ctx:critiqueCtx});
+  // A hidden decision the critic marked decisive becomes one owner question before the work of its feature; a
+  // hidden decision that moves no money, authority or customer data becomes nothing here, because the record
+  // repair settles it when an operation actually hits it.
+  planCritiqueDecisions(store,state,{ctx:critiqueCtx});
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
   writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,job:state.job,inputs:state.inputs,
     ledgerMode:state.ledgerMode,scope:state.scope,workRoot:slash(loaded.workRoot),ledgerValid:loaded.ok,
@@ -458,7 +547,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
     lanes:Object.fromEntries(Object.entries(state.lanes??{}).map(([node,entry])=>[node,[...entry.lane]])),
     ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
       allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
-    gates:state.gates,needUser:state.needUser,assessedBy:assessed?.provider??null});
+    gates:state.gates,needUser:state.needUser,assessedBy:assessed?.provider??null,provisions:state.provisions??[]});
   fs.writeFileSync(store.paths.goal,workGoalMarkdown(state,loaded));
   state.phase='awaiting-approval';
   store.appendEvent({event:'goal',ledgerMode:state.ledgerMode,scope:state.scope,ops:state.ops.length,

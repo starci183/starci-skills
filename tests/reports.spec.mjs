@@ -32,7 +32,11 @@ test('every outcome maps to exactly one Orca signal and done is earned, not clai
   assert.throws(()=>buildReport({...base,outcome:'blocked',blocker:{kind:'weather',detail:'x'}}),/blocker kind/);
   assert.equal(buildReport({...base,outcome:'blocked',blocker:{kind:'shared-change',detail:'Core must register the entity'}}).signal.type,'escalation');
   // The blocker vocabulary is the kind graph's: a gap the graph routes must be a blocker a report may carry.
-  assert.deepEqual(BLOCKER_KINDS,['shared-change','sds-gap','interface-gap','brand-gap','grammar-gap','environment','authority']);
+  assert.deepEqual(BLOCKER_KINDS,['shared-change','srs-gap','sds-gap','interface-gap','brand-gap','grammar-gap','environment','authority']);
+  // A requirement the SRS does not settle is a blocker of its own: it is routed to the record that owns it,
+  // so a report must be able to carry it and the escalation signal must be the same as for every other gap.
+  assert.equal(buildReport({...base,outcome:'blocked',blocker:{kind:'srs-gap',detail:'features/sales/business/srs/intake does not say whether a partial order is billable'}}).signal.type,'escalation');
+  assert.equal(buildReport({...base,outcome:'blocked',blocker:{kind:'srs-gap',detail:'x'}}).blocker.kind,'srs-gap');
   assert.equal(buildReport({...base,outcome:'blocked',blocker:{kind:'brand-gap',detail:'No brand record states the primary token'}}).signal.type,'escalation');
   // The third gap: the language itself lacks the word, which the graph routes to `grammar.update`.
   assert.equal(buildReport({...base,outcome:'blocked',blocker:{kind:'grammar-gap',detail:'no contract renders a stepped progress rail'}}).signal.type,'escalation');

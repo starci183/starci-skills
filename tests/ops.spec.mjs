@@ -55,6 +55,19 @@ test('decide operator dispatch selects split SRS and SDS authoring while legacy 
   assert.deepEqual(business.specificationPolicy.sectionSchemas,Object.values(srsContract.sections).map(section=>section.schema));
   assert.ok(business.writes.find(write=>write.id==='node').fields.includes('extensions.work3.srs'));
   assert.ok(!business.writes.find(write=>write.id==='node').fields.includes('extensions.work3.specification'));
+  // Both decide operators also carry their repair kind, and the repair rule is in the contract the agent reads:
+  // an unclear record is revised to its most reasonable reading with one decision-log entry, and only a reading
+  // that moves money, authority or customer data is put to the owner as numbered options with one recommendation.
+  for(const id of ['business.decide','architecture.decide']){
+    const contract=generated.ops.find(op=>op.id===id).contract;
+    assert.ok(contract.proofs.some(proof=>proof.id==='revision-decision-log'),id);
+    const revise=contract.steps.filter(step=>/decisionLog/.test(step.action.en));
+    assert.equal(revise.length,1,id);
+    assert.match(revise[0].action.en,/\{rev, at, gap, chosen, why, alternatives\}/,id);
+    assert.match(revise[0].action.en,/money, authority or customer data/,id);
+    assert.match(revise[0].action.en,/question\.kind decision/,id);
+    assert.match(revise[0].action.en,/Never ask for anything else/,id);
+  }
   const architecture=generated.ops.find(op=>op.id==='architecture.decide').contract;
   assert.equal(architecture.specificationPolicy.payloadSchema,'starci/sds-map@1');
   assert.equal(architecture.specificationPolicy.payloadField,'extensions.work3.sds');
