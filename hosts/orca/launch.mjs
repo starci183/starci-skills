@@ -533,15 +533,24 @@ export function startOperation(input,{orca=createOrcaCalls(),wait,candidates=nul
     recovery:chain.exhausted?'report-workflow-boundary-worker_failed':'reconcile-residual-resources-before-retry'};
 }
 
-function usage(){return `Usage:
-  node hosts/orca/launch.mjs start-op --run <nested-workflow-run> --workflow-task <parent-workflow-task> --from <monitor-terminal> --worktree <relative-path> --operation <op> --scope <scope> --spec-file <relative-file> [--skip <target:reason[,target:reason]>] [--dry-run]
+/**
+ * The usage block names the one command entry first. `bin/starci.mjs` forwards argv to this `main` unchanged,
+ * so a reader who is told the entry never has to know that a module path exists; the direct path is printed
+ * once underneath, because the kernel and the supervisor still spawn this file by path and a person reading a
+ * spawn log must be able to match it to a command.
+ */
+function usage(){return `Usage (the one command line; <skill root> is the installed .claude directory):
+  node <skill root>/bin/starci.mjs <command> ... - and the same command run directly is
+  node <skill root>/.dist/hosts/orca/launch.mjs <command> ...
+
+  node bin/starci.mjs start-op --run <nested-workflow-run> --workflow-task <parent-workflow-task> --from <monitor-terminal> --worktree <relative-path> --operation <op> --scope <scope> --spec-file <relative-file> [--skip <target:reason[,target:reason]>] [--dry-run]
     --skip records a Monitor-verified no-effect failure for a chain target (reason from registry fallback.allowedReasons) so the chain starts at the next candidate
-  node hosts/orca/launch.mjs settle --dispatch <dispatch> [--worktree <relative-path>] [--terminal <own-agent-terminal>] [--close true]
-  node hosts/orca/launch.mjs sweep --worktree <relative-path> --from <monitor-terminal> [--keep <handle,handle>]
-  node hosts/orca/launch.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
-  node hosts/orca/launch.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
-  node hosts/orca/launch.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
-  node hosts/orca/launch.mjs workflow-goal --job <text> [--id <workflow-id>] [--lane [<name>]] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--reintake feature] [--ledger-root <path>] [--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node bin/starci.mjs settle --dispatch <dispatch> [--worktree <relative-path>] [--terminal <own-agent-terminal>] [--close true]
+  node bin/starci.mjs sweep --worktree <relative-path> --from <monitor-terminal> [--keep <handle,handle>]
+  node bin/starci.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
+  node bin/starci.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
+  node bin/starci.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-goal --job <text> [--id <workflow-id>] [--lane [<name>]] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--reintake feature] [--ledger-root <path>] [--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2] [--host <path-to-.claude>] [--worktree <relative-path>]
     --lane gives the workflow a worktree of its own: an Orca worktree of this repository on a new branch cut
     from the branch you are on, as the top-level row [Workflow] <id> (default name: the workflow id). The
     kernel and every operation run in it, and its branch is merged back into the base branch when the
@@ -556,30 +565,30 @@ function usage(){return `Usage:
     then live in the owner repository, while code, checks and code commits stay in this worktree. A node that
     names no repository belongs to the side its layout sits in, so implementation/frontend/** is never a
     backend job's work and implementation/backend/** is never a frontend's.
-  node hosts/orca/launch.mjs workflow-answer --id <workflow-id> --op <owner-ask-op> [--choice <n>] [--note "<answer>"] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-answer --id <workflow-id> --op <owner-ask-op> [--choice <n>] [--note "<answer>"] [--host <path-to-.claude>] [--worktree <relative-path>]
     the owner's answer to a question the kernel prepared (needUser kind 'decision'): the option number and/or a note; the answer reaches the paused operation in its next contract.
-  node hosts/orca/launch.mjs workflow-approve --id <workflow-id> [--allocation <runtime=slots,...>] [--allow-dynamic N] [--accept-critique "<reason>"] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-approve --id <workflow-id> [--allocation <runtime=slots,...>] [--allow-dynamic N] [--accept-critique "<reason>"] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     --accept-critique is the owner overriding a goal critique that answered refuse: the reason is recorded and
     the kernel never asks for it again.
-  node hosts/orca/launch.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--allocation <runtime=slots,...>] [--max-iterations N] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--allocation <runtime=slots,...>] [--max-iterations N] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     runs the kernel loop: up to 10 operation agents in one worktree, machine-verified acceptance, gates, final report.
     On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and
     committed with a "Work: <node id>" trailer - in the repository that owns the tree, which is this one
     unless the product routes the Work elsewhere.
-  node hosts/orca/launch.mjs workflow-status --id <workflow-id> [--json true] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-status --id <workflow-id> [--json true] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     prints one status view of the workflow, derived from its own files: kernel liveness, runtimes, running
     and blocked operations, the ledger by feature, reviews, the validator, what needs you, the rate and the
     last events. --json true prints the machine shape (the kernel's own status fields plus view).
-  node hosts/orca/launch.mjs workflow-list [--json true] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-list [--json true] [--worktree <relative-path>]
     one line per workflow of this repository: phase, operations done, kernel liveness, last event age
-  node hosts/orca/launch.mjs workflow-stop --id <workflow-id> [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-stop --id <workflow-id> [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     approve, status and stop find the workflow directory where the goal put it, so a job whose ledger is
     owned by another repository is reached with the same --host (or --ledger-root) the goal was given.
-  node hosts/orca/launch.mjs workflow-lane-close --id <workflow-id> [--host <path-to-.claude>] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-lane-close --id <workflow-id> [--host <path-to-.claude>] [--worktree <relative-path>]
     removes the merged lane worktree from Orca and from git and keeps its branch. Refused while the kernel is
     alive (workflow-stop first) and while the lane has not been merged into its base branch.
-  node hosts/orca/launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000] [--worktree <repo>]
-  node hosts/orca/launch.mjs verify
+  node bin/starci.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000] [--worktree <repo>]
+  node bin/starci.mjs verify
   Every command accepts --host-adapter orca|headless (default orca; headless when STARCI_HOST=headless). The
   headless host runs the same kernel without Orca: operations are one-at-a-time claude -p / codex exec
   processes in the worktree, reports reach the kernel through a mailbox file, and a kind that needs a host

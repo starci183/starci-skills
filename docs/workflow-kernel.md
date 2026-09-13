@@ -5,14 +5,17 @@ Coordinator, no per-module Monitor, no provider chain. A **job** is any piece of
 feature A", "backend for three modules with the existing SRS/SDS", "write an SRS"); its **inputs** are typed
 refs (`sds:path`, `srs:path`, `file:path`, `note:...`) of which specifications are one kind among many.
 
-Entry points are the canonical launcher's commands, which route straight into `kernelMain`:
+Entry points are the commands of `bin/starci.mjs`, the one command line of the runtime; it forwards them
+unchanged to the launcher in `hosts/orca/launch.mjs`, which routes them straight into `kernelMain`. `starci`
+below is `node <skill root>/bin/starci.mjs`:
 
 ```
-hosts/orca/launch.mjs workflow-goal    --job <text> [--lane [<name>]] [--inputs a,b] [--gates name=command,...] [--ledger work|plan] [--scope f1,f2] [--id <id>]
-hosts/orca/launch.mjs workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
-hosts/orca/launch.mjs workflow-run     --id <id> [--from <own terminal> --run <run>] [--launch-file <f>] [--max-iterations N]
-hosts/orca/launch.mjs workflow-status  --id <id>
-hosts/orca/launch.mjs workflow-lane-close --id <id>
+starci workflow-goal    --job <text> [--lane [<name>]] [--inputs a,b] [--gates name=command,...] [--ledger work|plan] [--scope f1,f2] [--id <id>]
+starci workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
+starci workflow-answer  --id <id> --op <ask op> [--choice <n>] [--note "<the owner's words>"]
+starci workflow-run     --id <id> [--from <own terminal> --run <run>] [--launch-file <f>] [--max-iterations N]
+starci workflow-status  --id <id>
+starci workflow-lane-close --id <id>
 ```
 
 Every command also takes `--host-adapter orca|headless` (default `orca`, or `headless` when `STARCI_HOST=headless`
@@ -639,7 +642,7 @@ A workflow has no monitor agent. Three layers keep it running on their own:
 - **Triage (LLM, closed options)**: the policy table handles known outcomes (done/failed/question/shared-change/stall/rate-limit). When the same anomaly signature repeats `TRIAGE_AFTER` (3) times, the kernel asks the `decide` function once, offering only `resume-ops | park-runtime | settle-op | restart-kernel | needUser`; the pick is applied, recorded (`triage` event) and never asked again for that signature in the workflow. Without a decider (tests, `--functions` off) triage is a no-op and the anomaly stays a counter.
 
 ```
-node .claude/.dist/hosts/orca/launch.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000]
+node <skill root>/bin/starci.mjs workflow-supervise --host <skill root> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000]
 ```
 
 ### Supervisor level
@@ -745,7 +748,12 @@ check (`op-readmitted`). One error on a tracked or owned path and nothing moves.
 ## Hosts: Orca and headless (one chat = one workflow)
 
 The kernel runs on a **host**, and it reads exactly three things about it: a name, the capabilities it offers
-and whether it runs operations in parallel (`hostDescriptorOf(orca)`). Two hosts exist.
+and whether it runs operations in parallel (`hostDescriptorOf(orca)`). Those three facts are declared per host
+in `model/hosts.yaml` and loaded by `hosts/index.mjs` (`loadHosts`, `hostDescriptor`, `validateHosts`), so the
+two adapters read one source instead of each holding a constant, and `validateHosts` checks every offered
+capability against the `capabilities` vocabulary of `model/kinds.yaml` - the same vocabulary a kind's `needs`
+is drawn from. Each adapter keeps the shipped values as the fallback for a tree with no `.dist` yet: a host
+must be able to describe itself before a build exists. Two hosts exist.
 
 - **Orca** - `hosts/orca/calls.mjs`, `ORCA_HOST = {name:'orca', capabilities:['design-tool'], sequential:false}`:
   the multi-agent IDE with terminals, a dispatch mailbox and a run coordinator, the runner every command always had.
@@ -873,8 +881,8 @@ A workflow has no monitor agent to ask, so the one way to know where it stands i
 `stop.flag`, `validator/verdicts.jsonl` and the repository's `supervisor.log` - and the launcher prints it:
 
 ```
-hosts/orca/launch.mjs workflow-status --id <id> [--json true]
-hosts/orca/launch.mjs workflow-list
+starci workflow-status --id <id> [--json true]
+starci workflow-list
 ```
 
 `workflow-status` prints the page; `--json true` prints the machine record instead (the kernel's own status

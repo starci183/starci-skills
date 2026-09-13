@@ -8,8 +8,27 @@ import {inspectStorage,assertNewStoragePath,isLocalOnlyWorkspace} from '../workf
 import { distPath, requireDist, readDistJson, skillRoot } from '../core/runtime-root.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+// The workflow commands are not this module's: `bin/starci.mjs` forwards them to the kernel launcher before
+// the CLI is ever loaded. They are listed here all the same, one line each, because the one command line a
+// person types is `starci <command>` and a help page that hides half of it teaches the wrong entry.
 const help = `StarCi 3.0 — bounded, local operations
 Usage:
+  starci workflow-goal --job <text> [--scope f1,f2] [--lane [<name>]] [--host <skill root>]
+  starci workflow-approve --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
+  starci workflow-answer --id <id> --op <ask op> [--choice <n>] [--note "<answer>"]
+  starci workflow-run --id <id> [--host-adapter orca|headless] [--max-iterations N]
+  starci workflow-status --id <id> [--json true]
+  starci workflow-list [--json true]
+  starci workflow-stop --id <id>
+  starci workflow-lane-close --id <id>
+  starci workflow-supervise --host <skill root> [--once true] [--poll-ms 60000]
+  starci start-op --run <run> --workflow-task <task> --from <terminal> --worktree <path> --operation <op> --scope <scope> --spec-file <file>
+  starci settle --dispatch <dispatch> [--terminal <terminal>] [--close true]
+  starci sweep --worktree <path> --from <monitor terminal> [--keep <handle,handle>]
+  starci notify --terminal <monitor terminal> (--file <message-file> | --text <text>)
+  starci report --run <run> --from <own terminal> --task <task> --dispatch <dispatch> --outcome <outcome> --summary <text>
+  starci wait --run <run> --from <own terminal> [--timeout-ms 900000] [--tick-ms 120000]
+  starci verify
   starci workspace init <work-root> --id <workspace-id>
   starci storage <backend-root>
   starci source-layout <backend-root> <frontend-root>
