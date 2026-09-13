@@ -3579,19 +3579,39 @@ function closeOpTerminal(orca,store,state,op){
   if(closeTerminal(orca,state.worktree,handle))store.appendEvent({event:'op-terminal-closed',op:op.id,terminal:handle});
   op.terminal=null;
 }
-export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree}={}){
+/** An op tab has a reader only while its op is on it: running, answering a question, or paused to resume there. */
+const TAB_STATUSES=['running','answering','paused'];
+export const SWEEP_MS=5*60*1000;
+/**
+ * Every tab of this workflow that nobody reads is closed: a stale kernel tab, and the tab of any op of this
+ * workflow that is not on it right now - done, blocked, retried, pending alike - because a tab only exists for
+ * the time its op runs. Tabs of other workflows and tabs the owner opened are never touched. The sweep runs on
+ * time (`SWEEP_MS`), not only every N iterations: a workflow whose iterations are minutes long never reached
+ * the N-th one, and the owner counted fifteen idle tabs.
+ */
+export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Date.now}={}){
   const closed=[];
-  const doneIds=new Set(state.ops.filter(op=>op.status==='done'||op.refusal==='superseded').map(op=>op.id));
+  const ours=new Map(state.ops.map(op=>[op.id,op]));
   for(const item of listTerminals(orca,cwd)){
     const title=String(item.title??'');
     if(title===`[Kernel] ${state.id}`&&item.handle!==state.from){if(closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,reason:'stale kernel tab'});continue;}
-    const op=title.startsWith('[Op] ')?title.slice(title.lastIndexOf(' - ')+3).trim():null;
-    if(op&&doneIds.has(op)&&!state.ops.some(candidate=>candidate.terminal===item.handle&&liveStatus.includes(candidate.status))){
-      if(closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,op,reason:'op done'});
-    }
+    const opId=title.startsWith('[Op] ')?title.slice(title.lastIndexOf(' - ')+3).trim():null;
+    const op=opId?ours.get(opId):null;
+    if(!op)continue;
+    const inUse=op.terminal===item.handle&&TAB_STATUSES.includes(op.status);
+    if(inUse)continue;
+    if(closeTerminal(orca,cwd,item.handle)){closed.push({terminal:item.handle,op:op.id,reason:op.status==='done'?'op done':`op ${op.status}`});if(op.terminal===item.handle)op.terminal=null;}
   }
+  state.lastSweepAt=now();
   if(closed.length)store.appendEvent({event:'terminals-swept',closed});
   return closed;
+}
+/** The kernel's own tab is released when the kernel leaves without finishing: the next start opens one and re-binds the Run. */
+function releaseKernelTab(orca,store,state,{cwd,reason}){
+  if(!(state.kernelTerminalOwned&&state.from))return;
+  try{orca.invoke('terminal-close',{terminal:state.from},{cwd});}catch{}
+  store.appendEvent({event:'kernel-terminal-closed',terminal:state.from,reason});
+  state.from=null;state.kernelTerminalOwned=false;
 }
 export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync,allocator=null}={}){
   const listed=orca.invoke('worker-list',{run:state.run},{cwd});
@@ -3874,8 +3894,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   sweepStaleTerminals(orca,store,state,{cwd});
   state.buildStamp=buildStamp();
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
-    if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});sweepTreeStrays(store,state,ctx);sweepStaleTerminals(orca,store,state,{cwd});}
-    if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});store.saveState(state);return state;}
+    if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});sweepTreeStrays(store,state,ctx);}
+    if((iteration>0&&iteration%RECONCILE_EVERY===0)||now()-(state.lastSweepAt??0)>=SWEEP_MS)sweepStaleTerminals(orca,store,state,{cwd,now});
+    if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});releaseKernelTab(orca,store,state,{cwd,reason:'paused by stop flag'});store.saveState(state);return state;}
     applyInbox(store,state,ctx);
     if(state.restartRequested){const reason=state.restartRequested;state.restartRequested=null;store.appendEvent({event:'stopped',reason:`restart: ${reason}`});store.saveState(state);return state;}
     if(state.buildStamp&&buildStamp()&&buildStamp()!==state.buildStamp){store.appendEvent({event:'build-changed',from:state.buildStamp,to:buildStamp()});store.appendEvent({event:'stopped',reason:'build changed'});store.saveState(state);return state;}

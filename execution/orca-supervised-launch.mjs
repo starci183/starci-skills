@@ -333,7 +333,8 @@ function launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName,expec
     const ownTerminal=(getPath(started.receipt,'result.residualResources')??getPath(started.receipt,'result.effects')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
     const settlement=dispatchId&&started.effectState!=='none'?settleDispatch(orca,dispatchId,{cwd,reason:`worker-start ${started.outcome}`,terminalHandle:ownTerminal}):null;
     const effectState=settlement?settlement.effectState:started.effectState==='unknown'&&!dispatchId?'unknown':started.effectState;
-    return {ok:false,dispatchId,effectState,reason:started.reason??`worker-start ${started.outcome}`,stage:started.stage,call:started,settlement};
+    return {ok:false,dispatchId,effectState,reason:started.reason??`worker-start ${started.outcome}`,stage:started.stage,call:started,settlement,
+      ...(recovery?{recovery:{ok:recovery.ok,reason:recovery.reason??null,action:recovery.action??null}}:{})};
   }
   need(dispatchId,'Orca worker-start receipt is missing the supervised Dispatch');
   const ownTerminal=(getPath(started.receipt,'result.effects')??getPath(started.receipt,'result.residualResources')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
@@ -374,8 +375,11 @@ const STAGED_PROMPT=/(^|\n)\s*❯\s*\S|Pasted Content|Press up to edit queued me
  * agent_prompt_stalled although the agent is alive. One verified Enter submits it; anything else is fenced.
  */
 function recoverStagedPrompt(orca,{cwd,started,dispatchId,wait=sleepSync}){
-  const terminal=(getPath(started.receipt,'result.residualResources')??getPath(started.receipt,'result.effects')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
-  if(!terminal)return {ok:false,reason:'no agent terminal in the stalled receipt'};
+  // The agent terminal is named in the receipt's effects, or - when a flat receipt lists none - by the worker
+  // record Orca keeps for the Dispatch; without it the staged prompt cannot be submitted and the launch fails.
+  let terminal=(getPath(started.receipt,'result.residualResources')??getPath(started.receipt,'result.effects')??[]).find(e=>e?.kind==='terminal'&&e?.role==='agent')?.id??null;
+  if(!terminal){const shown=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});terminal=getPath(shown.receipt,'result.worker.agent_terminal_handle')??getPath(shown.receipt,'result.terminal.handle')??null;}
+  if(!terminal)return {ok:false,reason:'no agent terminal in the stalled receipt nor in the worker record'};
   const read=orca.invoke('terminal-read',{terminal,screen:true},{cwd});
   const screen=read.outcome==='ok'?screenText(read.receipt):'';
   if(!STAGED_PROMPT.test(screen))return {ok:false,reason:'prompt is not staged on the screen',terminal};
@@ -404,7 +408,7 @@ function runChain(orca,{cwd,request,candidates,taskId,taskRecord,attest,expected
   for(const [index,candidate] of candidates.entries()){
     const result=launchCandidate(orca,{cwd,candidate,taskId,taskRecord,displayName:request.displayName,expectedPath,attest:attest.bind(null,candidate.selection),wait});
     if(result.ok)return {ok:true,candidate,result,attempts};
-    attempts.push(attemptRecord(candidate,{dispatchId:result.dispatchId,effectState:result.effectState,reason:result.reason,stage:result.stage??null,settlement:result.settlement}));
+    attempts.push(attemptRecord(candidate,{dispatchId:result.dispatchId,effectState:result.effectState,reason:result.reason,stage:result.stage??null,settlement:result.settlement,...(result.recovery?{recovery:result.recovery}:{})}));
     if(result.effectState!=='none')return {ok:false,exhausted:false,stopReason:'partial-or-unknown-effects',attempts};
     // A settled attempt leaves the Task blocked or failed; only a ready Task accepts the next candidate.
     if(index<candidates.length-1&&result.dispatchId){

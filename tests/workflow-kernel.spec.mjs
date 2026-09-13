@@ -906,12 +906,19 @@ test('an accepted op closes its terminal, and the reconcile sweep closes stale k
     harness.fake.terminals.set('term_stale_kernel',{handle:'term_stale_kernel',title:`[Kernel] ${harness.state.id}`,status:'running',sent:false,worktreePath:cwd});
     harness.fake.terminals.set('term_other',{handle:'term_other',title:'[Kernel] some-other-workflow',status:'running',sent:false,worktreePath:cwd});
     harness.fake.terminals.set('term_foreign_op',{handle:'term_foreign_op',title:'[Op] backend.implement - other.workflow.op',status:'running',sent:true,worktreePath:cwd});
+    // A blocked op of this workflow still holding the tab of its last attempt: nobody reads it, it goes too.
+    const blocked={...harness.state.ops[0],id:'shared-9',kind:'e2e.verify',status:'blocked',terminal:'term_blocked_op',dispatch:null,requesters:['x']};harness.state.ops.push(blocked);
+    harness.fake.terminals.set('term_blocked_op',{handle:'term_blocked_op',title:`[Op] ${blocked.kind} - ${blocked.id}`,status:'running',sent:true,worktreePath:cwd});
     const state=harness.run({maxIterations:8});
     const op=state.ops.find(item=>item.id===nodeId);
     assert.equal(op.status,'done');
     assert.equal(op.terminal,null,'the accepted op has no terminal any more');
     const log=events(harness.store);
     assert.deepEqual(log.filter(event=>event.event==='op-terminal-closed').map(event=>event.op),[nodeId]);
+    assert.ok(log.some(event=>event.event==='terminals-swept'&&event.closed.some(item=>item.terminal==='term_blocked_op'&&item.reason==='op blocked')),'the blocked op tab was swept');
+    assert.equal(harness.fake.terminals.has('term_blocked_op'),false);
+    assert.equal(state.ops.find(item=>item.id===blocked.id).terminal,null);
+    assert.ok(typeof state.lastSweepAt==='number');
     assert.ok(log.some(event=>event.event==='terminals-swept'&&event.closed.some(item=>item.terminal==='term_stale_kernel'&&item.reason==='stale kernel tab')),'the stale kernel tab of this workflow was swept');
     assert.ok(harness.fake.terminals.has('term_other'),'another workflow\'s kernel tab is never touched');
     assert.ok(harness.fake.terminals.has('term_foreign_op'),'another workflow\'s op tab is never touched');
@@ -1039,6 +1046,20 @@ test('an accepted intake settles by what the tree holds under its scope and the 
     assert.deepEqual(log.filter(event=>event.event==='need-user-answered').map(event=>event.reason),['an intake authors records, not a node']);
     assert.deepEqual(state.needUser,[]);
     assert.equal(state.finished?.outcome,'done',JSON.stringify(state.finished));
+  }finally{harness.cleanup();}
+});
+
+test('a kernel paused by the stop flag releases its own tab, and the next start opens a new one',()=>{
+  const harness=setupWork();
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';harness.state.kernelTerminalOwned=true;
+    harness.fake.terminals.set('term_kernel',{handle:'term_kernel',title:`[Kernel] ${harness.state.id}`,status:'running',sent:false,worktreePath:cwd});
+    fs.writeFileSync(path.join(harness.store.dir,'stop.flag'),'');
+    const state=harness.run({maxIterations:3});
+    assert.equal(state.from,null);assert.equal(state.kernelTerminalOwned,false);
+    assert.equal(harness.fake.terminals.has('term_kernel'),false,'the paused kernel left no tab');
+    assert.deepEqual(events(harness.store).filter(event=>event.event==='kernel-terminal-closed').map(event=>event.reason),['paused by stop flag']);
   }finally{harness.cleanup();}
 });
 
