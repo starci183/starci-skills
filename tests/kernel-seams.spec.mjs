@@ -121,7 +121,10 @@ test('a profile that declares no writes declares no rule, and the same report is
     op.status='running';op.dispatch='ctx_1';
     const state=stubState(store,[op]);
     const files=['src/sales/intake.ts','.starciwork/features/sales/business/rule/index.yaml'];
-    const action=applyOpReport(null,store,state,op,doneReport({files}),baseCtx(dir,{git:fakeGit(files)}));
+    // The same op, the same files, against a profile of the 5.1 shape: it declares what the kind changes and
+    // nothing about what it may write, so there is no rule to break and the report is accepted as it always was.
+    const action=applyOpReport(null,store,state,op,doneReport({files}),baseCtx(dir,{git:fakeGit(files),
+      kindsProfile:{kinds:{'backend.implement':{family:'build',role:'implement',mutates:['code']}}}}));
     assert.equal(action,'done');
     assert.equal(store.events.some(item=>item.event==='io-undeclared-write'),false);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
@@ -138,7 +141,7 @@ test('a drawing that fails a canon check is downgraded before the validator; a p
         allowlist:['.starciwork/features/sales/ui'],checks:[]},0);
       op.status='running';op.dispatch='ctx_1';
       const state=stubState(store,[op]);
-      const files=['.starciwork/features/sales/ui/assets/home.png'];
+      const files=['.starciwork/features/sales/ui/index.yaml'];
       const calls=[];
       const ctx=baseCtx(dir,{git:fakeGit(files),renderChecks:input=>{
         calls.push(input.op.id);

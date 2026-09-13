@@ -13,13 +13,15 @@ import {RECORD_KINDS,decisionKindFor,intakeKindFor,ioBlock,ioPayload,kindsReadin
  * and they hold the record catalog - what a changed file IS - to the layout of the design.
  */
 const authored=parseYaml(fs.readFileSync(new URL('../model/kinds.yaml',import.meta.url),'utf8'));
+const sorted=list=>[...list].sort();
+/** The list the 5.1 kernel carried as `DESIGN_KINDS`; the derivation must reproduce it, in whatever order. */
+const BRAND_READERS=['interface.draw','interface.asset','frontend.implement','uat.verify','grammar.update'];
 
 test('the kinds that read the brand are derived from the profile and are exactly the list the kernel used to carry',()=>{
   // The lanes that draw or build an interface, plus the kind that grows the language they are drawn in.
-  assert.deepEqual(kindsReadingBrand({profile:authored}),
-    ['interface.draw','interface.asset','frontend.implement','uat.verify','grammar.update']);
+  assert.deepEqual(sorted(kindsReadingBrand({profile:authored})),sorted(BRAND_READERS));
   // The kernel's own exported snapshot is that derivation over the compiled profile, so both agree.
-  assert.deepEqual(DESIGN_KINDS,['interface.draw','interface.asset','frontend.implement','uat.verify','grammar.update']);
+  assert.deepEqual(sorted(DESIGN_KINDS),sorted(BRAND_READERS));
   // The kind that WRITES the brand is not one that reads it: a decision is not derived from itself.
   assert.equal(kindsReadingBrand({profile:authored}).includes('brand.decide'),false);
 });
@@ -50,13 +52,16 @@ test('the intake kind and the decision kind are the lane of the node, never a ma
   assert.equal(decisionKindFor('nothing-like-it',{profile:authored}),'business.decide');
 });
 
+/** A profile of the 5.1 shape: it declares what a kind changes and says nothing about what it reads. */
+const mutatesOnly={kinds:{'interface.draw':{family:'design',role:'write',mutates:['design']}}};
+
 test('the contract block and the validator payload are what the profile declares, and nothing when it declares nothing',()=>{
-  // Today's profile declares `mutates` only: there is an output rule and no input rule, and the block says so.
-  const block=ioBlock('interface.draw',{profile:authored});
+  // A profile that declares `mutates` only carries an output rule and no input rule, and the block says so.
+  const block=ioBlock('interface.draw',{profile:mutatesOnly});
   assert.equal(block.includes('## Reads'),false,'no input is declared, so no heading is printed over an empty list');
   assert.ok(block.includes('## Produces'));
   assert.ok(block.includes('- `design`'));
-  assert.deepEqual(ioPayload('interface.draw',{profile:authored}),{reads:[],writes:['design']});
+  assert.deepEqual(ioPayload('interface.draw',{profile:mutatesOnly}),{reads:[],writes:['design']});
   // A profile that declares both prints both.
   const profile={kinds:{'interface.draw':{family:'design',role:'write',reads:['srs','brand'],writes:['design']}}};
   const declared=ioBlock('interface.draw',{profile});
@@ -96,8 +101,9 @@ test('a path is mapped to the record kind it IS, most specific first',()=>{
 
 test('an undeclared write is named only when the profile declares what the kind writes',()=>{
   const files=['src/sales/intake.ts','.starciwork/features/sales/business/rule/index.yaml'];
-  // Today's profile carries no `writes`, so there is no rule and nothing is refused.
-  assert.deepEqual(undeclaredWrites('backend.implement',files,{profile:authored}),[]);
+  // A profile that carries no `writes` carries no rule either, so nothing is refused before the data exists.
+  assert.deepEqual(undeclaredWrites('backend.implement',files,
+    {profile:{kinds:{'backend.implement':{family:'build',role:'implement',mutates:['code']}}}}),[]);
   const profile={kinds:{'backend.implement':{family:'build',role:'implement',reads:['srs'],writes:['code']}}};
   assert.deepEqual(undeclaredWrites('backend.implement',files,{profile}),
     [{file:'.starciwork/features/sales/business/rule/index.yaml',record:'srs'}]);
