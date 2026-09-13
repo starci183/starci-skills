@@ -50,6 +50,12 @@ consolidation:
     - scope.retire
     - task.execute
   mappings:
+    - from: owner.ask
+      to:
+        - decision.prepare
+        - provision.ask
+      kind: split
+      responsibility: One kind put things to the owner; it is two now, split on whether the runtime waits - a decision is prepared and taken provisionally, a provision is asked for and waited on.
     - from: backend.plan
       to:
         - architecture.decide

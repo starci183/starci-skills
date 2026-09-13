@@ -14,13 +14,15 @@ import {readWorkflow} from './helpers/read-public.mjs';
 const matrices=readWorkflow('jobs.json');
 const contract=id=>catalogue.ops.find(o=>o.id===id).contract;
 
-test('the complete jobs replace the old catalogue, each is classified once, and twenty-two extras have explicit ownership',()=>{
+test('the complete jobs replace the old catalogue, each is classified once, and twenty-three extras have explicit ownership',()=>{
   // The catalogue IS the registry: a new operator appears in both or in neither, and it is basic or supporting,
   // never both and never neither. Counted from the registry so adding one operator is one edit, not three.
   assert.deepEqual(catalogue.ops.map(op=>op.id).sort(),[...registry.ops].sort());
   assert.equal(registry.consolidation.basic.length,6);
   assert.deepEqual([...registry.consolidation.basic,...registry.consolidation.supporting].sort(),[...registry.ops].sort());
-  assert.equal(registry.consolidation.mappings.length+registry.consolidation.unchanged.length,22);
+  assert.equal(registry.consolidation.mappings.length+registry.consolidation.unchanged.length,23);
+  // The one kind that put things to the owner is two now, and the split is recorded as a mapping.
+  assert.deepEqual(registry.consolidation.mappings.find(mapping=>mapping.from==='owner.ask')?.to,['decision.prepare','provision.ask']);
   for(const mapping of registry.consolidation.mappings){
     assert.equal(catalogue.ops.some(op=>op.id===mapping.from),false);
     for(const to of mapping.to)assert.ok(catalogue.ops.some(op=>op.id===to));
@@ -36,8 +38,8 @@ test('the complete jobs replace the old catalogue, each is classified once, and 
   assert.ok(registry.consolidation.supporting.includes('integration.verify'));
   assert.equal(registry.consolidation.basic.includes('integration.verify'),false);
   assert.ok(registry.consolidation.added.includes('integration.verify'));
-  assert.equal(registry.consolidation.supporting.length,15);
-  assert.equal(registry.ops.length,21);
+  assert.equal(registry.consolidation.supporting.length,16);
+  assert.equal(registry.ops.length,22);
   assert.match(JSON.stringify(contract('uat.verify')),/No plan\/account\/seed predecessor/);
 });
 test('English-only YAML is the maintained operator source with no runtime mirrors',()=>{
