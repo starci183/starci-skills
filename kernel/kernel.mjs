@@ -96,7 +96,7 @@ export const DESIGN_KINDS=kindsReadingBrand();
 
 /** The whole mutable state of one workflow. `schema` is the store's, so state.json is written atomically by it. */
 export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],store,host=null,launcher=null,
-  ledgerMode='plan',scope=[],reintake=[],repoRoot=null,ledgerRoot=null,ledgerOwner=null,ledgerSource=null,ledgerShared=false,
+  ledgerMode='plan',scope=[],reintake=[],migrate=[],repoRoot=null,ledgerRoot=null,ledgerOwner=null,ledgerSource=null,ledgerShared=false,
   codeRole=null,codeSide=null,lane=null}){
   need(plain(store)&&typeof store.id==='string','A workflow store is required');
   need(LEDGER_MODES.includes(ledgerMode),`Unsupported ledger mode ${ledgerMode}; use ${LEDGER_MODES.join(' or ')}`);
@@ -106,7 +106,7 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     // The worktree above is this workflow's lane when it owns one: the tree it runs in, and the branch that is
     // merged back into `lane.base.branch` when the workflow finishes done.
     lane:plain(lane)?{...lane}:null,
-    ledgerMode,scope:[...scope],reintake:[...reintake],repoRoot:repoRoot?path.resolve(repoRoot):null,
+    ledgerMode,scope:[...scope],reintake:[...reintake],migrate:[...migrate],repoRoot:repoRoot?path.resolve(repoRoot):null,
     // The code root is the worktree above; these name the tree the Work itself lives in, which may belong to
     // another repository of the same product.
     ledgerRoot:ledgerRoot?path.resolve(ledgerRoot):null,ledgerOwner:plain(ledgerOwner)?{...ledgerOwner}:null,
@@ -1012,7 +1012,9 @@ export function resumePaused(store,state){
       resumed.push(op.id);
       continue;
     }
-    if(['blocked','failed'].includes(shared.status)){
+    // A shared op blocked without a refusal is still alive - the kernel cools, re-admits or authors it - so its
+    // requester keeps waiting; only a refused or failed shared change blocks the requester behind it.
+    if(shared.status==='failed'||(shared.status==='blocked'&&shared.refusal)){
       op.status='blocked';op.waitingFor=null;
       state.needUser.push({op:op.id,kind:'shared-change',detail:`${op.id} waits for the shared change ${shared.id}, which is ${shared.status}`});
       store.appendEvent({event:'shared-change-blocked',op:op.id,shared:shared.id});
@@ -1809,6 +1811,81 @@ function avoidRuntime(op,runtime,now){
  * `restarted N times (rate-limited)` question with no cooldown recorded - is given one at load and released the
  * same way, and its question goes.
  */
+/**
+ * The rule the owner's list was written under. Every rule that turns a mechanical bound into an escalation
+ * applies to what an OLDER rule already parked for the owner, not only to what this kernel meets from now on:
+ * a review the old rule parked after its rounds, a shared change it called too deep, a record path it refused
+ * outright, a launch it gave up on, a requester it blocked behind a blocked shared change. Once per rule change,
+ * on kernel start, each such item is judged again under the current rule and routed where the rule routes it
+ * today; what the current rule still parks stays parked, and the list shrinks to what is genuinely the owner's.
+ * The stamp changes when the parking rules do, never with the build.
+ */
+export const PARK_RULE='5.0.0-plus';
+export function rejudgeParked(store,state,ctx){
+  if(state.parkRule===PARK_RULE)return [];
+  const routed=[];
+  const drop=item=>{state.needUser=state.needUser.filter(entry=>entry!==item);};
+  const readmit=(op,finding)=>{op.status='ready';op.refusal=null;op.attempt+=1;op.findings=unique([...(op.findings??[]),finding]);op.priorOpen=[];op.dispatch=null;op.terminal=null;op.nudged=false;};
+  // What the op asked for when it was parked: the shared-change blocker of its last report, read as the kernel reads it today.
+  const requested=op=>{
+    const report=(op.reports??[]).at(-1);
+    const blocker=plain(report?.blocker)?report.blocker:null;
+    if(!blocker||blocker.kind!=='shared-change')return {paths:[],detail:'',open:[]};
+    const named=ctx.guards?.parseSharedChangePaths?.(`${blocker.detail} ${(report.open??[]).join(' ')}`)??[];
+    return {paths:unique(named.map(normalize)).filter(file=>!inside(file,op.allowlist)),detail:String(blocker.detail??''),open:[...(report.open??[])]};
+  };
+  for(const item of [...state.needUser]){
+    const op=item.op?byId(state,item.op):null;
+    const stuck=Boolean(op&&op.status==='blocked'&&!op.refusal);
+    let route=null;
+    if(item.kind==='ledger'&&/^never verified:/.test(String(item.detail??''))){drop(item);route='recomputed-at-finish';}
+    else if(item.kind==='review'){
+      // The parked review of a group is escalated as the current rule escalates a spent review; its companion
+      // line ("used its rounds and is implemented again") names no op and goes with it.
+      if(!op){drop(item);route='companion-line';}
+      else if(op.kind==='review.verify'&&(op.ledgerIds??[]).length){
+        const key=groupKey(state,op.ledgerIds);
+        const findings=state.verifyFindings?.[key]??reviewFindings((op.reports??[]).at(-1)??{});
+        drop(item);
+        route=escalateVerify(store,state,ctx,{key,ledgerIds:[...op.ledgerIds],findings,op});
+      }
+    }
+    else if(item.kind==='shared-depth'&&stuck){
+      const {paths,detail,open}=requested(op);
+      const author=paths.length?authorSharedNode(store,state,op,ctx,{paths,detail,open}):null;
+      if(author){drop(item);route='shared-authored';}
+    }
+    else if(item.kind==='ledger-path'&&stuck){
+      const {paths,detail,open}=requested(op);
+      const ledgerPaths=paths.filter(entry=>/^\.?\/?\.starciwork\//.test(slash(entry)));
+      const codePaths=paths.filter(entry=>!ledgerPaths.includes(entry));
+      drop(item);
+      store.appendEvent({event:'ledger-path-refused',op:op.id,kind:op.kind,paths:ledgerPaths,continued:codePaths,reason:'ledger path',rejudged:true});
+      if(codePaths.length)route=requestSharedChange(store,state,op,{paths:codePaths,detail,open},ctx);
+      else{
+        readmit(op,`The Work tree is the kernel's own record: ${ledgerPaths.join(', ')} is not a change any operation may ask for, and an error of the tree outside your allowlist no longer counts against you. Run your checks on your own files and report done with their evidence, or blocked with a shared-change that names code paths only.`);
+        route='readmitted';
+      }
+    }
+    else if(item.kind==='environment'&&stuck&&!/\(rate-limited\)$/.test(String(item.detail??''))){
+      // A rate limit is migrated by `readmitCooled` itself, which also avoids the limited runtime; every other spent
+      // launch is a mechanical bound: it cools and comes back with its counters cleared.
+      drop(item);
+      coolOp(store,state,op,ctx,String(item.detail??''));
+      op.coolUntil=clockOf(ctx);
+      route='launch-cooling';
+    }
+    else if(item.kind==='shared-change'&&stuck){
+      const shared=(op.dependsOn??[]).map(id=>byId(state,id)).find(dep=>dep&&dep.status!=='done'&&dep.status!=='failed'&&!(dep.status==='blocked'&&dep.refusal));
+      if(shared){drop(item);op.status='paused';op.waitingFor=shared.id;op.dispatch=null;op.terminal=null;op.nudged=false;route=`waits-for:${shared.id}`;}
+    }
+    if(route)routed.push({kind:item.kind,op:op?.id??null,route});
+  }
+  state.parkRule=PARK_RULE;
+  store.appendEvent({event:'parked-rejudged',rule:PARK_RULE,routed,left:state.needUser.length});
+  return routed;
+}
+
 function readmitCooled(store,state,ctx){
   const now=typeof ctx?.now==='function'?ctx.now():Date.now();
   for(const item of state.needUser.filter(entry=>entry.kind==='environment'&&/\(rate-limited\)$/.test(String(entry.detail??'')))){
@@ -2033,6 +2110,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   sweepTreeStrays(store,state,ctx);
   sweepStaleTerminals(orca,store,state,{cwd});
   state.buildStamp=buildStamp();
+  rejudgeParked(store,state,ctx);
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
     if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});sweepTreeStrays(store,state,ctx);}
     if((iteration>0&&iteration%RECONCILE_EVERY===0)||now()-(state.lastSweepAt??0)>=SWEEP_MS)sweepStaleTerminals(orca,store,state,{cwd,now});
@@ -2091,7 +2169,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     }
     const gate=runGates(store,state,ctx);
     if(gate.ok){
-      const unverified=state.ledger.filter(item=>!['verified','preexisting'].includes(item.status));
+      // A node of another repository of the product is settled there, never here: it does not hold this
+      // workflow open, and the final ledger names it as `out-of-repository`.
+      const unverified=state.ledger.filter(item=>!['verified','preexisting','out-of-repository'].includes(item.status));
       if(unverified.length)state.needUser.push({kind:'ledger',detail:`never verified: ${unverified.map(item=>`${item.id} (${item.status})`).join(', ')}`});
       finish(store,state,state.needUser.length?'blocked':'done',state.needUser.length?'the policy could not settle every goal item':null,ctx);
       break;
@@ -2228,7 +2308,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const store=createStore({repoRoot:ledger.sharedLedger?ledger.ownerRepoRoot:repoRoot,id});
     const ledgerMode=detectLedgerMode(code,options.ledger??null,ledger.exists?ledger.ledgerRoot:null);
     const state=createWorkflowState({job,inputs:csv(options.inputs),worktree:code,branch:lane?lane.branch:currentBranch(code),
-      gates:csv(options.gates),store,host,launcher:launcherOf(host),ledgerMode,scope:csv(options.scope),reintake:csv(options.reintake),repoRoot:code,lane,
+      gates:csv(options.gates),store,host,launcher:launcherOf(host),ledgerMode,scope:csv(options.scope),reintake:csv(options.reintake),migrate:csv(options.migrate),repoRoot:code,lane,
       ledgerRoot:ledger.exists?ledger.ledgerRoot:null,ledgerShared:ledger.sharedLedger,ledgerSource:ledger.source,
       codeRole:ledger.role,codeSide:ledger.side,
       ledgerOwner:ledger.exists?{repoRoot:ledger.ownerRepoRoot,repository:ledger.ownerRepository,role:ledger.ownerRole,project:ledger.project}:null});

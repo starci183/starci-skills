@@ -331,6 +331,20 @@ conflict (the owner's) or new work that A hands to C (declared).
 (`intake-planned {mode: reconcile}`), which is how a feature authored before 5-plus is brought under the
 three cases (the first proof in §11).
 
+`workflow-goal --migrate <feature,...|all>` is the migration of a whole tree to this model: one intake per
+feature in migrate mode, no node executed, allowlists that never meet (the module record, `business/**`,
+`architecture/**`, `integration/**`), so every feature migrates at once on its own runtime slot. It adds what
+5-plus makes explicit - the typed reconciliation, the integrations with their credential custody, the
+integration nodes the tree then owes - and re-decides nothing: a decided record keeps its state, its rev
+and its wording, and a contradiction is a `conflict` row and a decision record.
+
+The same principle reaches the owner's list itself. A rule that turns a bound into an escalation applies to
+what an older rule already parked: on kernel start, once per rule, `rejudgeParked` judges every parked item
+again and routes it where the current rule routes it - a parked review is escalated, a deep shared change
+is authored as a node, a refused record path is refused and its code paths carry on, a spent launch cools
+and comes back, a requester blocked behind an alive shared change waits for it. What is genuinely the
+owner's - a provision, an irreversible effect, a decision - stays (`parked-rejudged`).
+
 ## 4b. The record is revised, not asked about
 
 An SRS or an SDS that is confusing, contradictory or silent is not a reason to stop. The owner ruled it on
