@@ -13,7 +13,8 @@ purpose: |-
   -> rendered UI
   ```
   The selected composition op may use these rules to answer the questions
-  that must be settled while the page is still a description: which regions the page has, which
+  that must be settled while the page is still a description: which regions the page has, what holds
+  several of the same thing, which
   content outranks which, which action carries the decision, which conditions the feature can be in,
   what the reader is told at each outcome, and where the scarce dominant emphasis is spent. These
   topics belong together because each of them is a commitment made before rendering, and because they
@@ -25,6 +26,10 @@ topics:
     path: layout.yaml
     decides: Which visible task regions exist, who owns their tracks and scrolling
     rules: LAYOUT-1 to LAYOUT-4
+  - title: Collection
+    path: collection.yaml
+    decides: What holds several of the same thing, and what one bounded object may contain
+    rules: COLLECTION-1 to COLLECTION-2
   - title: Hierarchy
     path: hierarchy.yaml
     decides: Which information rank each piece of meaning receives
