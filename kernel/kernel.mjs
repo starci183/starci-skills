@@ -489,7 +489,12 @@ function scheduleOps(orca,store,state,ctx){
     if(deferForBrand(store,state,op,ctx))continue;
     // On the Work ledger the authored files decide parallelism, through the ledger's own prefix semantics.
     const overlaps=other=>ctx.work?!ctx.work.api.disjoint(other.allowlist,op.allowlist):allowlistsOverlap(other.allowlist,op.allowlist);
-    if(busy.some(overlaps)){
+    // Two asks share the feature's policy-decisions folder by design, and neither is authoring in it: each writes
+    // at most one NEW slug folder of its own, and the whole-tree validator is what catches a duplicate. Waiting for
+    // each other bought nothing and cost an hour - three credential tabs the owner never saw sat behind one
+    // decision draft that shared nothing with them. A non-ask on that folder still waits: it edits what is there.
+    const contends=other=>overlaps(other)&&!(isAsk(op.kind)&&isAsk(other.kind));
+    if(busy.some(contends)){
       store.appendEvent({event:'schedule-deferred',op:op.id,reason:'allowlist overlaps a running operation'});
       continue;
     }
