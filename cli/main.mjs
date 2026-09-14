@@ -34,6 +34,7 @@ Usage:
   starci source-layout <backend-root> <frontend-root>
   starci validate <work-root>
   starci identity set <slug> --name <VAR> [--work-root <path>]   (the value is read from stdin, never printed)
+  starci identity fill <slug> --name <VAR> [--name <VAR>] [--work-root <path>]   (it asks for each one here, with the echo off)
   starci brand check <work-root> [--source <repository-root>] [--json]
   starci render check <ui-node-dir> --brand <work-root> [--family <id>] [--json]
   starci tree <work-root>
@@ -251,7 +252,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       // The value comes from stdin - never an argument, because an argument is in the process table, the shell
       // history and every log of the launch - and nothing here ever prints it back.
       const [action,...input]=args;
-      if(action!=='set')throw Error('Use starci identity set <slug> --name <VAR> [--work-root <path>]; the value is piped in on stdin.');
+      if(!['set','fill'].includes(action))throw Error('Use starci identity set <slug> --name <VAR> [--work-root <path>] (the value is piped in on stdin), or starci identity fill <slug> --name <VAR> [--name <VAR>] (it asks for each one here).');
       const rest=[...input];
       const option=name=>{
         const at=rest.indexOf(`--${name}`);
@@ -261,6 +262,21 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
         rest.splice(at,2);
         return value;
       };
+      // `fill` asks the owner for each variable in turn, here, with the echo off: one command they copy from
+      // wherever the kernel printed it, and nothing else to do. Every rule of `set` still holds - the value is
+      // never an argument, never printed, never written anywhere but the custody.
+      if(action==='fill'){
+        const names=[];
+        for(;;){const next=option('name');if(!next)break;names.push(next);}
+        const where=option('work-root');
+        if(!names.length)throw Error('--name needs the exact variable the code reads, for example STRIPE_SECRET_KEY; repeat it for each one.');
+        exactArgs(rest,1);
+        const {findWorkRoot,fillIdentitySecrets}=await import('../core/identity.mjs');
+        const filled=await fillIdentitySecrets({workRoot:findWorkRoot(process.cwd(),where),slug:rest[0],names,
+          input:io.in??process.stdin,output:{write:value=>(io.err??(text=>process.stderr.write(text)))(value)}});
+        emit(filled);
+        return filled.ok?0:1;
+      }
       const name=option('name'),given=option('work-root');
       if(!name)throw Error('--name needs the exact variable the code reads, for example STRIPE_SECRET_KEY.');
       // Exactly one positional, and it is the slug: a second word on this command line could only be a value,
