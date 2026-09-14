@@ -542,3 +542,38 @@ test('a tree with no brand record hashes exactly as it did before the brand exis
   assert.equal(without.nodes.find(n=>n.id==='sales.impl.be.cart').inputDigest,withBrand,'an unbound node never saw the brand');
   assert.equal(without.nodes.find(n=>n.id==='sales.ui').brand,null);
 });
+
+/**
+ * One project has one Work tree, owned by the backend and written by the frontend too, so a drawing operation's
+ * unrendered images sit in the same tree as every backend proof. A `todo` node's declared asset that is not on
+ * disk yet is therefore pending work - a warning, a valid tree, and no bytes in the digest - while the very same
+ * absence under a node that is done, where the asset is what the proof rests on, stays an error.
+ */
+test('a declared asset that has not been drawn yet is pending on a todo node and missing on a done one',t=>{
+  const f=fixture(t);
+  f.node('ui/screen',{assets:[{path:'assets/desktop.png'}]});
+  const pending=f.run();
+  assert.equal(pending.ok,true,JSON.stringify(pending.errors));
+  assert.deepEqual(pending.warnings.filter(w=>w.code==='NODE_ASSET_PENDING').map(w=>w.path),['ui/screen/node.md']);
+  assert.equal(pending.errors.some(e=>e.code==='NODE_ASSET_UNREADABLE'),false);
+  const waiting=pending.nodes.find(n=>n.id==='ui.screen').specDigest;
+
+  // The asset lands: it is the node's own input now, so the digest moves, which is what re-verifies anything
+  // resting on it. Nothing about the tree was red while it was being drawn.
+  f.write('ui/screen/assets/desktop.png','Synthetic render bytes, not an actual screenshot.');
+  const drawn=f.run();
+  assert.equal(drawn.ok,true,JSON.stringify(drawn.errors));
+  assert.equal(drawn.warnings.some(w=>w.code==='NODE_ASSET_PENDING'),false);
+  assert.notEqual(drawn.nodes.find(n=>n.id==='ui.screen').specDigest,waiting);
+
+  // The other half: a node that is not `todo` holds every asset it declares. Removing the file the done record
+  // was proved against is the error it always was.
+  f.done('ui/screen');
+  const proved=f.run();
+  assert.equal(proved.ok,true,JSON.stringify(proved.errors));
+  fs.rmSync(path.join(f.root,'ui/screen/assets/desktop.png'));
+  const gone=f.run();
+  assert.equal(gone.ok,false);
+  assert.deepEqual(gone.errors.filter(e=>e.code==='NODE_ASSET_UNREADABLE').map(e=>e.path),['ui/screen/node.md']);
+  assert.equal(gone.warnings.some(w=>w.code==='NODE_ASSET_PENDING'),false);
+});

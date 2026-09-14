@@ -115,6 +115,17 @@ sections:
         done; unfinished optional work produces a warning. Shared metadata/evidence integrity errors
         fail closed for all nodes. Unknown leaf kinds remain readable with warnings but cannot earn
         `done`; supported profiles must be implemented and tested before certifying new kinds.
+      - "A node's declared `assets` bind their current bytes into its `specDigest`, and when an asset
+        is not on disk the state of the node decides what that is. On a `todo` node it is pending
+        work - the node declares what its own next step will render, and the tree stays valid while
+        that step runs - reported as the warning `NODE_ASSET_PENDING` and left out of `ownedAssets`,
+        so the digest changes when the asset lands and whatever rested on it is re-verified then. On
+        any node that is not `todo` - a done leaf, or a branch that derives - every declared asset
+        must be present, and an absent one is the error `NODE_ASSET_UNREADABLE`. Absence is the only
+        pending case; an asset reached through a symlink, escaping its node's directory or resolving
+        to something that is not a file is unsafe whatever the node's state, and stays that error.
+        One tree is shared by the repositories of a project, so a drawing operation's unrendered
+        images must never redden the proof of the work beside it."
       - Resources may declare `files:[{path}]`. Each path is normalized and relative to the
         directory containing that resource's `resource.yaml`; paths cannot escape it, use symlinks,
         point to a directory or require remote retrieval. The core hashes actual local file bytes at

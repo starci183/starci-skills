@@ -51,10 +51,15 @@ test('asset payload folders do not create Work nodes or parse sample metadata',t
   const result=validateWorkspace(f.root);assert.ok(result.ok,JSON.stringify(result.errors));assert.equal(result.nodes.length,1);
 });
 
-test('nested UI cannot bind absent, duplicate or escaping assets and still requires state coverage',t=>{
+test('nested UI cannot bind duplicate or escaping assets, waits for the ones it has still to draw, and still requires state coverage',t=>{
   const f=fixture(t),dir='module/ui/group/screen';
+  // The node is `todo`: it declares the six images its own next step renders, so an absent one is pending work,
+  // a warning, and the tree - shared with every other repository of the project - stays valid while it is drawn.
   f.node(dir,{schema:'work/node@2',kind:'ui',ui:uiSpec(['assets/missing.png']),assets:[{path:'assets/missing.png'}]});
-  assert.ok(validateWorkspace(f.root).errors.some(e=>e.code==='NODE_ASSET_UNREADABLE'));
+  const pending=validateWorkspace(f.root);
+  assert.ok(pending.ok,JSON.stringify(pending.errors));
+  assert.ok(pending.warnings.some(e=>e.code==='NODE_ASSET_PENDING'&&e.path===dir+'/index.yaml'));
+  assert.equal(pending.errors.some(e=>e.code==='NODE_ASSET_UNREADABLE'),false);
   f.put(dir+'/assets/design.png','Synthetic');
   f.node(dir,{schema:'work/node@2',kind:'ui',ui:uiSpec(['assets/design.png']),assets:[{path:'assets/design.png'},{path:'assets/design.png'}]});
   assert.ok(validateWorkspace(f.root).errors.some(e=>e.code==='NODE_ASSET_PATH'));
