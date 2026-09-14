@@ -2471,6 +2471,22 @@ export function awaitLaunch(file,{wait=sleepSync,timeoutMs=LAUNCH_WAIT_MS,interv
 
 const hostOf=(options,repoRoot)=>path.resolve(options.host??path.join(repoRoot,'.claude'));
 const launcherOf=host=>slash(path.join(host,'.dist','hosts','orca','launch.mjs'));
+/**
+ * The launcher a workflow persisted is the file its contracts tell every op to report through. A build that
+ * lays the runtime out differently leaves that path behind, and a workflow that started under the old layout
+ * writes fresh contracts naming a file that is not there: an op then cannot report, or reports through
+ * whatever it finds. An absolute launcher that no longer exists is replaced by the one this build has, and the
+ * exchange is recorded (`launcher-relocated`); a relative launcher (a test's stand-in) is left alone.
+ */
+export function relocateLauncher(store,state){
+  const current=state.launcher?slash(String(state.launcher)):null;
+  if(!current||!path.isAbsolute(current)||fs.existsSync(current))return false;
+  const to=launcherOf(state.host);
+  if(!fs.existsSync(to)||to===current)return false;
+  state.launcher=to;
+  store.appendEvent({event:'launcher-relocated',from:current,to});
+  return true;
+}
 const templateOf=host=>fs.readFileSync(path.join(host,'docs','supervision-templates','op.md'),'utf8');
 
 /** One kernel per workflow: a pid lock in the store refuses a second process; a stop flag ends the loop cleanly. */
@@ -2686,6 +2702,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     if(!binding)rebindRunIfNeeded(orca,store,state,{cwd:worktree});
     state.host=state.host??hostOf(options,repoRoot);
     state.launcher=state.launcher??launcherOf(state.host);
+    relocateLauncher(store,state);
     store.appendEvent({event:binding?'run-bound':'run-resumed',run:state.run,from:state.from,iterations:state.iterations});
     const finished=(()=>{const release=acquireKernelLock(store);try{fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});return runLoop(orca,store,state,{cwd:worktree,wait,
       // Slots are derived from the operations that are actually running; saved loads may belong to a dead kernel.
