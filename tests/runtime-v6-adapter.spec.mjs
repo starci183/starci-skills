@@ -57,6 +57,16 @@ test('real workflow model policy consumes the same model-function scope selected
   const scopes=Object.keys(f.state.modelEligibility.probationScopes);assert.deepEqual(scopes,['wf/op/model.planOp/plan']);assert.equal(f.state.modelEligibility.probationBudget.remaining,(f.state.modelEligibility.probationBudget.initial-1));assert.equal(launches,1);runtime.close();
 });
 
+test('real workflow policy consumes native author probation in the eligibility workload scope',t=>{
+  const f=fixture(t);f.state.approved=true;const op={id:'author',kind:'work.author',attempt:1,status:'ready',allowlist:['src/a.js'],checks:[]};f.state.ops=[op];fs.writeFileSync(path.join(f.dir,'policy.json'),JSON.stringify({schema:'starci/model-capability-policy@1'}));
+  const profiles=loadRuntimes(),policy=createWorkflowModelEligibility({runtimes:profiles,state:f.state,policyFile:path.join(f.dir,'policy.json'),qualificationsFile:path.join(f.dir,'none.json'),root:f.dir,now:()=>1});
+  const eligibility=(job,candidate)=>{const source=job.input?.op??job,actual={...source,opId:job.opId??source.id,kind:source.kind,role:job.role??'write',independentReview:{required:true,freshContext:true},checks:[...(source.checks??[]),{name:'work-valid'}]};return policy.eligibility(actual,candidate);};
+  const runtime=createV6Runtime({...f,modelPolicy:policy,eligibility,spawnChild:()=>({pid:1,once(){},unref(){}})}),allocation={runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'};
+  const scope='wf/author/work.author/plan',first=runtime.reserveOperation(op,allocation);assert.equal(first.ok,true);assert.deepEqual(Object.keys(f.state.modelEligibility.probationScopes),[scope]);assert.equal(f.state.modelEligibility.probationScopes[scope].remaining,1);runtime.settled(op);
+  op.attempt=2;const second=runtime.reserveOperation(op,allocation);assert.equal(second.ok,true);assert.equal(f.state.modelEligibility.probationScopes[scope].remaining,0);runtime.settled(op);
+  op.attempt=3;const third=runtime.reserveOperation(op,allocation);assert.equal(third.ok,false);assert.match(third.reasons.join(' '),/exhausted|unavailable/);runtime.close();
+});
+
 test('model replay hash excludes candidate payload and mutable operation runtime fields',t=>{
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),runtime=createV6Runtime({...f,bridge,eligibility:()=>({eligible:true})}),op={id:'op',kind:'backend.implement',goal:'g',attempt:1,acceptance:['a'],allowlist:['a.js'],v6Candidate:{huge:'x'.repeat(10000)},status:'running'};let first;try{runtime.model('validateOp',{providers:['gpt-5.6-sol'],op,diff:{files:['a.js'],text:'+x'}},op);}catch(error){first=error.job.identity.jobId;}op.v6Candidate={different:'y'.repeat(10000)};op.status='blocked';let second;try{runtime.model('validateOp',{providers:['gpt-5.6-sol'],op,diff:{files:['a.js'],text:'+x'}},op);}catch(error){second=error.job.identity.jobId;}assert.equal(second,first);const payload=runtime.journal.getJob(first).payload;assert.equal(JSON.stringify(payload).includes('huge'),false);bridge.close();
 });

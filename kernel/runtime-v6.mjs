@@ -11,6 +11,7 @@ import {reconcilePureModelJobs} from './job-reconcile.mjs';
 import {openJournal} from './journal.mjs';
 import {createAdmission} from './admission.mjs';
 import {resourceLocks} from './guards.mjs';
+import {kindRole} from './common.mjs';
 
 export const ENGINE_VERSION='6.0.0-alpha.1';
 export const isV6=state=>state?.engine?.major===6;
@@ -99,16 +100,17 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
       candidate:op?.v6CandidateDigest??state.head??null,...(options.env?{env:options.env}:{})}}));},
     reserveOperation(op,allocated){
       const bound={...identity(op),jobId:`operation-${inputDigest({...identity(op),dispatchAttempt:op.launchFailures??0}).slice(0,32)}`};
-      const job={kind:'operation',role:allocated.role,input:{op,runtime:allocated.runtime,target:allocated.target},...bound};
+      const effectiveRole=allocated.role??kindRole(op.kind),job={kind:'operation',role:effectiveRole,input:{op,runtime:allocated.runtime,target:allocated.target},...bound};
+      const probationJob={...bound,kind:op.kind,role:effectiveRole,input:{op}};
       const pool=runtimeProfile.runtimes?.[allocated.runtime]??{};
       const decision=eligibility?.(job,{id:allocated.runtime,...pool,model:pool.target??allocated.target});
       if(!decision?.eligible)return {ok:false,reasons:decision?.reasons??['model eligibility unavailable']};
       const existing=journal.getJob(bound.jobId);
       if(existing&&existing.lease_token&&['leased','running'].includes(existing.status))return {ok:true,...bound,leaseToken:existing.lease_token};
-      journal.enqueueJob({...bound,kind:'operation',role:allocated.role,payload:{runtime:allocated.runtime,target:allocated.target,kind:op.kind}});
+      journal.enqueueJob({...bound,kind:'operation',role:effectiveRole,payload:{runtime:allocated.runtime,target:allocated.target,kind:op.kind}});
       const machineResources=declareMachineResources(op),resources=[{key:'ai/global',units:1},...((op.allowlist??[]).length?[writer]:[]),...machineResources];
       const result=admission.reserve({...bound,resources,ttlMs:10*60*1000});
-      if(result.ok&&decision.mode==='probation'){const consumed=modelPolicy?.consumeProbation?.(job,{id:allocated.runtime,...pool,model:pool.target??allocated.target});if(!consumed?.ok){admission.release({...bound,leaseToken:result.leaseToken});journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=?").run(JSON.stringify({reason:consumed?.code??'probation-unavailable'}),now(),bound.jobId);return {ok:false,reasons:[consumed?.code??'probation-unavailable'],...bound};}store.saveState(state);}
+      if(result.ok&&decision.mode==='probation'){const consumed=modelPolicy?.consumeProbation?.(probationJob,{id:allocated.runtime,...pool,model:pool.target??allocated.target});if(!consumed?.ok){admission.release({...bound,leaseToken:result.leaseToken});journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=?").run(JSON.stringify({reason:consumed?.code??'probation-unavailable'}),now(),bound.jobId);return {ok:false,reasons:[consumed?.code??'probation-unavailable'],...bound};}store.saveState(state);}
       if(result.ok)op.v6Lease={...bound,leaseToken:result.leaseToken,machineResources:machineResources.map(item=>item.key)};
       return {...result,...bound};
     },
