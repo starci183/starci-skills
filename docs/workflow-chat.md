@@ -66,10 +66,13 @@ verification.
    every node that was built on it.** Say that when you relay one, so an answer is never given carelessly.
 
    The owner can also answer **in the operation's own terminal**, by typing the option number there while the
-   `decision.prepare` (or `provision.ask` for a provision) op is still open; the kernel treats that exactly as the command. For a credential the op will
-   ask them to run `starci identity set <slug> --name <VAR>` - which reads the value from stdin and never
-   prints it - and to reply `set`; the op then checks only that it is present. Never ask the owner for a
-   credential value in the chat, never accept one if it is pasted, and never write one anywhere.
+   `decision.prepare` (or `provision.ask` for a provision) op is still open; the kernel treats that exactly as the command. A credential is
+   not asked in a tab at all: the kernel prints one line under `## Owner` - the variables, the custody and the
+   exact `starci identity fill <slug> --name <VAR> ...` command - and that command asks the owner `Fill <VAR>:`
+   with the echo off and puts each answer straight into the tree's encrypted custody; the kernel settles the
+   ask itself once the custody holds every variable. Relay that line verbatim, so the owner copies it. Never
+   ask the owner for a credential value in the chat, never accept one if it is pasted, and never write one
+   anywhere.
 
    A `host` item is different again: the operation's kind needs a capability this host does not offer, as
    `model/hosts.yaml` declares it. There is nothing to arrange locally - the same workflow resumes in Orca.
