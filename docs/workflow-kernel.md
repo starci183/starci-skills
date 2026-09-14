@@ -229,7 +229,7 @@ what happens to the reporter (`pause`, `reopen`, `retry`) and with which bound. 
 Kinds younger than `ops/registry.yaml` are resolved to a launchable operator id once, at the launch seam:
 `frontend.implement` launches as `interface.implement`, `architecture.revise` as `architecture.decide` and
 `business.revise` as `business.decide` (`launchOperator`), so both repairs run on the reasoning chain that
-decided the record in the first place - Fable, then Astra, then Opus. The allocator is asked for the op's own kind, because `roleOf` from the graph is what
+decided the record in the first place - Fable, then Astra, then its downgrade, Opus and Sol. The allocator is asked for the op's own kind, because `roleOf` from the graph is what
 decides its role - the runtimes profile's `roleOfKind` map is only the fallback for a kind the graph lacks.
 
 A profile that cannot be read is not fatal: the graph is empty, `DECISION_OPERATION` in `kernel/io.mjs` maps
@@ -1050,8 +1050,8 @@ What it changes in allocation, with `createAllocator({shared:{path, workflow}})`
 - a cooldown another kernel ran into is a cooldown here (`runtime-cooling-shared {runtime, until, from}`, once
   per learned cooldown); only provider limits are published - a rate limit and an exhausted quota - while an
   auth or local failure stays the kernel's own;
-- among the candidates that all qualify - role, free slot, budget, no cooldown - the one **no other kernel is
-  using** wins, and inside one shared load the local order decides (preference, then ratio, then chain order).
+- among the candidates that all qualify - role, free slot, an unexhausted provider window, no cooldown - the
+  one **no other kernel is using** wins, and inside one shared load the local order decides (preference, then ratio, then chain order).
   So a second workflow's hard operation goes to Astra while Fable carries the first one's, and the receipt says
   so: `allocation-shared {op, runtime, preferredOver:[...], sharedLoad:{runtime:n}}`.
 
@@ -1337,6 +1337,18 @@ reset, and among the ready runtimes the one with clearly more of its window left
 binds (a local model, an unread provider) sits in the top band. The shared-load key still comes first. When
 the budget alone moved the choice the launch says so: `allocation-budgeted {op, runtime, sparedOver:[...],
 remaining:{runtime:share}}`.
+
+That probed window is the **only** budget. No pool in `model/runtimes.yaml` declares a cap of its own any
+more: one did, and it stalled a migration late in the evening while the provider still had nearly half of its
+week left. A pool is bound by its provider's window, its own slots and its cooldowns, and by nothing else.
+
+And under every tier there is another one. The reasoning roles - `decide` and `plan` - no longer end at Fable
+and Astra: Fable overflows to Opus, Astra to Sol, and both of those carry the roles and appear at the end of
+the launch chains, so an operation whose top runtimes are full, cooling or out of window moves down instead of
+waiting for a week to reset. Because the policy is prefer-then-overflow the top tier is still preferred
+whenever it has a free slot, and the moment one frees the next operation goes back to it; a difficulty tier
+may order its runtimes per role (`tiers: {hard: {default: [...], decide: [...]}}`) so naming the downgrade for
+decide and plan leaves the order of the coding roles inside that tier untouched.
 
 ## The event log, by concern
 
