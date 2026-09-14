@@ -19,6 +19,7 @@ import * as work from '../kernel/ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
+import {relocateLauncher} from '../kernel/kernel.mjs';
 import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
@@ -2788,6 +2789,22 @@ test('a record that is still incomplete after its author op asks the user once a
     assert.deepEqual(state.ledger,[]);
     assert.equal(harness.read(REFUND).state,'todo');
     assert.equal(state.finished.outcome,'blocked');
+  }finally{harness.cleanup();}
+});
+
+test('a persisted launcher this build no longer has is replaced by the one it has, and a relative stand-in is left alone',()=>{
+  const harness=setupWork({});
+  try{
+    const store=harness.store,state=harness.state;
+    state.host=path.resolve('.');
+    state.launcher='D:/Repositories/somewhere/.claude/.dist/execution/orca-supervised-launch.mjs';
+    assert.equal(relocateLauncher(store,state),true);
+    assert.equal(state.launcher,path.resolve('.dist/hosts/orca/launch.mjs').replaceAll('\\','/'));
+    const moved=events(store).find(event=>event.event==='launcher-relocated');
+    assert.match(moved.from,/orca-supervised-launch\.mjs$/);
+    state.launcher='L.mjs';
+    assert.equal(relocateLauncher(store,state),false,'a relative launcher is a test stand-in and never touched');
+    assert.equal(state.launcher,'L.mjs');
   }finally{harness.cleanup();}
 });
 
