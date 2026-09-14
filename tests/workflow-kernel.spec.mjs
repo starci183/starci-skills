@@ -3010,6 +3010,28 @@ test('a record that is still incomplete after its author op asks the user once a
   }finally{harness.cleanup();}
 });
 
+/** A credential ask an older build launched as an agent, and that agent could not prepare, becomes a fill wait at start. */
+test('a blocked credential ask from an older build is taken over by the kernel as a fill wait at start',()=>{
+  const harness=setupWork({});
+  try{
+    const store=harness.store,state=harness.state;
+    const requester={...state.ops[0],id:'op-send',kind:'integration.verify',status:'paused',waitingFor:'ask-3',dispatch:null,terminal:null,nodeId:null};
+    const ask={...state.ops[0],id:'ask-3',kind:'provision.ask',status:'blocked',origin:'ask',requesters:['op-send'],nodeId:null,dispatch:null,terminal:'term_old_ask',
+      allowlist:['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],
+      question:{kind:'credential',stop:'credential',from:'op-send',text:'PAY_API_KEY is not provided for the payments provider in identity:payments',options:[]}};
+    state.ops.push(requester,ask);
+    state.needUser.push({op:'ask-3',kind:'decision',detail:'ask-3 could not prepare the question of op-send: PAY_API_KEY for payments in identity:payments'});
+    approve(store,state);state.run='run_wf';state.from='term_kernel';
+    const after=harness.run({maxIterations:1});
+    const taken=after.ops.find(op=>op.id==='ask-3');
+    assert.deepEqual([taken.status,taken.fill,taken.credential?.custody,taken.credential?.variables],['running',true,'identity:payments',['PAY_API_KEY']]);
+    assert.ok(!after.needUser.some(line=>line.op==='ask-3'),'the "could not prepare" line is gone: the kernel asks now');
+    assert.ok(events(store).some(event=>event.event==='provision-fill-readmitted'&&event.ask==='ask-3'&&event.was==='blocked'));
+    assert.ok(events(store).some(event=>event.event==='provision-fill-waiting'&&event.ask==='ask-3'));
+    assert.equal(after.ops.find(op=>op.id==='op-send').status,'paused','the requester still waits, now on the custody');
+  }finally{harness.cleanup();}
+});
+
 test('a persisted launcher this build no longer has is replaced by the one it has, and a relative stand-in is left alone',()=>{
   const harness=setupWork({});
   try{
