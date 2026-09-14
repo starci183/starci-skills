@@ -665,6 +665,25 @@ decision is listed under `state.provisional` - never under `needUser`. **A workf
 one**: the final report carries `provisional` plus a rendered `## Provisional decisions (n)` block, and
 `workflow-status` prints the same section beside, not inside, `## Needs you`.
 
+**One `## Owner (n)` section, everywhere the owner reads.** The owner's state lives in three places at once -
+the ask ops waiting in their tabs, `state.provisional`, `state.needUser` - and each is honest on its own while
+none of them is an answer to "where does it ask me?". `ownerItems(state)` (`kernel/owner.mjs`) is that answer:
+one derived list, written nowhere, of `{kind, op, what, how, terminal, since}` -
+`provision` for every live `provision.ask` (`how` names the tab to reply `set` in and the one
+`identity set <slug> --name <VAR>` command that puts the credential into custody - never a value, the op checks
+presence only), `decision` for every unanswered `state.provisional` entry (`how` is the exact `workflow-answer`
+command), and `blocked` / `ledger` for every `needUser` line of an `OWNER_LINE_KINDS` kind. `ownerSection`
+renders it as `## Owner (n)` for the status page, the final report (`owner`, `ownerReport`) and the
+`workflow-status` record; `noteOwnerList` appends `owner-list` when a digest of it changes. `what` is free text
+and always passes `redactSecrets`; `how` never does and must not - it is built from ids and a command shape,
+and the masker, which cannot tell a long workflow id from a key, once handed the owner `--id [redacted]`.
+
+**A mechanical line is never on that list.** `mechanicalOwnerLine` names the two shapes and `sweepStaleLines`
+drops them with `owner-line-dropped`: a `ledger incomplete: <node> ...` line while a `work.author` op for that
+node is on it (any status but `blocked`, and not `superseded`) - it comes back the moment that op blocks,
+because only then is the record nobody's job but the owner's - and an `environment` line whose op has since
+run or finished.
+
 **Answer, in the op or by command.** After writing the record the ask op prints the question and the numbered
 options in its own terminal and says the owner may answer there with the number or later with
 `workflow-answer`. An answer typed there comes back as `answered-by-owner: <n>` and is handled exactly as the
@@ -1405,7 +1424,10 @@ requester carries it; `credential-present` the owner provided something and the 
 there; `owner-answered` the owner's pick arrived (`via: 'command'` or `'terminal'`); `decision-confirmed` the
 owner chose what the runtime had chosen; `decision-overturned` they chose otherwise and the nodes built on it
 were reopened; `owner-answer-delivered` an answer reached one requester; `need-user-deduplicated` the owner's
-list was collapsed to one item per question; `decide` the supervisor model answered a mechanical question from
+list was collapsed to one item per question; `owner-list {items:[{kind,op}]}` what waits on the owner
+changed - appended when a stable digest of `ownerItems` differs from the last one, never once per tick;
+`owner-line-dropped {node, op, kind, reason}` a line the runtime had already taken in hand left the owner's
+list (`reason: 'an author op is on it'`, or `its op is running|done` for an environment line); `decide` the supervisor model answered a mechanical question from
 the closed options.
 
 **Scheduling and launching** (`kernel/kernel.mjs`, `schedule.mjs`, `chains.mjs`, `loads.mjs`) - `created` the
@@ -1434,7 +1456,7 @@ minutes were read as a quota refusal; `rate-limit-readmitted` the cooldown passe
 `need-user-stale-dropped` a mechanical line (triage, environment, shared-change, ledger-path, shared-depth, validator) about an op that has since moved on was dropped from the owner's list - every tick, so a stale line never finishes a workflow `blocked` over nothing;
 `parked-rejudged` the owner's list was judged again under the current rule on kernel start, once per rule (its `routed` names every item and where it went);
 `launcher-relocated {from, to}` a workflow whose persisted launcher (the report path in every contract) no longer exists in this build is given the one the build has, at start; `validator-scope-attributed {op, judged, left}` the validator is given only the files the op itself reported and git confirms (`attributedFiles`); the files left out are a neighbour's work under the same allowlist; `validator-readmitted {op, files}` an op the validator blocked over files it never claimed runs again at the next start, told to leave them alone; `gate-scope-narrowed {gates, files}` a gate repair holds only the files the failing gate's evidence names (inside the job's allowlists, existing in the worktree) and the whole job's allowlist only when it names none, so the rest of the job runs beside it; a red tree no longer stops derivation: `ledger-invalid` is still reported once per error set, but every node the validator still calls eligible is derived as usual, and only the nodes its errors touch (and their dependents) wait; `environment-retried {op, build}` an environment blocker an op itself reported is retried once per build, because a new build is what changes the environment it saw; `finish-withdrawn {because: settled}` a finish declared blocked over the owner's list is withdrawn on start once that list is empty and work remains;
-`op-overrun {op, runtime, ranMs, deadlineMs}` an attempt ran past its deadline (`OP_DEADLINE_MS`: a review three hours, a build eight, or the op's own `timeoutMs`) and was settled and relaunched elsewhere whatever the liveness probe said; `dependency-alive` an op an older rule blocked as "can never start" waits for its dependency again, because a dependency blocked without a refusal is alive; a `validator` line ("rejected by the validator N times") keeps its bound - one more round per fresh kernel start (`validatorReset`), never a cooldown;
+`op-overrun {op, runtime, ranMs, deadlineMs}` an attempt ran past its deadline (`OP_DEADLINE_MS`: a review three hours, a build eight, or the op's own `timeoutMs`) and was settled and relaunched elsewhere whatever the liveness probe said - **an op that waits for the OWNER is exempt** (`waitsForOwner`: a `provision.ask`, and a `decision.prepare` whose tab is kept), because the deadline exists for a runtime that went away and not for a person who has not answered yet; `dependency-alive` an op an older rule blocked as "can never start" waits for its dependency again, because a dependency blocked without a refusal is alive; a `validator` line ("rejected by the validator N times") keeps its bound - one more round per fresh kernel start (`validatorReset`), never a cooldown;
 `budget-wait {ops, since, reason}` nothing launched because every runtime that could take the ready ops is out of its daily op budget, cooling or full - a bound time lifts, so the kernel waits (one line per half hour) and never finishes over it; `finish-withdrawn` a finish an older rule declared over such a stall is withdrawn when its kernel is started again (workflow-run), never by the supervisor on its own - a workflow that finished blocked stays finished until someone runs it;
 `reconciliation-conflict {ask, provisional: true}` a conflict an intake recorded is taken provisionally through one detached `decision.prepare` that reads the decision record the intake wrote and reports its recommendation - the workflow never finishes blocked over it; `conflict-taken-provisionally` the same for a conflict an older rule had parked for the owner, on kernel start; `split-withdrawn` a split an older rule made of a record author was withdrawn - only a build is ever split; `split-parent-readmitted` the record author that split was made of, marked done with verdict `split` and never accepted, runs again as one operation;
 `validator-only-block {from, to}` a report that failed or was blocked only on the whole-tree validator is read as done (partial when it carries open items) and judged by the kernel's scoped verdict; an `authority` line that parked an op for spending its retries on that validator is migrated to a cooldown with its retries cleared;
@@ -1544,6 +1566,7 @@ kernel keeps no validator verdicts and no lanes still renders a complete page.
 | `anomalies` | `state.anomalies`: one signature per repeated oddity, its count and the triage option that settled it |
 | `recent` | the last 15 events, one line each: time, seq, event and the fields that matter |
 | `## Reconciliation (n)` | one line per intake of the workflow: the scope, the counts of the three cases the kernel checked in its table (`reconciled`), and every conflict still open for the owner (a `decision` item naming the intake op). Read from the log and the state alone |
+| `## Owner (n)` | the one list of what waits on the owner, printed above every other section of the page, in the final report (`owner`, `ownerReport`) and in the `workflow-status` record. One entry per live `provision.ask` (waiting in its own tab), per unanswered `state.provisional` entry, and per `needUser` line that is genuinely a person's (`validator`, `authority`, `environment`, `decision`, `credential`, `ledger`) - each carrying the `what` that waits and the `how` that settles it: the tab to reply in, or the exact command to type |
 | `## Provisional decisions (n)` | one line per decision the runtime took on its own recommendation and has not been answered on: the record, the option it took, and the `workflow-answer` command that settles it. Deliberately outside `## Needs you` - nothing is blocked on these, and a workflow that finished `done` may still owe the owner every one of them |
 | `## Integrations (n)` | one line per declared integration of the workflow's tree - its id, its provider, the node that owes the proof, and what it is actually proven by: *proven live*, *proven against a fake, not live*, or *not proven*. The tree is read through the bounded `readLedgerTree` so a status page never spawns the validator, and a workflow that names no tree leaves the section out rather than guessing |
 
