@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The installer for StarCi Skills. The runtime is a tree of files under <repo>/.claude and two
 // bootstrap files at the repo root (CLAUDE.md for Claude Code, AGENTS.md for Codex); nothing here is
-// a framework the tree depends on at run time. The CLI has no dependencies and needs Node 20+.
+// a framework the tree depends on at run time. The CLI has no dependencies and needs Node 22.13+.
 //
 //   npx starci init            install the tree into ./.claude and write the bootstraps
 //   npx starci update          bring an installed tree to this package's version
@@ -29,6 +29,7 @@ const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf
 // CLI must survive relocation: installed doctor fixtures copy this same declared payload.
 export const PAYLOAD = [...new Set(['package.json', ...pkg.files.map(ref => ref.replace(/\/$/, ''))])];
 const MANIFEST = '.starci-skills.json';
+const INSTALL_PROTOCOL = Object.freeze({ schema: 'starci/install-protocol@1', major: 6 });
 const LOCAL_IGNORES = ['.starciwork/_local/'];
 const ENTRY_MARKER = '<!-- starci:prompt-entry -->';
 const LEGACY_PROMPT_ENTRY = `${ENTRY_MARKER}
@@ -148,7 +149,7 @@ function readManifest(target) {
   return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
 }
 function writeManifest(target, kept = [], profile = 'full', bootstrapProfile = null) {
-  const manifest = { name: pkg.name, version: pkg.version, profile, bootstrapProfile, installedAt: new Date().toISOString(), files: hashTree(target) };
+  const manifest = { name: pkg.name, version: pkg.version, installProtocol: INSTALL_PROTOCOL, profile, bootstrapProfile, installedAt: new Date().toISOString(), files: hashTree(target) };
   if (kept.length) manifest.keptLocal = kept;
   writeFileSync(path.join(target, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
@@ -243,9 +244,26 @@ function checkRetiredHostReferences(repo, plan) {
   }
 }
 
+function installedProtocolMajor(manifest) {
+  if (!manifest) return null;
+  if (manifest.installProtocol !== undefined) {
+    const marker = manifest.installProtocol;
+    if (!marker || typeof marker !== 'object' || Array.isArray(marker) || marker.schema !== INSTALL_PROTOCOL.schema || !Number.isInteger(marker.major) || marker.major < 1) {
+      throw new Error('installed manifest has an invalid install protocol marker; refusing to infer compatibility');
+    }
+    return marker.major;
+  }
+  // Compatibility for installer receipts written before the explicit protocol marker. Their package major was
+  // the workflow protocol major; public v1 manifests always carry the marker above.
+  const legacy = Number(String(manifest.version ?? '').split('.')[0]);
+  if (!Number.isInteger(legacy) || legacy < 1) throw new Error('legacy installed manifest has no recognizable protocol version');
+  return legacy;
+}
 function checkMajorUpgrade(manifest, opts) {
-  if (manifest && Number(manifest.version.split('.')[0]) < Number(pkg.version.split('.')[0]) && !opts.upgradeMajor) {
-    throw new Error('major workflow upgrade requires --upgrade-major after reviewing README.json; existing .worktrees data is not migrated or deleted');
+  const installed = installedProtocolMajor(manifest);
+  if (installed > INSTALL_PROTOCOL.major) throw new Error(`installed workflow protocol ${installed} is newer than supported protocol ${INSTALL_PROTOCOL.major}`);
+  if (installed !== null && installed < INSTALL_PROTOCOL.major && !opts.upgradeMajor) {
+    throw new Error('major workflow upgrade requires --upgrade-major after reviewing README.md and the applicable upgrade note; existing .worktrees data is not migrated or deleted');
   }
 }
 
@@ -465,12 +483,12 @@ export function update(opts, log = console.log) {
 export function doctor(opts, log = console.log) {
   const target = path.join(opts.dir, '.claude');
   const installedPackage = path.join(target, 'package.json');
-  if (existsSync(installedPackage) && Number(JSON.parse(readFileSync(installedPackage, 'utf8')).version?.split('.')[0]) >= 3 && !existsSync(path.join(target, 'cli', 'main.mjs'))) {
-    throw new Error('installed v3 runtime is incomplete: missing cli/main.mjs; refusing fallback to legacy validation');
+  const manifest = readManifest(target),protocol = manifest ? installedProtocolMajor(manifest) : null;
+  if (existsSync(installedPackage) && (protocol !== null ? protocol >= 3 : Number(JSON.parse(readFileSync(installedPackage, 'utf8')).version?.split('.')[0]) >= 3) && !existsSync(path.join(target, 'cli', 'main.mjs'))) {
+    throw new Error('installed current workflow protocol is incomplete: missing cli/main.mjs; refusing fallback to legacy validation');
   }
   if (existsSync(path.join(target, 'cli', 'main.mjs'))) {
     const tests = opts.quick ? ['ops.spec.mjs', 'core.spec.mjs', 'workflow-routing.spec.mjs'] : ['ops.spec.mjs', 'core.spec.mjs', 'workflow-routing.spec.mjs', 'cli.spec.mjs', 'acceptance.spec.mjs'];
-    const manifest = readManifest(target);
     if (manifest) {
       const drift = Object.entries(manifest.files).filter(([rel, hash]) => !existsSync(path.join(target, rel)) || sha(path.join(target, rel)) !== hash);
       log(`${manifest.name}@${manifest.version}; ${drift.length} file(s) changed or missing since install`);

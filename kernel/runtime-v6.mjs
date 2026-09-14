@@ -15,7 +15,7 @@ import {kindRole} from './common.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
 
-export const ENGINE_VERSION='6.0.0-alpha.1';
+export const ENGINE_VERSION='1.0.0-alpha';
 export const isV6=state=>state?.engine?.major===6;
 export const isJobPending=error=>error?.code==='STARCI_JOB_PENDING';
 export function deferJob(result){
@@ -108,16 +108,47 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
       const effectiveRole=allocated.role??kindRole(op.kind),job={kind:'operation',role:effectiveRole,input:{op,runtime:allocated.runtime,target:allocated.target},...bound};
       const probationJob={...bound,kind:op.kind,role:effectiveRole,input:{op}};
       const pool=runtimeProfile.runtimes?.[allocated.runtime]??{};
+      const existing=journal.getJob(bound.jobId);
+      const machineResources=declareMachineResources(op),resources=[{key:'ai/global',units:1},...((op.allowlist??[]).length?[writer]:[]),...machineResources];
+      if(existing&&existing.lease_token&&['leased','running','effect_unknown'].includes(existing.status)){
+        const rows=journal.db.prepare('SELECT resource_key,units,expires_at FROM leases WHERE job_id=? AND token=? ORDER BY resource_key').all(existing.job_id,existing.lease_token),expected=existing.payload?.expectedResources??[];
+        const exact=existing.payload?.reservationProtocol==='intent-v1'&&rows.length>0&&rows.every(item=>Number.isFinite(item.expires_at)&&item.expires_at>now())&&JSON.stringify(rows.map(({resource_key,units})=>({resource_key,units})))===JSON.stringify([...expected].sort((a,b)=>a.key.localeCompare(b.key)).map(item=>({resource_key:item.key,units:item.units})));
+        if(!exact)return {ok:false,reasons:['existing durable reservation resource binding is incomplete']};
+        op.v6Lease={...bound,leaseToken:existing.lease_token,machineResources:expected.map(item=>item.key).filter(key=>key.startsWith('machine:')),probationRuntime:existing.payload.runtime,probationRole:existing.role};
+        return {ok:true,...bound,leaseToken:existing.lease_token,runtime:existing.payload.runtime,target:existing.payload.target,reattached:true};
+      }
       const decision=eligibility?.(job,{id:allocated.runtime,...pool,model:pool.target??allocated.target});
       if(!decision?.eligible)return {ok:false,reasons:decision?.reasons??['model eligibility unavailable']};
-      const existing=journal.getJob(bound.jobId);
-      if(existing&&existing.lease_token&&['leased','running'].includes(existing.status))return {ok:true,...bound,leaseToken:existing.lease_token};
-      journal.enqueueJob({...bound,kind:'operation',role:effectiveRole,payload:{runtime:allocated.runtime,target:allocated.target,kind:op.kind}});
-      const machineResources=declareMachineResources(op),resources=[{key:'ai/global',units:1},...((op.allowlist??[]).length?[writer]:[]),...machineResources];
+      journal.enqueueJob({...bound,kind:'operation',role:effectiveRole,payload:{runtime:allocated.runtime,target:allocated.target,kind:op.kind,reservationProtocol:'intent-v1',expectedResources:resources.map(item=>({key:item.key,units:item.units})).sort((a,b)=>a.key.localeCompare(b.key))}});
       const result=admission.reserve({...bound,resources,ttlMs:10*60*1000});
-      if(result.ok&&decision.mode==='probation'){const consumed=modelPolicy?.consumeProbation?.(probationJob,{id:allocated.runtime,...pool,model:pool.target??allocated.target});if(!consumed?.ok){admission.release({...bound,leaseToken:result.leaseToken});journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=?").run(JSON.stringify({reason:consumed?.code??'probation-unavailable'}),now(),bound.jobId);return {ok:false,reasons:[consumed?.code??'probation-unavailable'],...bound};}store.saveState(state);}
+      if(result.ok&&decision.mode==='probation'){const consumed=modelPolicy?.consumeProbation?.(probationJob,{id:allocated.runtime,...pool,model:pool.target??allocated.target});if(!consumed?.ok){admission.release({...bound,leaseToken:result.leaseToken});journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=?").run(JSON.stringify({reason:consumed?.code??'probation-unavailable'}),now(),bound.jobId);return {ok:false,reasons:[consumed?.code??'probation-unavailable'],...bound};}}
       if(result.ok)op.v6Lease={...bound,leaseToken:result.leaseToken,machineResources:machineResources.map(item=>item.key),probationRuntime:allocated.runtime,probationRole:effectiveRole};
       return {...result,...bound};
+    },
+    reservationPhase(op){
+      const lease=op?.v6Lease;if(!lease)return {phase:'absent'};
+      const job=journal.getJob(lease.jobId),exact=job&&job.workflow_id===lease.workflowId&&job.op_id===lease.opId&&job.attempt===lease.attempt&&job.generation===lease.generation&&job.lease_token===lease.leaseToken;
+      if(!exact||job.payload?.reservationProtocol!=='intent-v1')return {phase:'unknown',reason:'reservation is not bound to the intent-v1 protocol'};
+      if(['cancelled','failed','succeeded'].includes(job.status))return {phase:'settled',status:job.status};
+      if(job.status!=='leased')return {phase:'unknown',reason:`reservation durable status is ${job.status}`};
+      const resources=journal.db.prepare('SELECT resource_key,units,expires_at FROM leases WHERE job_id=? AND token=? ORDER BY resource_key').all(lease.jobId,lease.leaseToken),expected=job.payload.expectedResources??[];
+      const actualShape=resources.map(item=>({key:item.resource_key,units:item.units})),expectedShape=[...expected].sort((a,b)=>a.key.localeCompare(b.key));
+      if(!resources.length||JSON.stringify(actualShape)!==JSON.stringify(expectedShape)||resources.some(resource=>!Number.isFinite(resource.expires_at)||resource.expires_at<=now()))return {phase:'unknown',reason:'reservation has no complete live expected resource binding'};
+      const kinds=new Set(journal.events({workflowId:lease.workflowId}).filter(event=>event.entity_id===lease.jobId&&event.generation===lease.generation).map(event=>event.kind));
+      const binding={runtime:job.payload.runtime,target:job.payload.target,role:job.role};
+      if(kinds.has('operation-launched'))return {phase:'launched',...binding};
+      if(kinds.has('operation-launch-intent'))return {phase:'effect-intent',...binding};
+      return {phase:'reserved',...binding};
+    },
+    beginLaunchIntent(op){
+      const phase=this.reservationPhase(op);if(phase.phase!=='reserved'){const error=Error(`Operation ${op.id} reservation cannot enter launch intent: ${phase.reason??phase.phase}`);error.effectState=op?.v6Lease?'unknown':'none';throw error;}
+      const lease=op.v6Lease;journal.appendEvent({eventId:`${lease.jobId}:launch-intent`,workflowId:lease.workflowId,entityType:'job',entityId:lease.jobId,generation:lease.generation,kind:'operation-launch-intent',payload:{opId:lease.opId,attempt:lease.attempt}});
+      return {phase:'effect-intent'};
+    },
+    recordLaunchObservation(op){
+      const lease=op?.v6Lease;if(!lease||!op.launch?.task||!op.launch?.dispatch)return {ok:false};
+      journal.appendEvent({eventId:`${lease.jobId}:launch-observed:${op.launch.dispatch}`,workflowId:lease.workflowId,entityType:'job',entityId:lease.jobId,generation:lease.generation,kind:'operation-launch-observed',payload:{opId:lease.opId,attempt:lease.attempt,task:op.launch.task,dispatch:op.launch.dispatch}});
+      return {ok:true};
     },
     refundUnbegunProbation(op,proof,identity=op.v6Lease){
       if(!identity)return {ok:false,code:'probation-refund-job-identity-required'};

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import {EventEmitter} from 'node:events';
-import {execFile} from 'node:child_process';
+import {execFile,spawnSync} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
@@ -442,6 +442,42 @@ test('the rendered owner page includes the choice control while credentials are 
   assert.match(stdout,/<ul class="option-list">[\s\S]*Policy A preserves records for the complete approved audit period[\s\S]*Policy B removes records after the shorter approved period[\s\S]*<\/ul>/,'the rendered page exposes every long option outside the truncating native popup');
   assert.match(stdout,/<select[^>]*>[\s\S]*<\/select>[\s\S]*<button[^>]*>Gửi câu trả lời<\/button>/);
   assert.doesNotMatch(stdout,/type="password"/,'preparing credentials still expose no secret input');
+});
+
+test('owner controls survive unchanged polling and reset when their bound request revision changes',async t=>{
+  const chrome=[process.env.CHROME_PATH,process.platform==='win32'?'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe':null,
+    process.platform==='win32'?'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe':'/usr/bin/google-chrome','/usr/bin/chromium'].find(file=>file&&fs.existsSync(file));
+  if(!chrome)return t.skip('a Chromium browser is unavailable');
+  const token='p'.repeat(43),profile=fs.mkdtempSync(path.join(os.tmpdir(),'si-owner-poll-'));
+  const requests=[{id:'choice',opId:'ask-choice',revision:1,optionsDigest:'a'.repeat(64),kind:'business-decision',subject:'Choose',status:'waiting-owner',options:[{id:'a',label:'A'},{id:'b',label:'B'},{id:'c',label:'C'}],guidance:{}},
+    {id:'answer',opId:'ask-answer',revision:1,kind:'question',subject:'Explain',status:'waiting-owner',options:[],guidance:{}},
+    {id:'preparing',opId:'ask-preparing',revision:1,kind:'question',subject:'Preparing',status:'preparing',options:[],guidance:{}},
+    {id:'answered',opId:'ask-answered',revision:1,kind:'question',subject:'Answered',status:'answered',options:[],guidance:{}},
+    {id:'status',opId:'ask-status',revision:1,kind:'question',subject:'Status transition',status:'waiting-owner',options:[],guidance:{}}];let submissions=0;
+  const app=await startInputServer({token,sessionId:'poll',model:{snapshot:()=>({workflow:'poll',phase:'waiting',fields:[],unresolved:[],preparation:[],ownerRequests:structuredClone(requests).map(request=>({...request,updatedAt:Date.now()}))}),submit:async()=>({ok:false}),submitOwnerAction:()=>{submissions++;return {ok:false};}}});
+  const child=execFile(chrome,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,`${app.origin}/inputs/poll#${token}`]);let socket;
+  t.after(async()=>{try{socket?.close();}catch{}if(child.exitCode===null){if(process.platform==='win32')spawnSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true});else child.kill('SIGKILL');}await app.close();fs.rmSync(profile,{recursive:true,force:true});});
+  const portFile=path.join(profile,'DevToolsActivePort');for(let i=0;i<100&&!fs.existsSync(portFile);i++)await new Promise(resolve=>setTimeout(resolve,50));
+  assert.equal(fs.existsSync(portFile),true);const port=fs.readFileSync(portFile,'utf8').split(/\r?\n/)[0];
+  let page;for(let i=0;i<100&&!page;i++){const pages=await fetch(`http://127.0.0.1:${port}/json/list`).then(response=>response.json());page=pages.find(item=>item.url.includes('/inputs/poll'));if(!page)await new Promise(resolve=>setTimeout(resolve,50));}
+  assert.ok(page);socket=new WebSocket(page.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('CDP connection timed out')),5000);socket.addEventListener('open',()=>{clearTimeout(timer);resolve();},{once:true});socket.addEventListener('error',()=>{clearTimeout(timer);reject(Error('CDP connection failed'));},{once:true});});let seq=0;
+  const evaluate=expression=>new Promise((resolve,reject)=>{const id=++seq,timer=setTimeout(()=>{socket.removeEventListener('message',listener);reject(Error('CDP evaluate timed out'));},3000),listener=event=>{const message=JSON.parse(String(event.data));if(message.id!==id)return;clearTimeout(timer);socket.removeEventListener('message',listener);message.error?reject(Error(message.error.message)):resolve(message.result.result.value);};socket.addEventListener('message',listener);socket.send(JSON.stringify({id,method:'Runtime.evaluate',params:{expression,returnByValue:true}}));});
+  for(let i=0;i<100&&!(await evaluate("document.querySelectorAll('#owner form').length===5"));i++)await new Promise(resolve=>setTimeout(resolve,50));
+  assert.deepEqual(await evaluate("(()=>[...document.querySelectorAll('#owner form')].slice(2,4).map(f=>[f.querySelector('textarea').disabled,f.querySelector('button').disabled]))()"),[[true,true],[true,true]]);
+  await evaluate("(()=>{for(const f of [...document.querySelectorAll('#owner form')].slice(2,4))f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));return true})()");assert.equal(submissions,0);
+  await evaluate("(()=>{const s=document.querySelector('#owner select'),ts=document.querySelectorAll('#owner textarea'),t=ts[0];s.value='c';t.value='typed answer';ts[3].value='status draft';t.focus();t.setSelectionRange(2,6);return true})()");
+  await new Promise(resolve=>setTimeout(resolve,3000));
+  const preserved=await evaluate("(()=>{const s=document.querySelector('#owner select'),t=document.querySelector('#owner textarea');return [s.value,t.value,document.activeElement===t,t.selectionStart,t.selectionEnd]})()");
+  requests[1].guidance={why:'Fresh presentation guidance'};await new Promise(resolve=>setTimeout(resolve,3000));
+  const guidance=await evaluate("(()=>{const f=document.querySelectorAll('#owner form')[1],t=f.querySelector('textarea');return [f.textContent.includes('Fresh presentation guidance'),t.value,document.activeElement===t,t.selectionStart,t.selectionEnd]})()");
+  requests[0].options[2].label='Changed without digest';await new Promise(resolve=>setTimeout(resolve,3000));
+  const malformedChange=await evaluate("(()=>[document.querySelector('#owner select').value,document.querySelector('#owner textarea').value])()");
+  requests[0].optionsDigest='b'.repeat(64);requests[4].status='answered';await new Promise(resolve=>setTimeout(resolve,3000));
+  const bindingChanges=await evaluate("(()=>{const f=document.querySelectorAll('#owner form')[4];return [document.querySelector('#owner select').value,document.querySelector('#owner textarea').value,f.querySelector('textarea').value,f.querySelector('textarea').disabled,f.querySelector('button').disabled]})()");
+  requests[1].revision=2;await new Promise(resolve=>setTimeout(resolve,3000));
+  const reset=await evaluate("(()=>[document.querySelector('#owner select').value,document.querySelector('#owner textarea').value])()");
+  socket.send(JSON.stringify({id:++seq,method:'Browser.close'}));await new Promise(resolve=>child.once('exit',resolve));
+  assert.deepEqual(preserved,['c','typed answer',true,2,6]);assert.deepEqual(guidance,[true,'typed answer',true,2,6]);assert.deepEqual(malformedChange,['a','typed answer']);assert.deepEqual(bindingChanges,['a','typed answer','',true,true]);assert.deepEqual(reset,['a','']);
 });
 
 test('preparing credentials expose safe per-request progress while an independent owner decision stays answerable',t=>{

@@ -18,7 +18,7 @@ function pinAt(root){
   for(const file of ['.dist/kernel/kernel.mjs','bin/starci.mjs','bin/starci-skills.mjs','scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md','package.json','SKILL.md','docs/supervision-templates/op.md']){
     const target=path.join(sourceRoot,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,'synthetic pin fixture\n');
   }
-  return sealRuntime({sourceRoot,buildsRoot:path.join(root,'builds'),version:'6.0.0-alpha.1'});
+  return sealRuntime({sourceRoot,buildsRoot:path.join(root,'builds'),version:'1.0.0-alpha'});
 }
 
 test('runtime pin reuses identical bytes and rejects changed or unsealed executables',t=>{

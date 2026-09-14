@@ -7,13 +7,13 @@ purpose: |-
   `starci update` prints the note of the version it installed whenever the installed version changed, so an
   operator who only ever runs the installer is still told where to read.
 upgrades:
-  - version: 6.0.0-alpha.1
-    note: upgrades/6.0.0-alpha.1.md
+  - version: 1.0.0-alpha
+    note: upgrades/1.0.0-alpha.md
     summary: >-
-      Opt-in execution engine with SQLite admission, detached model/check jobs, strict candidate acceptance,
+      StarCi v1-alpha opt-in execution with SQLite admission, detached model/check jobs, strict candidate acceptance,
       unified Orca owner input, sealed runtime pins and optional agent-led coordination through a bounded
       manager decision function. Requires Node 22.13 or newer. Existing workflows
-      stay on their recorded execution policy until paused, dispatches settled and explicitly retried with v6.
+      stay on their recorded execution policy until paused, dispatches settled and explicitly retried into StarCi v1-alpha.
       Orca native write isolation is detection-only; native writers are serialized. This is an alpha trial,
       not a declaration that live provider integrations or a complete unattended workflow have passed.
   - version: 5.0.0-plus

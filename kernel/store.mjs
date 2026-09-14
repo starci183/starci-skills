@@ -39,6 +39,18 @@ function lastSeq(file){
 }
 function readText(file){try{return fs.readFileSync(file,'utf8');}catch{return '';}}
 const digest=value=>crypto.createHash('sha256').update(JSON.stringify(value??null)).digest('hex');
+const renameWait=new Int32Array(new SharedArrayBuffer(4));
+/** Windows readers can briefly deny replacement; retain atomic rename and bound the retry to 775 ms. */
+export function replaceStateSnapshot(tmp,file,{rename=fs.renameSync,wait=ms=>Atomics.wait(renameWait,0,0,ms),platform=process.platform}={}){
+  const delays=[25,50,100,200,400];
+  for(let attempt=0;;attempt++){
+    try{return rename(tmp,file);}
+    catch(error){
+      if(platform!=='win32'||!['EPERM','EACCES','EBUSY'].includes(error?.code)||attempt>=delays.length)throw error;
+      wait(delays[attempt]);
+    }
+  }
+}
 export const stateGoalIdentity=state=>String(state?.goalDigest??state?.approval?.goalDigest??state?.approvalDigest??state?.goal?.digest??digest({job:state?.job??null,inputs:state?.inputs??state?.goal?.inputs??null,scope:state?.scope??state?.goal?.scope??null,definitionOfDone:state?.definitionOfDone??state?.goal?.definitionOfDone??null,ledgerMode:state?.ledgerMode??state?.goal?.ledgerMode??null}));
 function assertNoRawSecrets(value,path=[]){if(!value||typeof value!=='object')return;for(const [key,item] of Object.entries(value)){const at=[...path,key];if(/^(plaintext|rawSecret|secretValue|credentialValue|passwordValue)$/i.test(key)&&item!==null&&item!==undefined&&item!=='')throw Error(`Workflow state contains raw secret field ${at.join('.')}`);assertNoRawSecrets(item,at);}}
 
@@ -60,7 +72,7 @@ export function createStore({repoRoot,id}){
     if(seq===null)seq=lastSeq(paths.events);
     seq+=1;return seq;
   };
-  const project=state=>{const tmp=`${paths.state}.${process.pid}.tmp`;fs.writeFileSync(tmp,`${JSON.stringify(state,null,2)}\n`);fs.renameSync(tmp,paths.state);return state;};
+  const project=state=>{const tmp=`${paths.state}.${process.pid}.tmp`;fs.writeFileSync(tmp,`${JSON.stringify(state,null,2)}\n`);replaceStateSnapshot(tmp,paths.state);return state;};
   const api={
     schema:WORKFLOW_STATE,id:workflowId,dir,paths,
     /** Append one audit line. The log is never rewritten, so a reader can replay a workflow from seq 0. */

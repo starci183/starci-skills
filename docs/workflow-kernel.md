@@ -1,13 +1,21 @@
-# The workflow kernel (StarCi 5-plus)
+# The StarCi workflow kernel
 
-This page describes the compatible 5-plus execution path. Enrolled `engine.major = 6` workflows follow
-[runtime v6](runtime-v6.md), including its strict acceptance, owner receipts, durable jobs and native-host
+This page preserves the historical 5-plus compatibility path and documents the current StarCi v1-alpha
+kernel. Enrolled workflows retain internal `engine.major = 6` compatibility identity and follow the
+[execution contract](runtime-v6.md), including its strict acceptance, owner receipts, durable jobs and native-host
 isolation limits. An explicitly enrolled `engine.coordination: agent-v1` workflow calls `manageWorkflow`
 through the same durable model bridge. Its snapshot exposes bounded semantic state, technical and owner
 blocker classes, and kernel-authored executable action IDs. The manager can order `dispatch:<op>` and
 `plan-verification`; the kernel rechecks the action and retains all Work derivation, owner authority,
 acceptance, budgets and state writes. Pending or invalid manager work schedules no strategic action. See
-[the deliberate upgrade boundary](../upgrades/6.0.0-alpha.1.md).
+[the deliberate upgrade boundary](../upgrades/1.0.0-alpha.md).
+
+An enrolled operation reservation is durable before native launch. A Windows sharing denial during atomic
+state projection retains the old complete snapshot and the exact reservation; only an `intent-v1` job with
+matching live lease/resources and no launch-intent event may continue mechanically on its frozen runtime,
+target and role. Launch intent is journaled immediately before the host call. From that point onward the
+effect is unknown until receipts settle it. Failed-launch recovery also requires a task/Dispatch observation
+bound to the same job attempt and generation; absence of a worker id is never proof of no effect.
 
 The `kernel/` folder is the whole control plane of a job. One process per workflow: no Plan Coordinator, no
 per-module Monitor, no provider chain. A **job** is any piece of work ("implement backend feature A",
@@ -757,6 +765,13 @@ A created page is only opening until its title/load state is observed. A runtime
 helper and reuses the page with a fresh capability. After workflow completion or loss of its kernel owner,
 the helper allows a two-minute completion/restart grace, then stops serving. The page retains its completion
 message; the runtime does not close owner-created tabs. An unavailable browser is reported as such.
+
+Polling preserves an owner's unsent draft and focus only while the request identity, revision,
+`optionsDigest` and actionable status are unchanged. A revised conflict can represent the reconciled A', B'
+or C' after another accepted answer, so the page invalidates the old draft when any of those bindings changes
+instead of submitting a choice against a different question. `preparing` and `answered` requests are
+read-only. Rendering or polling never submits an owner action; only the authenticated explicit submit path
+does that.
 
 An explicitly invalid or expired credential is a replacement request, not another presence check. Only
 `integration.verify` may submit `--credential-request-file <JSON>` on a blocked/environment report. The

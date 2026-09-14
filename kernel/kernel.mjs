@@ -5,6 +5,7 @@ import {applyOwnerInbox} from './owner-inbox.mjs';
 import {verifyAcceptedIntegrationOwnerRequests} from './owner-requests.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
 import {createWorkflowModelEligibility} from './model-policy.mjs';
+import {openJournal} from './journal.mjs';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
@@ -392,8 +393,11 @@ export function reconcileLegacyCoordinatorLease(state,op,{orca,store,verifyPin=v
   return {ok:true,jobId:lease.jobId,coordinator};
 }
 /** Re-read an exact failed launch and release its lease only when Orca proves the worker and resource are stopped. */
-export function reconcileFailedLaunchLease(state,op,{orca,store,settle=settleGenerationLeases}={}){
+function durableLaunchObservation(state,op){let journal;try{journal=openJournal({file:state.engine.journalFile});return journal.events({workflowId:state.id}).find(event=>event.entity_id===op.v6Lease.jobId&&event.generation===op.v6Lease.generation&&event.kind==='operation-launch-observed'&&event.payload?.task===op.launch.task&&event.payload?.dispatch===op.launch.dispatch)??null;}finally{journal?.close();}}
+export function reconcileFailedLaunchLease(state,op,{orca,store,settle=settleGenerationLeases,observeLaunch=durableLaunchObservation}={}){
   const taskId=op?.launch?.task;if(!op?.v6Lease||!taskId||op.dispatch||op.terminal)return {ok:false,reason:'failed launch identity is incomplete or already active'};
+  const launchReceipt=observeLaunch(state,op);
+  if(!launchReceipt)return {ok:false,reason:'failed launch is not bound to this durable lease attempt and generation'};
   let shown;try{shown=orca.invoke('dispatch-show',{task:taskId},{cwd:state.worktree});}catch(error){return {ok:false,reason:`dispatch lookup unavailable: ${error.message}`};}
   const dispatch=shown?.outcome==='ok'?getPath(shown.receipt,'result.dispatch'):null;
   if(!dispatch?.id||dispatch.task_id!==taskId||dispatch.run_id!==state.run)return {ok:false,reason:'dispatch is missing or does not match the recorded Run and Task'};
@@ -454,12 +458,13 @@ function launchOp(orca,store,state,op,allocated,ctx){
         (typeof state.engine?.runtimePin?.digest==='string'&&state.engine.runtimePin.digest.trim()?state.engine.runtimePin.digest:
           (typeof state.engine?.runtimePinDigest==='string'&&state.engine.runtimePinDigest.trim()?state.engine.runtimePinDigest:'runtime-unpinned')),
       dependencyInstall:op.dependencyInstall??null});}
+    if(ctx.v6)ctx.v6.beginLaunchIntent(op);
     workerEffectStarted=true;
     launched=ctx.launch(orca,{cwd:state.worktree,run:state.run,workflowTask:state.workflowTask??state.id,from:state.from,
       worktree:relative,operation:launchOperator(op.kind),kind:op.kind,scope:op.id,spec:operationSpec(op,contract),candidate:allocated.candidate,runtime:allocated.runtime,wait:ctx.wait});
   }catch(error){
     const typedNoEffect=['ORCA_COORDINATOR_MISMATCH','ORCA_TASK_CREATE_FAILED'].includes(error?.code)&&error?.effectState==='none';
-    const effectState=typedNoEffect?'none':workerEffectStarted?'unknown':'none';
+    const effectState=error?.effectState==='unknown'?'unknown':typedNoEffect?'none':workerEffectStarted?'unknown':'none';
     launched={ok:false,effectState,stopReason:String(error?.message??error).slice(0,300),attempts:[{target:allocated.target,stage:'launch',effectState,reason:String(error?.message??error).slice(0,240)}]};
   }
   const persistedAttempts=(launched?.attempts??[]).slice(0,8).map(attempt=>({target:attempt.target??null,agent:attempt.agent??null,model:attempt.model??null,dispatchId:attempt.dispatchId??null,effectState:attempt.effectState??'unknown',stage:attempt.stage??null,reason:String(attempt.reason??'').slice(0,300),
@@ -468,6 +473,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
   op.launch={ok:Boolean(launched?.ok),target:launched?.selection?.target??allocated.target,
     task:launched?.task?.id??null,dispatch:launched?.dispatchId??null,stopReason:launched?.stopReason??null,
     effectState:launched?.effectState??(launched?.ok?'partial':'unknown'),attempts:persistedAttempts};
+  if(ctx.v6)ctx.v6.recordLaunchObservation(op);
   // Orca refuses every launch from a coordinator tab whose pane is gone ("no stable pane identity"): that is the
   // kernel's tab to replace, not the runtime's failure to count - a new tab is opened, the Run re-bound, the op
   // stays ready for the next tick. Once per attempt, so a tab Orca keeps refusing does not loop for ever.
@@ -777,6 +783,10 @@ export function activatePendingOps(store,state){
   }
 }
 
+export function persistPrelaunchReservation(store,state,op,v6){
+  try{store.saveState(state);return {ok:true};}
+  catch(error){need(v6.reservationPhase(op).phase==='reserved',`Prelaunch reservation ${op.id} lost its safe durable phase after state persistence failed`);throw error;}
+}
 function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
   activatePendingOps(store,state);
   const launched=[];
@@ -848,7 +858,9 @@ function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
       catch(error){op.status='blocked';op.refusal='runtime-gate-binding';const detail=`${op.id} cannot prepare its required canonical Work gate: ${String(error?.message??error)}`;op.v6Pending={kind:'runtime-gate-binding',detail};store.appendEvent({event:'v6-work-gate-refused',op:op.id,reason:detail});continue;}
     }
     const allocationJob={...op,opId:op.id,role:kindRole(op.kind),independentReview:ctx.v6?{required:true,freshContext:true}:op.independentReview,checks:op.checks};
-    const allocated=ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,launchOperator(op.kind)),difficulty:op.difficulty??null,job:allocationJob});
+    const reservation=ctx.v6?.reservationPhase?.(op);
+    const allocated=reservation?.phase==='reserved'?{ok:true,runtime:reservation.runtime,target:reservation.target,role:reservation.role,continuedReservation:true}:
+      ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,launchOperator(op.kind)),difficulty:op.difficulty??null,job:allocationJob});
     if(!allocated?.ok){
       // Every runtime that could carry the op is on its own avoid list: the list has served its purpose (one restart
       // per runtime) and now only starves the op. It is cleared and the op gets one more round on any runtime;
@@ -886,6 +898,7 @@ function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
         continue;
       }
     }
+    if(ctx.v6)persistPrelaunchReservation(store,state,op,ctx.v6);
     const result=launchOp(orca,store,state,op,{...allocated,candidate},ctx);
     if(ctx.v6){
       if(result.ok)ctx.v6.launched(op);
@@ -1438,6 +1451,8 @@ export function sweepResolvedReviewLines(store,state){
 export function coordinateManagedWorkflow(store,state,ctx){
   if(state.engine?.coordination!=='agent-v1')return null;
   activatePendingOps(store,state);
+  const continuations=state.ops.filter(op=>op.status==='ready'&&!op.fill&&!op.ownerRequest&&ctx.v6?.reservationPhase?.(op).phase==='reserved');
+  if(continuations.length)return {pending:false,continuation:true,dispatch:continuations.map(op=>op.id)};
   const ready=state.ops.filter(op=>op.status==='ready'&&!op.fill&&!op.ownerRequest&&!op.v6Lease);
   const actions=ready.map(op=>({id:`${op.needsReplan?'replan':'dispatch'}:${op.id}`,type:op.needsReplan?'replan':'dispatch',opId:op.id,
     preconditions:[`status:${op.id}:ready`,'no-live-lease','approved-operation-boundaries'],summary:`${op.needsReplan?'Replan':'Dispatch'} ${op.id} (${op.kind})`,contextRefIds:[]}));

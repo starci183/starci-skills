@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {WORKFLOW_STATE,createStore,listWorkflows,newWorkflowId,repositoryRoot,workflowsRoot} from '../kernel/store.mjs';
+import {WORKFLOW_STATE,createStore,listWorkflows,newWorkflowId,replaceStateSnapshot,repositoryRoot,workflowsRoot} from '../kernel/store.mjs';
 
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-workflow-store-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(dir,{recursive:true});return dir;};
 const state=extra=>({schema:WORKFLOW_STATE,phase:'plan',...extra});
@@ -86,6 +86,37 @@ test('reading reports skips the wait state, non-JSON names and unreadable files'
     fs.writeFileSync(path.join(store.paths.reports,'notes.md'),'not a report');
     assert.deepEqual(store.readReports().map(report=>report.dispatch),['ctx_a','ctx_b']);
   }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+});
+
+test('transient Windows replacement denial preserves the old complete snapshot until atomic promotion',t=>{
+  const repo=tmp();t.after(()=>fs.rmSync(repo,{recursive:true,force:true}));
+  const file=path.join(repo,'state.json'),pending=path.join(repo,'state.pending');
+  const old=JSON.stringify(state({phase:'plan'})),next=JSON.stringify(state({phase:'run'}));
+  fs.writeFileSync(file,old);fs.writeFileSync(pending,next);let calls=0;const waits=[];
+  replaceStateSnapshot(pending,file,{platform:'win32',wait:ms=>waits.push(ms),rename:(from,to)=>{
+    assert.equal(fs.readFileSync(file,'utf8'),old,'a waiting reader always sees the complete old state');
+    if(calls++<2)throw Object.assign(Error('reader sharing violation'),{code:'EPERM'});
+    return fs.renameSync(from,to);
+  }});
+  assert.equal(calls,3);assert.equal(waits.length,2);assert.equal(fs.readFileSync(file,'utf8'),next);assert.equal(fs.existsSync(pending),false);
+});
+
+test('persistent Windows replacement failure is bounded and preserves both complete snapshots',t=>{
+  const repo=tmp();t.after(()=>fs.rmSync(repo,{recursive:true,force:true}));
+  const file=path.join(repo,'state.json'),pending=path.join(repo,'state.pending');
+  fs.writeFileSync(file,'old');fs.writeFileSync(pending,'new');let calls=0,waited=0;
+  const failure=Object.assign(Error('persistent sharing violation'),{code:'EACCES'});
+  assert.throws(()=>replaceStateSnapshot(pending,file,{platform:'win32',wait:ms=>{waited+=ms;},rename:()=>{calls++;throw failure;}}),error=>error===failure);
+  assert.ok(calls>1&&calls<=6);assert.ok(waited>0&&waited<1000);
+  assert.equal(fs.readFileSync(file,'utf8'),'old');assert.equal(fs.readFileSync(pending,'utf8'),'new');
+});
+
+test('snapshot replacement does not retry unrelated errors or non-Windows failures',()=>{
+  for(const [platform,code] of [['win32','ENOENT'],['linux','EPERM']]){
+    let calls=0;const failure=Object.assign(Error('non-transient replacement failure'),{code});
+    assert.throws(()=>replaceStateSnapshot('pending','state',{platform,wait:()=>assert.fail('unexpected retry'),rename:()=>{calls++;throw failure;}}),error=>error===failure);
+    assert.equal(calls,1);
+  }
 });
 
 test('listWorkflows returns every workflow of the repository newest first with its state',()=>{

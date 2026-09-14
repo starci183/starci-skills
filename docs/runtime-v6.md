@@ -1,7 +1,8 @@
-# Runtime 6.0 execution contract
+# StarCi execution contract
 
-Status: opt-in alpha. This contract governs workflows enrolled with `engine.major = 6`; existing 5-plus
-workflows retain their recorded policy until the explicit retry boundary in the upgrade note.
+Status: StarCi v1-alpha, open source under MIT and not yet released. This contract governs agent-led workflows. The internal
+`engine.major = 6` compatibility marker remains part of durable state; existing workflows retain their
+recorded policy until the explicit retry boundary in the upgrade note.
 
 ## Participants and authority
 

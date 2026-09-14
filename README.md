@@ -2,7 +2,7 @@
 
 **One complete delivery plan. Small, bounded workflows. Evidence before completion.**
 
-StarCi is a local skill runtime and CLI for AI-assisted project delivery: business requirements, architecture, interface design, backend/frontend implementation, review and UAT. It keeps the full outcome in view while each workflow performs only its approved segment.
+StarCi is a local supervised delivery system and CLI for AI-assisted project delivery: business requirements, architecture, interface design, backend/frontend implementation, review and UAT. It keeps the full outcome in view while each workflow performs only its approved segment.
 
 Turn a feature request into a traceable route from business decisions to architecture, implementation and verified user flows—without treating a short coding session as a finished product.
 
@@ -12,11 +12,11 @@ StarCi provides:
 - **Bounded workflows:** each segment has a concrete goal, permitted changes, expected output and verification criteria.
 - **Persistent project knowledge:** requirements, specifications and evidence live beside the backend source and are shared with the frontend.
 - **Evidence-backed status:** missing artifacts, changed inputs and unmet dependencies prevent stale work from being reported as done.
-- **One local runtime:** host `AGENTS.md` and `CLAUDE.md` point agents to the same `SKILL.md`, workflow contracts and knowledge library.
+- **One local StarCi installation:** host `AGENTS.md` and `CLAUDE.md` point agents to the same `SKILL.md`, workflow contracts and knowledge library.
 
-StarCi is not a hosted agent service or an autonomous project runner. Your coding agent executes the work; the CLI supplies installation, inspection and validation. It does not call an LLM or need its own API key.
+StarCi is a local supervised delivery system. Its deterministic kernel owns workflow state, authority, evidence and effects; bounded model functions choose only kernel-offered actions, and operation agents execute one approved contract at a time. Provider access comes from configured local agent hosts rather than a StarCi API key.
 
-**Status:** `5.0.0-plus` · **Requirements:** Node.js 20+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release of this build. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
+**StarCi v1-alpha:** open source under MIT, not yet released · **Requirements:** Node.js 22.13+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
 
 [Quick start](#quick-start) · [First project](#first-project) · [Execution modes](#execution-modes) · [CLI](#cli) · [Documentation](#documentation)
 
@@ -46,19 +46,19 @@ Start with an empty test host. The installer writes **source** into `.claude`, b
 
 ### Install an archive with npx
 
-If you have a reviewed `starci-5.0.0-plus.tgz`, run from the directory containing it:
+If you have a reviewed StarCi archive, run from the directory containing it:
 
 ```sh
-npx --yes --package=./starci-5.0.0-plus.tgz starci init --dir /absolute/path/to/host
-npx --yes --package=./starci-5.0.0-plus.tgz starci doctor --dir /absolute/path/to/host --quick
+npx --yes --package=./starci-reviewed.tgz starci init --dir /absolute/path/to/host
+npx --yes --package=./starci-reviewed.tgz starci doctor --dir /absolute/path/to/host --quick
 ```
 
 No global installation is required. `npx` executes package code: inspect the archive and choose the target deliberately. Maintainers can create an archive with `npm pack`; see [release verification](docs/releasing.md).
 
-After this exact version is published, the equivalent registry command will be:
+After StarCi is published, the equivalent registry command will be:
 
 ```sh
-npx starci@5.0.0-plus init --dir /absolute/path/to/host
+npx starci init --dir /absolute/path/to/host
 ```
 
 That registry command is a future release instruction, **not the current quick start**. See [installation](docs/installation.md) for update, doctor and project binding.
@@ -145,9 +145,9 @@ Auto identifies the initial ASAP chain and later checkpoint. It is not limited t
 
 User-facing language and execution preferences live in the installed `.claude/config.json`; defaults are Vietnamese (`vi`), inherited model and `medium` effort. Runtime contracts, knowledge and all canonical SRS/SDS content remain English. The configured locale affects conversation and presentation only. Installation does not change the current agent's model or enable auto.
 
-## 5-plus: the workflow kernel
+## Workflow kernel
 
-Beside the Plan route above, this release ships the **workflow kernel**: one ordinary process that owns a whole job — it freezes the approved goal, allocates a runtime per ready operation, launches operation agents, re-runs their checks itself, commits, runs the gates and writes the final report. A language model fills forms inside it and never runs the loop. It runs on the Orca IDE or on a plain Claude Code / Codex chat.
+Beside the Plan route above, StarCi includes the **workflow kernel**: one ordinary process that owns a whole job — it freezes the approved goal, allocates an eligible provider per ready operation, launches operation agents, re-runs their checks itself, commits, runs the gates and writes the final report. A bounded manager model orders only executable actions supplied by the kernel and never runs the loop. StarCi runs on the Orca IDE or on a plain Claude Code / Codex chat.
 
 The runtime is laid out by concept, one folder per concern:
 

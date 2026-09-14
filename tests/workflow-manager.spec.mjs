@@ -13,6 +13,12 @@ test('enrolled model configuration is read from the sealed pin instead of mutabl
   assert.equal(workflowModelConfigRoot({host:'host'}),'host');
 });
 
+test('a persisted prelaunch reservation continues mechanically without spending another manager decision',()=>{
+  const current=state(),reserved=current.ops[0];reserved.v6Lease={jobId:'job-a'};let called=0;
+  const result=coordinateManagedWorkflow({saveState(){},appendEvent(){}},current,{v6:{reservationPhase:op=>op===reserved?{phase:'reserved',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'}:{phase:'absent'}},manageWorkflow(){called+=1;throw Error('manager must not rerank a persisted reservation');}});
+  assert.deepEqual(result.dispatch,['a']);assert.equal(result.continuation,true);assert.equal(called,0);
+});
+
 test('manager snapshot identity is stable while semantics do not change and stale or invented actions fail',()=>{
   const current=state(),actions=[{id:'dispatch:a',type:'dispatch',opId:'a',preconditions:['status:a:ready'],summary:'dispatch a',contextRefIds:[]}];
   const first=buildManagerSnapshot({state:current,actions});current.engine.manager={version:first.version,basisDigest:first.basisDigest};

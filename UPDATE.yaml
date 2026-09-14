@@ -1,9 +1,9 @@
 schema: starci/document@1
 sections:
-  - title: 6.0 opt-in execution
+  - title: StarCi alpha execution
     blocks:
-      - The 6.0 alpha is an explicit workflow engine enrollment, not a silent upgrade of existing Work.
-        Read docs/runtime-v6.md and upgrades/6.0.0-alpha.1.md. Build and test privately before sealing a
+      - StarCi v1-alpha requires explicit workflow engine enrollment, not a silent upgrade of existing Work.
+        Read docs/runtime-v6.md and upgrades/1.0.0-alpha.md. Build and test privately before sealing a
         runtime pin; incomplete builds must not replace a live .dist. Follow the existing approval scope
         for push and retry. A version edit alone does not authorize publication.
       - Runtime helpers that execute in detached children must be listed in scripts/runtime-modules.txt.

@@ -111,7 +111,9 @@ test('major upgrade requires opt-in before writing and never converts existing w
   init({ dir: root, bootstrap: true }, quiet);
   const manifestPath = path.join(root, '.claude/.starci-skills.json');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  assert.deepEqual(manifest.installProtocol,{schema:'starci/install-protocol@1',major:6},'public semver is independent from the durable workflow protocol');
   manifest.version = '2.5.0';
+  delete manifest.installProtocol; // exact markerless receipt shape written by the historical installer
   fs.writeFileSync(manifestPath, JSON.stringify(manifest));
   const before = fs.readFileSync(manifestPath, 'utf8');
   const bootstrap = read(root, 'AGENTS.md');
@@ -276,11 +278,18 @@ test('retained domain knowledge links resolve without the retired orchestration 
   }
 });
 
-test('doctor cannot downgrade an incomplete v3 installation into legacy success', t => {
+test('doctor cannot downgrade an incomplete current-protocol installation into legacy success', t => {
   const root = host(t);
   init({ dir: root, bootstrap: false }, quiet);
   fs.unlinkSync(path.join(root, '.claude/cli/main.mjs'));
   assert.throws(() => doctor({ dir: root, quick: true }, quiet), /refusing fallback to legacy validation/);
+});
+
+test('doctor fails closed on an invalid durable install protocol marker', t => {
+  const root = host(t);init({ dir: root, bootstrap: false }, quiet);
+  const file=path.join(root,'.claude/.starci-skills.json'),manifest=JSON.parse(fs.readFileSync(file,'utf8'));
+  manifest.installProtocol={schema:'starci/install-protocol@1',major:'6'};fs.writeFileSync(file,JSON.stringify(manifest));
+  assert.throws(()=>doctor({dir:root,quick:true},quiet),/invalid install protocol marker/);
 });
 
 test('doctor rejects an all-skipped runner even when its process exits successfully', t => {
