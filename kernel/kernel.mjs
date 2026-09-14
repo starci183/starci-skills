@@ -2231,6 +2231,13 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     op.status='blocked';op.refusal='superseded';op.dispatch=null;op.terminal=null;
     store.appendEvent({event:'split-withdrawn',op:op.id,kind:op.kind,reason:'a record author is never split'});
   }
+  // The record author the split was made of was marked done with verdict `split` and never accepted: it runs
+  // again as itself, so its records reach the tree through the ordinary acceptance and commit.
+  for(const op of state.ops.filter(item=>authorsRecord(item.kind)&&item.status==='done'&&item.verdict==='split')){
+    op.status='ready';op.verdict=null;op.attempt=(op.attempt??1)+1;op.dispatch=null;op.terminal=null;op.nudged=false;op.repairs=0;
+    op.findings=unique([...(op.findings??[]),'an older rule split this operation by allowlist entry and never accepted its records; run again as one operation over the whole allowlist']);
+    store.appendEvent({event:'split-parent-readmitted',op:op.id,kind:op.kind});
+  }
   // A conflict an older rule parked for the owner is taken provisionally now: the decision record the intake wrote
   // is read by one detached decision.prepare, and the line leaves the owner's list.
   for(const item of state.needUser.filter(entry=>entry.kind==='decision'&&entry.record&&entry.op&&byId(state,entry.op)?.intake)){
