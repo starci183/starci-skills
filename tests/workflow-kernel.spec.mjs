@@ -44,9 +44,17 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
   const taken=new Map();let counter=0;const sends=[];
   const opOf=spec=>(String(spec??'').match(/op `([^`]+)`/)??[null,'unknown'])[1];
   const newHandle=()=>`term_${++counter}`;
+  /**
+   * What one tab shows, for the kernel's own `terminal-read`. A test that cares about the screen sets it with
+   * `setScreen`; the default is a tab the contract reached and that is sitting at its prompt - what
+   * `stalled-idle` was always supposed to mean - so the nudge-and-settle tests judge the same path they did.
+   */
+  const screens=new Map();
+  const IDLE_TAB=['=== TASK ===','Task id: task_fake','● I have read the contract and started.','','❯'];
   const screenOf=handle=>{
+    if(screens.has(handle))return screens.get(handle);
     const terminal=terminals.get(handle);
-    if(!terminal)return [];
+    if(!terminal)return IDLE_TAB;
     return terminal.sent
       ?['∵ Thinking… 1s','⠼ working (12s · esc to cancel)','qwen3.8-flash (Token Plan Singapore)']
       :['>_ Qwen Code (v0.23.3)','>   Type your message or @path/to/file','qwen3.8-flash (Token Plan Singapore)'];
@@ -137,7 +145,8 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
     if(!handler)throw Error(`Unexpected fake Orca call: ${args.join(' ')}`);
     return handler(args);
   };
-  return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),terminals,dispatches,live,sends};
+  const setScreen=(handle,lines)=>{screens.set(handle,[...lines]);return handle;};
+  return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),terminals,dispatches,live,sends,screens,setScreen,IDLE_TAB};
 }
 
 /** Pools instead of a chain: least-index-free runtime per role, honouring `avoid`. */
@@ -3225,6 +3234,125 @@ test('an op past its deadline is settled as an overrun and relaunched elsewhere,
     assert.equal(op.status,'ready');
     assert.equal(op.restarts,1);
     assert.ok(op.avoidRuntimes.includes('gpt-6-astra'),'the runtime that never came back is avoided for the cooldown');
+  }finally{harness.cleanup();}
+});
+
+/**
+ * The five readings of a tab the probe called `stalled-idle`. `telegram-bot-author` was called idle
+ * thirty-nine seconds after its launch, nudged, settled, relaunched, settled and cooled, and the kernel never
+ * looked at the screen that said which of these five things was happening.
+ */
+const stalledTab=(harness,{dispatch,lines,kind=null})=>{
+  const op=running(harness.state,'op-intake',dispatch);
+  if(kind)op.kind=kind;
+  harness.fake.setScreen(op.terminal,lines);
+  return op;
+};
+
+test('a tab the contract never reached is relaunched, and the operation is not charged a restart for it',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>0,work:null};
+    const op=stalledTab(harness,{dispatch:'ctx_blank',
+      lines:['>_ OpenAI Codex (v0.20.0)','   model: gpt-5.6-sol','▌ Ask Codex anything']});
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_blank',liveness:'stalled-idle'}]});
+    const read=events(harness.store).find(event=>event.event==='tab-read');
+    assert.deepEqual([read.op,read.verdict],['op-intake','prompt-missing']);
+    assert.equal(op.status,'ready','the launch is tried again');
+    assert.equal(op.restarts,0,'the agent did nothing: the prompt never reached its tab');
+    assert.equal(op.infraRestarts,1);
+    assert.deepEqual(op.avoidRuntimes,[],'the same runtime may take it again');
+    assert.deepEqual(events(harness.store).map(event=>event.event).filter(name=>['nudged','settled'].includes(name)),[]);
+  }finally{harness.cleanup();}
+});
+
+test('a tab whose last words are a question is routed as the ask report the operation never wrote',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>0,work:null};
+    const op=stalledTab(harness,{dispatch:'ctx_q',
+      lines:['=== TASK ===','● I found two ways to wire the webhook.','● Should I proceed with option 2?','','❯']});
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_q',liveness:'stalled-idle'}]});
+    const read=events(harness.store).find(event=>event.event==='tab-read');
+    assert.deepEqual([read.verdict,read.text],['asked','Should I proceed with option 2?']);
+    const opened=events(harness.store).find(event=>event.event==='owner-ask-opened');
+    assert.equal(opened.op,'op-intake');
+    const ask=harness.state.ops.find(item=>item.id===opened.ask);
+    assert.equal(ask.question.text,'Should I proceed with option 2?');
+    assert.equal(op.restarts,0,'a question is not a stall and is never restarted away');
+    // The report file the operation would have written is on disk, marked as the tab's reading.
+    const written=fs.readdirSync(harness.store.paths.reports).find(name=>name.startsWith('ctx_q.json'));
+    assert.match(written,/^ctx_q\.json\.asked-/);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(harness.store.paths.reports,written),'utf8')).via,'tab-read');
+  }finally{harness.cleanup();}
+});
+
+test('a tab that finished its turn without a report is judged as a failed report carrying its last words',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>0,work:null};
+    const op=stalledTab(harness,{dispatch:'ctx_fin',
+      lines:['=== TASK ===','● I updated the intake module and the unit tests pass.',
+        '  node L.mjs report --run run_wf --outcome done','  Error: Cannot find module \'L.mjs\'','','❯']});
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_fin',liveness:'stalled-idle'}]});
+    const read=events(harness.store).find(event=>event.event==='tab-read');
+    assert.equal(read.verdict,'finished-unreported');
+    assert.equal(op.status,'ready');
+    assert.equal(op.attempt,2,'the ordinary retry, not a blind restart');
+    assert.equal(op.restarts,0);
+    assert.match(op.findings.join('\n'),/Cannot find module/,'the last words are the next attempt\'s finding');
+  }finally{harness.cleanup();}
+});
+
+test('a tab still drawing a turn is not nudged and not settled: the wait is simply extended',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>0,work:null};
+    const op=stalledTab(harness,{dispatch:'ctx_busy',
+      lines:['⠧ Report task outcome','  Read 1 file, listed 3 directories, ran 9 shell commands','','❯']});
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_busy',liveness:'stalled-idle'}]});
+    assert.equal(events(harness.store).find(event=>event.event==='tab-read').verdict,'working');
+    assert.equal(op.status,'running');
+    assert.equal(op.nudged,false);
+    assert.equal(op.restarts,0);
+    assert.deepEqual(events(harness.store).map(event=>event.event).filter(name=>['nudged','settled'].includes(name)),[]);
+  }finally{harness.cleanup();}
+});
+
+test('an operation that authors a record is owed three minutes before any stall verdict; an ordinary one is not',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    let clock=0;
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>clock,work:null};
+    const op=stalledTab(harness,{dispatch:'ctx_author',kind:'work.author',
+      lines:['=== TASK ===','Task id: task_1','● Opening the contract.','','❯']});
+    op.launchedAt=0;
+    clock=39*1000;
+    const idle=()=>settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_author',liveness:'stalled-idle'}]});
+    idle();
+    const grace=events(harness.store).find(event=>event.event==='stall-grace');
+    assert.deepEqual([grace.op,grace.kind,grace.graceMs],['op-intake','work.author',3*60*1000]);
+    assert.equal(op.nudged,false,'thirty-nine seconds into a long contract is not evidence of anything');
+    assert.deepEqual(events(harness.store).map(event=>event.event).filter(name=>['nudged','settled','tab-read'].includes(name)),[]);
+    clock=4*60*1000;
+    idle();
+    assert.equal(op.nudged,true,'past the grace the tab is read and an idle one is nudged as before');
+    // A build with an ordinary contract has no grace at all: the same thirty-nine seconds settle it as before.
+    const plain=stalledTab(harness,{dispatch:'ctx_plain',kind:'backend.implement',lines:harness.fake.IDLE_TAB});
+    plain.launchedAt=clock;plain.nudged=true;
+    clock+=39*1000;
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_plain',liveness:'stalled-idle'}]});
+    assert.equal(events(harness.store).filter(event=>event.event==='settled').length,1);
   }finally{harness.cleanup();}
 });
 
