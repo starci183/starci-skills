@@ -179,6 +179,18 @@ export function undeclaredWrites(kind,files=[],{profile=null,records=null,nodeKi
   return found;
 }
 
+/**
+ * Whether a kind produces anything that lives in the Work tree: every record it declares except `code`, which is
+ * the product source. A scope composed from OTHER operations' allowlists gives a kind that produces none of them
+ * no Work-tree path at all: one tree is shared by a project's repositories, so a drawing operation's entries
+ * would hand a code builder the records another lane is writing right now. A kind that does author records - a
+ * redraw, a decision - keeps them, because they are the very thing it is sent back to change. An unknown kind
+ * declares nothing and is treated as a builder.
+ */
+export function writesWorkRecords(kind,{profile=null}={}){
+  try{return writesOf(kind,{profile}).some(record=>record!=='code');}catch{return false;}
+}
+
 /* ------------------------------------------------------------------ the contract */
 
 /**

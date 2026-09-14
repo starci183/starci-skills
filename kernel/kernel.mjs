@@ -20,12 +20,12 @@ import {AUTHOR_KIND,PLAN_KIND,AUTHORS_RECORD,authorsRecord,BRAND_DECIDE,BRAND_KI
   KERNEL_CHECK,LAUNCH_LIMIT,LAUNCH_OPERATOR,LAUNCH_WAIT_MS,LEDGER_MODES,POLL_MS,RATE_LIMIT_WINDOW_MS,RECORD_OWNED,
   RESTART_LIMIT,RESUME_LIMIT,RETRY_LIMIT,SHARED_OPS_PER_ITERATION,SILENCE_LIMIT,STALL_MS,VALIDATOR_REJECT_LIMIT,
   VALIDATOR_UNAVAILABLE_LIMIT,VERIFY_ROUNDS,WORKFLOW_KERNEL,WORK_LEDGER,WORK_OPERATION,DECISION_OPERATION,
-  addOp,allowlistsOverlap,byId,clockOf,covers,csv,currentBranch,describeNode,detectLedgerMode,dynamicBudget,firstLine,
+  addOp,allowlistsOverlap,buildScope,byId,clockOf,covers,csv,currentBranch,describeNode,detectLedgerMode,dynamicBudget,firstLine,
   countsAgainstBudget,grammarReferences,hostDescriptorOf,hostMissing,inScopePath,inside,jobRulings,kernelGuards,kindRole,
   launchOperator,ledgerBinding,ledgerItem,liveStatus,locateSharedTreePaths,need,nextId,normalize,parseGate,parseQuota,
   parseRef,pathsIn,plain,readJson,reportAllowlist,required,routeKind,routeOf,routed,rulingsText,slash,sleepSync,runCommand,
   tail,toOp,unique,validateCommandAt,workModule,workOpId,workValidateCommand,writeJson} from './common.mjs';
-import {ioBlock,kindsReadingBrand,undeclaredWrites} from './io.mjs';
+import {ioBlock,kindsReadingBrand,undeclaredWrites,writesWorkRecords} from './io.mjs';
 import {readDistJson} from '../core/runtime-root.mjs';
 import {recordDigests,reconcileIntake} from './reconciliation.mjs';
 import {renderChecksFor} from '../checks/render.mjs';
@@ -34,7 +34,7 @@ import {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTermin
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
 import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,openConflictDecision,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
   openOwnerAsk,provisionalLines,settleOwnerAsk,stopReasonFor} from './owner.mjs';
-import {BRAND_PAYLOAD,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
+import {BRAND_PAYLOAD,attributedFiles,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
   rereadBrand,sharedCheckCommand,treeForVerdict,treeVerdictFor,validateAccepted,validatorRejectLimit} from './verify.mjs';
 import {KERNEL_PLANNED_KINDS,LANE_LAYOUTS,advanceLanes,authorRecordOp,commitLedgerWrite,cutParentOf,deriveWorkOp,designGate,
@@ -69,7 +69,7 @@ import {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntime
 
 export {WORKFLOW_KERNEL,FINAL_REPORT,GOAL_RECORD,LEDGER_MODES,WORK_LEDGER,WORK_OPERATION,DECISION_OPERATION,
   BRAND_KIND,BRAND_DECIDE,LAUNCH_OPERATOR,launchOperator,kindRole,AUTHOR_KIND,PLAN_KIND,AUTHORS_RECORD,authorsRecord,RECORD_OWNED,STALL_MS,
-  DYNAMIC_OPS_BUDGET,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,allowlistsOverlap,kernelGuards,
+  DYNAMIC_OPS_BUDGET,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,allowlistsOverlap,buildScope,kernelGuards,
   currentBranch,detectLedgerMode,ledgerBinding,dynamicBudget,hostDescriptorOf,hostMissing,parseQuota,
   reportAllowlist,workOpId,workModule,grammarReferences};
 export {laneRowTitle,LANE_NAME,laneNameOf,laneOwnerOf,openLane,laneView} from './lanes.mjs';
@@ -78,7 +78,7 @@ export {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,recoverCoordinatorTab,reconcileWit
 export {ASK_KINDS,DECISION_PREPARE,PROVISION_ASK,isAsk,PROVISION_KINDS,QUESTION_KINDS,STOP_KINDS,answerCommand,answerOwnerQuestion,credentialNeed,
   decisionAllowlistFor,dedupeNeedUser,inheritProvisional,irreversibleEffect,openOwnerAsk,ownerProvisionNeed,
   provisionalLines,redactSecrets,stopReasonFor} from './owner.mjs';
-export {BRAND_PAYLOAD,brandFields,brandPayload,brandSummary,changedFiles,machineVerify,opDiff,readValidatorMemory,
+export {BRAND_PAYLOAD,attributedFiles,brandFields,brandPayload,brandSummary,changedFiles,machineVerify,opDiff,readValidatorMemory,
   renderValidatorMemory,sharedCheckCommand,treeForVerdict,treeVerdictFor,validatorRejectLimit} from './verify.mjs';
 export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,designRecord,deriveWorkOp,syncLedgerOps,
   kernelOwnedPaths,protectedFingerprint} from './sync.mjs';
@@ -86,7 +86,7 @@ export {CUT_ASSERTIONS,CUT_COMPONENTS,CUT_FILES,FAN_OUT,childOwning,cutGroup,cut
   groupIncomplete,groupVerifyKind,repairTarget,sdsComponents,settleCut} from './sync.mjs';
 export {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,goalPhase,
   laneHeaderLines,planGoalPhase,proposeQuota,recordStatements,validateWorkTree,workGoalPhase} from './goal.mjs';
-export {ioBlock,ioPayload,kindsReadingBrand,intakeKindFor,decisionKindFor,recordKindOfPath,undeclaredWrites} from './io.mjs';
+export {ioBlock,ioPayload,kindsReadingBrand,intakeKindFor,decisionKindFor,recordKindOfPath,undeclaredWrites,writesWorkRecords} from './io.mjs';
 /**
  * The design grammar and the brand record are read by exactly these kinds. The list is no longer written here:
  * `kindsReadingBrand()` derives it from the kinds profile, and this constant is the snapshot the docs and the
@@ -1233,11 +1233,16 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       return retryOp(store,state,op,verified.failed.map(check=>`the kernel re-ran ${check.name} (\`${check.command}\`) and it exited ${check.exitCode}: ${check.evidence}`),ctx,'machine-verify-failed');
     }
     const files=changedFiles(state,op,ctx,op.allowlist,{exclude:op.kernelOwned??[]});
-    // Every changed file is mapped to a record kind, and a file whose kind this op does not declare in `writes`
-    // is a defect the machine can name on its own: no model is asked, and the report goes back with the finding.
+    // Every changed file this op is answerable for is mapped to a record kind, and a file whose kind this op does
+    // not declare in `writes` is a defect the machine can name on its own: no model is asked, and the report goes
+    // back with the finding. Answerable means claimed: a project's repositories share one Work tree, so a record
+    // a frontend lane is writing right now is dirty in the backend's worktree, and an allowlist that happens to
+    // cover it is not evidence that this op wrote it. `attributedFiles` keeps the files the op itself reported,
+    // over every attempt it made, so its own uncommitted work from an earlier attempt still counts.
     // `ctx.kindsProfile` is the profile to read it against: null is the compiled one, and a caller that runs the
     // kernel against an authored or a fixture profile hands that one in instead of rebuilding `.dist` for it.
-    const undeclared=(()=>{try{return undeclaredWrites(op.kind,files,{profile:ctx.kindsProfile??null,nodeKind:ctx.work?.node?.(op.nodeId)?.kind??null});}catch{return [];}})();
+    const produced=attributedFiles(op,files,ctx);
+    const undeclared=(()=>{try{return undeclaredWrites(op.kind,produced,{profile:ctx.kindsProfile??null,nodeKind:ctx.work?.node?.(op.nodeId)?.kind??null});}catch{return [];}})();
     if(undeclared.length){
       op.reports.at(-1).downgradedTo='failed';
       store.appendEvent({event:'io-undeclared-write',op:op.id,files:undeclared.map(item=>item.file)});
@@ -1393,7 +1398,11 @@ function escalateVerify(store,state,ctx,{key,ledgerIds,findings,op}){
     const used=unique(implementers.map(item=>item.runtime).filter(Boolean));
     const route=routeOf({verdict:'fail',kind:review?.kind??'review.verify'})??{kind:'lane-build',origin:'repair',then:'retry'};
     const kind=routeKind(route,state,review??{kind:'review.verify',ledgerIds})??'backend.implement';
-    const allowlist=unique(implementers.flatMap(item=>item.allowlist??[]));
+    // The repair's scope is composed from other operations' allowlists, so the Work tree is dropped from it
+    // unless the repair's own kind authors records: a drawing op in the group would otherwise hand a code builder
+    // the records another lane is writing in the one shared tree, which is how a repair gets blamed for them.
+    const composed=unique(implementers.flatMap(item=>item.allowlist??[]));
+    const allowlist=writesWorkRecords(kind,{profile:ctx?.kindsProfile??null})?composed:buildScope(composed);
     const repair=allowlist.length?addOp(store,state,{kind,
       goal:cited.length
         ?`Resolve the review findings of ${key} against the decided records they cite (${cited.join(', ')}). The ordinary review rounds are spent: read those records first and change the code to match them, or report \`blocked\` with \`sds-gap\` naming the record that cannot be met.`
@@ -1655,7 +1664,7 @@ export function runGates(store,state,ctx){
   // gate's own evidence names the files: a typecheck that fails in two files is a two-file repair, and a repair
   // holding the whole job's allowlist held every other operation behind it for a morning. What it turns out to
   // need beyond those files it asks for as a shared change, like any build.
-  const whole=unique(state.ops.flatMap(op=>op.allowlist)).filter(entry=>!/(^|\/)\.starciwork(\/|$)/.test(slash(entry)));
+  const whole=buildScope(state.ops.flatMap(op=>op.allowlist));
   const named=unique(failed.flatMap(result=>pathsIn(result.evidence))).filter(file=>inside(file,whole));
   const scope=named.length?named:whole;
   if(named.length)store.appendEvent({event:'gate-scope-narrowed',gates:failed.map(result=>result.name),files:named});

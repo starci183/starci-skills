@@ -103,6 +103,15 @@ export const allowRoot=entry=>normalize(entry).replace(/\/?\*+$/,'').replace(/\/
 export const covers=(a,b)=>{const x=allowRoot(a),y=allowRoot(b);return x===y||y.startsWith(`${x}/`)||x.startsWith(`${y}/`);};
 export const allowlistsOverlap=(a=[],b=[])=>a.some(one=>b.some(other=>covers(one,other)));
 export const inside=(file,allowlist=[])=>allowlist.some(entry=>{const root=allowRoot(entry);return file===root||file.startsWith(`${root}/`);});
+/** A path inside a Work tree, in either spelling: the tree-relative `.starciwork/...` or the owner's absolute one. */
+export const isWorkTreePath=entry=>/(^|\/)\.starciwork(\/|$)/.test(slash(entry));
+/**
+ * A build or a repair scope composed from OTHER operations' allowlists: the code they touched, never the Work
+ * tree. One tree is shared by a project's repositories, so a `.starciwork` entry inherited from a design op puts
+ * another workflow's in-flight records inside a builder's write scope - a gate repair once committed a kernel
+ * block into a frontend record that way, and was later blamed for a record a frontend lane was still writing.
+ */
+export const buildScope=entries=>unique(entries??[]).filter(entry=>!isWorkTreePath(entry));
 /** Paths named inside free text (a blocker detail, a review finding): only tokens that carry a directory separator. */
 export const pathsIn=text=>unique(String(text??'').match(/[A-Za-z0-9_@.][A-Za-z0-9_@./-]*\/[A-Za-z0-9_@./-]+/g)??[]).map(normalize);
 /**
