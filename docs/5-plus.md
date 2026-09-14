@@ -509,6 +509,11 @@ the tab and never a ruling: the kernel accepts an ask by what the report says, s
 a design decision reports `decision: <id>` and its stop is lifted, a `decision.prepare` that found a credential
 reports the presence and its requester resumes on it, and both write `ask-reclassified {ask, from, to}`.
 
+The one environment variable the custody itself needs is `SOPS_AGE_KEY_FILE`: the kernel and the CLI name the
+host's `~/.starci/master.identity` themselves when nothing names a key file (`sopsEnv`), and every contract
+that runs `sops exec-env` tells the op to do the same - a presence check that could not open the custody once
+reported a credential the owner had just filled as absent.
+
 ### Custody: a credential is never an environment variable
 
 An environment variable is nobody's: it belongs to whichever terminal exported it, it is gone on the next
