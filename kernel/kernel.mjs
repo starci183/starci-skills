@@ -1275,7 +1275,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     }
     // The validator judges what the machine could not: a reject is a contradiction of the report, the op comes
     // back with the findings; a second reject of the same op stops it at the user instead of a third launch.
-    const validation=validateAccepted(store,state,op,ctx,{files,verified});
+    const validation=validateAccepted(store,state,op,ctx,{files,verified,produced});
     if(validation.verdict==='reject'){
       op.reports.at(-1).downgradedTo='failed';
       op.validatorRejects=(op.validatorRejects??0)+1;
@@ -2248,6 +2248,21 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
       op.findings=unique([...(op.findings??[]),`the runtime was rebuilt since you reported the environment blocker "${firstLine(String(op.reports.at(-1).blocker.detail??''))}": try again against the current build, and report blocked again only if it still holds`]);
       store.appendEvent({event:'environment-retried',op:op.id,build:stamp});
     }
+  }
+  // A validator block whose findings name only files the op never claimed is not the op's block: those files
+  // are a neighbour's work under the same allowlist (the first ask's draft beside the second's), and the
+  // validator judges claimed files only now. The op runs again, told to leave them alone. Once: the line goes.
+  for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&state.needUser.some(line=>line.op===item.id&&line.kind==='validator'))){
+    const changed=changedFiles(state,op,ctx,op.allowlist,{exclude:op.kernelOwned??[]});
+    const own=attributedFiles(op,changed,ctx);
+    if(!own.length)continue;
+    const named=unique((op.findings??[]).flatMap(finding=>pathsIn(String(finding)))).map(entry=>slash(entry).replace(/\/$/,''));
+    const claimed=entry=>own.some(file=>file===entry||file.startsWith(`${entry}/`));
+    if(!named.length||named.some(claimed))continue;
+    state.needUser=state.needUser.filter(line=>!(line.op===op.id&&line.kind==='validator'));
+    op.status='ready';op.attempt=(op.attempt??1)+1;op.dispatch=null;op.terminal=null;op.nudged=false;op.validatorRejects=0;
+    op.findings=[`the validator's earlier findings named only files you never reported as yours (${named.join(', ')}): they are another operation's work beside yours and are not judged against you any more. Leave them exactly as they are and report only the files you write.`];
+    store.appendEvent({event:'validator-readmitted',op:op.id,files:named});
   }
   // Split children an older rule made of a record author are withdrawn: half an intake is not an operation.
   for(const op of state.ops.filter(item=>item.origin==='repair'&&authorsRecord(item.kind)&&!item.nodeId&&/ - only \`/.test(String(item.goal??''))&&['pending','ready','blocked'].includes(item.status)&&item.refusal!=='superseded')){

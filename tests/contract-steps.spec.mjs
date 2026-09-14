@@ -661,6 +661,8 @@ test('decision.prepare prepares a decision in the policy-decision shape, prints 
   // The question is printed in this terminal with both doors, and nothing waits.
   assert.match(rendered,/the owner may answer here with the number, or later with workflow-answer/);
   assert.match(rendered,/Do not wait: a decision is taken provisionally on your recommendation/);
+  assert.match(rendered,/After the report, stay in this terminal: the kernel keeps this tab open for the owner until they answer/);
+  assert.match(rendered,/workflow-answer --host <skill root> --id <workflow> --op <this op> --choice <n>/);
   assert.match(rendered,/that is a provision\.ask and the kernel opens one when it is needed/);
   // The recommendation is what the kernel takes provisionally, so it has to be reported as a number.
   assert.match(rendered,/`decision: <record id>`, then a line `recommended: <n>`/);

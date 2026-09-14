@@ -309,15 +309,22 @@ export function treeForVerdict(ctx,files){
   if(!ctx?.work||!(files??[]).some(file=>/(^|\/)brand\/index\.yaml$/.test(slash(String(file)))))return ctx?.work?.loaded??null;
   try{const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});ctx.work.loaded=loaded;return loaded;}catch{return ctx.work.loaded??null;}
 }
-export function validateAccepted(store,state,op,ctx,{files,verified}){
+export function validateAccepted(store,state,op,ctx,{files,verified,produced=null}){
   if(ctx.validateOp===null||ctx.validateOp===undefined){
     if(!state.validatorSkipped){state.validatorSkipped=true;store.appendEvent({event:'validator-skipped',reason:'no validator function was given to this kernel'});}
     return {verdict:'skipped'};
   }
+  // The validator judges what the operation claimed and git confirms (`produced`, see `attributedFiles`): two
+  // decision drafts share one `policy-decisions/**` allowlist, and the second ask was rejected twice for the first
+  // ask's record that was dirty beside its own. An operation that claimed nothing is judged on everything it could
+  // have changed, as before - a report that hides its files buys it nothing.
+  const judged=(produced??[]).length?produced:files;
+  const left=files.filter(file=>!judged.includes(file));
+  if(left.length)store.appendEvent({event:'validator-scope-attributed',op:op.id,judged,left:left.slice(0,12)});
   // A review or a no-op slice changed nothing: there is no diff to judge, and a call on nothing could only misjudge.
-  if(!files.length){store.appendEvent({event:'validator-skipped',op:op.id,reason:'the operation changed nothing inside its allowlist, so there is no diff to judge'});return {verdict:'skipped'};}
+  if(!judged.length){store.appendEvent({event:'validator-skipped',op:op.id,reason:'the operation changed nothing inside its allowlist, so there is no diff to judge'});return {verdict:'skipped'};}
   const providers=ctx.validator??llm.DEFAULT_VALIDATOR_RUNTIMES;
-  const diff=opDiff(state,op,files,ctx);
+  const diff=opDiff(state,op,judged,ctx);
   let result;
   // The kernel's own check (`work-valid`) is proven by the kernel, not by the agent: it goes to the validator with the
   // re-run checks, so an acceptance statement naming it is never rejected as unproven (repair-5 was, four times).

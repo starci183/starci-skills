@@ -1004,6 +1004,39 @@ test('a record author an older rule split is run again as one operation, and its
  * A gate repair holds only the files the gate's evidence names when it names any inside the job's allowlists -
  * so the rest of the job keeps running beside it - and the whole job's allowlist only when the evidence names none.
  */
+/**
+ * Two operations share one allowlist folder: the validator judges the files each one reported, never the
+ * neighbour's dirty file beside them; and an op the validator blocked over files it never claimed is re-admitted.
+ */
+test('the validator judges only the files the op claimed, and a block over unclaimed files is lifted at start',()=>{
+  const own='apps/agentos-controlplane/src/intake/index.ts',foreign='apps/agentos-controlplane/src/intake/other.ts';
+  const plan={definitionOfDone:['the slice works'],ledger:[{id:'goal-1',title:'Intake',inputRef:'sds:3',status:'absent'}],
+    ops:[{id:'op-intake',kind:'backend.implement',goal:'Implement intake.',ledgerIds:['goal-1'],allowlist:[own,foreign],references:['sds.md'],
+      checks:[{name:'integration',command:'npx vitest run intake'}],acceptance:['intake works'],dependsOn:[]}]};
+  const seen=[];
+  const harness=setup({plan,dirty:[own,foreign],scripts:{'op-intake':[{outcome:'done',summary:'Intake done.',files:[own],checks:[passing('integration','npx vitest run intake')]}],
+    'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('integration','npx vitest run intake')]}]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const state=harness.run({guards:stubGuards(),maxIterations:6,validateOp:payload=>{seen.push(payload);return acceptAll();}});
+    const judged=seen.find(item=>item.op.id==='op-intake');
+    assert.deepEqual(judged.diff.files,[own],'the neighbour\'s dirty file under the same allowlist is not in the diff the validator judges');
+    const scoped=events(harness.store).find(event=>event.event==='validator-scope-attributed'&&event.op==='op-intake');
+    assert.deepEqual([scoped.judged,scoped.left],[[own],[foreign]]);
+    // An op an older build blocked over the neighbour's file is re-admitted at the next start, told to leave it alone.
+    const op=state.ops.find(item=>item.id==='op-intake');
+    op.status='blocked';op.validatorRejects=2;op.findings=[`validator: ${foreign} - this second file is outside the operation goal`];
+    state.needUser.push({op:op.id,kind:'validator',detail:'op-intake was rejected by the validator 2 times'});
+    harness.git.add(own);harness.git.add(foreign);
+    const again=harness.run({guards:stubGuards(),maxIterations:1,validateOp:acceptAll});
+    const readmitted=again.ops.find(item=>item.id==='op-intake');
+    assert.ok(events(harness.store).some(event=>event.event==='validator-readmitted'&&event.op==='op-intake'&&event.files.includes(foreign)));
+    assert.ok(!again.needUser.some(line=>line.op==='op-intake'&&line.kind==='validator'),'the validator line is gone');
+    assert.equal(readmitted.validatorRejects,0);
+  }finally{harness.cleanup();}
+});
+
 test('a gate repair is scoped to the files the failing gate names, and to the whole job only when it names none',()=>{
   const file=name=>`apps/agentos-controlplane/src/${name}/index.ts`;
   const plan={definitionOfDone:['both slices work'],ledger:[{id:'goal-1',title:'Sales slice',inputRef:'sds:3',status:'absent'}],
@@ -1412,6 +1445,10 @@ test('an accepted op closes its terminal, and the reconcile sweep closes stale k
     const blocked={...harness.state.ops[0],id:'shared-9',kind:'e2e.verify',status:'blocked',terminal:'term_blocked_op',dispatch:null,requesters:['x']};harness.state.ops.push(blocked);
     // Its rename never landed: the tab carries the agent's default title and is matched by the handle the op holds.
     harness.fake.terminals.set('term_blocked_op',{handle:'term_blocked_op',title:'Qwen - agentos',status:'running',sent:true,worktreePath:cwd});
+    // A prepared decision the owner has not answered: its tab is where they see the question, so it stays.
+    const asked={...harness.state.ops[0],id:'ask-7',kind:'decision.prepare',status:'done',terminal:'term_ask_open',dispatch:null,requesters:['x'],nodeId:null,
+      reports:[{outcome:'done',summary:'decision: demo.sales.business.srs.decision.d-demo\nrecommended: 1\n1. keep\n2. drop',files:[],checks:[]}]};harness.state.ops.push(asked);
+    harness.fake.terminals.set('term_ask_open',{handle:'term_ask_open',title:'[Op] decision.prepare - ask-7',status:'running',sent:true,worktreePath:cwd});
     // A sibling workflow of this store root that finished, and its kernel tab left behind.
     const siblingDir=path.join(path.dirname(harness.store.dir),'sibling-done');fs.mkdirSync(siblingDir,{recursive:true});
     fs.writeFileSync(path.join(siblingDir,'state.json'),JSON.stringify({id:'sibling-done',finished:{outcome:'done'}}));
@@ -1432,6 +1469,12 @@ test('an accepted op closes its terminal, and the reconcile sweep closes stale k
     assert.ok(harness.fake.terminals.has('term_other'),'another workflow\'s kernel tab is never touched');
     assert.ok(harness.fake.terminals.has('term_foreign_op'),'another workflow\'s op tab is never touched');
     assert.equal(harness.fake.terminals.has('term_stale_kernel'),false);
+    assert.ok(harness.fake.terminals.has('term_ask_open'),'the tab of an unanswered prepared decision stays open for the owner');
+    assert.ok(log.some(event=>event.event==='ask-tab-kept'&&event.op==='ask-7'));
+    // Answered, the question has no reader: the next sweep closes the tab.
+    state.ops.find(item=>item.id==='ask-7').answer={choice:'1',note:null,at:1,via:'command'};
+    harness.run({maxIterations:1});
+    assert.equal(harness.fake.terminals.has('term_ask_open'),false,'an answered decision\'s tab is swept');
   }finally{harness.cleanup();}
 });
 
