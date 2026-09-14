@@ -3283,7 +3283,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       retry.push(op.id);
       store.saveState(state);
     }
-    const engine=enrollV6(store,state,{runtimePin:pin});state.launcher=checked.launcher;
+    const engine=enrollV6(store,state,{runtimePin:pin,journalFile:options['journal-file']??state.engine?.journalFile});state.launcher=checked.launcher;
     store.appendEvent({event:'workflow-retried',engine:6,generation:engine.generation,ops:retry,context:'fresh agents from canonical approved inputs and Work'});
     store.saveState(state);
     fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});

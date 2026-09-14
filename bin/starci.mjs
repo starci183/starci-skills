@@ -25,6 +25,7 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
   workflow-answer      give the owner's answer to a question or a reconciliation conflict
   workflow-run         run the approved workflow: allocate, launch, verify, commit, gate, report
   workflow-retry       --id <id> --engine 6 --runtime-pin <file>: retry a paused workflow with fresh agents
+                       --journal-file <path>: use a local journal visible to the execution host
   workflow-status      print what one workflow is doing now, from its own files
   workflow-list        one line per workflow of this repository
   workflow-stop        pause a running workflow at its next tick
