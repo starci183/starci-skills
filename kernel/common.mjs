@@ -265,6 +265,8 @@ export function toOp(raw,index){
     acceptance:[...(raw.acceptance??[])],dependsOn:[...(raw.dependsOn??[])],timeoutMs:raw.timeoutMs??null,
     resources:[...(raw.resources??[])],requesters:[...(raw.requesters??[])],
     status:'pending',origin:raw.origin??'plan',attempt:1,resumes:0,repairs:0,restarts:0,launchFailures:0,
+    // Relaunches the kernel owes the operation nothing for: a prompt that never reached the agent's tab.
+    infraRestarts:0,contractBytes:0,tabReadAt:null,tabRead:null,
     priorOpen:[...(raw.priorOpen??[])],findings:[...(raw.findings??[])],avoidRuntimes:[...(raw.avoidRuntimes??[])],
     runtime:null,target:null,task:null,dispatch:null,terminal:null,contractFile:null,nudged:false,
     kernelOwned:[],kernelOwnedAt:null,waitingFor:null,refusal:null,createdIteration:0,question:plain(raw.question)?{...raw.question}:null,
