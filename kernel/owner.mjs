@@ -124,7 +124,12 @@ export function redactSecrets(text){
   // A slug of hyphenated lowercase words - a record id segment such as `d-sales-shared-public-route-contract` - is a
   // name, not a key: masking it once turned a provisional decision's record into "[redacted]", which the owner could
   // then never overturn. A key has digits and mixed case, or no word breaks at all.
-  return String(text??'').replace(/\b[A-Za-z0-9_\-]{24,}\b/g,token=>/^[a-z]+(?:-[a-z0-9]+)+$/.test(token)&&(token.match(/\d/g)??[]).length<4?token:'[redacted]');
+  // A variable NAME is never a value either: `RECOVERY_CUSTODY_SECRET_KEY` is what the code reads, and masking it
+  // once turned "credential: <VAR> present in identity:<slug>" into "credential: [redacted] present ...", which the
+  // kernel could not read as the credential's presence - so the requester stayed paused on a provision already
+  // made. An environment variable name is upper case, digits and underscores, starting with a letter.
+  return String(text??'').replace(/\b[A-Za-z0-9_\-]{24,}\b/g,token=>
+    (/^[a-z]+(?:-[a-z0-9]+)+$/.test(token)&&(token.match(/\d/g)??[]).length<4)||/^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(token)?token:'[redacted]');
 }
 
 /** The feature folder of an op, in the TREE's own spelling - never the id segment, which is not a path. */
@@ -275,7 +280,7 @@ export function settleOwnerAsk(store,state,ask,report){
   }
   // A provision the owner made: only its presence is reported, never its value. The credential form names the
   // variable and the custody it lives in and nothing else, so a value cannot travel even by accident.
-  const credential=(String(marker(summary,'credential')??'').match(/^([A-Za-z][A-Za-z0-9_]*)\s+present(?:\s+in\s+(\S+))?/)??null);
+  const credential=(String(marker(summary,'credential')??'').match(/^([A-Za-z][A-Za-z0-9_]*)\s+present(?:\s+in\s+([^\s.,;]+))?/)??null);
   const provided=credential?null:marker(summary,'provided');
   if(credential||provided){
     const what=credential?`${credential[1]}${credential[2]?` in ${credential[2]}`:''}`:String(provided).slice(0,120).trim();

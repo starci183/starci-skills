@@ -220,6 +220,9 @@ test('the secret redactor masks a key and leaves a record id slug alone',()=>{
   const key=['sk','live',['4eC39HqLyjWDarjtT1zdp7dc','9QzQ'].join('')].join('_');
   assert.equal(redactSecrets(`token ${key} present`),'token [redacted] present');
   assert.equal(redactSecrets('AKIAIOSFODNN7EXAMPLE1234ABCD'),'[redacted]');
+  // A variable NAME is what the code reads, never a value: it survives, so "credential: <VAR> present" stays readable.
+  assert.equal(redactSecrets('credential: RECOVERY_CUSTODY_SECRET_KEY present in identity:shared-lifecycle-recovery.'),'credential: RECOVERY_CUSTODY_SECRET_KEY present in identity:shared-lifecycle-recovery.');
+  assert.equal(redactSecrets('ZALO_OA_ACCESS_TOKEN_AND_SECRET_PAIR'),'ZALO_OA_ACCESS_TOKEN_AND_SECRET_PAIR');
   assert.equal(redactSecrets('a1b2c3d4e5f6a7b8c9d0e1f2a3b4'),'[redacted]');
 });
 
@@ -583,9 +586,10 @@ test('the owner answers in the op\'s own terminal, and a credential reports only
     credentialAsk.question.stop='credential';
     const state2=stubState(store2,[waiting,credentialAsk]);
     state2.provisional=[];
-    settleOwnerAsk(store2,state2,credentialAsk,{summary:'credential: PAY_API_KEY present in identity:payments'});
+    // The variable name is long enough to look like a key and the sentence ends in a full stop: both are read past.
+    settleOwnerAsk(store2,state2,credentialAsk,{summary:'credential: RECOVERY_CUSTODY_SECRET_KEY present in identity:payments. Named the provision exactly before asking.'});
     const present=store2.events.find(item=>item.event==='credential-present');
-    assert.equal(present.provided,'PAY_API_KEY in identity:payments');
+    assert.equal(present.provided,'RECOVERY_CUSTODY_SECRET_KEY in identity:payments');
     assert.equal(waiting.status,'ready');
     assert.match(waiting.answer,/confirmed only that it is present and never read its value/);
     // Nothing anywhere carries a value, and a value that slipped into a summary never reaches a file or an event.
