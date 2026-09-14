@@ -151,6 +151,24 @@ export function changedFiles(state,op,{git},allowlist=op.allowlist,{exclude=[]}=
     .filter(file=>inside(file,allowlist)&&!inside(file,exclude));
 }
 
+/**
+ * The changed files this operation itself claimed, across every attempt it made: `report.files` of each of its
+ * reports, intersected with what git actually shows. One Work tree is shared by a project's repositories, so a
+ * record a frontend lane is writing right now is dirty in the backend's worktree beside the backend's own work;
+ * whether it falls inside some allowlist says nothing about who wrote it. What an operation produced is what it
+ * said it produced and git confirms. Its own uncommitted work from an earlier attempt still counts: that attempt
+ * reported those files, and every report the operation ever sent is read here, not only the last one.
+ *
+ * `changedFiles` is unchanged and remains the git-computed truth - what is committed, what the validator judges
+ * and what the proof plan reads. This narrows attribution only: who a changed file is charged to.
+ */
+export function attributedFiles(op,files=[],ctx=null){
+  const owner=ctx?.work?.ledger?.repoRoot?`${normalize(ctx.work.ledger.repoRoot)}/`:null;
+  const spellings=file=>{const value=normalize(file);return owner&&value.startsWith(owner)?[value,value.slice(owner.length)]:[value];};
+  const claimed=new Set((op?.reports??[]).flatMap(report=>Array.isArray(report?.files)?report.files:[]).flatMap(spellings));
+  return files.filter(file=>spellings(file).some(spelling=>claimed.has(spelling)));
+}
+
 /** The checks the kernel itself re-ran, carrying the assertion each one proves (the check name is that id). */
 export const provenChecks=checks=>checks.map(check=>({name:check.name,command:check.command,exitCode:check.exitCode,assertion:check.name}));
 

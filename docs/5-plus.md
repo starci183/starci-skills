@@ -177,10 +177,12 @@ What the kernel does with the declaration (`kernel/io.mjs`):
 
 - The contract prints `## Reads` and `## Produces` under the goal (`ioBlock`), so an operation knows which
   records it may cite and which it may write before it reads its allowlist.
-- After a `done`, every changed file is mapped to a record kind; a file whose kind the op does not declare in
-  `writes` is the finding `produced a <kind> record it does not declare`, the report is downgraded to
-  `failed` and the op is retried (`io-undeclared-write`). This runs before the validator and asks no model.
-  A path that is not a record at all - the kernel's own state, `_local`, `_resources` - is never a finding.
+- After a `done`, every changed file the op itself reported is mapped to a record kind; a file whose kind the
+  op does not declare in `writes` is the finding `produced a <kind> record it does not declare`, the report is
+  downgraded to `failed` and the op is retried (`io-undeclared-write`). This runs before the validator and asks
+  no model. A path that is not a record at all - the kernel's own state, `_local`, `_resources` - is never a
+  finding, and neither is a record the op never claimed: one Work tree is shared by a project's repositories,
+  so a file another workflow left dirty beside this one is not its product.
 - The validator is given `io:{reads,writes}` with the one rule that makes it binding: a record cited outside
   `reads` or written outside `writes` is a defect, whatever else the diff gets right.
 - `kindsReadingBrand`, `intakeKindFor` and `decisionKindFor` answer from the two profiles what the kernel

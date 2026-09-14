@@ -18,7 +18,7 @@ import {resolveLedgerRoot} from '../kernel/routing.mjs';
 import * as work from '../kernel/ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
 import {machineVerify} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,changedFiles,createWorkflowState,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -2751,6 +2751,69 @@ test('changedFiles never carries a kernel-owned path, even when the allowlist is
   assert.equal(changedFiles(state,op,{git}).length,3);
   assert.deepEqual(changedFiles(state,op,{git},op.allowlist,{exclude:[`${ledger}/index.yaml`,`${ledger}/evidence/**`]}),
     ['.starciwork/features/sales/notes.md']);
+});
+
+/**
+ * One project has one Work tree, owned by the backend repository and written by the frontend repository too, so
+ * a record a frontend lane is writing right now is dirty in the backend's worktree beside the backend's own work.
+ * A backend build whose allowlist covers that record - here through the old rule that gave a repair the union of
+ * every operation's allowlist - is not its author, and the kernel must not blame it: what an operation produced
+ * is what it said it produced and the worktree confirms. The same file, once the operation does claim it, is the
+ * finding it always was.
+ */
+test('a record another workflow left dirty in the shared tree is not attributed to a backend build, but a record that build claims still is',()=>{
+  const foreign='.starciwork/features/sales/ui/index.yaml';
+  const unioned=[intakeFile,'.starciwork/features/sales/**'];
+  const plan={definitionOfDone:['order intake persists an order'],
+    ledger:[{id:'goal-1',title:'Order intake',inputRef:'sds:SDS-FR-SALES-03',status:'absent'}],
+    ops:[{id:'op-intake',kind:'backend.implement',goal:'Implement order intake.',ledgerIds:['goal-1'],
+      allowlist:unioned,references:['.starciwork/features/sales/sds.md#3'],
+      checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:['intake persists an order'],dependsOn:[]}]};
+  const unclaimed=setup({plan,dirty:[intakeFile,foreign],
+    scripts:{'op-intake':[doneReport(intakeFile,'sales')],'verify-1':[reviewPassed]}});
+  try{
+    approve(unclaimed.store,unclaimed.state);
+    unclaimed.state.run='run_wf';unclaimed.state.from='term_kernel';
+    const state=unclaimed.run();
+    const op=state.ops.find(item=>item.id==='op-intake');
+    assert.equal(op.status,'done');
+    assert.equal(events(unclaimed.store).some(event=>event.event==='io-undeclared-write'),false,
+      'the drawing record the frontend lane was writing is not this build\'s product');
+    assert.equal(op.reports.at(-1).downgradedTo,undefined);
+    assert.equal(op.attempt,1,'the build was never sent back for a record it did not write');
+  }finally{unclaimed.cleanup();}
+
+  const claimed=setup({plan,dirty:[intakeFile,foreign],
+    scripts:{'op-intake':[{outcome:'done',summary:'Intake implemented and the screen record updated.',
+      files:[intakeFile,foreign],checks:[passing('unit','npx vitest run sales')]}]}});
+  try{
+    approve(claimed.store,claimed.state);
+    claimed.state.run='run_wf';claimed.state.from='term_kernel';
+    const state=claimed.run();
+    const op=state.ops.find(item=>item.id==='op-intake');
+    const undeclared=events(claimed.store).find(event=>event.event==='io-undeclared-write');
+    assert.deepEqual(undeclared?.files,[foreign]);
+    assert.equal(op.reports[0].downgradedTo,'failed');
+    assert.match(op.findings[0],/produced a design record it does not declare: \.starciwork\/features\/sales\/ui\/index\.yaml/);
+  }finally{claimed.cleanup();}
+});
+
+/**
+ * The same rule one step earlier: a scope composed from OTHER operations' allowlists is code, never the Work
+ * tree, so a code builder is not handed the records another lane is writing in the first place. `runGates`
+ * already held this by hand; `buildScope` is the one rule, and the review escalation now applies it too - except
+ * where the new op's own kind declares it writes a record (`writesWorkRecords`), because a redraw or a decision
+ * is sent back to change exactly those records.
+ */
+test('a scope composed from other operations allowlists carries no Work tree path, and a record-writing kind keeps its records',()=>{
+  assert.deepEqual(buildScope(['apps/web/src/cart/**','.starciwork/features/sales/ui/**','apps/web/src/cart/**']),
+    ['apps/web/src/cart/**']);
+  assert.deepEqual(buildScope(['C:/owner/backend/.starciwork/features/sales/ui/index.yaml','src/sales/intake.ts',
+    'C:\\owner\\backend\\.starciwork\\features\\sales']),['src/sales/intake.ts']);
+  // Which kinds the filter applies to is the catalog's answer, not a list the kernel remembers.
+  assert.deepEqual(['backend.implement','frontend.implement','review.verify','task.execute'].map(kind=>writesWorkRecords(kind)),
+    [false,false,false,false]);
+  assert.deepEqual(['interface.draw','architecture.decide','work.author'].map(kind=>writesWorkRecords(kind)),[true,true,true]);
 });
 
 /* ------------------------------------------------------------------ shared-change discipline */

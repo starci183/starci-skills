@@ -335,7 +335,16 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       else {const seen=new Set();for(const asset of n.meta.assets){
         const value=asset?.path,parts=typeof value==='string'?value.split('/'):[];
         if(!text(value)||!value.startsWith('assets/')||value.includes('\\')||value.includes(':')||parts.some(p=>!p||p==='.'||p==='..')||seen.has(value)){issue('NODE_ASSET_PATH',n.path,'Node assets must be unique normalized paths under own assets/.');continue;}seen.add(value);
-        try{let file=n.dir;for(const part of parts){file=path.join(file,part);if(fs.lstatSync(file).isSymbolicLink())throw Error('symlink');}if(!within(n.dir,fs.realpathSync(file))||!fs.statSync(file).isFile())throw Error('escape');ownedAssets.push({path:value,sha256:digest(fs.readFileSync(file))});}catch{issue('NODE_ASSET_UNREADABLE',n.path,'Node asset missing, non-file or unsafe.');}
+        // A `todo` node declares the assets its own next step will produce, so an absent one is pending work and
+        // never a red tree: one frontend drawing's six unrendered images invalidated a whole shared Work tree,
+        // and every backend proof in it, for a morning. Only a node that is not `todo` - a done leaf, or a branch
+        // that derives - must hold every asset it declares. The pending asset is left out of `ownedAssets`, so the
+        // digest changes when it lands, which is exactly when what rests on it must be proved again. Absent is the
+        // only pending case: a symlink, an escape or a non-file is unsafe whatever the state, and stays an error.
+        let file=n.dir,failure='';
+        try{for(const part of parts){file=path.join(file,part);if(fs.lstatSync(file).isSymbolicLink())throw Error('symlink');}if(!within(n.dir,fs.realpathSync(file))||!fs.statSync(file).isFile())throw Error('escape');ownedAssets.push({path:value,sha256:digest(fs.readFileSync(file))});}catch(error){failure=error?.code==='ENOENT'?'absent':'unsafe';}
+        if(failure==='absent'&&n.meta.state==='todo')warn('NODE_ASSET_PENDING',n.path,'A declared asset of a todo node has not been produced yet: it is pending work and binds nothing until it lands.');
+        else if(failure)issue('NODE_ASSET_UNREADABLE',n.path,'Node asset missing, non-file or unsafe.');
       }}
     }
     if(n.meta.ui!==undefined){const declared=new Set((n.meta.assets??[]).map(a=>a?.path));for(const asset of n.meta.ui.assets??[]){if(!declared.has(asset?.path))issue('UI_ASSET_BINDING',n.path,'Every ui.assets path must also appear in top-level assets so its current bytes bind the UI specification.');}}
