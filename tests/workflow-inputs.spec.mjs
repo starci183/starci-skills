@@ -5,10 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import {EventEmitter} from 'node:events';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {identitySecretPresent} from '../core/identity.mjs';
-import {createInputModel,inputBinding,readInputState,credentialFields} from '../kernel/inputs-model.mjs';
+import {createInputModel,inputBinding,readInputState,credentialFields,preparationProgress} from '../kernel/inputs-model.mjs';
 import {startInputServer,inputFiles,privateJson,INPUT_BODY_LIMIT} from '../kernel/inputs-server.mjs';
 import {reconcileWorkflowInputs,recoverWorkflowInputReferences} from '../kernel/inputs.mjs';
 import {integrationReadiness,prepareCredentialAsk,preparationFingerprint,relatedIntegrations} from '../kernel/inputs-readiness.mjs';
@@ -28,6 +30,7 @@ import {preparedEntry,inputAsk} from './helpers/input-fixture.mjs';
 const host=fileURLToPath(new URL('..',import.meta.url));
 const sentinel='SYNTHETIC_INPUT_SENTINEL_ONLY';
 const now=()=>Date.parse('2026-09-14T12:00:00Z');
+const execFileAsync=promisify(execFile);
 const fixture=t=>{
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'si-'));
   t.after(()=>fs.rmSync(repo,{recursive:true,force:true}));
@@ -421,6 +424,52 @@ test('the same Orca input page queues noncredential owner actions with a server-
   assert.equal(result.ok,true);assert.equal(queued[0].action.actor.type,'owner');assert.equal(queued[0].action.actor.channel,'orca-input');assert.ok(queued[0].action.actor.receiptId.length>=32);
   assert.deepEqual([queued[0].action.workflowId,queued[0].action.opId,queued[0].action.attempt,queued[0].action.generation],[f.state.id,'ask-policy',1,Number(f.state.generation??0)]);
   assert.equal(model.submitOwnerAction({requestId:request.id,revision:0,type:'choose',value:'short',actor:{type:'model'}}).code,'invalid-request');
+});
+
+test('the rendered owner page includes the choice control while credentials are still preparing',async t=>{
+  const chrome=[process.env.CHROME_PATH,process.platform==='win32'?'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe':null,
+    process.platform==='win32'?'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe':'/usr/bin/google-chrome',
+    '/usr/bin/chromium','/usr/bin/chromium-browser'].find(file=>file&&fs.existsSync(file));
+  if(!chrome)return t.skip('a Chromium browser is unavailable');
+  const token='s'.repeat(43),profile=fs.mkdtempSync(path.join(os.tmpdir(),'si-render-'));
+  t.after(()=>fs.rmSync(profile,{recursive:true,force:true}));
+  const snapshot={workflow:'synthetic-owner-ui',phase:'preparing',fields:[],unresolved:[],preparation:[],ownerRequests:[{id:'request-1',opId:'ask-policy',revision:0,
+    kind:'business-decision',subject:'Choose policy',status:'waiting-owner',options:[{id:'a',label:'Policy A preserves records for the complete approved audit period while keeping every binding condition visible to the owner before selection.'},{id:'b',label:'Policy B removes records after the shorter approved period and requires the owner to accept the documented reporting limitation.'}],guidance:{}}]};
+  const app=await startInputServer({token,sessionId:'render',model:{snapshot:()=>snapshot,submit:async()=>({ok:false}),submitOwnerAction:()=>({ok:false})}});
+  t.after(()=>app.close());
+  const {stdout}=await execFileAsync(chrome,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check',`--user-data-dir=${profile}`,'--virtual-time-budget=1000','--dump-dom',`${app.origin}/inputs/render#${token}`],{timeout:10000,maxBuffer:1024*1024});
+  assert.match(stdout,/<select class="owner-select">[\s\S]*<option value="a">Policy A preserves records[\s\S]*<option value="b">Policy B removes records[\s\S]*<\/select>/);
+  assert.match(stdout,/<ul class="option-list">[\s\S]*Policy A preserves records for the complete approved audit period[\s\S]*Policy B removes records after the shorter approved period[\s\S]*<\/ul>/,'the rendered page exposes every long option outside the truncating native popup');
+  assert.match(stdout,/<select[^>]*>[\s\S]*<\/select>[\s\S]*<button[^>]*>Gửi câu trả lời<\/button>/);
+  assert.doesNotMatch(stdout,/type="password"/,'preparing credentials still expose no secret input');
+});
+
+test('preparing credentials expose safe per-request progress while an independent owner decision stays answerable',t=>{
+  const f=fixture(t),ask=f.state.ops[1],evidence=`${sentinel}-must-not-render`;
+  ask.credential.ready=false;ask.credential.preparations=[{name:'SERVICE_TOKEN',ok:false,errors:['machine-preparation-pending'],provider:'synthetic-service',
+    preparation:{schema:'starci/integration-preparation@1',credential:{name:'SERVICE_TOKEN',label:'Service access token'},
+      sources:[{url:'https://docs.example.test/auth',title:'Authentication',official:true,readAt:'2026-09-14',observation:'The current authentication flow was read.'}],
+      prerequisites:[{id:'docs',owner:'workflow',status:'ready',action:'Read authentication docs',reason:'Bind the current API',evidence},
+        {id:'account',owner:'owner',status:'pending',action:'Choose the service account',reason:'Only the account owner can choose',evidence:''}],
+      verification:{steps:['connect','reject-foreign']}}}];
+  f.state.ops.push({id:'ask-policy',kind:'decision.prepare',status:'running',attempt:1,question:{kind:'business-decision',subject:'Choose policy',text:'Choose one',options:[{id:'a',label:'Policy A'}]}});
+  const progress=preparationProgress(f.state);assert.equal(progress.length,1);assert.deepEqual(progress[0],{ask:'ask-a',name:'SERVICE_TOKEN',label:'Service access token',provider:'synthetic-service',tasks:[{id:'op-a',label:'Check the service connection'}],errors:['machine-preparation-pending'],docs:[{title:'Authentication',url:'https://docs.example.test/auth'}],prerequisites:[{id:'docs',owner:'workflow',status:'ready',action:'Read authentication docs',reason:'Bind the current API',proofPresent:true},{id:'account',owner:'owner',status:'pending',action:'Choose the service account',reason:'Only the account owner can choose',proofPresent:false}],verificationSteps:2});
+  assert.equal(JSON.stringify(progress).includes(sentinel),false,'evidence contents never reach the owner page');
+  const snapshot=createInputModel({binding:f.binding,read:()=>f.state,present:()=>false}).snapshot();
+  assert.equal(snapshot.phase,'preparing');assert.equal(snapshot.fields.length,0);assert.equal(snapshot.preparation.length,1);
+  assert.deepEqual(snapshot.ownerRequests.map(request=>request.opId),['ask-policy'],'credential preparation never hides an answerable owner decision');
+});
+
+test('preparation progress ignores malformed arrays, unread claims and capability-bearing URLs without hiding owner questions',t=>{
+  const f=fixture(t),ask=f.state.ops[1];ask.credential.ready=false;ask.credential.preparations=[null,{name:'SERVICE_TOKEN',errors:null,preparation:{schema:'starci/integration-preparation@1',credential:{label:'Service token'},
+    sources:[null,{official:true,title:'Unread',url:'https://docs.example.test/unread'},{official:true,title:'Secret query',readAt:'2026-09-14',observation:'read',url:'https://docs.example.test/auth?token=secret#capability'},
+      {official:true,title:'Safe docs',readAt:'2026-09-14',observation:'read',url:'https://docs.example.test/auth'}],prerequisites:{bad:true},verification:{steps:null}}},
+    {name:null,preparation:null}];
+  f.state.ops.push({id:'ask-policy',kind:'decision.prepare',status:'running',attempt:1,question:{kind:'business-decision',subject:'Choose policy',text:'Choose one',options:[{id:'a',label:'Policy A'}]}});
+  assert.doesNotThrow(()=>preparationProgress(f.state));const progress=preparationProgress(f.state);
+  assert.deepEqual(progress[0].docs,[{title:'Safe docs',url:'https://docs.example.test/auth'}]);assert.deepEqual(progress[0].prerequisites,[]);assert.equal(progress[0].verificationSteps,0);
+  assert.equal(JSON.stringify(progress).includes('token=secret'),false);assert.equal(JSON.stringify(progress).includes('#capability'),false);
+  const snapshot=createInputModel({binding:f.binding,read:()=>f.state,present:()=>false}).snapshot();assert.deepEqual(snapshot.ownerRequests.map(request=>request.opId),['ask-policy']);
 });
 
 test('presence probe removes ambient secrets and quotes for the actual SOPS shell',t=>{

@@ -34,17 +34,22 @@ function guidance(ask){
 /** Owner requests are projections of canonical ask operations. They are never an independent decision store. */
 export function deriveOwnerRequests(state,{now=Date.now}={}){
   const workflowId=clean(state?.id),generation=Number(state?.engine?.generation??state?.generation??0),workflowJobId=clean(state?.engine?.jobId||state?.jobId);
-  return list(state?.ops).filter(ask=>ask?.question&&(OWNER_REQUEST_STATES.includes(ask.ownerRequestStatus)
-    ||(!ask.ownerAnswer&&['running','waiting-owner','blocked'].includes(ask.status)&&(ask.kind==='provision.ask'||ask.kind==='decision.prepare')))).map(ask=>{
-    const kind=askKind(ask),answer=plain(ask.ownerAnswer)?ask.ownerAnswer:null,verification=plain(ask.ownerVerification)?ask.ownerVerification:null;
+  const decisionMarkers=new Map(list(state?.needUser).filter(item=>item?.kind==='decision'&&clean(item.op)&&clean(item.record)).map(item=>[clean(item.op),item]));
+  return list(state?.ops).filter(ask=>{
+    const legacyDecision=ask?.kind==='decision.prepare'&&!ask.ownerAnswer&&!ask.answer&&decisionMarkers.has(clean(ask.id));
+    return ask?.question&&ask.refusal!=='superseded'&&ask.status!=='cancelled'&&ask.ownerRequestStatus!=='cancelled'&&(legacyDecision||OWNER_REQUEST_STATES.includes(ask.ownerRequestStatus)
+      ||(!ask.ownerAnswer&&['running','waiting-owner','blocked'].includes(ask.status)&&(ask.kind==='provision.ask'||ask.kind==='decision.prepare')));
+  }).map(ask=>{
+    const decisionMarker=decisionMarkers.get(clean(ask.id)),kind=decisionMarker?'business-decision':askKind(ask),answer=plain(ask.ownerAnswer)?ask.ownerAnswer:null,verification=plain(ask.ownerVerification)?ask.ownerVerification:null;
     let status=clean(ask.ownerRequestStatus);
     if(!OWNER_REQUEST_STATES.includes(status))status=answer?(kind==='credential'?'saved':'answered'):'waiting-owner';
     if(verification?.status==='verified')status='verified';
     else if(verification?.status==='rejected')status='needs-correction';
     const subject=clean(ask?.question?.subject||ask?.credential?.provider||ask?.question?.text||ask.id);
     const base={workflowId,opId:clean(ask.id),attempt:Number(ask.attempt??ask.restarts??0),generation,jobId:clean(ask.jobId)||workflowJobId,kind,subject};
-    return {...base,id:requestKey(base),status,revision:Number(ask.ownerRequestRevision??0),guidance:guidance(ask),
-      options:list(ask?.question?.options||ask?.options).map((value,index)=>plain(value)?{id:clean(value.id)||String(index+1),label:clean(value.label||value.text)}:{id:String(index+1),label:clean(value)}).filter(item=>item.label),
+    const optionSource=list(ask?.question?.options).length?ask.question.options:list(ask?.options).length?ask.options:list(decisionMarker?.options);
+    return {...base,id:requestKey(base),status,revision:Number(ask.ownerRequestRevision??0),guidance:guidance(ask),decisionRecord:clean(decisionMarker?.record||ask?.question?.record)||null,
+      options:optionSource.map((value,index)=>plain(value)?{id:clean(value.id)||String(index+1),label:clean(value.label||value.text)}:{id:String(index+1),label:clean(value)}).filter(item=>item.label),
       credential:kind==='credential'?{custody:clean(ask?.credential?.custody),variables:list(ask?.credential?.variables).map(clean).filter(Boolean)}:null,
       updatedAt:Number(ask.ownerRequestUpdatedAt??now())};
   });
@@ -78,7 +83,11 @@ export function applyOwnerAction(state,action,{now=Date.now,verificationReceipts
     if(type==='choose'&&!current.options.some(option=>option.id===clean(value)))return {ok:false,code:'invalid-choice'};
     if(type==='answer'&&!clean(value))return {ok:false,code:'answer-required'};
     if(type==='confirm'&&value!==true)return {ok:false,code:'confirmation-required'};
-    ask.ownerAnswer={via:'owner',receiptId:action.actor.receiptId,channel:action.actor.channel,type,value:type==='answer'?clean(value):value};
+    const selected=type==='choose'?current.options.find(option=>option.id===clean(value)):null;
+    ask.ownerAnswer={via:'owner',receiptId:action.actor.receiptId,channel:action.actor.channel,type,value:type==='answer'?clean(value):value,
+      ...(selected?{selectedLabel:selected.label}:{}),...(current.decisionRecord?{decisionRecord:current.decisionRecord}:{})};
+    if(current.decisionRecord||selected)ask.question={...ask.question,...(current.decisionRecord?{record:current.decisionRecord}:{}),
+      ...(current.options.length?{options:current.options.map(option=>({id:option.id,label:option.label}))}:{})};
     ask.ownerRequestStatus='answered';
   }else if(type==='verification'){
     const receipt=list(verificationReceipts).find(item=>item?.id===action.verificationReceiptId&&item?.requestId===current.id&&item?.origin==='kernel-verification');

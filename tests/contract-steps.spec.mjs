@@ -66,7 +66,7 @@ test('every sequence renders a numbered working order and a definition of done, 
     // and build sequences sit at the top of that range because each of them carries the artwork slots too.
     assert.ok(steps(text).length>=5&&steps(text).length<=8,`${key} has ${steps(text).length} steps`);
     assert.ok(done(text).length>=2,`${key} has a definition of done`);
-    assert.match(text,/Report `done` exactly once|report `done` exactly once/i);
+    assert.match(text,/Report (?:`done` )?exactly once/i);
     // Concrete: the op's own allowlist and check command are in the steps, never only generic wording.
     assert.ok(text.includes(`\`${operation.allowlist[0]}\``),`${key} names its allowlist`);
     if(operation.checks.length)assert.ok(text.includes('`npx vitest run intake`'),`${key} names its check command`);
@@ -103,7 +103,9 @@ test('review.verify is read-only, runs every check itself, names file+line+asser
   assert.match(text,/Run every check of the group yourself, verbatim: unit-tests-pass: `npx vitest run intake`; lint: `npm run lint`/);
   assert.match(text,/file \+ line \+ the assertion it breaks/);
   assert.match(text,/Never fix anything/);
-  assert.match(text,/`open\[\]` \(empty when the group is clean\)/);
+  assert.match(text,/`done` only when all required checks passed and `open\[\]` is empty/);
+  assert.match(text,/`partial` with every finding in `open\[\]`/);
+  assert.match(text,/unavailable verification never means the group is clean/);
   assert.doesNotMatch(text,/MUST fail now/);
 });
 

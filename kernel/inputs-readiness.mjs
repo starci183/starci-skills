@@ -73,7 +73,7 @@ export function prepareCredentialAsk(ask,entries,{now=Date.now()}={}){
       &&new Set(checked.map(item=>item.entry.preparation?.credential?.meaning)).size===1;
     const entry=checked[0]?.entry;
     preparations.push({name,ok:valid,errors:valid?[]:checked.length?checked.flatMap(item=>item.result.errors):['integration-declaration-missing'],
-      ...(valid?{preparation:entry.preparation,provider:entry.provider}:{}),owners:[...new Set(matches.map(item=>item.declaredBy))]});
+      ...(entry?.preparation?{preparation:entry.preparation,provider:entry.provider}:{}),owners:[...new Set(matches.map(item=>item.declaredBy))]});
   }
   ask.credential={...credential,preparationRequired:true,preparations,
     ready:preparations.length>0&&preparations.every(item=>item.ok)};

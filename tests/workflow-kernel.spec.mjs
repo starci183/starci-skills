@@ -6,7 +6,7 @@ import path from 'node:path';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {EventEmitter} from 'node:events';
 import {preparedEntry,inputAsk} from './helpers/input-fixture.mjs';
-import {refreshCredentialPreparation,deferForIntegrationPreparation} from '../kernel/kernel.mjs';
+import {refreshCredentialPreparation,deferForIntegrationPreparation,normalizePreparationAuthority} from '../kernel/kernel.mjs';
 import {reconcileWorkflowInputs} from '../kernel/inputs.mjs';
 import {credentialFields} from '../kernel/inputs-model.mjs';
 import {inputFiles,privateJson} from '../kernel/inputs-server.mjs';
@@ -27,7 +27,7 @@ import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGra
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher,reviveSupervisor} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,prepareV6WorkGate,producedKindVerdict,restoreDurableCheckpoint,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -654,6 +654,26 @@ test('the sweep keeps the tab a provision.ask is asking the owner in, and closes
     assert.deepEqual(sweepStaleTerminals(harness.fake.orca,harness.store,harness.state,{cwd,now:()=>0})
       .filter(item=>item.terminal==='term_ask_cred').map(item=>item.op),['ask-cred']);
     assert.equal(harness.fake.terminals.has('term_ask_cred'),false);
+  }finally{harness.cleanup();}
+});
+
+test('durable recovery keeps the validated coordinator of this invocation and sweep closes only the stale handle',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    const state=harness.state,checkpoint=structuredClone(state);
+    Object.assign(checkpoint,{approved:true,from:'term_old',run:'run_wf',hostAdapter:'old-host',launcher:'old-launcher'});
+    checkpoint.ops[0].goal='semantic goal from durable checkpoint';
+    Object.assign(state,{approved:false,from:'term_current',run:'run_wf',hostAdapter:'orca',launcher:'sealed-launcher'});
+    restoreDurableCheckpoint(state,checkpoint,{workflowId:state.id,from:'term_current',run:'run_wf',hostAdapter:'orca',launcher:'sealed-launcher',kernelTerminalOwned:true,arbitrary:'ignored'});
+    assert.equal(state.approved,true);assert.equal(state.ops[0].goal,'semantic goal from durable checkpoint');
+    assert.deepEqual([state.from,state.run,state.hostAdapter,state.launcher,state.kernelTerminalOwned],['term_current','run_wf','orca','sealed-launcher',true]);
+    assert.equal(state.arbitrary,undefined);
+    harness.fake.terminals.set('term_current',{handle:'term_current',title:`[Kernel] ${state.id}`,status:'running',worktreePath:cwd});
+    harness.fake.terminals.set('term_old',{handle:'term_old',title:`[Kernel] ${state.id}`,status:'running',worktreePath:cwd});
+    const closed=sweepStaleTerminals(harness.fake.orca,harness.store,state,{cwd,now:()=>0});
+    assert.ok(harness.fake.terminals.has('term_current'),'the process coordinator survives recovery and sweep');
+    assert.equal(harness.fake.terminals.has('term_old'),false);assert.deepEqual(closed.map(item=>item.terminal),['term_old']);
+    assert.throws(()=>restoreDurableCheckpoint(state,{...checkpoint,id:'another-workflow'},{workflowId:state.id,from:'x',run:'y'}),/workflow identity mismatch/);
   }finally{harness.cleanup();}
 });
 
@@ -1678,6 +1698,23 @@ test('a run bound to a coordinator tab that is gone is re-bound to the tab the k
   }finally{harness.cleanup();}
 });
 
+test('v6 prepares one authentic canonical Work gate for every Work-writing kind and rejects a forged name',()=>{
+  const ctx={v6:{},work:{repoRoot:'D:/product',ledger:{workRoot:'D:/canonical/.starciwork'}}},op={kind:'architecture.revise',checks:[]};
+  assert.equal(prepareV6WorkGate(op,ctx),true);assert.equal(op.checks.length,1);assert.equal(op.checks[0].name,'work-valid');assert.match(op.checks[0].command,/D:[\\/]canonical[\\/]\.starciwork/);assert.equal(op.checks[0].runtimePrepared,true);
+  assert.equal(prepareV6WorkGate(op,ctx),false);assert.equal(op.checks.length,1,'the exact runtime gate is deduplicated');
+  assert.throws(()=>prepareV6WorkGate({kind:'architecture.revise',checks:[{name:'work-valid',command:'exit 0'}]},ctx),/reserved for the exact canonical Work validator/);
+  assert.throws(()=>prepareV6WorkGate({kind:'architecture.revise',checks:[]},{v6:{},work:null}),/canonical Work binding is unavailable/);
+});
+
+test('v6 record-kind validation sees every sealed observed write while legacy attribution remains report-bound',()=>{
+  const record='.starciwork/features/sales/ui/index.yaml';
+  const op={kind:'backend.implement',nodeId:null,reports:[{files:[]}]};
+  assert.deepEqual(producedKindVerdict(op,[record],{}).produced,[]);
+  const v6=producedKindVerdict(op,[record],{v6:{}});
+  assert.deepEqual(v6.produced,[record]);assert.deepEqual(v6.undeclared.map(item=>item.file),[record]);
+  assert.equal(producedKindVerdict(op,[record],{v6:{},kindsProfile:{}}).ok,false,'an unavailable v6 kind schema fails closed');
+});
+
 test('an intake op planned by an older build carries the current goal and acceptance after a sync, its allowlist untouched',()=>{
   const harness=setupWork({scope:['collab']});
   try{
@@ -1926,14 +1963,20 @@ test('kernel startup discovers existing credential waits before the first tick, 
       if(name==='tab-create')return {outcome:'ok',effectState:'committed',receipt:{result:{browserPageId:'synthetic-input-page'}}};
       throw Error('Unexpected browser call '+name);
     }};
-    const options={maxIterations:0,refreshPreparation:refreshCredentialPreparation,deferPreparation:deferForIntegrationPreparation,
+    let runtimeCtx=null;
+    const options={maxIterations:0,refreshPreparation:(...args)=>{runtimeCtx=args[2];return refreshCredentialPreparation(...args);},deferPreparation:deferForIntegrationPreparation,
       reconcileInputs:(_orca,currentStore,currentState,ctx)=>reconcileWorkflowInputs(browser,currentStore,currentState,{...ctx,
         alive:pid=>pid===101,spawnProcess:()=>{launches++;const child=new EventEmitter();child.pid=101;child.unref=()=>{};return child;}})};
     harness.run(options);
     assert.equal(ask.credential.ready,false);assert.equal(credentialFields(state).fields.length,0);
     assert.equal(ask.inputMode,'gui');assert.equal(requester.status,'pending');
     assert.equal(requester.attempt,originalAttempt+1);
-    assert.ok(state.ops.some(op=>op.integrationPreparation?.owner===owner),'existing owning-record repair is admitted on startup');
+    const preparationAuthor=state.ops.find(op=>op.integrationPreparation?.owner===owner);
+    assert.ok(preparationAuthor,'existing owning-record repair is admitted on startup');
+    normalizePreparationAuthority(store,state,preparationAuthor,runtimeCtx);
+    assert.equal(preparationAuthor.nodeId,owner);
+    assert.deepEqual(preparationAuthor.allowlist,['.starciwork/features/sales/architecture/sds/intake/index.yaml'],
+      'the preparation author can write only its owning declaration');
     assert.deepEqual(requester.allowlist,originalAllowlist,'requester authority is preserved');
     assert.equal(launches,1);assert.equal(state.ownerInputs.phase,'starting');
     const session=JSON.parse(fs.readFileSync(files.session,'utf8'));
@@ -1944,6 +1987,14 @@ test('kernel startup discovers existing credential waits before the first tick, 
     assert.equal(browserCalls.filter(call=>call.name==='tab-create').length,1);
     assert.equal(browserCalls.find(call=>call.name==='tab-create').params.worktree,`path:${state.worktree.replaceAll('\\','/')}`);
     assert.equal(state.approved,true);assert.equal(state.iterations,0,'startup did not need a scheduling tick or model launch');
+
+    // A reused author from an older workflow is repaired before it can be admitted again; read-only references
+    // do not broaden its write authority.
+    preparationAuthor.nodeId=null;preparationAuthor.allowlist=['.starciwork/features'];harness.store.saveState(state);
+    normalizePreparationAuthority(store,state,preparationAuthor,runtimeCtx);
+    assert.equal(preparationAuthor.nodeId,owner);
+    assert.deepEqual(preparationAuthor.allowlist,['.starciwork/features/sales/architecture/sds/intake/index.yaml']);
+    assert.ok(events(store).some(event=>event.event==='integration-preparation-authority-refreshed'&&event.op===preparationAuthor.id));
   }finally{harness.cleanup();}
 });
 

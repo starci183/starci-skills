@@ -68,6 +68,31 @@ export function credentialFields(state){
   return {fields:all.filter(field=>field.pending||!all.some(other=>other.pending&&other.slug===field.slug&&other.name===field.name)),unresolved};
 }
 
+/** Safe progress only: no credential values, evidence bytes or capability-bearing URLs are included. */
+export function preparationProgress(state){
+  const waiting=new Set(fillWaitingAsks(state).map(ask=>ask.id)),rows=[];
+  const text=(value,limit=500)=>typeof value==='string'?value.trim().slice(0,limit):'';
+  const safeUrl=value=>{try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)&&!url.username&&!url.password&&!url.search&&!url.hash&&url.href.length<=2048?url.href:null;}catch{return null;}};
+  for(const ask of state.ops??[]){
+    if(!waiting.has(ask.id)||ask.credential?.ready)continue;
+    for(const item of (Array.isArray(ask.credential?.preparations)?ask.credential.preparations:[]).slice(0,64)){
+      const name=text(item?.name,160);if(!name)continue;
+      const prep=plain(item?.preparation)&&item.preparation.schema==='starci/integration-preparation@1'?item.preparation:null,credential=plain(prep?.credential)?prep.credential:{};
+      const docs=(Array.isArray(prep?.sources)?prep.sources:[]).slice(0,32).flatMap(source=>{const url=safeUrl(source?.url),readAt=Date.parse(source?.readAt??''),title=text(source?.title,240);
+        return source?.official===true&&Number.isFinite(readAt)&&readAt<=Date.now()+5*60*1000&&text(source?.observation,1)&&title&&url?[{title,url}]:[];});
+      const prerequisites=(Array.isArray(prep?.prerequisites)?prep.prerequisites:[]).slice(0,32).flatMap(step=>{
+        const id=text(step?.id,160),owner=['workflow','owner'].includes(step?.owner)?step.owner:null,status=['ready','pending'].includes(step?.status)?step.status:null,
+          action=text(step?.action),reason=text(step?.reason);
+        return id&&owner&&status&&action&&reason?[{id,owner,status,action,reason,proofPresent:text(step?.evidence,1).length>0}]:[];});
+      rows.push({ask:text(ask.id,160),name,label:text(credential.label,240)||name,provider:text(item?.provider??ask.credential?.provider,240)||null,
+        tasks:(Array.isArray(ask.requesters)?ask.requesters:[]).slice(0,16).flatMap(id=>{const safeId=text(id,160);if(!safeId)return [];const op=state.ops.find(candidate=>candidate.id===id);return [{id:safeId,label:text(op?.title??op?.goal??op?.kind??id,500)}];}),
+        errors:[...new Set((Array.isArray(item?.errors)?item.errors:[]).map(error=>text(error,80)).filter(error=>/^[a-z0-9-]+$/.test(error)))].slice(0,16),docs,prerequisites,
+        verificationSteps:(Array.isArray(prep?.verification?.steps)?prep.verification.steps:[]).filter(step=>typeof step==='string'&&step.trim()).slice(0,32).length});
+    }
+  }
+  return rows;
+}
+
 /** Presence only; cache by encrypted-file metadata, never by a decrypted value. */
 export function presenceReader(verify=identitySecretPresent){
   const cache=new Map();
@@ -106,11 +131,11 @@ export function createInputModel({binding,read=()=>readInputState(binding),prese
   const snapshot=()=>{
     const state=read();
     if(!state)return {workflow:binding.id,phase:'unavailable',fields:[],unresolved:[]};
-    const {fields,unresolved}=credentialFields(state);
+    const {fields,unresolved}=credentialFields(state),preparation=preparationProgress(state);
     return {workflow:binding.id,phase:state.finished?'finished':unresolved.length&&!fields.some(field=>field.pending)?'preparing':fields.some(field=>field.pending)?'waiting':'running',
       fields:fields.map(({replacement,...field})=>({...field,replacementReason:replacement?.reason??null,
         status:!field.pending?'complete':replacementWritten({...field,replacement})&&present({workRoot:binding.workRoot,slug:field.slug,name:field.name})?'saved':'pending'})),
-      ownerRequests:deriveOwnerRequests(state).filter(request=>request.kind!=='credential'),unresolved};
+      preparation,ownerRequests:deriveOwnerRequests(state).filter(request=>request.kind!=='credential'),unresolved};
   };
   const queueAction=(state,request,action,actor)=>enqueue({schema:'starci/owner-action@1',action:{...action,
     workflowId:request.workflowId,opId:request.opId,attempt:request.attempt,generation:request.generation,jobId:request.jobId,

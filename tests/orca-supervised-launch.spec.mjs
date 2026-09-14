@@ -446,7 +446,12 @@ test('a dispatch\'s last words are parsed out of whatever shape last_failure has
 
   const spoke=workerLastWords({id:'ctx_1',status:'failed',last_failure:JSON.stringify(words)});
   assert.deepEqual([spoke.report.outcome,spoke.report.subject],['failed','Decision prepared; contract reporter missing']);
+  assert.deepEqual(spoke.report.open,[
+    'Unresolved worker report (structured findings unavailable): the contract report command failed with MODULE_NOT_FOUND'
+  ],'a failed retained body remains a labelled diagnostic when structured findings were lost');
   assert.match(spoke.text,/MODULE_NOT_FOUND/,'the failure text carries what the reader classifies the cause from');
+  const successful=workerLastWords({status:'failed',last_failure:JSON.stringify({provenance:'worker_report',outcome:'done',subject:'Review clean',body:'All criteria passed.'})});
+  assert.deepEqual(successful.report.open,[],'successful prose does not manufacture an open finding');
   assert.equal(workerLastWords({id:'ctx_2',status:'failed',last_failure:JSON.stringify({provenance:'orca',reason:'agent_prompt_stalled'})}).report,null,
     'a failure Orca itself recorded is not the worker\'s report');
   assert.equal(workerLastWords({id:'ctx_3',status:'failed',last_failure:JSON.stringify({provenance:'worker_report',body:'   '})}).report,null,

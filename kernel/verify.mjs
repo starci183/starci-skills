@@ -200,8 +200,11 @@ export function kernelProof(ctx,nodeId,op=null){
 export function treeVerdictFor(ctx,op){
   let result=null;
   try{result=ctx.work.validate({repoRoot:ctx.work.ledger?.repoRoot??ctx.work.repoRoot,workRoot:ctx.work.ledger?.workRoot??null});}catch(error){return {ok:false,own:[{code:'VALIDATOR',path:'',message:String(error?.message??error)}],foreign:[]};}
-  const errors=Array.isArray(result?.errors)?result.errors:[];
-  if(result?.ok||!errors.length)return {ok:true,own:[],foreign:[]};
+  if(!plain(result)||typeof result.ok!=='boolean'||!Array.isArray(result.errors)||result.errors.some(error=>!plain(error))||
+    (result.ok&&result.errors.length>0)||(!result.ok&&result.errors.length===0))
+    return {ok:false,own:[{code:'VALIDATOR',path:'',message:'Work validation returned missing, malformed, or contradictory evidence'}],foreign:[]};
+  const errors=result.errors;
+  if(result.ok===true)return {ok:true,own:[],foreign:[]};
   if(!op)return {ok:false,own:errors,foreign:[]};
   const owned=unique([...(op.allowlist??[]),...(op.files??[]),...(op.kernelOwned??[])].map(entry=>slash(String(entry))));
   const root=slash(ctx.work.ledger?.workRoot??'');
@@ -212,7 +215,7 @@ export function treeVerdictFor(ctx,op){
   const own=[],foreign=[];
   for(const error of errors){
     const file=`.starciwork/${slash(String(error.path??''))}`;
-    const mine=owned.some(entry=>within(file,entry))||(nodePath&&(file===nodePath||file.startsWith(path.posix.dirname(nodePath)+'/')));
+    const mine=!String(error.path??'').trim()||owned.some(entry=>within(file,entry))||(nodePath&&(file===nodePath||file.startsWith(path.posix.dirname(nodePath)+'/')));
     (mine?own:foreign).push(error);
   }
   return {ok:own.length===0,own,foreign};

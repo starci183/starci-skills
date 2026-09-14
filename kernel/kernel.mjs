@@ -670,7 +670,7 @@ export function deferForIntegrationPreparation(store,state,op,ctx,{entries=null}
   const missing=related.filter(entry=>!integrationReadiness(entry,{now:clockOf(ctx)}).ok);
   if(!missing.length)return false;
   for(const owner of unique(missing.map(entry=>entry.declaredBy))){
-    const node=ctx.work.node(owner),record=node&&!ctx.work.shared?recordPath(state,ctx,node):null;
+    const node=ctx.work.node(owner),record=node?recordPath(state,ctx,node):null;
     const scoped=node&&work.inScope(node,state.scope.length?state.scope:null);
     if(!record||!scoped){
       op.status='blocked';
@@ -686,6 +686,7 @@ export function deferForIntegrationPreparation(store,state,op,ctx,{entries=null}
       `official integration preparation missing for ${op.id}`);
       author.integrationPreparation={owner};author.difficulty='hard';
     }
+    normalizePreparationAuthority(store,state,author,ctx);
     // A prior finished author gets a fresh attempt only for this specific missing preparation, never a stale conversation.
     if(author.status==='done'){author.status='ready';author.attempt+=1;author.dispatch=null;author.terminal=null;author.preparationBefore=null;}
     op.dependsOn=unique([...(op.dependsOn??[]),author.id]);
@@ -693,6 +694,22 @@ export function deferForIntegrationPreparation(store,state,op,ctx,{entries=null}
     op.findings=unique([...(op.findings??[]),`Read the official-documentation preparation produced by ${author.id} before design, implementation, credentials or live verification.`]);
   }
   return true;
+}
+
+/** Bind a preparation-only author to its one approved owning declaration, including authors reused from old runs. */
+export function normalizePreparationAuthority(store,state,op,ctx){
+  const owner=op?.integrationPreparation?.owner;
+  need(typeof owner==='string'&&owner,'integration preparation has no owning declaration');
+  need(ctx?.work,'canonical Work binding is unavailable');
+  const node=ctx.work.node(owner);
+  need(node&&work.inScope(node,state.scope?.length?state.scope:null),`${owner} is outside this workflow's approved scope`);
+  const record=recordPath(state,ctx,node);
+  need(typeof record==='string'&&record,`${owner} has no protected declaration record`);
+  const oldNode=op.nodeId,oldAllowlist=[...(op.allowlist??[])];
+  op.nodeId=owner;op.allowlist=[record];op.references=unique([node.path,...(node.refs??[])]);
+  const changed=oldNode!==owner||oldAllowlist.length!==1||oldAllowlist[0]!==record;
+  if(changed)store.appendEvent({event:'integration-preparation-authority-refreshed',op:op.id,owner,record,previousNode:oldNode??null,previousAllowlist:oldAllowlist});
+  return changed;
 }
 
 /** Re-evaluate old waits on restart; unsupported variable-only asks are hidden and their requester is re-admitted. */
@@ -723,6 +740,24 @@ export function refreshCredentialPreparation(store,state,ctx){
     }
   }
 }
+export function prepareV6WorkGate(op,ctx){
+  need(ctx?.v6,'v6 runtime is required to prepare a Work gate');
+  need(ctx?.work&&plain(ctx.work.ledger),'canonical Work binding is unavailable');
+  const command=workValidateCommand(ctx);need(typeof command==='string'&&command.trim(),'canonical Work validator command is unavailable');
+  const checks=Array.isArray(op.checks)?op.checks:[],named=checks.filter(check=>String(check?.name??'').toLowerCase()==='work-valid');
+  if(named.some(check=>check.command!==command))throw Error('work-valid is reserved for the exact canonical Work validator command');
+  const others=checks.filter(check=>String(check?.name??'').toLowerCase()!=='work-valid');
+  op.checks=[...others,{name:'work-valid',command,runtimePrepared:true}];
+  return named.length!==1||named[0].command!==command||named[0].runtimePrepared!==true;
+}
+
+/** Every sealed v6 byte is attributed to its operation; legacy runs retain report-confirmed attribution. */
+export function producedKindVerdict(op,observed,ctx){
+  const produced=ctx?.v6?[...observed]:attributedFiles(op,observed,ctx);
+  try{return {ok:true,produced,undeclared:undeclaredWrites(op.kind,produced,{profile:ctx?.kindsProfile??null,nodeKind:ctx?.work?.node?.(op.nodeId)?.kind??null})};}
+  catch(error){return ctx?.v6?{ok:false,produced,undeclared:[],error:String(error?.message??error)}:{ok:true,produced,undeclared:[]};}
+}
+
 function scheduleOps(orca,store,state,ctx){
   for(const op of state.ops){
     if(op.status!=='pending')continue;
@@ -741,6 +776,10 @@ function scheduleOps(orca,store,state,ctx){
   const ready=state.ops.filter(item=>item.status==='ready');
   for(const op of ctx.v6?ctx.v6.rank(ready):ready){
     ctx.currentOp=op;
+    if(ctx.v6&&op.integrationPreparation){
+      try{if(normalizePreparationAuthority(store,state,op,ctx))store.saveState(state);}
+      catch(error){op.status='blocked';op.refusal='runtime-gate-binding';const detail=`${op.id} cannot bind its integration preparation to one approved declaration: ${String(error?.message??error)}`;op.v6Pending={kind:'runtime-gate-binding',detail};store.appendEvent({event:'integration-preparation-authority-refused',op:op.id,reason:detail});continue;}
+    }
     // A credential is asked by one command the owner runs, so its ask is never dispatched to a runtime at all:
     // it waits here, holding no runtime and no slot, until the custody holds every variable it named.
     if(fillWaiting(orca,store,state,op,ctx))continue;
@@ -795,8 +834,11 @@ function scheduleOps(orca,store,state,ctx){
       store.appendEvent({event:'op-host-unsupported',op:op.id,kind:op.kind,node:op.nodeId??null,host:ctx.host.name,missing});
       continue;
     }
-    const allocationJob={...op,opId:op.id,role:kindRole(op.kind),independentReview:ctx.v6?{required:true,freshContext:true}:op.independentReview,
-      checks:ctx.v6&&authorsRecord(op.kind)?[...(op.checks??[]),{name:'work-valid',command:workValidateCommand(ctx)}]:op.checks};
+    if(ctx.v6&&writesWorkRecords(op.kind,{profile:ctx.kindsProfile})){
+      try{if(prepareV6WorkGate(op,ctx)){store.appendEvent({event:'v6-work-gate-prepared',op:op.id,command:op.checks.find(check=>check.name==='work-valid').command});store.saveState(state);}}
+      catch(error){op.status='blocked';op.refusal='runtime-gate-binding';const detail=`${op.id} cannot prepare its required canonical Work gate: ${String(error?.message??error)}`;op.v6Pending={kind:'runtime-gate-binding',detail};store.appendEvent({event:'v6-work-gate-refused',op:op.id,reason:detail});continue;}
+    }
+    const allocationJob={...op,opId:op.id,role:kindRole(op.kind),independentReview:ctx.v6?{required:true,freshContext:true}:op.independentReview,checks:op.checks};
     const allocated=ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,launchOperator(op.kind)),difficulty:op.difficulty??null,job:allocationJob});
     if(!allocated?.ok){
       // Every runtime that could carry the op is on its own avoid list: the list has served its purpose (one restart
@@ -1548,7 +1590,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     const verified=machineVerify(state,op,verifyCtx);
     // `work-valid` is the kernel's own check and is stripped from every operation's list, so an op that edits the
     // tree is held to it here: the record it wrote must leave a tree that still validates, before anything is committed.
-    if(authorsRecord(op.kind)){
+    if((ctx.v6&&writesWorkRecords(op.kind,{profile:ctx.kindsProfile}))||authorsRecord(op.kind)){
       const command=workValidateCommand(ctx);
       // Scoped to what this op could have caused, the way a node's own proof is judged: an error under a path
       // another workflow owns is evidence in the check, never this op's failure.
@@ -1578,8 +1620,12 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     // over every attempt it made, so its own uncommitted work from an earlier attempt still counts.
     // `ctx.kindsProfile` is the profile to read it against: null is the compiled one, and a caller that runs the
     // kernel against an authored or a fixture profile hands that one in instead of rebuilding `.dist` for it.
-    const produced=attributedFiles(op,files,ctx);
-    const undeclared=(()=>{try{return undeclaredWrites(op.kind,produced,{profile:ctx.kindsProfile??null,nodeKind:ctx.work?.node?.(op.nodeId)?.kind??null});}catch{return [];}})();
+    const kindVerdict=producedKindVerdict(op,files,ctx),produced=kindVerdict.produced,undeclared=kindVerdict.undeclared;
+    if(!kindVerdict.ok){
+      const finding=`record-kind validation was unavailable: ${kindVerdict.error}`;
+      op.reports.at(-1).downgradedTo='failed';store.appendEvent({event:'io-kind-validation-unavailable',op:op.id,reason:finding});
+      return retryOp(store,state,op,[finding],ctx,'io-kind-validation-unavailable');
+    }
     if(undeclared.length){
       op.reports.at(-1).downgradedTo='failed';
       store.appendEvent({event:'io-undeclared-write',op:op.id,files:undeclared.map(item=>item.file)});
@@ -2731,12 +2777,28 @@ function contractDigestFor(kind){
   return work.contractDigestOf({kind,kindRecord,operator,rules:llm.VALIDATOR_RULES});
 }
 
+/** Restore semantic durable state without replacing the coordinator identity validated for this process launch. */
+export function restoreDurableCheckpoint(state,checkpoint,binding=null){
+  need(plain(state)&&plain(checkpoint),'durable checkpoint recovery needs workflow state');
+  need(checkpoint.id===state.id,'durable checkpoint workflow identity mismatch');
+  const owned=plain(binding)&&binding.workflowId===state.id&&typeof binding.from==='string'&&binding.from&&typeof binding.run==='string'&&binding.run;
+  Object.assign(state,checkpoint);
+  if(!owned)return state;
+  state.from=binding.from;state.run=binding.run;
+  if(typeof binding.hostAdapter==='string'&&binding.hostAdapter)state.hostAdapter=binding.hostAdapter;
+  if(typeof binding.launcher==='string'&&binding.launcher)state.launcher=binding.launcher;
+  if(binding.kernelTerminalOwned===true)state.kernelTerminalOwned=true;
+  else if(binding.kernelTerminalOwned===false)state.kernelTerminalOwned=false;
+  if(typeof binding.workflowTask==='string'&&binding.workflowTask)state.workflowTask=binding.workflowTask;
+  return state;
+}
+
 export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=llm.planOp,decide=llm.decide,validateOp=llm.validateOp,template,supervisor=null,validator=null,
   wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
   ledgerApi=work,validate=validateWorkTree,ledgerRoot=null,resolveLedger=resolveLedgerRoot,
   reconcile=reconcileIntakeSeam,renderChecks=renderChecksFor,contractDigest=contractDigestFor,kindsProfile=null,
   verifyPresence=null,reconcileInputs=reconcileWorkflowInputs,refreshPreparation=refreshCredentialPreparation,deferPreparation=deferForIntegrationPreparation,
-  v6Runtime=null,modelEligibility=null,modelPolicy=null,
+  v6Runtime=null,modelEligibility=null,modelPolicy=null,runtimeBinding=null,
   waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now,host=hostDescriptorOf(orca)}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   // Restore the narrowly identified 5-plus GUI collision before any resumed operation reads goal inputs.
@@ -2765,7 +2827,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   if(ctx.v6){
     store.bindJournal?.(ctx.v6.journal,state.engine.generation,{state});
     const checkpoint=store.loadState();
-    if(checkpoint)Object.assign(state,checkpoint);
+    if(checkpoint)restoreDurableCheckpoint(state,checkpoint,runtimeBinding);
     ctx.planOp=args=>ctx.v6.model('planOp',args,ctx.currentOp??null);
     ctx.decide=args=>ctx.v6.model('decide',args,ctx.currentOp??null);
     ctx.validateOp=args=>ctx.v6.model('validateOp',args,args.op??ctx.currentOp??null);
@@ -3455,13 +3517,13 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     // The supervisor starts the next kernel of this workflow on the same host, so the host is a fact of the state.
     state.hostAdapter=host.name;
     const launchFile=options['launch-file']?path.resolve(worktree,options['launch-file']):store.paths.launch;
-    let from=options.from??state.from,run=options.run??state.run;
-    if(!from&&fs.existsSync(launchFile)){const launch=awaitLaunch(launchFile,{wait});from=launch.from;run=run??launch.run??null;state.workflowTask=launch.task??state.workflowTask;}
+    let from=options.from??state.from,run=options.run??state.run,launchTask=null,openedKernelTerminal=false;
+    if(!from&&fs.existsSync(launchFile)){const launch=awaitLaunch(launchFile,{wait});from=launch.from;run=run??launch.run??null;launchTask=launch.task??null;if(launchTask)state.workflowTask=launchTask;}
     if(!from){
       // No coordinator terminal handed this kernel a handle (the supervisor started it): the kernel is its own
       // Orca terminal in the worktree - the one titled after it, reused across restarts, never a new tab per start.
       from=ownKernelTerminal(orca,store,state,worktree);
-      state.kernelTerminalOwned=true;
+      state.kernelTerminalOwned=true;openedKernelTerminal=true;
     }
     state.from=required(from,'own terminal handle');
     // `run-bound` is the one-time hand-off this kernel performed; joining a run it already has is `run-resumed`.
@@ -3471,6 +3533,9 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     state.host=state.host??hostOf(options,repoRoot);
     state.launcher=state.launcher??launcherOf(state.host);
     relocateLauncher(store,state);
+    const invocationOwnsTerminal=openedKernelTerminal||(()=>{try{return listTerminals(orca,worktree).some(item=>item.handle===state.from&&item.title===`[Kernel] ${state.id}`);}catch{return false;}})();
+    const runtimeBinding={workflowId:state.id,from:state.from,run:state.run,hostAdapter:state.hostAdapter,launcher:state.launcher,
+      kernelTerminalOwned:invocationOwnsTerminal,...(launchTask?{workflowTask:launchTask}:{})};
     store.appendEvent({event:binding?'run-bound':'run-resumed',run:state.run,from:state.from,iterations:state.iterations});
     const runtimeProfile=withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host));
     let modelPolicy=null;
@@ -3484,7 +3549,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       const actual={...op,opId:job.opId??op.opId??op.id,kind:job?.input?.functionName?job.kind:op.kind,
         ...(job?.input?.functionName?{input:job.input}:{}),
         role:job.role??kindRole(op.kind),independentReview:{required:true,freshContext:true},
-        checks:authorsRecord(op.kind)?[...(op.checks??[]),{name:'work-valid'}]:op.checks};
+        checks:op.checks};
       return modelPolicy.eligibility(actual,runtime);
     }):null;
     const finished=(()=>{const release=acquireKernelLock(store);try{fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});return runLoop(orca,store,state,{cwd:worktree,wait,
@@ -3494,7 +3559,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
       // A sequential host (headless) caps the allocator at one operation whatever the approved quota says.
       allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(store.dir),workflow:state.id},budget:{path:path.dirname(store.dir)},sequential:host.sequential,eligibility}),template:templateOf(isV6(state)?state.engine.runtimePin.root:state.host),host,
-      modelEligibility:eligibility,modelPolicy,
+      modelEligibility:eligibility,modelPolicy,runtimeBinding,
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
     // The kernel's own tab is the Run's coordinator terminal, so it lives as long as the workflow: a pause or a

@@ -432,7 +432,7 @@ const SEQUENCE_STEPS={
       `Compare the implemented behavior against each assertion and the design (SDS) it references; read the code and the specs, not the previous report.`,
       `Write each finding as file + line + the assertion it breaks; a finding without a file and line is not a finding.`,
       `Never fix anything: a repair is a separate operation the kernel creates from your findings.`,
-      `Report \`done\` exactly once with the findings in \`open[]\` (empty when the group is clean) and the checks file; report \`failed\` only when a check could not run at all.`
+      `Report exactly once with the checks file: use \`done\` only when all required checks passed and \`open[]\` is empty; use \`partial\` with every finding in \`open[]\` when repair is needed, including a check failure that identifies a defect. If a required check could not run, report \`failed\` with the observed reason; unavailable verification never means the group is clean.`
     ],
     done:[`every check ran and its exit code is recorded`,`every assertion was compared against the code`,`findings name file, line and assertion; no product file changed`]
   }),

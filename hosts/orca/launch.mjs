@@ -227,9 +227,15 @@ export function workerLastWords(dispatch,worker=null){
   const subject=typeof failure?.subject==='string'?failure.subject.trim():'';
   const body=typeof failure?.body==='string'?failure.body.trim():'';
   if(failure?.provenance!=='worker_report'||!(subject||body))return {failure,text,report:null};
+  const outcome=WORKER_REPORT_OUTCOMES.includes(failure.outcome)?failure.outcome:'failed';
+  const declaredOpen=Array.isArray(failure.open)?failure.open.filter(item=>typeof item==='string'&&item.trim()):[];
+  // A failed worker report retained by Orca is diagnostic evidence, even when the contract reporter vanished
+  // before transporting its structured findings. Label the prose accordingly; it is not verified structure.
+  const open=!declaredOpen.length&&['failed','partial'].includes(outcome)&&body
+    ?[`Unresolved worker report (structured findings unavailable): ${body}`]
+    :declaredOpen;
   return {failure,text,report:{
-    outcome:WORKER_REPORT_OUTCOMES.includes(failure.outcome)?failure.outcome:'failed',subject,body,
-    open:Array.isArray(failure.open)?failure.open.filter(item=>typeof item==='string'&&item.trim()):[],
+    outcome,subject,body,open,
     blocker:plain(failure.blocker)?failure.blocker:null,question:plain(failure.question)?failure.question:null}};
 }
 /** Ask Orca for one Dispatch and read its last words; an unreachable Orca simply has none. */
