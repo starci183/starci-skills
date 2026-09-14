@@ -592,7 +592,9 @@ export const ownerDigest=items=>createHash('sha1')
  */
 export function noteOwnerList(store,state){
   const items=ownerItems(state);
-  const digest=ownerDigest(items);
+  // An empty list is `null`, not the hash of nothing: a workflow that has never owed the owner anything writes
+  // no `owner-list` at all, and the first one that does is the news. Emptying a list that had items still is.
+  const digest=items.length?ownerDigest(items):null;
   if(digest===(state.ownerDigest??null))return null;
   state.ownerDigest=digest;
   store.appendEvent({event:'owner-list',items:items.map(item=>({kind:item.kind,op:item.op}))});
