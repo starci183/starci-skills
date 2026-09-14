@@ -325,6 +325,21 @@ test('approved input references without credential waits do not start an owner i
   assert.equal(f.state.inputs,inputs);assert.equal(b.calls.length,0);
 });
 
+test('v6 owner input helper launches from the runtime pin while preserving the original workflow binding',t=>{
+  const f=fixture(t),b=browserFixture(),pinned=path.join(f.repo,'sealed-runtime');
+  f.state.engine={major:6,runtimePin:{root:pinned,digest:'a'.repeat(64)}};
+  let launch=null;
+  const child=new EventEmitter();child.pid=101;child.unref=()=>{};
+  const result=reconcileWorkflowInputs(b.orca,f.store,f.state,{now:()=>100000,alive:()=>false,
+    spawnProcess:(executable,args,options)=>{launch={executable,args,options};return child;}});
+  assert.equal(result.phase,'starting');
+  assert.equal(launch.args[0],path.join(pinned,'bin','starci.mjs'));
+  const session=JSON.parse(fs.readFileSync(inputFiles(f.store.dir).session,'utf8'));
+  assert.equal(path.resolve(session.binding.host),path.resolve(f.state.host));
+  assert.equal(session.binding.host,f.binding.host);
+  assert.equal(session.binding.host.includes('sealed-runtime'),false);
+});
+
 test('kernel input reconciliation preserves approved input refs across page, helper, replacement and workflow restarts',t=>{
   const f=fixture(t),b=browserFixture(),files=inputFiles(f.store.dir);let time=100000,launches=0;
   const approvedInputs=structuredClone(f.state.inputs);

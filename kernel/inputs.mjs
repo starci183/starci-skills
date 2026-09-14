@@ -90,7 +90,9 @@ export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Da
     privateJson(files.session,session);
     privateJson(files.launch,{session:session.id,phase:'starting',pid:null,at});
     try{
-      const child=spawnProcess(process.execPath,[path.join(state.host,'bin','starci.mjs'),'workflow-inputs','--session',files.session],
+      const runtimeRoot=state.engine?.major===6&&plain(state.engine.runtimePin)&&typeof state.engine.runtimePin.root==='string'
+        ?state.engine.runtimePin.root:state.host;
+      const child=spawnProcess(process.execPath,[path.join(runtimeRoot,'bin','starci.mjs'),'workflow-inputs','--session',files.session],
         {cwd:state.worktree,stdio:'ignore',detached:true,windowsHide:true});
       child.on('error',()=>{});child.unref();
       privateJson(files.launch,{session:session.id,phase:child.pid?'spawned':'starting',pid:child.pid??null,at});

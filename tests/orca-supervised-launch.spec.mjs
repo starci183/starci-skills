@@ -300,6 +300,30 @@ test('a dead worker whose terminal Orca keeps as identity_unproven settles to no
   assert.equal(settleDispatch(live.orca,'ctx_1',{cwd:'.'}).effectState,'partial');
 });
 
+test('close retry reuses proven stopped settlement when the terminal is already closed',()=>{
+  for(const release of [
+    ()=>json(0,{ok:true,result:{dispatchId:'ctx_closed',state:'already_released',processAction:'none'}}),
+    ()=>json(1,{ok:false,result:{dispatchId:'ctx_closed',state:'retained',reason:'identity_unproven',processAction:'none'}})
+  ]){
+    const fake=fakeOrca({
+      'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_closed',state:'stopped',alreadySettled:true}}),
+      'terminal-close':()=>json(1,{ok:false,error:{code:'terminal_missing',message:'already closed'}}),
+      'worker-release':release
+    });
+    const settlement=settleDispatch(fake.orca,'ctx_closed',{cwd:'.',terminalHandle:'term_closed',closeTerminal:true});
+    assert.equal(settlement.effectState,'none');assert.equal(settlement.closedTerminal.outcome,'failed');
+  }
+});
+
+test('close failure cannot turn an unknown worker stop into proven settlement',()=>{
+  const fake=fakeOrca({
+    'worker-stop':()=>json(1,{ok:false,result:{dispatchId:'ctx_live',state:'stop_unknown'}}),
+    'terminal-close':()=>json(1,{ok:false,error:{code:'terminal_busy',message:'still live'}}),
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_live',state:'already_released',processAction:'none'}})
+  });
+  assert.equal(settleDispatch(fake.orca,'ctx_live',{cwd:'.',terminalHandle:'term_live',closeTerminal:true}).effectState,'unknown');
+});
+
 test('settlement reconciles an unknown stop, closes an unstoppable own terminal, and reports unknown when nothing settles',()=>{
   const fake=fakeOrca({'worker-stop':()=>json(1,{ok:false,result:{dispatchId:'ctx_x',state:'stop_unknown'}}),
     'worker-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_1'},worker:{state:'ready',agent_terminal_handle:'term_1'},observation:{status:'live'}}}),

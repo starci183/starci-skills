@@ -241,6 +241,16 @@ export function dispatchLastWords(orca,dispatchId,{cwd}={}){
   const dispatch=plain(result?.dispatch)?result.dispatch:null;
   return {ok:true,status:dispatch?.status??null,...workerLastWords(dispatch,plain(result?.worker)?result.worker:null)};
 }
+const classifySettlement=(stop,release)=>{
+  const stopState=getPath(stop?.receipt,'result.state')??null,releaseState=getPath(release?.receipt,'result.state')??null;
+  const releaseReason=getPath(release?.receipt,'result.reason')??null,processAction=getPath(release?.receipt,'result.processAction')??null;
+  let effectState='unknown',residualTerminal=null;
+  if(stop?.outcome!=='unknown'&&release?.outcome==='ok')effectState='none';
+  else if(releaseState==='retained'&&processAction==='none'&&['failed','stopped','abandoned'].includes(stopState)){
+    effectState='none';residualTerminal={state:releaseState,reason:releaseReason,processAction};
+  }else if(release?.outcome==='failed'&&release.effectState==='partial')effectState='partial';
+  return {effectState,residualTerminal,stopState,releaseState,releaseReason,processAction};
+};
 
 export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt',wait,terminalHandle=null,closeTerminal=false}={}){
   let stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd}),reconciliation=null,closedTerminal=null;
@@ -250,7 +260,12 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
     const closed=orca.invoke('terminal-close',{terminal:terminalHandle},{cwd});
     closedTerminal={handle:terminalHandle,outcome:closed.outcome,reason:closed.reason};
     const release=orca.invoke('worker-release',{dispatch:dispatchId},{cwd});
-    return {schema:SETTLEMENT,dispatchId,reason,effectState:closed.outcome==='ok'?'none':'unknown',residualTerminal:null,reconciliation:null,closedTerminal,
+    const classified=classifySettlement(stop,release);
+    const stopped=stop.outcome==='ok'&&['failed','stopped','abandoned'].includes(classified.stopState);
+    const released=release.outcome==='ok'&&['released','already_released'].includes(classified.releaseState);
+    const retained=classified.releaseState==='retained'&&classified.processAction==='none';
+    const effectState=closed.outcome==='ok'?'none':stopped&&(released||retained)?'none':'unknown';
+    return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal:closed.outcome==='ok'?null:classified.residualTerminal,reconciliation:null,closedTerminal,
       stop:{outcome:stop.outcome,effectState:stop.effectState,state:getPath(stop.receipt,'result.state')??null,alreadySettled:getPath(stop.receipt,'result.alreadySettled')??null,reason:stop.reason},
       release:{outcome:release.outcome,effectState:release.effectState,state:getPath(release.receipt,'result.state')??null,processAction:getPath(release.receipt,'result.processAction')??null,reason:getPath(release.receipt,'result.reason')??release.reason}};
   }
@@ -281,18 +296,7 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
     }
   }
   const release=stop.outcome==='unknown'?null:orca.invoke('worker-release',{dispatch:dispatchId},{cwd});
-  const stopState=getPath(stop.receipt,'result.state')??null;
-  const releaseState=getPath(release?.receipt,'result.state')??null;
-  const releaseReason=getPath(release?.receipt,'result.reason')??null;
-  const processAction=getPath(release?.receipt,'result.processAction')??null;
-  let effectState='unknown',residualTerminal=null;
-  if(stop.outcome!=='unknown'&&release?.outcome==='ok')effectState='none';
-  else if(releaseState==='retained'&&processAction==='none'&&['failed','stopped','abandoned'].includes(stopState)){
-    // Orca will not close a terminal whose identity it cannot prove, but the worker process is gone:
-    // no live effect remains, only a UI terminal the operator may close by hand.
-    effectState='none';residualTerminal={state:releaseState,reason:releaseReason,processAction};
-  }
-  else if(release?.outcome==='failed'&&release.effectState==='partial')effectState='partial';
+  const {effectState,residualTerminal,stopState,releaseState,releaseReason,processAction}=classifySettlement(stop,release);
   return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal,reconciliation,closedTerminal,
     stop:{outcome:stop.outcome,effectState:stop.effectState,state:stopState,alreadySettled:getPath(stop.receipt,'result.alreadySettled')??null,reason:stop.reason},
     release:release?{outcome:release.outcome,effectState:release.effectState,state:releaseState,processAction,reason:releaseReason??release.reason}:{outcome:'skipped',reason:'worker-stop outcome unknown'}};
