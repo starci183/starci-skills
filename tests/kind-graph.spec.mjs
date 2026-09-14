@@ -66,7 +66,7 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.equal(roleOf('architecture.revise',{profile}),'decide');
   // The record-authoring kind completes the fields a node needs before its lane may start, and no lane walks it.
   // An intake authors the feature's own records too, which is why it writes more than the node's fields.
-  assert.deepEqual(writesOf('work.author',{profile}),['record','srs','sds','decision']);
+  assert.deepEqual(writesOf('work.author',{profile}),['record','srs','sds','decision','integration'],'an intake or a migration also authors the integration node a declaration owes');
   assert.equal(familyOf('work.author',{profile}),'design');
   assert.equal(roleOf('work.author',{profile}),'plan');
   assert.equal(operatorOf('work.author',{profile}),'work.author');
