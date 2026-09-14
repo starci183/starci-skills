@@ -1636,7 +1636,7 @@ test('a check re-run for a shared-ledger op names the tree at its owner: the bar
   assert.equal(verified.ok,true);
 });
 
-test('a question only the owner can answer pauses the op and opens a decision.prepare op; the drafted decision is listed, the answer is delivered, and a mechanical question stays with the kernel',()=>{
+test('a question only the owner can answer pauses the op and opens an ask op; an ask that reports a decision lifts its own stop, the answer is delivered, and a mechanical question stays with the kernel',()=>{
   const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
   const question={outcome:'ask',summary:'Need a ruling.',files:[],checks:[],question:{text:'Which Telegram bot token does the chatbot use, and where does the owner provide it?',options:['a stack secret named TELEGRAM_BOT_TOKEN','an environment variable on the host'],kind:'credential'}};
   const askReport={outcome:'done',summary:'decision: demo.sales.business.srs.decision.d-telegram-token\n1. a stack secret named TELEGRAM_BOT_TOKEN\n2. an environment variable on the host',files:[],checks:[passing('work-tree-validates','node starci.mjs validate')]};
@@ -1657,24 +1657,27 @@ test('a question only the owner can answer pauses the op and opens a decision.pr
     const contract=renderContract({template,op:ask,state:after,store,launcher:'L.mjs',run:'run_wf'});
     assert.match(contract,/## Question for the owner\nAsked by `demo\.sales\.implementation\.backend\.intake` \(credential\): Which Telegram bot token/);
     assert.match(contract,/## Credentials and configuration/);
-    // The ask op runs and reports the drafted decision: the question is listed for the owner with its options.
+    // The ask op reads the records and reports a DECISION: "where does the owner provide it" is a design
+    // question - where a value lives - and the word "token" only chose the tab. The kernel takes the report by
+    // its content, so the stop is LIFTED, the recommendation is taken provisionally, and the requester carries on.
     after=harness.run({maxIterations:4});
-    const listed=after.needUser.find(item=>item.kind==='decision');
-    assert.ok(listed,'the owner is asked');
-    assert.deepEqual([listed.op,listed.record,listed.options.length,listed.requesters],['ask-1','demo.sales.business.srs.decision.d-telegram-token',2,[nodeId]]);
-    assert.match(listed.detail,/workflow-answer --id .* --op ask-1 --choice <n>/);
-    assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused','the requester still waits');
-    // The owner answers through the inbox: the requester resumes with the answer in its next contract.
+    assert.deepEqual(events(store).filter(event=>event.event==='ask-reclassified').map(event=>[event.ask,event.from,event.to]),
+      [['ask-1','provision','decision']]);
+    assert.equal(after.needUser.some(item=>item.kind==='decision'),false,'nothing is left for the owner to provide');
+    assert.deepEqual((after.provisional??[]).map(entry=>[entry.decision,entry.op,entry.recommended,entry.options.length]),
+      [['demo.sales.business.srs.decision.d-telegram-token','ask-1',1,2]]);
+    assert.match(String(after.ops.find(op=>op.id===nodeId).answer),/^provisional: option 1 - a stack secret named TELEGRAM_BOT_TOKEN/);
+    // The owner answers through the inbox: the same option confirms what the runtime had already carried.
     queueInbox(store,{kind:'answer',op:'ask-1',choice:'1',note:'the stack secret store, never a .env file'});
     after=harness.run({maxIterations:6});
     const resumed=after.ops.find(op=>op.id===nodeId);
     assert.equal(after.needUser.some(item=>item.kind==='decision'),false,'the question is gone');
-    assert.match(String(resumed.answer),/The owner decided on "Which Telegram bot token.*option 1 - a stack secret named TELEGRAM_BOT_TOKEN; the stack secret store/);
     const log=events(store);
     assert.deepEqual(log.filter(event=>event.event==='owner-answered').map(event=>[event.ask,event.choice,event.requesters]),[['ask-1','1',[nodeId]]]);
+    assert.deepEqual(log.filter(event=>event.event==='decision-confirmed').map(event=>event.decision),['demo.sales.business.srs.decision.d-telegram-token']);
     assert.ok(log.some(event=>event.event==='owner-answer-delivered'&&event.op===nodeId));
     assert.equal(resumed.status,'done','the requester finished on the ruling');
-    assert.match(renderContract({template,op:{...resumed,answer:resumed.answer},state:after,store,launcher:'L.mjs',run:'run_wf'}),/## Answer to the question you asked earlier\nThe owner decided on/);
+    assert.match(renderContract({template,op:{...resumed,answer:resumed.answer},state:after,store,launcher:'L.mjs',run:'run_wf'}),/## Answer to the question you asked earlier\n/);
   }finally{harness.cleanup();}
   // A mechanical question is the kernel's: the supervisor model answers it and no ask op exists.
   const mechanical=setupWork({dirty:[file],scripts:{[nodeId]:[{...question,question:{text:'Run the unit suite with vitest or jest?',options:['vitest','jest'],kind:'mechanical'}},{outcome:'done',summary:'Done.',files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]}]}});
@@ -1684,6 +1687,35 @@ test('a question only the owner can answer pauses the op and opens a decision.pr
     assert.equal(after.ops.some(op=>['decision.prepare','provision.ask'].includes(op.kind)),false);
     assert.ok(events(mechanical.store).some(event=>event.event==='decide'&&event.option==='answer'));
   }finally{mechanical.cleanup();}
+});
+
+/**
+ * Two asks share the feature's policy-decisions folder because that is where every decision of the feature is
+ * kept, and neither is authoring in it: each writes at most one NEW slug folder of its own, and the whole-tree
+ * validator is what catches a duplicate. Serializing them bought nothing and cost an hour of the owner's day -
+ * three credential tabs they never saw sat behind one decision draft that shared nothing with them. An op that
+ * really does edit that folder still waits, because it edits what is there.
+ */
+test('an ask is never deferred for the decision folder another ask holds, and a work.author on that folder still is',()=>{
+  const decisions='.starciwork/features/sales/business/srs/business-rules/policy-decisions/**';
+  const harness=setupWork({allocator:fakeAllocator({maxParallelOps:6}),scripts:{}});
+  try{
+    const {store,state}=harness;
+    const ready=(id,kind)=>({...state.ops[0],id,kind,status:'ready',allowlist:[decisions],dispatch:null,terminal:null,
+      requesters:[],nodeId:null,ledgerIds:[],dependsOn:[],origin:'ask',
+      question:{kind:kind==='provision.ask'?'credential':'decision',stop:kind==='provision.ask'?'credential':null,text:`the question of ${id}`,options:[]}});
+    state.ops.push(ready('ask-a','decision.prepare'));
+    state.ops.push(ready('ask-b','provision.ask'));
+    state.ops.push({...ready('author-c','work.author'),origin:'ledger',question:null});
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    const after=harness.run({maxIterations:1});
+    const deferred=events(store).filter(event=>event.event==='schedule-deferred'&&event.reason==='allowlist overlaps a running operation').map(event=>event.op);
+    assert.deepEqual(deferred,['author-c'],'only the op that edits the folder waits for the ops holding it');
+    const status=id=>after.ops.find(op=>op.id===id).status;
+    assert.deepEqual([status('ask-a'),status('ask-b')],['running','running'],'both asks run: neither waits for the other');
+    assert.equal(status('author-c'),'ready','the work.author is not launched and is not blocked either - it is simply next');
+  }finally{harness.cleanup();}
 });
 
 test('an environment blocker that names a credential is the question of the owner, put by a provision.ask op, and credentialNeed reads the detail',()=>{
