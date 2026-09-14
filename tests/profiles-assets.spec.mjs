@@ -41,7 +41,8 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.equal(registry.executionModes.orchestrated.maxConcurrentOperationAgents,3);
   assert.deepEqual(Object.keys(registry.operators).sort(),[...ops].sort());
   // An operator declares every runtime that carries its role, so runtime allocation always resolves a
-  // launch shape: the decide ops gained Opus as the reasoning overflow, review.verify gained Opus and Astra.
+  // launch shape: the decide and plan ops carry their whole downgrade - Opus under Fable, Sol under Astra -
+  // and review.verify gained Opus and Astra.
   // interface.draw renders the installed grammar in a browser, so every implementing runtime can draw: Sol first for its compositions, then Opus, then Qwen.
   // brand.decide also generates a placeholder mascot, so it runs on the working chain (Codex, then Opus); interface.asset
   // re-renders the artwork the candidates embed, so it needs the same image model and the same one link as interface.draw.
@@ -49,7 +50,7 @@ test('every operator has an ordered external-agent chain and skill-level default
   // carries the two runtimes that read a whole repository's conventions before changing one.
   // integration.verify runs code against a real provider exactly as e2e.verify runs it against a real stack,
   // so it carries the same three verify-role runtimes.
-  const expectedCounts={'business.decide':3,'architecture.decide':3,'brand.decide':2,'review.verify':5,'interface.draw':3,'interface.asset':1,'grammar.update':2,'work.author':2,'integration.verify':3};
+  const expectedCounts={'business.decide':4,'architecture.decide':4,'decision.prepare':4,'provision.ask':4,'brand.decide':2,'review.verify':5,'interface.draw':3,'interface.asset':1,'grammar.update':2,'work.author':4,'integration.verify':3};
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
     const expectedCount=expectedCounts[op]??3;
@@ -90,8 +91,9 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.deepEqual(resolveExecutionChain({op:'integration.verify'}).candidates.map(x=>x.target),['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
   assert.equal(resolveExecutionChain({op:'integration.verify'}).candidates[0].profile,'gpt-5.6-sol');
   // Completing a Work record is reading work, so it runs on the plan-role runtimes with the reasoning profiles.
-  // Authoring records runs on the strongest reasoning runtimes only.
-  assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.target),['claude-fable-5.1','gpt-6-astra']);
+  // Authoring records leads with the strongest reasoning runtimes and never the cheap pool, and carries the
+  // downgrade under them so a spent week hands the authoring on instead of holding it.
+  assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.target),['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol']);
   assert.match(resolveExecutionChain({op:'work.author'}).candidates[1].profile,/astra/);
   assert.equal(resolveExecutionChain({op:'work.author'}).role,'reasoning');
   // Settling an identity is reasoning, so the chain carries the reasoning profiles; the Codex target leads it
@@ -141,8 +143,9 @@ test('Qwen Flash executes then Opus then Sol, Sol draws, Fable then Astra reason
     assert.deepEqual(chain[0].orcaLaunch,qwenLaunch);
   }
   assert.equal(review[0].target,'qwen3.8-flash');
-  assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus']);
-  assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus']);
+  // Fable, then Astra, then the downgrade each of them has: Opus and, last of all, Sol.
+  assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol']);
+  assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol']);
   const ops=Object.keys(readPublicJson('model/registry.json').operators);
   for(const op of ops){
     const chain=resolveExecutionChain({op}).candidates;

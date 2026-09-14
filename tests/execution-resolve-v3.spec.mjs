@@ -30,8 +30,9 @@ test('resolver preserves each exact operator chain and its environment metadata'
   assert.deepEqual(review.map(value => value.target), [
     'qwen3.8-flash', 'claude-fable-5.1', 'gpt-5.6-sol', 'claude-opus', 'gpt-6-astra'
   ]);
+  // The reasoning chain ends on the coding runtimes now: Opus is Fable's downgrade and Sol the last tier.
   const reasoning = flattenOperationCandidates({operation: 'architecture.decide', registry});
-  assert.deepEqual(reasoning.map(value => value.target), ['claude-fable-5.1', 'gpt-6-astra', 'claude-opus']);
+  assert.deepEqual(reasoning.map(value => value.target), ['claude-fable-5.1', 'gpt-6-astra', 'claude-opus', 'gpt-5.6-sol']);
 });
 
 test('automatic Orca chains accept return-preamble command terminals and reject any other terminal form', () => {
